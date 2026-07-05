@@ -36,6 +36,11 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  // Scheduled handlers (heartbeat cron callbacks)
+  const { collectForecastsHandler, collectObservationsHandler } = await import("../scheduledHandlers");
+  app.post("/api/scheduled/collect-forecasts", collectForecastsHandler);
+  app.post("/api/scheduled/collect-observations", collectObservationsHandler);
+
   // tRPC API
   app.use(
     "/api/trpc",

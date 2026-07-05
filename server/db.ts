@@ -1,7 +1,20 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import {
+  InsertUser,
+  users,
+  forecasts,
+  observations,
+  reliabilityScores,
+  meteoaiForecast,
+  collectionJobs,
+  InsertForecast,
+  InsertObservation,
+  InsertReliabilityScore,
+  InsertMeteoAIForecast,
+  InsertCollectionJob,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -17,6 +30,8 @@ export async function getDb() {
   }
   return _db;
 }
+
+// ─── USER HELPERS ───────────────────────────────────────────────────────────
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
@@ -56,8 +71,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+      values.role = "admin";
+      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -89,4 +104,197 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ─── FORECAST HELPERS ───────────────────────────────────────────────────────
+
+export async function insertForecasts(data: InsertForecast[]): Promise<void> {
+  const db = await getDb();
+  if (!db || data.length === 0) return;
+  await db.insert(forecasts).values(data);
+}
+
+export async function getForecastsByDate(date: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(forecasts).where(eq(forecasts.date, date));
+}
+
+export async function getForecastsByDateRange(startDate: string, endDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(forecasts)
+    .where(and(gte(forecasts.date, startDate), lte(forecasts.date, endDate)))
+    .orderBy(forecasts.date);
+}
+
+export async function getForecastsByService(serviceName: string, limit = 30) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(forecasts)
+    .where(eq(forecasts.serviceName, serviceName))
+    .orderBy(desc(forecasts.date))
+    .limit(limit);
+}
+
+// ─── OBSERVATION HELPERS ────────────────────────────────────────────────────
+
+export async function insertObservation(data: InsertObservation): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Upsert: if observation for this date exists, update it
+  await db.insert(observations).values(data).onDuplicateKeyUpdate({
+    set: {
+      tempMax: data.tempMax,
+      tempMin: data.tempMin,
+      precipitation: data.precipitation,
+      windSpeed: data.windSpeed,
+      windGust: data.windGust,
+      humidity: data.humidity,
+      cloudCover: data.cloudCover,
+      condition: data.condition,
+      source: data.source,
+      rawData: data.rawData,
+    },
+  });
+}
+
+export async function getObservationByDate(date: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(observations).where(eq(observations.date, date)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getObservationsByDateRange(startDate: string, endDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(observations)
+    .where(and(gte(observations.date, startDate), lte(observations.date, endDate)))
+    .orderBy(observations.date);
+}
+
+// ─── RELIABILITY SCORE HELPERS ──────────────────────────────────────────────
+
+export async function insertReliabilityScores(data: InsertReliabilityScore[]): Promise<void> {
+  const db = await getDb();
+  if (!db || data.length === 0) return;
+  await db.insert(reliabilityScores).values(data);
+}
+
+export async function getLatestReliabilityScores() {
+  const db = await getDb();
+  if (!db) return [];
+  // Get the most recent score for each service
+  return db
+    .select()
+    .from(reliabilityScores)
+    .orderBy(desc(reliabilityScores.date), desc(reliabilityScores.weightedScore));
+}
+
+export async function getReliabilityScoresByService(serviceName: string, limit = 30) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(reliabilityScores)
+    .where(eq(reliabilityScores.serviceName, serviceName))
+    .orderBy(desc(reliabilityScores.date))
+    .limit(limit);
+}
+
+export async function getCumulativeRanking() {
+  const db = await getDb();
+  if (!db) return [];
+  // Average weighted score per service across all dates
+  const result = await db
+    .select({
+      serviceName: reliabilityScores.serviceName,
+      avgScore: sql<number>`AVG(${reliabilityScores.weightedScore})`,
+      avgMaeTemp: sql<number>`AVG(${reliabilityScores.maeTemp})`,
+      avgMaePrecip: sql<number>`AVG(${reliabilityScores.maePrecip})`,
+      avgMaeWind: sql<number>`AVG(${reliabilityScores.maeWind})`,
+      avgRmseTemp: sql<number>`AVG(${reliabilityScores.rmseTemp})`,
+      avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
+      avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
+      daysTracked: sql<number>`COUNT(*)`,
+    })
+    .from(reliabilityScores)
+    .groupBy(reliabilityScores.serviceName)
+    .orderBy(sql`AVG(${reliabilityScores.weightedScore}) DESC`);
+  return result;
+}
+
+// ─── METEOAI FORECAST HELPERS ───────────────────────────────────────────────
+
+export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(meteoaiForecast).values(data).onDuplicateKeyUpdate({
+    set: {
+      tempMax: data.tempMax,
+      tempMin: data.tempMin,
+      precipitation: data.precipitation,
+      windSpeed: data.windSpeed,
+      condition: data.condition,
+      stabilityIndex: data.stabilityIndex,
+      stabilityLabel: data.stabilityLabel,
+      confidenceScore: data.confidenceScore,
+      weights: data.weights,
+      explanation: data.explanation,
+    },
+  });
+}
+
+export async function getMeteoAIForecastByDate(date: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db
+    .select()
+    .from(meteoaiForecast)
+    .where(eq(meteoaiForecast.date, date))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getLatestMeteoAIForecasts(limit = 7) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(meteoaiForecast)
+    .orderBy(desc(meteoaiForecast.date))
+    .limit(limit);
+}
+
+// ─── COLLECTION JOB HELPERS ─────────────────────────────────────────────────
+
+export async function createCollectionJob(data: InsertCollectionJob): Promise<number> {
+  const db = await getDb();
+  if (!db) return -1;
+  const result = await db.insert(collectionJobs).values(data);
+  return (result as any)[0]?.insertId ?? -1;
+}
+
+export async function updateCollectionJob(
+  id: number,
+  updates: Partial<Pick<InsertCollectionJob, "status" | "servicesCollected" | "errorMessage" | "completedAt">>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(collectionJobs).set(updates).where(eq(collectionJobs.id, id));
+}
+
+export async function getRecentCollectionJobs(limit = 10) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(collectionJobs)
+    .orderBy(desc(collectionJobs.startedAt))
+    .limit(limit);
+}
