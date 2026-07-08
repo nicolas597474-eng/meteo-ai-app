@@ -18,7 +18,7 @@ import {
   insertReliabilityScores,
   upsertMeteoAIForecast,
 } from "../db";
-import { collectExpertForecasts, collectObservations, WEATHER_SERVICES } from "../weatherServices";
+import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "../statsEngine";
 
 function getTodayParis(): string {
@@ -118,6 +118,24 @@ export const weatherRouter = router({
         ranking,
       };
     }),
+
+  /**
+   * 15-day MeteoAI forecast from multiple models
+   */
+  get15DayForecast: publicProcedure.query(async () => {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+    const { days, modelsUsed } = await collect15DayForecast();
+    return { today, days, modelsUsed };
+  }),
+
+  /**
+   * Hourly forecast for today
+   */
+  getHourlyForecast: publicProcedure.query(async () => {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+    const hours = await collectHourlyForecast(today);
+    return { today, hours };
+  }),
 
   /**
    * Admin: Manual trigger for forecast collection (for testing)
