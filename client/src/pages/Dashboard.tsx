@@ -2,22 +2,19 @@ import { trpc } from "@/lib/trpc";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
-import {
-  Droplets, Wind, Thermometer, Activity, MapPin, Clock, TrendingUp, Eye
-} from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer } from "lucide-react";
 
-// ─── Weather condition icons (SVG inline) ────────────────────────────────────
+// ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
   const c = (condition ?? "").toLowerCase();
   const s = size;
-
   if (c.includes("orage")) return (
     <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
       <path d="M12 28c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H14c-6 0-10-4-10-9 0-4 3-7 7-8z" fill="#6b7280" opacity="0.8"/>
       <path d="M36 34l-8 14h6l-4 10 14-18h-8l6-6z" fill="#fbbf24"/>
     </svg>
   );
-  if (c.includes("pluie forte") || c.includes("averses")) return (
+  if (c.includes("pluie forte") || (c.includes("averses") && !c.includes("légère"))) return (
     <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
       <path d="M12 28c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H14c-6 0-10-4-10-9 0-4 3-7 7-8z" fill="#6b7280" opacity="0.8"/>
       <line x1="20" y1="48" x2="16" y2="58" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round"/>
@@ -26,7 +23,7 @@ function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?
       <line x1="50" y1="48" x2="46" y2="58" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round"/>
     </svg>
   );
-  if (c.includes("pluie légère") || c.includes("bruine")) return (
+  if (c.includes("pluie légère") || c.includes("bruine") || c.includes("averses")) return (
     <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
       <path d="M12 28c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H14c-6 0-10-4-10-9 0-4 3-7 7-8z" fill="#9ca3af" opacity="0.7"/>
       <line x1="24" y1="48" x2="22" y2="56" stroke="#93c5fd" strokeWidth="2.5" strokeLinecap="round"/>
@@ -51,88 +48,74 @@ function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?
       <path d="M22 36c0-7 5-13 12-13 5 0 10 3 11 8 3 0 6 3 6 7 0 4-3 7-8 7H24c-4 0-7-3-7-6 0-2 2-4 5-3z" fill="#d1d5db" opacity="0.9"/>
     </svg>
   );
-  // Ensoleillé / default
   return (
     <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
       <circle cx="32" cy="32" r="12" fill="#fbbf24"/>
       {[0,45,90,135,180,225,270,315].map((angle, i) => {
         const rad = (angle * Math.PI) / 180;
-        const x1 = 32 + 16 * Math.cos(rad);
-        const y1 = 32 + 16 * Math.sin(rad);
-        const x2 = 32 + 22 * Math.cos(rad);
-        const y2 = 32 + 22 * Math.sin(rad);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fbbf24" strokeWidth="3" strokeLinecap="round"/>;
+        return <line key={i} x1={32 + 16*Math.cos(rad)} y1={32 + 16*Math.sin(rad)} x2={32 + 22*Math.cos(rad)} y2={32 + 22*Math.sin(rad)} stroke="#fbbf24" strokeWidth="3" strokeLinecap="round"/>;
       })}
     </svg>
   );
 }
 
-function getStabilityColor(index: number) {
-  if (index >= 80) return "text-emerald-400";
-  if (index >= 60) return "text-yellow-400";
-  if (index >= 40) return "text-orange-400";
+function stabilityColor(i: number) {
+  if (i >= 80) return "text-emerald-400";
+  if (i >= 60) return "text-yellow-400";
+  if (i >= 40) return "text-orange-400";
   return "text-red-400";
 }
-
-function getStabilityBg(index: number) {
-  if (index >= 80) return "bg-emerald-500/10 border-emerald-500/20";
-  if (index >= 60) return "bg-yellow-500/10 border-yellow-500/20";
-  if (index >= 40) return "bg-orange-500/10 border-orange-500/20";
+function stabilityBg(i: number) {
+  if (i >= 80) return "bg-emerald-500/10 border-emerald-500/20";
+  if (i >= 60) return "bg-yellow-500/10 border-yellow-500/20";
+  if (i >= 40) return "bg-orange-500/10 border-orange-500/20";
   return "bg-red-500/10 border-red-500/20";
 }
 
-function formatDayLabel(dateStr: string) {
-  const date = new Date(dateStr + "T12:00:00");
+function dayLabel(dateStr: string) {
+  const d = new Date(dateStr + "T12:00:00");
   const today = new Date().toLocaleDateString("en-CA");
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toLocaleDateString("en-CA");
+  const tom = new Date(); tom.setDate(tom.getDate() + 1);
   if (dateStr === today) return "Auj.";
-  if (dateStr === tomorrowStr) return "Dem.";
-  return date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
+  if (dateStr === tom.toLocaleDateString("en-CA")) return "Dem.";
+  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
 }
-
-function formatDayFull(dateStr: string) {
-  const date = new Date(dateStr + "T12:00:00");
+function dayFull(dateStr: string) {
+  const d = new Date(dateStr + "T12:00:00");
   const today = new Date().toLocaleDateString("en-CA");
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toLocaleDateString("en-CA");
+  const tom = new Date(); tom.setDate(tom.getDate() + 1);
   if (dateStr === today) return "Aujourd'hui";
-  if (dateStr === tomorrowStr) return "Demain";
-  return date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" });
+  if (dateStr === tom.toLocaleDateString("en-CA")) return "Demain";
+  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" });
 }
 
-// Custom tooltip for the 15-day chart
 function TempTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-card border border-border rounded-lg p-3 text-sm shadow-lg">
+    <div className="bg-card border border-border rounded-lg p-2 text-xs shadow-lg">
       <p className="font-semibold mb-1">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color }}>
-          {p.name === "Max" ? "↑" : "↓"} {p.value}°C
-        </p>
+        <p key={p.name} style={{ color: p.color }}>{p.name === "Max" ? "↑" : "↓"} {p.value}°C</p>
       ))}
     </div>
   );
 }
 
 export default function Dashboard() {
-  const { data: dashData, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery();
-  const { data: forecast15, isLoading: forecastLoading, isError: forecastError } = trpc.weather.get15DayForecast.useQuery();
-  const { data: hourlyData, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery();
+  const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery();
+  const { data: f15, isLoading: f15Loading, isError: f15Error } = trpc.weather.get15DayForecast.useQuery();
+  const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery();
 
   if (dashLoading) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="container">
-          <div className="animate-pulse space-y-6">
-            <div className="h-10 w-72 bg-muted rounded-xl" />
-            <div className="h-52 bg-muted rounded-2xl" />
-            <div className="h-40 bg-muted rounded-2xl" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-36 bg-muted rounded-xl" />)}
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 w-48 bg-muted rounded-xl" />
+            <div className="h-48 bg-muted rounded-2xl" />
+            <div className="h-32 bg-muted rounded-2xl" />
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-28 bg-muted rounded-xl" />)}
             </div>
           </div>
         </div>
@@ -142,311 +125,304 @@ export default function Dashboard() {
 
   if (dashError) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 text-center max-w-md">
-          <Activity className="h-12 w-12 mx-auto text-red-400 mb-4" />
-          <h2 className="text-xl font-semibold text-red-400 mb-2">Erreur de chargement</h2>
-          <p className="text-muted-foreground">Impossible de charger les prévisions. Veuillez rafraîchir la page.</p>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center max-w-sm w-full">
+          <Activity className="h-10 w-10 mx-auto text-red-400 mb-3" />
+          <h2 className="text-lg font-semibold text-red-400 mb-1">Erreur de chargement</h2>
+          <p className="text-sm text-muted-foreground">Impossible de charger les prévisions.</p>
         </div>
       </div>
     );
   }
 
-  const meteoAI = dashData?.meteoAI;
-  const topServices = dashData?.topServices ?? [];
-  const days = forecast15?.days ?? [];
-  const todayForecast = days[0] ?? null;
+  const meteoAI = dash?.meteoAI;
+  const days = f15?.days ?? [];
+  const today = days[0] ?? null;
   const futureDays = days.slice(1);
-  const hours = hourlyData?.hours ?? [];
+  const hours = hourly?.hours ?? [];
+  const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
 
-  // Chart data for 15-day temperature
   const chartData = days.map(d => ({
-    name: formatDayLabel(d.date),
+    name: dayLabel(d.date),
     Max: d.tempMax,
     Min: d.tempMin,
     Précip: d.precipitation,
   }));
 
-  // Current hour highlight
-  const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
-  const currentHourStr = nowHour.slice(0, 2) + ":00";
+  // Current temperature from hourly (closest to now)
+  const currentHour = hours.find(h => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
+  const currentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container py-8 space-y-8">
+      <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 sm:px-6 sm:py-8 sm:space-y-6">
 
         {/* ── Header ── */}
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
               MeteoAI
             </h1>
-            <div className="flex items-center gap-2 mt-1.5 text-muted-foreground text-sm">
-              <MapPin className="h-3.5 w-3.5" />
-              <span>Hondeghem, Nord — 50.76°N, 2.52°E</span>
+            <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground text-xs sm:text-sm">
+              <MapPin className="h-3 w-3 flex-shrink-0" />
+              <span>Hondeghem, Nord</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-card border border-border rounded-lg px-3 py-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            <span>{dashData?.today}</span>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-lg px-2.5 py-1.5">
+            <Clock className="h-3 w-3" />
+            <span>{dash?.today}</span>
           </div>
         </div>
 
-        {/* ── Today's Hero Card ── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-6">
+        {/* ── Hero : Température actuelle + max/min ── */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-blue-600/10 pointer-events-none" />
           <div className="relative">
-            <div className="flex items-center gap-2 mb-5">
-              <Activity className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-primary">Prévision MeteoAI — Aujourd'hui</span>
-              <span className="text-xs text-muted-foreground ml-auto">
-                {forecast15?.modelsUsed?.length ?? 0} modèles · {forecast15?.modelsUsed?.join(", ")}
+            {/* Source label */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                <Activity className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-medium text-primary">Prévision MeteoAI</span>
+              </div>
+              <span className="text-xs text-muted-foreground hidden sm:block">
+                {f15?.modelsUsed?.join(", ")}
               </span>
             </div>
 
-            <div className="flex items-center gap-8">
-              {/* Big icon + temp */}
-              <div className="flex flex-col items-center gap-2">
-                <WeatherIcon condition={todayForecast?.condition ?? meteoAI?.condition ?? null} size={72} />
-                <p className="text-5xl font-bold">
-                  {todayForecast?.tempMax ?? meteoAI?.tempMax ?? "—"}°
-                </p>
-                <p className="text-lg text-muted-foreground">
-                  min {todayForecast?.tempMin ?? meteoAI?.tempMin ?? "—"}°C
-                </p>
+            {/* Main temperature row */}
+            <div className="flex items-center gap-4 sm:gap-6">
+              {/* Icon */}
+              <div className="flex-shrink-0">
+                <WeatherIcon condition={today?.condition ?? meteoAI?.condition ?? null} size={64} />
               </div>
 
-              {/* Divider */}
-              <div className="h-28 w-px bg-border" />
+              {/* Big current temp */}
+              <div className="flex items-start gap-3 sm:gap-5">
+                <div>
+                  <p className="text-7xl sm:text-8xl font-bold leading-none tracking-tight">
+                    {currentTemp != null ? Math.round(currentTemp) : "—"}°
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {today?.condition ?? meteoAI?.condition ?? ""}
+                  </p>
+                </div>
 
-              {/* Stats grid */}
-              <div className="grid grid-cols-2 gap-x-10 gap-y-4 flex-1">
-                <div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-0.5">
-                    <Droplets className="h-3.5 w-3.5" /> Précipitations
-                  </p>
-                  <p className="text-xl font-semibold">{todayForecast?.precipitation ?? meteoAI?.precipitation ?? 0} mm</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-0.5">
-                    <Wind className="h-3.5 w-3.5" /> Vent max
-                  </p>
-                  <p className="text-xl font-semibold">{todayForecast?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-0.5">
-                    <Wind className="h-3.5 w-3.5 opacity-60" /> Rafales
-                  </p>
-                  <p className="text-xl font-semibold">{todayForecast?.windGust ?? "—"} km/h</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-0.5">
-                    <Droplets className="h-3.5 w-3.5 opacity-60" /> Humidité
-                  </p>
-                  <p className="text-xl font-semibold">{todayForecast?.humidity ?? "—"}%</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-0.5">
-                    <Eye className="h-3.5 w-3.5" /> Nébulosité
-                  </p>
-                  <p className="text-xl font-semibold">{todayForecast?.cloudCover ?? "—"}%</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-0.5">
-                    <Activity className="h-3.5 w-3.5" /> Fiabilité
-                  </p>
-                  <p className={`text-xl font-semibold ${getStabilityColor(todayForecast?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0)}`}>
-                    {todayForecast?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0}/100
-                  </p>
+                {/* Max / Min */}
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-orange-400 uppercase tracking-wide">max</span>
+                    <span className="text-2xl sm:text-3xl font-bold text-orange-300">
+                      {today?.tempMax ?? meteoAI?.tempMax ?? "—"}°
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-blue-400 uppercase tracking-wide">min</span>
+                    <span className="text-2xl sm:text-3xl font-bold text-blue-300">
+                      {today?.tempMin ?? meteoAI?.tempMin ?? "—"}°
+                    </span>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Condition label */}
-              <div className="text-right">
-                <p className="text-2xl font-semibold">{todayForecast?.condition ?? meteoAI?.condition ?? "—"}</p>
-                {meteoAI?.explanation && (
-                  <p className="text-xs text-muted-foreground mt-2 max-w-48">{meteoAI.explanation}</p>
-                )}
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-700">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <Droplets className="h-3 w-3" />Précip.
+                </p>
+                <p className="text-base sm:text-lg font-semibold">{today?.precipitation ?? meteoAI?.precipitation ?? 0} mm</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <Wind className="h-3 w-3" />Vent
+                </p>
+                <p className="text-base sm:text-lg font-semibold">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <Activity className="h-3 w-3" />Fiabilité
+                </p>
+                <p className={`text-base sm:text-lg font-semibold ${stabilityColor(today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0)}`}>
+                  {today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0}%
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <Wind className="h-3 w-3 opacity-60" />Rafales
+                </p>
+                <p className="text-base sm:text-lg font-semibold">{today?.windGust ?? "—"} km/h</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <Droplets className="h-3 w-3 opacity-60" />Humidité
+                </p>
+                <p className="text-base sm:text-lg font-semibold">{today?.humidity ?? "—"}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <Eye className="h-3 w-3" />Nuages
+                </p>
+                <p className="text-base sm:text-lg font-semibold">{today?.cloudCover ?? "—"}%</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Hourly Forecast ── */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
+        {/* ── Hourly ── */}
+        <div className="space-y-2">
+          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
-            Prévisions heure par heure
+            Heure par heure
           </h2>
           {hourlyLoading ? (
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="animate-pulse flex-shrink-0 w-20 h-28 bg-muted rounded-xl" />
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="animate-pulse flex-shrink-0 w-16 h-24 bg-muted rounded-xl" />
               ))}
             </div>
           ) : hours.length > 0 ? (
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
               {hours.map((h) => {
-                const isCurrent = h.hour === currentHourStr;
+                const isCurrent = h.hour === nowHour;
                 return (
-                  <div
-                    key={h.hour}
-                    className={`flex-shrink-0 w-20 rounded-xl p-3 text-center border transition-all ${
-                      isCurrent
-                        ? "bg-primary/20 border-primary/40 ring-1 ring-primary/30"
-                        : "bg-card border-border hover:border-primary/30"
-                    }`}
-                  >
-                    <p className={`text-xs font-medium mb-2 ${isCurrent ? "text-primary" : "text-muted-foreground"}`}>
-                      {h.hour}
-                    </p>
-                    <div className="flex justify-center mb-2">
-                      <WeatherIcon condition={h.condition} size={28} />
+                  <div key={h.hour} className={`flex-shrink-0 w-16 sm:w-20 rounded-xl p-2 sm:p-3 text-center border ${
+                    isCurrent ? "bg-primary/20 border-primary/40 ring-1 ring-primary/30" : "bg-card border-border"
+                  }`}>
+                    <p className={`text-xs font-medium mb-1.5 ${isCurrent ? "text-primary" : "text-muted-foreground"}`}>{h.hour}</p>
+                    <div className="flex justify-center mb-1.5">
+                      <WeatherIcon condition={h.condition} size={24} />
                     </div>
-                    <p className="text-sm font-bold">{h.temp != null ? `${h.temp}°` : "—"}</p>
+                    <p className="text-sm font-bold">{h.temp != null ? `${Math.round(h.temp)}°` : "—"}</p>
                     {(h.precipitation ?? 0) > 0 && (
                       <p className="text-xs text-blue-400 mt-0.5">{h.precipitation}mm</p>
                     )}
-                    {h.windSpeed != null && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{h.windSpeed}km/h</p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">{h.windSpeed}km/h</p>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Prévisions horaires indisponibles.</p>
+            <p className="text-sm text-muted-foreground">Données horaires indisponibles.</p>
           )}
         </div>
 
-        {/* ── 15-day Temperature Chart ── */}
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Températures sur 15 jours
-            </h2>
-            {forecastError && <span className="text-xs text-red-400">Erreur de chargement</span>}
-          </div>
-          {forecastLoading ? (
-            <div className="h-48 bg-muted rounded-xl animate-pulse" />
-          ) : chartData.length > 0 ? (
-            <div style={{ height: 200 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="maxGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="minGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} unit="°" />
-                  <Tooltip content={<TempTooltip />} />
-                  <Area type="monotone" dataKey="Max" stroke="#f97316" strokeWidth={2} fill="url(#maxGrad)" dot={false} />
-                  <Area type="monotone" dataKey="Min" stroke="#60a5fa" strokeWidth={2} fill="url(#minGrad)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : null}
-
-          {/* Precipitation mini-bar */}
-          {chartData.some(d => (d.Précip ?? 0) > 0) && (
-            <div style={{ height: 60 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="name" tick={false} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} unit="mm" />
-                  <Tooltip formatter={(v: any) => [`${v} mm`, "Précip."]} />
-                  <Bar dataKey="Précip" fill="#60a5fa" opacity={0.7} radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        {/* ── 15-day Cards ── */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
+        {/* ── 15-day chart ── */}
+        <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-3">
+          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
-            Prévisions sur 15 jours
-            <span className="text-xs text-muted-foreground font-normal ml-1">
-              Sources : {forecast15?.modelsUsed?.join(", ")}
-            </span>
+            Températures — 15 jours
           </h2>
-          {forecastLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="animate-pulse h-44 bg-muted rounded-xl" />
+          {f15Loading ? (
+            <div className="h-40 bg-muted rounded-xl animate-pulse" />
+          ) : chartData.length > 0 ? (
+            <>
+              <div style={{ height: 160 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="maxG" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="minG" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={1} />
+                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} unit="°" />
+                    <Tooltip content={<TempTooltip />} />
+                    <Area type="monotone" dataKey="Max" stroke="#f97316" strokeWidth={2} fill="url(#maxG)" dot={false} />
+                    <Area type="monotone" dataKey="Min" stroke="#60a5fa" strokeWidth={2} fill="url(#minG)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              {chartData.some(d => (d.Précip ?? 0) > 0) && (
+                <div style={{ height: 48 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 0, right: 5, left: -25, bottom: 0 }}>
+                      <XAxis dataKey="name" tick={false} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} unit="mm" />
+                      <Tooltip formatter={(v: any) => [`${v} mm`, "Précip."]} />
+                      <Bar dataKey="Précip" fill="#60a5fa" opacity={0.7} radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+
+        {/* ── 15-day cards ── */}
+        <div className="space-y-2">
+          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            Prévisions 15 jours
+            <span className="text-xs text-muted-foreground font-normal">{f15?.modelsUsed?.length ?? 0} modèles</span>
+          </h2>
+          {f15Loading ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="animate-pulse h-36 bg-muted rounded-xl" />
               ))}
             </div>
           ) : futureDays.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
               {futureDays.map((day) => (
-                <div
-                  key={day.date}
-                  className={`rounded-xl p-4 border transition-all hover:scale-[1.02] hover:shadow-lg ${getStabilityBg(day.stabilityIndex)}`}
-                >
-                  <p className="text-xs font-semibold text-muted-foreground mb-2">{formatDayFull(day.date)}</p>
-                  <div className="flex items-center gap-2 mb-3">
-                    <WeatherIcon condition={day.condition} size={36} />
+                <div key={day.date} className={`rounded-xl p-2.5 sm:p-3 border ${stabilityBg(day.stabilityIndex)}`}>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1.5 truncate">{dayFull(day.date)}</p>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <WeatherIcon condition={day.condition} size={28} />
                     <div>
-                      <p className="text-lg font-bold leading-none">{day.tempMax}°</p>
-                      <p className="text-xs text-muted-foreground">{day.tempMin}°C</p>
+                      <p className="text-base sm:text-lg font-bold leading-none">{day.tempMax}°</p>
+                      <p className="text-xs text-muted-foreground">{day.tempMin}°</p>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2 truncate">{day.condition}</p>
-                  <div className="space-y-1 text-xs">
+                  <p className="text-xs text-muted-foreground mb-1.5 truncate">{day.condition}</p>
+                  <div className="space-y-0.5 text-xs">
                     {(day.precipitation ?? 0) > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-blue-400 flex items-center gap-1"><Droplets className="h-3 w-3" />Précip</span>
+                      <div className="flex justify-between">
+                        <span className="text-blue-400">Précip</span>
                         <span className="text-blue-400 font-medium">{day.precipitation}mm</span>
                       </div>
                     )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground flex items-center gap-1"><Wind className="h-3 w-3" />Vent</span>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Vent</span>
                       <span>{day.windSpeed}km/h</span>
                     </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-border/40">
-                      <span className="text-muted-foreground">Fiabilité</span>
-                      <span className={`font-bold ${getStabilityColor(day.stabilityIndex)}`}>{day.stabilityIndex}%</span>
+                    <div className="flex justify-between pt-1 border-t border-border/40">
+                      <span className="text-muted-foreground">Conf.</span>
+                      <span className={`font-bold ${stabilityColor(day.stabilityIndex)}`}>{day.stabilityIndex}%</span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-xl p-8 text-center">
-              <p className="text-muted-foreground text-sm">Prévisions en cours de chargement...</p>
-            </div>
+            <p className="text-sm text-muted-foreground">Chargement des prévisions...</p>
           )}
         </div>
 
-        {/* ── Top Models ── */}
-        {topServices.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+        {/* ── Top models ── */}
+        {(dash?.topServices?.length ?? 0) > 0 && (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary" />
-              Classement des modèles (fiabilité historique)
+              Classement des modèles
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {topServices.map((service, i) => (
-                <div key={service.serviceName} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-background/60 border border-border">
-                  <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+            <div className="space-y-2">
+              {dash!.topServices.map((s, i) => (
+                <div key={s.serviceName} className="flex items-center gap-2.5">
+                  <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
                     i === 0 ? "bg-yellow-500/20 text-yellow-400" :
                     i === 1 ? "bg-gray-400/20 text-gray-300" :
                     i === 2 ? "bg-orange-600/20 text-orange-400" :
                     "bg-muted text-muted-foreground"
                   }`}>{i + 1}</span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium truncate">{service.serviceName}</p>
-                    <p className="text-xs font-mono text-primary">{(service.avgScore ?? 0).toFixed(1)}/100</p>
-                  </div>
+                  <span className="text-sm flex-1 truncate">{s.serviceName}</span>
+                  <span className="text-sm font-mono text-primary">{(s.avgScore ?? 0).toFixed(1)}</span>
                 </div>
               ))}
             </div>

@@ -21,16 +21,15 @@ export default function Ranking() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container py-8 space-y-6">
+      <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 sm:px-6 sm:py-8 sm:space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Trophy className="h-8 w-8 text-yellow-400" />
+          <h1 className="text-xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" />
             Classement de Fiabilité
           </h1>
-          <p className="text-muted-foreground mt-1">
-            {data?.totalServices ?? 16} services météo classés par score pondéré
-            (30% Temp + 30% Précip + 20% Vent + 20% Conditions)
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+            {data?.totalServices ?? 16} services · Score pondéré 30% Temp + 30% Précip + 20% Vent + 20% Conditions
           </p>
         </div>
 
@@ -59,77 +58,69 @@ export default function Ranking() {
 
         {/* Ranking Table */}
         {ranking.length > 0 ? (
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-4 font-medium">#</th>
-                    <th className="text-left p-4 font-medium">Service</th>
-                    <th className="text-right p-4 font-medium">Score</th>
-                    <th className="text-right p-4 font-medium">MAE Temp</th>
-                    <th className="text-right p-4 font-medium">MAE Précip</th>
-                    <th className="text-right p-4 font-medium">MAE Vent</th>
-                    <th className="text-right p-4 font-medium">RMSE Temp</th>
-                    <th className="text-right p-4 font-medium">Biais Temp</th>
-                    <th className="text-right p-4 font-medium">Biais Précip</th>
-                    <th className="text-right p-4 font-medium">Jours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ranking.map((service, i) => (
-                    <tr
-                      key={service.serviceName}
-                      className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${
-                        i < 3 ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      <td className="p-4">
-                        <span
-                          className={`font-bold ${
-                            i === 0
-                              ? "text-yellow-400"
-                              : i === 1
-                              ? "text-gray-300"
-                              : i === 2
-                              ? "text-orange-400"
-                              : "text-muted-foreground"
-                          }`}
-                        >
-                          {i + 1}
-                        </span>
-                      </td>
-                      <td className="p-4 font-medium">{service.serviceName}</td>
-                      <td className="p-4 text-right">
-                        <span className="font-mono font-bold text-primary">
-                          {(service.avgScore ?? 0).toFixed(1)}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right font-mono">
-                        {(service.avgMaeTemp ?? 0).toFixed(2)}°C
-                      </td>
-                      <td className="p-4 text-right font-mono">
-                        {(service.avgMaePrecip ?? 0).toFixed(2)} mm
-                      </td>
-                      <td className="p-4 text-right font-mono">
-                        {(service.avgMaeWind ?? 0).toFixed(1)} km/h
-                      </td>
-                      <td className="p-4 text-right font-mono">
-                        {(service.avgRmseTemp ?? 0).toFixed(2)}°C
-                      </td>
-                      <td className="p-4 text-right">
-                        <BiasIndicator value={service.avgBiasTemp ?? 0} unit="°C" />
-                      </td>
-                      <td className="p-4 text-right">
-                        <BiasIndicator value={service.avgBiasPrecip ?? 0} unit="mm" />
-                      </td>
-                      <td className="p-4 text-right text-muted-foreground">
-                        {service.daysTracked}
-                      </td>
+          <div className="space-y-2">
+            {/* Desktop table (hidden on mobile) */}
+            <div className="hidden sm:block bg-card border border-border rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="text-left p-3 font-medium">#</th>
+                      <th className="text-left p-3 font-medium">Service</th>
+                      <th className="text-right p-3 font-medium">Score</th>
+                      <th className="text-right p-3 font-medium">MAE Temp</th>
+                      <th className="text-right p-3 font-medium">MAE Précip</th>
+                      <th className="text-right p-3 font-medium">MAE Vent</th>
+                      <th className="text-right p-3 font-medium">RMSE Temp</th>
+                      <th className="text-right p-3 font-medium">Biais Temp</th>
+                      <th className="text-right p-3 font-medium">Jours</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {ranking.map((service, i) => (
+                      <tr key={service.serviceName} className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${i < 3 ? "bg-primary/5" : ""}`}>
+                        <td className="p-3"><span className={`font-bold ${i===0?"text-yellow-400":i===1?"text-gray-300":i===2?"text-orange-400":"text-muted-foreground"}`}>{i+1}</span></td>
+                        <td className="p-3 font-medium">{service.serviceName}</td>
+                        <td className="p-3 text-right"><span className="font-mono font-bold text-primary">{(service.avgScore??0).toFixed(1)}</span></td>
+                        <td className="p-3 text-right font-mono">{(service.avgMaeTemp??0).toFixed(2)}°C</td>
+                        <td className="p-3 text-right font-mono">{(service.avgMaePrecip??0).toFixed(2)}mm</td>
+                        <td className="p-3 text-right font-mono">{(service.avgMaeWind??0).toFixed(1)}km/h</td>
+                        <td className="p-3 text-right font-mono">{(service.avgRmseTemp??0).toFixed(2)}°C</td>
+                        <td className="p-3 text-right"><BiasIndicator value={service.avgBiasTemp??0} unit="°C" /></td>
+                        <td className="p-3 text-right text-muted-foreground">{service.daysTracked}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-2">
+              {ranking.map((service, i) => (
+                <div key={service.serviceName} className={`bg-card border rounded-xl p-3 ${i < 3 ? "border-primary/30 bg-primary/5" : "border-border"}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center ${i===0?"bg-yellow-500/20 text-yellow-400":i===1?"bg-gray-400/20 text-gray-300":i===2?"bg-orange-600/20 text-orange-400":"bg-muted text-muted-foreground"}`}>{i+1}</span>
+                      <span className="font-semibold text-sm">{service.serviceName}</span>
+                    </div>
+                    <span className="font-mono font-bold text-primary text-lg">{(service.avgScore??0).toFixed(1)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center">
+                      <p className="text-muted-foreground">MAE Temp</p>
+                      <p className="font-mono font-medium">{(service.avgMaeTemp??0).toFixed(2)}°C</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground">MAE Précip</p>
+                      <p className="font-mono font-medium">{(service.avgMaePrecip??0).toFixed(2)}mm</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground">MAE Vent</p>
+                      <p className="font-mono font-medium">{(service.avgMaeWind??0).toFixed(1)}km/h</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : (

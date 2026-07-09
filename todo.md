@@ -16,3 +16,8 @@
 - [x] Tests: Vitest specs for statistical engine and API endpoints
 - [x] Seed: Historical data from 26 June - 2 July analysis imported
 - [x] Seed: Today's Open-Meteo forecast collected and MeteoAI generated
+- [x] Frontend: Dashboard redesign with SVG weather icons, hourly forecast, 15-day chart (Recharts)
+- [x] Backend: get15DayForecast endpoint (4 models: ECMWF, GFS, ICON, Open-Meteo averaged)
+- [x] Backend: getHourlyForecast endpoint (24h hourly from Open-Meteo best_match)
+- [x] Heartbeat: Cron collecte prévisions à 05h00 Paris (03h00 UTC) — task_uid: bi9pQpzNMMUk5ijSwFMnoh
+- [x] Heartbeat: Cron collecte observations à 23h50 Paris (21h50 UTC) — task_uid: Qg2R5Xkkfk5cukBEn789qj
