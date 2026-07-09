@@ -83,6 +83,7 @@ export const reliabilityScores = mysqlTable("reliability_scores", {
   biasWind: float("biasWind"),
   conditionAccuracy: float("conditionAccuracy"), // 0-1
   weightedScore: float("weightedScore"), // 0-100
+  regime: varchar("regime", { length: 32 }), // detected weather regime
   computedAt: timestamp("computedAt").defaultNow().notNull(),
 });
 

@@ -27,4 +27,4 @@
 - [x] Backend: Stocker le régime détecté dans les scores de fiabilité
 - [x] Frontend: Afficher le régime actif + badge poids sur Dashboard
 - [x] Frontend: Afficher le régime utilisé dans la page Classement
-- [ ] Database: Ajouter colonne `regime` à `reliability_scores` pour persistance historique des régimes
+- [x] Database: Ajouter colonne `regime` à `reliability_scores` pour persistance historique des régimes

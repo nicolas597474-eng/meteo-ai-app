@@ -317,6 +317,7 @@ export const weatherRouter = router({
               biasWind: score.biasWind,
               conditionAccuracy: score.conditionAccuracy,
               weightedScore: score.weightedScore,
+              regime: score.regime, // persist detected regime for historical analysis
             };
           });
           await insertReliabilityScores(scoreRows);
