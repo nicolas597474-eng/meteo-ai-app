@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
-import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun } from "lucide-react";
 
 // ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
@@ -56,6 +56,55 @@ function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?
         return <line key={i} x1={32 + 16*Math.cos(rad)} y1={32 + 16*Math.sin(rad)} x2={32 + 22*Math.cos(rad)} y2={32 + 22*Math.sin(rad)} stroke="#fbbf24" strokeWidth="3" strokeLinecap="round"/>;
       })}
     </svg>
+  );
+}
+
+// ─── Wind Rose ───────────────────────────────────────────────────────────────
+function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
+  const dir = direction ?? 0;
+  const cardinalDir = (deg: number) => {
+    const dirs = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+    return dirs[Math.round(deg / 45) % 8];
+  };
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative w-10 h-10">
+        <svg viewBox="0 0 40 40" className="w-full h-full">
+          {/* Compass circle */}
+          <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+          {/* Cardinal ticks */}
+          {[0, 90, 180, 270].map(a => {
+            const rad = (a - 90) * Math.PI / 180;
+            return <line key={a} x1={20 + 14*Math.cos(rad)} y1={20 + 14*Math.sin(rad)} x2={20 + 18*Math.cos(rad)} y2={20 + 18*Math.sin(rad)} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />;
+          })}
+          {/* Arrow pointing in wind direction */}
+          <g transform={`rotate(${dir}, 20, 20)`}>
+            <polygon points="20,4 23,20 20,17 17,20" fill="#60a5fa" opacity="0.9" />
+            <polygon points="20,36 23,20 20,23 17,20" fill="rgba(255,255,255,0.2)" />
+          </g>
+          {/* Center dot */}
+          <circle cx="20" cy="20" r="2" fill="#60a5fa" />
+        </svg>
+      </div>
+      <p className="text-xs font-bold text-blue-300">{cardinalDir(dir)}</p>
+      {speed != null && <p className="text-xs text-muted-foreground">{speed}km/h</p>}
+    </div>
+  );
+}
+
+// ─── UV Index indicator ────────────────────────────────────────────────────────
+function UVBadge({ uv }: { uv: number | null }) {
+  if (uv == null) return <span className="text-base font-semibold">—</span>;
+  const level = uv <= 2 ? { label: "Faible", color: "text-green-400" }
+    : uv <= 5 ? { label: "Modéré", color: "text-yellow-400" }
+    : uv <= 7 ? { label: "Élevé", color: "text-orange-400" }
+    : uv <= 10 ? { label: "Très élevé", color: "text-red-400" }
+    : { label: "Extrême", color: "text-purple-400" };
+  return (
+    <div className="flex flex-col items-center">
+      <span className={`text-base sm:text-lg font-bold ${level.color}`}>{Math.round(uv)}</span>
+      <span className={`text-xs ${level.color} opacity-80`}>{level.label}</span>
+    </div>
   );
 }
 
@@ -152,6 +201,10 @@ export default function Dashboard() {
   // Current temperature from hourly (closest to now)
   const currentHour = hours.find(h => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
   const currentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
+  const apparentTemp = currentHour?.apparentTemp ?? null;
+  const currentUV = hours.find(h => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
+  const windDir = currentHour?.windDirection ?? null;
+  const windSpeed = currentHour?.windSpeed ?? today?.windSpeed ?? meteoAI?.windSpeed ?? null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -225,8 +278,37 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Apparent temp + UV + Wind rose highlight row */}
+            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-700/60">
+              {/* Ressenti */}
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                  <Thermometer className="h-3 w-3" />Ressenti
+                </p>
+                <p className="text-xl sm:text-2xl font-bold">
+                  {apparentTemp != null ? `${Math.round(apparentTemp)}°` : currentTemp != null ? `${Math.round(currentTemp)}°` : "—"}
+                </p>
+              </div>
+              {/* UV Index */}
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                  <Sun className="h-3 w-3" />Indice UV
+                </p>
+                <UVBadge uv={currentUV} />
+              </div>
+              {/* Wind Rose */}
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                  <Wind className="h-3 w-3" />Direction
+                </p>
+                <div className="flex justify-center">
+                  <WindRose direction={windDir} speed={windSpeed} />
+                </div>
+              </div>
+            </div>
+
             {/* Stats row */}
-            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-700">
+            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-700">
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
                   <Droplets className="h-3 w-3" />Précip.
@@ -235,9 +317,9 @@ export default function Dashboard() {
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Wind className="h-3 w-3" />Vent
+                  <Wind className="h-3 w-3" />Rafales
                 </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
+                <p className="text-base sm:text-lg font-semibold">{today?.windGust ?? "—"} km/h</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
@@ -246,12 +328,6 @@ export default function Dashboard() {
                 <p className={`text-base sm:text-lg font-semibold ${stabilityColor(today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0)}`}>
                   {today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0}%
                 </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Wind className="h-3 w-3 opacity-60" />Rafales
-                </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.windGust ?? "—"} km/h</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
@@ -264,6 +340,12 @@ export default function Dashboard() {
                   <Eye className="h-3 w-3" />Nuages
                 </p>
                 <p className="text-base sm:text-lg font-semibold">{today?.cloudCover ?? "—"}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <Wind className="h-3 w-3" />Vent max
+                </p>
+                <p className="text-base sm:text-lg font-semibold">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
               </div>
             </div>
           </div>

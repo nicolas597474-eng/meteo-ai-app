@@ -161,10 +161,13 @@ export type DayForecast = {
 export type HourlyPoint = {
   hour: string;      // "HH:00"
   temp: number | null;
+  apparentTemp: number | null;
   precipitation: number | null;
   windSpeed: number | null;
+  windDirection: number | null;  // degrees 0-360
   cloudCover: number | null;
   humidity: number | null;
+  uvIndex: number | null;
   condition: string | null;
 };
 
@@ -276,7 +279,7 @@ export async function collectHourlyForecast(targetDate: string): Promise<HourlyP
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", HONDEGHEM.lat.toString());
     url.searchParams.set("longitude", HONDEGHEM.lon.toString());
-    url.searchParams.set("hourly", "temperature_2m,precipitation,wind_speed_10m,cloud_cover,relative_humidity_2m");
+    url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index");
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", "2");
 
@@ -297,10 +300,13 @@ export async function collectHourlyForecast(targetDate: string): Promise<HourlyP
       points.push({
         hour,
         temp: hourly.temperature_2m?.[i] ?? null,
+        apparentTemp: hourly.apparent_temperature?.[i] ?? null,
         precipitation: precip,
         windSpeed: hourly.wind_speed_10m?.[i] ?? null,
+        windDirection: hourly.wind_direction_10m?.[i] ?? null,
         cloudCover: cloud,
         humidity: hourly.relative_humidity_2m?.[i] ?? null,
+        uvIndex: hourly.uv_index?.[i] ?? null,
         condition: deriveCondition(precip, cloud),
       });
     }
