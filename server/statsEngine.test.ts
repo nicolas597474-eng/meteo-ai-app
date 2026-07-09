@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateReliabilityScore, calculateStabilityIndex, generateMeteoAIForecast } from "./statsEngine";
+import { calculateReliabilityScore, calculateStabilityIndex, generateMeteoAIForecast, detectWeatherRegime } from "./statsEngine";
 
 describe("calculateReliabilityScore", () => {
   it("returns perfect score when forecast matches observation", () => {
@@ -88,6 +88,91 @@ describe("calculateStabilityIndex", () => {
     const result = calculateStabilityIndex([]);
     expect(typeof result.index).toBe("number");
     expect(result.label).toBe("stable");
+  });
+});
+
+describe("detectWeatherRegime", () => {
+  it("detects storm when wind > 50 km/h", () => {
+    const result = detectWeatherRegime({ precipitation: 2, windSpeed: 60, tempMax: 18, tempMin: 12 });
+    expect(result.regime).toBe("storm");
+    expect(result.weights.wind).toBe(0.40);
+    expect(result.weights.precip).toBe(0.30);
+  });
+
+  it("detects rainy day when precipitation > 3 mm", () => {
+    const result = detectWeatherRegime({ precipitation: 8, windSpeed: 20, tempMax: 14, tempMin: 9 });
+    expect(result.regime).toBe("rainy");
+    expect(result.weights.precip).toBe(0.50);
+    expect(result.weights.temp).toBe(0.20);
+  });
+
+  it("detects cold winter when avg temp < 5°C", () => {
+    const result = detectWeatherRegime({ precipitation: 0.5, windSpeed: 15, tempMax: 3, tempMin: -2 });
+    expect(result.regime).toBe("cold_winter");
+    expect(result.weights.temp).toBe(0.45);
+  });
+
+  it("detects summer stable when hot, dry, calm", () => {
+    const result = detectWeatherRegime({ precipitation: 0, windSpeed: 10, tempMax: 30, tempMin: 18 });
+    expect(result.regime).toBe("summer");
+    expect(result.weights.temp).toBe(0.40);
+    expect(result.weights.condition).toBe(0.30);
+  });
+
+  it("falls back to standard for mild conditions", () => {
+    const result = detectWeatherRegime({ precipitation: 1, windSpeed: 20, tempMax: 17, tempMin: 10 });
+    expect(result.regime).toBe("standard");
+    expect(result.weights.temp).toBe(0.30);
+    expect(result.weights.precip).toBe(0.30);
+  });
+
+  it("handles null values gracefully", () => {
+    const result = detectWeatherRegime({ precipitation: null, windSpeed: null, tempMax: null, tempMin: null });
+    expect(result.regime).toBe("standard"); // defaults to standard with all-null inputs
+  });
+
+  it("storm takes priority over rainy", () => {
+    // High wind + heavy rain → storm, not rainy
+    const result = detectWeatherRegime({ precipitation: 10, windSpeed: 55, tempMax: 12, tempMin: 8 });
+    expect(result.regime).toBe("storm");
+  });
+});
+
+describe("calculateReliabilityScore with regime", () => {
+  it("uses forced regime weights when provided", () => {
+    const forecasts = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
+    const observations = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
+
+    const rainyResult = calculateReliabilityScore(forecasts, observations, "rainy");
+    const stormResult = calculateReliabilityScore(forecasts, observations, "storm");
+
+    expect(rainyResult.regime).toBe("rainy");
+    expect(rainyResult.weights.precip).toBe(0.50);
+    expect(stormResult.regime).toBe("storm");
+    expect(stormResult.weights.wind).toBe(0.40);
+  });
+
+  it("auto-detects regime from observations when not forced", () => {
+    // Hot, dry, calm → summer
+    const forecasts = [{ tempMax: 30, tempMin: 18, precipitation: 0, windSpeed: 10 }];
+    const observations = [{ tempMax: 30, tempMin: 18, precipitation: 0, windSpeed: 10 }];
+
+    const result = calculateReliabilityScore(forecasts, observations);
+    expect(result.regime).toBe("summer");
+    expect(result.regimeEmoji).toBe("🌞");
+  });
+
+  it("includes regime metadata in result", () => {
+    const forecasts = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
+    const observations = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
+
+    const result = calculateReliabilityScore(forecasts, observations);
+
+    expect(result.regime).toBeDefined();
+    expect(result.regimeLabel).toBeDefined();
+    expect(result.regimeEmoji).toBeDefined();
+    expect(result.weights).toBeDefined();
+    expect(result.weights.temp + result.weights.precip + result.weights.wind + result.weights.condition).toBeCloseTo(1.0, 5);
   });
 });
 

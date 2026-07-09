@@ -19,7 +19,7 @@ import {
   upsertMeteoAIForecast,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
-import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "../statsEngine";
+import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 
 function getTodayParis(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
@@ -44,6 +44,14 @@ export const weatherRouter = router({
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7);
 
+    // Detect current weather regime from today's MeteoAI forecast
+    const regimeInfo = detectWeatherRegime({
+      precipitation: meteoAI?.precipitation ?? null,
+      windSpeed: meteoAI?.windSpeed ?? null,
+      tempMax: meteoAI?.tempMax ?? null,
+      tempMin: meteoAI?.tempMin ?? null,
+    });
+
     return {
       today,
       meteoAI,
@@ -51,6 +59,13 @@ export const weatherRouter = router({
       topServices: ranking.slice(0, 5),
       recentForecasts,
       allServices: [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public],
+      regime: {
+        id: regimeInfo.regime,
+        label: regimeInfo.label,
+        emoji: regimeInfo.emoji,
+        description: regimeInfo.description,
+        weights: regimeInfo.weights,
+      },
     };
   }),
 
@@ -59,9 +74,37 @@ export const weatherRouter = router({
    */
   getRanking: publicProcedure.query(async () => {
     const ranking = await getCumulativeRanking();
+
+    // Compute regime from the most recent observation available
+    const recentObs = await getObservationsByDateRange(
+      new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }),
+      getTodayParis()
+    );
+    const latestObs = recentObs[recentObs.length - 1];
+    const regimeInfo = detectWeatherRegime({
+      precipitation: latestObs?.precipitation ?? null,
+      windSpeed: latestObs?.windSpeed ?? null,
+      tempMax: latestObs?.tempMax ?? null,
+      tempMin: latestObs?.tempMin ?? null,
+    });
+
+    // All regime definitions for the UI selector
+    const allRegimes = (Object.keys(REGIME_DEFINITIONS) as WeatherRegime[]).map(key => ({
+      id: key,
+      ...REGIME_DEFINITIONS[key],
+    }));
+
     return {
       ranking,
       totalServices: WEATHER_SERVICES.expert.length + WEATHER_SERVICES.public.length,
+      regime: {
+        id: regimeInfo.regime,
+        label: regimeInfo.label,
+        emoji: regimeInfo.emoji,
+        description: regimeInfo.description,
+        weights: regimeInfo.weights,
+      },
+      allRegimes,
     };
   }),
 
@@ -246,10 +289,19 @@ export const weatherRouter = router({
         const observation = await getObservationByDate(targetDate);
 
         if (dayForecasts.length > 0 && observation) {
+          // Detect regime from actual observation
+          const regimeInfo = detectWeatherRegime({
+            precipitation: observation.precipitation,
+            windSpeed: observation.windSpeed,
+            tempMax: observation.tempMax,
+            tempMin: observation.tempMin,
+          });
+
           const scoreRows = dayForecasts.map((f) => {
             const score = calculateReliabilityScore(
               [{ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed }],
-              [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed }]
+              [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed }],
+              regimeInfo.regime
             );
             return {
               date: targetDate,

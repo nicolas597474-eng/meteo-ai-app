@@ -18,6 +18,8 @@ export default function Ranking() {
   }
 
   const ranking = data?.ranking ?? [];
+  const regime = data?.regime;
+  const allRegimes = data?.allRegimes ?? [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -29,32 +31,75 @@ export default function Ranking() {
             Classement de Fiabilité
           </h1>
           <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-            {data?.totalServices ?? 16} services · Score pondéré 30% Temp + 30% Précip + 20% Vent + 20% Conditions
+            {data?.totalServices ?? 16} services · Pondération contextuelle dynamique
           </p>
         </div>
 
-        {/* Scoring explanation */}
-        <div className="bg-card border border-border rounded-xl p-4">
-          <h3 className="font-medium text-sm mb-2">Méthodologie de scoring</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-chart-1" />
-              <span>Température: 30%</span>
+        {/* Active regime + contextual weights */}
+        {regime && (
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-600/50 rounded-xl p-4 space-y-3">
+            {/* Active regime */}
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">{regime.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-sm text-white">Régime actif : {regime.label}</h3>
+                  <span className="text-xs bg-primary/20 text-primary border border-primary/30 rounded-full px-2 py-0.5">Aujourd'hui</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{regime.description}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-chart-2" />
-              <span>Précipitations: 30%</span>
+
+            {/* Weight bars */}
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Poids du scoring</p>
+              {[
+                { label: "🌡 Température", value: regime.weights.temp, color: "bg-orange-400" },
+                { label: "🌧 Précipitations", value: regime.weights.precip, color: "bg-blue-400" },
+                { label: "💨 Vent", value: regime.weights.wind, color: "bg-cyan-400" },
+                { label: "☁ Conditions", value: regime.weights.condition, color: "bg-purple-400" },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{label}</span>
+                  <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
+                    <div className={`h-full ${color} rounded-full`} style={{ width: `${Math.round(value * 100)}%` }} />
+                  </div>
+                  <span className="text-xs font-bold text-white w-8 text-right">{Math.round(value * 100)}%</span>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-chart-3" />
-              <span>Vent: 20%</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-chart-4" />
-              <span>Conditions: 20%</span>
-            </div>
+
+            {/* All regimes reference */}
+            {allRegimes.length > 0 && (
+              <details className="group">
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-white transition-colors select-none">
+                  Voir tous les régimes ▾
+                </summary>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {allRegimes.map(r => (
+                    <div key={r.id} className={`rounded-lg border px-3 py-2 text-xs ${
+                      r.id === regime.id
+                        ? "border-primary/50 bg-primary/10"
+                        : "border-slate-700 bg-slate-800/50"
+                    }`}>
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <span>{r.emoji}</span>
+                        <span className="text-white">{r.label}</span>
+                        {r.id === regime.id && <span className="text-primary ml-auto">✓ actif</span>}
+                      </div>
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        <span className="text-orange-300">🌡 {Math.round(r.weights.temp * 100)}%</span>
+                        <span className="text-blue-300">🌧 {Math.round(r.weights.precip * 100)}%</span>
+                        <span className="text-cyan-300">💨 {Math.round(r.weights.wind * 100)}%</span>
+                        <span className="text-purple-300">☁ {Math.round(r.weights.condition * 100)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Ranking Table */}
         {ranking.length > 0 ? (

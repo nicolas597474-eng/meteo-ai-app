@@ -21,3 +21,10 @@
 - [x] Backend: getHourlyForecast endpoint (24h hourly from Open-Meteo best_match)
 - [x] Heartbeat: Cron collecte prévisions à 05h00 Paris (03h00 UTC) — task_uid: bi9pQpzNMMUk5ijSwFMnoh
 - [x] Heartbeat: Cron collecte observations à 23h50 Paris (21h50 UTC) — task_uid: Qg2R5Xkkfk5cukBEn789qj
+- [x] statsEngine: Définir les 5 régimes météo (pluvieux, été stable, tempête, hiver froid, standard)
+- [x] statsEngine: Implémenter detectWeatherRegime() basé sur précip, vent, temp
+- [x] statsEngine: Adapter calculateReliabilityScore() avec poids contextuels par régime
+- [x] Backend: Stocker le régime détecté dans les scores de fiabilité
+- [x] Frontend: Afficher le régime actif + badge poids sur Dashboard
+- [x] Frontend: Afficher le régime utilisé dans la page Classement
+- [ ] Database: Ajouter colonne `regime` à `reliability_scores` pour persistance historique des régimes

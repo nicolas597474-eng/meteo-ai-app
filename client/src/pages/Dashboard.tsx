@@ -190,6 +190,7 @@ export default function Dashboard() {
   const futureDays = days.slice(1);
   const hours = hourly?.hours ?? [];
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
+  const regime = dash?.regime;
 
   const chartData = days.map(d => ({
     name: dayLabel(d.date),
@@ -231,7 +232,7 @@ export default function Dashboard() {
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-blue-600/10 pointer-events-none" />
           <div className="relative">
-            {/* Source label */}
+            {/* Source label + Regime badge */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
@@ -241,6 +242,36 @@ export default function Dashboard() {
                 {f15?.modelsUsed?.join(", ")}
               </span>
             </div>
+
+            {/* ── Regime badge ── */}
+            {regime && (
+              <div className="mb-3 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{regime.emoji}</span>
+                    <div>
+                      <p className="text-xs font-semibold text-white">{regime.label}</p>
+                      <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
+                    </div>
+                  </div>
+                  {/* Weight pills */}
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium">
+                      🌡 {Math.round(regime.weights.temp * 100)}%
+                    </span>
+                    <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full px-2 py-0.5 font-medium">
+                      🌧 {Math.round(regime.weights.precip * 100)}%
+                    </span>
+                    <span className="text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full px-2 py-0.5 font-medium">
+                      💨 {Math.round(regime.weights.wind * 100)}%
+                    </span>
+                    <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full px-2 py-0.5 font-medium">
+                      ☁ {Math.round(regime.weights.condition * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Main temperature row */}
             <div className="flex items-center gap-4 sm:gap-6">
