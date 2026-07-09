@@ -153,12 +153,82 @@ export const weatherRouter = router({
       const meteoAI = await getMeteoAIForecastByDate(date);
       const ranking = await getCumulativeRanking();
 
+      // Compute live dimension scores per service for this date
+      let dimensionScores: Array<{
+        serviceName: string;
+        weightedScore: number;
+        regime: string;
+        regimeEmoji: string;
+        regimeLabel: string;
+        dimensions: {
+          temperature: { mae: number; bias: number; maxError: number; score: number };
+          precipitation: { pod: number; far: number; csi: number; falsePositives: number; falseNegatives: number; maeQuantity: number; score: number };
+          wind: { maeMean: number; maeGusts: number; biasMean: number; score: number };
+          condition: { concordance: number; maeCloudCover: number; score: number };
+        };
+        weights: { temp: number; precip: number; wind: number; condition: number };
+      }> = [];
+
+      if (observation) {
+        const regimeInfo = detectWeatherRegime({
+          precipitation: observation.precipitation,
+          windSpeed: observation.windSpeed,
+          tempMax: observation.tempMax,
+          tempMin: observation.tempMin,
+        });
+
+        dimensionScores = forecasts.map((f) => {
+          const score = calculateReliabilityScore(
+            [{ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed, windGust: f.windGust, cloudCover: f.cloudCover, condition: f.condition }],
+            [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed, windGust: observation.windGust, cloudCover: observation.cloudCover, condition: observation.condition }],
+            regimeInfo.regime
+          );
+          return {
+            serviceName: f.serviceName,
+            weightedScore: score.weightedScore,
+            regime: score.regime,
+            regimeEmoji: score.regimeEmoji,
+            regimeLabel: score.regimeLabel,
+            dimensions: {
+              temperature: {
+                mae: score.dimensions.temperature.mae,
+                bias: score.dimensions.temperature.bias,
+                maxError: score.dimensions.temperature.maxError,
+                score: score.dimensions.temperature.score,
+              },
+              precipitation: {
+                pod: score.dimensions.precipitation.pod,
+                far: score.dimensions.precipitation.far,
+                csi: score.dimensions.precipitation.csi,
+                falsePositives: score.dimensions.precipitation.falsePositives,
+                falseNegatives: score.dimensions.precipitation.falseNegatives,
+                maeQuantity: score.dimensions.precipitation.maeQuantity,
+                score: score.dimensions.precipitation.score,
+              },
+              wind: {
+                maeMean: score.dimensions.wind.maeMean,
+                maeGusts: score.dimensions.wind.maeGusts,
+                biasMean: score.dimensions.wind.biasMean,
+                score: score.dimensions.wind.score,
+              },
+              condition: {
+                concordance: score.dimensions.condition.concordance,
+                maeCloudCover: score.dimensions.condition.maeCloudCover,
+                score: score.dimensions.condition.score,
+              },
+            },
+            weights: score.weights,
+          };
+        });
+      }
+
       return {
         date,
         forecasts,
         observation,
         meteoAI,
         ranking,
+        dimensionScores,
       };
     }),
 
@@ -303,9 +373,11 @@ export const weatherRouter = router({
               [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed }],
               regimeInfo.regime
             );
+            const d = score.dimensions;
             return {
               date: targetDate,
               serviceName: f.serviceName,
+              // Legacy flat fields
               maeTemp: score.maeTemp,
               maePrecip: score.maePrecip,
               maeWind: score.maeWind,
@@ -317,7 +389,24 @@ export const weatherRouter = router({
               biasWind: score.biasWind,
               conditionAccuracy: score.conditionAccuracy,
               weightedScore: score.weightedScore,
-              regime: score.regime, // persist detected regime for historical analysis
+              regime: score.regime,
+              // 🌡️ Temperature dimension
+              tempScore: d.temperature.score,
+              tempMaxError: d.temperature.maxError,
+              // 🌧️ Precipitation dimension
+              precipScore: d.precipitation.score,
+              precipPod: d.precipitation.pod,
+              precipFar: d.precipitation.far,
+              precipCsi: d.precipitation.csi,
+              precipFalsePositives: d.precipitation.falsePositives,
+              precipFalseNegatives: d.precipitation.falseNegatives,
+              // 💨 Wind dimension
+              windScore: d.wind.score,
+              windMaeGusts: d.wind.maeGusts,
+              // ☁️ Condition dimension
+              condScore: d.condition.score,
+              condConcordance: d.condition.concordance,
+              condMaeCloud: d.condition.maeCloudCover,
             };
           });
           await insertReliabilityScores(scoreRows);

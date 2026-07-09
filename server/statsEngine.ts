@@ -1,10 +1,29 @@
 /**
- * Statistical Engine for MeteoAI
- * Calculates MAE, RMSE, Bias and weighted reliability scores.
+ * Statistical Engine for MeteoAI — Multi-Dimension Error Analysis
+ *
+ * Principle: NEVER compute a single raw score. First measure each error dimension
+ * independently with its own specific metrics, then combine with contextual weights.
+ *
+ * ─── 4 Error Dimensions ──────────────────────────────────────────────────────
+ *
+ * 🌡️ Temperature
+ *   - MAE (Mean Absolute Error)
+ *   - Bias (tendency to over/under-estimate)
+ *   - Max error (worst forecast spike)
+ *
+ * 🌧️ Precipitation
+ *   - Rain detection: POD (Probability of Detection), FAR (False Alarm Rate), CSI (Critical Success Index)
+ *   - Quantity error: MAE on rainy days only
+ *   - False positives (predicted rain, no rain) / False negatives (missed rain)
+ *
+ * 💨 Wind
+ *   - MAE mean wind speed
+ *   - MAE wind gusts (when available)
+ *
+ * ☁️ Cloud cover / Conditions
+ *   - Categorical concordance score (sunny / cloudy / overcast)
  *
  * ─── Contextual Weighting ────────────────────────────────────────────────────
- * The scoring weights adapt dynamically to the detected weather regime:
- *
  * 🌧️ Jour pluvieux   → Précip 50% | Temp 20% | Vent 15% | Cond 15%
  * 🌞 Été stable      → Temp 40%   | Précip 20% | Vent 10% | Cond 30%
  * 🌬️ Tempête         → Vent 40%   | Précip 30% | Temp 15% | Cond 15%
@@ -15,11 +34,11 @@
 // ─── Regime definitions ───────────────────────────────────────────────────────
 
 export type WeatherRegime =
-  | "rainy"       // 🌧️ Jour pluvieux
-  | "summer"      // 🌞 Été stable
-  | "storm"       // 🌬️ Tempête
-  | "cold_winter" // ❄️  Hiver froid
-  | "standard";   // ⛅ Standard
+  | "rainy"
+  | "summer"
+  | "storm"
+  | "cold_winter"
+  | "standard";
 
 export type RegimeWeights = {
   temp: number;
@@ -36,24 +55,23 @@ export type RegimeInfo = {
   weights: RegimeWeights;
 };
 
-/** All regime definitions with their contextual weights */
 export const REGIME_DEFINITIONS: Record<WeatherRegime, Omit<RegimeInfo, "regime">> = {
   rainy: {
     label: "Jour pluvieux",
     emoji: "🌧️",
-    description: "Précipitations significatives détectées — la précision des pluies est prioritaire.",
+    description: "Précipitations significatives — la précision des pluies est prioritaire.",
     weights: { temp: 0.20, precip: 0.50, wind: 0.15, condition: 0.15 },
   },
   summer: {
     label: "Été stable",
     emoji: "🌞",
-    description: "Temps chaud et stable — la température et les conditions dominent le scoring.",
+    description: "Temps chaud et stable — la température et les conditions dominent.",
     weights: { temp: 0.40, precip: 0.20, wind: 0.10, condition: 0.30 },
   },
   storm: {
     label: "Tempête",
     emoji: "🌬️",
-    description: "Vents forts et/ou fortes pluies — le vent et les précipitations sont critiques.",
+    description: "Vents forts — le vent et les précipitations sont critiques.",
     weights: { temp: 0.15, precip: 0.30, wind: 0.40, condition: 0.15 },
   },
   cold_winter: {
@@ -65,20 +83,16 @@ export const REGIME_DEFINITIONS: Record<WeatherRegime, Omit<RegimeInfo, "regime"
   standard: {
     label: "Standard",
     emoji: "⛅",
-    description: "Conditions normales — pondération équilibrée entre tous les paramètres.",
+    description: "Conditions normales — pondération équilibrée.",
     weights: { temp: 0.30, precip: 0.30, wind: 0.20, condition: 0.20 },
   },
 };
 
-/**
- * Detect the current weather regime from observed/forecast conditions.
- * Uses precipitation, wind speed, and temperature to classify the situation.
- */
 export function detectWeatherRegime(params: {
-  precipitation: number | null;  // mm/day
-  windSpeed: number | null;       // km/h
-  tempMax: number | null;         // °C
-  tempMin: number | null;         // °C
+  precipitation: number | null;
+  windSpeed: number | null;
+  tempMax: number | null;
+  tempMin: number | null;
 }): RegimeInfo {
   const precip = params.precipitation ?? 0;
   const wind = params.windSpeed ?? 0;
@@ -86,34 +100,92 @@ export function detectWeatherRegime(params: {
   const tempMin = params.tempMin ?? 5;
   const avgTemp = (tempMax + tempMin) / 2;
 
-  // 🌬️ Tempête: vent fort (> 50 km/h) OU pluie forte + vent modéré
-  if (wind > 50 || (wind > 35 && precip > 5)) {
-    return { regime: "storm", ...REGIME_DEFINITIONS.storm };
-  }
-
-  // 🌧️ Jour pluvieux: précipitations significatives (> 3 mm)
-  if (precip > 3) {
-    return { regime: "rainy", ...REGIME_DEFINITIONS.rainy };
-  }
-
-  // ❄️ Hiver froid: température moyenne < 5°C
-  if (avgTemp < 5) {
-    return { regime: "cold_winter", ...REGIME_DEFINITIONS.cold_winter };
-  }
-
-  // 🌞 Été stable: temp élevée (> 22°C) et peu de pluie (< 1 mm) et vent faible (< 25 km/h)
-  if (avgTemp > 22 && precip < 1 && wind < 25) {
-    return { regime: "summer", ...REGIME_DEFINITIONS.summer };
-  }
-
-  // ⛅ Standard: toutes les autres situations
+  if (wind > 50 || (wind > 35 && precip > 5)) return { regime: "storm", ...REGIME_DEFINITIONS.storm };
+  if (precip > 3) return { regime: "rainy", ...REGIME_DEFINITIONS.rainy };
+  if (avgTemp < 5) return { regime: "cold_winter", ...REGIME_DEFINITIONS.cold_winter };
+  if (avgTemp > 22 && precip < 1 && wind < 25) return { regime: "summer", ...REGIME_DEFINITIONS.summer };
   return { regime: "standard", ...REGIME_DEFINITIONS.standard };
 }
 
-// ─── Score types ──────────────────────────────────────────────────────────────
+// ─── Row types ────────────────────────────────────────────────────────────────
 
+export type ForecastRow = {
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGust?: number | null;
+  cloudCover?: number | null;
+  condition?: string | null;
+};
+
+export type ObservationRow = {
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGust?: number | null;
+  cloudCover?: number | null;
+  condition?: string | null;
+};
+
+// ─── Dimension result types ───────────────────────────────────────────────────
+
+/** 🌡️ Temperature dimension */
+export type TempDimension = {
+  mae: number;          // Mean Absolute Error (°C)
+  bias: number;         // Systematic bias (+ = overestimate, - = underestimate)
+  maxError: number;     // Worst single-day error (°C)
+  rmse: number;         // Root Mean Square Error
+  score: number;        // 0-100 (higher = better)
+  sampleSize: number;
+};
+
+/** 🌧️ Precipitation dimension */
+export type PrecipDimension = {
+  // Detection skill (binary: rain vs no-rain, threshold 1mm)
+  pod: number;          // Probability of Detection (hits / (hits + misses)) 0-1
+  far: number;          // False Alarm Rate (false alarms / (hits + false alarms)) 0-1
+  csi: number;          // Critical Success Index (hits / (hits + misses + false alarms)) 0-1
+  falsePositives: number;  // Days predicted rain, no rain observed
+  falseNegatives: number;  // Days missed rain (rain observed, none predicted)
+  // Quantity error (only on days where both forecast and obs have rain)
+  maeQuantity: number;  // MAE of precipitation amount (mm)
+  biasQuantity: number; // Wet/dry bias on quantity
+  score: number;        // 0-100 composite
+  sampleSize: number;
+};
+
+/** 💨 Wind dimension */
+export type WindDimension = {
+  maeMean: number;      // MAE of mean wind speed (km/h)
+  maeGusts: number;     // MAE of wind gusts (km/h), NaN if no gust data
+  biasMean: number;     // Systematic bias on mean wind
+  maxError: number;     // Worst single-day error
+  score: number;        // 0-100
+  sampleSize: number;
+};
+
+/** ☁️ Cloud cover / Conditions dimension */
+export type ConditionDimension = {
+  concordance: number;  // % of days where category matches (0-100)
+  maeCloudCover: number; // MAE of cloud cover % (when available)
+  score: number;        // 0-100
+  sampleSize: number;
+};
+
+/** Full multi-dimension score result */
+export type DimensionScores = {
+  temperature: TempDimension;
+  precipitation: PrecipDimension;
+  wind: WindDimension;
+  condition: ConditionDimension;
+};
+
+/** Final aggregated score result */
 export type ScoreResult = {
   serviceName: string;
+  // Legacy flat fields (kept for DB compatibility)
   maeTemp: number;
   maePrecip: number;
   maeWind: number;
@@ -125,141 +197,296 @@ export type ScoreResult = {
   biasWind: number;
   conditionAccuracy: number;
   weightedScore: number;
+  // New dimension-level detail
+  dimensions: DimensionScores;
   regime: WeatherRegime;
   regimeLabel: string;
   regimeEmoji: string;
   weights: RegimeWeights;
 };
 
-type ForecastRow = {
-  tempMax: number | null;
-  tempMin: number | null;
-  precipitation: number | null;
-  windSpeed: number | null;
-};
+// ─── Math primitives ──────────────────────────────────────────────────────────
 
-type ObservationRow = {
-  tempMax: number | null;
-  tempMin: number | null;
-  precipitation: number | null;
-  windSpeed: number | null;
-};
-
-// ─── Math helpers ─────────────────────────────────────────────────────────────
+function mean(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
 
 function mae(predicted: number[], actual: number[]): number {
   if (predicted.length === 0) return 0;
-  return predicted.reduce((acc, val, i) => acc + Math.abs(val - actual[i]), 0) / predicted.length;
+  return mean(predicted.map((v, i) => Math.abs(v - actual[i])));
 }
 
 function rmse(predicted: number[], actual: number[]): number {
   if (predicted.length === 0) return 0;
-  return Math.sqrt(predicted.reduce((acc, val, i) => acc + Math.pow(val - actual[i], 2), 0) / predicted.length);
+  return Math.sqrt(mean(predicted.map((v, i) => Math.pow(v - actual[i], 2))));
 }
 
 function bias(predicted: number[], actual: number[]): number {
   if (predicted.length === 0) return 0;
-  return predicted.reduce((acc, val, i) => acc + (val - actual[i]), 0) / predicted.length;
+  return mean(predicted.map((v, i) => v - actual[i]));
 }
 
-/**
- * Convert MAE to a 0-100 score (lower MAE = higher score).
- * Uses exponential decay: score = 100 * exp(-k * mae)
- */
+function maxAbsError(predicted: number[], actual: number[]): number {
+  if (predicted.length === 0) return 0;
+  return Math.max(...predicted.map((v, i) => Math.abs(v - actual[i])));
+}
+
+/** Convert MAE to 0-100 score using exponential decay */
 function maeToScore(maeValue: number, maxExpectedError: number): number {
   const k = 3 / maxExpectedError;
   return Math.max(0, Math.min(100, 100 * Math.exp(-k * maeValue)));
 }
 
+function round2(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
+// ─── Dimension calculators ────────────────────────────────────────────────────
+
+/**
+ * 🌡️ Temperature dimension
+ * Uses both tempMax and tempMin for all metrics.
+ */
+function calcTempDimension(forecasts: ForecastRow[], observations: ObservationRow[]): TempDimension {
+  const pred: number[] = [];
+  const actual: number[] = [];
+
+  for (let i = 0; i < forecasts.length; i++) {
+    const f = forecasts[i], o = observations[i];
+    if (!f || !o) continue;
+    if (f.tempMax != null && o.tempMax != null) { pred.push(f.tempMax); actual.push(o.tempMax); }
+    if (f.tempMin != null && o.tempMin != null) { pred.push(f.tempMin); actual.push(o.tempMin); }
+  }
+
+  const maeVal = mae(pred, actual);
+  return {
+    mae: round2(maeVal),
+    bias: round2(bias(pred, actual)),
+    maxError: round2(maxAbsError(pred, actual)),
+    rmse: round2(rmse(pred, actual)),
+    score: round2(maeToScore(maeVal, 10)),
+    sampleSize: pred.length,
+  };
+}
+
+/**
+ * 🌧️ Precipitation dimension
+ * Threshold for rain/no-rain detection: 1 mm/day
+ */
+const RAIN_THRESHOLD = 1.0; // mm
+
+function calcPrecipDimension(forecasts: ForecastRow[], observations: ObservationRow[]): PrecipDimension {
+  let hits = 0;        // Both predicted and observed rain
+  let misses = 0;      // Observed rain, not predicted
+  let falseAlarms = 0; // Predicted rain, not observed
+  let correctNeg = 0;  // Both correctly predicted no rain
+
+  const quantityPred: number[] = [];
+  const quantityActual: number[] = [];
+
+  for (let i = 0; i < forecasts.length; i++) {
+    const f = forecasts[i], o = observations[i];
+    if (!f || !o || f.precipitation == null || o.precipitation == null) continue;
+
+    const fRain = f.precipitation >= RAIN_THRESHOLD;
+    const oRain = o.precipitation >= RAIN_THRESHOLD;
+
+    if (fRain && oRain) {
+      hits++;
+      quantityPred.push(f.precipitation);
+      quantityActual.push(o.precipitation);
+    } else if (!fRain && oRain) {
+      misses++;
+    } else if (fRain && !oRain) {
+      falseAlarms++;
+    } else {
+      correctNeg++;
+    }
+  }
+
+  const pod = (hits + misses) > 0 ? hits / (hits + misses) : 0;
+  const far = (hits + falseAlarms) > 0 ? falseAlarms / (hits + falseAlarms) : 0;
+  const csi = (hits + misses + falseAlarms) > 0 ? hits / (hits + misses + falseAlarms) : 1;
+
+  const maeQ = mae(quantityPred, quantityActual);
+  const biasQ = bias(quantityPred, quantityActual);
+
+  // Composite score: 50% detection skill (CSI) + 50% quantity accuracy
+  const detectionScore = csi * 100;
+  const quantityScore = quantityPred.length > 0 ? maeToScore(maeQ, 15) : 70;
+  const compositeScore = (detectionScore * 0.5) + (quantityScore * 0.5);
+
+  return {
+    pod: round2(pod),
+    far: round2(far),
+    csi: round2(csi),
+    falsePositives: falseAlarms,
+    falseNegatives: misses,
+    maeQuantity: round2(maeQ),
+    biasQuantity: round2(biasQ),
+    score: round2(compositeScore),
+    sampleSize: hits + misses + falseAlarms + correctNeg,
+  };
+}
+
+/**
+ * 💨 Wind dimension
+ * Separate MAE for mean wind and gusts.
+ */
+function calcWindDimension(forecasts: ForecastRow[], observations: ObservationRow[]): WindDimension {
+  const meanPred: number[] = [];
+  const meanActual: number[] = [];
+  const gustPred: number[] = [];
+  const gustActual: number[] = [];
+
+  for (let i = 0; i < forecasts.length; i++) {
+    const f = forecasts[i], o = observations[i];
+    if (!f || !o) continue;
+    if (f.windSpeed != null && o.windSpeed != null) { meanPred.push(f.windSpeed); meanActual.push(o.windSpeed); }
+    if (f.windGust != null && o.windGust != null) { gustPred.push(f.windGust); gustActual.push(o.windGust); }
+  }
+
+  const maeMean = mae(meanPred, meanActual);
+  const maeGusts = gustPred.length > 0 ? mae(gustPred, gustActual) : 0;
+
+  // Score: 70% mean wind accuracy + 30% gust accuracy (if available)
+  const meanScore = maeToScore(maeMean, 25);
+  const gustScore = gustPred.length > 0 ? maeToScore(maeGusts, 35) : meanScore;
+  const score = gustPred.length > 0 ? (meanScore * 0.7 + gustScore * 0.3) : meanScore;
+
+  return {
+    maeMean: round2(maeMean),
+    maeGusts: gustPred.length > 0 ? round2(maeGusts) : 0,
+    biasMean: round2(bias(meanPred, meanActual)),
+    maxError: round2(maxAbsError(meanPred, meanActual)),
+    score: round2(score),
+    sampleSize: meanPred.length,
+  };
+}
+
+/**
+ * ☁️ Cloud cover / Conditions dimension
+ * Categorical concordance: maps conditions to 3 categories (clear/partly/overcast).
+ */
+function conditionCategory(condition: string | null | undefined, cloudCover: number | null | undefined): number {
+  // 0 = clear, 1 = partly cloudy, 2 = overcast/rain
+  if (condition) {
+    const c = condition.toLowerCase();
+    if (c.includes("pluie") || c.includes("orage") || c.includes("couvert")) return 2;
+    if (c.includes("nuageux") || c.includes("averses") || c.includes("partiellement")) return 1;
+    if (c.includes("ensoleillé") || c.includes("clair") || c.includes("dégagé")) return 0;
+  }
+  if (cloudCover != null) {
+    if (cloudCover > 75) return 2;
+    if (cloudCover > 35) return 1;
+    return 0;
+  }
+  return 1; // unknown → partly cloudy
+}
+
+function calcConditionDimension(forecasts: ForecastRow[], observations: ObservationRow[]): ConditionDimension {
+  let matches = 0;
+  let total = 0;
+  const cloudPred: number[] = [];
+  const cloudActual: number[] = [];
+
+  for (let i = 0; i < forecasts.length; i++) {
+    const f = forecasts[i], o = observations[i];
+    if (!f || !o) continue;
+
+    const fCat = conditionCategory(f.condition, f.cloudCover);
+    const oCat = conditionCategory(o.condition, o.cloudCover);
+    total++;
+    if (fCat === oCat) matches++;
+
+    if (f.cloudCover != null && o.cloudCover != null) {
+      cloudPred.push(f.cloudCover);
+      cloudActual.push(o.cloudCover);
+    }
+  }
+
+  const concordance = total > 0 ? (matches / total) * 100 : 70;
+  const maeCloud = cloudPred.length > 0 ? mae(cloudPred, cloudActual) : 0;
+
+  // Score: concordance is primary, cloud MAE is secondary
+  const score = cloudPred.length > 0
+    ? (concordance * 0.6 + maeToScore(maeCloud, 40) * 0.4)
+    : concordance;
+
+  return {
+    concordance: round2(concordance),
+    maeCloudCover: round2(maeCloud),
+    score: round2(score),
+    sampleSize: total,
+  };
+}
+
 // ─── Main scoring function ────────────────────────────────────────────────────
 
 /**
- * Calculate contextually-weighted reliability score for a single service.
- *
- * The regime is detected from the observation data (actual weather that occurred),
- * ensuring the weights reflect what truly mattered on those days.
- *
- * @param forecasts   Array of forecast rows for the service
- * @param observations Array of actual observation rows (same dates)
- * @param forcedRegime Optional: override auto-detection with a specific regime
+ * Calculate full multi-dimension reliability score.
+ * Each dimension is measured independently before contextual combination.
  */
 export function calculateReliabilityScore(
   forecasts: ForecastRow[],
   observations: ObservationRow[],
   forcedRegime?: WeatherRegime
 ): ScoreResult {
-  const tempPredicted: number[] = [];
-  const tempActual: number[] = [];
-  const precipPredicted: number[] = [];
-  const precipActual: number[] = [];
-  const windPredicted: number[] = [];
-  const windActual: number[] = [];
+  // Calculate each dimension independently
+  const tempDim = calcTempDimension(forecasts, observations);
+  const precipDim = calcPrecipDimension(forecasts, observations);
+  const windDim = calcWindDimension(forecasts, observations);
+  const condDim = calcConditionDimension(forecasts, observations);
 
-  for (let i = 0; i < forecasts.length; i++) {
-    const f = forecasts[i];
-    const o = observations[i];
-    if (!f || !o) continue;
-
-    if (f.tempMax != null && o.tempMax != null) { tempPredicted.push(f.tempMax); tempActual.push(o.tempMax); }
-    if (f.tempMin != null && o.tempMin != null) { tempPredicted.push(f.tempMin); tempActual.push(o.tempMin); }
-    if (f.precipitation != null && o.precipitation != null) { precipPredicted.push(f.precipitation); precipActual.push(o.precipitation); }
-    if (f.windSpeed != null && o.windSpeed != null) { windPredicted.push(f.windSpeed); windActual.push(o.windSpeed); }
-  }
-
-  // Detect regime from actual observations (average across all days)
+  // Detect regime from observations
   let regimeInfo: RegimeInfo;
   if (forcedRegime) {
     regimeInfo = { regime: forcedRegime, ...REGIME_DEFINITIONS[forcedRegime] };
   } else {
-    const avgPrecip = precipActual.length > 0 ? precipActual.reduce((a, b) => a + b, 0) / precipActual.length : null;
-    const avgWind = windActual.length > 0 ? windActual.reduce((a, b) => a + b, 0) / windActual.length : null;
-    // Use tempActual pairs for max/min (even indices = max, odd = min)
-    const tempMaxActual = tempActual.filter((_, i) => i % 2 === 0);
-    const tempMinActual = tempActual.filter((_, i) => i % 2 === 1);
-    const avgTempMax = tempMaxActual.length > 0 ? tempMaxActual.reduce((a, b) => a + b, 0) / tempMaxActual.length : null;
-    const avgTempMin = tempMinActual.length > 0 ? tempMinActual.reduce((a, b) => a + b, 0) / tempMinActual.length : null;
-    regimeInfo = detectWeatherRegime({ precipitation: avgPrecip, windSpeed: avgWind, tempMax: avgTempMax, tempMin: avgTempMin });
+    // Average precipitation and wind across observations for regime detection
+    const obsPrecips = observations.filter(o => o.precipitation != null).map(o => o.precipitation!);
+    const obsWinds = observations.filter(o => o.windSpeed != null).map(o => o.windSpeed!);
+    const obsTempMax = observations.filter(o => o.tempMax != null).map(o => o.tempMax!);
+    const obsTempMin = observations.filter(o => o.tempMin != null).map(o => o.tempMin!);
+    regimeInfo = detectWeatherRegime({
+      precipitation: obsPrecips.length > 0 ? mean(obsPrecips) : null,
+      windSpeed: obsWinds.length > 0 ? mean(obsWinds) : null,
+      tempMax: obsTempMax.length > 0 ? mean(obsTempMax) : null,
+      tempMin: obsTempMin.length > 0 ? mean(obsTempMin) : null,
+    });
   }
 
   const { weights } = regimeInfo;
 
-  const maeT = mae(tempPredicted, tempActual);
-  const maeP = mae(precipPredicted, precipActual);
-  const maeW = mae(windPredicted, windActual);
-
-  const rmseT = rmse(tempPredicted, tempActual);
-  const rmseP = rmse(precipPredicted, precipActual);
-  const rmseW = rmse(windPredicted, windActual);
-
-  const biasT = bias(tempPredicted, tempActual);
-  const biasP = bias(precipPredicted, precipActual);
-  const biasW = bias(windPredicted, windActual);
-
-  const tempScore = maeToScore(maeT, 10);
-  const precipScore = maeToScore(maeP, 20);
-  const windScore = maeToScore(maeW, 30);
-  const conditionScore = 70; // Default when no text comparison available
-
-  // Contextually-weighted score
+  // Contextually-weighted final score
   const weightedScore =
-    (tempScore * weights.temp) +
-    (precipScore * weights.precip) +
-    (windScore * weights.wind) +
-    (conditionScore * weights.condition);
+    (tempDim.score * weights.temp) +
+    (precipDim.score * weights.precip) +
+    (windDim.score * weights.wind) +
+    (condDim.score * weights.condition);
 
   return {
     serviceName: "",
-    maeTemp: Math.round(maeT * 100) / 100,
-    maePrecip: Math.round(maeP * 100) / 100,
-    maeWind: Math.round(maeW * 100) / 100,
-    rmseTemp: Math.round(rmseT * 100) / 100,
-    rmsePrecip: Math.round(rmseP * 100) / 100,
-    rmseWind: Math.round(rmseW * 100) / 100,
-    biasTemp: Math.round(biasT * 100) / 100,
-    biasPrecip: Math.round(biasP * 100) / 100,
-    biasWind: Math.round(biasW * 100) / 100,
-    conditionAccuracy: conditionScore / 100,
-    weightedScore: Math.round(weightedScore * 100) / 100,
+    // Legacy flat fields
+    maeTemp: tempDim.mae,
+    maePrecip: precipDim.maeQuantity,
+    maeWind: windDim.maeMean,
+    rmseTemp: tempDim.rmse,
+    rmsePrecip: 0,
+    rmseWind: 0,
+    biasTemp: tempDim.bias,
+    biasPrecip: precipDim.biasQuantity,
+    biasWind: windDim.biasMean,
+    conditionAccuracy: condDim.concordance / 100,
+    weightedScore: round2(weightedScore),
+    // Dimension detail
+    dimensions: {
+      temperature: tempDim,
+      precipitation: precipDim,
+      wind: windDim,
+      condition: condDim,
+    },
     regime: regimeInfo.regime,
     regimeLabel: regimeInfo.label,
     regimeEmoji: regimeInfo.emoji,
@@ -278,12 +505,12 @@ export function calculateStabilityIndex(forecasts: ForecastRow[]): {
   const temps = forecasts.filter(f => f.tempMax != null).map(f => f.tempMax!);
   const precips = forecasts.filter(f => f.precipitation != null).map(f => f.precipitation!);
 
-  const tempMean = temps.reduce((a, b) => a + b, 0) / temps.length;
-  const tempStd = Math.sqrt(temps.reduce((acc, t) => acc + Math.pow(t - tempMean, 2), 0) / temps.length);
+  const tempMean = mean(temps);
+  const tempStd = Math.sqrt(mean(temps.map(t => Math.pow(t - tempMean, 2))));
 
-  const precipMean = precips.length > 0 ? precips.reduce((a, b) => a + b, 0) / precips.length : 0;
+  const precipMean = precips.length > 0 ? mean(precips) : 0;
   const precipStd = precips.length > 0
-    ? Math.sqrt(precips.reduce((acc, p) => acc + Math.pow(p - precipMean, 2), 0) / precips.length)
+    ? Math.sqrt(mean(precips.map(p => Math.pow(p - precipMean, 2))))
     : 0;
 
   const tempStability = Math.max(0, 100 - (tempStd * 20));
@@ -313,21 +540,21 @@ export function generateMeteoAIForecast(
   });
 
   let tempMaxSum = 0, tempMinSum = 0, precipSum = 0, windSum = 0;
-  let tempMaxWeight = 0, tempMinWeight = 0, precipWeight = 0, windWeight = 0;
+  let tempMaxW = 0, tempMinW = 0, precipW = 0, windW = 0;
 
   forecasts.forEach((f, i) => {
     const w = (reliabilityScores[serviceNames[i]] || 50) / totalScore;
-    if (f.tempMax != null) { tempMaxSum += f.tempMax * w; tempMaxWeight += w; }
-    if (f.tempMin != null) { tempMinSum += f.tempMin * w; tempMinWeight += w; }
-    if (f.precipitation != null) { precipSum += f.precipitation * w; precipWeight += w; }
-    if (f.windSpeed != null) { windSum += f.windSpeed * w; windWeight += w; }
+    if (f.tempMax != null) { tempMaxSum += f.tempMax * w; tempMaxW += w; }
+    if (f.tempMin != null) { tempMinSum += f.tempMin * w; tempMinW += w; }
+    if (f.precipitation != null) { precipSum += f.precipitation * w; precipW += w; }
+    if (f.windSpeed != null) { windSum += f.windSpeed * w; windW += w; }
   });
 
   return {
-    tempMax: Math.round((tempMaxWeight > 0 ? tempMaxSum / tempMaxWeight : 0) * 10) / 10,
-    tempMin: Math.round((tempMinWeight > 0 ? tempMinSum / tempMinWeight : 0) * 10) / 10,
-    precipitation: Math.round((precipWeight > 0 ? precipSum / precipWeight : 0) * 10) / 10,
-    windSpeed: Math.round((windWeight > 0 ? windSum / windWeight : 0) * 10) / 10,
+    tempMax: Math.round((tempMaxW > 0 ? tempMaxSum / tempMaxW : 0) * 10) / 10,
+    tempMin: Math.round((tempMinW > 0 ? tempMinSum / tempMinW : 0) * 10) / 10,
+    precipitation: Math.round((precipW > 0 ? precipSum / precipW : 0) * 10) / 10,
+    windSpeed: Math.round((windW > 0 ? windSum / windW : 0) * 10) / 10,
     weights,
   };
 }

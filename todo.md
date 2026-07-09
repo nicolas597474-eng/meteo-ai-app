@@ -28,3 +28,11 @@
 - [x] Frontend: Afficher le régime actif + badge poids sur Dashboard
 - [x] Frontend: Afficher le régime utilisé dans la page Classement
 - [x] Database: Ajouter colonne `regime` à `reliability_scores` pour persistance historique des régimes
+- [ ] statsEngine: Dimension Température — MAE, biais, erreur max (pics)
+- [ ] statsEngine: Dimension Précipitations — détection pluie/sec (POD/FAR/CSI), erreur quantité, faux positifs/négatifs
+- [ ] statsEngine: Dimension Vent — MAE vent moyen, MAE rafales
+- [ ] statsEngine: Dimension Nébulosité — score de concordance catégorielle
+- [ ] statsEngine: Score final = combinaison pondérée des 4 dimensions (pas de score brut unique)
+- [ ] Database: Ajouter colonnes détaillées par dimension dans reliability_scores
+- [ ] Backend: Exposer les scores par dimension dans getRanking et getReport
+- [ ] Frontend: Afficher les 4 dimensions avec leurs métriques dans Classement et Rapport

@@ -84,6 +84,23 @@ export const reliabilityScores = mysqlTable("reliability_scores", {
   conditionAccuracy: float("conditionAccuracy"), // 0-1
   weightedScore: float("weightedScore"), // 0-100
   regime: varchar("regime", { length: 32 }), // detected weather regime
+  // 🌡️ Temperature dimension
+  tempScore: float("tempScore"),
+  tempMaxError: float("tempMaxError"),
+  // 🌧️ Precipitation dimension
+  precipScore: float("precipScore"),
+  precipPod: float("precipPod"),    // Probability of Detection
+  precipFar: float("precipFar"),    // False Alarm Rate
+  precipCsi: float("precipCsi"),    // Critical Success Index
+  precipFalsePositives: int("precipFalsePositives"),
+  precipFalseNegatives: int("precipFalseNegatives"),
+  // 💨 Wind dimension
+  windScore: float("windScore"),
+  windMaeGusts: float("windMaeGusts"),
+  // ☁️ Condition dimension
+  condScore: float("condScore"),
+  condConcordance: float("condConcordance"),
+  condMaeCloud: float("condMaeCloud"),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
 });
 
