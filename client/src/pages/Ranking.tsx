@@ -1,5 +1,150 @@
 import { trpc } from "@/lib/trpc";
-import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useState } from "react";
+import { Trophy, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-react";
+
+type RankingService = {
+  serviceName: string;
+  avgScore: number | null;
+  avgMaeTemp: number | null;
+  avgMaePrecip: number | null;
+  avgMaeWind: number | null;
+  avgRmseTemp: number | null;
+  avgBiasTemp: number | null;
+  daysTracked: number;
+  avgTempScore: number | null;
+  avgTempMae: number | null;
+  avgTempBias: number | null;
+  avgTempMaxError: number | null;
+  avgPrecipScore: number | null;
+  avgPrecipPod: number | null;
+  avgPrecipFar: number | null;
+  avgPrecipCsi: number | null;
+  totalPrecipFalsePos: number | null;
+  totalPrecipFalseNeg: number | null;
+  avgWindScore: number | null;
+  avgWindMaeGusts: number | null;
+  avgCondScore: number | null;
+  avgCondConcordance: number | null;
+  avgCondMaeCloud: number | null;
+};
+
+function ScoreBar({ score, color }: { score: number | null; color: string }) {
+  const s = score ?? 0;
+  const barColor = s >= 80 ? "bg-green-400" : s >= 60 ? "bg-yellow-400" : "bg-red-400";
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+        <div className={`h-full ${barColor} rounded-full`} style={{ width: `${s}%` }} />
+      </div>
+      <span className={`text-xs font-mono font-bold w-8 text-right ${s >= 80 ? "text-green-400" : s >= 60 ? "text-yellow-400" : "text-red-400"}`}>{s.toFixed(0)}</span>
+    </div>
+  );
+}
+
+function ServiceDimCard({ service, rank }: { service: RankingService; rank: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const medalColor = rank === 1 ? "bg-yellow-500/20 text-yellow-400" : rank === 2 ? "bg-gray-400/20 text-gray-300" : rank === 3 ? "bg-orange-500/20 text-orange-400" : "bg-muted text-muted-foreground";
+  const borderClass = rank <= 3 ? "border-primary/30" : "border-border";
+  const hasDimData = service.avgTempScore != null;
+
+  return (
+    <div className={`bg-card border rounded-xl overflow-hidden ${borderClass}`}>
+      <button
+        className="w-full flex items-center justify-between p-3 hover:bg-muted/20 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${medalColor}`}>{rank}</span>
+          <span className="font-semibold text-sm">{service.serviceName}</span>
+          <span className="text-xs text-muted-foreground hidden sm:inline">({service.daysTracked}j)</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {hasDimData && (
+            <div className="hidden sm:flex gap-1.5 text-xs">
+              {[{ e: "🌡", s: service.avgTempScore }, { e: "🌧", s: service.avgPrecipScore }, { e: "💨", s: service.avgWindScore }, { e: "☁", s: service.avgCondScore }].map(({ e, s }) => {
+                const score = s ?? 0;
+                const c = score >= 80 ? "text-green-400" : score >= 60 ? "text-yellow-400" : "text-red-400";
+                return <span key={e} className={`font-mono font-bold ${c}`}>{e}{score.toFixed(0)}</span>;
+              })}
+            </div>
+          )}
+          <span className="font-mono font-bold text-primary text-lg">{(service.avgScore ?? 0).toFixed(1)}</span>
+          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border p-3 space-y-3 bg-muted/10">
+          {hasDimData ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* 🌡️ Temperature */}
+              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🌡️ Température</span>
+                </div>
+                <ScoreBar score={service.avgTempScore} color="orange" />
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">MAE moy.</span><span className="font-mono">{(service.avgTempMae ?? 0).toFixed(2)} °C</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Biais moy.</span><span className={`font-mono ${(service.avgTempBias ?? 0) > 0.2 ? "text-orange-400" : (service.avgTempBias ?? 0) < -0.2 ? "text-blue-400" : "text-green-400"}`}>{(service.avgTempBias ?? 0) > 0 ? "+" : ""}{(service.avgTempBias ?? 0).toFixed(2)} °C</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Erreur max</span><span className="font-mono">{(service.avgTempMaxError ?? 0).toFixed(1)} °C</span></div>
+                </div>
+              </div>
+
+              {/* 🌧️ Précipitations */}
+              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🌧️ Précipitations</span>
+                </div>
+                <ScoreBar score={service.avgPrecipScore} color="blue" />
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">CSI moy.</span><span className="font-mono">{((service.avgPrecipCsi ?? 0) * 100).toFixed(0)}%</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">POD moy.</span><span className="font-mono">{((service.avgPrecipPod ?? 0) * 100).toFixed(0)}%</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">FAR moy.</span><span className="font-mono">{((service.avgPrecipFar ?? 0) * 100).toFixed(0)}%</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Faux + / −</span><span className="font-mono">{service.totalPrecipFalsePos ?? 0}j / {service.totalPrecipFalseNeg ?? 0}j</span></div>
+                </div>
+              </div>
+
+              {/* 💨 Vent */}
+              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">💨 Vent</span>
+                </div>
+                <ScoreBar score={service.avgWindScore} color="cyan" />
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">MAE vent moy.</span><span className="font-mono">{(service.avgMaeWind ?? 0).toFixed(1)} km/h</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">MAE rafales</span><span className="font-mono">{service.avgWindMaeGusts != null && service.avgWindMaeGusts > 0 ? `${service.avgWindMaeGusts.toFixed(1)} km/h` : "—"}</span></div>
+                </div>
+              </div>
+
+              {/* ☁️ Conditions */}
+              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">☁️ Conditions</span>
+                </div>
+                <ScoreBar score={service.avgCondScore} color="purple" />
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Concordance</span><span className="font-mono">{(service.avgCondConcordance ?? 0).toFixed(0)}%</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">MAE nuages</span><span className="font-mono">{service.avgCondMaeCloud != null && service.avgCondMaeCloud > 0 ? `${service.avgCondMaeCloud.toFixed(0)}%` : "—"}</span></div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground text-center py-2">
+              Données par dimension disponibles après la prochaine collecte d'observations (23h50).
+            </div>
+          )}
+          {/* Legacy flat metrics */}
+          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-1 border-t border-border/30">
+            <span>MAE T: <span className="font-mono text-foreground">{(service.avgMaeTemp ?? 0).toFixed(2)}°C</span></span>
+            <span>MAE P: <span className="font-mono text-foreground">{(service.avgMaePrecip ?? 0).toFixed(2)}mm</span></span>
+            <span>RMSE T: <span className="font-mono text-foreground">{(service.avgRmseTemp ?? 0).toFixed(2)}°C</span></span>
+            <span>Jours: <span className="font-mono text-foreground">{service.daysTracked}</span></span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Ranking() {
   const { data, isLoading } = trpc.weather.getRanking.useQuery();
@@ -101,72 +246,12 @@ export default function Ranking() {
           </div>
         )}
 
-        {/* Ranking Table */}
+        {/* Ranking Cards with dimension breakdown */}
         {ranking.length > 0 ? (
           <div className="space-y-2">
-            {/* Desktop table (hidden on mobile) */}
-            <div className="hidden sm:block bg-card border border-border rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th className="text-left p-3 font-medium">#</th>
-                      <th className="text-left p-3 font-medium">Service</th>
-                      <th className="text-right p-3 font-medium">Score</th>
-                      <th className="text-right p-3 font-medium">MAE Temp</th>
-                      <th className="text-right p-3 font-medium">MAE Précip</th>
-                      <th className="text-right p-3 font-medium">MAE Vent</th>
-                      <th className="text-right p-3 font-medium">RMSE Temp</th>
-                      <th className="text-right p-3 font-medium">Biais Temp</th>
-                      <th className="text-right p-3 font-medium">Jours</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ranking.map((service, i) => (
-                      <tr key={service.serviceName} className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${i < 3 ? "bg-primary/5" : ""}`}>
-                        <td className="p-3"><span className={`font-bold ${i===0?"text-yellow-400":i===1?"text-gray-300":i===2?"text-orange-400":"text-muted-foreground"}`}>{i+1}</span></td>
-                        <td className="p-3 font-medium">{service.serviceName}</td>
-                        <td className="p-3 text-right"><span className="font-mono font-bold text-primary">{(service.avgScore??0).toFixed(1)}</span></td>
-                        <td className="p-3 text-right font-mono">{(service.avgMaeTemp??0).toFixed(2)}°C</td>
-                        <td className="p-3 text-right font-mono">{(service.avgMaePrecip??0).toFixed(2)}mm</td>
-                        <td className="p-3 text-right font-mono">{(service.avgMaeWind??0).toFixed(1)}km/h</td>
-                        <td className="p-3 text-right font-mono">{(service.avgRmseTemp??0).toFixed(2)}°C</td>
-                        <td className="p-3 text-right"><BiasIndicator value={service.avgBiasTemp??0} unit="°C" /></td>
-                        <td className="p-3 text-right text-muted-foreground">{service.daysTracked}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            {/* Mobile cards */}
-            <div className="sm:hidden space-y-2">
-              {ranking.map((service, i) => (
-                <div key={service.serviceName} className={`bg-card border rounded-xl p-3 ${i < 3 ? "border-primary/30 bg-primary/5" : "border-border"}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center ${i===0?"bg-yellow-500/20 text-yellow-400":i===1?"bg-gray-400/20 text-gray-300":i===2?"bg-orange-600/20 text-orange-400":"bg-muted text-muted-foreground"}`}>{i+1}</span>
-                      <span className="font-semibold text-sm">{service.serviceName}</span>
-                    </div>
-                    <span className="font-mono font-bold text-primary text-lg">{(service.avgScore??0).toFixed(1)}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="text-center">
-                      <p className="text-muted-foreground">MAE Temp</p>
-                      <p className="font-mono font-medium">{(service.avgMaeTemp??0).toFixed(2)}°C</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-muted-foreground">MAE Précip</p>
-                      <p className="font-mono font-medium">{(service.avgMaePrecip??0).toFixed(2)}mm</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-muted-foreground">MAE Vent</p>
-                      <p className="font-mono font-medium">{(service.avgMaeWind??0).toFixed(1)}km/h</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {ranking.map((service, i) => (
+              <ServiceDimCard key={service.serviceName} service={service} rank={i + 1} />
+            ))}
           </div>
         ) : (
           <div className="bg-card border border-border rounded-xl p-12 text-center">

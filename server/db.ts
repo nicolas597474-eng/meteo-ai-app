@@ -215,6 +215,7 @@ export async function getCumulativeRanking() {
     .select({
       serviceName: reliabilityScores.serviceName,
       avgScore: sql<number>`AVG(${reliabilityScores.weightedScore})`,
+      // Legacy flat metrics
       avgMaeTemp: sql<number>`AVG(${reliabilityScores.maeTemp})`,
       avgMaePrecip: sql<number>`AVG(${reliabilityScores.maePrecip})`,
       avgMaeWind: sql<number>`AVG(${reliabilityScores.maeWind})`,
@@ -222,6 +223,25 @@ export async function getCumulativeRanking() {
       avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
       daysTracked: sql<number>`COUNT(*)`,
+      // 🌡️ Temperature dimension
+      avgTempScore: sql<number>`AVG(${reliabilityScores.tempScore})`,
+      avgTempMae: sql<number>`AVG(${reliabilityScores.maeTemp})`,
+      avgTempBias: sql<number>`AVG(${reliabilityScores.biasTemp})`,
+      avgTempMaxError: sql<number>`AVG(${reliabilityScores.tempMaxError})`,
+      // 🌧️ Precipitation dimension
+      avgPrecipScore: sql<number>`AVG(${reliabilityScores.precipScore})`,
+      avgPrecipPod: sql<number>`AVG(${reliabilityScores.precipPod})`,
+      avgPrecipFar: sql<number>`AVG(${reliabilityScores.precipFar})`,
+      avgPrecipCsi: sql<number>`AVG(${reliabilityScores.precipCsi})`,
+      totalPrecipFalsePos: sql<number>`SUM(${reliabilityScores.precipFalsePositives})`,
+      totalPrecipFalseNeg: sql<number>`SUM(${reliabilityScores.precipFalseNegatives})`,
+      // 💨 Wind dimension
+      avgWindScore: sql<number>`AVG(${reliabilityScores.windScore})`,
+      avgWindMaeGusts: sql<number>`AVG(${reliabilityScores.windMaeGusts})`,
+      // ☁️ Condition dimension
+      avgCondScore: sql<number>`AVG(${reliabilityScores.condScore})`,
+      avgCondConcordance: sql<number>`AVG(${reliabilityScores.condConcordance})`,
+      avgCondMaeCloud: sql<number>`AVG(${reliabilityScores.condMaeCloud})`,
     })
     .from(reliabilityScores)
     .groupBy(reliabilityScores.serviceName)
