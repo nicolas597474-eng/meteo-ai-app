@@ -10,7 +10,8 @@ import {
 } from "../db";
 import { collectNearbyStations, rankStations, calculateGroundTruth } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
-import { generateMeteoAIForecast, detectWeatherRegime, REGIME_DEFINITIONS } from "../statsEngine";
+import { generateMeteoAIForecast, detectWeatherRegime } from "../statsEngine";
+import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ultraLocalService";
 
 export const favoritesRouter = router({
   /**
@@ -32,6 +33,7 @@ export const favoritesRouter = router({
       position: z.number().min(0).max(4).optional(),
       radiusKm: z.number().min(5).max(50).optional(),
       tempUnit: z.enum(["celsius", "fahrenheit"]).optional(),
+      localMode: z.enum(["standard", "local", "ultra-local"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const id = await addFavoriteLocation({
@@ -43,6 +45,7 @@ export const favoritesRouter = router({
         position: input.position ?? 0,
         radiusKm: input.radiusKm ?? 20,
         tempUnit: input.tempUnit ?? "celsius",
+        localMode: input.localMode ?? "standard",
       });
       if (id === null) {
         throw new Error("Maximum 5 favoris atteint");
@@ -60,6 +63,7 @@ export const favoritesRouter = router({
       radiusKm: z.number().min(5).max(50).optional(),
       preferredModels: z.array(z.string()).optional(),
       tempUnit: z.enum(["celsius", "fahrenheit"]).optional(),
+      localMode: z.enum(["standard", "local", "ultra-local"]).optional(),
       alertsEnabled: z.boolean().optional(),
       alertThresholds: z.object({
         precipMm: z.number().optional(),
@@ -77,6 +81,7 @@ export const favoritesRouter = router({
       if (data.radiusKm !== undefined) updateData.radiusKm = data.radiusKm;
       if (data.preferredModels !== undefined) updateData.preferredModels = data.preferredModels;
       if (data.tempUnit !== undefined) updateData.tempUnit = data.tempUnit;
+      if (data.localMode !== undefined) updateData.localMode = data.localMode;
       if (data.alertsEnabled !== undefined) updateData.alertsEnabled = data.alertsEnabled ? 1 : 0;
       if (data.alertThresholds !== undefined) updateData.alertThresholds = data.alertThresholds;
       if (data.position !== undefined) updateData.position = data.position;
@@ -110,29 +115,48 @@ export const favoritesRouter = router({
     }),
 
   /**
-   * Get full weather data for a specific location (used for prefetching all favorites).
-   * Returns: current conditions, hourly, 15-day, stations, AI scores.
+   * Get Ultra-local mode configuration details.
+   */
+  getUltraLocalConfig: publicProcedure
+    .input(z.object({
+      mode: z.enum(["standard", "local", "ultra-local"]).default("standard"),
+    }))
+    .query(({ input }) => {
+      return getUltraLocalConfig(input.mode);
+    }),
+
+  /**
+   * Get full weather data for a specific location with Ultra-local mode support.
+   * Returns: current conditions, hourly, 15-day, stations, AI scores, ultra-local details.
    */
   getLocationWeather: publicProcedure
     .input(z.object({
       lat: z.number().min(-90).max(90),
       lon: z.number().min(-180).max(180),
       radiusKm: z.number().min(5).max(50).default(20),
+      localMode: z.enum(["standard", "local", "ultra-local"]).default("standard"),
     }))
     .query(async ({ input }) => {
-      const { lat, lon, radiusKm } = input;
+      const { lat, lon, radiusKm, localMode } = input;
+
+      // For ultra-local, always search at least 20km to find all potential stations
+      const searchRadius = localMode === "ultra-local" ? Math.max(radiusKm, 20) : radiusKm;
 
       // Parallel fetch: 15-day, hourly, stations
       const todayDate = new Date().toISOString().split("T")[0];
       const [forecast15dResult, hourly, stations] = await Promise.all([
         collect15DayForecast(),
         collectHourlyForecast(todayDate),
-        collectNearbyStations(lat, lon, radiusKm),
+        collectNearbyStations(lat, lon, searchRadius),
       ]);
       const forecast15d = forecast15dResult.days;
 
-      // Ground truth from stations
+      // Ultra-local calculation
       const ranked = rankStations(stations);
+      const modelTemp = hourly[0]?.temp ?? null;
+      const ultraLocalResult = calculateUltraLocal(ranked, localMode, lat, lon, null, modelTemp);
+
+      // Standard ground truth (for comparison)
       const groundTruth = calculateGroundTruth(ranked);
 
       // Today's synthesis
@@ -162,6 +186,7 @@ export const favoritesRouter = router({
 
       return {
         location: { lat, lon },
+        localMode,
         today: todayForecast ? {
           tempMax: todayForecast.tempMax,
           tempMin: todayForecast.tempMin,
@@ -184,6 +209,40 @@ export const favoritesRouter = router({
             precipitation: groundTruth.precipitation,
             stationCount: groundTruth.stationCount,
           },
+        },
+        ultraLocal: {
+          temperature: ultraLocalResult.temperature,
+          humidity: ultraLocalResult.humidity,
+          windSpeed: ultraLocalResult.windSpeed,
+          precipitation: ultraLocalResult.precipitation,
+          stationsUsed: ultraLocalResult.stationsUsed.map(s => ({
+            name: s.name,
+            source: s.source,
+            distanceKm: s.distanceKm,
+            temperature: s.temperature,
+            adjustedTemperature: s.adjustedTemperature,
+            weight: s.weight,
+            band: s.band,
+            bandWeight: s.bandWeight,
+            altitudeAdjustment: s.altitudeAdjustment,
+            qualityChecks: s.qualityChecks,
+          })),
+          stationsIgnored: ultraLocalResult.stationsIgnored.map(s => ({
+            name: s.name,
+            source: s.source,
+            distanceKm: s.distanceKm,
+            temperature: s.temperature,
+            reason: s.reason,
+            checks: s.checks,
+          })),
+          bandBreakdown: ultraLocalResult.bandBreakdown,
+          modelContribution: ultraLocalResult.modelContribution,
+          modelWeight: ultraLocalResult.modelWeight,
+          microclimateAdjustment: ultraLocalResult.microclimateAdjustment,
+          microclimateFactors: ultraLocalResult.microclimateFactors,
+          confidenceScore: ultraLocalResult.confidenceScore,
+          explanation: ultraLocalResult.explanation,
+          stationCount: ultraLocalResult.stationCount,
         },
         scores: {
           confidenceScore,

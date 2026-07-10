@@ -15,6 +15,7 @@ type FavoriteLocation = {
   isDefault: number | null;
   radiusKm: number | null;
   position: number;
+  localMode?: string | null;
 };
 
 type LocationItem = {
@@ -25,6 +26,7 @@ type LocationItem = {
   lon: number;
   radiusKm: number;
   isDefault?: boolean;
+  localMode?: "standard" | "local" | "ultra-local";
   temp?: number | null;
   condition?: string | null;
   confidenceScore?: number | null;
@@ -93,7 +95,7 @@ export function FavoritesBar({
   prefetchedWeather,
 }: {
   activeLocation: { lat: number; lon: number; name: string } | null;
-  onLocationChange: (loc: { lat: number; lon: number; name: string; radiusKm: number }) => void;
+  onLocationChange: (loc: { lat: number; lon: number; name: string; radiusKm: number; localMode?: "standard" | "local" | "ultra-local" }) => void;
   prefetchedWeather?: Map<string, { temp: number | null; condition: string | null; confidenceScore: number | null }>;
 }) {
   const { user } = useAuth();
@@ -150,6 +152,7 @@ export function FavoritesBar({
         lon: fav.lon,
         radiusKm: fav.radiusKm ?? 10,
         isDefault: fav.isDefault === 1,
+        localMode: (fav.localMode as "standard" | "local" | "ultra-local") ?? "standard",
       });
     });
   } else {
@@ -174,6 +177,7 @@ export function FavoritesBar({
         lon: defaultLoc.lon,
         name: defaultLoc.name,
         radiusKm: defaultLoc.radiusKm,
+        localMode: defaultLoc.localMode,
       });
     }
   }, [activeLocation, locations.length]);
@@ -210,7 +214,7 @@ export function FavoritesBar({
           {locations.map((loc) => (
             <button
               key={loc.id}
-              onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm })}
+              onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, localMode: loc.localMode })}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full border whitespace-nowrap text-xs font-medium transition-all flex-shrink-0 ${
                 isActive(loc)
                   ? "bg-primary/20 border-primary text-primary shadow-sm shadow-primary/20"

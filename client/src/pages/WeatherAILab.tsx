@@ -78,13 +78,41 @@ function DivergenceBar({ label, value, max, unit, color }: { label: string; valu
 }
 
 
-// ─── Stations section (embedded in AI Lab) ───────────────────────────────────
+// ─── Stations section (embedded in AI Lab) — Ultra-local aware ──────────────
 
 function StationsSection() {
-  const { data, isLoading } = trpc.weather.searchStations.useQuery(
-    { radiusKm: 20 },
+  // Get location from localStorage to match Dashboard
+  const storedLoc = (() => {
+    try {
+      const s = localStorage.getItem("meteoai_last_location");
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  })();
+  const storedMode = (() => {
+    try {
+      const m = localStorage.getItem("meteoai_local_mode");
+      if (m === "standard" || m === "local" || m === "ultra-local") return m;
+      return "standard";
+    } catch { return "standard" as const; }
+  })();
+
+  const { data: ultraData, isLoading: ultraLoading } = trpc.favorites.getLocationWeather.useQuery(
+    {
+      lat: storedLoc?.lat ?? 50.76,
+      lon: storedLoc?.lon ?? 2.52,
+      radiusKm: storedLoc?.radiusKm ?? 20,
+      localMode: storedMode as "standard" | "local" | "ultra-local",
+    },
     { staleTime: 5 * 60 * 1000 }
   );
+
+  // Fallback to old stations query
+  const { data: fallbackData, isLoading: fallbackLoading } = trpc.weather.searchStations.useQuery(
+    { radiusKm: 20 },
+    { staleTime: 5 * 60 * 1000, enabled: !storedLoc }
+  );
+
+  const isLoading = storedLoc ? ultraLoading : fallbackLoading;
 
   if (isLoading) {
     return (
@@ -102,11 +130,195 @@ function StationsSection() {
     );
   }
 
-  if (!data || data.stations.length === 0) return null;
+  // Ultra-local mode display
+  if (ultraData?.ultraLocal && storedMode !== "standard") {
+    const ul = ultraData.ultraLocal;
+    const modeLabel = storedMode === "ultra-local" ? "Ultra-local" : "Local";
+    const modeColor = storedMode === "ultra-local" ? "emerald" : "blue";
 
-  const active = data.stations.filter((s: { isActive: boolean }) => s.isActive);
-  const ignored = data.stations.filter((s: { isActive: boolean }) => !s.isActive);
-  const gt = data.groundTruth;
+    return (
+      <div className={`bg-card rounded-xl border border-${modeColor}-500/30 p-3 space-y-3`}>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Radio className={`h-4 w-4 text-${modeColor}-400`} />
+            <span className="text-sm font-semibold">Mode {modeLabel} — Stations</span>
+          </div>
+          <Link href="/stations" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
+            <LinkIcon className="h-3 w-3" />Voir tout
+          </Link>
+        </div>
+
+        {/* Temperature result */}
+        {ul.temperature != null && (
+          <div className={`flex items-center gap-3 p-2.5 rounded-lg bg-${modeColor}-500/10 border border-${modeColor}-500/20`}>
+            <Thermometer className={`h-5 w-5 text-${modeColor}-400`} />
+            <div>
+              <span className={`text-xl font-bold text-${modeColor}-300`}>{ul.temperature}°C</span>
+              <span className="text-xs text-muted-foreground ml-2">Confiance {ul.confidenceScore}%</span>
+            </div>
+            {ul.modelContribution != null && (
+              <div className="ml-auto text-right">
+                <div className="text-[10px] text-muted-foreground">Modèles: {ul.modelContribution.toFixed(1)}°C</div>
+                <div className="text-[10px] text-muted-foreground">Poids: {Math.round(ul.modelWeight * 100)}%</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Band breakdown */}
+        {ul.bandBreakdown && ul.bandBreakdown.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bandes de distance</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {ul.bandBreakdown.map((band: any) => (
+                <div key={band.band} className={`rounded-lg p-2 text-center border ${
+                  band.stationCount > 0 ? `border-${modeColor}-500/30 bg-${modeColor}-500/5` : "border-border bg-muted/20"
+                }`}>
+                  <div className="text-[10px] font-medium text-muted-foreground">{band.band}</div>
+                  <div className="text-sm font-bold">{band.avgTemperature != null ? `${band.avgTemperature}°` : "—"}</div>
+                  <div className={`text-[10px] ${band.stationCount > 0 ? `text-${modeColor}-400` : "text-muted-foreground"}`}>
+                    {Math.round(band.effectiveWeight * 100)}% · {band.stationCount} st.
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Stations used */}
+        {ul.stationsUsed && ul.stationsUsed.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Utilisées ({ul.stationsUsed.length})
+            </div>
+            {ul.stationsUsed.slice(0, 6).map((s: any, i: number) => (
+              <div key={i} className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                  </div>
+                  <CheckCircle className="h-3 w-3 text-green-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium truncate">{s.name}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {s.source} · {s.distanceKm.toFixed(1)} km · {s.band}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xs font-semibold">
+                      {s.temperature != null ? `${s.temperature.toFixed(1)}°` : "—"}
+                      {s.altitudeAdjustment !== 0 && (
+                        <span className="text-[10px] text-muted-foreground ml-0.5">
+                          ({s.altitudeAdjustment > 0 ? "+" : ""}{s.altitudeAdjustment.toFixed(1)}°)
+                        </span>
+                      )}
+                    </div>
+                    <div className={`text-[10px] text-${modeColor}-400 font-medium`}>
+                      {Math.round(s.weight * 100)}% contrib.
+                    </div>
+                  </div>
+                </div>
+                <div className="ml-7 h-1 bg-muted rounded-full overflow-hidden">
+                  <div className={`h-full bg-${modeColor}-500/60 rounded-full`} style={{ width: Math.min(100, s.weight * 100 * 3) + "%" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Stations ignored */}
+        {ul.stationsIgnored && ul.stationsIgnored.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Ignorées ({ul.stationsIgnored.length})
+            </div>
+            {ul.stationsIgnored.slice(0, 4).map((s: any, i: number) => (
+              <div key={i} className="flex items-start gap-2 py-1">
+                <XCircle className="h-3 w-3 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium truncate opacity-60">{s.name}</div>
+                  <div className="text-[10px] text-red-400/70">{s.reason}</div>
+                </div>
+                <div className="text-[10px] text-muted-foreground flex-shrink-0">
+                  {s.temperature != null ? `${s.temperature.toFixed(1)}°` : "—"} · {s.distanceKm.toFixed(1)} km
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Microclimate factors */}
+        {ul.microclimateFactors && ul.microclimateFactors.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Microclimats détectés
+            </div>
+            {ul.microclimateFactors.map((f: any, i: number) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <Info className="h-3 w-3 text-yellow-400 flex-shrink-0" />
+                <span className="font-medium">{f.label}</span>
+                <span className="text-muted-foreground">{f.adjustment > 0 ? "+" : ""}{f.adjustment.toFixed(1)}°C</span>
+                <span className="text-muted-foreground ml-auto">conf. {Math.round(f.confidence * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Explanation */}
+        {ul.explanation && (
+          <div className="text-[10px] text-muted-foreground italic border-t border-border/50 pt-2 leading-relaxed">
+            {ul.explanation}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Standard mode fallback
+  const data2 = fallbackData;
+  if (!data2 || data2.stations.length === 0) {
+    // Use ultraData stations if available
+    if (ultraData?.stations) {
+      const gt = ultraData.stations.groundTruth;
+      return (
+        <div className="bg-card rounded-xl border border-border p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Radio className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Stations locales</span>
+            </div>
+            <Link href="/stations" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
+              <LinkIcon className="h-3 w-3" />Voir tout
+            </Link>
+          </div>
+          {gt && gt.stationCount > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "Temp.", value: gt.temperature != null ? gt.temperature + "°C" : "—" },
+                { label: "Vent", value: gt.windSpeed != null ? gt.windSpeed + " km/h" : "—" },
+                { label: "Précip.", value: gt.precipitation != null ? gt.precipitation + " mm" : "—" },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-muted/40 rounded-lg p-2 text-center">
+                  <div className="text-sm font-bold">{value}</div>
+                  <div className="text-[10px] text-muted-foreground">{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <MapPin className="h-3 w-3" />
+            {ultraData.stations.active} stations actives sur {ultraData.stations.total} trouvées
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  const active = data2.stations.filter((s: { isActive: boolean }) => s.isActive);
+  const ignored = data2.stations.filter((s: { isActive: boolean }) => !s.isActive);
+  const gt = data2.groundTruth;
 
   return (
     <div className="bg-card rounded-xl border border-border p-3 space-y-3">
@@ -140,7 +352,6 @@ function StationsSection() {
           Utilisées ({active.length})
         </div>
         {active.slice(0, 5).map((s: any, i: number) => {
-          // Compute per-station weight: 50% distance (inverse), 30% reliability, 20% availability
           const distScore = Math.max(0, 100 - s.distanceKm * 3);
           const totalScore = distScore * 0.5 + s.reliabilityScore * 0.3 + s.dataAvailability * 100 * 0.2;
           return (
@@ -159,7 +370,6 @@ function StationsSection() {
                 <div className="text-[10px] text-primary">{Math.round(totalScore)}% contrib.</div>
               </div>
             </div>
-            {/* Contribution bar */}
             <div className="ml-7 h-1 bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-primary/60 rounded-full" style={{ width: Math.min(100, totalScore) + "%" }} />
             </div>
@@ -173,7 +383,7 @@ function StationsSection() {
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Ignorées ({ignored.length})
           </div>
-          {ignored.slice(0, 3).map(s => (
+          {ignored.slice(0, 3).map((s: any) => (
             <div key={s.stationId} className="flex items-start gap-2 py-1">
               <XCircle className="h-3 w-3 text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
@@ -189,7 +399,7 @@ function StationsSection() {
       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground border-t border-border/50 pt-2">
         <MapPin className="h-3 w-3" />
         Vérité terrain : 50% distance · 30% qualité · 20% fraîcheur
-        &nbsp;·&nbsp;{data.totalFound} stations dans {data.radiusKm} km
+        &nbsp;·&nbsp;{data2.totalFound} stations dans {data2.radiusKm} km
       </div>
     </div>
   );

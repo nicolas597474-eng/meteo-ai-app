@@ -43,6 +43,13 @@
       "when": 1783659062787,
       "tag": "0005_peaceful_umar",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1783661849837,
+      "tag": "0006_productive_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

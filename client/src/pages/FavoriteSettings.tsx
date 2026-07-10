@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { ArrowLeft, MapPin, Star, Trash2, Edit3, Save, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, Star, Trash2, Edit3, Save, Radio } from "lucide-react";
 import { Link } from "wouter";
 
 export default function FavoriteSettings() {
@@ -15,12 +15,14 @@ export default function FavoriteSettings() {
   const [editName, setEditName] = useState("");
   const [editRadius, setEditRadius] = useState(10);
   const [editUnit, setEditUnit] = useState<"celsius" | "fahrenheit">("celsius");
+  const [editLocalMode, setEditLocalMode] = useState<"standard" | "local" | "ultra-local">("standard");
 
   const startEdit = (fav: any) => {
     setEditingId(fav.id);
     setEditName(fav.customName || fav.name);
     setEditRadius(fav.radiusKm ?? 10);
     setEditUnit(fav.tempUnit ?? "celsius");
+    setEditLocalMode(fav.localMode ?? "standard");
   };
 
   const saveEdit = () => {
@@ -30,6 +32,7 @@ export default function FavoriteSettings() {
       customName: editName,
       radiusKm: editRadius,
       tempUnit: editUnit,
+      localMode: editLocalMode,
     });
     setEditingId(null);
   };
@@ -85,6 +88,37 @@ export default function FavoriteSettings() {
                       onChange={(e) => setEditName(e.target.value)}
                       className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground font-medium">Mode de calcul</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      {(["standard", "local", "ultra-local"] as const).map(mode => (
+                        <button
+                          key={mode}
+                          onClick={() => setEditLocalMode(mode)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                            editLocalMode === mode
+                              ? mode === "ultra-local"
+                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                                : mode === "local"
+                                  ? "bg-blue-500/20 border-blue-500/40 text-blue-300"
+                                  : "bg-primary/20 border-primary text-primary"
+                              : "bg-muted border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          {mode === "ultra-local" ? "Ultra-local" : mode === "local" ? "Local" : "Standard"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {editLocalMode === "ultra-local"
+                        ? "Stations < 2 km = 65%. Vérification stricte. Microclimats activés."
+                        : editLocalMode === "local"
+                          ? "Stations < 5 km = 55%. Correction d'altitude. Fraîcheur < 60 min."
+                          : "Pondération équilibrée. Rayon complet de recherche."
+                      }
+                    </p>
                   </div>
 
                   <div>
@@ -144,48 +178,60 @@ export default function FavoriteSettings() {
                 </div>
               ) : (
                 /* View mode */
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      fav.isDefault ? "bg-yellow-500/20" : "bg-muted"
-                    }`}>
-                      <Star className={`h-4 w-4 ${fav.isDefault ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground"}`} />
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        fav.isDefault ? "bg-yellow-500/20" : "bg-muted"
+                      }`}>
+                        <Star className={`h-4 w-4 ${fav.isDefault ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground"}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{fav.customName || fav.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {fav.lat.toFixed(2)}°N, {fav.lon.toFixed(2)}°E · {fav.radiusKm ?? 10} km
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{fav.customName || fav.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {fav.lat.toFixed(2)}°N, {fav.lon.toFixed(2)}°E · {fav.radiusKm ?? 10} km
-                      </p>
+
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {!fav.isDefault && (
+                        <button
+                          onClick={() => setDefaultMutation.mutate({ id: fav.id })}
+                          title="Définir par défaut"
+                          className="p-2 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors"
+                        >
+                          <Star className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => startEdit(fav)}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm("Supprimer ce favori ?")) {
+                            removeMutation.mutate({ id: fav.id });
+                          }
+                        }}
+                        className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {!fav.isDefault && (
-                      <button
-                        onClick={() => setDefaultMutation.mutate({ id: fav.id })}
-                        title="Définir par défaut"
-                        className="p-2 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors"
-                      >
-                        <Star className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => startEdit(fav)}
-                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm("Supprimer ce favori ?")) {
-                          removeMutation.mutate({ id: fav.id });
-                        }
-                      }}
-                      className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {/* Mode badge */}
+                  {fav.localMode && fav.localMode !== "standard" && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <Radio className={`h-3 w-3 ${fav.localMode === "ultra-local" ? "text-emerald-400" : "text-blue-400"}`} />
+                      <span className={`text-[10px] font-medium ${fav.localMode === "ultra-local" ? "text-emerald-400" : "text-blue-400"}`}>
+                        Mode {fav.localMode === "ultra-local" ? "Ultra-local" : "Local"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -197,6 +243,7 @@ export default function FavoriteSettings() {
           <h3 className="text-sm font-semibold mb-2">Paramètres par lieu</h3>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
             <li>• <strong>Nom personnalisé</strong> — Renommez vos favoris librement</li>
+            <li>• <strong>Mode de calcul</strong> — Standard, Local ou Ultra-local (pondération des stations)</li>
             <li>• <strong>Rayon de recherche</strong> — Distance max pour trouver les stations locales (5-50 km)</li>
             <li>• <strong>Unité de température</strong> — Celsius ou Fahrenheit par lieu</li>
             <li>• <strong>Favori par défaut</strong> — Lieu affiché au démarrage de l'application</li>

@@ -240,6 +240,7 @@ export const favoriteLocations = mysqlTable("favorite_locations", {
   isDefault: int("isDefault").default(0), // 1 = default location on app start
   position: int("position").notNull().default(0), // ordering 0-4
   // Per-location settings
+  localMode: mysqlEnum("localMode", ["standard", "local", "ultra-local"]).default("standard"),
   radiusKm: int("radiusKm").default(20), // station search radius
   preferredModels: json("preferredModels"), // array of model names
   tempUnit: mysqlEnum("tempUnit", ["celsius", "fahrenheit"]).default("celsius"),

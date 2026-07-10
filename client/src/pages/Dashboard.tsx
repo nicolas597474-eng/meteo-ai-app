@@ -1,9 +1,9 @@
 import { trpc } from "@/lib/trpc";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
-import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun, FlaskConical } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun, FlaskConical, Radio } from "lucide-react";
 import { Link } from "wouter";
 import { FavoritesBar } from "@/components/FavoritesBar";
 
@@ -164,17 +164,47 @@ function storeLocation(loc: { lat: number; lon: number; name: string; radiusKm?:
   try { localStorage.setItem("meteoai_last_location", JSON.stringify(loc)); } catch {}
 }
 
+function getStoredLocalMode(): "standard" | "local" | "ultra-local" {
+  try {
+    const stored = localStorage.getItem("meteoai_local_mode");
+    if (stored === "standard" || stored === "local" || stored === "ultra-local") return stored;
+    return "standard";
+  } catch { return "standard"; }
+}
+
+function storeLocalMode(mode: "standard" | "local" | "ultra-local") {
+  try { localStorage.setItem("meteoai_local_mode", mode); } catch {}
+}
+
 export default function Dashboard() {
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number } | null>(getStoredLocation);
+  const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
 
-  const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number }) => {
+  const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number; localMode?: "standard" | "local" | "ultra-local" }) => {
     setActiveLocation(loc);
     storeLocation(loc);
+    // If the favorite has a per-location mode, apply it
+    if (loc.localMode) {
+      setLocalMode(loc.localMode);
+      storeLocalMode(loc.localMode);
+    }
+  };
+
+  const handleModeChange = (mode: "standard" | "local" | "ultra-local") => {
+    setLocalMode(mode);
+    storeLocalMode(mode);
   };
 
   // Use location-aware query when a location is selected
+  const queryInput = useMemo(() => ({
+    lat: activeLocation?.lat ?? 50.76,
+    lon: activeLocation?.lon ?? 2.52,
+    radiusKm: activeLocation?.radiusKm ?? 20,
+    localMode,
+  }), [activeLocation?.lat, activeLocation?.lon, activeLocation?.radiusKm, localMode]);
+
   const { data: locationWeather, isLoading: locLoading } = trpc.favorites.getLocationWeather.useQuery(
-    { lat: activeLocation?.lat ?? 50.76, lon: activeLocation?.lon ?? 2.52, radiusKm: activeLocation?.radiusKm ?? 20 },
+    queryInput,
     { enabled: !!activeLocation }
   );
 
@@ -426,6 +456,99 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Ultra-local Mode Selector ── */}
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">
+          <Radio className="h-4 w-4 text-primary flex-shrink-0" />
+          <span className="text-xs font-semibold text-muted-foreground mr-auto">Mode</span>
+          <div className="flex gap-1">
+            {(["standard", "local", "ultra-local"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => handleModeChange(mode)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                  localMode === mode
+                    ? mode === "ultra-local"
+                      ? "bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 border border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/10"
+                      : mode === "local"
+                        ? "bg-blue-500/20 border border-blue-500/40 text-blue-300"
+                        : "bg-primary/20 border border-primary/40 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
+                }`}
+              >
+                {mode === "ultra-local" ? "Ultra-local" : mode === "local" ? "Local" : "Standard"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Ultra-local transparency (when active) ── */}
+        {localMode !== "standard" && locationWeather?.ultraLocal && (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Radio className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-xs font-semibold text-emerald-300">
+                  {localMode === "ultra-local" ? "Mode Ultra-local" : "Mode Local"}
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {locationWeather.ultraLocal.stationCount} station{locationWeather.ultraLocal.stationCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Temperature from ultra-local */}
+            {locationWeather.ultraLocal.temperature != null && (
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-bold text-emerald-300">
+                  {locationWeather.ultraLocal.temperature}°C
+                </span>
+                <div className="text-xs text-muted-foreground">
+                  <p>Confiance : <span className="font-semibold text-foreground">{locationWeather.ultraLocal.confidenceScore}%</span></p>
+                  {locationWeather.ultraLocal.microclimateAdjustment !== 0 && (
+                    <p>Microclimat : {locationWeather.ultraLocal.microclimateAdjustment > 0 ? "+" : ""}{locationWeather.ultraLocal.microclimateAdjustment}°C</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Band breakdown */}
+            {locationWeather.ultraLocal.bandBreakdown.filter((b: any) => b.stationCount > 0).length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {locationWeather.ultraLocal.bandBreakdown.filter((b: any) => b.stationCount > 0).map((band: any) => (
+                  <div key={band.band} className="text-center rounded-lg bg-background/50 border border-border/50 p-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">{band.band}</p>
+                    <p className="text-sm font-bold">{band.avgTemperature != null ? `${band.avgTemperature}°` : "—"}</p>
+                    <p className="text-xs text-emerald-400">{Math.round(band.effectiveWeight * 100)}% · {band.stationCount}st.</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Top stations used */}
+            {locationWeather.ultraLocal.stationsUsed.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Stations utilisées :</p>
+                <div className="space-y-0.5">
+                  {locationWeather.ultraLocal.stationsUsed.slice(0, 4).map((s: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="truncate max-w-[50%]">{s.name}</span>
+                      <span className="text-muted-foreground">{s.distanceKm.toFixed(1)} km · {s.temperature != null ? `${s.temperature.toFixed(1)}°C` : "—"} · <span className="text-emerald-400 font-medium">{Math.round(s.weight * 100)}%</span></span>
+                    </div>
+                  ))}
+                  {locationWeather.ultraLocal.stationsUsed.length > 4 && (
+                    <p className="text-xs text-muted-foreground">+ {locationWeather.ultraLocal.stationsUsed.length - 4} autres stations</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Explanation */}
+            <p className="text-xs text-muted-foreground italic leading-relaxed">
+              {locationWeather.ultraLocal.explanation}
+            </p>
+          </div>
+        )}
 
         {/* ── AI Lab CTA ── */}
         <Link href="/ai-lab">

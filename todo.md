@@ -68,3 +68,16 @@
 - [x] Frontend: FavoritesBar — afficher les lieux favoris sauvegardés directement sur la page principale
 - [x] Frontend: FavoritesBar — bouton "+" pour ajouter un nouveau lieu favori avec recherche de ville intégrée
 - [x] Frontend: FavoritesBar — permettre de switcher entre les lieux favoris depuis le Dashboard
+- [x] Backend: Mode Ultra-local — ajouter champ localMode (standard/local/ultra-local) au schéma favorites
+- [x] Backend: Service Ultra-local — recherche stations par rayons (0-2km, 2-5km, 5-10km, 10-20km)
+- [x] Backend: Pondération Ultra-locale — 65%/20%/10%/3%/2% selon la distance
+- [x] Backend: Vérification qualité stations — fraîcheur, cohérence, altitude, historique, stabilité
+- [x] Backend: Détection microclimats — ajustement selon contexte géographique
+- [x] Frontend: Sélecteur de mode (Standard/Local/Ultra-local) sur Dashboard et paramètres
+- [x] Frontend: Affichage transparence Ultra-local dans AI Lab — stations utilisées/ignorées avec raisons
+- [x] Frontend: Mémorisation du mode par lieu favori
+- [x] Backend: Exposer bandes 0-2 / 2-5 / 5-10 / 10-20 km dans la réponse Ultra-local avec stationCount par bande
+- [x] Backend: Appliquer pondération 65/20/10/3/2 par bande + 2% modèles avec vérification
+- [x] Backend: Ajouter vérification altitude comme critère qualité explicite
+- [x] Frontend: Ajouter sélecteur Standard/Local/Ultra-local dans FavoriteSettings
+- [x] Frontend: Sauvegarder localMode par favori (DB + lecture du favori actif) au lieu d'un global
