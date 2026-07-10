@@ -382,26 +382,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── AI Lab CTA ── */}
-        <a
-          href="/ai-lab"
-          className="flex items-center justify-between gap-3 p-3 bg-gradient-to-r from-primary/10 to-purple-900/20 border border-primary/30 rounded-xl hover:border-primary/60 transition-all active:scale-[0.98]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-              <span className="text-lg">🧪</span>
-            </div>
-            <div>
-              <div className="text-sm font-semibold">Weather AI Lab</div>
-              <div className="text-xs text-muted-foreground">Transparence totale sur les calculs IA</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-primary font-medium flex-shrink-0">
-            <span>Explorer</span>
-            <span>→</span>
-          </div>
-        </a>
-
         {/* ── Hourly ── */}
         <div className="space-y-2">
           <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2">
