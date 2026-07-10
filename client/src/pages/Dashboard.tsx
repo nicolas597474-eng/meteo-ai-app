@@ -2,7 +2,8 @@ import { trpc } from "@/lib/trpc";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
-import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun, FlaskConical } from "lucide-react";
+import { Link } from "wouter";
 
 // ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
@@ -381,6 +382,22 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── AI Lab CTA ── */}
+        <Link href="/ai-lab">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-primary/15 to-purple-500/10 border border-primary/30 cursor-pointer hover:border-primary/50 transition-colors">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <FlaskConical className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold">Weather AI Lab</div>
+                <div className="text-xs text-muted-foreground">Transparence totale · Sources · Formule · Replay IA</div>
+              </div>
+            </div>
+            <div className="text-xs text-primary font-medium">Voir →</div>
+          </div>
+        </Link>
 
         {/* ── Hourly ── */}
         <div className="space-y-2">

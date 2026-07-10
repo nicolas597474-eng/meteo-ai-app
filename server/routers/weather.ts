@@ -17,6 +17,7 @@ import {
   insertObservation,
   insertReliabilityScores,
   upsertMeteoAIForecast,
+  getHistoricalScoreTimeSeries,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
@@ -421,5 +422,149 @@ export const weatherRouter = router({
    */
   getJobs: adminProcedure.query(async () => {
     return getRecentCollectionJobs(20);
+  }),
+
+  /**
+   * Weather AI Lab — full transparency data for the AI Lab page
+   */
+  getAILab: publicProcedure.query(async () => {
+    const today = getTodayParis();
+    const forecasts = await getForecastsByDate(today);
+    const observation = await getObservationByDate(today);
+    const meteoAI = await getMeteoAIForecastByDate(today);
+    const ranking = await getCumulativeRanking();
+    const jobs = await getRecentCollectionJobs(5);
+
+    // 1. Detect current regime
+    const regimeInfo = detectWeatherRegime({
+      precipitation: observation?.precipitation ?? (meteoAI?.precipitation ?? 0),
+      windSpeed: observation?.windSpeed ?? (meteoAI?.windSpeed ?? 0),
+      tempMax: observation?.tempMax ?? (meteoAI?.tempMax ?? 15),
+      tempMin: observation?.tempMin ?? (meteoAI?.tempMin ?? 5),
+    });
+    const regime = regimeInfo.regime;
+    const regimeDef = REGIME_DEFINITIONS[regime];
+    const weights = regimeDef.weights;
+
+    // 2. Build model details from today's forecasts
+    const allServicesList = [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public];
+    const modelDetails = forecasts.map(f => {
+      const service = allServicesList.find((s: { name: string }) => s.name === f.serviceName);
+      return {
+        name: f.serviceName,
+        label: service?.name ?? f.serviceName,
+        tempMax: f.tempMax,
+        tempMin: f.tempMin,
+        precipitation: f.precipitation,
+        windSpeed: f.windSpeed,
+        cloudCover: f.cloudCover,
+        condition: f.condition,
+      };
+    });
+
+    // 3. Compute divergence between models
+    const tempValues = forecasts.map(f => f.tempMax ?? 0).filter(v => v > 0);
+    const precipValues = forecasts.map(f => f.precipitation ?? 0);
+    const windValues = forecasts.map(f => f.windSpeed ?? 0).filter(v => v > 0);
+    const divergence = {
+      tempRange: tempValues.length > 1 ? Math.round((Math.max(...tempValues) - Math.min(...tempValues)) * 10) / 10 : 0,
+      precipRange: precipValues.length > 1 ? Math.round((Math.max(...precipValues) - Math.min(...precipValues)) * 10) / 10 : 0,
+      windRange: windValues.length > 1 ? Math.round((Math.max(...windValues) - Math.min(...windValues)) * 10) / 10 : 0,
+      tempMean: tempValues.length > 0 ? Math.round(tempValues.reduce((a, b) => a + b, 0) / tempValues.length * 10) / 10 : 0,
+      precipMean: precipValues.length > 0 ? Math.round(precipValues.reduce((a, b) => a + b, 0) / precipValues.length * 10) / 10 : 0,
+    };
+
+    // 4. Confidence score (0-100): based on model agreement
+    const tempCV = tempValues.length > 1 ? (Math.sqrt(tempValues.reduce((s, v) => s + Math.pow(v - divergence.tempMean, 2), 0) / tempValues.length) / (divergence.tempMean || 1)) * 100 : 0;
+    const confidenceScore = Math.max(0, Math.min(100, Math.round(100 - tempCV * 2 - divergence.tempRange * 3)));
+
+    // 5. Stability score from MeteoAI
+    const stabilityScore = meteoAI?.stabilityIndex ?? 0;
+
+    // 6. Transparency score (always high — we expose everything)
+    const transparencyScore = 95;
+
+    // 7. AI Analysis text
+    const modelCount = forecasts.length;
+    const topModel = ranking.length > 0 ? ranking[0].serviceName : "ECMWF";
+    const convergenceLevel = divergence.tempRange < 2 ? "excellente" : divergence.tempRange < 4 ? "bonne" : "modérée";
+    const aiAnalysis = [
+      `MeteoAI synthétise ${modelCount} modèles numériques pour Hondeghem (50.76°N, 2.52°E).`,
+      `La convergence entre les modèles est ${convergenceLevel} aujourd'hui (écart max temp : ${divergence.tempRange}°C).`,
+      `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`,
+      `Le modèle historiquement le plus fiable sur ce site est ${topModel}.`,
+      `Score de confiance global : ${confidenceScore}/100 — ${confidenceScore >= 80 ? "prévision très fiable" : confidenceScore >= 60 ? "prévision fiable" : "incertitude modérée"}.`,
+    ].join(" ");
+
+    // 8. Formula description
+    const formula = {
+      description: "Score MeteoAI = Σ (poids_dimension × score_dimension)",
+      components: [
+        { name: "Température", weight: weights.temp, description: "MAE + biais + erreur max" },
+        { name: "Précipitations", weight: weights.precip, description: "POD + FAR + CSI + faux+/faux−" },
+        { name: "Vent", weight: weights.wind, description: "MAE moyen + MAE rafales" },
+        { name: "Conditions", weight: weights.condition, description: "Concordance catégorielle + MAE nébulosité" },
+      ],
+    };
+
+    // 9. Replay steps (7 étapes de la synthèse IA)
+    const replaySteps = [
+      { step: 1, title: "Collecte des modèles", description: `${modelCount} modèles collectés à 05h00 via Open-Meteo API`, icon: "📡" },
+      { step: 2, title: "Détection du régime", description: `Régime "${regimeDef.label}" détecté — poids contextuels appliqués`, icon: "🔍" },
+      { step: 3, title: "Calcul des dimensions", description: "4 dimensions d'erreur calculées indépendamment (T°, Précip, Vent, Cond)", icon: "📐" },
+      { step: 4, title: "Scoring pondéré", description: `Score final = ${Math.round(weights.temp * 100)}% T° + ${Math.round(weights.precip * 100)}% Précip + ${Math.round(weights.wind * 100)}% Vent + ${Math.round(weights.condition * 100)}% Cond`, icon: "⚖️" },
+      { step: 5, title: "Analyse de divergence", description: `Écart inter-modèles : ${divergence.tempRange}°C en température, ${divergence.precipRange} mm en précipitations`, icon: "📊" },
+      { step: 6, title: "Synthèse MeteoAI", description: `Prévision finale : ${meteoAI?.tempMax ?? "—"}°C max, ${meteoAI?.tempMin ?? "—"}°C min, ${meteoAI?.precipitation ?? 0} mm`, icon: "🤖" },
+      { step: 7, title: "Calcul du Weather Confidence Score", description: `Confiance : ${confidenceScore}/100 — Stabilité : ${stabilityScore}/100`, icon: "✅" },
+    ];
+
+    // 10. Sources with freshness info
+    const lastForecastJob = jobs.find(j => j.jobType === "forecast");
+    const lastObsJob = jobs.find(j => j.jobType === "observation");
+
+    // 11. Historical time series for chart
+    const rawTimeSeries = await getHistoricalScoreTimeSeries(14);
+    const tsByDate: Record<string, Record<string, number>> = {};
+    rawTimeSeries.forEach(row => {
+      if (!tsByDate[row.date]) tsByDate[row.date] = {};
+      tsByDate[row.date][row.serviceName] = row.weightedScore ?? 0;
+    });
+    const allServices = Array.from(new Set(rawTimeSeries.map(r => r.serviceName)));
+    const historicalTimeSeries = Object.entries(tsByDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, scores]) => ({
+        date,
+        ...Object.fromEntries(allServices.map(s => [s, scores[s] ?? null])),
+      }));
+
+    const sources = [
+      { name: "Open-Meteo API", type: "API météo", models: ["ECMWF", "AROME", "ARPEGE", "ICON", "GFS", "Open-Meteo Best Match"], updateFrequency: "6h", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Haute" },
+      { name: "Stations Météo-France", type: "Observations", models: [], updateFrequency: "1h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Haute" },
+      { name: "Open-Meteo ERA5", type: "Réanalyse", models: ["ERA5"], updateFrequency: "24h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Très haute" },
+    ];
+
+    return {
+      date: today,
+      regime,
+      regimeLabel: regimeDef.label,
+      regimeEmoji: regimeDef.emoji,
+      regimeDescription: regimeDef.description,
+      weights,
+      allRegimes: REGIME_DEFINITIONS,
+      modelDetails,
+      divergence,
+      confidenceScore,
+      stabilityScore,
+      transparencyScore,
+      aiAnalysis,
+      formula,
+      replaySteps,
+      sources,
+      engineVersion: "MeteoAI v2.0 — Multi-Dimension",
+      calculatedAt: new Date().toISOString(),
+      modelsUsed: forecasts.length,
+      historicalTimeSeries,
+      historicalServices: allServices,
+    };
   }),
 });

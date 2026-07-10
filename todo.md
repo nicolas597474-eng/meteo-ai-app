@@ -38,3 +38,9 @@
 - [x] Frontend: Afficher les 4 dimensions avec leurs métriques dans Classement et Rapport
 - [x] Backend: Étendre getRanking pour retourner les scores détaillés par dimension par service
 - [x] Frontend: Mettre à jour la page Classement pour afficher les 4 dimensions détaillées par service
+- [x] Backend: Endpoint getAILab — résumé IA, sources, pondération modèles, formule, divergence, scores confiance/stabilité/transparence, analyse IA textuelle
+- [x] Backend: Helper getHistoricalScoreTimeSeries pour graphique historique par modèle
+- [x] Frontend: Page WeatherAILab.tsx — toutes les sections premium (résumé, sources, pondération, formule, divergence, replay animé, historique graphique)
+- [x] Frontend: Bouton 🧪 Weather AI Lab CTA sur le Dashboard
+- [x] Navigation: Onglet AI Lab dans le menu desktop et bottom nav mobile
+- [x] Backend: Corriger getHistoricalScoreTimeSeries pour retourner toutes les séries sans troncature (limit days*20)

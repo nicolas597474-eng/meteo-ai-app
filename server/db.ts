@@ -291,6 +291,27 @@ export async function getLatestMeteoAIForecasts(limit = 7) {
     .limit(limit);
 }
 
+/**
+ * Get daily weighted scores per service for the last N days (for AI Lab historical chart)
+ */
+export async function getHistoricalScoreTimeSeries(days = 14) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      date: reliabilityScores.date,
+      serviceName: reliabilityScores.serviceName,
+      weightedScore: reliabilityScores.weightedScore,
+      tempScore: reliabilityScores.tempScore,
+      precipScore: reliabilityScores.precipScore,
+      windScore: reliabilityScores.windScore,
+      condScore: reliabilityScores.condScore,
+    })
+    .from(reliabilityScores)
+    .orderBy(desc(reliabilityScores.date), reliabilityScores.serviceName)
+    .limit(days * 20); // up to 20 services per day
+}
+
 // ─── COLLECTION JOB HELPERS ─────────────────────────────────────────────────
 
 export async function createCollectionJob(data: InsertCollectionJob): Promise<number> {
