@@ -65,3 +65,6 @@
 - [x] Frontend: Recalcul automatique IA à chaque changement de lieu (prévisions, stations, pondérations, confiance)
 - [x] Frontend: Page paramètres par favori (nom, rayon, unité) — route /favorites
 - [x] Frontend: Recherche ville/adresse/GPS + géolocalisation position actuelle (Open-Meteo geocoding)
+- [x] Frontend: FavoritesBar — afficher les lieux favoris sauvegardés directement sur la page principale
+- [x] Frontend: FavoritesBar — bouton "+" pour ajouter un nouveau lieu favori avec recherche de ville intégrée
+- [x] Frontend: FavoritesBar — permettre de switcher entre les lieux favoris depuis le Dashboard
