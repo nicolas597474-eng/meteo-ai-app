@@ -10,6 +10,7 @@ import History from "./pages/History";
 import Report from "./pages/Report";
 import WeatherAILab from "./pages/WeatherAILab";
 import Stations from "./pages/Stations";
+import FavoriteSettings from "./pages/FavoriteSettings";
 import {
   LayoutDashboard,
   Trophy,
@@ -102,6 +103,7 @@ function Router() {
       <Route path="/report" component={Report} />
       <Route path="/ai-lab" component={WeatherAILab} />
       <Route path="/stations" component={Stations} />
+      <Route path="/favorites" component={FavoriteSettings} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

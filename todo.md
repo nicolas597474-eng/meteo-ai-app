@@ -55,3 +55,13 @@
 - [x] Navigation: Onglet Stations dans le menu
 - [x] Backend: Ajouter l'endpoint tRPC `getStationDetail(id)` avec détails complets d'une station et son historique récent
 - [x] Frontend: Mettre à jour `WeatherAILab.tsx` pour afficher les stations utilisées, leur distance, leur contribution pondérée, les stations ignorées et les raisons d'exclusion
+- [x] DB: Table `favorite_locations` (id, userId, name, customName, lat, lon, isDefault, position, radiusKm, preferredModels, tempUnit, alertsEnabled, createdAt)
+- [x] Backend: CRUD endpoints favoris (add, update, delete, reorder, setDefault) — max 5 par user
+- [x] Backend: Endpoint getLocationWeather(lat, lon, radiusKm) — retourne prévisions + stations + scores pour un lieu
+- [x] Frontend: Barre de favoris horizontale en haut du Dashboard (📍 + ⭐×5) avec temp/conditions/scores
+- [x] Frontend: Navigation swipe horizontale entre lieux (touch + desktop) avec indicateurs dots
+- [x] Frontend: Indicateur visuel du lieu actif + mémorisation du dernier lieu consulté
+- [x] Frontend: Préchargement en arrière-plan des données via prefetchedWeather prop
+- [x] Frontend: Recalcul automatique IA à chaque changement de lieu (prévisions, stations, pondérations, confiance)
+- [x] Frontend: Page paramètres par favori (nom, rayon, unité) — route /favorites
+- [x] Frontend: Recherche ville/adresse/GPS + géolocalisation position actuelle (Open-Meteo geocoding)

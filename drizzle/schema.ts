@@ -225,3 +225,29 @@ export const groundTruth = mysqlTable("ground_truth", {
 
 export type GroundTruth = typeof groundTruth.$inferSelect;
 export type InsertGroundTruth = typeof groundTruth.$inferInsert;
+
+/**
+ * User favorite locations (max 5 per user).
+ * Each location stores coordinates, custom settings, and display preferences.
+ */
+export const favoriteLocations = mysqlTable("favorite_locations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(), // FK to users.id
+  name: varchar("name", { length: 256 }).notNull(), // geocoded name
+  customName: varchar("customName", { length: 256 }), // user-defined label
+  lat: float("lat").notNull(),
+  lon: float("lon").notNull(),
+  isDefault: int("isDefault").default(0), // 1 = default location on app start
+  position: int("position").notNull().default(0), // ordering 0-4
+  // Per-location settings
+  radiusKm: int("radiusKm").default(20), // station search radius
+  preferredModels: json("preferredModels"), // array of model names
+  tempUnit: mysqlEnum("tempUnit", ["celsius", "fahrenheit"]).default("celsius"),
+  alertsEnabled: int("alertsEnabled").default(1), // 1=on, 0=off
+  alertThresholds: json("alertThresholds"), // { precipMm, windKmh, tempMin, tempMax }
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FavoriteLocation = typeof favoriteLocations.$inferSelect;
+export type InsertFavoriteLocation = typeof favoriteLocations.$inferInsert;

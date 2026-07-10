@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { weatherRouter } from "./routers/weather";
+import { favoritesRouter } from "./routers/favorites";
 
 export const appRouter = router({
   system: systemRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
     }),
   }),
   weather: weatherRouter,
+  favorites: favoritesRouter,
 });
 
 export type AppRouter = typeof appRouter;

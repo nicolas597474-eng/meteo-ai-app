@@ -1,9 +1,11 @@
 import { trpc } from "@/lib/trpc";
+import { useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
 import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun, FlaskConical } from "lucide-react";
 import { Link } from "wouter";
+import { FavoritesBar } from "@/components/FavoritesBar";
 
 // ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
@@ -151,12 +153,46 @@ function TempTooltip({ active, payload, label }: any) {
   );
 }
 
-export default function Dashboard() {
-  const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery();
-  const { data: f15, isLoading: f15Loading, isError: f15Error } = trpc.weather.get15DayForecast.useQuery();
-  const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery();
+function getStoredLocation(): { lat: number; lon: number; name: string; radiusKm?: number } | null {
+  try {
+    const stored = localStorage.getItem("meteoai_last_location");
+    return stored ? JSON.parse(stored) : null;
+  } catch { return null; }
+}
 
-  if (dashLoading) {
+function storeLocation(loc: { lat: number; lon: number; name: string; radiusKm?: number }) {
+  try { localStorage.setItem("meteoai_last_location", JSON.stringify(loc)); } catch {}
+}
+
+export default function Dashboard() {
+  const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number } | null>(getStoredLocation);
+
+  const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number }) => {
+    setActiveLocation(loc);
+    storeLocation(loc);
+  };
+
+  // Use location-aware query when a location is selected
+  const { data: locationWeather, isLoading: locLoading } = trpc.favorites.getLocationWeather.useQuery(
+    { lat: activeLocation?.lat ?? 50.76, lon: activeLocation?.lon ?? 2.52, radiusKm: activeLocation?.radiusKm ?? 20 },
+    { enabled: !!activeLocation }
+  );
+
+  // Fallback to default queries for Hondeghem when no location selected
+  const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery(
+    undefined, { enabled: !activeLocation }
+  );
+  const { data: f15, isLoading: f15Loading, isError: f15Error } = trpc.weather.get15DayForecast.useQuery(
+    undefined, { enabled: !activeLocation }
+  );
+  const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery(
+    undefined, { enabled: !activeLocation }
+  );
+
+  const isLoading = activeLocation ? locLoading : dashLoading;
+  const isError = activeLocation ? false : dashError;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="max-w-2xl mx-auto space-y-4">
@@ -173,7 +209,7 @@ export default function Dashboard() {
     );
   }
 
-  if (dashError) {
+  if (isError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center max-w-sm w-full">
@@ -185,15 +221,17 @@ export default function Dashboard() {
     );
   }
 
-  const meteoAI = dash?.meteoAI;
-  const days = f15?.days ?? [];
+  // Merge data from location-aware or fallback queries
+  const lw = locationWeather;
+  const meteoAI = lw ? (lw as any).meteoAI ?? null : dash?.meteoAI;
+  const days: any[] = lw ? lw.forecast15d : (f15?.days ?? []);
   const today = days[0] ?? null;
   const futureDays = days.slice(1);
-  const hours = hourly?.hours ?? [];
+  const hours: any[] = lw ? lw.hourly : (hourly?.hours ?? []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
-  const regime = dash?.regime;
+  const regime = lw ? { regime: lw.scores.regime, label: lw.scores.regimeLabel, emoji: lw.scores.regimeEmoji, weights: { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 } } as any : dash?.regime;
 
-  const chartData = days.map(d => ({
+  const chartData = days.map((d: any) => ({
     name: dayLabel(d.date),
     Max: d.tempMax,
     Min: d.tempMin,
@@ -201,10 +239,10 @@ export default function Dashboard() {
   }));
 
   // Current temperature from hourly (closest to now)
-  const currentHour = hours.find(h => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
+  const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
   const currentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
   const apparentTemp = currentHour?.apparentTemp ?? null;
-  const currentUV = hours.find(h => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
+  const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
   const windDir = currentHour?.windDirection ?? null;
   const windSpeed = currentHour?.windSpeed ?? today?.windSpeed ?? meteoAI?.windSpeed ?? null;
 
@@ -220,7 +258,7 @@ export default function Dashboard() {
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground text-xs sm:text-sm">
               <MapPin className="h-3 w-3 flex-shrink-0" />
-              <span>Hondeghem, Nord</span>
+              <span>{activeLocation?.name ?? "Hondeghem, Nord"}</span>
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-lg px-2.5 py-1.5">
@@ -228,6 +266,12 @@ export default function Dashboard() {
             <span>{dash?.today}</span>
           </div>
         </div>
+
+        {/* ── Favorites Bar ── */}
+        <FavoritesBar
+          activeLocation={activeLocation}
+          onLocationChange={handleLocationChange}
+        />
 
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">

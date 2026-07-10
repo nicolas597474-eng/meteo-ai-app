@@ -8,11 +8,13 @@ import {
   reliabilityScores,
   meteoaiForecast,
   collectionJobs,
+  favoriteLocations,
   InsertForecast,
   InsertObservation,
   InsertReliabilityScore,
   InsertMeteoAIForecast,
   InsertCollectionJob,
+  InsertFavoriteLocation,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -338,4 +340,65 @@ export async function getRecentCollectionJobs(limit = 10) {
     .from(collectionJobs)
     .orderBy(desc(collectionJobs.startedAt))
     .limit(limit);
+}
+
+
+// ─── Favorite Locations ──────────────────────────────────────────────────────
+
+export async function getFavoriteLocations(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(favoriteLocations)
+    .where(eq(favoriteLocations.userId, userId))
+    .orderBy(favoriteLocations.position);
+}
+
+export async function addFavoriteLocation(data: InsertFavoriteLocation) {
+  const db = await getDb();
+  if (!db) return null;
+  // Check max 5
+  const existing = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(favoriteLocations)
+    .where(eq(favoriteLocations.userId, data.userId));
+  if (existing[0]?.count >= 5) return null;
+  const result = await db.insert(favoriteLocations).values(data);
+  return result[0].insertId;
+}
+
+export async function updateFavoriteLocation(id: number, userId: number, data: Partial<InsertFavoriteLocation>) {
+  const db = await getDb();
+  if (!db) return false;
+  await db
+    .update(favoriteLocations)
+    .set(data)
+    .where(and(eq(favoriteLocations.id, id), eq(favoriteLocations.userId, userId)));
+  return true;
+}
+
+export async function deleteFavoriteLocation(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  await db
+    .delete(favoriteLocations)
+    .where(and(eq(favoriteLocations.id, id), eq(favoriteLocations.userId, userId)));
+  return true;
+}
+
+export async function setDefaultFavorite(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  // Clear all defaults for this user
+  await db
+    .update(favoriteLocations)
+    .set({ isDefault: 0 })
+    .where(eq(favoriteLocations.userId, userId));
+  // Set the new default
+  await db
+    .update(favoriteLocations)
+    .set({ isDefault: 1 })
+    .where(and(eq(favoriteLocations.id, id), eq(favoriteLocations.userId, userId)));
+  return true;
 }
