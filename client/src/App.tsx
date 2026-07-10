@@ -9,6 +9,7 @@ import Ranking from "./pages/Ranking";
 import History from "./pages/History";
 import Report from "./pages/Report";
 import WeatherAILab from "./pages/WeatherAILab";
+import Stations from "./pages/Stations";
 import {
   LayoutDashboard,
   Trophy,
@@ -16,13 +17,14 @@ import {
   FileText,
   Activity,
   FlaskConical,
+  Radio,
 } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/ranking", label: "Classement", icon: Trophy },
   { path: "/history", label: "Historique", icon: Calendar },
-  { path: "/report", label: "Rapport", icon: FileText },
+  { path: "/stations", label: "Stations", icon: Radio },
   { path: "/ai-lab", label: "AI Lab", icon: FlaskConical },
 ];
 
@@ -99,6 +101,7 @@ function Router() {
       <Route path="/history" component={History} />
       <Route path="/report" component={Report} />
       <Route path="/ai-lab" component={WeatherAILab} />
+      <Route path="/stations" component={Stations} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

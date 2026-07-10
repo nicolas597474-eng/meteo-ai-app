@@ -146,3 +146,82 @@ export const collectionJobs = mysqlTable("collection_jobs", {
 
 export type CollectionJob = typeof collectionJobs.$inferSelect;
 export type InsertCollectionJob = typeof collectionJobs.$inferInsert;
+
+/**
+ * Weather stations discovered near a location.
+ * Multi-source: Open-Meteo, Météo-France, Netatmo, WUnderground, CWOP, NOAA, etc.
+ */
+export const weatherStations = mysqlTable("weather_stations", {
+  id: int("id").autoincrement().primaryKey(),
+  stationId: varchar("stationId", { length: 128 }).notNull().unique(), // external ID (e.g. "MF-07690", "LFQQ")
+  source: varchar("source", { length: 64 }).notNull(), // "meteofrance", "netatmo", "wunderground", "cwop", "noaa", "openmeteo"
+  name: varchar("name", { length: 256 }).notNull(),
+  lat: float("lat").notNull(),
+  lon: float("lon").notNull(),
+  altitude: float("altitude"), // meters
+  // Reference location (user's chosen position)
+  refLat: float("refLat").notNull(),
+  refLon: float("refLon").notNull(),
+  distanceKm: float("distanceKm").notNull(), // km from reference
+  // Quality metrics
+  reliabilityScore: float("reliabilityScore").default(50), // 0-100
+  updateFrequencyMin: int("updateFrequencyMin"), // typical update interval in minutes
+  dataAvailability: float("dataAvailability").default(1), // 0-1 fraction of expected updates received
+  // Status
+  isActive: int("isActive").default(1), // 1=active, 0=excluded
+  exclusionReason: varchar("exclusionReason", { length: 256 }), // reason if excluded
+  firstSeen: timestamp("firstSeen").defaultNow().notNull(),
+  lastSeen: timestamp("lastSeen").defaultNow().notNull(),
+});
+
+export type WeatherStation = typeof weatherStations.$inferSelect;
+export type InsertWeatherStation = typeof weatherStations.$inferInsert;
+
+/**
+ * Observations collected from individual weather stations.
+ * Each row = one station's reading at a given timestamp.
+ */
+export const stationObservations = mysqlTable("station_observations", {
+  id: int("id").autoincrement().primaryKey(),
+  stationId: varchar("stationId", { length: 128 }).notNull(), // FK to weatherStations.stationId
+  observedAt: bigint("observedAt", { mode: "number" }).notNull(), // UTC ms timestamp
+  temperature: float("temperature"), // °C
+  humidity: float("humidity"), // %
+  pressure: float("pressure"), // hPa
+  windSpeed: float("windSpeed"), // km/h
+  windGust: float("windGust"), // km/h
+  windDirection: float("windDirection"), // degrees
+  precipitation: float("precipitation"), // mm
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(),
+});
+
+export type StationObservation = typeof stationObservations.$inferSelect;
+export type InsertStationObservation = typeof stationObservations.$inferInsert;
+
+/**
+ * Ground truth computed from multiple nearby stations (weighted average).
+ * Stored per location + date for use in forecast accuracy scoring.
+ */
+export const groundTruth = mysqlTable("ground_truth", {
+  id: int("id").autoincrement().primaryKey(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  refLat: float("refLat").notNull(),
+  refLon: float("refLon").notNull(),
+  radiusKm: float("radiusKm").notNull(),
+  stationsUsed: json("stationsUsed"), // array of { stationId, name, distance, weight, contribution }
+  stationsIgnored: json("stationsIgnored"), // array of { stationId, name, reason }
+  // Weighted average values
+  temperature: float("temperature"),
+  humidity: float("humidity"),
+  pressure: float("pressure"),
+  windSpeed: float("windSpeed"),
+  windGust: float("windGust"),
+  precipitation: float("precipitation"),
+  // Quality
+  stationCount: int("stationCount").notNull(),
+  confidenceScore: float("confidenceScore"), // 0-100
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+});
+
+export type GroundTruth = typeof groundTruth.$inferSelect;
+export type InsertGroundTruth = typeof groundTruth.$inferInsert;

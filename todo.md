@@ -44,3 +44,14 @@
 - [x] Frontend: Bouton 🧪 Weather AI Lab CTA sur le Dashboard
 - [x] Navigation: Onglet AI Lab dans le menu desktop et bottom nav mobile
 - [x] Backend: Corriger getHistoricalScoreTimeSeries pour retourner toutes les séries sans troncature (limit days*20)
+- [x] DB: Table `weather_stations` (id, source, name, lat, lon, altitude, distance, reliability_score, last_seen)
+- [x] DB: Table `station_observations` (station_id, date, temp, humidity, pressure, wind, gusts, precip, updated_at)
+- [x] Backend: stationService.ts — collecte multi-sources (Open-Meteo nearby, Météo-France StatIC, WUnderground, CWOP/APRS, NOAA)
+- [x] Backend: Calcul distance Haversine + classement automatique (distance, fraîcheur, cohérence, disponibilité)
+- [x] Backend: Calcul vérité terrain pondérée (50% distance, 30% qualité, 20% fraîcheur)
+- [x] Backend: Endpoints tRPC — searchStations(lat, lon, radius), getGroundTruth(lat, lon, radius), getStationDetail(id)
+- [x] Frontend: Page Stations.tsx — sélecteur GPS/ville, rayon configurable, classement
+- [x] Frontend: Weather AI Lab — section stations utilisées, distance, contribution, stations ignorées + raisons
+- [x] Navigation: Onglet Stations dans le menu
+- [x] Backend: Ajouter l'endpoint tRPC `getStationDetail(id)` avec détails complets d'une station et son historique récent
+- [x] Frontend: Mettre à jour `WeatherAILab.tsx` pour afficher les stations utilisées, leur distance, leur contribution pondérée, les stations ignorées et les raisons d'exclusion

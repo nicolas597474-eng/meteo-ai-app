@@ -4,8 +4,10 @@ import {
   FlaskConical, Brain, Zap, Shield, Eye, RefreshCw,
   ChevronDown, ChevronUp, CheckCircle, AlertTriangle,
   TrendingUp, Info, Play, BarChart3,
-  Thermometer, Droplets, Wind, Cloud, Clock, Database
+  Thermometer, Droplets, Wind, Cloud, Clock, Database,
+  Radio, MapPin, XCircle, Link as LinkIcon
 } from "lucide-react";
+import { Link } from "wouter";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
@@ -70,6 +72,124 @@ function DivergenceBar({ label, value, max, unit, color }: { label: string; valu
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+
+// ─── Stations section (embedded in AI Lab) ───────────────────────────────────
+
+function StationsSection() {
+  const { data, isLoading } = trpc.weather.searchStations.useQuery(
+    { radiusKm: 20 },
+    { staleTime: 5 * 60 * 1000 }
+  );
+
+  if (isLoading) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Radio className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold">Stations locales</span>
+        </div>
+        <div className="space-y-1.5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="animate-pulse h-10 bg-muted rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!data || data.stations.length === 0) return null;
+
+  const active = data.stations.filter((s: { isActive: boolean }) => s.isActive);
+  const ignored = data.stations.filter((s: { isActive: boolean }) => !s.isActive);
+  const gt = data.groundTruth;
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Radio className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold">Stations locales utilisées</span>
+        </div>
+        <Link href="/stations" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
+          <LinkIcon className="h-3 w-3" />Voir tout
+        </Link>
+      </div>
+
+      {gt && gt.stationCount > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Temp.", value: gt.temperature != null ? gt.temperature + "°C" : "—" },
+            { label: "Vent", value: gt.windSpeed != null ? gt.windSpeed + " km/h" : "—" },
+            { label: "Précip.", value: gt.precipitation != null ? gt.precipitation + " mm" : "—" },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-muted/40 rounded-lg p-2 text-center">
+              <div className="text-sm font-bold">{value}</div>
+              <div className="text-[10px] text-muted-foreground">{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Utilisées ({active.length})
+        </div>
+        {active.slice(0, 5).map((s: any, i: number) => {
+          // Compute per-station weight: 50% distance (inverse), 30% reliability, 20% availability
+          const distScore = Math.max(0, 100 - s.distanceKm * 3);
+          const totalScore = distScore * 0.5 + s.reliabilityScore * 0.3 + s.dataAvailability * 100 * 0.2;
+          return (
+          <div key={s.stationId} className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+              </div>
+              <CheckCircle className="h-3 w-3 text-green-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium truncate">{s.name}</div>
+                <div className="text-[10px] text-muted-foreground">{s.source} · {s.distanceKm} km</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-xs font-semibold">{s.temperature != null ? s.temperature + "°" : "—"}</div>
+                <div className="text-[10px] text-primary">{Math.round(totalScore)}% contrib.</div>
+              </div>
+            </div>
+            {/* Contribution bar */}
+            <div className="ml-7 h-1 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-primary/60 rounded-full" style={{ width: Math.min(100, totalScore) + "%" }} />
+            </div>
+          </div>
+          );
+        })}
+      </div>
+
+      {ignored.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Ignorées ({ignored.length})
+          </div>
+          {ignored.slice(0, 3).map(s => (
+            <div key={s.stationId} className="flex items-start gap-2 py-1">
+              <XCircle className="h-3 w-3 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium truncate opacity-60">{s.name}</div>
+                <div className="text-[10px] text-red-400/70">{s.exclusionReason ?? "Données insuffisantes"}</div>
+              </div>
+              <div className="text-[10px] text-muted-foreground flex-shrink-0">{s.distanceKm} km</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground border-t border-border/50 pt-2">
+        <MapPin className="h-3 w-3" />
+        Vérité terrain : 50% distance · 30% qualité · 20% fraîcheur
+        &nbsp;·&nbsp;{data.totalFound} stations dans {data.radiusKm} km
       </div>
     </div>
   );
@@ -433,6 +553,9 @@ export default function WeatherAILab() {
           ))}
         </div>
       </div>
+
+      {/* ── Stations locales ── */}
+      <StationsSection />
 
       {/* ── Footer ── */}
       <div className="text-center text-xs text-muted-foreground py-2">

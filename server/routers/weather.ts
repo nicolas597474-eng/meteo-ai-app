@@ -20,6 +20,7 @@ import {
   getHistoricalScoreTimeSeries,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
+import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 
 function getTodayParis(): string {
@@ -567,4 +568,135 @@ export const weatherRouter = router({
       historicalServices: allServices,
     };
   }),
+
+  /**
+   * Search nearby weather stations from all sources within a configurable radius.
+   */
+  searchStations: publicProcedure
+    .input(z.object({
+      lat: z.number().optional(),
+      lon: z.number().optional(),
+      radiusKm: z.number().min(1).max(50).default(20),
+    }))
+    .query(async ({ input }) => {
+      const lat = input.lat ?? HONDEGHEM.lat;
+      const lon = input.lon ?? HONDEGHEM.lon;
+      const radiusKm = input.radiusKm;
+
+      const stations = await collectNearbyStations(lat, lon, radiusKm);
+      const ranked = rankStations(stations);
+      const groundTruth = calculateGroundTruth(ranked);
+
+      return {
+        lat,
+        lon,
+        radiusKm,
+        stations: ranked.map(s => ({
+          stationId: s.stationId,
+          source: s.source,
+          name: s.name,
+          lat: s.lat,
+          lon: s.lon,
+          altitude: s.altitude,
+          distanceKm: s.distanceKm,
+          temperature: s.temperature,
+          humidity: s.humidity,
+          pressure: s.pressure,
+          windSpeed: s.windSpeed,
+          windGust: s.windGust,
+          windDirection: s.windDirection,
+          precipitation: s.precipitation,
+          updatedAt: s.updatedAt,
+          reliabilityScore: s.reliabilityScore,
+          updateFrequencyMin: s.updateFrequencyMin,
+          dataAvailability: s.dataAvailability,
+          isActive: s.isActive,
+          exclusionReason: s.exclusionReason,
+        })),
+        groundTruth,
+        totalFound: stations.length,
+        activeCount: stations.filter(s => s.isActive).length,
+        ignoredCount: stations.filter(s => !s.isActive).length,
+        fetchedAt: new Date().toISOString(),
+      };
+    }),
+
+  /**
+   * Get ground truth for a location (weighted average from nearby stations).
+   */
+  getGroundTruth: publicProcedure
+    .input(z.object({
+      lat: z.number().optional(),
+      lon: z.number().optional(),
+      radiusKm: z.number().min(1).max(50).default(20),
+    }))
+    .query(async ({ input }) => {
+      const lat = input.lat ?? HONDEGHEM.lat;
+      const lon = input.lon ?? HONDEGHEM.lon;
+
+      const stations = await collectNearbyStations(lat, lon, input.radiusKm);
+      const ranked = rankStations(stations);
+      return calculateGroundTruth(ranked);
+    }),
+
+  /**
+   * Get ranking criteria explanation for a set of stations.
+   */
+  getStationRankingCriteria: publicProcedure.query(() => {
+    return {
+      criteria: [
+        { name: "Distance", weight: 40, description: "Plus la station est proche, plus son poids est élevé (inverse de la distance)" },
+        { name: "Fiabilité historique", weight: 30, description: "Score de cohérence basé sur l'historique de la station" },
+        { name: "Disponibilité", weight: 20, description: "Fraction des mises à jour attendues effectivement reçues" },
+        { name: "Fréquence", weight: 10, description: "Stations à mise à jour fréquente (toutes les 5-10 min) favorisées" },
+      ],
+      groundTruthWeights: {
+        distance: 50,
+        qualityHistory: 30,
+        freshness: 20,
+      },
+      exclusionRules: [
+        "Aucune donnée disponible (température, vent et précipitations toutes nulles)",
+        "Données trop anciennes (> 120 minutes)",
+        "Score de fiabilité trop bas (< 40/100)",
+      ],
+      sources: [
+        { id: "meteofrance", name: "Météo-France StatIC", reliability: 92, updateFreqMin: 60 },
+        { id: "synop", name: "SYNOP/WMO (ECMWF)", reliability: 88, updateFreqMin: 60 },
+        { id: "noaa", name: "NOAA International", reliability: 85, updateFreqMin: 60 },
+        { id: "openmeteo", name: "Open-Meteo Grid", reliability: 80, updateFreqMin: 60 },
+        { id: "davis", name: "Davis Instruments", reliability: 78, updateFreqMin: 10 },
+        { id: "netatmo", name: "Netatmo Public", reliability: 65, updateFreqMin: 10 },
+        { id: "cwop", name: "CWOP/APRS Amateur", reliability: 60, updateFreqMin: 15 },
+        { id: "wunderground", name: "Weather Underground PWS", reliability: 58, updateFreqMin: 5 },
+      ],
+    };
+  }),
+
+  /**
+   * Get full details for a single station by ID, including live data refresh.
+   */
+  getStationDetail: publicProcedure
+    .input(z.object({
+      stationId: z.string(),
+      lat: z.number().optional(),
+      lon: z.number().optional(),
+      radiusKm: z.number().min(1).max(50).default(20),
+    }))
+    .query(async ({ input }) => {
+      const lat = input.lat ?? HONDEGHEM.lat;
+      const lon = input.lon ?? HONDEGHEM.lon;
+      const stations = await collectNearbyStations(lat, lon, input.radiusKm);
+      const station = stations.find(s => s.stationId === input.stationId);
+      if (!station) return null;
+      return {
+        ...station,
+        groundTruthContribution: (() => {
+          const ranked = rankStations(stations);
+          const gt = calculateGroundTruth(ranked);
+          const used = gt.stationsUsed.find(s => s.stationId === input.stationId);
+          return used ? { weight: used.weight, distanceWeight: used.distanceWeight, qualityWeight: used.qualityWeight, freshnessWeight: used.freshnessWeight } : null;
+        })(),
+      };
+    }),
 });
