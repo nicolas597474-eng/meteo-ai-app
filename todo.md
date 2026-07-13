@@ -81,3 +81,10 @@
 - [x] Backend: Ajouter vérification altitude comme critère qualité explicite
 - [x] Frontend: Ajouter sélecteur Standard/Local/Ultra-local dans FavoriteSettings
 - [x] Frontend: Sauvegarder localMode par favori (DB + lecture du favori actif) au lieu d'un global
+- [x] Bug: Corriger incohérence régime météo Dashboard ("Eté stable") vs Classement ("Standard") — unifier la source
+- [x] Backend: Heartbeat 05h00 — collecte prévisions pour chaque lieu favori enregistré en DB
+- [x] Backend: Stocker les prévisions par lieu favori (table forecast_by_location ou extension de forecasts)
+- [x] Frontend: Afficher les données préchargées des favoris depuis la DB (pas seulement à la demande)
+- [x] Heartbeat: créer le cron 05h00 qui appelle /api/scheduled/collect-favorites-forecasts
+- [x] Backend: exposer location_forecasts via tRPC pour les favoris de l'utilisateur
+- [x] Frontend: brancher FavoritesBar sur les données préchargées (mini-temp dans les pills)

@@ -76,19 +76,34 @@ export const weatherRouter = router({
    */
   getRanking: publicProcedure.query(async () => {
     const ranking = await getCumulativeRanking();
+    const today = getTodayParis();
 
-    // Compute regime from the most recent observation available
-    const recentObs = await getObservationsByDateRange(
-      new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }),
-      getTodayParis()
-    );
-    const latestObs = recentObs[recentObs.length - 1];
-    const regimeInfo = detectWeatherRegime({
-      precipitation: latestObs?.precipitation ?? null,
-      windSpeed: latestObs?.windSpeed ?? null,
-      tempMax: latestObs?.tempMax ?? null,
-      tempMin: latestObs?.tempMin ?? null,
-    });
+    // Use today's MeteoAI forecast for regime detection (same source as Dashboard)
+    // Fall back to most recent observation if no forecast available
+    const meteoAI = await getMeteoAIForecastByDate(today);
+    let regimeSource: { precipitation: number | null; windSpeed: number | null; tempMax: number | null; tempMin: number | null };
+    if (meteoAI) {
+      regimeSource = {
+        precipitation: meteoAI.precipitation ?? null,
+        windSpeed: meteoAI.windSpeed ?? null,
+        tempMax: meteoAI.tempMax ?? null,
+        tempMin: meteoAI.tempMin ?? null,
+      };
+    } else {
+      // Fallback: use most recent observation
+      const recentObs = await getObservationsByDateRange(
+        new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }),
+        today
+      );
+      const latestObs = recentObs[recentObs.length - 1];
+      regimeSource = {
+        precipitation: latestObs?.precipitation ?? null,
+        windSpeed: latestObs?.windSpeed ?? null,
+        tempMax: latestObs?.tempMax ?? null,
+        tempMin: latestObs?.tempMin ?? null,
+      };
+    }
+    const regimeInfo = detectWeatherRegime(regimeSource);
 
     // All regime definitions for the UI selector
     const allRegimes = (Object.keys(REGIME_DEFINITIONS) as WeatherRegime[]).map(key => ({

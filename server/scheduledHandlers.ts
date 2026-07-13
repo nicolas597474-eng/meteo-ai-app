@@ -364,3 +364,190 @@ function determineMajorityCondition(forecasts: any[]): string {
   if (avgCloud > 25) return "Partiellement nuageux";
   return "Ensoleillé";
 }
+
+/**
+ * Handler: Collect forecasts for all registered favorite locations
+ * Triggered daily at 05h00 Paris time (03h00 UTC summer)
+ * Stores results in location_forecasts table for instant display
+ */
+export async function collectFavoritesForecastsHandler(req: Request, res: Response) {
+  try {
+    const user = await sdk.authenticateRequest(req);
+    if (!user.isCron || !user.taskUid) {
+      return res.status(403).json({ error: "cron-only" });
+    }
+
+    const today = getTodayParis();
+    console.log(`[MeteoAI] Starting favorites forecast collection for ${today}`);
+
+    // Import needed helpers
+    const { getAllFavoriteLocations, upsertLocationForecast } = await import("./db");
+    const { generateMeteoAIForecast, calculateStabilityIndex } = await import("./statsEngine");
+    const { collectExpertForecasts, WEATHER_SERVICES } = await import("./weatherServices");
+    const { getCumulativeRanking } = await import("./db");
+
+    // Get all favorites across all users
+    const allFavorites = await getAllFavoriteLocations();
+
+    if (allFavorites.length === 0) {
+      console.log("[MeteoAI] No favorite locations found, skipping.");
+      return res.json({ ok: true, locationsProcessed: 0 });
+    }
+
+    // Deduplicate by lat/lon to avoid redundant API calls
+    const seen = new Set<string>();
+    const uniqueLocations: typeof allFavorites = [];
+    for (const fav of allFavorites) {
+      const key = `${fav.lat.toFixed(3)},${fav.lon.toFixed(3)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueLocations.push(fav);
+      }
+    }
+
+    console.log(`[MeteoAI] Processing ${uniqueLocations.length} unique locations (${allFavorites.length} total favorites)`);
+
+    // Get cumulative ranking for model weights
+    const ranking = await getCumulativeRanking();
+    const reliabilityMap: Record<string, number> = {};
+    ranking.forEach((r) => {
+      reliabilityMap[r.serviceName] = r.avgScore ?? 50;
+    });
+
+    let locationsProcessed = 0;
+    const errors: string[] = [];
+
+    for (const fav of uniqueLocations) {
+      try {
+        console.log(`[MeteoAI] Collecting forecasts for ${fav.name} (${fav.lat}, ${fav.lon})`);
+
+        // Collect expert forecasts for this location
+        const expertData = await collectExpertForecasts(today, { lat: fav.lat, lon: fav.lon });
+
+        if (expertData.length === 0) {
+          console.warn(`[MeteoAI] No data for ${fav.name}`);
+          continue;
+        }
+
+        // Calculate stability index
+        const stability = calculateStabilityIndex(
+          expertData.map((f) => ({
+            tempMax: f.tempMax,
+            tempMin: f.tempMin,
+            precipitation: f.precipitation,
+            windSpeed: f.windSpeed,
+          }))
+        );
+
+        // Generate MeteoAI synthesis
+        const meteoAI = generateMeteoAIForecast(
+          expertData.map((f) => ({
+            tempMax: f.tempMax,
+            tempMin: f.tempMin,
+            precipitation: f.precipitation,
+            windSpeed: f.windSpeed,
+          })),
+          expertData.map((f) => f.serviceName),
+          reliabilityMap
+        );
+
+        // Determine condition
+        const avgPrecip = expertData.reduce((s, f) => s + (f.precipitation ?? 0), 0) / expertData.length;
+        const avgCloud = expertData.reduce((s, f) => s + (f.cloudCover ?? 50), 0) / expertData.length;
+        let condition = "Ensoleillé";
+        if (avgPrecip > 5) condition = "Pluie";
+        else if (avgPrecip > 1) condition = "Averses";
+        else if (avgPrecip > 0.2) condition = "Pluie légère";
+        else if (avgCloud > 80) condition = "Couvert";
+        else if (avgCloud > 50) condition = "Nuageux";
+        else if (avgCloud > 25) condition = "Partiellement nuageux";
+
+        // Estimate current temperature (midpoint of min/max adjusted for time of day)
+        const hour = new Date().getHours();
+        const dayProgress = Math.max(0, Math.min(1, (hour - 6) / 12)); // 0 at 6h, 1 at 18h
+        const tempCurrent = meteoAI.tempMin !== null && meteoAI.tempMax !== null
+          ? Math.round((meteoAI.tempMin + (meteoAI.tempMax - meteoAI.tempMin) * Math.sin(dayProgress * Math.PI / 2)) * 10) / 10
+          : null;
+
+        // Generate AI explanation
+        let explanation = `Prévision pour ${fav.customName ?? fav.name} — ${expertData.length} modèles consultés. Indice de stabilité: ${stability.index}/100.`;
+        try {
+          const { invokeLLM } = await import("./_core/llm");
+          const llmResult = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `Tu es MeteoAI, un assistant météo expert. Génère une explication concise (2-3 phrases) de la prévision du jour pour ${fav.customName ?? fav.name} en français.`,
+              },
+              {
+                role: "user",
+                content: `Prévision MeteoAI pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- Stabilité: ${stability.index}/100 (${stability.label})\n- ${expertData.length} modèles consultés`,
+              },
+            ],
+            maxTokens: 200,
+          });
+          const rawContent = llmResult.choices?.[0]?.message?.content;
+          if (typeof rawContent === "string") explanation = rawContent;
+        } catch (e) {
+          console.warn(`[MeteoAI] LLM explanation failed for ${fav.name}:`, e);
+        }
+
+        // Find all favorites with this location (same lat/lon) and upsert for each
+        const matchingFavorites = allFavorites.filter(
+          (f) => Math.abs(f.lat - fav.lat) < 0.001 && Math.abs(f.lon - fav.lon) < 0.001
+        );
+
+        for (const matchFav of matchingFavorites) {
+          await upsertLocationForecast({
+            favoriteLocationId: matchFav.id,
+            userId: matchFav.userId,
+            lat: matchFav.lat,
+            lon: matchFav.lon,
+            date: today,
+            tempMax: meteoAI.tempMax,
+            tempMin: meteoAI.tempMin,
+            tempCurrent,
+            precipitation: meteoAI.precipitation,
+            windSpeed: meteoAI.windSpeed,
+            condition,
+            aiScore: stability.index,
+            confidenceScore: stability.index,
+            stabilityIndex: stability.index,
+            modelsData: expertData as any,
+            explanation,
+          });
+        }
+
+        locationsProcessed++;
+
+        // Rate limit between locations
+        await new Promise((r) => setTimeout(r, 500));
+      } catch (err: any) {
+        console.error(`[MeteoAI] Error collecting for ${fav.name}:`, err.message);
+        errors.push(`${fav.name}: ${err.message}`);
+      }
+    }
+
+    // Notify owner
+    await notifyOwner({
+      title: `🌍 MeteoAI — Favoris collectés ${today}`,
+      content: `${locationsProcessed}/${uniqueLocations.length} lieux traités avec succès.${errors.length > 0 ? `\n⚠️ Erreurs: ${errors.slice(0, 3).join(", ")}` : ""}`,
+    });
+
+    res.json({
+      ok: true,
+      date: today,
+      locationsProcessed,
+      totalFavorites: allFavorites.length,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error: any) {
+    console.error("[MeteoAI] Favorites forecast collection error:", error);
+    res.status(500).json({
+      error: error.message,
+      stack: error.stack,
+      context: { url: req.url },
+      timestamp: new Date().toISOString(),
+    });
+  }
+}

@@ -48,14 +48,18 @@ export type ForecastData = {
  * Collect forecasts from Open-Meteo API for expert models.
  * Returns forecast data for today's date.
  */
-export async function collectExpertForecasts(targetDate: string): Promise<ForecastData[]> {
+export async function collectExpertForecasts(
+  targetDate: string,
+  coords?: { lat: number; lon: number }
+): Promise<ForecastData[]> {
+  const location = coords ?? HONDEGHEM;
   const results: ForecastData[] = [];
 
   for (const service of WEATHER_SERVICES.expert) {
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
-      url.searchParams.set("latitude", HONDEGHEM.lat.toString());
-      url.searchParams.set("longitude", HONDEGHEM.lon.toString());
+      url.searchParams.set("latitude", location.lat.toString());
+      url.searchParams.set("longitude", location.lon.toString());
       url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", "7");

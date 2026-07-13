@@ -7,6 +7,8 @@ import {
   updateFavoriteLocation,
   deleteFavoriteLocation,
   setDefaultFavorite,
+  getLocationForecastsForUser,
+  getLocationForecast,
 } from "../db";
 import { collectNearbyStations, rankStations, calculateGroundTruth } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
@@ -253,4 +255,27 @@ export const favoritesRouter = router({
         },
       };
     }),
+
+  /**
+   * Get pre-loaded forecasts for all of the user's favorites (from 05h00 cron).
+   * Returns null for favorites that haven't been collected yet.
+   */
+  getPreloadedForecasts: protectedProcedure.query(async ({ ctx }) => {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+    const favorites = await getFavoriteLocations(ctx.user.id);
+    const forecasts = await getLocationForecastsForUser(ctx.user.id, today);
+
+    // Map forecasts by favoriteLocationId for quick lookup
+    const forecastMap = new Map(forecasts.map(f => [f.favoriteLocationId, f]));
+
+    return favorites.map(fav => ({
+      favoriteId: fav.id,
+      name: fav.customName ?? fav.name,
+      lat: fav.lat,
+      lon: fav.lon,
+      isDefault: fav.isDefault === 1,
+      position: fav.position,
+      forecast: forecastMap.get(fav.id) ?? null,
+    }));
+  }),
 });

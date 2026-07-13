@@ -9,12 +9,14 @@ import {
   meteoaiForecast,
   collectionJobs,
   favoriteLocations,
+  locationForecasts,
   InsertForecast,
   InsertObservation,
   InsertReliabilityScore,
   InsertMeteoAIForecast,
   InsertCollectionJob,
   InsertFavoriteLocation,
+  InsertLocationForecast,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -345,6 +347,18 @@ export async function getRecentCollectionJobs(limit = 10) {
 
 // ─── Favorite Locations ──────────────────────────────────────────────────────
 
+/**
+ * Get ALL favorite locations across all users (used by cron jobs for bulk collection)
+ */
+export async function getAllFavoriteLocations() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(favoriteLocations)
+    .orderBy(favoriteLocations.userId, favoriteLocations.position);
+}
+
 export async function getFavoriteLocations(userId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -401,4 +415,71 @@ export async function setDefaultFavorite(id: number, userId: number) {
     .set({ isDefault: 1 })
     .where(and(eq(favoriteLocations.id, id), eq(favoriteLocations.userId, userId)));
   return true;
+}
+
+// ─── Location Forecasts (pre-fetched per favorite) ───────────────────────────
+
+/**
+ * Upsert a pre-fetched forecast for a favorite location.
+ * If a row for (favoriteLocationId, date) already exists, update it.
+ */
+export async function upsertLocationForecast(data: InsertLocationForecast) {
+  const db = await getDb();
+  if (!db) return;
+  // Try update first
+  const existing = await db
+    .select({ id: locationForecasts.id })
+    .from(locationForecasts)
+    .where(
+      and(
+        eq(locationForecasts.favoriteLocationId, data.favoriteLocationId),
+        eq(locationForecasts.date, data.date)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(locationForecasts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(locationForecasts.id, existing[0].id));
+  } else {
+    await db.insert(locationForecasts).values(data);
+  }
+}
+
+/**
+ * Get the latest pre-fetched forecast for a favorite location.
+ */
+export async function getLocationForecast(favoriteLocationId: number, date: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(locationForecasts)
+    .where(
+      and(
+        eq(locationForecasts.favoriteLocationId, favoriteLocationId),
+        eq(locationForecasts.date, date)
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Get all pre-fetched forecasts for a user's favorite locations (latest date).
+ */
+export async function getLocationForecastsForUser(userId: number, date: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(locationForecasts)
+    .where(
+      and(
+        eq(locationForecasts.userId, userId),
+        eq(locationForecasts.date, date)
+      )
+    );
 }

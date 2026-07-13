@@ -252,3 +252,37 @@ export const favoriteLocations = mysqlTable("favorite_locations", {
 
 export type FavoriteLocation = typeof favoriteLocations.$inferSelect;
 export type InsertFavoriteLocation = typeof favoriteLocations.$inferInsert;
+
+/**
+ * Pre-fetched forecasts for each favorite location.
+ * Populated daily at 05h00 by the heartbeat cron.
+ * Allows instant display without waiting for API calls.
+ */
+export const locationForecasts = mysqlTable("location_forecasts", {
+  id: int("id").autoincrement().primaryKey(),
+  favoriteLocationId: int("favoriteLocationId").notNull(), // FK to favorite_locations.id
+  userId: int("userId").notNull(),
+  lat: float("lat").notNull(),
+  lon: float("lon").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  // MeteoAI synthesized values
+  tempMax: float("tempMax"),
+  tempMin: float("tempMin"),
+  tempCurrent: float("tempCurrent"),
+  precipitation: float("precipitation"),
+  windSpeed: float("windSpeed"),
+  condition: varchar("condition", { length: 128 }),
+  // AI scores
+  aiScore: float("aiScore"),       // Weather AI Score 0-100
+  confidenceScore: float("confidenceScore"), // Weather Confidence Score 0-100
+  stabilityIndex: float("stabilityIndex"),
+  // Raw forecast data per model (JSON array)
+  modelsData: json("modelsData"),
+  // Explanation
+  explanation: text("explanation"),
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LocationForecast = typeof locationForecasts.$inferSelect;
+export type InsertLocationForecast = typeof locationForecasts.$inferInsert;

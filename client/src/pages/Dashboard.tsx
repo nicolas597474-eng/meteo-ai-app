@@ -6,6 +6,7 @@ import {
 import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun, FlaskConical, Radio } from "lucide-react";
 import { Link } from "wouter";
 import { FavoritesBar } from "@/components/FavoritesBar";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 // ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
@@ -177,6 +178,7 @@ function storeLocalMode(mode: "standard" | "local" | "ultra-local") {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
 
@@ -207,6 +209,28 @@ export default function Dashboard() {
     queryInput,
     { enabled: !!activeLocation }
   );
+
+  // Pre-loaded forecasts for all favorites (from 05h00 cron)
+  const { data: preloadedForecasts } = trpc.favorites.getPreloadedForecasts.useQuery(
+    undefined,
+    { enabled: !!user, staleTime: 5 * 60 * 1000 }
+  );
+
+  // Build prefetchedWeather map for FavoritesBar pills (key = "fav-{id}")
+  const prefetchedWeather = useMemo(() => {
+    if (!preloadedForecasts) return undefined;
+    const map = new Map<string, { temp: number | null; condition: string | null; confidenceScore: number | null }>();
+    for (const pf of preloadedForecasts) {
+      if (pf.forecast) {
+        map.set(`fav-${pf.favoriteId}`, {
+          temp: pf.forecast.tempCurrent ?? pf.forecast.tempMax,
+          condition: pf.forecast.condition,
+          confidenceScore: pf.forecast.confidenceScore,
+        });
+      }
+    }
+    return map;
+  }, [preloadedForecasts]);
 
   // Fallback to default queries for Hondeghem when no location selected
   const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery(
@@ -301,6 +325,7 @@ export default function Dashboard() {
         <FavoritesBar
           activeLocation={activeLocation}
           onLocationChange={handleLocationChange}
+          prefetchedWeather={prefetchedWeather}
         />
 
         {/* ── Hero : Température actuelle + max/min ── */}

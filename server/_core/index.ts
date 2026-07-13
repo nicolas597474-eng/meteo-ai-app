@@ -37,9 +37,10 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   // Scheduled handlers (heartbeat cron callbacks)
-  const { collectForecastsHandler, collectObservationsHandler } = await import("../scheduledHandlers");
+  const { collectForecastsHandler, collectObservationsHandler, collectFavoritesForecastsHandler } = await import("../scheduledHandlers");
   app.post("/api/scheduled/collect-forecasts", collectForecastsHandler);
   app.post("/api/scheduled/collect-observations", collectObservationsHandler);
+  app.post("/api/scheduled/collect-favorites-forecasts", collectFavoritesForecastsHandler);
 
   // tRPC API
   app.use(
