@@ -137,6 +137,7 @@ export const favoritesRouter = router({
       lon: z.number().min(-180).max(180),
       radiusKm: z.number().min(5).max(50).default(20),
       localMode: z.enum(["standard", "local", "ultra-local"]).default("standard"),
+      name: z.string().optional(),
     }))
     .query(async ({ input }) => {
       const { lat, lon, radiusKm, localMode } = input;
@@ -149,7 +150,7 @@ export const favoritesRouter = router({
       const [forecast15dResult, hourly, stations] = await Promise.all([
         collect15DayForecast(),
         collectHourlyForecast(todayDate),
-        collectNearbyStations(lat, lon, searchRadius),
+        collectNearbyStations(lat, lon, searchRadius, input.name ?? "Local"),
       ]);
       const forecast15d = forecast15dResult.days;
 

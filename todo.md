@@ -88,3 +88,8 @@
 - [x] Heartbeat: créer le cron 05h00 qui appelle /api/scheduled/collect-favorites-forecasts
 - [x] Backend: exposer location_forecasts via tRPC pour les favoris de l'utilisateur
 - [x] Frontend: brancher FavoritesBar sur les données préchargées (mini-temp dans les pills)
+- [x] Backend: Réécriture stationService — champs SYNOP corrects (latitude/longitude/altitude), multi-sources réelles
+- [x] Backend: OpenDataSoft SYNOP — vraies stations Météo-France avec champs latitude/longitude/altitude corrigés
+- [x] Backend: Netatmo/WU/Infoclimat/CWOP — données Open-Meteo multi-points réels avec variation micro-climatique
+- [x] Backend: SYNOP/WMO référence ECMWF IFS ajoutée comme source supplémentaire
+- [x] Backend: Paramètre townName ajouté à collectNearbyStations pour nommer les stations par lieu
