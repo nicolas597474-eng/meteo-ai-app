@@ -283,7 +283,15 @@ export default function Dashboard() {
   const futureDays = days.slice(1);
   const hours: any[] = lw ? lw.hourly : (hourly?.hours ?? []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
-  const regime = lw ? { regime: lw.scores.regime, label: lw.scores.regimeLabel, emoji: lw.scores.regimeEmoji, weights: { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 } } as any : dash?.regime;
+  const regime = lw
+    ? {
+        regime: lw.scores.regime,
+        label: lw.scores.regimeLabel,
+        emoji: lw.scores.regimeEmoji,
+        description: (lw.scores as any).regimeDescription ?? "",
+        weights: (lw.scores as any).regimeWeights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
+      }
+    : dash?.regime;
 
   const chartData = days.map((d: any) => ({
     name: dayLabel(d.date),

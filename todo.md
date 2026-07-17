@@ -93,3 +93,4 @@
 - [x] Backend: Netatmo/WU/Infoclimat/CWOP — données Open-Meteo multi-points réels avec variation micro-climatique
 - [x] Backend: SYNOP/WMO référence ECMWF IFS ajoutée comme source supplémentaire
 - [x] Backend: Paramètre townName ajouté à collectNearbyStations pour nommer les stations par lieu
+- [x] Bug: Unifier les poids de pondération du régime météo — Dashboard et Classement affichent maintenant les mêmes pourcentages (vrais poids du régime détecté, plus de valeurs codées en dur)

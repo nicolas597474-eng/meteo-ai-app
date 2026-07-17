@@ -253,6 +253,8 @@ export const favoritesRouter = router({
           regime: regimeInfo.regime,
           regimeLabel: regimeInfo.label,
           regimeEmoji: regimeInfo.emoji,
+          regimeDescription: regimeInfo.description,
+          regimeWeights: regimeInfo.weights,
         },
       };
     }),
