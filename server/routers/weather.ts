@@ -12,12 +12,14 @@ import {
   getMeteoAIForecastByDate,
   getLatestMeteoAIForecasts,
   getCumulativeRanking,
+  getCumulativeRankingForLocation,
   getRecentCollectionJobs,
   insertForecasts,
   insertObservation,
   insertReliabilityScores,
   upsertMeteoAIForecast,
   getHistoricalScoreTimeSeries,
+  makeLocationKey,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
@@ -31,20 +33,23 @@ export const weatherRouter = router({
   /**
    * Dashboard: today's MeteoAI forecast + stability index + top services
    */
-  getDashboard: publicProcedure.query(async () => {
+  getDashboard: publicProcedure
+    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .query(async ({ input }) => {
     const today = getTodayParis();
+    const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
     // Get MeteoAI forecast for today
-    const meteoAI = await getMeteoAIForecastByDate(today);
+    const meteoAI = await getMeteoAIForecastByDate(today, locKey);
 
     // Get all forecasts for today
-    const forecasts = await getForecastsByDate(today);
+    const forecasts = await getForecastsByDate(today, locKey);
 
-    // Get ranking
-    const ranking = await getCumulativeRanking();
+    // Get ranking for this location
+    const ranking = await getCumulativeRankingForLocation(locKey);
 
     // Get recent forecasts if no today data
-    const recentForecasts = await getLatestMeteoAIForecasts(7);
+    const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
 
     // Detect current weather regime from today's MeteoAI forecast
     const regimeInfo = detectWeatherRegime({
@@ -74,13 +79,15 @@ export const weatherRouter = router({
   /**
    * Full ranking of all services with cumulative scores
    */
-  getRanking: publicProcedure.query(async () => {
-    const ranking = await getCumulativeRanking();
+  getRanking: publicProcedure
+    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .query(async ({ input }) => {
     const today = getTodayParis();
+    const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
+    const ranking = await getCumulativeRankingForLocation(locKey);
 
     // Use today's MeteoAI forecast for regime detection (same source as Dashboard)
-    // Fall back to most recent observation if no forecast available
-    const meteoAI = await getMeteoAIForecastByDate(today);
+    const meteoAI = await getMeteoAIForecastByDate(today, locKey);
     let regimeSource: { precipitation: number | null; windSpeed: number | null; tempMax: number | null; tempMin: number | null };
     if (meteoAI) {
       regimeSource = {
@@ -93,7 +100,8 @@ export const weatherRouter = router({
       // Fallback: use most recent observation
       const recentObs = await getObservationsByDateRange(
         new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }),
-        today
+        today,
+        locKey
       );
       const latestObs = recentObs[recentObs.length - 1];
       regimeSource = {
@@ -132,6 +140,8 @@ export const weatherRouter = router({
     .input(
       z.object({
         days: z.number().min(1).max(30).default(7),
+        lat: z.number().optional(),
+        lon: z.number().optional(),
       })
     )
     .query(async ({ input }) => {
@@ -139,10 +149,11 @@ export const weatherRouter = router({
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - input.days);
       const startStr = startDate.toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+      const locKey = input.lat != null && input.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
-      const forecasts = await getForecastsByDateRange(startStr, endDate);
-      const observations = await getObservationsByDateRange(startStr, endDate);
-      const meteoAIForecasts = await getLatestMeteoAIForecasts(input.days);
+      const forecasts = await getForecastsByDateRange(startStr, endDate, locKey);
+      const observations = await getObservationsByDateRange(startStr, endDate, locKey);
+      const meteoAIForecasts = await getLatestMeteoAIForecasts(input.days, locKey);
 
       return {
         forecasts,
@@ -160,15 +171,18 @@ export const weatherRouter = router({
     .input(
       z.object({
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        lat: z.number().optional(),
+        lon: z.number().optional(),
       })
     )
     .query(async ({ input }) => {
       const date = input.date || getTodayParis();
+      const locKey = input.lat != null && input.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
-      const forecasts = await getForecastsByDate(date);
-      const observation = await getObservationByDate(date);
-      const meteoAI = await getMeteoAIForecastByDate(date);
-      const ranking = await getCumulativeRanking();
+      const forecasts = await getForecastsByDate(date, locKey);
+      const observation = await getObservationByDate(date, locKey);
+      const meteoAI = await getMeteoAIForecastByDate(date, locKey);
+      const ranking = await getCumulativeRankingForLocation(locKey);
 
       // Compute live dimension scores per service for this date
       let dimensionScores: Array<{
@@ -443,12 +457,19 @@ export const weatherRouter = router({
   /**
    * Weather AI Lab — full transparency data for the AI Lab page
    */
-  getAILab: publicProcedure.query(async () => {
+  getAILab: publicProcedure
+    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .query(async ({ input }) => {
     const today = getTodayParis();
-    const forecasts = await getForecastsByDate(today);
+    const locationKey = input?.lat && input?.lon ? makeLocationKey(input.lat, input.lon) : undefined;
+    const forecasts = locationKey
+      ? await getForecastsByDate(today, locationKey)
+      : await getForecastsByDate(today);
     const observation = await getObservationByDate(today);
     const meteoAI = await getMeteoAIForecastByDate(today);
-    const ranking = await getCumulativeRanking();
+    const ranking = locationKey
+      ? await getCumulativeRankingForLocation(locationKey)
+      : await getCumulativeRanking();
     const jobs = await getRecentCollectionJobs(5);
 
     // 1. Detect current regime

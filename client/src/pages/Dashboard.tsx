@@ -7,6 +7,7 @@ import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, 
 import { Link } from "wouter";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useLocation } from "@/contexts/LocationContext";
 
 // ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
@@ -179,12 +180,15 @@ function storeLocalMode(mode: "standard" | "local" | "ultra-local") {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { setActiveLocation: setContextLocation } = useLocation();
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
 
   const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number; localMode?: "standard" | "local" | "ultra-local" }) => {
     setActiveLocation(loc);
     storeLocation(loc);
+    // Sync to LocationContext so all pages (Ranking, History, AI Lab) use this location
+    setContextLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, localMode: loc.localMode });
     // If the favorite has a per-location mode, apply it
     if (loc.localMode) {
       setLocalMode(loc.localMode);

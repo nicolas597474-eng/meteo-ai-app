@@ -20,6 +20,10 @@ import {
   getForecastsByDate,
   getObservationByDate,
   getCumulativeRanking,
+  makeLocationKey,
+  getAllFavoriteLocations,
+  upsertLocationForecast,
+  getCumulativeRankingForLocation,
 } from "./db";
 
 /**
@@ -60,11 +64,16 @@ export async function collectForecastsHandler(req: Request, res: Response) {
     });
 
     try {
+      // Default location key for Hondeghem (legacy)
+      const { HONDEGHEM } = await import("./weatherServices");
+      const defaultLocKey = makeLocationKey(HONDEGHEM.lat, HONDEGHEM.lon);
+
       // Collect from Open-Meteo expert models
       const expertData = await collectExpertForecasts(today);
 
-      // Insert forecasts into DB
+      // Insert forecasts into DB with locationKey
       const forecastRows = expertData.map((f) => ({
+        locationKey: defaultLocKey,
         date: today,
         serviceName: f.serviceName,
         serviceCategory: f.serviceCategory,
@@ -81,15 +90,14 @@ export async function collectForecastsHandler(req: Request, res: Response) {
 
       await insertForecasts(forecastRows);
 
-      // Also insert public service entries (simulated from Open-Meteo best_match with small variations)
-      // In production, these would come from actual API calls to each service
-      const publicForecasts = generatePublicServiceForecasts(expertData, today);
+      // Also insert public service entries
+      const publicForecasts = generatePublicServiceForecasts(expertData, today, defaultLocKey);
       if (publicForecasts.length > 0) {
         await insertForecasts(publicForecasts);
       }
 
       // Get all forecasts for today to compute MeteoAI synthesis
-      const allForecasts = await getForecastsByDate(today);
+      const allForecasts = await getForecastsByDate(today, defaultLocKey);
 
       if (allForecasts.length > 0) {
         // Calculate stability index
@@ -148,8 +156,9 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         // Determine condition from majority
         const condition = determineMajorityCondition(allForecasts);
 
-        // Save MeteoAI forecast
+        // Save MeteoAI forecast with locationKey
         await upsertMeteoAIForecast({
+          locationKey: defaultLocKey,
           date: today,
           tempMax: meteoAI.tempMax,
           tempMin: meteoAI.tempMin,
@@ -321,7 +330,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
  * In production, these would come from actual API calls.
  * Here we add realistic variations to the best_match model.
  */
-function generatePublicServiceForecasts(expertData: any[], date: string) {
+function generatePublicServiceForecasts(expertData: any[], date: string, locationKey = "default") {
   const bestMatch = expertData.find((d) => d.serviceName === "Open-Meteo");
   if (!bestMatch) return [];
 
@@ -332,6 +341,7 @@ function generatePublicServiceForecasts(expertData: any[], date: string) {
     const windVar = () => (Math.random() - 0.5) * 6; // ±3 km/h
 
     return {
+      locationKey,
       date,
       serviceName: service.name,
       serviceCategory: service.category,
@@ -380,12 +390,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     const today = getTodayParis();
     console.log(`[MeteoAI] Starting favorites forecast collection for ${today}`);
 
-    // Import needed helpers
-    const { getAllFavoriteLocations, upsertLocationForecast } = await import("./db");
-    const { generateMeteoAIForecast, calculateStabilityIndex } = await import("./statsEngine");
-    const { collectExpertForecasts, WEATHER_SERVICES } = await import("./weatherServices");
-    const { getCumulativeRanking } = await import("./db");
-
     // Get all favorites across all users
     const allFavorites = await getAllFavoriteLocations();
 
@@ -421,6 +425,16 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       try {
         console.log(`[MeteoAI] Collecting forecasts for ${fav.name} (${fav.lat}, ${fav.lon})`);
 
+        // Compute locationKey for this favorite
+        const locKey = makeLocationKey(fav.lat, fav.lon);
+
+        // Get location-specific ranking (fallback to global)
+        const locRanking = await getCumulativeRankingForLocation(locKey);
+        const locReliabilityMap: Record<string, number> = {};
+        (locRanking.length > 0 ? locRanking : ranking).forEach((r) => {
+          locReliabilityMap[r.serviceName] = r.avgScore ?? 50;
+        });
+
         // Collect expert forecasts for this location
         const expertData = await collectExpertForecasts(today, { lat: fav.lat, lon: fav.lon });
 
@@ -439,7 +453,27 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           }))
         );
 
-        // Generate MeteoAI synthesis
+        // Store all model forecasts in the main forecasts table with locationKey
+        const forecastRowsForLoc = expertData.map((f) => ({
+          locationKey: locKey,
+          date: today,
+          serviceName: f.serviceName,
+          serviceCategory: f.serviceCategory,
+          tempMax: f.tempMax,
+          tempMin: f.tempMin,
+          precipitation: f.precipitation,
+          windSpeed: f.windSpeed,
+          windGust: f.windGust,
+          humidity: f.humidity,
+          cloudCover: f.cloudCover,
+          condition: f.condition,
+          rawData: f.rawData as any,
+        }));
+        // Also add public service simulations
+        const publicRowsForLoc = generatePublicServiceForecasts(expertData, today, locKey);
+        await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);
+
+        // Generate MeteoAI synthesis using location-specific reliability
         const meteoAI = generateMeteoAIForecast(
           expertData.map((f) => ({
             tempMax: f.tempMax,
@@ -448,7 +482,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             windSpeed: f.windSpeed,
           })),
           expertData.map((f) => f.serviceName),
-          reliabilityMap
+          locReliabilityMap
         );
 
         // Determine condition
@@ -496,6 +530,22 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         const matchingFavorites = allFavorites.filter(
           (f) => Math.abs(f.lat - fav.lat) < 0.001 && Math.abs(f.lon - fav.lon) < 0.001
         );
+
+        // Also save MeteoAI forecast for this location
+        await upsertMeteoAIForecast({
+          locationKey: locKey,
+          date: today,
+          tempMax: meteoAI.tempMax,
+          tempMin: meteoAI.tempMin,
+          precipitation: meteoAI.precipitation,
+          windSpeed: meteoAI.windSpeed,
+          condition,
+          stabilityIndex: stability.index,
+          stabilityLabel: stability.label,
+          confidenceScore: stability.index,
+          weights: meteoAI.weights as any,
+          explanation,
+        });
 
         for (const matchFav of matchingFavorites) {
           await upsertLocationForecast({

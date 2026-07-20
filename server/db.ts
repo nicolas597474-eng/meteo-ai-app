@@ -110,25 +110,38 @@ export async function getUserByOpenId(openId: string) {
 
 // ─── FORECAST HELPERS ───────────────────────────────────────────────────────
 
+// ─── LOCATION KEY HELPERS ──────────────────────────────────────────────────
+
+/** Make a stable location key from lat/lon (3dp precision ≈ 111m). */
+export function makeLocationKey(lat: number, lon: number): string {
+  const latR = Math.round(lat * 1000) / 1000;
+  const lonR = Math.round(lon * 1000) / 1000;
+  return `${latR}_${lonR}`;
+}
+
+// ─── FORECAST HELPERS ───────────────────────────────────────────────────────
+
 export async function insertForecasts(data: InsertForecast[]): Promise<void> {
   const db = await getDb();
   if (!db || data.length === 0) return;
   await db.insert(forecasts).values(data);
 }
 
-export async function getForecastsByDate(date: string) {
+export async function getForecastsByDate(date: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(forecasts).where(eq(forecasts.date, date));
+  return db.select().from(forecasts).where(
+    and(eq(forecasts.date, date), eq(forecasts.locationKey, locationKey))
+  );
 }
 
-export async function getForecastsByDateRange(startDate: string, endDate: string) {
+export async function getForecastsByDateRange(startDate: string, endDate: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
   return db
     .select()
     .from(forecasts)
-    .where(and(gte(forecasts.date, startDate), lte(forecasts.date, endDate)))
+    .where(and(gte(forecasts.date, startDate), lte(forecasts.date, endDate), eq(forecasts.locationKey, locationKey)))
     .orderBy(forecasts.date);
 }
 
@@ -148,7 +161,7 @@ export async function getForecastsByService(serviceName: string, limit = 30) {
 export async function insertObservation(data: InsertObservation): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  // Upsert: if observation for this date exists, update it
+  // Upsert: if observation for this date+location exists, update it
   await db.insert(observations).values(data).onDuplicateKeyUpdate({
     set: {
       tempMax: data.tempMax,
@@ -165,20 +178,22 @@ export async function insertObservation(data: InsertObservation): Promise<void> 
   });
 }
 
-export async function getObservationByDate(date: string) {
+export async function getObservationByDate(date: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.select().from(observations).where(eq(observations.date, date)).limit(1);
+  const result = await db.select().from(observations).where(
+    and(eq(observations.date, date), eq(observations.locationKey, locationKey))
+  ).limit(1);
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getObservationsByDateRange(startDate: string, endDate: string) {
+export async function getObservationsByDateRange(startDate: string, endDate: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
   return db
     .select()
     .from(observations)
-    .where(and(gte(observations.date, startDate), lte(observations.date, endDate)))
+    .where(and(gte(observations.date, startDate), lte(observations.date, endDate), eq(observations.locationKey, locationKey)))
     .orderBy(observations.date);
 }
 
@@ -190,13 +205,13 @@ export async function insertReliabilityScores(data: InsertReliabilityScore[]): P
   await db.insert(reliabilityScores).values(data);
 }
 
-export async function getLatestReliabilityScores() {
+export async function getLatestReliabilityScores(locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
-  // Get the most recent score for each service
   return db
     .select()
     .from(reliabilityScores)
+    .where(eq(reliabilityScores.locationKey, locationKey))
     .orderBy(desc(reliabilityScores.date), desc(reliabilityScores.weightedScore));
 }
 
@@ -253,11 +268,49 @@ export async function getCumulativeRanking() {
   return result;
 }
 
+export async function getCumulativeRankingForLocation(locationKey = "default") {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db
+    .select({
+      serviceName: reliabilityScores.serviceName,
+      avgScore: sql<number>`AVG(${reliabilityScores.weightedScore})`,
+      avgMaeTemp: sql<number>`AVG(${reliabilityScores.maeTemp})`,
+      avgMaePrecip: sql<number>`AVG(${reliabilityScores.maePrecip})`,
+      avgMaeWind: sql<number>`AVG(${reliabilityScores.maeWind})`,
+      avgRmseTemp: sql<number>`AVG(${reliabilityScores.rmseTemp})`,
+      avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
+      avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
+      daysTracked: sql<number>`COUNT(*)`,
+      avgTempScore: sql<number>`AVG(${reliabilityScores.tempScore})`,
+      avgTempMae: sql<number>`AVG(${reliabilityScores.maeTemp})`,
+      avgTempBias: sql<number>`AVG(${reliabilityScores.biasTemp})`,
+      avgTempMaxError: sql<number>`AVG(${reliabilityScores.tempMaxError})`,
+      avgPrecipScore: sql<number>`AVG(${reliabilityScores.precipScore})`,
+      avgPrecipPod: sql<number>`AVG(${reliabilityScores.precipPod})`,
+      avgPrecipFar: sql<number>`AVG(${reliabilityScores.precipFar})`,
+      avgPrecipCsi: sql<number>`AVG(${reliabilityScores.precipCsi})`,
+      totalPrecipFalsePos: sql<number>`SUM(${reliabilityScores.precipFalsePositives})`,
+      totalPrecipFalseNeg: sql<number>`SUM(${reliabilityScores.precipFalseNegatives})`,
+      avgWindScore: sql<number>`AVG(${reliabilityScores.windScore})`,
+      avgWindMaeGusts: sql<number>`AVG(${reliabilityScores.windMaeGusts})`,
+      avgCondScore: sql<number>`AVG(${reliabilityScores.condScore})`,
+      avgCondConcordance: sql<number>`AVG(${reliabilityScores.condConcordance})`,
+      avgCondMaeCloud: sql<number>`AVG(${reliabilityScores.condMaeCloud})`,
+    })
+    .from(reliabilityScores)
+    .where(eq(reliabilityScores.locationKey, locationKey))
+    .groupBy(reliabilityScores.serviceName)
+    .orderBy(sql`AVG(${reliabilityScores.weightedScore}) DESC`);
+  return result;
+}
+
 // ─── METEOAI FORECAST HELPERS ───────────────────────────────────────────────
 
 export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast): Promise<void> {
   const db = await getDb();
   if (!db) return;
+  // Note: unique constraint was dropped; use locationKey+date as logical key
   await db.insert(meteoaiForecast).values(data).onDuplicateKeyUpdate({
     set: {
       tempMax: data.tempMax,
@@ -274,23 +327,25 @@ export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast): Promis
   });
 }
 
-export async function getMeteoAIForecastByDate(date: string) {
+export async function getMeteoAIForecastByDate(date: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return null;
   const result = await db
     .select()
     .from(meteoaiForecast)
-    .where(eq(meteoaiForecast.date, date))
+    .where(and(eq(meteoaiForecast.date, date), eq(meteoaiForecast.locationKey, locationKey)))
+    .orderBy(desc(meteoaiForecast.computedAt))
     .limit(1);
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getLatestMeteoAIForecasts(limit = 7) {
+export async function getLatestMeteoAIForecasts(limit = 7, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
   return db
     .select()
     .from(meteoaiForecast)
+    .where(eq(meteoaiForecast.locationKey, locationKey))
     .orderBy(desc(meteoaiForecast.date))
     .limit(limit);
 }
@@ -298,7 +353,7 @@ export async function getLatestMeteoAIForecasts(limit = 7) {
 /**
  * Get daily weighted scores per service for the last N days (for AI Lab historical chart)
  */
-export async function getHistoricalScoreTimeSeries(days = 14) {
+export async function getHistoricalScoreTimeSeries(days = 14, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
   return db

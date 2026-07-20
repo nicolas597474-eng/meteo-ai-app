@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   MapPin, Radio, Thermometer, Droplets, Wind, Gauge, Clock,
   CheckCircle, XCircle, ChevronDown, ChevronUp, Search, Target,
   Activity, BarChart3, Layers, Info
 } from "lucide-react";
+import { useLocation } from "@/contexts/LocationContext";
 
 // ─── Source badge colours ─────────────────────────────────────────────────────
 const SOURCE_COLORS: Record<string, string> = {
@@ -180,12 +181,22 @@ function StationCard({ station, rank }: { station: any; rank: number }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Stations() {
-  const [lat, setLat] = useState(50.7567);
-  const [lon, setLon] = useState(2.5204);
+  const { activeLocation } = useLocation();
+  const [lat, setLat] = useState(activeLocation?.lat ?? 50.7567);
+  const [lon, setLon] = useState(activeLocation?.lon ?? 2.5204);
   const [radiusKm, setRadiusKm] = useState(20);
-  const [cityInput, setCityInput] = useState("Hondeghem");
+  const [cityInput, setCityInput] = useState(activeLocation?.name ?? "Hondeghem");
   const [geoLoading, setGeoLoading] = useState(false);
   const [showIgnored, setShowIgnored] = useState(false);
+
+  // Sync with active location when it changes
+  useEffect(() => {
+    if (activeLocation) {
+      setLat(activeLocation.lat);
+      setLon(activeLocation.lon);
+      setCityInput(activeLocation.name);
+    }
+  }, [activeLocation?.lat, activeLocation?.lon, activeLocation?.name]);
 
   const { data, isLoading, refetch } = trpc.weather.searchStations.useQuery(
     { lat, lon, radiusKm },

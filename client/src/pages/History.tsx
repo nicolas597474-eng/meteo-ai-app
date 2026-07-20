@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Calendar, BarChart3 } from "lucide-react";
+import { Calendar, BarChart3, MapPin } from "lucide-react";
+import { useLocation } from "@/contexts/LocationContext";
 import {
   LineChart,
   Line,
@@ -14,7 +15,10 @@ import {
 
 export default function History() {
   const [days, setDays] = useState(7);
-  const { data, isLoading } = trpc.weather.getHistory.useQuery({ days });
+  const { activeLocation } = useLocation();
+  const { data, isLoading } = trpc.weather.getHistory.useQuery(
+    activeLocation ? { days, lat: activeLocation.lat, lon: activeLocation.lon } : { days }
+  );
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -88,6 +92,12 @@ export default function History() {
             <p className="text-muted-foreground mt-1">
               Comparaison prévisions vs observations sur {days} jours
             </p>
+            {activeLocation && (
+              <div className="flex items-center gap-1 mt-1 text-xs text-primary">
+                <MapPin className="h-3 w-3" />
+                <span>{activeLocation.name}</span>
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             {[7, 14, 30].map((d) => (

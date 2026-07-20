@@ -94,3 +94,19 @@
 - [x] Backend: SYNOP/WMO référence ECMWF IFS ajoutée comme source supplémentaire
 - [x] Backend: Paramètre townName ajouté à collectNearbyStations pour nommer les stations par lieu
 - [x] Bug: Unifier les poids de pondération du régime météo — Dashboard et Classement affichent maintenant les mêmes pourcentages (vrais poids du régime détecté, plus de valeurs codées en dur)
+
+## Gestion indépendante des 5 lieux favoris
+- [ ] DB: Ajouter locationKey (lat+lon hash) aux tables forecasts, observations, scores pour isoler les données par lieu
+- [ ] DB: Table location_profiles — altitude, timezone, climate type, microclimat par favori
+- [ ] Backend: Endpoints history/ranking/AI Lab acceptent lat+lon comme paramètre de lieu
+- [ ] Backend: Classement indépendant par lieu (getRanking avec lat/lon)
+- [ ] Backend: Historique indépendant par lieu (getHistory avec lat/lon)
+- [ ] Backend: AI Lab indépendant par lieu (stations, scores, analyses)
+- [ ] Backend: Pondération intelligente selon contexte géographique (côtier, montagne, urbain)
+- [ ] Cron 05h00: Collecter prévisions pour chaque favori indépendamment avec ses coordonnées
+- [ ] Frontend: Contexte de lieu actif propagé à toutes les pages (Classement, Historique, Stations, AI Lab)
+- [ ] Frontend: Chaque page affiche "Pour [Nom du lieu]" et utilise les données de ce lieu
+- [ ] Frontend: Swipe horizontal entre favoris sur Dashboard avec préchargement instantané
+- [ ] Backend: Collecte 05h00 — tous les modèles météo pour tous les lieux favoris (avec locationKey)
+- [ ] Backend: Fonction makeLocationKey(lat, lon) partagée dans shared/
+- [ ] Backend: db.ts helpers filtrés par locationKey pour forecasts/observations/scores

@@ -57,6 +57,13 @@
       "when": 1783739128423,
       "tag": "0007_greedy_flatman",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1784255162576,
+      "tag": "0008_loose_longshot",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
-import { Trophy, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-react";
+import { Trophy, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { useLocation } from "@/contexts/LocationContext";
 
 type RankingService = {
   serviceName: string;
@@ -147,7 +148,10 @@ function ServiceDimCard({ service, rank }: { service: RankingService; rank: numb
 }
 
 export default function Ranking() {
-  const { data, isLoading } = trpc.weather.getRanking.useQuery();
+  const { activeLocation } = useLocation();
+  const { data, isLoading } = trpc.weather.getRanking.useQuery(
+    activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined
+  );
 
   if (isLoading) {
     return (
@@ -178,6 +182,12 @@ export default function Ranking() {
           <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
             {data?.totalServices ?? 16} services · Pondération contextuelle dynamique
           </p>
+          {activeLocation && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-primary">
+              <MapPin className="h-3 w-3" />
+              <span>{activeLocation.name}</span>
+            </div>
+          )}
         </div>
 
         {/* Active regime + contextual weights */}

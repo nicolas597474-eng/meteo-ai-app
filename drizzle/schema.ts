@@ -24,6 +24,7 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const forecasts = mysqlTable("forecasts", {
   id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull().default("default"), // "lat_lon" rounded to 3dp, e.g. "50.781_2.544"
   date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
   serviceName: varchar("serviceName", { length: 64 }).notNull(),
   serviceCategory: mysqlEnum("serviceCategory", ["public", "expert"]).notNull(),
@@ -48,7 +49,8 @@ export type InsertForecast = typeof forecasts.$inferInsert;
  */
 export const observations = mysqlTable("observations", {
   id: int("id").autoincrement().primaryKey(),
-  date: varchar("date", { length: 10 }).notNull().unique(), // YYYY-MM-DD
+  locationKey: varchar("locationKey", { length: 32 }).notNull().default("default"), // "lat_lon" rounded to 3dp
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
   tempMax: float("tempMax"),
   tempMin: float("tempMin"),
   precipitation: float("precipitation"), // mm
@@ -70,6 +72,7 @@ export type InsertObservation = typeof observations.$inferInsert;
  */
 export const reliabilityScores = mysqlTable("reliability_scores", {
   id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull().default("default"), // "lat_lon" rounded to 3dp
   date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
   serviceName: varchar("serviceName", { length: 64 }).notNull(),
   maeTemp: float("maeTemp"),
@@ -113,7 +116,8 @@ export type InsertReliabilityScore = typeof reliabilityScores.$inferInsert;
  */
 export const meteoaiForecast = mysqlTable("meteoai_forecast", {
   id: int("id").autoincrement().primaryKey(),
-  date: varchar("date", { length: 10 }).notNull().unique(), // YYYY-MM-DD
+  locationKey: varchar("locationKey", { length: 32 }).notNull().default("default"), // "lat_lon" rounded to 3dp
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
   tempMax: float("tempMax"),
   tempMin: float("tempMin"),
   precipitation: float("precipitation"),

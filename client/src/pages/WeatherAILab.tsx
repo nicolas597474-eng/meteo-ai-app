@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
+import { useLocation } from "@/contexts/LocationContext";
 import {
   FlaskConical, Brain, Zap, Shield, Eye, RefreshCw,
   ChevronDown, ChevronUp, CheckCircle, AlertTriangle,
@@ -408,9 +409,11 @@ function StationsSection() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function WeatherAILab() {
-  const { data, isLoading, error, refetch } = trpc.weather.getAILab.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-  });
+  const { activeLocation } = useLocation();
+  const { data, isLoading, error, refetch } = trpc.weather.getAILab.useQuery(
+    activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined,
+    { staleTime: 5 * 60 * 1000 }
+  );
 
   const [replayActive, setReplayActive] = useState(false);
   const [replayStep, setReplayStep] = useState(0);
