@@ -473,7 +473,14 @@ export default function WeatherAILab() {
           </div>
           <div>
             <h1 className="text-base font-bold">Weather AI Lab</h1>
-            <p className="text-xs text-muted-foreground">Transparence totale · {data.date}</p>
+            <p className="text-xs text-muted-foreground">
+              Transparence totale · {data.date}
+              {activeLocation && (
+                <span className="ml-1 inline-flex items-center gap-1 text-primary/80">
+                  · <MapPin className="h-3 w-3 inline" /> {activeLocation.name}
+                </span>
+              )}
+            </p>
           </div>
         </div>
         <button

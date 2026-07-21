@@ -465,8 +465,12 @@ export const weatherRouter = router({
     const forecasts = locationKey
       ? await getForecastsByDate(today, locationKey)
       : await getForecastsByDate(today);
-    const observation = await getObservationByDate(today);
-    const meteoAI = await getMeteoAIForecastByDate(today);
+    const observation = locationKey
+      ? await getObservationByDate(today, locationKey)
+      : await getObservationByDate(today);
+    const meteoAI = locationKey
+      ? await getMeteoAIForecastByDate(today, locationKey)
+      : await getMeteoAIForecastByDate(today);
     const ranking = locationKey
       ? await getCumulativeRankingForLocation(locationKey)
       : await getCumulativeRanking();

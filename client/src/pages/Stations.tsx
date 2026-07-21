@@ -250,7 +250,14 @@ export default function Stations() {
           <Radio className="h-5 w-5 text-primary" />
           <div>
             <h1 className="text-lg font-bold">Stations locales</h1>
-            <p className="text-xs text-muted-foreground">Collecte multi-sources en temps réel</p>
+            <p className="text-xs text-muted-foreground">
+              Collecte multi-sources en temps réel
+              {activeLocation && (
+                <span className="ml-1 text-primary/80">
+                  · <MapPin className="h-3 w-3 inline" /> {activeLocation.name}
+                </span>
+              )}
+            </p>
           </div>
         </div>
 
