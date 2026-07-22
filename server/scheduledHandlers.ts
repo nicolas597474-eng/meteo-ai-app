@@ -207,8 +207,9 @@ export async function collectForecastsHandler(req: Request, res: Response) {
 }
 
 /**
- * Handler: Collect observations and compute reliability scores
- * Triggered daily at 20h00 Paris time
+ * Handler: Collect observations and compute reliability scores for ALL favorite locations
+ * Triggered daily at 00h30 Paris time (22h30 UTC)
+ * Collects real observations for yesterday per location, then computes per-model scores
  */
 export async function collectObservationsHandler(req: Request, res: Response) {
   try {
@@ -217,9 +218,9 @@ export async function collectObservationsHandler(req: Request, res: Response) {
       return res.status(403).json({ error: "cron-only" });
     }
 
-    // Collect observations for yesterday (full day data available)
+    // Collect observations for yesterday (full day data available at 00h30)
     const yesterday = getYesterdayParis();
-    console.log(`[MeteoAI] Starting observation collection for ${yesterday}`);
+    console.log(`[MeteoAI] Starting per-location observation collection for ${yesterday}`);
 
     const jobId = await createCollectionJob({
       jobType: "observation",
@@ -228,84 +229,164 @@ export async function collectObservationsHandler(req: Request, res: Response) {
     });
 
     try {
-      // Collect real observations
-      const obsData = await collectObservations(yesterday);
+      // Get all favorite locations across all users
+      const allFavorites = await getAllFavoriteLocations();
 
-      if (obsData) {
-        await insertObservation({
-          date: obsData.date,
-          tempMax: obsData.tempMax,
-          tempMin: obsData.tempMin,
-          precipitation: obsData.precipitation,
-          windSpeed: obsData.windSpeed,
-          windGust: obsData.windGust,
-          humidity: obsData.humidity,
-          cloudCover: obsData.cloudCover,
-          condition: obsData.condition,
-          source: obsData.source,
-          rawData: obsData.rawData as any,
-        });
-
-        // Get forecasts for that date and compute reliability scores
-        const dayForecasts = await getForecastsByDate(yesterday);
-        const observation = await getObservationByDate(yesterday);
-
-        if (dayForecasts.length > 0 && observation) {
-          const scoreRows = dayForecasts.map((f) => {
-            const score = calculateReliabilityScore(
-              [{ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed }],
-              [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed }]
-            );
-            return {
-              date: yesterday,
-              serviceName: f.serviceName,
-              maeTemp: score.maeTemp,
-              maePrecip: score.maePrecip,
-              maeWind: score.maeWind,
-              rmseTemp: score.rmseTemp,
-              rmsePrecip: score.rmsePrecip,
-              rmseWind: score.rmseWind,
-              biasTemp: score.biasTemp,
-              biasPrecip: score.biasPrecip,
-              biasWind: score.biasWind,
-              conditionAccuracy: score.conditionAccuracy,
-              weightedScore: score.weightedScore,
-            };
-          });
-
-          await insertReliabilityScores(scoreRows);
-
-          // Get updated ranking for notification
-          const ranking = await getCumulativeRanking();
-          const top3 = ranking.slice(0, 3);
-
-          await updateCollectionJob(jobId, {
-            status: "completed",
-            servicesCollected: scoreRows.length,
-            completedAt: new Date(),
-          });
-
-          // Send notification with ranking
-          await notifyOwner({
-            title: `📊 MeteoAI — Scores du ${yesterday}`,
-            content: `Observations collectées. ${scoreRows.length} scores calculés.\n\n🏆 Top 3:\n${top3.map((s, i) => `${i + 1}. ${s.serviceName} (${(s.avgScore ?? 0).toFixed(1)}/100)`).join("\n")}`,
-          });
-        } else {
-          await updateCollectionJob(jobId, {
-            status: "completed",
-            servicesCollected: 0,
-            completedAt: new Date(),
-          });
+      // Deduplicate by locationKey to avoid redundant API calls
+      const seen = new Set<string>();
+      const uniqueLocations: typeof allFavorites = [];
+      for (const fav of allFavorites) {
+        const key = makeLocationKey(fav.lat, fav.lon);
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueLocations.push(fav);
         }
-      } else {
-        await updateCollectionJob(jobId, {
-          status: "failed",
-          errorMessage: "No observation data available",
-          completedAt: new Date(),
-        });
       }
 
-      res.json({ ok: true, date: yesterday });
+      // Also always include the default Hondeghem location
+      const { HONDEGHEM } = await import("./weatherServices");
+      const defaultKey = makeLocationKey(HONDEGHEM.lat, HONDEGHEM.lon);
+      if (!seen.has(defaultKey)) {
+        uniqueLocations.push({ id: 0, userId: 0, lat: HONDEGHEM.lat, lon: HONDEGHEM.lon, name: "Hondeghem", customName: null, localMode: "standard", isDefault: 1, position: 0, radiusKm: 20, preferredModels: null, tempUnit: "celsius", alertsEnabled: 1, alertThresholds: null, createdAt: new Date(), updatedAt: new Date() });
+      }
+
+      console.log(`[MeteoAI] Processing observations for ${uniqueLocations.length} unique locations`);
+
+      let totalScores = 0;
+      const locationSummaries: string[] = [];
+      const errors: string[] = [];
+
+      for (const loc of uniqueLocations) {
+        const locKey = makeLocationKey(loc.lat, loc.lon);
+        const locName = loc.customName ?? loc.name;
+
+        try {
+          console.log(`[MeteoAI] Collecting observations for ${locName} (${loc.lat}, ${loc.lon})`);
+
+          // Collect real observations for this location
+          const obsData = await collectObservations(yesterday, { lat: loc.lat, lon: loc.lon, name: locName });
+
+          if (!obsData) {
+            console.warn(`[MeteoAI] No observation data for ${locName}`);
+            errors.push(`${locName}: aucune donnée d'observation`);
+            continue;
+          }
+
+          // Store observation with locationKey
+          await insertObservation({
+            locationKey: locKey,
+            date: obsData.date,
+            tempMax: obsData.tempMax,
+            tempMin: obsData.tempMin,
+            precipitation: obsData.precipitation,
+            windSpeed: obsData.windSpeed,
+            windGust: obsData.windGust,
+            humidity: obsData.humidity,
+            cloudCover: obsData.cloudCover,
+            condition: obsData.condition,
+            source: obsData.source,
+            rawData: obsData.rawData as any,
+          });
+
+          // Get forecasts for yesterday at this locationKey
+          const dayForecasts = await getForecastsByDate(yesterday, locKey);
+          const observation = await getObservationByDate(yesterday, locKey);
+
+          if (dayForecasts.length > 0 && observation) {
+            // Calculate per-model reliability scores with multi-dimensional scoring
+            const scoreRows = dayForecasts.map((f) => {
+              const score = calculateReliabilityScore(
+                [{ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed, windGust: f.windGust, cloudCover: f.cloudCover }],
+                [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed, windGust: observation.windGust, cloudCover: observation.cloudCover }]
+              );
+              return {
+                locationKey: locKey,
+                date: yesterday,
+                serviceName: f.serviceName,
+                // Legacy flat fields
+                maeTemp: score.maeTemp,
+                maePrecip: score.maePrecip,
+                maeWind: score.maeWind,
+                rmseTemp: score.rmseTemp,
+                rmsePrecip: score.rmsePrecip,
+                rmseWind: score.rmseWind,
+                biasTemp: score.biasTemp,
+                biasPrecip: score.biasPrecip,
+                biasWind: score.biasWind,
+                conditionAccuracy: score.conditionAccuracy,
+                weightedScore: score.weightedScore,
+                regime: score.regime,
+                // Temperature dimension
+                tempScore: score.dimensions.temperature.score,
+                tempMaxError: score.dimensions.temperature.maxError,
+                // Precipitation dimension
+                precipScore: score.dimensions.precipitation.score,
+                precipPod: score.dimensions.precipitation.pod,
+                precipFar: score.dimensions.precipitation.far,
+                precipCsi: score.dimensions.precipitation.csi,
+                precipFalsePositives: score.dimensions.precipitation.falsePositives,
+                precipFalseNegatives: score.dimensions.precipitation.falseNegatives,
+                // Wind dimension
+                windScore: score.dimensions.wind.score,
+                windMaeGusts: isNaN(score.dimensions.wind.maeGusts) ? null : score.dimensions.wind.maeGusts,
+                // Condition dimension
+                condScore: score.dimensions.condition.score,
+                condConcordance: score.dimensions.condition.concordance,
+                condMaeCloud: score.dimensions.condition.maeCloudCover,
+              };
+            });
+
+            await insertReliabilityScores(scoreRows);
+            totalScores += scoreRows.length;
+
+            // Get top model for this location
+            const locRanking = await getCumulativeRankingForLocation(locKey);
+            const topModel = locRanking[0];
+            if (topModel) {
+              locationSummaries.push(
+                `📍 ${locName}: ${scoreRows.length} scores — 🥇 ${topModel.serviceName} (${(topModel.avgScore ?? 0).toFixed(1)}/100)`
+              );
+            } else {
+              locationSummaries.push(`📍 ${locName}: ${scoreRows.length} scores calculés`);
+            }
+          } else {
+            locationSummaries.push(`📍 ${locName}: observation collectée, aucune prévision à comparer`);
+          }
+
+          // Rate limit between locations
+          await new Promise((r) => setTimeout(r, 500));
+        } catch (err: any) {
+          console.error(`[MeteoAI] Error processing ${locName}:`, err.message);
+          errors.push(`${locName}: ${err.message}`);
+        }
+      }
+
+      await updateCollectionJob(jobId, {
+        status: "completed",
+        servicesCollected: totalScores,
+        completedAt: new Date(),
+      });
+
+      // Send owner notification with per-location summary
+      const notifContent = [
+        `${uniqueLocations.length} lieu(x) traité(s), ${totalScores} scores calculés.`,
+        "",
+        ...locationSummaries,
+        ...(errors.length > 0 ? ["", `⚠️ Erreurs: ${errors.slice(0, 3).join(", ")}`] : []),
+      ].join("\n");
+
+      await notifyOwner({
+        title: `📊 MeteoAI — Observations du ${yesterday}`,
+        content: notifContent,
+      });
+
+      res.json({
+        ok: true,
+        date: yesterday,
+        locationsProcessed: uniqueLocations.length,
+        totalScores,
+        errors: errors.length > 0 ? errors : undefined,
+      });
     } catch (err: any) {
       await updateCollectionJob(jobId, {
         status: "failed",

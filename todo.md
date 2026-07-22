@@ -115,3 +115,11 @@
 - [x] Backend: Rendre getAILab 100% location-aware (observation + meteoAI filtrés par locationKey)
 - [x] Frontend: Ajouter indicateur lieu actif sur Stations et AI Lab pages
 - [x] Heartbeat: Aligner le cron favoris sur 05h00 Paris exactement (cron 0 0 3 * * *)
+
+## Collecte observations 00h30 par lieu favori
+- [x] Backend: Étendre collectObservations(date, lat, lon) pour accepter des coordonnées arbitraires
+- [x] Backend: Reécrire collectObservationsHandler pour boucler sur tous les favoris
+- [x] Backend: Stocker les observations avec locationKey par lieu
+- [x] Backend: Calculer les scores de fiabilité par lieu (forecasts vs observations du même locationKey)
+- [x] Backend: Notification récapitulative avec scores par lieu
+- [x] Heartbeat: Cron observations mis à jour à 00h30 Paris (22h30 UTC) — task_uid: Qg2R5Xkkfk5cukBEn789qj

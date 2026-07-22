@@ -108,12 +108,19 @@ export async function collectExpertForecasts(
 
 /**
  * Collect real observations from Open-Meteo historical API.
+ * Accepts optional lat/lon to collect for any location (defaults to HONDEGHEM).
  */
-export async function collectObservations(targetDate: string) {
+export async function collectObservations(
+  targetDate: string,
+  coords?: { lat: number; lon: number; name?: string }
+) {
+  const lat = coords?.lat ?? HONDEGHEM.lat;
+  const lon = coords?.lon ?? HONDEGHEM.lon;
+  const locationName = coords?.name ?? "Steenvoorde/Hazebrouck";
   try {
     const url = new URL("https://api.open-meteo.com/v1/forecast");
-    url.searchParams.set("latitude", HONDEGHEM.lat.toString());
-    url.searchParams.set("longitude", HONDEGHEM.lon.toString());
+    url.searchParams.set("latitude", lat.toString());
+    url.searchParams.set("longitude", lon.toString());
     url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("past_days", "7");
@@ -139,7 +146,7 @@ export async function collectObservations(targetDate: string) {
       humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
       cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
       condition: null,
-      source: "Open-Meteo Historical (Steenvoorde/Hazebrouck)",
+      source: `Open-Meteo Historical (${locationName})`,
       rawData: data,
     };
   } catch (err) {
