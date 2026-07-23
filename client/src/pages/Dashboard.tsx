@@ -236,18 +236,27 @@ export default function Dashboard() {
     return map;
   }, [preloadedForecasts]);
 
-  // Fallback to default queries for Hondeghem when no location selected
+  // Coordinates for weather queries — use active location or Hondeghem default
+  const coordsInput = useMemo(() => ({
+    lat: activeLocation?.lat ?? 50.76,
+    lon: activeLocation?.lon ?? 2.52,
+  }), [activeLocation?.lat, activeLocation?.lon]);
+
+  // Dashboard (MeteoAI synthesis) — always location-aware
   const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery(
-    undefined, { enabled: !activeLocation }
+    coordsInput, { staleTime: 5 * 60 * 1000 }
   );
+  // 15-day forecast — always location-aware
   const { data: f15, isLoading: f15Loading, isError: f15Error } = trpc.weather.get15DayForecast.useQuery(
-    undefined, { enabled: !activeLocation }
+    coordsInput, { staleTime: 5 * 60 * 1000 }
   );
+  // Hourly forecast — always location-aware
   const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery(
-    undefined, { enabled: !activeLocation }
+    coordsInput, { staleTime: 5 * 60 * 1000 }
   );
 
-  const isLoading = activeLocation ? locLoading : dashLoading;
+  // Loading: wait for MeteoAI (dash or locationWeather) + 15-day + hourly
+  const isLoading = (activeLocation ? locLoading : dashLoading) && f15Loading && hourlyLoading;
   const isError = activeLocation ? false : dashError;
 
   if (isLoading) {
@@ -279,13 +288,15 @@ export default function Dashboard() {
     );
   }
 
-  // Merge data from location-aware or fallback queries
+  // Merge data: location-aware query (getLocationWeather) takes priority for MeteoAI/regime/ultraLocal
+  // but 15-day forecast and hourly always come from their dedicated location-aware endpoints
   const lw = locationWeather;
   const meteoAI = lw ? (lw as any).meteoAI ?? null : dash?.meteoAI;
-  const days: any[] = lw ? lw.forecast15d : (f15?.days ?? []);
+  // 15-day and hourly always use their dedicated location-aware endpoints
+  const days: any[] = f15?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
   const futureDays = days.slice(1);
-  const hours: any[] = lw ? lw.hourly : (hourly?.hours ?? []);
+  const hours: any[] = hourly?.hours ?? (lw ? lw.hourly : []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const regime = lw
     ? {
@@ -349,6 +360,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs font-medium text-primary">Prévision MeteoAI</span>
+                {activeLocation && <span className="text-xs text-primary/60">· {activeLocation.name}</span>}
               </div>
               <span className="text-xs text-muted-foreground hidden sm:block">
                 {f15?.modelsUsed?.join(", ")}
@@ -605,9 +617,10 @@ export default function Dashboard() {
 
         {/* ── Hourly ── */}
         <div className="space-y-2">
-          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2 flex-wrap">
             <Clock className="h-4 w-4 text-primary" />
             Heure par heure
+            {activeLocation && <span className="text-xs text-primary/70 font-normal">· {activeLocation.name}</span>}
           </h2>
           {hourlyLoading ? (
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -643,9 +656,10 @@ export default function Dashboard() {
 
         {/* ── 15-day chart ── */}
         <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-3">
-          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2 flex-wrap">
             <TrendingUp className="h-4 w-4 text-primary" />
             Températures — 15 jours
+            {activeLocation && <span className="text-xs text-primary/70 font-normal">· {activeLocation.name}</span>}
           </h2>
           {f15Loading ? (
             <div className="h-40 bg-muted rounded-xl animate-pulse" />
@@ -695,6 +709,7 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-primary" />
             Prévisions 15 jours
             <span className="text-xs text-muted-foreground font-normal">{f15?.modelsUsed?.length ?? 0} modèles</span>
+            {activeLocation && <span className="text-xs text-primary/70 font-normal ml-1">· {activeLocation.name}</span>}
           </h2>
           {f15Loading ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">

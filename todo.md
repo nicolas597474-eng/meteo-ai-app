@@ -123,3 +123,14 @@
 - [x] Backend: Calculer les scores de fiabilité par lieu (forecasts vs observations du même locationKey)
 - [x] Backend: Notification récapitulative avec scores par lieu
 - [x] Heartbeat: Cron observations mis à jour à 00h30 Paris (22h30 UTC) — task_uid: Qg2R5Xkkfk5cukBEn789qj
+
+## Dashboard dynamique par lieu favori
+- [x] Backend: collect15DayForecast() accepte coords {lat, lon} optionnelles
+- [x] Backend: collectHourlyForecast() accepte coords {lat, lon} optionnelles
+- [x] Backend: get15DayForecast tRPC accepte input {lat, lon} optionnel
+- [x] Backend: getHourlyForecast tRPC accepte input {lat, lon} optionnel
+- [x] Frontend: Dashboard — Prévision MeteoAI change selon le lieu actif (via getLocationWeather + getDashboard)
+- [x] Frontend: Dashboard — Heure par heure change selon le lieu actif (getHourlyForecast avec coordsInput)
+- [x] Frontend: Dashboard — Températures 15 jours change selon le lieu actif (get15DayForecast avec coordsInput)
+- [x] Frontend: Dashboard — Prévisions 15 jours change selon le lieu actif (get15DayForecast avec coordsInput)
+- [x] Frontend: Nom du lieu actif affiché dans chaque section (MeteoAI, Heure par heure, Températures 15j, Prévisions 15j)

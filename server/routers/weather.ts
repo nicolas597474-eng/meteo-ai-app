@@ -266,20 +266,26 @@ export const weatherRouter = router({
   /**
    * 15-day MeteoAI forecast from multiple models
    */
-  get15DayForecast: publicProcedure.query(async () => {
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
-    const { days, modelsUsed } = await collect15DayForecast();
-    return { today, days, modelsUsed };
-  }),
+  get15DayForecast: publicProcedure
+    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .query(async ({ input }) => {
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+      const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
+      const { days, modelsUsed } = await collect15DayForecast(coords);
+      return { today, days, modelsUsed };
+    }),
 
   /**
    * Hourly forecast for today
    */
-  getHourlyForecast: publicProcedure.query(async () => {
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
-    const hours = await collectHourlyForecast(today);
-    return { today, hours };
-  }),
+  getHourlyForecast: publicProcedure
+    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .query(async ({ input }) => {
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+      const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
+      const hours = await collectHourlyForecast(today, coords);
+      return { today, hours };
+    }),
 
   /**
    * Admin: Manual trigger for forecast collection (for testing)

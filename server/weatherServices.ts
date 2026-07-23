@@ -197,7 +197,10 @@ function deriveCondition(precip: number | null, cloud: number | null): string {
 /**
  * Fetch 15-day forecast from multiple Open-Meteo models and return averaged daily data.
  */
-export async function collect15DayForecast(): Promise<{ days: DayForecast[]; modelsUsed: string[] }> {
+export async function collect15DayForecast(
+  coords?: { lat: number; lon: number }
+): Promise<{ days: DayForecast[]; modelsUsed: string[] }> {
+  const location = coords ?? HONDEGHEM;
   const models = [
     { name: "ECMWF", modelId: "ecmwf_ifs025" },
     { name: "GFS", modelId: "gfs_seamless" },
@@ -212,8 +215,8 @@ export async function collect15DayForecast(): Promise<{ days: DayForecast[]; mod
   for (const model of models) {
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
-      url.searchParams.set("latitude", HONDEGHEM.lat.toString());
-      url.searchParams.set("longitude", HONDEGHEM.lon.toString());
+      url.searchParams.set("latitude", location.lat.toString());
+      url.searchParams.set("longitude", location.lon.toString());
       url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", "16");
@@ -285,11 +288,15 @@ export async function collect15DayForecast(): Promise<{ days: DayForecast[]; mod
 /**
  * Fetch hourly forecast for today from Open-Meteo best_match model.
  */
-export async function collectHourlyForecast(targetDate: string): Promise<HourlyPoint[]> {
+export async function collectHourlyForecast(
+  targetDate: string,
+  coords?: { lat: number; lon: number }
+): Promise<HourlyPoint[]> {
+  const location = coords ?? HONDEGHEM;
   try {
     const url = new URL("https://api.open-meteo.com/v1/forecast");
-    url.searchParams.set("latitude", HONDEGHEM.lat.toString());
-    url.searchParams.set("longitude", HONDEGHEM.lon.toString());
+    url.searchParams.set("latitude", location.lat.toString());
+    url.searchParams.set("longitude", location.lon.toString());
     url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index");
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", "2");
