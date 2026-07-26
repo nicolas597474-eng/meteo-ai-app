@@ -194,3 +194,7 @@
 
 ## Harmonisation températures avec 1 décimale
 - [x] Dashboard héro : afficher currentTemp, tempMax, tempMin, apparentTemp avec toFixed(1) au lieu de Math.round
+
+## Résumé textuel IA en haut du Dashboard
+- [x] Backend: Créer une procédure tRPC qui génère un résumé IA de la journée en 3 phrases (matin, après-midi, nuit)
+- [x] Frontend: Afficher le résumé en haut du Dashboard après le héro

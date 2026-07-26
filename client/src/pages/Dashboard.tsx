@@ -218,6 +218,10 @@ export default function Dashboard() {
   const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
+  // AI Day Summary — 3 phrases
+  const { data: daySummary } = trpc.weather.getDaySummary.useQuery(
+    coordsInput, { staleTime: 10 * 60 * 1000 }
+  );
 
   // Loading: wait for MeteoAI (dash or locationWeather) + 15-day + hourly
   const isLoading = (activeLocation ? locLoading : dashLoading) && f15Loading && hourlyLoading;
@@ -461,6 +465,36 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── AI Day Summary ── */}
+        {daySummary && (daySummary.morning || daySummary.afternoon || daySummary.night) && (
+          <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm">&#x1F4AC;</span>
+              <h3 className="text-xs font-semibold text-indigo-300 uppercase tracking-wide">Résumé IA de la journée</h3>
+            </div>
+            <div className="space-y-2">
+              {daySummary.morning && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs mt-0.5">&#x2600;&#xFE0F;</span>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{daySummary.morning}</p>
+                </div>
+              )}
+              {daySummary.afternoon && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs mt-0.5">&#x1F324;&#xFE0F;</span>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{daySummary.afternoon}</p>
+                </div>
+              )}
+              {daySummary.night && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs mt-0.5">&#x1F319;</span>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{daySummary.night}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Ultra-local Mode Selector ── */}
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">
