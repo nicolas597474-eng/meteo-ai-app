@@ -161,3 +161,15 @@
 - [x] Frontend: Colonnes plus larges (largeur fixe basée sur viewport / 7)
 - [x] Frontend: Hint "← Glissez pour voir les jours suivants →"
 - [x] TypeScript clean + 47 tests passent
+
+## Design moderne graphique 15 jours + panneau détaillé enrichi
+- [x] Backend: Ajouter uvIndex, windDirection, feelsLikeMax, feelsLikeMin, sunrise, sunset dans DayForecast
+- [x] Backend: Requête Open-Meteo étendue avec tous les champs daily supplémentaires
+- [x] Frontend: Précipitations intégrées DANS le graphique (barres avec gradient + glow en arrière-plan)
+- [x] Frontend: Courbes bézier lisses avec gradient fill entre Max et Min
+- [x] Frontend: Points lumineux avec glow effect + labels annotés
+- [x] Frontend: Zones contextuelles colorées (canicule rouge, orage violet)
+- [x] Frontend: Flèches de vent directionnelles orientées selon windDirection
+- [x] Frontend: Panneau détaillé enrichi : Température, Ressenti, Vent, Direction, Précipitations, Humidité, UV, Nébulosité, Lever/Coucher soleil, Confiance avec barre de progression
+- [x] Frontend: Design glassmorphism (bg-gradient, backdrop-blur, border-white/10)
+- [x] TypeScript clean + 47 tests passent

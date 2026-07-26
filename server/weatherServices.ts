@@ -208,7 +208,8 @@ export async function collect15DayForecast(
     { name: "Open-Meteo", modelId: null },
   ];
 
-  const allModelData: Record<string, { tempMax: number[]; tempMin: number[]; precip: number[]; wind: number[]; windGust: number[]; humidity: number[]; cloud: number[] }> = {};
+  const allModelData: Record<string, { tempMax: number[]; tempMin: number[]; precip: number[]; wind: number[]; windGust: number[]; windDir: number[]; humidity: number[]; cloud: number[]; uv: number[]; feelsMax: number[]; feelsMin: number[] }> = {};
+  const sunData: Record<string, { sunrise: string | null; sunset: string | null }> = {};
   const modelsUsed: string[] = [];
   let dates: string[] = [];
 
@@ -217,7 +218,7 @@ export async function collect15DayForecast(
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
+      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,relative_humidity_2m_mean,cloud_cover_mean,uv_index_max,apparent_temperature_max,apparent_temperature_min,sunrise,sunset");
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", "16");
       if (model.modelId) url.searchParams.set("models", model.modelId);
@@ -235,15 +236,25 @@ export async function collect15DayForecast(
       for (let i = 0; i < Math.min(15, daily.time.length); i++) {
         const d = daily.time[i];
         if (!allModelData[d]) {
-          allModelData[d] = { tempMax: [], tempMin: [], precip: [], wind: [], windGust: [], humidity: [], cloud: [] };
+          allModelData[d] = { tempMax: [], tempMin: [], precip: [], wind: [], windGust: [], windDir: [], humidity: [], cloud: [], uv: [], feelsMax: [], feelsMin: [] };
         }
         if (daily.temperature_2m_max?.[i] != null) allModelData[d].tempMax.push(daily.temperature_2m_max[i]);
         if (daily.temperature_2m_min?.[i] != null) allModelData[d].tempMin.push(daily.temperature_2m_min[i]);
         if (daily.precipitation_sum?.[i] != null) allModelData[d].precip.push(daily.precipitation_sum[i]);
         if (daily.wind_speed_10m_max?.[i] != null) allModelData[d].wind.push(daily.wind_speed_10m_max[i]);
         if (daily.wind_gusts_10m_max?.[i] != null) allModelData[d].windGust.push(daily.wind_gusts_10m_max[i]);
+        if (daily.wind_direction_10m_dominant?.[i] != null) allModelData[d].windDir.push(daily.wind_direction_10m_dominant[i]);
         if (daily.relative_humidity_2m_mean?.[i] != null) allModelData[d].humidity.push(daily.relative_humidity_2m_mean[i]);
         if (daily.cloud_cover_mean?.[i] != null) allModelData[d].cloud.push(daily.cloud_cover_mean[i]);
+        if (daily.uv_index_max?.[i] != null) allModelData[d].uv.push(daily.uv_index_max[i]);
+        if (daily.apparent_temperature_max?.[i] != null) allModelData[d].feelsMax.push(daily.apparent_temperature_max[i]);
+        if (daily.apparent_temperature_min?.[i] != null) allModelData[d].feelsMin.push(daily.apparent_temperature_min[i]);
+        // Sunrise/sunset from first model only
+        if (!sunData[d] && daily.sunrise?.[i] && daily.sunset?.[i]) {
+          const sr = daily.sunrise[i] as string;
+          const ss = daily.sunset[i] as string;
+          sunData[d] = { sunrise: sr.slice(11, 16), sunset: ss.slice(11, 16) };
+        }
       }
 
       await new Promise(r => setTimeout(r, 200));
@@ -274,11 +285,17 @@ export async function collect15DayForecast(
       precipitation: avgPrecip,
       windSpeed: avg(d.wind),
       windGust: avg(d.windGust),
+      windDirection: avg(d.windDir),
       humidity: avg(d.humidity),
       cloudCover: avgCloud,
       condition: deriveCondition(avgPrecip, avgCloud),
       stabilityIndex,
       stabilityLabel,
+      uvIndex: avg(d.uv),
+      feelsLikeMax: avg(d.feelsMax),
+      feelsLikeMin: avg(d.feelsMin),
+      sunrise: sunData[date]?.sunrise ?? null,
+      sunset: sunData[date]?.sunset ?? null,
     };
   }).filter(Boolean) as DayForecast[];
 

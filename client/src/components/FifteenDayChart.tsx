@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import { TrendingUp, X, Thermometer, Wind, Droplets, Eye, Sun, Cloud } from "lucide-react";
+import { useRef, useState, useEffect, useCallback } from "react";
+import { TrendingUp, X, Thermometer, Wind, Droplets, Eye, Sun, Cloud, Sunrise, Sunset, Gauge, Navigation } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface DayData {
@@ -9,11 +9,17 @@ export interface DayData {
   precipitation: number | null;
   windSpeed: number | null;
   windGust: number | null;
+  windDirection: number | null;
   humidity: number | null;
   cloudCover: number | null;
   condition: string | null;
   stabilityIndex: number;
   stabilityLabel?: string;
+  uvIndex: number | null;
+  feelsLikeMax: number | null;
+  feelsLikeMin: number | null;
+  sunrise: string | null;
+  sunset: string | null;
 }
 
 interface Props {
@@ -27,7 +33,7 @@ function formatDate(dateStr: string) {
   const days = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
   const months = ["jan.", "fév.", "mars", "avr.", "mai", "juin", "juil.", "août", "sep.", "oct.", "nov.", "déc."];
   const isToday = dateStr === new Date().toISOString().slice(0, 10);
-  if (isToday) return { line1: "Auj.", line2: "" };
+  if (isToday) return { line1: "Auj.", line2: `${d.getDate()} ${months[d.getMonth()]}` };
   return { line1: days[d.getDay()], line2: `${d.getDate()} ${months[d.getMonth()]}` };
 }
 
@@ -51,195 +57,219 @@ function wmoToCondition(wmoCode: number | null | undefined, cloudCover: number |
   return "Ensoleillé";
 }
 
-function getWeatherZone(condition: string | null, tempMax: number | null): { label: string; color: string } | null {
-  const c = (condition ?? "").toLowerCase();
-  if ((tempMax ?? 0) >= 30) return { label: "☀ Canicule", color: "rgba(251,146,60,0.18)" };
-  if (c.includes("orage")) return { label: "⚡ Orage", color: "rgba(139,92,246,0.20)" };
-  if (c.includes("neige")) return { label: "❄ Neige", color: "rgba(147,197,253,0.20)" };
-  return null;
+function degToCompass(deg: number | null): string {
+  if (deg == null) return "—";
+  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+  return dirs[Math.round(deg / 22.5) % 16];
 }
 
-// ─── SVG Weather Icons ────────────────────────────────────────────────────────
-function WeatherIconSVG({ condition, size = 28 }: { condition: string | null; size?: number }) {
-  const c = (condition ?? "").toLowerCase();
+function uvLabel(uv: number | null): { text: string; color: string } {
+  if (uv == null) return { text: "—", color: "text-muted-foreground" };
+  if (uv <= 2) return { text: "Faible", color: "text-green-400" };
+  if (uv <= 5) return { text: "Modéré", color: "text-yellow-400" };
+  if (uv <= 7) return { text: "Élevé", color: "text-orange-400" };
+  if (uv <= 10) return { text: "Très élevé", color: "text-red-400" };
+  return { text: "Extrême", color: "text-purple-400" };
+}
+
+// ─── Weather Icon SVG ─────────────────────────────────────────────────────────
+function WeatherIconSVG({ condition, size = 28 }: { condition: string; size?: number }) {
   const s = size;
+  const condLower = condition.toLowerCase();
 
-  if (c.includes("orage")) {
+  if (condLower.includes("ensoleillé") || condLower.includes("dégagé")) {
     return (
-      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
-        <path d="M10 30c0-8 6-14 14-14 6 0 11 4 13 9 4 1 7 4 7 8 0 5-4 8-9 8H12c-5 0-8-3-8-7 0-3 2-5 6-4z" fill="#94a3b8" opacity="0.9"/>
-        <path d="M22 34l-4 8h5l-3 6 10-10h-6l4-4z" fill="#fbbf24"/>
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="7" fill="#fbbf24" />
+        <g stroke="#fbbf24" strokeWidth="2" strokeLinecap="round">
+          <line x1="16" y1="2" x2="16" y2="5" /><line x1="16" y1="27" x2="16" y2="30" />
+          <line x1="2" y1="16" x2="5" y2="16" /><line x1="27" y1="16" x2="30" y2="16" />
+          <line x1="6" y1="6" x2="8" y2="8" /><line x1="24" y1="24" x2="26" y2="26" />
+          <line x1="6" y1="26" x2="8" y2="24" /><line x1="24" y1="8" x2="26" y2="6" />
+        </g>
       </svg>
     );
   }
-  if (c.includes("neige")) {
+  if (condLower.includes("partiellement")) {
     return (
-      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
-        <path d="M10 28c0-8 6-14 14-14 6 0 11 4 13 9 4 1 7 4 7 8 0 5-4 8-9 8H12c-5 0-8-3-8-7 0-3 2-5 6-4z" fill="#cbd5e1" opacity="0.9"/>
-        <circle cx="16" cy="40" r="2" fill="#93c5fd"/>
-        <circle cx="24" cy="42" r="2" fill="#93c5fd"/>
-        <circle cx="32" cy="40" r="2" fill="#93c5fd"/>
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <circle cx="20" cy="12" r="6" fill="#fbbf24" />
+        <path d="M8 24c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#94a3b8" />
       </svg>
     );
   }
-  if (c.includes("pluie") || c.includes("averse") || c.includes("bruine")) {
+  if (condLower.includes("couvert") || condLower.includes("nuageux")) {
     return (
-      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
-        <path d="M10 26c0-8 6-14 14-14 6 0 11 4 13 9 4 1 7 4 7 8 0 5-4 8-9 8H12c-5 0-8-3-8-7 0-3 2-5 6-4z" fill="#64748b" opacity="0.9"/>
-        <line x1="16" y1="36" x2="14" y2="44" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
-        <line x1="24" y1="36" x2="22" y2="44" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
-        <line x1="32" y1="36" x2="30" y2="44" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M8 24c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#64748b" />
       </svg>
     );
   }
-  if (c.includes("brouillard")) {
+  if (condLower.includes("pluie") || condLower.includes("averse") || condLower.includes("bruine")) {
     return (
-      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
-        <line x1="8" y1="20" x2="40" y2="20" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round"/>
-        <line x1="12" y1="28" x2="36" y2="28" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round"/>
-        <line x1="8" y1="36" x2="40" y2="36" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round"/>
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M8 20c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#64748b" />
+        <line x1="10" y1="23" x2="9" y2="27" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="16" y1="23" x2="15" y2="28" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="22" y1="23" x2="21" y2="27" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     );
   }
-  if (c.includes("couvert")) {
+  if (condLower.includes("orage")) {
     return (
-      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
-        <path d="M8 30c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H10c-6 0-10-4-10-9 0-4 3-7 7-8z" fill="#6b7280" opacity="0.9"/>
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M8 18c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#475569" />
+        <polygon points="17,19 14,25 16,25 15,30 20,23 17,23 19,19" fill="#fbbf24" />
       </svg>
     );
   }
-  if (c.includes("partiellement") || c.includes("nuageux")) {
+  if (condLower.includes("neige")) {
     return (
-      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
-        <circle cx="18" cy="20" r="10" fill="#fbbf24" opacity="0.9"/>
-        <path d="M16 30c0-8 6-14 14-14 6 0 11 4 13 9 4 1 7 4 7 8 0 5-4 8-9 8H18c-5 0-8-3-8-7 0-3 2-5 6-4z" fill="#9ca3af" opacity="0.9"/>
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M8 20c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#94a3b8" />
+        <circle cx="10" cy="25" r="1.5" fill="white" /><circle cx="16" cy="27" r="1.5" fill="white" /><circle cx="22" cy="25" r="1.5" fill="white" />
       </svg>
     );
   }
-  // Ensoleillé
+  // Default: cloudy
   return (
-    <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="10" fill="#fbbf24"/>
-      {[0,45,90,135,180,225,270,315].map((angle) => {
-        const rad = (angle * Math.PI) / 180;
-        const x1 = 24 + 14 * Math.cos(rad);
-        const y1 = 24 + 14 * Math.sin(rad);
-        const x2 = 24 + 20 * Math.cos(rad);
-        const y2 = 24 + 20 * Math.sin(rad);
-        return <line key={angle} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round"/>;
-      })}
+    <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+      <path d="M8 24c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#64748b" />
     </svg>
   );
 }
 
-// ─── Wind Arrow ───────────────────────────────────────────────────────────────
-function WindArrow({ direction }: { direction?: number }) {
-  // direction: 0=N, 90=E, 180=S, 270=W
-  const deg = direction ?? 0;
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" style={{ transform: `rotate(${deg}deg)`, display: "inline-block" }}>
-      <path d="M7 1 L10 10 L7 8 L4 10 Z" fill="#4ade80"/>
-    </svg>
-  );
-}
-
-// ─── Detail Panel ─────────────────────────────────────────────────────────────
+// ─── Day Detail Panel ─────────────────────────────────────────────────────────
 function DayDetailPanel({ day, onClose }: { day: DayData; onClose: () => void }) {
-  const condition = day.condition ?? wmoToCondition(null, day.cloudCover, day.precipitation);
-  const { line1, line2 } = formatDate(day.date);
-
-  const stabilityColor = day.stabilityIndex >= 80 ? "text-green-400"
-    : day.stabilityIndex >= 60 ? "text-yellow-400"
-    : day.stabilityIndex >= 40 ? "text-orange-400"
-    : "text-red-400";
-
-  // Derive morning/afternoon/evening from condition + cloudCover
-  const morningCloud = Math.max(0, (day.cloudCover ?? 50) - 15);
-  const afternoonCloud = day.cloudCover ?? 50;
-  const eveningCloud = Math.min(100, (day.cloudCover ?? 50) + 10);
-  const morningCond = wmoToCondition(null, morningCloud, 0);
-  const afternoonCond = condition;
-  const eveningCond = wmoToCondition(null, eveningCloud, (day.precipitation ?? 0) * 0.3);
+  const d = new Date(day.date + "T12:00:00");
+  const dayName = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][d.getDay()];
+  const months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  const dateLabel = `${dayName} ${d.getDate()} ${months[d.getMonth()]}`;
+  const cond = day.condition ?? wmoToCondition(null, day.cloudCover, day.precipitation);
+  const stabilityColor = day.stabilityIndex >= 70 ? "text-green-400" : day.stabilityIndex >= 45 ? "text-yellow-400" : "text-red-400";
+  const uv = uvLabel(day.uvIndex);
 
   return (
-    <div className="mt-2 rounded-xl border border-border bg-card/90 backdrop-blur-sm p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+    <div className="mt-3 bg-gradient-to-br from-slate-800/80 to-slate-900/90 backdrop-blur-sm border border-white/10 rounded-xl p-4 shadow-2xl shadow-blue-500/5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <WeatherIconSVG condition={condition} size={32} />
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <WeatherIconSVG condition={cond} size={36} />
           <div>
-            <p className="font-semibold text-sm">{line1} {line2}</p>
-            <p className="text-xs text-muted-foreground">{condition}</p>
+            <h3 className="font-semibold text-white text-sm">{dateLabel}</h3>
+            <p className="text-xs text-slate-400">{cond}</p>
           </div>
         </div>
-        <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors">
-          <X className="h-4 w-4 text-muted-foreground" />
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+          <X className="h-4 w-4 text-slate-400" />
         </button>
       </div>
 
-      {/* Températures */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-muted/40 rounded-lg p-2.5 flex items-center gap-2">
-          <Thermometer className="h-4 w-4 text-orange-400 shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">Max / Min</p>
-            <p className="text-sm font-bold"><span className="text-orange-400">{day.tempMax ?? "—"}°</span> / <span className="text-blue-400">{day.tempMin ?? "—"}°</span></p>
+      {/* Main grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+        {/* Température */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Thermometer className="h-3.5 w-3.5 text-orange-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Température</span>
           </div>
+          <p className="text-lg font-bold text-white">{day.tempMax ?? "—"}° <span className="text-blue-400 text-sm">/ {day.tempMin ?? "—"}°</span></p>
         </div>
-        <div className="bg-muted/40 rounded-lg p-2.5 flex items-center gap-2">
-          <Droplets className="h-4 w-4 text-blue-400 shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">Précipitations</p>
-            <p className="text-sm font-bold text-blue-400">{(day.precipitation ?? 0) > 0 ? `${day.precipitation} mm` : "0 mm"}</p>
-          </div>
-        </div>
-        <div className="bg-muted/40 rounded-lg p-2.5 flex items-center gap-2">
-          <Wind className="h-4 w-4 text-green-400 shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">Vent / Rafales</p>
-            <p className="text-sm font-bold">{day.windSpeed ?? "—"} <span className="text-xs font-normal">km/h</span> {day.windGust ? <span className="text-orange-400">↑{day.windGust}</span> : ""}</p>
-          </div>
-        </div>
-        <div className="bg-muted/40 rounded-lg p-2.5 flex items-center gap-2">
-          <Eye className="h-4 w-4 text-cyan-400 shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">Humidité</p>
-            <p className="text-sm font-bold text-cyan-400">{day.humidity != null ? `${Math.round(day.humidity)}%` : "—"}</p>
-          </div>
-        </div>
-        <div className="bg-muted/40 rounded-lg p-2.5 flex items-center gap-2">
-          <Cloud className="h-4 w-4 text-slate-400 shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">Couverture nuageuse</p>
-            <p className="text-sm font-bold">{day.cloudCover != null ? `${Math.round(day.cloudCover)}%` : "—"}</p>
-          </div>
-        </div>
-        <div className="bg-muted/40 rounded-lg p-2.5 flex items-center gap-2">
-          <Sun className="h-4 w-4 text-yellow-400 shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">Confiance</p>
-            <p className={`text-sm font-bold ${stabilityColor}`}>{day.stabilityIndex}%</p>
-          </div>
-        </div>
-      </div>
 
-      {/* Matin / Après-midi / Soir */}
-      <div>
-        <p className="text-xs text-muted-foreground mb-1.5 font-medium">Conditions dans la journée</p>
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { label: "Matin", cond: morningCond, icon: morningCond },
-            { label: "Après-midi", cond: afternoonCond, icon: afternoonCond },
-            { label: "Soir", cond: eveningCond, icon: eveningCond },
-          ].map(({ label, cond }) => (
-            <div key={label} className="bg-muted/30 rounded-lg p-2 text-center">
-              <p className="text-xs text-muted-foreground mb-1">{label}</p>
-              <div className="flex justify-center mb-1">
-                <WeatherIconSVG condition={cond} size={22} />
-              </div>
-              <p className="text-xs leading-tight">{cond}</p>
-            </div>
-          ))}
+        {/* Ressenti */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Thermometer className="h-3.5 w-3.5 text-pink-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Ressenti</span>
+          </div>
+          <p className="text-lg font-bold text-white">{day.feelsLikeMax ?? "—"}° <span className="text-blue-400 text-sm">/ {day.feelsLikeMin ?? "—"}°</span></p>
+        </div>
+
+        {/* Vent */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Wind className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Vent</span>
+          </div>
+          <p className="text-sm font-bold text-white">{day.windSpeed ?? "—"} <span className="text-xs font-normal text-slate-400">km/h</span></p>
+          {day.windGust && <p className="text-xs text-orange-400 mt-0.5">Rafales {day.windGust} km/h</p>}
+        </div>
+
+        {/* Direction */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Navigation className="h-3.5 w-3.5 text-sky-400" style={{ transform: `rotate(${(day.windDirection ?? 0) + 180}deg)` }} />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Direction</span>
+          </div>
+          <p className="text-lg font-bold text-white">{degToCompass(day.windDirection)}</p>
+          <p className="text-xs text-slate-500">{day.windDirection != null ? `${Math.round(day.windDirection)}°` : ""}</p>
+        </div>
+
+        {/* Précipitations */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Droplets className="h-3.5 w-3.5 text-blue-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Précipitations</span>
+          </div>
+          <p className="text-lg font-bold text-blue-400">{day.precipitation ?? 0} <span className="text-xs font-normal">mm</span></p>
+        </div>
+
+        {/* Humidité */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Eye className="h-3.5 w-3.5 text-cyan-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Humidité</span>
+          </div>
+          <p className="text-lg font-bold text-cyan-400">{day.humidity != null ? `${Math.round(day.humidity)}%` : "—"}</p>
+        </div>
+
+        {/* UV */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Sun className="h-3.5 w-3.5 text-yellow-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Indice UV</span>
+          </div>
+          <p className={`text-lg font-bold ${uv.color}`}>{day.uvIndex != null ? Math.round(day.uvIndex) : "—"}</p>
+          <p className={`text-xs ${uv.color}`}>{uv.text}</p>
+        </div>
+
+        {/* Nébulosité */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Cloud className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Nébulosité</span>
+          </div>
+          <p className="text-lg font-bold text-white">{day.cloudCover != null ? `${Math.round(day.cloudCover)}%` : "—"}</p>
+        </div>
+
+        {/* Lever du soleil */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Sunrise className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Lever</span>
+          </div>
+          <p className="text-lg font-bold text-amber-400">{day.sunrise ?? "—"}</p>
+        </div>
+
+        {/* Coucher du soleil */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Sunset className="h-3.5 w-3.5 text-orange-500" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Coucher</span>
+          </div>
+          <p className="text-lg font-bold text-orange-500">{day.sunset ?? "—"}</p>
+        </div>
+
+        {/* Confiance */}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Gauge className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Confiance</span>
+          </div>
+          <p className={`text-lg font-bold ${stabilityColor}`}>{day.stabilityIndex}%</p>
+          <div className="mt-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full ${day.stabilityIndex >= 70 ? "bg-green-400" : day.stabilityIndex >= 45 ? "bg-yellow-400" : "bg-red-400"}`} style={{ width: `${day.stabilityIndex}%` }} />
+          </div>
         </div>
       </div>
     </div>
@@ -254,16 +284,15 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Canvas dimensions — taller for better readability
-  const CHART_HEIGHT = 280; // area for temp curves + wind line (was 200)
-  const PRECIP_HEIGHT = 56; // precipitation bars (was 48)
-  const ICON_HEIGHT = 40;   // weather icons row (was 36)
-  const LABEL_HEIGHT = 42;  // date labels (was 36)
-  const TOTAL_HEIGHT = CHART_HEIGHT + PRECIP_HEIGHT + ICON_HEIGHT + LABEL_HEIGHT;
-  const PADDING_LEFT = 36;
+  // Canvas dimensions — generous for readability
+  const CHART_HEIGHT = 320; // main area: temp curves + precip bars + wind
+  const ICON_HEIGHT = 40;   // weather icons row
+  const LABEL_HEIGHT = 44;  // date labels
+  const TOTAL_HEIGHT = CHART_HEIGHT + ICON_HEIGHT + LABEL_HEIGHT;
+  const PADDING_LEFT = 40;
   const PADDING_RIGHT = 16;
-  const PADDING_TOP = 32;
-  const PADDING_BOTTOM = 10;
+  const PADDING_TOP = 36;
+  const PADDING_BOTTOM = 50; // space for precip bars at bottom of chart area
 
   const displayDays = days.slice(0, 15);
   const N = displayDays.length;
@@ -271,32 +300,33 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   // Fixed column width: show 7 days in the visible area
   const VISIBLE_DAYS = 7;
   const colWidth = containerWidth > 0 ? (containerWidth - PADDING_LEFT - PADDING_RIGHT) / VISIBLE_DAYS : 0;
-  // Total canvas width = enough for all N days
   const canvasWidth = PADDING_LEFT + PADDING_RIGHT + colWidth * N;
 
   // Temperature range
-  const allMax = displayDays.map(d => d.tempMax ?? 0).filter(v => v != null);
-  const allMin = displayDays.map(d => d.tempMin ?? 0).filter(v => v != null);
-  const allWind = displayDays.map(d => d.windSpeed ?? 0).filter(v => v != null);
-  const tMax = allMax.length > 0 ? Math.max(...allMax) : 35;
-  const tMin = allMin.length > 0 ? Math.min(...allMin) : 5;
-  const tRange = Math.max(tMax - tMin + 8, 20);
-  const tPadded = tMin - 4;
+  const allMax = displayDays.map(d => d.tempMax ?? 0);
+  const allMin = displayDays.map(d => d.tempMin ?? 0);
+  const allWind = displayDays.map(d => d.windSpeed ?? 0);
+  const tMax = Math.max(...allMax, 20);
+  const tMin = Math.min(...allMin, 0);
+  const tRange = Math.max(tMax - tMin + 10, 20);
+  const tPadded = tMin - 5;
 
   const maxPrecip = Math.max(...displayDays.map(d => d.precipitation ?? 0), 1);
   const maxWind = Math.max(...allWind, 10);
 
-  // Map temperature to Y coordinate within chart area
+  // Map temperature to Y coordinate within chart area (upper 65%)
+  const tempAreaBottom = CHART_HEIGHT - PADDING_BOTTOM;
+  const tempAreaTop = PADDING_TOP;
   const tempToY = useCallback((temp: number) => {
-    return PADDING_TOP + CHART_HEIGHT - PADDING_BOTTOM - ((temp - tPadded) / tRange) * (CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM);
-  }, [tPadded, tRange, CHART_HEIGHT, PADDING_TOP, PADDING_BOTTOM]);
+    return tempAreaTop + (tempAreaBottom - tempAreaTop) * 0.65 - ((temp - tPadded) / tRange) * ((tempAreaBottom - tempAreaTop) * 0.65);
+  }, [tPadded, tRange, tempAreaTop, tempAreaBottom]);
 
-  // Map wind to Y coordinate (lower portion of chart area)
+  // Map wind to Y coordinate (lower portion)
   const windToY = useCallback((wind: number) => {
-    const windAreaTop = PADDING_TOP + (CHART_HEIGHT - PADDING_BOTTOM) * 0.55;
-    const windAreaBottom = CHART_HEIGHT - PADDING_BOTTOM;
+    const windAreaTop = tempAreaTop + (tempAreaBottom - tempAreaTop) * 0.55;
+    const windAreaBottom = tempAreaBottom - 30;
     return windAreaTop + (1 - wind / maxWind) * (windAreaBottom - windAreaTop);
-  }, [maxWind, CHART_HEIGHT, PADDING_TOP, PADDING_BOTTOM]);
+  }, [maxWind, tempAreaTop, tempAreaBottom]);
 
   // X center of column i
   const colX = useCallback((i: number) => PADDING_LEFT + i * colWidth + colWidth / 2, [PADDING_LEFT, colWidth]);
@@ -312,140 +342,189 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     canvas.width = canvasWidth * dpr;
     canvas.height = TOTAL_HEIGHT * dpr;
     ctx.scale(dpr, dpr);
-
-    // Background
-    ctx.fillStyle = "transparent";
     ctx.clearRect(0, 0, canvasWidth, TOTAL_HEIGHT);
 
-    // ── Contextual zone backgrounds ──────────────────────────────────────────
-    let zoneStart = -1;
-    let zoneColor = "";
-    let zoneLabel = "";
-    for (let i = 0; i <= N; i++) {
-      const day = displayDays[i];
-      const zone = day ? getWeatherZone(day.condition, day.tempMax) : null;
-      const currentColor = zone?.color ?? "";
-      if (currentColor !== zoneColor) {
-        if (zoneColor && zoneStart >= 0) {
-          const x1 = colX(zoneStart) - colWidth / 2;
-          const x2 = colX(i - 1) + colWidth / 2;
-          ctx.fillStyle = zoneColor;
-          ctx.fillRect(x1, PADDING_TOP, x2 - x1, CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM);
-          // Zone label
-          if (zoneLabel) {
-            ctx.fillStyle = zoneColor.includes("251,146") ? "#fb923c" : "#a78bfa";
-            ctx.font = "bold 10px system-ui";
-            ctx.fillText(zoneLabel, x1 + 4, PADDING_TOP + 12);
-          }
-        }
-        zoneStart = i;
-        zoneColor = currentColor;
-        zoneLabel = zone?.label ?? "";
-      }
-    }
+    // ── Background gradient ──────────────────────────────────────────────────
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, CHART_HEIGHT);
+    bgGrad.addColorStop(0, "rgba(15, 23, 42, 0.6)");
+    bgGrad.addColorStop(1, "rgba(15, 23, 42, 0.2)");
+    ctx.fillStyle = bgGrad;
+    ctx.beginPath();
+    ctx.roundRect(PADDING_LEFT - 8, 4, canvasWidth - PADDING_LEFT - PADDING_RIGHT + 16, CHART_HEIGHT - 8, 12);
+    ctx.fill();
 
-    // ── Grid lines ───────────────────────────────────────────────────────────
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.lineWidth = 1;
-    for (let t = Math.ceil(tPadded / 4) * 4; t <= tMax + 4; t += 4) {
-      const y = tempToY(t);
-      if (y < PADDING_TOP || y > CHART_HEIGHT - PADDING_BOTTOM) continue;
+    // ── Horizontal grid lines ────────────────────────────────────────────────
+    const gridSteps = 5;
+    for (let i = 0; i <= gridSteps; i++) {
+      const temp = tPadded + (tRange * i) / gridSteps;
+      const y = tempToY(temp);
+      if (y < PADDING_TOP || y > tempAreaBottom * 0.7) continue;
       ctx.beginPath();
       ctx.moveTo(PADDING_LEFT, y);
       ctx.lineTo(canvasWidth - PADDING_RIGHT, y);
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
+      ctx.lineWidth = 1;
       ctx.stroke();
-      // Y axis labels
-      ctx.fillStyle = "rgba(156,163,175,0.8)";
-      ctx.font = "10px system-ui";
+      // Label
+      ctx.fillStyle = "rgba(148, 163, 184, 0.5)";
+      ctx.font = "9px system-ui";
       ctx.textAlign = "right";
-      ctx.fillText(`${t}°`, PADDING_LEFT - 3, y + 3);
+      ctx.fillText(`${Math.round(temp)}°`, PADDING_LEFT - 6, y + 3);
     }
 
-    // ── Selected day highlight ────────────────────────────────────────────────
-    if (selectedDay !== null && selectedDay < N) {
-      const x = colX(selectedDay);
-      ctx.fillStyle = "rgba(99,102,241,0.12)";
-      ctx.fillRect(x - colWidth / 2, 0, colWidth, TOTAL_HEIGHT);
-    }
+    // ── Precipitation bars (inside chart area, at bottom) ────────────────────
+    const precipBarMaxH = 45;
+    const precipBaseY = CHART_HEIGHT - 16;
+    displayDays.forEach((d, i) => {
+      const precip = d.precipitation ?? 0;
+      if (precip <= 0) return;
+      const barH = Math.max(4, (precip / maxPrecip) * precipBarMaxH);
+      const x = colX(i);
+      const barW = Math.min(colWidth * 0.5, 20);
 
-    // ── Max temperature area fill ─────────────────────────────────────────────
-    const maxPoints = displayDays.map((d, i) => ({ x: colX(i), y: tempToY(d.tempMax ?? tPadded) }));
-    const minPoints = displayDays.map((d, i) => ({ x: colX(i), y: tempToY(d.tempMin ?? tPadded) }));
+      // Gradient bar
+      const barGrad = ctx.createLinearGradient(0, precipBaseY - barH, 0, precipBaseY);
+      barGrad.addColorStop(0, "rgba(96, 165, 250, 0.8)");
+      barGrad.addColorStop(1, "rgba(59, 130, 246, 0.3)");
+      ctx.fillStyle = barGrad;
+      ctx.beginPath();
+      ctx.roundRect(x - barW / 2, precipBaseY - barH, barW, barH, [3, 3, 0, 0]);
+      ctx.fill();
 
+      // Glow effect
+      ctx.shadowColor = "rgba(96, 165, 250, 0.4)";
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Value label
+      ctx.fillStyle = "#93c5fd";
+      ctx.font = "bold 9px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(`${precip}`, x, precipBaseY - barH - 4);
+    });
+
+    // ── Context zones (canicule / orage) ─────────────────────────────────────
+    displayDays.forEach((d, i) => {
+      const x = colX(i) - colWidth / 2;
+      const w = colWidth;
+      if ((d.tempMax ?? 0) >= 33) {
+        // Canicule zone
+        const grad = ctx.createLinearGradient(0, PADDING_TOP, 0, CHART_HEIGHT * 0.4);
+        grad.addColorStop(0, "rgba(239, 68, 68, 0.15)");
+        grad.addColorStop(1, "rgba(239, 68, 68, 0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, PADDING_TOP, w, CHART_HEIGHT * 0.35);
+      }
+      const condLower = (d.condition ?? "").toLowerCase();
+      if (condLower.includes("orage")) {
+        const grad = ctx.createLinearGradient(0, PADDING_TOP, 0, CHART_HEIGHT * 0.5);
+        grad.addColorStop(0, "rgba(139, 92, 246, 0.15)");
+        grad.addColorStop(1, "rgba(139, 92, 246, 0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, PADDING_TOP, w, CHART_HEIGHT * 0.4);
+      }
+    });
+
+    // ── Max temperature curve (orange with gradient fill) ─────────────────────
+    const maxPoints = displayDays.map((d, i) => ({ x: colX(i), y: tempToY(d.tempMax ?? 0) }));
+    const minPoints = displayDays.map((d, i) => ({ x: colX(i), y: tempToY(d.tempMin ?? 0) }));
+
+    // Fill between curves
     ctx.beginPath();
     ctx.moveTo(maxPoints[0].x, maxPoints[0].y);
     for (let i = 1; i < maxPoints.length; i++) {
-      const cp = { x: (maxPoints[i - 1].x + maxPoints[i].x) / 2, y: (maxPoints[i - 1].y + maxPoints[i].y) / 2 };
-      ctx.quadraticCurveTo(maxPoints[i - 1].x, maxPoints[i - 1].y, cp.x, cp.y);
+      const cp1x = (maxPoints[i - 1].x + maxPoints[i].x) / 2;
+      ctx.bezierCurveTo(cp1x, maxPoints[i - 1].y, cp1x, maxPoints[i].y, maxPoints[i].x, maxPoints[i].y);
     }
-    ctx.lineTo(maxPoints[maxPoints.length - 1].x, maxPoints[maxPoints.length - 1].y);
     for (let i = minPoints.length - 1; i >= 0; i--) {
-      ctx.lineTo(minPoints[i].x, minPoints[i].y);
+      if (i === minPoints.length - 1) {
+        ctx.lineTo(minPoints[i].x, minPoints[i].y);
+      } else {
+        const cp1x = (minPoints[i + 1].x + minPoints[i].x) / 2;
+        ctx.bezierCurveTo(cp1x, minPoints[i + 1].y, cp1x, minPoints[i].y, minPoints[i].x, minPoints[i].y);
+      }
     }
     ctx.closePath();
-    const areaGrad = ctx.createLinearGradient(0, PADDING_TOP, 0, CHART_HEIGHT);
-    areaGrad.addColorStop(0, "rgba(249,115,22,0.15)");
-    areaGrad.addColorStop(0.5, "rgba(96,165,250,0.08)");
-    areaGrad.addColorStop(1, "rgba(96,165,250,0.02)");
-    ctx.fillStyle = areaGrad;
+    const fillGrad = ctx.createLinearGradient(0, PADDING_TOP, 0, tempAreaBottom);
+    fillGrad.addColorStop(0, "rgba(251, 146, 60, 0.12)");
+    fillGrad.addColorStop(0.5, "rgba(96, 165, 250, 0.06)");
+    fillGrad.addColorStop(1, "rgba(96, 165, 250, 0.02)");
+    ctx.fillStyle = fillGrad;
     ctx.fill();
 
-    // ── Max temperature curve ─────────────────────────────────────────────────
+    // Max curve line
     ctx.beginPath();
     ctx.moveTo(maxPoints[0].x, maxPoints[0].y);
     for (let i = 1; i < maxPoints.length; i++) {
-      const cp = { x: (maxPoints[i - 1].x + maxPoints[i].x) / 2, y: (maxPoints[i - 1].y + maxPoints[i].y) / 2 };
-      ctx.quadraticCurveTo(maxPoints[i - 1].x, maxPoints[i - 1].y, cp.x, cp.y);
+      const cp1x = (maxPoints[i - 1].x + maxPoints[i].x) / 2;
+      ctx.bezierCurveTo(cp1x, maxPoints[i - 1].y, cp1x, maxPoints[i].y, maxPoints[i].x, maxPoints[i].y);
     }
-    ctx.lineTo(maxPoints[maxPoints.length - 1].x, maxPoints[maxPoints.length - 1].y);
-    ctx.strokeStyle = "#f97316";
+    ctx.strokeStyle = "#fb923c";
     ctx.lineWidth = 2.5;
+    ctx.shadowColor = "rgba(251, 146, 60, 0.5)";
+    ctx.shadowBlur = 8;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // Max dots + labels
+    // Max points + labels
     maxPoints.forEach((pt, i) => {
       const val = displayDays[i].tempMax;
       if (val == null) return;
+      const isSelected = selectedDay === i;
+      // Glow
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, selectedDay === i ? 5 : 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#f97316";
+      ctx.arc(pt.x, pt.y, isSelected ? 8 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(251, 146, 60, 0.2)";
       ctx.fill();
-      ctx.fillStyle = "#f97316";
-      ctx.font = `bold ${selectedDay === i ? 11 : 10}px system-ui`;
+      // Point
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, isSelected ? 5 : 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#fb923c";
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = "#fdba74";
+      ctx.font = `bold ${isSelected ? 11 : 10}px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(val)}`, pt.x, pt.y - 7);
+      ctx.fillText(`${Math.round(val)}°`, pt.x, pt.y - 10);
     });
 
-    // ── Min temperature curve ─────────────────────────────────────────────────
+    // ── Min temperature curve (blue) ─────────────────────────────────────────
     ctx.beginPath();
     ctx.moveTo(minPoints[0].x, minPoints[0].y);
     for (let i = 1; i < minPoints.length; i++) {
-      const cp = { x: (minPoints[i - 1].x + minPoints[i].x) / 2, y: (minPoints[i - 1].y + minPoints[i].y) / 2 };
-      ctx.quadraticCurveTo(minPoints[i - 1].x, minPoints[i - 1].y, cp.x, cp.y);
+      const cp1x = (minPoints[i - 1].x + minPoints[i].x) / 2;
+      ctx.bezierCurveTo(cp1x, minPoints[i - 1].y, cp1x, minPoints[i].y, minPoints[i].x, minPoints[i].y);
     }
-    ctx.lineTo(minPoints[minPoints.length - 1].x, minPoints[minPoints.length - 1].y);
     ctx.strokeStyle = "#60a5fa";
     ctx.lineWidth = 2;
+    ctx.shadowColor = "rgba(96, 165, 250, 0.4)";
+    ctx.shadowBlur = 6;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // Min dots + labels
+    // Min points + labels
     minPoints.forEach((pt, i) => {
       const val = displayDays[i].tempMin;
       if (val == null) return;
+      const isSelected = selectedDay === i;
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, selectedDay === i ? 5 : 3, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, isSelected ? 5 : 3, 0, Math.PI * 2);
       ctx.fillStyle = "#60a5fa";
       ctx.fill();
       ctx.fillStyle = "#93c5fd";
-      ctx.font = `${selectedDay === i ? 10 : 9}px system-ui`;
+      ctx.font = `${isSelected ? "bold 11" : "10"}px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(val)}`, pt.x, pt.y + 14);
+      ctx.fillText(`${Math.round(val)}°`, pt.x, pt.y + 16);
     });
 
-    // ── Wind dashed line ──────────────────────────────────────────────────────
+    // ── Wind dashed line (green) ─────────────────────────────────────────────
     const windPoints = displayDays.map((d, i) => ({ x: colX(i), y: windToY(d.windSpeed ?? 0) }));
     ctx.beginPath();
-    ctx.setLineDash([5, 4]);
+    ctx.setLineDash([6, 4]);
     ctx.moveTo(windPoints[0].x, windPoints[0].y);
     for (let i = 1; i < windPoints.length; i++) {
       ctx.lineTo(windPoints[i].x, windPoints[i].y);
@@ -455,70 +534,68 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Wind values + arrows
+    // Wind values + direction arrows
     windPoints.forEach((pt, i) => {
       const val = displayDays[i].windSpeed;
+      const dir = displayDays[i].windDirection;
       if (val == null) return;
       ctx.fillStyle = "#4ade80";
-      ctx.font = "9px system-ui";
+      ctx.font = "bold 9px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(val)}`, pt.x, pt.y - 5);
-      // Arrow →
-      ctx.fillStyle = "#4ade80";
-      ctx.font = "10px system-ui";
-      ctx.fillText("→", pt.x, pt.y + 8);
-    });
-
-    // ── Precipitation bars ────────────────────────────────────────────────────
-    const precipY = CHART_HEIGHT;
-    const precipBarMaxH = PRECIP_HEIGHT - 12;
-    displayDays.forEach((d, i) => {
-      const precip = d.precipitation ?? 0;
-      const barH = precip > 0 ? Math.max(4, (precip / maxPrecip) * precipBarMaxH) : 0;
-      const x = colX(i);
-      const barW = Math.min(colWidth * 0.55, 18);
-
-      if (barH > 0) {
-        ctx.fillStyle = selectedDay === i ? "#93c5fd" : "#60a5fa";
-        ctx.globalAlpha = 0.75;
+      ctx.fillText(`${Math.round(val)}`, pt.x, pt.y - 6);
+      // Direction arrow
+      if (dir != null) {
+        const arrowSize = 5;
+        const angle = ((dir + 180) % 360) * (Math.PI / 180);
+        ctx.save();
+        ctx.translate(pt.x, pt.y + 8);
+        ctx.rotate(angle);
         ctx.beginPath();
-        ctx.roundRect(x - barW / 2, precipY + PRECIP_HEIGHT - barH - 12, barW, barH, [2, 2, 0, 0]);
+        ctx.moveTo(0, -arrowSize);
+        ctx.lineTo(-3, arrowSize * 0.5);
+        ctx.lineTo(3, arrowSize * 0.5);
+        ctx.closePath();
+        ctx.fillStyle = "#4ade80";
+        ctx.globalAlpha = 0.7;
         ctx.fill();
         ctx.globalAlpha = 1;
-
-        ctx.fillStyle = "#93c5fd";
-        ctx.font = "9px system-ui";
-        ctx.textAlign = "center";
-        ctx.fillText(`${precip}`, x, precipY + PRECIP_HEIGHT - barH - 14);
-      } else {
-        // Show 0 faintly
-        ctx.fillStyle = "rgba(156,163,175,0.4)";
-        ctx.font = "9px system-ui";
-        ctx.textAlign = "center";
-        ctx.fillText("0", x, precipY + PRECIP_HEIGHT - 14);
+        ctx.restore();
       }
     });
 
-    // ── Date labels ───────────────────────────────────────────────────────────
-    const labelY = CHART_HEIGHT + PRECIP_HEIGHT + ICON_HEIGHT;
+    // ── Selected day highlight ───────────────────────────────────────────────
+    if (selectedDay !== null && selectedDay < N) {
+      const x = colX(selectedDay) - colWidth / 2;
+      ctx.fillStyle = "rgba(99, 102, 241, 0.08)";
+      ctx.beginPath();
+      ctx.roundRect(x + 2, 8, colWidth - 4, CHART_HEIGHT - 16, 8);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.3)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // ── Date labels ──────────────────────────────────────────────────────────
+    const labelY = CHART_HEIGHT + ICON_HEIGHT;
     displayDays.forEach((d, i) => {
       const { line1, line2 } = formatDate(d.date);
       const x = colX(i);
       const isToday = d.date === new Date().toISOString().slice(0, 10);
-      ctx.fillStyle = isToday ? "#818cf8" : selectedDay === i ? "#e2e8f0" : "rgba(156,163,175,0.9)";
-      ctx.font = `${isToday ? "bold " : ""}10px system-ui`;
+      const isSelected = selectedDay === i;
+      ctx.fillStyle = isToday ? "#818cf8" : isSelected ? "#e2e8f0" : "rgba(148, 163, 184, 0.8)";
+      ctx.font = `${isToday || isSelected ? "bold " : ""}11px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText(line1, x, labelY + 12);
+      ctx.fillText(line1, x, labelY + 14);
       if (line2) {
         ctx.font = "9px system-ui";
-        ctx.fillStyle = isToday ? "#818cf8" : "rgba(107,114,128,0.8)";
-        ctx.fillText(line2, x, labelY + 23);
+        ctx.fillStyle = isToday ? "#818cf8" : "rgba(107, 114, 128, 0.8)";
+        ctx.fillText(line2, x, labelY + 27);
       }
     });
 
-  }, [canvasWidth, displayDays, selectedDay, N, colX, colWidth, tempToY, windToY, tPadded, tMax, tRange, maxPrecip, maxWind, CHART_HEIGHT, PRECIP_HEIGHT, ICON_HEIGHT, LABEL_HEIGHT, TOTAL_HEIGHT, PADDING_LEFT, PADDING_RIGHT, PADDING_TOP, PADDING_BOTTOM]);
+  }, [canvasWidth, displayDays, selectedDay, N, colX, colWidth, tempToY, windToY, tPadded, tRange, maxPrecip, maxWind, CHART_HEIGHT, ICON_HEIGHT, LABEL_HEIGHT, TOTAL_HEIGHT, PADDING_LEFT, PADDING_RIGHT, PADDING_TOP, PADDING_BOTTOM, tempAreaBottom, tempAreaTop]);
 
-  // Resize observer — track the outer container width (viewport)
+  // Resize observer
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -556,18 +633,19 @@ export default function FifteenDayChart({ days, locationName }: Props) {
           {locationName && <span className="text-xs text-primary/70 font-normal">· {locationName}</span>}
         </h2>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-orange-400 inline-block rounded" /> Max °C</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-400 inline-block rounded" /> Min °C</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 border-t-2 border-dashed border-green-400 inline-block" /> Vent</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-orange-400 inline-block rounded" /> Max</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-400 inline-block rounded" /> Min</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 border-t border-dashed border-green-400 inline-block" /> Vent</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-3 bg-blue-400/60 inline-block rounded-sm" /> Pluie</span>
         </div>
       </div>
 
       {/* Scroll hint */}
       {N > VISIBLE_DAYS && (
-        <p className="text-xs text-muted-foreground/60 mb-1 text-right">← Glissez pour voir les jours suivants →</p>
+        <p className="text-[10px] text-muted-foreground/50 mb-1 text-right italic">← Glissez pour voir les jours suivants →</p>
       )}
 
-      {/* Outer container for measuring available width */}
+      {/* Outer container */}
       <div ref={containerRef} className="w-full">
         {/* Scrollable wrapper */}
         <div
@@ -575,24 +653,24 @@ export default function FifteenDayChart({ days, locationName }: Props) {
           className="overflow-x-auto scrollbar-hide relative"
           style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
         >
-          {/* Inner content with fixed total width */}
+          {/* Inner content */}
           <div className="relative" style={{ width: canvasWidth, minHeight: TOTAL_HEIGHT }}>
-            {/* Weather icons row — rendered as HTML over canvas */}
+            {/* Weather icons row */}
             {canvasWidth > 0 && N > 0 && (
               <div
                 className="absolute flex"
-                style={{ top: CHART_HEIGHT + PRECIP_HEIGHT, height: ICON_HEIGHT, left: PADDING_LEFT, width: colWidth * N }}
+                style={{ top: CHART_HEIGHT, height: ICON_HEIGHT, left: PADDING_LEFT, width: colWidth * N }}
               >
                 {displayDays.map((d, i) => {
                   const cond = d.condition ?? wmoToCondition(null, d.cloudCover, d.precipitation);
                   return (
                     <div
                       key={d.date}
-                      className="flex items-center justify-center cursor-pointer"
+                      className="flex items-center justify-center cursor-pointer transition-transform hover:scale-110"
                       style={{ width: colWidth, flexShrink: 0 }}
                       onClick={() => setSelectedDay(prev => prev === i ? null : i)}
                     >
-                      <WeatherIconSVG condition={cond} size={Math.min(32, colWidth * 0.6)} />
+                      <WeatherIconSVG condition={cond} size={Math.min(32, colWidth * 0.55)} />
                     </div>
                   );
                 })}
