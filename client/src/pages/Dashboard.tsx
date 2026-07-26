@@ -364,7 +364,7 @@ export default function Dashboard() {
               <div className="flex items-start gap-3 sm:gap-5">
                 <div>
                   <p className="text-7xl sm:text-8xl font-bold leading-none tracking-tight">
-                    {currentTemp != null ? Math.round(currentTemp) : "—"}°
+                    {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
                     {today?.condition ?? meteoAI?.condition ?? ""}
@@ -376,13 +376,13 @@ export default function Dashboard() {
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-medium text-orange-400 uppercase tracking-wide">max</span>
                     <span className="text-2xl sm:text-3xl font-bold text-orange-300">
-                      {today?.tempMax ?? meteoAI?.tempMax ?? "—"}°
+                      {today?.tempMax != null ? Number(today.tempMax).toFixed(1) : meteoAI?.tempMax != null ? Number(meteoAI.tempMax).toFixed(1) : "—"}°
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-medium text-blue-400 uppercase tracking-wide">min</span>
                     <span className="text-2xl sm:text-3xl font-bold text-blue-300">
-                      {today?.tempMin ?? meteoAI?.tempMin ?? "—"}°
+                      {today?.tempMin != null ? Number(today.tempMin).toFixed(1) : meteoAI?.tempMin != null ? Number(meteoAI.tempMin).toFixed(1) : "—"}°
                     </span>
                   </div>
                 </div>
@@ -397,7 +397,7 @@ export default function Dashboard() {
                   <Thermometer className="h-3 w-3" />Ressenti
                 </p>
                 <p className="text-xl sm:text-2xl font-bold">
-                  {apparentTemp != null ? `${Math.round(apparentTemp)}°` : currentTemp != null ? `${Math.round(currentTemp)}°` : "—"}
+                  {apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : currentTemp != null ? `${currentTemp.toFixed(1)}°` : "—"}
                 </p>
               </div>
               {/* UV Index */}
@@ -506,12 +506,12 @@ export default function Dashboard() {
             {locationWeather.ultraLocal.temperature != null && (
               <div className="flex items-center gap-3">
                 <span className="text-2xl font-bold text-emerald-300">
-                  {locationWeather.ultraLocal.temperature}°C
+                  {Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C
                 </span>
                 <div className="text-xs text-muted-foreground">
                   <p>Confiance : <span className="font-semibold text-foreground">{locationWeather.ultraLocal.confidenceScore}%</span></p>
                   {locationWeather.ultraLocal.microclimateAdjustment !== 0 && (
-                    <p>Microclimat : {locationWeather.ultraLocal.microclimateAdjustment > 0 ? "+" : ""}{locationWeather.ultraLocal.microclimateAdjustment}°C</p>
+                    <p>Microclimat : {locationWeather.ultraLocal.microclimateAdjustment > 0 ? "+" : ""}{Number(locationWeather.ultraLocal.microclimateAdjustment).toFixed(1)}°C</p>
                   )}
                 </div>
               </div>

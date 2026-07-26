@@ -191,3 +191,6 @@
 ## Courbe température ressentie sur graphique horaire
 - [x] Ajouter courbe en pointillés (rose/pink) pour la température ressentie sur HourlyChart
 - [x] Ajouter entrée dans la légende
+
+## Harmonisation températures avec 1 décimale
+- [x] Dashboard héro : afficher currentTemp, tempMax, tempMin, apparentTemp avec toFixed(1) au lieu de Math.round
