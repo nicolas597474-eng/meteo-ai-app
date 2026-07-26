@@ -288,6 +288,34 @@ export default function HourlyChart({ hours, locationName }: Props) {
       }
     });
 
+    // Apparent temperature curve (pink dashed)
+    const apparentPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.apparentTemp ?? h.temp ?? 0) }));
+    if (apparentPts.length > 1) {
+      ctx.beginPath();
+      ctx.setLineDash([4, 4]);
+      ctx.moveTo(apparentPts[0].x, apparentPts[0].y);
+      for (let i = 1; i < apparentPts.length; i++) {
+        const cpx = (apparentPts[i - 1].x + apparentPts[i].x) / 2;
+        ctx.bezierCurveTo(cpx, apparentPts[i - 1].y, cpx, apparentPts[i].y, apparentPts[i].x, apparentPts[i].y);
+      }
+      ctx.strokeStyle = "#f472b6";
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Apparent temp values (every 3 hours or on selection)
+    apparentPts.forEach((pt, i) => {
+      const v = hours[i].apparentTemp;
+      if (v == null) return;
+      const sel = selectedHour === i;
+      if (i % 3 === 1 || sel) {
+        ctx.fillStyle = "#f9a8d4";
+        ctx.font = `${sel ? "bold 10" : "9"}px system-ui`;
+        ctx.textAlign = "center";
+        ctx.fillText(`${v.toFixed(0)}°`, pt.x, pt.y + 14);
+      }
+    });
+
     // Wind dashed line (green)
     const windPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: windToY(h.windSpeed ?? 0) }));
     if (windPts.length > 1) {
@@ -449,6 +477,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
         )}
         <div className="flex items-center gap-3 text-[11px] mt-1.5">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Temp °C</span>
+          <span className="flex items-center gap-1.5 text-pink-300"><span className="w-4 h-0 border-t-2 border-dashed border-pink-400 inline-block" /> Ressenti</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
           <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
         </div>

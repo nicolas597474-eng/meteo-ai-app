@@ -187,3 +187,7 @@
 - [x] Frontend: Supprimer section Classement des modèles du Dashboard
 - [x] Frontend: Intégrer HourlyChart dans le Dashboard à la place de la section heure par heure actuelle
 - [x] TypeScript clean + tests passent
+
+## Courbe température ressentie sur graphique horaire
+- [x] Ajouter courbe en pointillés (rose/pink) pour la température ressentie sur HourlyChart
+- [x] Ajouter entrée dans la légende
