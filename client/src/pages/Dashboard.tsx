@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import FifteenDayChart from "@/components/FifteenDayChart";
 import HourlyChart from "@/components/HourlyChart";
@@ -219,7 +219,7 @@ export default function Dashboard() {
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
   // AI Day Summary — 3 phrases
-  const { data: daySummary } = trpc.weather.getDaySummary.useQuery(
+  const { data: daySummary, isFetching: summaryFetching, refetch: refetchSummary } = trpc.weather.getDaySummary.useQuery(
     coordsInput, { staleTime: 10 * 60 * 1000 }
   );
 
@@ -471,7 +471,15 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-sm">&#x1F4AC;</span>
-              <h3 className="text-xs font-semibold text-indigo-300 uppercase tracking-wide">Résumé IA de la journée</h3>
+              <h3 className="text-xs font-semibold text-indigo-300 uppercase tracking-wide flex-1">Résumé IA de la journée</h3>
+              <button
+                onClick={() => refetchSummary()}
+                disabled={summaryFetching}
+                className="p-1.5 rounded-lg text-indigo-300 hover:text-indigo-100 hover:bg-indigo-500/20 transition-all disabled:opacity-50"
+                title="Actualiser le résumé"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${summaryFetching ? "animate-spin" : ""}`} />
+              </button>
             </div>
             <div className="space-y-2">
               {daySummary.morning && (

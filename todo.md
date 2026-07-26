@@ -198,3 +198,6 @@
 ## Résumé textuel IA en haut du Dashboard
 - [x] Backend: Créer une procédure tRPC qui génère un résumé IA de la journée en 3 phrases (matin, après-midi, nuit)
 - [x] Frontend: Afficher le résumé en haut du Dashboard après le héro
+
+## Bouton actualisation résumé IA
+- [x] Ajouter bouton RefreshCw à côté du titre résumé IA avec refetch + animation spin pendant le chargement
