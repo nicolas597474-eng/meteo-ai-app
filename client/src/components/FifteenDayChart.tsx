@@ -196,13 +196,13 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const maxPrecip = Math.max(...displayDays.map(d => d.precipitation ?? 0), 0.5);
   const maxWind = Math.max(...displayDays.map(d => d.windSpeed ?? 0), 5);
 
-  // Zones: temp curves occupy top 55% of chart, wind 20%, precip 20%, rest padding
+  // Zones: temp curves top 55%, wind 18%, precip tight below wind
   const tempTop = PAD_T;
   const tempBot = PAD_T + (CHART_H - PAD_T) * 0.55;
-  const windTop = tempBot + 10;
+  const windTop = tempBot + 6;
   const windBot = windTop + (CHART_H - PAD_T) * 0.18;
-  const precipTop = windBot + 8;
-  const precipBot = CHART_H - 4;
+  const precipTop = windBot + 2;
+  const precipBot = CHART_H - 2;
 
   const tempToY = useCallback((t: number) => {
     return tempTop + (1 - (t - scaleBot) / scaleRange) * (tempBot - tempTop);
@@ -280,18 +280,25 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     });
 
     // ── Grid lines (fixed 8° steps like reference) ───────────────────────────
+    // °C label at top-left
+    ctx.fillStyle = "rgba(148, 163, 184, 0.7)";
+    ctx.font = "bold 11px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("°C", 2, PAD_T - 4);
+
     ctx.textAlign = "right";
     for (let t = scaleBot; t <= scaleTop; t += gridStep) {
       const y = tempToY(t);
       ctx.beginPath();
       ctx.moveTo(PAD_L, y);
       ctx.lineTo(totalW - PAD_R, y);
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.1)";
       ctx.lineWidth = 1;
       ctx.stroke();
-      ctx.fillStyle = "rgba(148, 163, 184, 0.5)";
-      ctx.font = "bold 10px system-ui";
-      ctx.fillText(`${t}°`, PAD_L - 5, y + 4);
+      // Scale labels — larger, more visible
+      ctx.fillStyle = "rgba(203, 213, 225, 0.85)";
+      ctx.font = "bold 12px system-ui";
+      ctx.fillText(`${t}°`, PAD_L - 4, y + 4);
     }
 
     // ── Max temperature curve (orange, thick) ────────────────────────────────
@@ -485,11 +492,11 @@ export default function FifteenDayChart({ days, locationName }: Props) {
           <span>Températures &amp; Météo — 15 jours</span>
           {locationName && <span className="text-[11px] text-primary/60 font-normal">· {locationName}</span>}
         </h2>
-        <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block border border-white/50" /> Max °C</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block border border-white/50" /> Min °C</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-3 bg-blue-500/70 inline-block rounded-sm" /> Pluie</span>
+        <div className="flex items-center gap-3 text-[11px]">
+          <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-5 rounded-full bg-orange-400 inline-block" /> Max °C</span>
+          <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-5 rounded-full bg-blue-400 inline-block" /> Min °C</span>
+          <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent</span>
+          <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-4 bg-blue-500/80 inline-block rounded-sm" /> Pluie</span>
         </div>
       </div>
 
