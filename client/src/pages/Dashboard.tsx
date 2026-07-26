@@ -6,6 +6,7 @@ import {
 import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun, FlaskConical, Radio } from "lucide-react";
 import { Link } from "wouter";
 import { FavoritesBar } from "@/components/FavoritesBar";
+import FifteenDayChart from "@/components/FifteenDayChart";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 
@@ -654,52 +655,12 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ── 15-day chart ── */}
-        <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-3">
-          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2 flex-wrap">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            Températures — 15 jours
-            {activeLocation && <span className="text-xs text-primary/70 font-normal">· {activeLocation.name}</span>}
-          </h2>
+        {/* ── 15-day chart enriched ── */}
+        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
           {f15Loading ? (
-            <div className="h-40 bg-muted rounded-xl animate-pulse" />
-          ) : chartData.length > 0 ? (
-            <>
-              <div style={{ height: 160 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="maxG" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="minG" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={1} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} unit="°" />
-                    <Tooltip content={<TempTooltip />} />
-                    <Area type="monotone" dataKey="Max" stroke="#f97316" strokeWidth={2} fill="url(#maxG)" dot={false} />
-                    <Area type="monotone" dataKey="Min" stroke="#60a5fa" strokeWidth={2} fill="url(#minG)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              {chartData.some(d => (d.Précip ?? 0) > 0) && (
-                <div style={{ height: 48 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 0, right: 5, left: -25, bottom: 0 }}>
-                      <XAxis dataKey="name" tick={false} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} unit="mm" />
-                      <Tooltip formatter={(v: any) => [`${v} mm`, "Précip."]} />
-                      <Bar dataKey="Précip" fill="#60a5fa" opacity={0.7} radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </>
+            <div className="h-72 bg-muted rounded-xl animate-pulse" />
+          ) : days.length > 0 ? (
+            <FifteenDayChart days={days} locationName={activeLocation?.name} />
           ) : null}
         </div>
 

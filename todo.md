@@ -144,3 +144,13 @@
 - [x] Conserver simulation pour les 8 autres modèles publics (AccuWeather, Apple Weather, etc.)
 - [x] TypeScript clean + 47 tests passent
 - [x] Checkpoint final
+
+## Graphique enrichi Températures & Météo 15 jours
+- [x] Frontend: Créer FifteenDayChart.tsx — graphique Canvas avec courbes Max/Min + valeurs sur points
+- [x] Frontend: Zones colorées contextuelles (canicule rouge, orage violet) selon WMO code
+- [x] Frontend: Ligne de vent en pointillés verts avec flèches directionnelles et valeurs
+- [x] Frontend: Barres de précipitations bleues avec valeurs mm
+- [x] Frontend: Icônes météo SVG entre barres précip et jours de la semaine
+- [x] Frontend: Panneau déroulant au clic sur un jour (ressenti, UV, humidité, vent+direction, confiance, Matin/AM/Soir)
+- [x] Frontend: Intégrer FifteenDayChart dans Dashboard.tsx en remplacement de la section existante
+- [x] TypeScript clean + 47 tests passent
