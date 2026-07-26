@@ -230,6 +230,8 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [animated, setAnimated] = useState(false);
+  const [animProgress, setAnimProgress] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const displayDays = days.slice(0, 15);
@@ -269,21 +271,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const tempToY = useCallback((t: number) => tempZoneTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempZoneTop), [scaleBot, scaleRange, tempZoneTop, tempZoneBot]);
   const windToY = useCallback((w: number) => windZoneTop + (1 - w / maxWind) * (windZoneBot - windZoneTop), [maxWind, windZoneTop, windZoneBot]);
   const colX = useCallback((i: number) => i * COL_W + COL_W / 2, []);
-
-  // ── Wind & Precip scale ticks ───────────────────────────────────────────────
-  const windTicks = useMemo(() => {
-    const step = maxWind > 40 ? 20 : maxWind > 20 ? 10 : 5;
-    const ticks: number[] = [];
-    for (let v = 0; v <= maxWind; v += step) ticks.push(v);
-    return ticks;
-  }, [maxWind]);
-
-  const precipTicks = useMemo(() => {
-    const step = maxPrecip > 10 ? 5 : maxPrecip > 4 ? 2 : 1;
-    const ticks: number[] = [];
-    for (let v = 0; v <= maxPrecip; v += step) ticks.push(v);
-    return ticks;
-  }, [maxPrecip]);
 
   // ── Draw scrollable canvas ──────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -364,8 +351,8 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     });
 
     // ── Animation progress ───────────────────────────────────────────────────
-    const progress = animated ? 1 : 0;
-    const visibleN = Math.ceil(N * progress) || N;
+    const progress = animated ? 1 : animProgress;
+    const visibleN = Math.max(1, Math.ceil(N * progress));
 
     // ── Max curve (orange) ───────────────────────────────────────────────────
     const maxPts = displayDays.slice(0, visibleN).map((d, i) => ({ x: colX(i), y: tempToY(d.tempMax ?? 0) }));
@@ -505,7 +492,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillStyle = today ? "#a5b4fc" : "rgba(107, 114, 128, 0.7)";
       ctx.fillText(line2, x, lblY + 24);
     });
-  }, [displayDays, N, selectedDay, animated, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, maxWind, tempToY, windToY, colX, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
+  }, [displayDays, N, selectedDay, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, maxWind, tempToY, windToY, colX, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
 
   // ── Resize observer ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -517,13 +504,40 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // ── Animation trigger ───────────────────────────────────────────────────────
+  // ── Animation trigger (progressive draw) ────────────────────────────────────
   useEffect(() => {
     if (N > 0 && !animated) {
-      const t = setTimeout(() => setAnimated(true), 100);
+      let start: number | null = null;
+      const duration = 1200; // ms
+      const step = (ts: number) => {
+        if (!start) start = ts;
+        const elapsed = ts - start;
+        const p = Math.min(elapsed / duration, 1);
+        // Ease-out cubic
+        const eased = 1 - Math.pow(1 - p, 3);
+        setAnimProgress(eased);
+        if (p < 1) {
+          requestAnimationFrame(step);
+        } else {
+          setAnimated(true);
+        }
+      };
+      const t = setTimeout(() => requestAnimationFrame(step), 150);
       return () => clearTimeout(t);
     }
   }, [N, animated]);
+
+  // ── Scroll progress tracker ─────────────────────────────────────────────────
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      if (maxScroll > 0) setScrollProgress(el.scrollLeft / maxScroll);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -565,24 +579,12 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
       {/* ── Chart area: fixed axis + scrollable content ───────────────────── */}
       <div className="flex" style={{ height: TOTAL_H }}>
-        {/* Fixed left axis */}
+        {/* Fixed left axis — only temperature scale */}
         <div className="flex-shrink-0 relative" style={{ width: AXIS_W, height: TOTAL_H }}>
-          {/* Temp scale */}
           <span className="absolute text-[9px] text-slate-500 font-bold" style={{ top: 0, left: 2 }}>°C</span>
           {tempTicks.map(t => (
             <span key={`t-${t}`} className="absolute text-[11px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 6 }}>{t}°</span>
           ))}
-          {/* Wind scale */}
-          <span className="absolute text-[8px] text-green-500/70 font-bold" style={{ top: windZoneTop - 10, left: 0 }}>km/h</span>
-          {windTicks.map(v => (
-            <span key={`w-${v}`} className="absolute text-[9px] text-green-400/60 right-1" style={{ top: windToY(v) - 5 }}>{v}</span>
-          ))}
-          {/* Precip scale */}
-          <span className="absolute text-[8px] text-blue-400/70 font-bold" style={{ top: precipZoneTop - 10, left: 0 }}>mm</span>
-          {precipTicks.map(v => {
-            const y = precipZoneBot - (v / maxPrecip) * (precipZoneBot - precipZoneTop);
-            return <span key={`p-${v}`} className="absolute text-[9px] text-blue-400/60 right-1" style={{ top: y - 5 }}>{v}</span>;
-          })}
         </div>
 
         {/* Scrollable chart */}
@@ -603,6 +605,22 @@ export default function FifteenDayChart({ days, locationName }: Props) {
           </div>
         </div>
       </div>
+
+      {/* ── Scroll progress bar ────────────────────────────────────────── */}
+      {N > 7 && (
+        <div className="mt-2 mx-auto" style={{ width: "50%", maxWidth: 160 }}>
+          <div className="h-[3px] rounded-full bg-slate-700/40 relative overflow-hidden">
+            <div
+              className="absolute h-full rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 transition-transform duration-100"
+              style={{
+                width: `${(7 / N) * 100}%`,
+                transform: `translateX(${scrollProgress * ((N / 7) - 1) * 100}%)`
+              }}
+            />
+          </div>
+          <p className="text-center text-[9px] text-slate-500 mt-1">← Glissez →</p>
+        </div>
+      )}
 
       {/* ── AI Analysis ───────────────────────────────────────────────────── */}
       <AIAnalysis days={displayDays} />
