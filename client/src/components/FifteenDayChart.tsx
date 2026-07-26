@@ -227,6 +227,26 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, totalW, TOTAL_H);
 
+    // ── Background gradient (subtle red/blue like reference) ─────────────────
+    const bgGrad = ctx.createLinearGradient(PAD_L, 0, totalW - PAD_R, 0);
+    bgGrad.addColorStop(0, "rgba(220, 38, 38, 0.04)");
+    bgGrad.addColorStop(0.3, "rgba(139, 92, 246, 0.03)");
+    bgGrad.addColorStop(0.7, "rgba(59, 130, 246, 0.02)");
+    bgGrad.addColorStop(1, "rgba(15, 23, 42, 0.01)");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(PAD_L, 0, totalW - PAD_L - PAD_R, CHART_H);
+
+    // ── Vertical separator lines between days (thin, subtle) ─────────────────
+    for (let i = 1; i < N; i++) {
+      const x = PAD_L + i * colW;
+      ctx.beginPath();
+      ctx.moveTo(x, PAD_T);
+      ctx.lineTo(x, CHART_H);
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.07)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
     // ── Context zones ────────────────────────────────────────────────────────
     displayDays.forEach((d, i) => {
       const x = colX(i) - colW / 2;
