@@ -763,7 +763,7 @@ export const weatherRouter = router({
         condition: z.string().nullable().optional(),
       })).optional(),
     }).optional())
-    .query(async ({ input }) => {
+    .mutation(async ({ input }) => {
       const today = getTodayParis();
       const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 

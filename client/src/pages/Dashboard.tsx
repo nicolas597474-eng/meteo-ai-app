@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import FifteenDayChart from "@/components/FifteenDayChart";
@@ -232,9 +232,25 @@ export default function Dashboard() {
     })),
   }), [coordsInput.lat, coordsInput.lon, hourly?.hours]);
 
-  const { data: daySummary, isFetching: summaryFetching, refetch: refetchSummary } = trpc.weather.getDaySummary.useQuery(
-    summaryInput, { staleTime: 10 * 60 * 1000, enabled: !!hourly?.hours }
-  );
+  const summaryMutation = trpc.weather.getDaySummary.useMutation();
+  const [daySummary, setDaySummary] = useState<{ morning: string | null; afternoon: string | null; night: string | null } | null>(null);
+  const summaryFetching = summaryMutation.isPending;
+
+  // Reset summary when location changes
+  useEffect(() => {
+    setDaySummary(null);
+  }, [coordsInput.lat, coordsInput.lon]);
+
+  // Auto-fetch summary when hourly data becomes available
+  useEffect(() => {
+    if (hourly?.hours && hourly.hours.length > 0 && !daySummary && !summaryMutation.isPending) {
+      summaryMutation.mutateAsync(summaryInput).then(setDaySummary).catch(() => {});
+    }
+  }, [hourly?.hours?.length, coordsInput.lat, coordsInput.lon, daySummary]);
+
+  const refetchSummary = useCallback(() => {
+    summaryMutation.mutateAsync(summaryInput).then(setDaySummary).catch(() => {});
+  }, [summaryInput]);
 
   // Loading: wait for MeteoAI (dash or locationWeather) + 15-day + hourly
   const isLoading = (activeLocation ? locLoading : dashLoading) && f15Loading && hourlyLoading;

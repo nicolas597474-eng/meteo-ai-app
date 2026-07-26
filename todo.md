@@ -201,3 +201,7 @@
 
 ## Bouton actualisation résumé IA
 - [x] Ajouter bouton RefreshCw à côté du titre résumé IA avec refetch + animation spin pendant le chargement
+
+## Bugs signalés - favoris + graphique horaire
+- [x] Bug: Les lieux favoris ne s'affichent plus dans le Dashboard (session expirée — reconnecter)
+- [x] Bug: Le graphique heure par heure disparaît quand le résumé IA est affiché (getDaySummary changé en mutation POST)
