@@ -232,9 +232,11 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const [animated, setAnimated] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [viewMode, setViewMode] = useState<7 | 15>(7);
   const containerRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
-  const displayDays = days.slice(0, 15);
+  const displayDays = days.slice(0, viewMode);
   const N = displayDays.length;
 
   // ── Layout constants ────────────────────────────────────────────────────────
@@ -558,12 +560,24 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
   return (
     <div ref={containerRef} className="w-full">
-      {/* ── Header (3 lines) ──────────────────────────────────────────────── */}
+      {/* Header with toggle */}
       <div className="mb-2">
-        <h2 className="text-sm font-semibold flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-primary" />
-          <span>Températures &amp; Météo — 15 jours</span>
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <span>Températures & Météo</span>
+          </h2>
+          <div className="flex items-center bg-slate-800/80 rounded-full p-0.5 border border-slate-700/50">
+            <button
+              onClick={() => setViewMode(7)}
+              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 7 ? 'bg-indigo-500/90 text-white shadow-sm shadow-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+            >7 jours</button>
+            <button
+              onClick={() => setViewMode(15)}
+              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 15 ? 'bg-indigo-500/90 text-white shadow-sm shadow-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+            >15 jours</button>
+          </div>
+        </div>
         {locationName && (
           <p className="text-[11px] text-primary/70 flex items-center gap-1 mt-0.5">
             <MapPin className="h-3 w-3" /> {locationName}
@@ -608,17 +622,30 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
       {/* ── Scroll progress bar ────────────────────────────────────────── */}
       {N > 7 && (
-        <div className="mt-2 mx-auto" style={{ width: "50%", maxWidth: 160 }}>
-          <div className="h-[3px] rounded-full bg-slate-700/40 relative overflow-hidden">
+        <div className="mt-2 mx-auto" style={{ width: "60%", maxWidth: 200 }}>
+          <div
+            ref={progressBarRef}
+            className="h-[6px] rounded-full bg-slate-700/40 relative cursor-pointer group"
+            onClick={(e) => {
+              const bar = progressBarRef.current;
+              const scroll = scrollRef.current;
+              if (!bar || !scroll) return;
+              const rect = bar.getBoundingClientRect();
+              const clickX = e.clientX - rect.left;
+              const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+              const maxScroll = scroll.scrollWidth - scroll.clientWidth;
+              scroll.scrollTo({ left: ratio * maxScroll, behavior: 'smooth' });
+            }}
+          >
             <div
-              className="absolute h-full rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 transition-transform duration-100"
+              className="absolute h-full rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 transition-transform duration-150 group-hover:from-indigo-300 group-hover:to-purple-300"
               style={{
                 width: `${(7 / N) * 100}%`,
                 transform: `translateX(${scrollProgress * ((N / 7) - 1) * 100}%)`
               }}
             />
           </div>
-          <p className="text-center text-[9px] text-slate-500 mt-1">← Glissez →</p>
+          <p className="text-center text-[9px] text-slate-500 mt-1">Cliquez ou glissez pour naviguer</p>
         </div>
       )}
 

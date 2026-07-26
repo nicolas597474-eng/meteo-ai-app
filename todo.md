@@ -173,3 +173,9 @@
 - [x] Frontend: Panneau détaillé enrichi : Température, Ressenti, Vent, Direction, Précipitations, Humidité, UV, Nébulosité, Lever/Coucher soleil, Confiance avec barre de progression
 - [x] Frontend: Design glassmorphism (bg-gradient, backdrop-blur, border-white/10)
 - [x] TypeScript clean + 47 tests passent
+
+## Toggle 7j/15j + Barre de progression cliquable
+- [x] Frontend: Toggle 7j/15j au-dessus du graphique (boutons pill actif/inactif)
+- [x] Frontend: Barre de progression cliquable — clic positionne le scroll au jour correspondant
+- [x] Frontend: Barre de progression agrandie (6px) avec hover effect et texte "Cliquez ou glissez"
+- [x] TypeScript clean + 47 tests passent
