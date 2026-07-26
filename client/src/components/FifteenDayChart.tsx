@@ -250,25 +250,29 @@ function DayDetailPanel({ day, onClose }: { day: DayData; onClose: () => void })
 export default function FifteenDayChart({ days, locationName }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [canvasWidth, setCanvasWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
 
-  // Canvas dimensions
-  const CHART_HEIGHT = 200; // area for temp curves + wind line
-  const PRECIP_HEIGHT = 48; // precipitation bars
-  const ICON_HEIGHT = 36;   // weather icons row
-  const LABEL_HEIGHT = 36;  // date labels
+  // Canvas dimensions — taller for better readability
+  const CHART_HEIGHT = 280; // area for temp curves + wind line (was 200)
+  const PRECIP_HEIGHT = 56; // precipitation bars (was 48)
+  const ICON_HEIGHT = 40;   // weather icons row (was 36)
+  const LABEL_HEIGHT = 42;  // date labels (was 36)
   const TOTAL_HEIGHT = CHART_HEIGHT + PRECIP_HEIGHT + ICON_HEIGHT + LABEL_HEIGHT;
   const PADDING_LEFT = 36;
-  const PADDING_RIGHT = 12;
-  const PADDING_TOP = 28;
-  const PADDING_BOTTOM = 8;
+  const PADDING_RIGHT = 16;
+  const PADDING_TOP = 32;
+  const PADDING_BOTTOM = 10;
 
   const displayDays = days.slice(0, 15);
   const N = displayDays.length;
 
-  // Compute column width
-  const colWidth = N > 0 ? (canvasWidth - PADDING_LEFT - PADDING_RIGHT) / N : 0;
+  // Fixed column width: show 7 days in the visible area
+  const VISIBLE_DAYS = 7;
+  const colWidth = containerWidth > 0 ? (containerWidth - PADDING_LEFT - PADDING_RIGHT) / VISIBLE_DAYS : 0;
+  // Total canvas width = enough for all N days
+  const canvasWidth = PADDING_LEFT + PADDING_RIGHT + colWidth * N;
 
   // Temperature range
   const allMax = displayDays.map(d => d.tempMax ?? 0).filter(v => v != null);
@@ -514,16 +518,16 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
   }, [canvasWidth, displayDays, selectedDay, N, colX, colWidth, tempToY, windToY, tPadded, tMax, tRange, maxPrecip, maxWind, CHART_HEIGHT, PRECIP_HEIGHT, ICON_HEIGHT, LABEL_HEIGHT, TOTAL_HEIGHT, PADDING_LEFT, PADDING_RIGHT, PADDING_TOP, PADDING_BOTTOM]);
 
-  // Resize observer
+  // Resize observer — track the outer container width (viewport)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const ro = new ResizeObserver(entries => {
       const w = entries[0].contentRect.width;
-      setCanvasWidth(w);
+      setContainerWidth(w);
     });
     ro.observe(container);
-    setCanvasWidth(container.clientWidth);
+    setContainerWidth(container.clientWidth);
     return () => ro.disconnect();
   }, []);
 
@@ -558,35 +562,50 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         </div>
       </div>
 
-      {/* Canvas wrapper */}
-      <div ref={containerRef} className="w-full relative" style={{ minHeight: TOTAL_HEIGHT }}>
-        {/* Weather icons row — rendered as HTML over canvas */}
-        {canvasWidth > 0 && N > 0 && (
-          <div
-            className="absolute left-0 right-0 flex"
-            style={{ top: CHART_HEIGHT + PRECIP_HEIGHT, height: ICON_HEIGHT, paddingLeft: PADDING_LEFT, paddingRight: PADDING_RIGHT }}
-          >
-            {displayDays.map((d, i) => {
-              const cond = d.condition ?? wmoToCondition(null, d.cloudCover, d.precipitation);
-              return (
-                <div
-                  key={d.date}
-                  className="flex items-center justify-center cursor-pointer"
-                  style={{ width: colWidth, flexShrink: 0 }}
-                  onClick={() => setSelectedDay(prev => prev === i ? null : i)}
-                >
-                  <WeatherIconSVG condition={cond} size={Math.min(28, colWidth * 0.7)} />
-                </div>
-              );
-            })}
-          </div>
-        )}
+      {/* Scroll hint */}
+      {N > VISIBLE_DAYS && (
+        <p className="text-xs text-muted-foreground/60 mb-1 text-right">← Glissez pour voir les jours suivants →</p>
+      )}
 
-        <canvas
-          ref={canvasRef}
-          style={{ width: "100%", height: TOTAL_HEIGHT, cursor: "pointer", display: "block" }}
-          onClick={handleCanvasClick}
-        />
+      {/* Outer container for measuring available width */}
+      <div ref={containerRef} className="w-full">
+        {/* Scrollable wrapper */}
+        <div
+          ref={scrollRef}
+          className="overflow-x-auto scrollbar-hide relative"
+          style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
+        >
+          {/* Inner content with fixed total width */}
+          <div className="relative" style={{ width: canvasWidth, minHeight: TOTAL_HEIGHT }}>
+            {/* Weather icons row — rendered as HTML over canvas */}
+            {canvasWidth > 0 && N > 0 && (
+              <div
+                className="absolute flex"
+                style={{ top: CHART_HEIGHT + PRECIP_HEIGHT, height: ICON_HEIGHT, left: PADDING_LEFT, width: colWidth * N }}
+              >
+                {displayDays.map((d, i) => {
+                  const cond = d.condition ?? wmoToCondition(null, d.cloudCover, d.precipitation);
+                  return (
+                    <div
+                      key={d.date}
+                      className="flex items-center justify-center cursor-pointer"
+                      style={{ width: colWidth, flexShrink: 0 }}
+                      onClick={() => setSelectedDay(prev => prev === i ? null : i)}
+                    >
+                      <WeatherIconSVG condition={cond} size={Math.min(32, colWidth * 0.6)} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <canvas
+              ref={canvasRef}
+              style={{ width: canvasWidth, height: TOTAL_HEIGHT, cursor: "pointer", display: "block" }}
+              onClick={handleCanvasClick}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Detail panel */}

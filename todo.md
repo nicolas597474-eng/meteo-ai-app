@@ -154,3 +154,10 @@
 - [x] Frontend: Panneau déroulant au clic sur un jour (ressenti, UV, humidité, vent+direction, confiance, Matin/AM/Soir)
 - [x] Frontend: Intégrer FifteenDayChart dans Dashboard.tsx en remplacement de la section existante
 - [x] TypeScript clean + 47 tests passent
+
+## Amélioration lisibilité graphique 15 jours
+- [x] Frontend: Agrandir le graphique (CHART_HEIGHT 280, PRECIP 56, ICON 40, LABEL 42)
+- [x] Frontend: Scroll horizontal tactile — 7 jours visibles, glisser pour les 8 suivants
+- [x] Frontend: Colonnes plus larges (largeur fixe basée sur viewport / 7)
+- [x] Frontend: Hint "← Glissez pour voir les jours suivants →"
+- [x] TypeScript clean + 47 tests passent
