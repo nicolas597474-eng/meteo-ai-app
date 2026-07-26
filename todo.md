@@ -134,3 +134,13 @@
 - [x] Frontend: Dashboard — Températures 15 jours change selon le lieu actif (get15DayForecast avec coordsInput)
 - [x] Frontend: Dashboard — Prévisions 15 jours change selon le lieu actif (get15DayForecast avec coordsInput)
 - [x] Frontend: Nom du lieu actif affiché dans chaque section (MeteoAI, Heure par heure, Températures 15j, Prévisions 15j)
+
+## Vraies APIs météo publiques (avec fallback gracieux)
+- [x] Créer server/realWeatherAPIs.ts — adaptateurs OpenWeatherMap + Météo-France
+- [x] OpenWeatherMap: endpoint /data/2.5/forecast (5j/3h), agrégation journalière, fallback si clé absente
+- [x] Météo-France: OAuth2 portail + fallback Open-Meteo ARPEGE/AROME (sans authentification)
+- [x] Ajouter OPENWEATHERMAP_API_KEY et METEOFRANCE_API_KEY dans server/_core/env.ts
+- [x] Intégrer realWeatherAPIs dans collectFavoritesForecastsHandler — remplacer generatePublicServiceForecasts pour OWM et MF
+- [x] Conserver simulation pour les 8 autres modèles publics (AccuWeather, Apple Weather, etc.)
+- [x] TypeScript clean + 47 tests passent
+- [x] Checkpoint final

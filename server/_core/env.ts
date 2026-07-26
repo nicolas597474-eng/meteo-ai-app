@@ -7,4 +7,7 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // External weather APIs (optional — fallback to simulation if absent)
+  openWeatherMapApiKey: process.env.OPENWEATHERMAP_API_KEY ?? "",
+  meteoFranceApiKey: process.env.METEOFRANCE_API_KEY ?? "",
 };

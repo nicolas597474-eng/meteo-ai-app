@@ -9,6 +9,7 @@ import { sdk } from "./_core/sdk";
 import { notifyOwner } from "./_core/notification";
 import { invokeLLM } from "./_core/llm";
 import { collectExpertForecasts, collectObservations, WEATHER_SERVICES } from "./weatherServices";
+import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "./statsEngine";
 import {
   insertForecasts,
@@ -91,7 +92,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       await insertForecasts(forecastRows);
 
       // Also insert public service entries
-      const publicForecasts = generatePublicServiceForecasts(expertData, today, defaultLocKey);
+      const publicForecasts = await generatePublicServiceForecasts(expertData, today, defaultLocKey);
       if (publicForecasts.length > 0) {
         await insertForecasts(publicForecasts);
       }
@@ -407,20 +408,79 @@ export async function collectObservationsHandler(req: Request, res: Response) {
 }
 
 /**
- * Generate simulated public service forecasts based on expert model data.
- * In production, these would come from actual API calls.
- * Here we add realistic variations to the best_match model.
+ * Generate public service forecasts.
+ * - OpenWeatherMap et Météo-France : vraies APIs si clé présente, sinon simulation.
+ * - Autres services publics : simulation basée sur Open-Meteo best_match.
  */
-function generatePublicServiceForecasts(expertData: any[], date: string, locationKey = "default") {
+async function generatePublicServiceForecasts(
+  expertData: any[],
+  date: string,
+  locationKey = "default",
+  lat?: number,
+  lon?: number
+): Promise<any[]> {
   const bestMatch = expertData.find((d) => d.serviceName === "Open-Meteo");
   if (!bestMatch) return [];
 
-  return WEATHER_SERVICES.public.map((service) => {
-    // Add small random variations to simulate different service predictions
-    const variation = () => (Math.random() - 0.5) * 2; // ±1°C
-    const precipVar = () => Math.max(0, (Math.random() - 0.3) * 3); // 0-2mm variation
-    const windVar = () => (Math.random() - 0.5) * 6; // ±3 km/h
+  // Tenter les vraies APIs si coordonnées disponibles
+  let realOwm: any = null;
+  let realMf: any = null;
+  if (lat !== undefined && lon !== undefined) {
+    try {
+      const real = await fetchRealPublicForecasts(date, lat, lon);
+      realOwm = real.owm;
+      realMf = real.mf;
+      if (realOwm) console.log(`[MeteoAI] ✅ OpenWeatherMap real data for ${lat},${lon}`);
+      if (realMf) console.log(`[MeteoAI] ✅ Météo-France real data for ${lat},${lon}`);
+    } catch (e: any) {
+      console.warn(`[MeteoAI] Real APIs fetch failed: ${e.message}`);
+    }
+  }
 
+  const variation = () => (Math.random() - 0.5) * 2;
+  const precipVar = () => Math.max(0, (Math.random() - 0.3) * 3);
+  const windVar = () => (Math.random() - 0.5) * 6;
+
+  return WEATHER_SERVICES.public.map((service) => {
+    // OpenWeatherMap — utiliser les vraies données si disponibles
+    if (service.name === "OpenWeatherMap" && realOwm) {
+      return {
+        locationKey,
+        date,
+        serviceName: service.name,
+        serviceCategory: service.category,
+        tempMax: realOwm.tempMax,
+        tempMin: realOwm.tempMin,
+        precipitation: realOwm.precipitation,
+        windSpeed: realOwm.windSpeed,
+        windGust: realOwm.windGust,
+        humidity: realOwm.humidity,
+        cloudCover: realOwm.cloudCover,
+        condition: realOwm.condition,
+        rawData: null, // ne pas stocker le payload complet
+      };
+    }
+
+    // Météo-France — utiliser les vraies données si disponibles
+    if ((service.name === "Météo-France" || service.name === "Meteo-France") && realMf) {
+      return {
+        locationKey,
+        date,
+        serviceName: service.name,
+        serviceCategory: service.category,
+        tempMax: realMf.tempMax,
+        tempMin: realMf.tempMin,
+        precipitation: realMf.precipitation,
+        windSpeed: realMf.windSpeed,
+        windGust: realMf.windGust,
+        humidity: realMf.humidity,
+        cloudCover: realMf.cloudCover,
+        condition: realMf.condition,
+        rawData: null,
+      };
+    }
+
+    // Autres services publics — simulation basée sur Open-Meteo best_match
     return {
       locationKey,
       date,
@@ -550,8 +610,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           condition: f.condition,
           rawData: f.rawData as any,
         }));
-        // Also add public service simulations
-        const publicRowsForLoc = generatePublicServiceForecasts(expertData, today, locKey);
+        // Also add public service forecasts (real APIs when keys available, simulation otherwise)
+        const publicRowsForLoc = await generatePublicServiceForecasts(expertData, today, locKey, fav.lat, fav.lon);
         await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);
 
         // Generate MeteoAI synthesis using location-specific reliability
