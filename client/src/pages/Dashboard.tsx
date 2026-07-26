@@ -218,9 +218,22 @@ export default function Dashboard() {
   const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
-  // AI Day Summary — 3 phrases
+  // AI Day Summary — 3 phrases (only fires after hourly data is loaded)
+  const summaryInput = useMemo(() => ({
+    lat: coordsInput.lat,
+    lon: coordsInput.lon,
+    hourlyData: hourly?.hours?.map(h => ({
+      hour: h.hour,
+      temp: h.temp,
+      apparentTemp: h.apparentTemp ?? null,
+      precipitation: h.precipitation,
+      windSpeed: h.windSpeed,
+      condition: h.condition ?? null,
+    })),
+  }), [coordsInput.lat, coordsInput.lon, hourly?.hours]);
+
   const { data: daySummary, isFetching: summaryFetching, refetch: refetchSummary } = trpc.weather.getDaySummary.useQuery(
-    coordsInput, { staleTime: 10 * 60 * 1000 }
+    summaryInput, { staleTime: 10 * 60 * 1000, enabled: !!hourly?.hours }
   );
 
   // Loading: wait for MeteoAI (dash or locationWeather) + 15-day + hourly
