@@ -1,12 +1,9 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
-} from "recharts";
-import { Droplets, Wind, Activity, MapPin, Clock, TrendingUp, Eye, Thermometer, Sun, FlaskConical, Radio } from "lucide-react";
-import { Link } from "wouter";
+import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import FifteenDayChart from "@/components/FifteenDayChart";
+import HourlyChart from "@/components/HourlyChart";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 
@@ -120,41 +117,7 @@ function stabilityColor(i: number) {
   if (i >= 40) return "text-orange-400";
   return "text-red-400";
 }
-function stabilityBg(i: number) {
-  if (i >= 80) return "bg-emerald-500/10 border-emerald-500/20";
-  if (i >= 60) return "bg-yellow-500/10 border-yellow-500/20";
-  if (i >= 40) return "bg-orange-500/10 border-orange-500/20";
-  return "bg-red-500/10 border-red-500/20";
-}
 
-function dayLabel(dateStr: string) {
-  const d = new Date(dateStr + "T12:00:00");
-  const today = new Date().toLocaleDateString("en-CA");
-  const tom = new Date(); tom.setDate(tom.getDate() + 1);
-  if (dateStr === today) return "Auj.";
-  if (dateStr === tom.toLocaleDateString("en-CA")) return "Dem.";
-  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
-}
-function dayFull(dateStr: string) {
-  const d = new Date(dateStr + "T12:00:00");
-  const today = new Date().toLocaleDateString("en-CA");
-  const tom = new Date(); tom.setDate(tom.getDate() + 1);
-  if (dateStr === today) return "Aujourd'hui";
-  if (dateStr === tom.toLocaleDateString("en-CA")) return "Demain";
-  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" });
-}
-
-function TempTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-lg p-2 text-xs shadow-lg">
-      <p className="font-semibold mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color }}>{p.name === "Max" ? "↑" : "↓"} {p.value}°C</p>
-      ))}
-    </div>
-  );
-}
 
 function getStoredLocation(): { lat: number; lon: number; name: string; radiusKm?: number } | null {
   try {
@@ -296,7 +259,6 @@ export default function Dashboard() {
   // 15-day and hourly always use their dedicated location-aware endpoints
   const days: any[] = f15?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
-  const futureDays = days.slice(1);
   const hours: any[] = hourly?.hours ?? (lw ? lw.hourly : []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const regime = lw
@@ -308,13 +270,6 @@ export default function Dashboard() {
         weights: (lw.scores as any).regimeWeights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
       }
     : dash?.regime;
-
-  const chartData = days.map((d: any) => ({
-    name: dayLabel(d.date),
-    Max: d.tempMax,
-    Min: d.tempMin,
-    Précip: d.precipitation,
-  }));
 
   // Current temperature from hourly (closest to now)
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
@@ -600,56 +555,13 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── AI Lab CTA ── */}
-        <Link href="/ai-lab">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-primary/15 to-purple-500/10 border border-primary/30 cursor-pointer hover:border-primary/50 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <FlaskConical className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold">Weather AI Lab</div>
-                <div className="text-xs text-muted-foreground">Transparence totale · Sources · Formule · Replay IA</div>
-              </div>
-            </div>
-            <div className="text-xs text-primary font-medium">Voir →</div>
-          </div>
-        </Link>
 
-        {/* ── Hourly ── */}
-        <div className="space-y-2">
-          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2 flex-wrap">
-            <Clock className="h-4 w-4 text-primary" />
-            Heure par heure
-            {activeLocation && <span className="text-xs text-primary/70 font-normal">· {activeLocation.name}</span>}
-          </h2>
+                {/* Hourly Chart */}
+        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
           {hourlyLoading ? (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="animate-pulse flex-shrink-0 w-16 h-24 bg-muted rounded-xl" />
-              ))}
-            </div>
+            <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
-            <div className="flex gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
-              {hours.map((h) => {
-                const isCurrent = h.hour === nowHour;
-                return (
-                  <div key={h.hour} className={`flex-shrink-0 w-16 sm:w-20 rounded-xl p-2 sm:p-3 text-center border ${
-                    isCurrent ? "bg-primary/20 border-primary/40 ring-1 ring-primary/30" : "bg-card border-border"
-                  }`}>
-                    <p className={`text-xs font-medium mb-1.5 ${isCurrent ? "text-primary" : "text-muted-foreground"}`}>{h.hour}</p>
-                    <div className="flex justify-center mb-1.5">
-                      <WeatherIcon condition={h.condition} size={24} />
-                    </div>
-                    <p className="text-sm font-bold">{h.temp != null ? `${Math.round(h.temp)}°` : "—"}</p>
-                    {(h.precipitation ?? 0) > 0 && (
-                      <p className="text-xs text-blue-400 mt-0.5">{h.precipitation}mm</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-0.5">{h.windSpeed}km/h</p>
-                  </div>
-                );
-              })}
-            </div>
+            <HourlyChart hours={hours} locationName={activeLocation?.name} />
           ) : (
             <p className="text-sm text-muted-foreground">Données horaires indisponibles.</p>
           )}
@@ -663,81 +575,6 @@ export default function Dashboard() {
             <FifteenDayChart days={days} locationName={activeLocation?.name} />
           ) : null}
         </div>
-
-        {/* ── 15-day cards ── */}
-        <div className="space-y-2">
-          <h2 className="text-sm sm:text-base font-semibold flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            Prévisions 15 jours
-            <span className="text-xs text-muted-foreground font-normal">{f15?.modelsUsed?.length ?? 0} modèles</span>
-            {activeLocation && <span className="text-xs text-primary/70 font-normal ml-1">· {activeLocation.name}</span>}
-          </h2>
-          {f15Loading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="animate-pulse h-36 bg-muted rounded-xl" />
-              ))}
-            </div>
-          ) : futureDays.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-              {futureDays.map((day) => (
-                <div key={day.date} className={`rounded-xl p-2.5 sm:p-3 border ${stabilityBg(day.stabilityIndex)}`}>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1.5 truncate">{dayFull(day.date)}</p>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <WeatherIcon condition={day.condition} size={28} />
-                    <div>
-                      <p className="text-base sm:text-lg font-bold leading-none">{day.tempMax}°</p>
-                      <p className="text-xs text-muted-foreground">{day.tempMin}°</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-1.5 truncate">{day.condition}</p>
-                  <div className="space-y-0.5 text-xs">
-                    {(day.precipitation ?? 0) > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-blue-400">Précip</span>
-                        <span className="text-blue-400 font-medium">{day.precipitation}mm</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Vent</span>
-                      <span>{day.windSpeed}km/h</span>
-                    </div>
-                    <div className="flex justify-between pt-1 border-t border-border/40">
-                      <span className="text-muted-foreground">Conf.</span>
-                      <span className={`font-bold ${stabilityColor(day.stabilityIndex)}`}>{day.stabilityIndex}%</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Chargement des prévisions...</p>
-          )}
-        </div>
-
-        {/* ── Top models ── */}
-        {(dash?.topServices?.length ?? 0) > 0 && (
-          <div className="bg-card border border-border rounded-xl p-4">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              Classement des modèles
-            </h3>
-            <div className="space-y-2">
-              {dash!.topServices.map((s, i) => (
-                <div key={s.serviceName} className="flex items-center gap-2.5">
-                  <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    i === 0 ? "bg-yellow-500/20 text-yellow-400" :
-                    i === 1 ? "bg-gray-400/20 text-gray-300" :
-                    i === 2 ? "bg-orange-600/20 text-orange-400" :
-                    "bg-muted text-muted-foreground"
-                  }`}>{i + 1}</span>
-                  <span className="text-sm flex-1 truncate">{s.serviceName}</span>
-                  <span className="text-sm font-mono text-primary">{(s.avgScore ?? 0).toFixed(1)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
       </div>
     </div>

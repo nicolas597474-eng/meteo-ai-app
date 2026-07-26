@@ -179,3 +179,11 @@
 - [x] Frontend: Barre de progression cliquable — clic positionne le scroll au jour correspondant
 - [x] Frontend: Barre de progression agrandie (6px) avec hover effect et texte "Cliquez ou glissez"
 - [x] TypeScript clean + 47 tests passent
+
+## Graphique heure par heure Canvas + nettoyage Dashboard
+- [x] Frontend: Créer HourlyChart.tsx — graphique Canvas similaire au 15 jours (courbes temp, vent, précip, icônes, scroll horizontal)
+- [x] Frontend: Supprimer section Weather AI Lab du Dashboard
+- [x] Frontend: Supprimer section Prévisions 15 jours en tableau (cards) du Dashboard
+- [x] Frontend: Supprimer section Classement des modèles du Dashboard
+- [x] Frontend: Intégrer HourlyChart dans le Dashboard à la place de la section heure par heure actuelle
+- [x] TypeScript clean + tests passent
