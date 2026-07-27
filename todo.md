@@ -194,14 +194,3 @@
 
 ## Harmonisation températures avec 1 décimale
 - [x] Dashboard héro : afficher currentTemp, tempMax, tempMin, apparentTemp avec toFixed(1) au lieu de Math.round
-
-## Résumé textuel IA en haut du Dashboard
-- [x] Backend: Créer une procédure tRPC qui génère un résumé IA de la journée en 3 phrases (matin, après-midi, nuit)
-- [x] Frontend: Afficher le résumé en haut du Dashboard après le héro
-
-## Bouton actualisation résumé IA
-- [x] Ajouter bouton RefreshCw à côté du titre résumé IA avec refetch + animation spin pendant le chargement
-
-## Bugs signalés - favoris + graphique horaire
-- [x] Bug: Les lieux favoris ne s'affichent plus dans le Dashboard (session expirée — reconnecter)
-- [x] Bug: Le graphique heure par heure disparaît quand le résumé IA est affiché (getDaySummary changé en mutation POST)

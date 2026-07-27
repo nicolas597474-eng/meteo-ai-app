@@ -4,7 +4,6 @@
 
 import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
-import { invokeLLM } from "../_core/llm";
 import {
   getForecastsByDate,
   getForecastsByDateRange,
@@ -745,108 +744,5 @@ export const weatherRouter = router({
           return used ? { weight: used.weight, distanceWeight: used.distanceWeight, qualityWeight: used.qualityWeight, freshnessWeight: used.freshnessWeight } : null;
         })(),
       };
-    }),
-
-  /**
-   * AI Day Summary — 3 phrases: matin, après-midi, nuit
-   */
-  getDaySummary: publicProcedure
-    .input(z.object({
-      lat: z.number().optional(),
-      lon: z.number().optional(),
-      hourlyData: z.array(z.object({
-        hour: z.string(),
-        temp: z.number().nullable(),
-        apparentTemp: z.number().nullable().optional(),
-        precipitation: z.number().nullable(),
-        windSpeed: z.number().nullable(),
-        condition: z.string().nullable().optional(),
-      })).optional(),
-    }).optional())
-    .mutation(async ({ input }) => {
-      const today = getTodayParis();
-      const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
-
-      // Get MeteoAI forecast for context
-      const meteoAI = await getMeteoAIForecastByDate(today, locKey);
-
-      // Use hourly data passed from client (already fetched by getHourlyForecast)
-      // This avoids a second slow external API call
-      const hourlyData: any[] = input?.hourlyData ?? [];
-
-      // Build context for LLM
-      const morningHours = hourlyData.filter(h => {
-        const hh = parseInt(h.hour?.split(":")[0] ?? "0");
-        return hh >= 6 && hh < 12;
-      });
-      const afternoonHours = hourlyData.filter(h => {
-        const hh = parseInt(h.hour?.split(":")[0] ?? "0");
-        return hh >= 12 && hh < 20;
-      });
-      const nightHours = hourlyData.filter(h => {
-        const hh = parseInt(h.hour?.split(":")[0] ?? "0");
-        return hh >= 20 || hh < 6;
-      });
-
-      const summarizePeriod = (hours: any[]) => {
-        if (hours.length === 0) return null;
-        const avgTemp = hours.reduce((s, h) => s + (h.temp ?? 0), 0) / hours.length;
-        const maxWind = Math.max(...hours.map(h => h.windSpeed ?? 0));
-        const totalPrecip = hours.reduce((s, h) => s + (h.precipitation ?? 0), 0);
-        const conditions = hours.map(h => h.condition).filter(Boolean);
-        return { avgTemp: avgTemp.toFixed(1), maxWind: Math.round(maxWind), totalPrecip: totalPrecip.toFixed(1), conditions: Array.from(new Set(conditions)).join(", ") };
-      };
-
-      const morningSummary = summarizePeriod(morningHours);
-      const afternoonSummary = summarizePeriod(afternoonHours);
-      const nightSummary = summarizePeriod(nightHours);
-
-      // If no hourly data available, return quick fallback from MeteoAI data only
-      if (hourlyData.length === 0 && meteoAI) {
-        return {
-          morning: `Matin : conditions ${meteoAI.condition ?? "variables"}, temp min ${meteoAI.tempMin?.toFixed(1) ?? "?"}°C.`,
-          afternoon: `Apr\u00e8s-midi : max ${meteoAI.tempMax?.toFixed(1) ?? "?"}°C, ${meteoAI.condition ?? "variable"}, vent ${meteoAI.windSpeed ?? "?"}km/h.`,
-          night: `Nuit : retour vers ${meteoAI.tempMin?.toFixed(1) ?? "?"}°C, vent en baisse.`,
-        };
-      }
-      if (hourlyData.length === 0) {
-        return { morning: null, afternoon: null, night: null };
-      }
-
-      const dataContext = `Date: ${today}\nCondition g\u00e9n\u00e9rale: ${meteoAI?.condition ?? "inconnue"}\nTemp max: ${meteoAI?.tempMax ?? "?"}°C, min: ${meteoAI?.tempMin ?? "?"}°C\n\nMatin (6h-12h): Temp moy ${morningSummary?.avgTemp ?? "?"}°C, Vent max ${morningSummary?.maxWind ?? "?"}km/h, Pr\u00e9cip ${morningSummary?.totalPrecip ?? "0"}mm, Conditions: ${morningSummary?.conditions ?? "?"}\nApr\u00e8s-midi (12h-20h): Temp moy ${afternoonSummary?.avgTemp ?? "?"}°C, Vent max ${afternoonSummary?.maxWind ?? "?"}km/h, Pr\u00e9cip ${afternoonSummary?.totalPrecip ?? "0"}mm, Conditions: ${afternoonSummary?.conditions ?? "?"}\nNuit (20h-6h): Temp moy ${nightSummary?.avgTemp ?? "?"}°C, Vent max ${nightSummary?.maxWind ?? "?"}km/h, Pr\u00e9cip ${nightSummary?.totalPrecip ?? "0"}mm, Conditions: ${nightSummary?.conditions ?? "?"}`;
-
-      try {
-        const result = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content: "Tu es un assistant météo français concis. Génère un résumé de la journée en exactement 3 phrases courtes et naturelles. Une phrase pour le matin, une pour l'après-midi, une pour la nuit. Chaque phrase doit mentionner la température et les conditions principales. Réponds en JSON avec les clés: morning, afternoon, night. Pas de markdown."
-            },
-            {
-              role: "user",
-              content: dataContext
-            }
-          ],
-          maxTokens: 300,
-          responseFormat: { type: "json_object" },
-        });
-
-        const content = typeof result.choices[0]?.message?.content === "string"
-          ? result.choices[0].message.content
-          : "";
-        const parsed = JSON.parse(content);
-        return {
-          morning: parsed.morning ?? null,
-          afternoon: parsed.afternoon ?? null,
-          night: parsed.night ?? null,
-        };
-      } catch (e) {
-        // Fallback: generate deterministic summary from data
-        return {
-          morning: morningSummary ? `Matin : ${morningSummary.avgTemp}°C, ${morningSummary.conditions || "variable"}, vent jusqu'à ${morningSummary.maxWind} km/h.` : null,
-          afternoon: afternoonSummary ? `Après-midi : ${afternoonSummary.avgTemp}°C, ${afternoonSummary.conditions || "variable"}, vent jusqu'à ${afternoonSummary.maxWind} km/h.` : null,
-          night: nightSummary ? `Nuit : ${nightSummary.avgTemp}°C, ${nightSummary.conditions || "variable"}, vent jusqu'à ${nightSummary.maxWind} km/h.` : null,
-        };
-      }
     }),
 });

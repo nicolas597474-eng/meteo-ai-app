@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import FifteenDayChart from "@/components/FifteenDayChart";
 import HourlyChart from "@/components/HourlyChart";
@@ -218,39 +218,6 @@ export default function Dashboard() {
   const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
-  // AI Day Summary — 3 phrases (only fires after hourly data is loaded)
-  const summaryInput = useMemo(() => ({
-    lat: coordsInput.lat,
-    lon: coordsInput.lon,
-    hourlyData: hourly?.hours?.map(h => ({
-      hour: h.hour,
-      temp: h.temp,
-      apparentTemp: h.apparentTemp ?? null,
-      precipitation: h.precipitation,
-      windSpeed: h.windSpeed,
-      condition: h.condition ?? null,
-    })),
-  }), [coordsInput.lat, coordsInput.lon, hourly?.hours]);
-
-  const summaryMutation = trpc.weather.getDaySummary.useMutation();
-  const [daySummary, setDaySummary] = useState<{ morning: string | null; afternoon: string | null; night: string | null } | null>(null);
-  const summaryFetching = summaryMutation.isPending;
-
-  // Reset summary when location changes
-  useEffect(() => {
-    setDaySummary(null);
-  }, [coordsInput.lat, coordsInput.lon]);
-
-  // Auto-fetch summary when hourly data becomes available
-  useEffect(() => {
-    if (hourly?.hours && hourly.hours.length > 0 && !daySummary && !summaryMutation.isPending) {
-      summaryMutation.mutateAsync(summaryInput).then(setDaySummary).catch(() => {});
-    }
-  }, [hourly?.hours?.length, coordsInput.lat, coordsInput.lon, daySummary]);
-
-  const refetchSummary = useCallback(() => {
-    summaryMutation.mutateAsync(summaryInput).then(setDaySummary).catch(() => {});
-  }, [summaryInput]);
 
   // Loading: wait for MeteoAI (dash or locationWeather) + 15-day + hourly
   const isLoading = (activeLocation ? locLoading : dashLoading) && f15Loading && hourlyLoading;
@@ -494,44 +461,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
-        {/* ── AI Day Summary ── */}
-        {daySummary && (daySummary.morning || daySummary.afternoon || daySummary.night) && (
-          <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm">&#x1F4AC;</span>
-              <h3 className="text-xs font-semibold text-indigo-300 uppercase tracking-wide flex-1">Résumé IA de la journée</h3>
-              <button
-                onClick={() => refetchSummary()}
-                disabled={summaryFetching}
-                className="p-1.5 rounded-lg text-indigo-300 hover:text-indigo-100 hover:bg-indigo-500/20 transition-all disabled:opacity-50"
-                title="Actualiser le résumé"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${summaryFetching ? "animate-spin" : ""}`} />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {daySummary.morning && (
-                <div className="flex items-start gap-2">
-                  <span className="text-xs mt-0.5">&#x2600;&#xFE0F;</span>
-                  <p className="text-sm text-foreground/90 leading-relaxed">{daySummary.morning}</p>
-                </div>
-              )}
-              {daySummary.afternoon && (
-                <div className="flex items-start gap-2">
-                  <span className="text-xs mt-0.5">&#x1F324;&#xFE0F;</span>
-                  <p className="text-sm text-foreground/90 leading-relaxed">{daySummary.afternoon}</p>
-                </div>
-              )}
-              {daySummary.night && (
-                <div className="flex items-start gap-2">
-                  <span className="text-xs mt-0.5">&#x1F319;</span>
-                  <p className="text-sm text-foreground/90 leading-relaxed">{daySummary.night}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ── Ultra-local Mode Selector ── */}
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">
