@@ -6,9 +6,8 @@
 
 import type { Request, Response } from "express";
 import { sdk } from "./_core/sdk";
-import { notifyOwner } from "./_core/notification";
 import { invokeLLM } from "./_core/llm";
-import { collectExpertForecasts, collectObservations, WEATHER_SERVICES } from "./weatherServices";
+import { collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, WEATHER_SERVICES } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "./statsEngine";
 import {
@@ -25,6 +24,7 @@ import {
   getAllFavoriteLocations,
   upsertLocationForecast,
   getCumulativeRankingForLocation,
+  insertHourlyForecasts,
 } from "./db";
 
 /**
@@ -179,12 +179,6 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         status: "completed",
         servicesCollected: forecastRows.length + publicForecasts.length,
         completedAt: new Date(),
-      });
-
-      // Send notification
-      await notifyOwner({
-        title: `☀️ MeteoAI — Collecte matinale ${today}`,
-        content: `${forecastRows.length + publicForecasts.length} services collectés avec succès.\nTempérature prévue: ${allForecasts.length > 0 ? `${allForecasts[0].tempMin ?? "?"}°C - ${allForecasts[0].tempMax ?? "?"}°C` : "N/A"}`,
       });
 
       res.json({ ok: true, servicesCollected: forecastRows.length + publicForecasts.length });
@@ -375,11 +369,6 @@ export async function collectObservationsHandler(req: Request, res: Response) {
         ...locationSummaries,
         ...(errors.length > 0 ? ["", `⚠️ Erreurs: ${errors.slice(0, 3).join(", ")}`] : []),
       ].join("\n");
-
-      await notifyOwner({
-        title: `📊 MeteoAI — Observations du ${yesterday}`,
-        content: notifContent,
-      });
 
       res.json({
         ok: true,
@@ -709,6 +698,32 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           });
         }
 
+        // Collect hourly forecasts for all models for this location
+        try {
+          const hourlyAllModels = await collectHourlyForecastAllModels(today, { lat: fav.lat, lon: fav.lon });
+          for (const { modelName, hours } of hourlyAllModels) {
+            const rows = hours.map((h) => ({
+              locationKey: locKey,
+              date: today,
+              hour: h.hour,
+              modelName,
+              temperature: h.temperature,
+              apparentTemperature: h.apparentTemperature,
+              precipitation: h.precipitation,
+              windSpeed: h.windSpeed,
+              windGusts: h.windGusts,
+              windDirection: h.windDirection,
+              humidity: h.humidity,
+              cloudCover: h.cloudCover,
+              weatherCode: h.weatherCode,
+            }));
+            await insertHourlyForecasts(rows);
+          }
+          console.log(`[HourlyAll] Stored ${hourlyAllModels.length} models for ${fav.name}`);
+        } catch (hourlyErr: any) {
+          console.warn(`[HourlyAll] Failed for ${fav.name}:`, hourlyErr.message);
+        }
+
         locationsProcessed++;
 
         // Rate limit between locations
@@ -718,12 +733,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         errors.push(`${fav.name}: ${err.message}`);
       }
     }
-
-    // Notify owner
-    await notifyOwner({
-      title: `🌍 MeteoAI — Favoris collectés ${today}`,
-      content: `${locationsProcessed}/${uniqueLocations.length} lieux traités avec succès.${errors.length > 0 ? `\n⚠️ Erreurs: ${errors.slice(0, 3).join(", ")}` : ""}`,
-    });
 
     res.json({
       ok: true,

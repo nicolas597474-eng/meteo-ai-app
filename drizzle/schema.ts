@@ -290,3 +290,28 @@ export const locationForecasts = mysqlTable("location_forecasts", {
 
 export type LocationForecast = typeof locationForecasts.$inferSelect;
 export type InsertLocationForecast = typeof locationForecasts.$inferInsert;
+
+/**
+ * Hourly forecasts collected per location per model.
+ * Populated daily at 05h00 by the heartbeat cron.
+ * Stores 24h of hourly data per model per location.
+ */
+export const hourlyForecasts = mysqlTable("hourly_forecasts", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD (forecast day)
+  hour: int("hour").notNull(), // 0-23
+  modelName: varchar("modelName", { length: 64 }).notNull(), // e.g. "AROME", "ECMWF", "best_match"
+  temperature: float("temperature"), // °C
+  apparentTemperature: float("apparentTemperature"), // °C ressenti
+  precipitation: float("precipitation"), // mm
+  windSpeed: float("windSpeed"), // km/h
+  windGusts: float("windGusts"), // km/h
+  windDirection: int("windDirection"), // degrees 0-360
+  humidity: float("humidity"), // %
+  cloudCover: float("cloudCover"), // %
+  weatherCode: int("weatherCode"), // WMO code
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(),
+});
+export type HourlyForecast = typeof hourlyForecasts.$inferSelect;
+export type InsertHourlyForecast = typeof hourlyForecasts.$inferInsert;

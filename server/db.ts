@@ -10,6 +10,7 @@ import {
   collectionJobs,
   favoriteLocations,
   locationForecasts,
+  hourlyForecasts,
   InsertForecast,
   InsertObservation,
   InsertReliabilityScore,
@@ -17,6 +18,7 @@ import {
   InsertCollectionJob,
   InsertFavoriteLocation,
   InsertLocationForecast,
+  InsertHourlyForecast,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -537,4 +539,49 @@ export async function getLocationForecastsForUser(userId: number, date: string) 
         eq(locationForecasts.date, date)
       )
     );
+}
+
+// ─── HOURLY FORECASTS HELPERS ────────────────────────────────────────────────
+
+/**
+ * Insert a batch of hourly forecast rows for a location/date/model.
+ * Replaces existing rows for the same locationKey+date+modelName combination.
+ */
+export async function insertHourlyForecasts(rows: InsertHourlyForecast[]): Promise<void> {
+  if (!rows.length) return;
+  const db = await getDb();
+  if (!db) return;
+  // Delete existing rows for this locationKey + date + modelName before inserting
+  const { locationKey, date, modelName } = rows[0];
+  await db
+    .delete(hourlyForecasts)
+    .where(
+      and(
+        eq(hourlyForecasts.locationKey, locationKey),
+        eq(hourlyForecasts.date, date),
+        eq(hourlyForecasts.modelName, modelName)
+      )
+    );
+  // Insert in batches of 50 to avoid query size limits
+  for (let i = 0; i < rows.length; i += 50) {
+    await db.insert(hourlyForecasts).values(rows.slice(i, i + 50));
+  }
+}
+
+/**
+ * Get stored hourly forecasts for a location and date (all models).
+ */
+export async function getStoredHourlyForecasts(locationKey: string, date: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(hourlyForecasts)
+    .where(
+      and(
+        eq(hourlyForecasts.locationKey, locationKey),
+        eq(hourlyForecasts.date, date)
+      )
+    )
+    .orderBy(hourlyForecasts.modelName, hourlyForecasts.hour);
 }

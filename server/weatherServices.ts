@@ -14,6 +14,8 @@ export const WEATHER_SERVICES = {
     { name: "ICON", modelId: "dwd_icon_eu", category: "expert" as const },
     { name: "ECMWF", modelId: "ecmwf_ifs025", category: "expert" as const },
     { name: "GFS", modelId: "gfs_seamless", category: "expert" as const },
+    { name: "GEM", modelId: "gem_seamless", category: "expert" as const },
+    { name: "UKMET", modelId: "ukmo_seamless", category: "expert" as const },
     { name: "Open-Meteo", modelId: "best_match", category: "expert" as const },
   ],
   public: [
@@ -62,7 +64,7 @@ export async function collectExpertForecasts(
       url.searchParams.set("longitude", location.lon.toString());
       url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
       url.searchParams.set("timezone", "Europe/Paris");
-      url.searchParams.set("forecast_days", "7");
+      url.searchParams.set("forecast_days", "16");
 
       if (service.modelId !== "best_match") {
         url.searchParams.set("models", service.modelId);
@@ -350,4 +352,122 @@ export async function collectHourlyForecast(
     console.error("[Hourly] Error fetching hourly forecast:", err);
     return [];
   }
+}
+
+/**
+ * Collect hourly forecasts for ALL expert models for a given date and location.
+ * Returns an array of { modelName, hours } for storage in hourly_forecasts table.
+ * Called daily at 05h00 by the heartbeat cron.
+ */
+export async function collectHourlyForecastAllModels(
+  targetDate: string,
+  coords?: { lat: number; lon: number }
+): Promise<Array<{
+  modelName: string;
+  hours: Array<{
+    hour: number;
+    temperature: number | null;
+    apparentTemperature: number | null;
+    precipitation: number | null;
+    windSpeed: number | null;
+    windGusts: number | null;
+    windDirection: number | null;
+    humidity: number | null;
+    cloudCover: number | null;
+    weatherCode: number | null;
+  }>;
+}>> {
+  const location = coords ?? HONDEGHEM;
+  const modelsToCollect = [
+    { name: "AROME", modelId: "meteofrance_arome_france_hd" },
+    { name: "ARPEGE", modelId: "meteofrance_arpege_europe" },
+    { name: "ICON", modelId: "dwd_icon_eu" },
+    { name: "ECMWF", modelId: "ecmwf_ifs025" },
+    { name: "GFS", modelId: "gfs_seamless" },
+    { name: "GEM", modelId: "gem_seamless" },
+    { name: "UKMET", modelId: "ukmo_seamless" },
+    { name: "best_match", modelId: null }, // Open-Meteo best match
+  ];
+
+  const results: Array<{
+    modelName: string;
+    hours: Array<{
+      hour: number;
+      temperature: number | null;
+      apparentTemperature: number | null;
+      precipitation: number | null;
+      windSpeed: number | null;
+      windGusts: number | null;
+      windDirection: number | null;
+      humidity: number | null;
+      cloudCover: number | null;
+      weatherCode: number | null;
+    }>;
+  }> = [];
+
+  for (const model of modelsToCollect) {
+    try {
+      const url = new URL("https://api.open-meteo.com/v1/forecast");
+      url.searchParams.set("latitude", location.lat.toString());
+      url.searchParams.set("longitude", location.lon.toString());
+      url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,cloud_cover,weather_code");
+      url.searchParams.set("timezone", "Europe/Paris");
+      url.searchParams.set("forecast_days", "2");
+      if (model.modelId) {
+        url.searchParams.set("models", model.modelId);
+      }
+
+      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(15000) });
+      if (!response.ok) {
+        console.warn(`[HourlyAll] ${model.name} HTTP ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const hourly = data.hourly;
+      if (!hourly?.time) continue;
+
+      const hours: Array<{
+        hour: number;
+        temperature: number | null;
+        apparentTemperature: number | null;
+        precipitation: number | null;
+        windSpeed: number | null;
+        windGusts: number | null;
+        windDirection: number | null;
+        humidity: number | null;
+        cloudCover: number | null;
+        weatherCode: number | null;
+      }> = [];
+
+      for (let i = 0; i < hourly.time.length; i++) {
+        const dt: string = hourly.time[i]; // "2026-07-05T14:00"
+        if (!dt.startsWith(targetDate)) continue;
+        const hourNum = parseInt(dt.slice(11, 13), 10);
+        hours.push({
+          hour: hourNum,
+          temperature: hourly.temperature_2m?.[i] ?? null,
+          apparentTemperature: hourly.apparent_temperature?.[i] ?? null,
+          precipitation: hourly.precipitation?.[i] ?? null,
+          windSpeed: hourly.wind_speed_10m?.[i] ?? null,
+          windGusts: hourly.wind_gusts_10m?.[i] ?? null,
+          windDirection: hourly.wind_direction_10m?.[i] ?? null,
+          humidity: hourly.relative_humidity_2m?.[i] ?? null,
+          cloudCover: hourly.cloud_cover?.[i] ?? null,
+          weatherCode: hourly.weather_code?.[i] ?? null,
+        });
+      }
+
+      if (hours.length > 0) {
+        results.push({ modelName: model.name, hours });
+      }
+
+      // Rate limit between models
+      await new Promise(r => setTimeout(r, 400));
+    } catch (err) {
+      console.error(`[HourlyAll] Error fetching ${model.name}:`, err);
+    }
+  }
+
+  return results;
 }
