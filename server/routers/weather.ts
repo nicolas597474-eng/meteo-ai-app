@@ -23,6 +23,7 @@ import {
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
+import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 
 function getTodayParis(): string {
@@ -631,7 +632,40 @@ export const weatherRouter = router({
 
       const stations = await collectNearbyStations(lat, lon, radiusKm);
       const ranked = rankStations(stations);
-      const groundTruth = calculateGroundTruth(ranked);
+      // Use the unified engine (same as Mode Local in Dashboard)
+      const ultraResult = calculateUltraLocal(ranked, "local", lat, lon, null, null);
+      const groundTruth = {
+        temperature: ultraResult.temperature,
+        humidity: ultraResult.humidity,
+        pressure: ultraResult.pressure,
+        windSpeed: ultraResult.windSpeed,
+        windGust: ultraResult.windGust,
+        precipitation: ultraResult.precipitation,
+        stationsUsed: ultraResult.stationsUsed.map(s => ({
+          stationId: s.stationId,
+          name: s.name,
+          source: s.source,
+          distanceKm: s.distanceKm,
+          weight: s.weight,
+          distanceWeight: s.distanceWeight,
+          qualityWeight: s.qualityWeight,
+          freshnessWeight: s.freshnessWeight,
+          temperature: s.temperature,
+          humidity: s.humidity,
+          pressure: s.pressure,
+          windSpeed: s.windSpeed,
+          precipitation: s.precipitation,
+        })),
+        stationsIgnored: ultraResult.stationsIgnored.map(s => ({
+          stationId: s.stationId,
+          name: s.name,
+          source: s.source,
+          distanceKm: s.distanceKm,
+          reason: s.reason,
+        })),
+        stationCount: ultraResult.stationCount,
+        confidenceScore: ultraResult.confidenceScore,
+      };
 
       return {
         lat,
@@ -682,7 +716,40 @@ export const weatherRouter = router({
 
       const stations = await collectNearbyStations(lat, lon, input.radiusKm);
       const ranked = rankStations(stations);
-      return calculateGroundTruth(ranked);
+      // Unified engine — same as Mode Local in Dashboard
+      const result = calculateUltraLocal(ranked, "local", lat, lon, null, null);
+      return {
+        temperature: result.temperature,
+        humidity: result.humidity,
+        pressure: result.pressure,
+        windSpeed: result.windSpeed,
+        windGust: result.windGust,
+        precipitation: result.precipitation,
+        stationsUsed: result.stationsUsed.map(s => ({
+          stationId: s.stationId,
+          name: s.name,
+          source: s.source,
+          distanceKm: s.distanceKm,
+          weight: s.weight,
+          distanceWeight: s.distanceWeight,
+          qualityWeight: s.qualityWeight,
+          freshnessWeight: s.freshnessWeight,
+          temperature: s.temperature,
+          humidity: s.humidity,
+          pressure: s.pressure,
+          windSpeed: s.windSpeed,
+          precipitation: s.precipitation,
+        })),
+        stationsIgnored: result.stationsIgnored.map(s => ({
+          stationId: s.stationId,
+          name: s.name,
+          source: s.source,
+          distanceKm: s.distanceKm,
+          reason: s.reason,
+        })),
+        stationCount: result.stationCount,
+        confidenceScore: result.confidenceScore,
+      };
     }),
 
   /**
@@ -739,7 +806,8 @@ export const weatherRouter = router({
         ...station,
         groundTruthContribution: (() => {
           const ranked = rankStations(stations);
-          const gt = calculateGroundTruth(ranked);
+          // Unified engine — same as Mode Local in Dashboard
+          const gt = calculateUltraLocal(ranked, "local", lat, lon, null, null);
           const used = gt.stationsUsed.find(s => s.stationId === input.stationId);
           return used ? { weight: used.weight, distanceWeight: used.distanceWeight, qualityWeight: used.qualityWeight, freshnessWeight: used.freshnessWeight } : null;
         })(),

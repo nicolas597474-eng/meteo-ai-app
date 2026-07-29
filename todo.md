@@ -194,3 +194,14 @@
 
 ## Harmonisation températures avec 1 décimale
 - [x] Dashboard héro : afficher currentTemp, tempMax, tempMin, apparentTemp avec toFixed(1) au lieu de Math.round
+
+## Unification moteur température Vérité terrain / Mode Local
+- [ ] Analyser les deux algorithmes actuels (stationService.ts et routers/weather.ts)
+- [ ] Créer un moteur unifié computeLocalTemperature() dans stationService.ts
+- [ ] Mettre à jour le Dashboard (Mode Local) pour utiliser le même moteur que Vérité terrain
+- [ ] Afficher clairement l'algorithme utilisé dans les deux vues
+
+## Unification moteur température Vérité terrain / Mode Local
+- [x] Analyser les deux algorithmes (calculateGroundTruth vs calculateUltraLocal)
+- [x] Remplacer calculateGroundTruth par calculateUltraLocal(mode="local") dans getGroundTruth, searchStations, getStationDetail
+- [x] Vérifier TypeScript + 47 tests passent
