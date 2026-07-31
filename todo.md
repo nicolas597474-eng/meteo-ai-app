@@ -224,3 +224,16 @@
 - [x] Frontend: FifteenDayChart — toggle 7j/15j/16j + barre de progression adaptée
 - [x] Frontend: HourlyChart — overlay détaillé enrichi (confiance, multi-modèles si dispo)
 - [x] Frontend: Ranking — système multi-régimes avec illustration dynamique, pourcentages, confiance globale
+
+## Corrections bugs audit + scoring échéance + historique enrichi (31 juillet 2026)
+
+- [x] Bug 1: Séparer confidenceScore (basé sur accord modèles + historique) de stabilityIndex
+- [x] Bug 2: Implémenter rmsePrecip et rmseWind dans calculateReliabilityScore
+- [x] Bug 3: Persister previousReadings pour activer la détection de valeurs figées
+- [x] Bug 4: Supprimer le cron 07h30 redondant (collectForecastsHandler)
+- [x] Scoring par échéance: brancher computeLeadTimeScores dans collectObservationsHandler + stocker en DB
+- [x] Scoring par échéance: créer table lead_time_scores en DB
+- [x] Scoring par échéance: exposer via procédure tRPC
+- [x] Page Historique: comparaison par modèle individuel (graphique multi-courbes)
+- [x] Page Historique: graphique de précipitations observées vs prévues
+- [x] Page Historique: graphique de vent observé vs prévu

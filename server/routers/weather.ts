@@ -19,6 +19,7 @@ import {
   insertReliabilityScores,
   upsertMeteoAIForecast,
   getHistoricalScoreTimeSeries,
+  getLeadTimeScoresForLocation,
   makeLocationKey,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
@@ -172,11 +173,15 @@ export const weatherRouter = router({
       const forecasts = await getForecastsByDateRange(startStr, endDate, locKey);
       const observations = await getObservationsByDateRange(startStr, endDate, locKey);
       const meteoAIForecasts = await getLatestMeteoAIForecasts(input.days, locKey);
+      const scoreTimeSeries = await getHistoricalScoreTimeSeries(input.days, locKey);
+      const leadTimeScoresData = await getLeadTimeScoresForLocation(locKey, input.days);
 
       return {
         forecasts,
         observations,
         meteoAIForecasts,
+        scoreTimeSeries,
+        leadTimeScores: leadTimeScoresData,
         startDate: startStr,
         endDate,
       };
@@ -865,5 +870,24 @@ export const weatherRouter = router({
           return used ? { weight: used.weight, distanceWeight: used.distanceWeight, qualityWeight: used.qualityWeight, freshnessWeight: used.freshnessWeight } : null;
         })(),
       };
+    }),
+
+  /**
+   * Get lead-time scores (MAE/RMSE/biais par échéance) for a location.
+   * Returns per-service, per-bucket (0-6h, 6-24h, 1-3d, 4-7d, 8-15d) averages.
+   */
+  getLeadTimeScores: publicProcedure
+    .input(z.object({
+      lat: z.number().optional(),
+      lon: z.number().optional(),
+      days: z.number().min(1).max(90).default(14),
+    }).optional())
+    .query(async ({ input }) => {
+      const lat = input?.lat ?? HONDEGHEM.lat;
+      const lon = input?.lon ?? HONDEGHEM.lon;
+      const locKey = makeLocationKey(lat, lon);
+      const days = input?.days ?? 14;
+      const scores = await getLeadTimeScoresForLocation(locKey, days);
+      return { locationKey: locKey, days, scores };
     }),
 });

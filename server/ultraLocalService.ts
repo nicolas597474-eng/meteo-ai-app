@@ -1,3 +1,5 @@
+import { getPreviousReadings, recordStationReadings } from "./stationReadingsCache";
+
 /**
  * Ultra-Local Service — Advanced temperature calculation using concentric radius bands
  *
@@ -341,10 +343,41 @@ export function calculateUltraLocal(
     stations.find(s => s.altitude != null && s.distanceKm < 5)?.altitude ?? null
   );
 
-  // Quality verification for all stations
+  // Get previous readings for frozen-value / sudden-jump detection
+  const prevReadings = getPreviousReadings();
+
+  // Quality verification for all stations (enhanced with frozen/jump detection)
   const verified: { station: StationData; passed: boolean; checks: QualityCheck[]; altAdj: number }[] =
     stations.map(s => {
       const result = verifyStationQuality(s, stations, config, effectiveAltitude);
+      // Additional check: frozen value detection from cache
+      if (s.temperature != null && prevReadings.size > 0) {
+        const prev = prevReadings.get(s.stationId);
+        if (prev) {
+          const ageMin = (Date.now() - prev.timestamp) / 60000;
+          const tempDelta = Math.abs(s.temperature - prev.temperature);
+          // Frozen: no change for > 60 min
+          if (ageMin > 60 && tempDelta < 0.01) {
+            result.checks.push({
+              name: "frozen_value",
+              passed: false,
+              value: `${s.temperature.toFixed(1)}°C inchangé depuis ${Math.round(ageMin)} min`,
+              threshold: "ΔT > 0.01°C en 60 min",
+            });
+            result.passed = false;
+          }
+          // Sudden jump: > 5°C in < 10 min
+          if (ageMin < 10 && tempDelta > 5) {
+            result.checks.push({
+              name: "sudden_jump",
+              passed: false,
+              value: `Δ${tempDelta.toFixed(1)}°C en ${Math.round(ageMin)} min`,
+              threshold: "ΔT < 5°C en 10 min",
+            });
+            result.passed = false;
+          }
+        }
+      }
       return { station: s, passed: result.passed, checks: result.checks, altAdj: result.altitudeAdj };
     });
 
@@ -494,6 +527,12 @@ export function calculateUltraLocal(
 
   // Generate explanation
   const explanation = generateExplanation(mode, contributions, bandBreakdown, microFactors, finalTemp, modelTemperature);
+
+  // Record current readings for next cycle's frozen/jump detection
+  const readingsToRecord = stations
+    .filter(s => s.temperature != null)
+    .map(s => ({ stationId: s.stationId, temperature: s.temperature! }));
+  recordStationReadings(readingsToRecord);
 
   return {
     mode,

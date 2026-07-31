@@ -422,6 +422,32 @@ function calcConditionDimension(forecasts: ForecastRow[], observations: Observat
   };
 }
 
+// ─── RMSE helpers for legacy flat fields ─────────────────────────────────────
+
+function rmsePrecipValue(forecasts: ForecastRow[], observations: ObservationRow[]): number {
+  const pred: number[] = [];
+  const actual: number[] = [];
+  for (let i = 0; i < forecasts.length; i++) {
+    const f = forecasts[i], o = observations[i];
+    if (!f || !o || f.precipitation == null || o.precipitation == null) continue;
+    pred.push(f.precipitation);
+    actual.push(o.precipitation);
+  }
+  return rmse(pred, actual);
+}
+
+function rmseWindValue(forecasts: ForecastRow[], observations: ObservationRow[]): number {
+  const pred: number[] = [];
+  const actual: number[] = [];
+  for (let i = 0; i < forecasts.length; i++) {
+    const f = forecasts[i], o = observations[i];
+    if (!f || !o || f.windSpeed == null || o.windSpeed == null) continue;
+    pred.push(f.windSpeed);
+    actual.push(o.windSpeed);
+  }
+  return rmse(pred, actual);
+}
+
 // ─── Main scoring function ────────────────────────────────────────────────────
 
 /**
@@ -473,8 +499,8 @@ export function calculateReliabilityScore(
     maePrecip: precipDim.maeQuantity,
     maeWind: windDim.maeMean,
     rmseTemp: tempDim.rmse,
-    rmsePrecip: 0,
-    rmseWind: 0,
+    rmsePrecip: round2(rmsePrecipValue(forecasts, observations)),
+    rmseWind: round2(rmseWindValue(forecasts, observations)),
     biasTemp: tempDim.bias,
     biasPrecip: precipDim.biasQuantity,
     biasWind: windDim.biasMean,

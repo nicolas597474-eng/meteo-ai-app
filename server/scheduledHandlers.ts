@@ -10,7 +10,7 @@ import { invokeLLM } from "./_core/llm";
 import { collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, WEATHER_SERVICES } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "./statsEngine";
-import { generateAdaptiveForecast } from "./fusionEngine";
+import { generateAdaptiveForecast, classifyLeadTime, type LeadTimeBucket } from "./fusionEngine";
 import {
   insertForecasts,
   insertObservation,
@@ -26,6 +26,7 @@ import {
   upsertLocationForecast,
   getCumulativeRankingForLocation,
   insertHourlyForecasts,
+  insertLeadTimeScores,
 } from "./db";
 
 /**
@@ -181,6 +182,11 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         // Determine condition from majority
         const condition = determineMajorityCondition(allForecasts);
 
+        // Compute true confidence score from model agreement (divergence)
+        const allTemps = allForecasts.map((f: any) => f.tempMax).filter((v: any) => v != null) as number[];
+        const modelDivergence = allTemps.length > 1 ? Math.max(...allTemps) - Math.min(...allTemps) : 0;
+        const trueConfidenceScore = Math.max(0, Math.min(100, Math.round(100 - modelDivergence * 5)));
+
         // Save MeteoAI forecast with locationKey
         await upsertMeteoAIForecast({
           locationKey: defaultLocKey,
@@ -192,7 +198,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           condition,
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
-          confidenceScore: stability.index,
+          confidenceScore: trueConfidenceScore,
           weights: meteoAI.weights as any,
           explanation,
         });
@@ -357,6 +363,53 @@ export async function collectObservationsHandler(req: Request, res: Response) {
 
             await insertReliabilityScores(scoreRows);
             totalScores += scoreRows.length;
+
+            // ─── Lead-time scoring per model ───────────────────────────────
+            // For each forecast, compute which lead-time bucket it falls into
+            // based on when it was collected (issueDate) vs the observation date
+            for (const f of dayForecasts) {
+              const issueDate = f.collectedAt
+                ? new Date(f.collectedAt).toISOString().slice(0, 10)
+                : f.date; // fallback: same day (bucket = 0-6h)
+              const bucket = classifyLeadTime(yesterday, issueDate);
+
+              // Compute errors for this forecast vs observation
+              const tempErrors: number[] = [];
+              if (f.tempMax != null && observation.tempMax != null) {
+                tempErrors.push(f.tempMax - observation.tempMax);
+              }
+              if (f.tempMin != null && observation.tempMin != null) {
+                tempErrors.push(f.tempMin - observation.tempMin);
+              }
+              const maeT = tempErrors.length > 0
+                ? tempErrors.reduce((s, e) => s + Math.abs(e), 0) / tempErrors.length
+                : null;
+              const rmseT = tempErrors.length > 0
+                ? Math.sqrt(tempErrors.reduce((s, e) => s + e * e, 0) / tempErrors.length)
+                : null;
+              const biasT = tempErrors.length > 0
+                ? tempErrors.reduce((s, e) => s + e, 0) / tempErrors.length
+                : null;
+              const maeP = (f.precipitation != null && observation.precipitation != null)
+                ? Math.abs(f.precipitation - observation.precipitation)
+                : null;
+              const maeW = (f.windSpeed != null && observation.windSpeed != null)
+                ? Math.abs(f.windSpeed - observation.windSpeed)
+                : null;
+
+              await insertLeadTimeScores([{
+                locationKey: locKey,
+                date: yesterday,
+                serviceName: f.serviceName,
+                bucket,
+                maeTemp: maeT != null ? Math.round(maeT * 100) / 100 : null,
+                rmseTemp: rmseT != null ? Math.round(rmseT * 100) / 100 : null,
+                biasTemp: biasT != null ? Math.round(biasT * 100) / 100 : null,
+                maePrecip: maeP != null ? Math.round(maeP * 100) / 100 : null,
+                maeWind: maeW != null ? Math.round(maeW * 100) / 100 : null,
+                sampleSize: tempErrors.length,
+              }]);
+            }
 
             // Get top model for this location
             const locRanking = await getCumulativeRankingForLocation(locKey);
@@ -708,6 +761,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           (f) => Math.abs(f.lat - fav.lat) < 0.001 && Math.abs(f.lon - fav.lon) < 0.001
         );
 
+        // Compute true confidence score from model agreement (divergence)
+        const favTemps = expertData.map((f: any) => f.tempMax).filter((v: any) => v != null) as number[];
+        const favDivergence = favTemps.length > 1 ? Math.max(...favTemps) - Math.min(...favTemps) : 0;
+        const favConfidenceScore = Math.max(0, Math.min(100, Math.round(100 - favDivergence * 5)));
+
         // Also save MeteoAI forecast for this location
         await upsertMeteoAIForecast({
           locationKey: locKey,
@@ -719,7 +777,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           condition,
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
-          confidenceScore: stability.index,
+          confidenceScore: favConfidenceScore,
           weights: meteoAI.weights as any,
           explanation,
         });
@@ -737,8 +795,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             precipitation: meteoAI.precipitation,
             windSpeed: meteoAI.windSpeed,
             condition,
-            aiScore: stability.index,
-            confidenceScore: stability.index,
+            aiScore: favConfidenceScore,
+            confidenceScore: favConfidenceScore,
             stabilityIndex: stability.index,
             modelsData: expertData as any,
             explanation,

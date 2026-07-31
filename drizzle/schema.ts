@@ -315,3 +315,26 @@ export const hourlyForecasts = mysqlTable("hourly_forecasts", {
 });
 export type HourlyForecast = typeof hourlyForecasts.$inferSelect;
 export type InsertHourlyForecast = typeof hourlyForecasts.$inferInsert;
+
+/**
+ * Lead-time scoring — per-model, per-location, per-horizon error metrics.
+ * Populated during observation collection by comparing forecasts issued N days
+ * before the observation date with the actual observation.
+ * Buckets: 0-6h, 6-24h, 1-3d, 4-7d, 8-15d
+ */
+export const leadTimeScores = mysqlTable("lead_time_scores", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull().default("default"),
+  date: varchar("date", { length: 10 }).notNull(), // observation date YYYY-MM-DD
+  serviceName: varchar("serviceName", { length: 64 }).notNull(),
+  bucket: varchar("bucket", { length: 10 }).notNull(), // "0-6h", "6-24h", "1-3d", "4-7d", "8-15d"
+  maeTemp: float("maeTemp"),
+  rmseTemp: float("rmseTemp"),
+  biasTemp: float("biasTemp"),
+  maePrecip: float("maePrecip"),
+  maeWind: float("maeWind"),
+  sampleSize: int("sampleSize").notNull().default(0),
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+});
+export type LeadTimeScore = typeof leadTimeScores.$inferSelect;
+export type InsertLeadTimeScore = typeof leadTimeScores.$inferInsert;

@@ -11,6 +11,7 @@ import {
   favoriteLocations,
   locationForecasts,
   hourlyForecasts,
+  leadTimeScores,
   InsertForecast,
   InsertObservation,
   InsertReliabilityScore,
@@ -19,6 +20,7 @@ import {
   InsertFavoriteLocation,
   InsertLocationForecast,
   InsertHourlyForecast,
+  InsertLeadTimeScore,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -369,6 +371,12 @@ export async function getHistoricalScoreTimeSeries(days = 14, locationKey = "def
       condScore: reliabilityScores.condScore,
     })
     .from(reliabilityScores)
+    .where(
+      and(
+        eq(reliabilityScores.locationKey, locationKey),
+        sql`${reliabilityScores.date} >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`
+      )
+    )
     .orderBy(desc(reliabilityScores.date), reliabilityScores.serviceName)
     .limit(days * 20); // up to 20 services per day
 }
@@ -584,4 +592,59 @@ export async function getStoredHourlyForecasts(locationKey: string, date: string
       )
     )
     .orderBy(hourlyForecasts.modelName, hourlyForecasts.hour);
+}
+
+// ─── LEAD TIME SCORES HELPERS ────────────────────────────────────────────────
+
+/**
+ * Insert a batch of lead-time score rows.
+ * Replaces existing rows for the same locationKey+date+serviceName combination.
+ */
+export async function insertLeadTimeScores(rows: InsertLeadTimeScore[]): Promise<void> {
+  if (!rows.length) return;
+  const db = await getDb();
+  if (!db) return;
+  // Delete existing rows for this locationKey + date + serviceName
+  const locKey = rows[0].locationKey ?? "default";
+  const dt = rows[0].date;
+  const svc = rows[0].serviceName;
+  await db
+    .delete(leadTimeScores)
+    .where(
+      and(
+        eq(leadTimeScores.locationKey, locKey),
+        eq(leadTimeScores.date, dt),
+        eq(leadTimeScores.serviceName, svc)
+      )
+    );
+  await db.insert(leadTimeScores).values(rows);
+}
+
+/**
+ * Get lead-time scores for a location over the last N days.
+ * Returns per-service, per-bucket averages.
+ */
+export async function getLeadTimeScoresForLocation(locationKey: string, days = 14) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      serviceName: leadTimeScores.serviceName,
+      bucket: leadTimeScores.bucket,
+      avgMaeTemp: sql<number>`AVG(${leadTimeScores.maeTemp})`.as("avgMaeTemp"),
+      avgRmseTemp: sql<number>`AVG(${leadTimeScores.rmseTemp})`.as("avgRmseTemp"),
+      avgBiasTemp: sql<number>`AVG(${leadTimeScores.biasTemp})`.as("avgBiasTemp"),
+      avgMaePrecip: sql<number>`AVG(${leadTimeScores.maePrecip})`.as("avgMaePrecip"),
+      avgMaeWind: sql<number>`AVG(${leadTimeScores.maeWind})`.as("avgMaeWind"),
+      totalSamples: sql<number>`SUM(${leadTimeScores.sampleSize})`.as("totalSamples"),
+    })
+    .from(leadTimeScores)
+    .where(
+      and(
+        eq(leadTimeScores.locationKey, locationKey),
+        sql`${leadTimeScores.date} >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`
+      )
+    )
+    .groupBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`)
+    .orderBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`);
 }
