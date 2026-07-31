@@ -245,3 +245,4 @@
 - [x] Backend: grille 20 régimes possibles avec pourcentages calculés par l'IA
 - [x] Backend: facteurs clés du moment (top 5 facteurs influençant la météo actuelle)
 - [x] Frontend: refonte complète Ranking.tsx fidèle à la maquette (image paysage, détection IA, confiance, paramètres, pondérations, régimes, facteurs, meilleur modèle)
+- [x] Frontend: refonte pixel-perfect identique à la maquette fournie (fond noir, cartes arrondies, SVG icons, grille 5x4, image paysage uploadée)
