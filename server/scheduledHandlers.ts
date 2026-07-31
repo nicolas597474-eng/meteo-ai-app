@@ -10,6 +10,7 @@ import { invokeLLM } from "./_core/llm";
 import { collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, WEATHER_SERVICES } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "./statsEngine";
+import { generateAdaptiveForecast } from "./fusionEngine";
 import {
   insertForecasts,
   insertObservation,
@@ -118,17 +119,40 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           reliabilityMap[r.serviceName] = r.avgScore ?? 50;
         });
 
-        // Generate MeteoAI forecast
-        const meteoAI = generateMeteoAIForecast(
-          allForecasts.map((f) => ({
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-          })),
-          allForecasts.map((f) => f.serviceName),
-          reliabilityMap
-        );
+        // Generate MeteoAI forecast — adaptive per-parameter MAE weighting if enough historical data
+        const hasHistoricalData = ranking.some((r) => r.avgMaeTemp != null && Number(r.daysTracked) >= 3);
+        const performanceMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
+        ranking.forEach((r) => {
+          performanceMap[r.serviceName] = {
+            maeTemp: r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined,
+            maePrecip: r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined,
+            maeWind: r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined,
+            weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
+          };
+        });
+        const meteoAI = hasHistoricalData
+          ? generateAdaptiveForecast(
+              allForecasts.map((f) => ({
+                serviceName: f.serviceName,
+                tempMax: f.tempMax,
+                tempMin: f.tempMin,
+                precipitation: f.precipitation,
+                windSpeed: f.windSpeed,
+                windGust: null,
+                cloudCover: f.cloudCover ?? null,
+              })),
+              performanceMap
+            )
+          : generateMeteoAIForecast(
+              allForecasts.map((f) => ({
+                tempMax: f.tempMax,
+                tempMin: f.tempMin,
+                precipitation: f.precipitation,
+                windSpeed: f.windSpeed,
+              })),
+              allForecasts.map((f) => f.serviceName),
+              reliabilityMap
+            );
 
         // Generate AI explanation
         let explanation = "";
@@ -603,17 +627,40 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         const publicRowsForLoc = await generatePublicServiceForecasts(expertData, today, locKey, fav.lat, fav.lon);
         await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);
 
-        // Generate MeteoAI synthesis using location-specific reliability
-        const meteoAI = generateMeteoAIForecast(
-          expertData.map((f) => ({
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-          })),
-          expertData.map((f) => f.serviceName),
-          locReliabilityMap
-        );
+        // Generate MeteoAI synthesis — adaptive per-parameter MAE weighting if enough historical data
+        const locHasHistoricalData = locRanking.some((r) => r.avgMaeTemp != null && Number(r.daysTracked) >= 3);
+        const locPerfMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
+        (locRanking.length > 0 ? locRanking : ranking).forEach((r) => {
+          locPerfMap[r.serviceName] = {
+            maeTemp: r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined,
+            maePrecip: r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined,
+            maeWind: r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined,
+            weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
+          };
+        });
+        const meteoAI = locHasHistoricalData
+          ? generateAdaptiveForecast(
+              expertData.map((f) => ({
+                serviceName: f.serviceName,
+                tempMax: f.tempMax,
+                tempMin: f.tempMin,
+                precipitation: f.precipitation,
+                windSpeed: f.windSpeed,
+                windGust: null,
+                cloudCover: f.cloudCover ?? null,
+              })),
+              locPerfMap
+            )
+          : generateMeteoAIForecast(
+              expertData.map((f) => ({
+                tempMax: f.tempMax,
+                tempMin: f.tempMin,
+                precipitation: f.precipitation,
+                windSpeed: f.windSpeed,
+              })),
+              expertData.map((f) => f.serviceName),
+              locReliabilityMap
+            );
 
         // Determine condition
         const avgPrecip = expertData.reduce((s, f) => s + (f.precipitation ?? 0), 0) / expertData.length;

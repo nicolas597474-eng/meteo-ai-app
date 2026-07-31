@@ -196,12 +196,22 @@
 - [x] Dashboard héro : afficher currentTemp, tempMax, tempMin, apparentTemp avec toFixed(1) au lieu de Math.round
 
 ## Unification moteur température Vérité terrain / Mode Local
-- [ ] Analyser les deux algorithmes actuels (stationService.ts et routers/weather.ts)
-- [ ] Créer un moteur unifié computeLocalTemperature() dans stationService.ts
-- [ ] Mettre à jour le Dashboard (Mode Local) pour utiliser le même moteur que Vérité terrain
-- [ ] Afficher clairement l'algorithme utilisé dans les deux vues
+- [x] Analyser les deux algorithmes actuels (stationService.ts et routers/weather.ts)
+- [x] Créer un moteur unifié — calculateUltraLocal(mode="local") utilisé partout
+- [x] Mettre à jour le Dashboard (Mode Local) et Stations pour utiliser le même moteur
+- [x] Algorithme identique dans les deux vues (bandes 55/25/10%, qualité, altitude, modèle 10%)
 
 ## Unification moteur température Vérité terrain / Mode Local
 - [x] Analyser les deux algorithmes (calculateGroundTruth vs calculateUltraLocal)
 - [x] Remplacer calculateGroundTruth par calculateUltraLocal(mode="local") dans getGroundTruth, searchStations, getStationDetail
 - [x] Vérifier TypeScript + 47 tests passent
+
+## Optimisation scientifique MeteoAI
+- [ ] Phase 1: Audit complet des algorithmes existants (ultraLocalService, stationService, scoring)
+- [ ] Phase 2: Implémenter moteur d'évaluation MAE/RMSE/biais sur données historiques
+- [ ] Phase 3: Implémenter fusion IDW (Inverse Distance Weighting) avec exposant adaptatif
+- [ ] Phase 4: Pondération adaptative par performance historique (station + modèle)
+- [ ] Phase 5: Détection et correction des microclimats (altitude, urbain, maritime)
+- [ ] Phase 6: Scoring contextuel dynamique (pondérations selon phénomène météo)
+- [ ] Phase 7: Tests A/B validation sur données réelles + rapport de précision
+- [ ] Phase 8: Déploiement des améliorations validées

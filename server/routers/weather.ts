@@ -25,6 +25,7 @@ import { collectExpertForecasts, collectObservations, collect15DayForecast, coll
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
+import { generateAdaptiveForecast, detectExtendedRegime } from "../fusionEngine";
 
 function getTodayParis(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
@@ -336,16 +337,52 @@ export const weatherRouter = router({
           reliabilityMap[r.serviceName] = r.avgScore ?? 50;
         });
 
-        const meteoAI = generateMeteoAIForecast(
-          allForecasts.map((f) => ({
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-          })),
-          allForecasts.map((f) => f.serviceName),
-          reliabilityMap
-        );
+        // Build per-parameter performance map for adaptive fusion
+        const performanceByService: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
+        ranking.forEach((r) => {
+          performanceByService[r.serviceName] = {
+            maeTemp: r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined,
+            maePrecip: r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined,
+            maeWind: r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined,
+            weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
+          };
+        });
+        // Use adaptive fusion (per-parameter MAE weighting) if enough historical data
+        const hasPerformanceData = ranking.some(r => r.avgMaeTemp != null && Number(r.daysTracked) >= 3);
+        let meteoAI: { tempMax: number | null; tempMin: number | null; precipitation: number | null; windSpeed: number | null; weights: Record<string, any> };
+        if (hasPerformanceData) {
+          const adaptiveResult = generateAdaptiveForecast(
+            allForecasts.map((f) => ({
+              serviceName: f.serviceName,
+              tempMax: f.tempMax,
+              tempMin: f.tempMin,
+              precipitation: f.precipitation,
+              windSpeed: f.windSpeed,
+              windGust: null,
+              cloudCover: f.cloudCover ?? null,
+            })),
+            performanceByService
+          );
+          meteoAI = {
+            tempMax: adaptiveResult.tempMax,
+            tempMin: adaptiveResult.tempMin,
+            precipitation: adaptiveResult.precipitation,
+            windSpeed: adaptiveResult.windSpeed,
+            weights: adaptiveResult.weights,
+          };
+        } else {
+          // Fallback to legacy weighted average when no historical data yet
+          meteoAI = generateMeteoAIForecast(
+            allForecasts.map((f) => ({
+              tempMax: f.tempMax,
+              tempMin: f.tempMin,
+              precipitation: f.precipitation,
+              windSpeed: f.windSpeed,
+            })),
+            allForecasts.map((f) => f.serviceName),
+            reliabilityMap
+          );
+        }
 
         // Determine condition
         const avgPrecip = allForecasts.reduce((sum, f) => sum + (f.precipitation ?? 0), 0) / allForecasts.length;
