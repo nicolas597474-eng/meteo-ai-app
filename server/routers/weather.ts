@@ -124,6 +124,54 @@ export const weatherRouter = router({
       ...EXTENDED_REGIME_INFO[key],
     }));
 
+    // Compute current weather parameters for display
+    const currentParams = {
+      temperature: regimeParams.temperature ?? 15,
+      precipitation: regimeParams.precipitation ?? 0,
+      windSpeed: regimeParams.windSpeed ?? 0,
+      humidity: regimeParams.humidity ?? 60,
+      cloudCover: regimeParams.cloudCover ?? 50,
+      pressure: (meteoAI as any)?.pressure ?? 1013,
+    };
+
+    // Determine impact level per parameter based on regime weights
+    const getImpact = (weight: number): "Faible" | "Modéré" | "Élevé" | "Critique" => {
+      if (weight >= 0.30) return "Critique";
+      if (weight >= 0.20) return "Élevé";
+      if (weight >= 0.12) return "Modéré";
+      return "Faible";
+    };
+
+    const paramImpacts = {
+      temperature: getImpact(multiRegime.blendedWeights.temp),
+      precipitation: getImpact(multiRegime.blendedWeights.precip),
+      wind: getImpact(multiRegime.blendedWeights.wind),
+      cloudCover: getImpact(multiRegime.blendedWeights.condition),
+      humidity: getImpact(multiRegime.blendedWeights.humidity),
+      pressure: getImpact(multiRegime.blendedWeights.pressure),
+    };
+
+    // Key factors of the moment (top 5 based on current conditions)
+    const keyFactors: Array<{ label: string; icon: string }> = [];
+    if (currentParams.cloudCover > 70) keyFactors.push({ label: "Haute couverture nuageuse", icon: "☁️" });
+    if (currentParams.humidity > 75) keyFactors.push({ label: "Humidité élevée", icon: "💧" });
+    if (currentParams.pressure >= 1010 && currentParams.pressure <= 1020) keyFactors.push({ label: "Pression stable", icon: "🌀" });
+    if (currentParams.precipitation > 0.5) keyFactors.push({ label: "Averses possibles", icon: "🌧️" });
+    if (currentParams.windSpeed > 15 && currentParams.windSpeed <= 40) keyFactors.push({ label: `Vent modéré`, icon: "💨" });
+    if (currentParams.windSpeed > 40) keyFactors.push({ label: "Vent fort", icon: "🌬️" });
+    if (currentParams.temperature > 30) keyFactors.push({ label: "Forte chaleur", icon: "🌡️" });
+    if (currentParams.temperature < 5) keyFactors.push({ label: "Froid marqué", icon: "❄️" });
+    if (currentParams.cloudCover < 30) keyFactors.push({ label: "Ciel dégagé", icon: "☀️" });
+    if (currentParams.pressure < 1005) keyFactors.push({ label: "Dépression active", icon: "🌀" });
+    // Keep top 5
+    const topFactors = keyFactors.slice(0, 5);
+
+    // Best model info
+    const bestModel = ranking[0] ?? null;
+    const bestModelTrend = ranking[0] && ranking.length > 1
+      ? Math.round(((ranking[0].avgScore ?? 0) - (ranking[1].avgScore ?? 0)) * 10) / 10
+      : 0;
+
     return {
       ranking,
       totalServices: WEATHER_SERVICES.expert.length + WEATHER_SERVICES.public.length,
@@ -149,6 +197,15 @@ export const weatherRouter = router({
         description: multiRegime.description,
       },
       allRegimes,
+      // New fields for the redesigned UI
+      currentParams,
+      paramImpacts,
+      keyFactors: topFactors,
+      bestModel: bestModel ? {
+        name: bestModel.serviceName,
+        score: bestModel.avgScore ?? 0,
+        trend: bestModelTrend,
+      } : null,
     };
   }),
 

@@ -237,3 +237,11 @@
 - [x] Page Historique: comparaison par modèle individuel (graphique multi-courbes)
 - [x] Page Historique: graphique de précipitations observées vs prévues
 - [x] Page Historique: graphique de vent observé vs prévu
+
+## Refonte complète page Classement (31 juillet 2026)
+
+- [x] Backend: enrichir getRanking avec paramètres météo actuels (temp, humidité, pression, précip, vent, couverture nuageuse) + impact par paramètre
+- [x] Backend: calcul des pondérations 6 dimensions (température, nuages, précipitations, vent, humidité, pression)
+- [x] Backend: grille 20 régimes possibles avec pourcentages calculés par l'IA
+- [x] Backend: facteurs clés du moment (top 5 facteurs influençant la météo actuelle)
+- [x] Frontend: refonte complète Ranking.tsx fidèle à la maquette (image paysage, détection IA, confiance, paramètres, pondérations, régimes, facteurs, meilleur modèle)

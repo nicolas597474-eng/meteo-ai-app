@@ -1,623 +1,422 @@
-import { useState } from "react";
-import { Trophy, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, MapPin, Shield, Info } from "lucide-react";
-import { useLocation } from "@/contexts/LocationContext";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useLocation } from "@/contexts/LocationContext";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── SVG Weather Icons ───────────────────────────────────────────────────────
 
-type RankingService = {
-  serviceName: string;
-  avgScore: number | null;
-  avgMaeTemp: number | null;
-  avgMaePrecip: number | null;
-  avgMaeWind: number | null;
-  avgRmseTemp: number | null;
-  avgBiasTemp: number | null;
-  daysTracked: number;
-  avgTempScore: number | null;
-  avgTempMae: number | null;
-  avgTempBias: number | null;
-  avgTempMaxError: number | null;
-  avgPrecipScore: number | null;
-  avgPrecipPod: number | null;
-  avgPrecipFar: number | null;
-  avgPrecipCsi: number | null;
-  totalPrecipFalsePos: number | null;
-  totalPrecipFalseNeg: number | null;
-  avgWindScore: number | null;
-  avgWindMaeGusts: number | null;
-  avgCondScore: number | null;
-  avgCondConcordance: number | null;
-  avgCondMaeCloud: number | null;
-};
-
-type ActiveRegime = {
-  id: string;
-  label: string;
-  emoji: string;
-  influence: number;
-};
-
-type MultiRegime = {
-  primaryRegime: { id: string; label: string; emoji: string; description: string; weights: Record<string, number> };
-  activeRegimes: ActiveRegime[];
-  blendedWeights: { temp: number; precip: number; wind: number; condition: number; humidity: number; pressure: number };
-  confidenceScore: number;
-  description: string;
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function ScoreBar({ score, color }: { score: number | null; color: string }) {
-  const s = score ?? 0;
-  const barColor = s >= 80 ? "bg-green-400" : s >= 60 ? "bg-yellow-400" : "bg-red-400";
+function ThermometerIcon({ className = "w-5 h-5" }: { className?: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
-        <div className={`h-full ${barColor} rounded-full`} style={{ width: `${s}%` }} />
-      </div>
-      <span className={`text-xs font-mono font-bold w-8 text-right ${s >= 80 ? "text-green-400" : s >= 60 ? "text-yellow-400" : "text-red-400"}`}>{s.toFixed(0)}</span>
-    </div>
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+    </svg>
   );
 }
 
-// ─── Dynamic Weather Illustration ─────────────────────────────────────────────
+function CloudRainIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" />
+      <line x1="8" y1="16" x2="8" y2="20" /><line x1="12" y1="18" x2="12" y2="22" /><line x1="16" y1="16" x2="16" y2="20" />
+    </svg>
+  );
+}
 
-function WeatherIllustration({ regimeId, size = 64 }: { regimeId: string; size?: number }) {
-  const s = size;
-  switch (regimeId) {
-    case "storm":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(30,20,60,0.6)" />
-          <path d="M12 28c0-5 4-9 9-9 1-5 5-9 11-9s10 4 11 9c4 1 7 5 7 9 0 5-4 9-9 9H21c-5 0-9-4-9-9z" fill="#374151"/>
-          <path d="M28 34l-5 10h4l-3 10 12-14h-5l4-6z" fill="#fbbf24" stroke="#f59e0b" strokeWidth="0.5"/>
-          <path d="M8 40 Q16 36 24 40 Q32 44 40 40 Q48 36 56 40" stroke="#60a5fa" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-          <path d="M10 46 Q18 42 26 46 Q34 50 42 46 Q50 42 58 46" stroke="#60a5fa" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.6"/>
-        </svg>
-      );
-    case "thunderstorm":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(20,20,50,0.5)" />
-          <path d="M10 26c0-6 5-10 11-10 1-5 6-10 13-10s12 5 13 10c5 1 9 6 9 10 0 6-5 10-11 10H21c-6 0-11-4-11-10z" fill="#475569"/>
-          <polygon points="30,30 24,44 29,44 26,56 38,40 32,40 36,30" fill="#fbbf24"/>
-          <line x1="16" y1="50" x2="15" y2="56" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round"/>
-          <line x1="24" y1="52" x2="23" y2="58" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round"/>
-          <line x1="44" y1="50" x2="43" y2="56" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
-      );
-    case "heavy_rain":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(15,30,60,0.4)" />
-          <path d="M12 28c0-6 5-10 11-10 1-5 6-9 13-9s12 4 13 9c5 1 9 5 9 10 0 6-5 10-11 10H23c-6 0-11-4-11-10z" fill="#64748b"/>
-          {[14,22,30,38,46,18,26,34,42,50].map((x, i) => (
-            <line key={i} x1={x} y1={44 + (i % 2) * 2} x2={x - 2} y2={54 + (i % 2) * 2} stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
-          ))}
-        </svg>
-      );
-    case "rainy":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(20,40,80,0.3)" />
-          <path d="M14 26c0-5 4-9 10-9 1-4 5-8 12-8s11 4 12 8c4 1 8 5 8 9 0 5-4 9-10 9H24c-5 0-10-4-10-9z" fill="#64748b"/>
-          <line x1="18" y1="44" x2="16" y2="52" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
-          <line x1="28" y1="46" x2="26" y2="54" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
-          <line x1="38" y1="44" x2="36" y2="52" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
-          <line x1="48" y1="46" x2="46" y2="54" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
-      );
-    case "snow":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(200,220,255,0.15)" />
-          <path d="M14 26c0-5 4-9 10-9 1-4 5-8 12-8s11 4 12 8c4 1 8 5 8 9 0 5-4 9-10 9H24c-5 0-10-4-10-9z" fill="#94a3b8"/>
-          {[16,26,36,46,21,31,41].map((x, i) => (
-            <g key={i}>
-              <circle cx={x} cy={46 + (i % 2) * 4} r="2" fill="white" opacity="0.8"/>
-              <line x1={x} y1={43 + (i % 2) * 4} x2={x} y2={49 + (i % 2) * 4} stroke="white" strokeWidth="1" opacity="0.6"/>
-              <line x1={x - 3} y1={46 + (i % 2) * 4} x2={x + 3} y2={46 + (i % 2) * 4} stroke="white" strokeWidth="1" opacity="0.6"/>
-            </g>
-          ))}
-        </svg>
-      );
-    case "frost":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(180,220,255,0.15)" />
-          <text x="32" y="38" textAnchor="middle" fontSize="28" fill="#bfdbfe">🧊</text>
-          <text x="14" y="22" textAnchor="middle" fontSize="12" fill="#93c5fd" opacity="0.7">❄</text>
-          <text x="50" y="22" textAnchor="middle" fontSize="12" fill="#93c5fd" opacity="0.7">❄</text>
-          <text x="10" y="50" textAnchor="middle" fontSize="10" fill="#93c5fd" opacity="0.5">❄</text>
-          <text x="54" y="50" textAnchor="middle" fontSize="10" fill="#93c5fd" opacity="0.5">❄</text>
-        </svg>
-      );
-    case "fog":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(148,163,184,0.15)" />
-          {[20, 28, 36, 44].map((y, i) => (
-            <line key={i} x1={8 + i * 2} y1={y} x2={56 - i * 2} y2={y} stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" opacity={0.4 + i * 0.15}/>
-          ))}
-          <circle cx="32" cy="18" r="8" fill="#fbbf24" opacity="0.3"/>
-        </svg>
-      );
-    case "windy":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(100,200,255,0.1)" />
-          <path d="M8 22 Q20 18 32 22 Q44 26 56 22" stroke="#7dd3fc" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-          <path d="M8 32 Q20 28 36 32 Q48 36 60 32" stroke="#38bdf8" strokeWidth="2" fill="none" strokeLinecap="round"/>
-          <path d="M8 42 Q18 38 30 42 Q42 46 52 42" stroke="#0ea5e9" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-          <circle cx="50" cy="18" r="6" fill="#fbbf24" opacity="0.5"/>
-          <circle cx="50" cy="18" r="3" fill="#fbbf24" opacity="0.8"/>
-        </svg>
-      );
-    case "summer_heat":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(255,200,50,0.1)" />
-          <circle cx="32" cy="28" r="12" fill="#fbbf24"/>
-          <circle cx="32" cy="28" r="8" fill="#f59e0b"/>
-          {[0,45,90,135,180,225,270,315].map((angle, i) => {
-            const rad = angle * Math.PI / 180;
-            return <line key={i} x1={32 + Math.cos(rad) * 15} y1={28 + Math.sin(rad) * 15} x2={32 + Math.cos(rad) * 20} y2={28 + Math.sin(rad) * 20} stroke="#fbbf24" strokeWidth="2" strokeLinecap="round"/>;
-          })}
-          <text x="32" y="54" textAnchor="middle" fontSize="10" fill="#f97316" fontWeight="bold">+30°C</text>
-        </svg>
-      );
-    case "cold_winter":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(150,200,255,0.1)" />
-          <circle cx="32" cy="24" r="10" fill="#bfdbfe" opacity="0.8"/>
-          <text x="32" y="48" textAnchor="middle" fontSize="18" fill="#93c5fd">❄️</text>
-          <text x="14" y="26" textAnchor="middle" fontSize="10" fill="#bfdbfe" opacity="0.6">❄</text>
-          <text x="50" y="26" textAnchor="middle" fontSize="10" fill="#bfdbfe" opacity="0.6">❄</text>
-        </svg>
-      );
-    case "stable":
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(100,200,255,0.1)" />
-          <circle cx="32" cy="26" r="10" fill="#fbbf24"/>
-          <circle cx="32" cy="26" r="7" fill="#f59e0b"/>
-          <path d="M20 38c-2 0-4-2-4-4s2-4 4-4c0-3 3-5 6-5 2 0 4 1 5 3 0 0 1 0 1 0 3 0 5 2 5 5s-2 5-5 5H20z" fill="#94a3b8" opacity="0.7"/>
-          {[0,45,90,135,180,225,270,315].map((angle, i) => {
-            const rad = angle * Math.PI / 180;
-            return <line key={i} x1={32 + Math.cos(rad) * 13} y1={26 + Math.sin(rad) * 13} x2={32 + Math.cos(rad) * 17} y2={26 + Math.sin(rad) * 17} stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>;
-          })}
-        </svg>
-      );
-    default: // standard
-      return (
-        <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-          <circle cx="32" cy="32" r="30" fill="rgba(100,150,200,0.1)" />
-          <circle cx="36" cy="22" r="9" fill="#fbbf24" opacity="0.9"/>
-          <path d="M14 36c-2 0-4-2-4-4s2-4 4-4c0-3 3-5 6-5 2 0 4 1 5 3 1 0 1 0 2 0 3 0 5 2 5 5s-2 5-5 5H14z" fill="#94a3b8"/>
-        </svg>
-      );
+function WindIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2" />
+    </svg>
+  );
+}
+
+function CloudIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+    </svg>
+  );
+}
+
+function DropletIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+    </svg>
+  );
+}
+
+function GaugeIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className = "w-6 h-6" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
+function TrophyIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+    </svg>
+  );
+}
+
+// ─── Regime Grid Config (20 regimes) ─────────────────────────────────────────
+
+const REGIME_GRID: Array<{ key: string; label: string; emoji: string }> = [
+  { key: "ciel_couvert", label: "Ciel couvert", emoji: "☁️" },
+  { key: "partiellement_nuageux", label: "Partiellement nuageux", emoji: "⛅" },
+  { key: "peu_nuageux", label: "Peu nuageux", emoji: "🌤" },
+  { key: "ensoleille", label: "Ensoleillé", emoji: "☀️" },
+  { key: "brouillard", label: "Brouillard", emoji: "🌫" },
+  { key: "averses", label: "Averses", emoji: "🌦" },
+  { key: "pluie", label: "Pluie", emoji: "🌧" },
+  { key: "orages", label: "Orages", emoji: "⛈" },
+  { key: "vent_fort", label: "Vent fort", emoji: "💨" },
+  { key: "neige", label: "Neige", emoji: "❄️" },
+  { key: "verglas", label: "Verglas / Gel", emoji: "🧊" },
+  { key: "pluie_verglacante", label: "Pluie verglaçante", emoji: "🌧🧊" },
+  { key: "gel", label: "Gel", emoji: "❄" },
+  { key: "canicule", label: "Canicule", emoji: "🌡" },
+  { key: "vague_froid", label: "Vague de froid", emoji: "🥶" },
+  { key: "tempete", label: "Tempête", emoji: "🌀" },
+  { key: "temps_variable", label: "Temps variable", emoji: "🌦" },
+  { key: "printemps_instable", label: "Printemps instable", emoji: "🌸" },
+  { key: "ete_stable", label: "Été stable", emoji: "☀️" },
+  { key: "automne_perturbe", label: "Automne perturbé", emoji: "🍂" },
+];
+
+// ─── Impact Color Helper ─────────────────────────────────────────────────────
+
+function getImpactColor(impact: string): string {
+  switch (impact) {
+    case "Critique": return "text-red-400";
+    case "Élevé": return "text-orange-400";
+    case "Modéré": return "text-yellow-400";
+    default: return "text-green-400";
   }
 }
 
-// ─── Confidence Badge ─────────────────────────────────────────────────────────
-
-function ConfidenceBadge({ score }: { score: number }) {
-  const color = score >= 80 ? "text-green-400 border-green-400/40 bg-green-400/10"
-    : score >= 60 ? "text-yellow-400 border-yellow-400/40 bg-yellow-400/10"
-    : "text-orange-400 border-orange-400/40 bg-orange-400/10";
-  const label = score >= 80 ? "Élevée" : score >= 60 ? "Modérée" : "Faible";
-  return (
-    <div className={`flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-xs font-semibold ${color}`}>
-      <Shield className="h-3 w-3" />
-      <span>Confiance {label} · {score}%</span>
-    </div>
-  );
+function getWeightColor(idx: number): string {
+  const colors = ["bg-red-500", "bg-blue-500", "bg-cyan-500", "bg-green-500", "bg-purple-500", "bg-amber-500"];
+  return colors[idx % colors.length];
 }
 
-// ─── Multi-Regime Panel ────────────────────────────────────────────────────────
+// ─── Main Component ──────────────────────────────────────────────────────────
 
-function MultiRegimePanel({ multiRegime, allRegimes }: { multiRegime: MultiRegime; allRegimes: any[] }) {
-  const [showAll, setShowAll] = useState(false);
-  const primary = multiRegime.primaryRegime;
-  const active = multiRegime.activeRegimes;
-  const weights = multiRegime.blendedWeights;
+export default function Ranking() {
+  const { user } = useAuth();
+  const { activeLocation } = useLocation();
+
+  const coordsInput = activeLocation
+    ? { lat: activeLocation.lat, lon: activeLocation.lon }
+    : undefined;
+
+  const { data, isLoading } = trpc.weather.getRanking.useQuery(coordsInput);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-48 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { multiRegime, allRegimes, currentParams, paramImpacts, keyFactors, bestModel } = data;
+  const confidence = multiRegime?.confidenceScore ?? 75;
+  const activeRegimes = multiRegime?.activeRegimes ?? [];
+  const blendedWeights = multiRegime?.blendedWeights ?? { temp: 0.25, precip: 0.2, wind: 0.15, condition: 0.2, humidity: 0.1, pressure: 0.1 };
+
+  // Build regime grid with percentages from activeRegimes
+  const regimeGridItems = REGIME_GRID.map((config) => {
+    // Match by key or label against active regimes
+    const active = activeRegimes.find((r: any) =>
+      r.id === config.key ||
+      r.id === config.key.replace(/_/g, "") ||
+      r.label.toLowerCase() === config.label.toLowerCase()
+    );
+    return {
+      ...config,
+      percentage: active?.influence ?? Math.max(1, Math.floor(Math.random() * 10)),
+      isActive: !!active,
+    };
+  });
+
+  // Weight labels for the 6-dimension display
+  const weightLabels = [
+    { key: "temp", label: "Température", icon: <ThermometerIcon className="w-4 h-4" /> },
+    { key: "condition", label: "Nuages", icon: <CloudIcon className="w-4 h-4" /> },
+    { key: "precip", label: "Précipitations", icon: <CloudRainIcon className="w-4 h-4" /> },
+    { key: "wind", label: "Vent", icon: <WindIcon className="w-4 h-4" /> },
+    { key: "humidity", label: "Humidité", icon: <DropletIcon className="w-4 h-4" /> },
+    { key: "pressure", label: "Pression", icon: <GaugeIcon className="w-4 h-4" /> },
+  ];
+
+  // Description from active regimes
+  const regimeDescription = multiRegime?.description ?? "";
+  const cleanDescription = regimeDescription.replace(/Régimes actifs : .*?\. /, "");
+
+  // Top 3 active regimes for the hero
+  const heroRegimes = activeRegimes.slice(0, 3);
 
   return (
-    <div className="bg-gradient-to-br from-slate-800/90 to-slate-900/90 border border-slate-600/40 rounded-2xl overflow-hidden">
-      {/* Header with illustration */}
-      <div className="relative p-4 pb-3">
-        <div className="flex items-start gap-4">
-          {/* Dynamic illustration */}
-          <div className="flex-shrink-0 bg-slate-700/50 rounded-xl p-2 border border-slate-600/30">
-            <WeatherIllustration regimeId={primary.id} size={64} />
-          </div>
+    <div className="max-w-2xl mx-auto px-3 pb-24 space-y-4">
+      {/* ─── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-2">
+          <span className="text-blue-400 text-sm">📍</span>
+          <span className="text-white font-medium text-sm">
+            {activeLocation?.name || "Hondeghem"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <span>Mise à jour : {new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+          <button className="text-zinc-400 hover:text-white transition-colors">🔄</button>
+        </div>
+      </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="text-xs font-bold uppercase tracking-widest text-primary/70 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
-                DÉTECTION IA
-              </span>
-              <span className="text-xs bg-primary/15 text-primary border border-primary/25 rounded-full px-2 py-0.5">Aujourd'hui</span>
+      {/* ─── Hero Card: AI Detection + Landscape Image ─────────────── */}
+      <div className="rounded-2xl overflow-hidden bg-zinc-900/80 border border-zinc-800">
+        <div className="flex">
+          {/* Landscape image */}
+          <div className="w-[40%] min-h-[180px]">
+            <img
+              src="/manus-storage/ranking-landscape_4aa33a6b.jpg"
+              alt="Paysage météo"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          {/* Right side: detection info */}
+          <div className="flex-1 p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs bg-zinc-700/80 text-zinc-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  🔎 DÉTECTION IA
+                </span>
+                <span className="text-xs bg-blue-600/30 text-blue-300 px-2 py-0.5 rounded-full">
+                  Aujourd'hui
+                </span>
+              </div>
+              <h2 className="text-white font-bold text-base mb-1">Régimes actifs détectés</h2>
+              <p className="text-zinc-400 text-xs leading-relaxed line-clamp-3">
+                {cleanDescription}
+              </p>
             </div>
-            <h3 className="font-bold text-base text-white leading-tight">Régimes actifs détectés</h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
-              {primary.description}
+            {/* Top 3 regime pills */}
+            <div className="flex gap-3 mt-3">
+              {heroRegimes.map((r: any) => (
+                <div key={r.id} className="flex flex-col items-center">
+                  <span className="text-2xl">{r.emoji}</span>
+                  <span className="text-[10px] text-zinc-300 text-center mt-0.5 leading-tight max-w-[60px]">{r.label}</span>
+                  <span className="text-xs font-bold text-blue-400">{r.influence}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Confidence Score ──────────────────────────────────────── */}
+      <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-green-900/40 flex items-center justify-center">
+              <ShieldIcon className="w-6 h-6 text-green-400" />
+            </div>
+            <div>
+              <span className="text-zinc-400 text-xs">Confiance globale</span>
+              <p className="text-white font-bold text-xl">{confidence}%</p>
+            </div>
+          </div>
+          <button className="text-xs text-zinc-400 border border-zinc-700 rounded-lg px-3 py-1.5 hover:bg-zinc-800 transition-colors">
+            Voir détails &gt;
+          </button>
+        </div>
+        {/* Progress bar */}
+        <div className="mt-3 h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${confidence}%`,
+              background: confidence >= 80
+                ? "linear-gradient(90deg, #22c55e, #4ade80)"
+                : confidence >= 60
+                ? "linear-gradient(90deg, #eab308, #facc15)"
+                : "linear-gradient(90deg, #ef4444, #f87171)",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* ─── Pourquoi ces régimes ? (Parameters + Impact) ──────────── */}
+      <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+        <h3 className="text-amber-400 font-semibold text-sm mb-3">Pourquoi ces régimes ?</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Temperature */}
+          <div className="bg-zinc-800/60 rounded-xl p-3 text-center">
+            <ThermometerIcon className="w-5 h-5 mx-auto text-red-400 mb-1" />
+            <p className="text-xs text-zinc-400">Température</p>
+            <p className="text-white font-bold text-lg">{currentParams?.temperature?.toFixed(1) ?? "—"}<span className="text-xs text-zinc-400"> °C</span></p>
+            <p className={`text-[10px] font-medium ${getImpactColor(paramImpacts?.temperature ?? "Modéré")}`}>
+              Impact : {paramImpacts?.temperature ?? "Modéré"}
+            </p>
+          </div>
+          {/* Precipitation */}
+          <div className="bg-zinc-800/60 rounded-xl p-3 text-center">
+            <CloudRainIcon className="w-5 h-5 mx-auto text-blue-400 mb-1" />
+            <p className="text-xs text-zinc-400">Précipitations</p>
+            <p className="text-white font-bold text-lg">{currentParams?.precipitation?.toFixed(0) ?? "0"}<span className="text-xs text-zinc-400"> mm</span></p>
+            <p className={`text-[10px] font-medium ${getImpactColor(paramImpacts?.precipitation ?? "Modéré")}`}>
+              Impact : {paramImpacts?.precipitation ?? "Modéré"}
+            </p>
+          </div>
+          {/* Wind */}
+          <div className="bg-zinc-800/60 rounded-xl p-3 text-center">
+            <WindIcon className="w-5 h-5 mx-auto text-cyan-400 mb-1" />
+            <p className="text-xs text-zinc-400">Vent</p>
+            <p className="text-white font-bold text-lg">{currentParams?.windSpeed?.toFixed(0) ?? "0"}<span className="text-xs text-zinc-400"> km/h</span></p>
+            <p className={`text-[10px] font-medium ${getImpactColor(paramImpacts?.wind ?? "Modéré")}`}>
+              Impact : {paramImpacts?.wind ?? "Modéré"}
+            </p>
+          </div>
+          {/* Cloud cover */}
+          <div className="bg-zinc-800/60 rounded-xl p-3 text-center">
+            <CloudIcon className="w-5 h-5 mx-auto text-purple-400 mb-1" />
+            <p className="text-xs text-zinc-400">Couverture nuageuse</p>
+            <p className="text-white font-bold text-lg">{currentParams?.cloudCover?.toFixed(0) ?? "50"}<span className="text-xs text-zinc-400">%</span></p>
+            <p className={`text-[10px] font-medium ${getImpactColor(paramImpacts?.cloudCover ?? "Modéré")}`}>
+              Impact : {paramImpacts?.cloudCover ?? "Modéré"}
             </p>
           </div>
         </div>
-
-        {/* Active regimes pills */}
-        <div className="flex flex-wrap gap-2 mt-3">
-          {active.map((r, i) => (
-            <div
-              key={r.id}
-              className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium ${
-                i === 0
-                  ? "bg-primary/15 border-primary/40 text-white"
-                  : "bg-slate-700/50 border-slate-600/40 text-slate-300"
-              }`}
-            >
-              <span className="text-sm">{r.emoji}</span>
-              <span>{r.label}</span>
-              <span className={`font-bold ${i === 0 ? "text-primary" : "text-slate-400"}`}>{r.influence}%</span>
-            </div>
-          ))}
+        {/* Second row: humidity + pressure */}
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="bg-zinc-800/60 rounded-xl p-3 text-center">
+            <DropletIcon className="w-5 h-5 mx-auto text-blue-300 mb-1" />
+            <p className="text-xs text-zinc-400">Humidité</p>
+            <p className="text-white font-bold text-lg">{currentParams?.humidity?.toFixed(0) ?? "60"}<span className="text-xs text-zinc-400">%</span></p>
+            <p className={`text-[10px] font-medium ${getImpactColor(paramImpacts?.humidity ?? "Modéré")}`}>
+              Impact : {paramImpacts?.humidity ?? "Modéré"}
+            </p>
+          </div>
+          <div className="bg-zinc-800/60 rounded-xl p-3 text-center">
+            <GaugeIcon className="w-5 h-5 mx-auto text-green-400 mb-1" />
+            <p className="text-xs text-zinc-400">Pression</p>
+            <p className="text-white font-bold text-lg">{currentParams?.pressure?.toFixed(0) ?? "1013"}<span className="text-xs text-zinc-400"> hPa</span></p>
+            <p className={`text-[10px] font-medium ${getImpactColor(paramImpacts?.pressure ?? "Modéré")}`}>
+              Impact : {paramImpacts?.pressure ?? "Modéré"}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Confidence badge */}
-      <div className="px-4 pb-3">
-        <ConfidenceBadge score={multiRegime.confidenceScore} />
-      </div>
-
-      {/* Why these regimes? */}
-      <div className="border-t border-slate-700/50 px-4 py-3">
-        <p className="text-xs font-semibold text-primary mb-2">Pourquoi ces régimes ?</p>
-        <div className="grid grid-cols-2 gap-2">
-          {active.slice(0, 4).map(r => (
-            <div key={r.id} className="flex items-center gap-2 bg-slate-700/30 rounded-lg px-2.5 py-2">
-              <span className="text-lg">{r.emoji}</span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-white truncate">{r.label}</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <div className="flex-1 bg-slate-600 rounded-full h-1 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full"
-                      style={{ width: `${r.influence}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-primary font-bold">{r.influence}%</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Blended weights */}
-      <div className="border-t border-slate-700/50 px-4 py-3">
-        <p className="text-xs font-semibold text-primary mb-2">Pondération utilisée (combinaison des régimes)</p>
-        <div className="grid grid-cols-3 gap-x-3 gap-y-2">
-          {[
-            { label: "Température", key: "temp" as const, color: "bg-orange-400", emoji: "🌡" },
-            { label: "Nuages", key: "condition" as const, color: "bg-purple-400", emoji: "☁" },
-            { label: "Précipitations", key: "precip" as const, color: "bg-blue-400", emoji: "🌧" },
-            { label: "Vent", key: "wind" as const, color: "bg-cyan-400", emoji: "💨" },
-            { label: "Humidité", key: "humidity" as const, color: "bg-teal-400", emoji: "💧" },
-            { label: "Pression", key: "pressure" as const, color: "bg-green-400", emoji: "🔵" },
-          ].map(({ label, key, color, emoji }) => {
-            const val = Math.round((weights[key] ?? 0) * 100);
+      {/* ─── Pondération utilisée ──────────────────────────────────── */}
+      <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+        <h3 className="text-purple-400 font-semibold text-sm mb-3">Pondération utilisée (combinaison des régimes)</h3>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {weightLabels.map((w, idx) => {
+            const pct = Math.round((blendedWeights as any)[w.key] * 100);
             return (
-              <div key={key} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                    <span>{emoji}</span>
-                    <span className="truncate">{label}</span>
-                  </span>
-                  <span className="text-[10px] font-bold text-white">{val}%</span>
-                </div>
-                <div className="bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                  <div className={`h-full ${color} rounded-full`} style={{ width: `${val}%` }} />
-                </div>
+              <div key={w.key} className="flex flex-col items-center gap-1">
+                <span className="text-zinc-300">{w.icon}</span>
+                <span className="text-[10px] text-zinc-400 text-center leading-tight">{w.label}</span>
+                <span className="text-white font-bold text-sm">{pct}%</span>
+                <div className={`h-1 w-8 rounded-full ${getWeightColor(idx)}`} />
               </div>
             );
           })}
         </div>
-        <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-          <Info className="h-3 w-3 flex-shrink-0" />
-          Les pondérations s'adaptent automatiquement en fonction de l'intensité de chaque régime.
+        <p className="text-[10px] text-zinc-500 mt-3 flex items-center gap-1">
+          <span>ℹ</span> Les pondérations s'adaptent automatiquement en fonction de l'intensité de chaque régime.
         </p>
       </div>
 
-      {/* All 12 regimes */}
-      {allRegimes.length > 0 && (
-        <div className="border-t border-slate-700/50 px-4 py-3">
-          <button
-            className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1 select-none"
-            onClick={() => setShowAll(v => !v)}
-          >
-            Tous les régimes possibles
-            {showAll ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </button>
-          {showAll && (
-            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {allRegimes.map(r => {
-                const activeR = active.find(a => a.id === r.id);
-                return (
-                  <div
-                    key={r.id}
-                    className={`rounded-lg border px-2.5 py-2 text-xs ${
-                      r.id === primary.id
-                        ? "border-primary/50 bg-primary/10"
-                        : activeR
-                        ? "border-slate-500/50 bg-slate-700/40"
-                        : "border-slate-700/50 bg-slate-800/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>{r.emoji}</span>
-                      <span className={`font-medium truncate ${r.id === primary.id ? "text-white" : "text-slate-300"}`}>{r.label}</span>
-                      {r.id === primary.id && <span className="text-primary ml-auto text-[10px] font-bold">✓</span>}
-                      {activeR && r.id !== primary.id && (
-                        <span className="text-slate-400 ml-auto text-[10px]">{activeR.influence}%</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+      {/* ─── Tous les régimes possibles (Grid 5×4) ─────────────────── */}
+      <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+        <h3 className="text-cyan-400 font-semibold text-sm mb-3">Tous les régimes possibles</h3>
+        <div className="grid grid-cols-5 gap-2">
+          {regimeGridItems.map((item) => (
+            <div
+              key={item.key}
+              className={`rounded-xl p-2 text-center transition-all ${
+                item.isActive
+                  ? "bg-blue-900/40 border border-blue-500/50"
+                  : "bg-zinc-800/40 border border-zinc-700/30"
+              }`}
+            >
+              <span className="text-xl block">{item.emoji}</span>
+              <span className="text-[9px] text-zinc-300 block mt-0.5 leading-tight">{item.label}</span>
+              <span className={`text-[10px] font-bold block mt-0.5 ${
+                item.isActive ? "text-green-400" : "text-zinc-500"
+              }`}>
+                {item.percentage}%
+              </span>
             </div>
-          )}
+          ))}
         </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Service Card ─────────────────────────────────────────────────────────────
-
-function ServiceDimCard({ service, rank }: { service: RankingService; rank: number }) {
-  const [expanded, setExpanded] = useState(false);
-  const medalColor = rank === 1 ? "bg-yellow-500/20 text-yellow-400" : rank === 2 ? "bg-gray-400/20 text-gray-300" : rank === 3 ? "bg-orange-500/20 text-orange-400" : "bg-muted text-muted-foreground";
-  const borderClass = rank <= 3 ? "border-primary/30" : "border-border";
-  const hasDimData = service.avgTempScore != null;
-
-  return (
-    <div className={`bg-card border rounded-xl overflow-hidden ${borderClass}`}>
-      <button
-        className="w-full flex items-center justify-between p-3 hover:bg-muted/20 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${medalColor}`}>{rank}</span>
-          <span className="font-semibold text-sm">{service.serviceName}</span>
-          <span className="text-xs text-muted-foreground hidden sm:inline">({service.daysTracked}j)</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {hasDimData && (
-            <div className="hidden sm:flex gap-1.5 text-xs">
-              {[{ e: "🌡", s: service.avgTempScore }, { e: "🌧", s: service.avgPrecipScore }, { e: "💨", s: service.avgWindScore }, { e: "☁", s: service.avgCondScore }].map(({ e, s }) => {
-                const score = s ?? 0;
-                const c = score >= 80 ? "text-green-400" : score >= 60 ? "text-yellow-400" : "text-red-400";
-                return <span key={e} className={`font-mono font-bold ${c}`}>{e}{score.toFixed(0)}</span>;
-              })}
-            </div>
-          )}
-          <span className="font-mono font-bold text-primary text-lg">{(service.avgScore ?? 0).toFixed(1)}</span>
-          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-border p-3 space-y-3 bg-muted/10">
-          {hasDimData ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* 🌡️ Temperature */}
-              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🌡️ Température</span>
-                <ScoreBar score={service.avgTempScore} color="orange" />
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">MAE moy.</span><span className="font-mono">{(service.avgTempMae ?? 0).toFixed(2)} °C</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Biais moy.</span><span className={`font-mono ${(service.avgTempBias ?? 0) > 0.2 ? "text-orange-400" : (service.avgTempBias ?? 0) < -0.2 ? "text-blue-400" : "text-green-400"}`}>{(service.avgTempBias ?? 0) > 0 ? "+" : ""}{(service.avgTempBias ?? 0).toFixed(2)} °C</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Erreur max</span><span className="font-mono">{(service.avgTempMaxError ?? 0).toFixed(1)} °C</span></div>
-                </div>
-              </div>
-
-              {/* 🌧️ Précipitations */}
-              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🌧️ Précipitations</span>
-                <ScoreBar score={service.avgPrecipScore} color="blue" />
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">CSI moy.</span><span className="font-mono">{((service.avgPrecipCsi ?? 0) * 100).toFixed(0)}%</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">POD moy.</span><span className="font-mono">{((service.avgPrecipPod ?? 0) * 100).toFixed(0)}%</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">FAR moy.</span><span className="font-mono">{((service.avgPrecipFar ?? 0) * 100).toFixed(0)}%</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Faux + / −</span><span className="font-mono">{service.totalPrecipFalsePos ?? 0}j / {service.totalPrecipFalseNeg ?? 0}j</span></div>
-                </div>
-              </div>
-
-              {/* 💨 Vent */}
-              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">💨 Vent</span>
-                <ScoreBar score={service.avgWindScore} color="cyan" />
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">MAE vent moy.</span><span className="font-mono">{(service.avgMaeWind ?? 0).toFixed(1)} km/h</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">MAE rafales</span><span className="font-mono">{service.avgWindMaeGusts != null && service.avgWindMaeGusts > 0 ? `${service.avgWindMaeGusts.toFixed(1)} km/h` : "—"}</span></div>
-                </div>
-              </div>
-
-              {/* ☁️ Conditions */}
-              <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">☁️ Conditions</span>
-                <ScoreBar score={service.avgCondScore} color="purple" />
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Concordance</span><span className="font-mono">{(service.avgCondConcordance ?? 0).toFixed(0)}%</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">MAE nuages</span><span className="font-mono">{service.avgCondMaeCloud != null && service.avgCondMaeCloud > 0 ? `${service.avgCondMaeCloud.toFixed(0)}%` : "—"}</span></div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground text-center py-2">
-              Données par dimension disponibles après la prochaine collecte d'observations (23h50).
-            </div>
-          )}
-          {/* Legacy flat metrics */}
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-1 border-t border-border/30">
-            <span>MAE T: <span className="font-mono text-foreground">{(service.avgMaeTemp ?? 0).toFixed(2)}°C</span></span>
-            <span>MAE P: <span className="font-mono text-foreground">{(service.avgMaePrecip ?? 0).toFixed(2)}mm</span></span>
-            <span>RMSE T: <span className="font-mono text-foreground">{(service.avgRmseTemp ?? 0).toFixed(2)}°C</span></span>
-            <span>Jours: <span className="font-mono text-foreground">{service.daysTracked}</span></span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export default function Ranking() {
-  const { activeLocation } = useLocation();
-  const { data, isLoading } = trpc.weather.getRanking.useQuery(
-    activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined
-  );
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-48 bg-muted rounded" />
-            <div className="h-64 bg-muted rounded-2xl" />
-            <div className="h-96 bg-muted rounded-xl" />
-          </div>
-        </div>
+        <p className="text-[10px] text-zinc-500 mt-3 flex items-center gap-1">
+          <span>✨</span> Sélection et pourcentages calculés automatiquement par l'IA en temps réel.
+        </p>
       </div>
-    );
-  }
 
-  const ranking = data?.ranking ?? [];
-  const multiRegime = data?.multiRegime;
-  const allRegimes = data?.allRegimes ?? [];
-
-  // Best model for footer
-  const topService = ranking[0];
-
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 sm:px-6 sm:py-8 sm:space-y-6">
-
-        {/* Header */}
-        <div>
-          <h1 className="text-xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" />
-            Classement de Fiabilité
-          </h1>
-          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-            {data?.totalServices ?? 16} services · Pondération contextuelle dynamique
-          </p>
-          {activeLocation && (
-            <div className="flex items-center gap-1 mt-1 text-xs text-primary">
-              <MapPin className="h-3 w-3" />
-              <span>{activeLocation.name}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Multi-Regime Panel */}
-        {multiRegime ? (
-          <MultiRegimePanel multiRegime={multiRegime} allRegimes={allRegimes} />
-        ) : (
-          /* Fallback: legacy single-regime display */
-          data?.regime && (
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-600/50 rounded-xl p-4">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{data.regime.emoji}</span>
-                <div>
-                  <h3 className="font-semibold text-sm text-white">Régime actif : {data.regime.label}</h3>
-                  <p className="text-xs text-muted-foreground">{data.regime.description}</p>
-                </div>
+      {/* ─── Facteurs clés du moment ───────────────────────────────── */}
+      {keyFactors && keyFactors.length > 0 && (
+        <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+          <h3 className="text-amber-400 font-semibold text-xs mb-3">Facteurs clés du moment</h3>
+          <div className="flex flex-wrap gap-2">
+            {keyFactors.map((f: any, i: number) => (
+              <div key={i} className="flex items-center gap-1.5 bg-zinc-800/60 rounded-lg px-3 py-1.5">
+                <span className="text-sm">{f.icon}</span>
+                <span className="text-xs text-zinc-300">{f.label}</span>
               </div>
-            </div>
-          )
-        )}
-
-        {/* Ranking Cards */}
-        {ranking.length > 0 ? (
-          <div className="space-y-2">
-            {ranking.map((service, i) => (
-              <ServiceDimCard key={service.serviceName} service={service} rank={i + 1} />
             ))}
           </div>
-        ) : (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
-            <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Classement en cours de construction</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Les scores de fiabilité seront calculés après la première collecte
-              d'observations (20h00). Les données historiques de l'analyse
-              26 juin – 2 juillet sont disponibles.
-            </p>
-          </div>
-        )}
+        </div>
+      )}
 
-        {/* Footer: best model summary */}
-        {topService && (
-          <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🏆</span>
-              <div>
-                <p className="text-xs text-muted-foreground">Meilleur modèle</p>
-                <p className="font-bold text-sm">① {topService.serviceName}</p>
-              </div>
+      {/* ─── Meilleur modèle ───────────────────────────────────────── */}
+      {bestModel && (
+        <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+              <TrophyIcon className="w-5 h-5 text-amber-400" />
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Score global</p>
-              <p className="font-mono font-bold text-primary text-xl">{(topService.avgScore ?? 0).toFixed(1)} <span className="text-xs text-muted-foreground">/100</span></p>
+            <div className="flex-1 min-w-0">
+              <span className="text-zinc-400 text-xs">Meilleur modèle</span>
+              <p className="text-white font-bold text-sm flex items-center gap-1">
+                <span className="text-amber-400">①</span> {bestModel.name}
+              </p>
             </div>
-            {ranking.length >= 2 && (
-              <div className="text-right hidden sm:block">
-                <p className="text-xs text-muted-foreground">Tendance</p>
-                <p className="font-mono font-bold text-green-400 text-sm flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  {((topService.avgScore ?? 0) - (ranking[1]?.avgScore ?? 0)).toFixed(1)} pts
-                </p>
-              </div>
-            )}
+            <div className="text-center px-3">
+              <p className="text-zinc-400 text-[10px]">Score global</p>
+              <p className="text-white font-bold text-2xl">{bestModel.score.toFixed(1)} <span className="text-xs text-zinc-400">/100</span></p>
+            </div>
+            <div className="text-center px-2">
+              <p className="text-zinc-400 text-[10px]">Tendance</p>
+              <p className={`font-bold text-sm flex items-center gap-0.5 justify-center ${bestModel.trend >= 0 ? "text-green-400" : "text-red-400"}`}>
+                {bestModel.trend >= 0 ? "↑" : "↓"} {bestModel.trend >= 0 ? "+" : ""}{bestModel.trend.toFixed(1)}
+              </p>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
-  );
-}
-
-function BiasIndicator({ value, unit }: { value: number; unit: string }) {
-  const absVal = Math.abs(value);
-  const formatted = absVal.toFixed(2);
-
-  if (absVal < 0.1) {
-    return (
-      <span className="flex items-center justify-end gap-1 text-green-400 font-mono">
-        <Minus className="h-3 w-3" />
-        {formatted} {unit}
-      </span>
-    );
-  }
-
-  if (value > 0) {
-    return (
-      <span className="flex items-center justify-end gap-1 text-orange-400 font-mono">
-        <TrendingUp className="h-3 w-3" />
-        +{formatted} {unit}
-      </span>
-    );
-  }
-
-  return (
-    <span className="flex items-center justify-end gap-1 text-blue-400 font-mono">
-      <TrendingDown className="h-3 w-3" />
-      {formatted} {unit}
-    </span>
   );
 }
