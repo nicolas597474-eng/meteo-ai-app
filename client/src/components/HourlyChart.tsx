@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation } from "lucide-react";
+import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -50,26 +51,9 @@ function degToCompass(deg: number | null): string {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
-// ─── Weather Icon SVG ─────────────────────────────────────────────────────────
+// ─── Weather Icon (MeteoAI pack) ─────────────────────────────────────────────
 function WeatherIconSVG({ condition, size = 20 }: { condition: string; size?: number }) {
-  const s = size;
-  const c = condition.toLowerCase();
-  if (c.includes("ensoleillé") || c.includes("dégagé")) {
-    return (<svg width={s} height={s} viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="7" fill="#fbbf24"/><g stroke="#fbbf24" strokeWidth="2" strokeLinecap="round"><line x1="16" y1="2" x2="16" y2="5"/><line x1="16" y1="27" x2="16" y2="30"/><line x1="2" y1="16" x2="5" y2="16"/><line x1="27" y1="16" x2="30" y2="16"/><line x1="6" y1="6" x2="8" y2="8"/><line x1="24" y1="24" x2="26" y2="26"/><line x1="6" y1="26" x2="8" y2="24"/><line x1="24" y1="8" x2="26" y2="6"/></g></svg>);
-  }
-  if (c.includes("partiellement") || c.includes("nuageux")) {
-    return (<svg width={s} height={s} viewBox="0 0 32 32" fill="none"><circle cx="20" cy="12" r="6" fill="#fbbf24"/><path d="M8 24c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#94a3b8"/></svg>);
-  }
-  if (c.includes("couvert")) {
-    return (<svg width={s} height={s} viewBox="0 0 32 32" fill="none"><path d="M8 24c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#64748b"/></svg>);
-  }
-  if (c.includes("pluie") || c.includes("averse") || c.includes("bruine")) {
-    return (<svg width={s} height={s} viewBox="0 0 32 32" fill="none"><path d="M8 20c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#64748b"/><line x1="10" y1="23" x2="9" y2="27" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round"/><line x1="16" y1="23" x2="15" y2="28" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round"/><line x1="22" y1="23" x2="21" y2="27" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round"/></svg>);
-  }
-  if (c.includes("orage")) {
-    return (<svg width={s} height={s} viewBox="0 0 32 32" fill="none"><path d="M8 18c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#475569"/><polygon points="17,19 14,25 16,25 15,30 20,23 17,23 19,19" fill="#fbbf24"/></svg>);
-  }
-  return (<svg width={s} height={s} viewBox="0 0 32 32" fill="none"><path d="M8 24c-2.2 0-4-1.8-4-4s1.8-4 4-4c.4-2.8 2.8-5 5.7-5 2.5 0 4.6 1.6 5.3 3.8.4-.1.7-.1 1-.1 2.8 0 5 2.2 5 5s-2.2 5-5 5H8z" fill="#64748b"/></svg>);
+  return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} />;
 }
 
 // ─── Detail Overlay ──────────────────────────────────────────────────────────

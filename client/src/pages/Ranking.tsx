@@ -4,18 +4,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "@/contexts/LocationContext";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
-import {
-  Thermometer, CloudRain, Wind, Cloud, Droplets, Gauge,
-  Sun, CloudSun, CloudFog, Snowflake, CloudLightning,
-  CloudDrizzle, Waves, Flame, ThermometerSnowflake,
-  Tornado, CloudHail, TreePine, Leaf, Flower2,
-  MapPin, RefreshCw, ShieldCheck, ChevronRight, Info, Sparkles,
-  Trophy, TrendingUp, TrendingDown, Eye
-} from "lucide-react";
+import { MapPin, Info, Sparkles, Eye } from "lucide-react";
+import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
 
 /**
  * Page Classement — reproduction exacte de la maquette MeteoAI
- * Utilise lucide-react pour toutes les icônes
+ * Utilise le pack d'icônes MeteoAI personnalisé
  */
 
 export default function Ranking() {
@@ -65,7 +59,7 @@ export default function Ranking() {
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span>Mise à jour : {new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
-            <RefreshCw className="h-3.5 w-3.5 text-slate-400 cursor-pointer hover:text-white transition-colors" />
+            <MeteoIcon name="refresh" size={14} className="cursor-pointer hover:opacity-80 transition-opacity" />
           </div>
         </div>
 
@@ -85,7 +79,7 @@ export default function Ranking() {
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[11px] bg-[#1E293B] text-slate-300 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                    <Eye className="h-3 w-3 text-blue-400" /> DÉTECTION IA
+                    <MeteoIcon name="confidence" size={12} /> DÉTECTION IA
                   </span>
                   <span className="text-[11px] bg-blue-600/30 text-blue-300 px-2.5 py-1 rounded-full font-medium">
                     Aujourd'hui
@@ -99,12 +93,10 @@ export default function Ranking() {
               {/* Top 3 régimes */}
               <div className="flex justify-between mt-4">
                 {heroRegimes.map((r: any, i: number) => {
-                  const IconComp = getRegimeLucideIcon(r.id || r.label);
-                  const iconColor = getRegimeIconColor(r.id || r.label);
                   return (
                     <div key={i} className="flex flex-col items-center gap-1">
                       <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800/50">
-                        <IconComp className={`h-6 w-6 ${iconColor}`} />
+                        <MeteoIcon name={getIconNameFromRegime(r.id || r.label)} size={28} />
                       </div>
                       <span className="text-[10px] text-slate-400 text-center leading-tight max-w-[70px]">{r.label}</span>
                       <span className="text-sm font-bold text-blue-400">{r.influence}%</span>
@@ -128,7 +120,7 @@ export default function Ranking() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-green-900/40 border border-green-600/40">
-                <ShieldCheck className="h-7 w-7 text-green-400" />
+                <MeteoIcon name="confidence" size={28} />
               </div>
               <div>
                 <p className="text-slate-400 text-xs">Confiance globale</p>
@@ -136,7 +128,7 @@ export default function Ranking() {
               </div>
             </div>
             <button className="text-xs text-slate-400 border border-slate-700 rounded-lg px-3 py-2 hover:bg-slate-800 transition-colors flex items-center gap-1">
-              Voir détails <ChevronRight className="h-3 w-3" />
+              Voir détails <MeteoIcon name="chevron_right" size={12} />
             </button>
           </div>
           <div className="h-3 bg-[#1E293B] rounded-full overflow-hidden">
@@ -155,28 +147,28 @@ export default function Ranking() {
           <h3 className="text-amber-400 font-bold text-sm mb-3">Pourquoi ces régimes ?</h3>
           <div className="grid grid-cols-4 gap-2 mb-2">
             <ParamCard
-              icon={<Thermometer className="h-5 w-5 text-red-400" />}
+              icon={<MeteoIcon name="temperature" size={20} />}
               label="Température"
               value={`${currentParams?.temperature?.toFixed(1) ?? "18.2"}`}
               unit="°C"
               impact={paramImpacts?.temperature ?? "Élevé"}
             />
             <ParamCard
-              icon={<CloudRain className="h-5 w-5 text-blue-400" />}
+              icon={<MeteoIcon name="precipitation" size={20} />}
               label="Précipitations"
               value={`${currentParams?.precipitation?.toFixed(0) ?? "20"}`}
               unit="%"
               impact={paramImpacts?.precipitation ?? "Modéré"}
             />
             <ParamCard
-              icon={<Wind className="h-5 w-5 text-cyan-400" />}
+              icon={<MeteoIcon name="wind_param" size={20} />}
               label="Vent"
               value={`${currentParams?.windSpeed?.toFixed(0) ?? "14"}`}
               unit=" km/h"
               impact={paramImpacts?.wind ?? "Élevé"}
             />
             <ParamCard
-              icon={<Cloud className="h-5 w-5 text-purple-400" />}
+              icon={<MeteoIcon name="cloud_cover" size={20} />}
               label="Couverture nuageuse"
               value={`${currentParams?.cloudCover?.toFixed(0) ?? "92"}`}
               unit="%"
@@ -185,14 +177,14 @@ export default function Ranking() {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <ParamCard
-              icon={<Droplets className="h-5 w-5 text-blue-400" />}
+              icon={<MeteoIcon name="humidity" size={20} />}
               label="Humidité"
               value={`${currentParams?.humidity?.toFixed(0) ?? "78"}`}
               unit="%"
               impact={paramImpacts?.humidity ?? "Élevé"}
             />
             <ParamCard
-              icon={<Gauge className="h-5 w-5 text-green-400" />}
+              icon={<MeteoIcon name="pressure" size={20} />}
               label="Pression"
               value={`${currentParams?.pressure?.toFixed(0) ?? "1016"}`}
               unit=" hPa"
@@ -206,12 +198,12 @@ export default function Ranking() {
           <h3 className="text-purple-400 font-bold text-sm mb-4">Pondération utilisée (combinaison des régimes)</h3>
           <div className="grid grid-cols-6 gap-2">
             {[
-              { key: "temp", label: "Température", icon: <Thermometer className="h-4 w-4" />, color: "#ef4444" },
-              { key: "condition", label: "Nuages", icon: <Cloud className="h-4 w-4" />, color: "#3b82f6" },
-              { key: "precip", label: "Précipitations", icon: <CloudRain className="h-4 w-4" />, color: "#06b6d4" },
-              { key: "wind", label: "Vent", icon: <Wind className="h-4 w-4" />, color: "#22c55e" },
-              { key: "humidity", label: "Humidité", icon: <Droplets className="h-4 w-4" />, color: "#8b5cf6" },
-              { key: "pressure", label: "Pression", icon: <Gauge className="h-4 w-4" />, color: "#f59e0b" },
+              { key: "temp", label: "Température", icon: <MeteoIcon name="temperature" size={16} />, color: "#ef4444" },
+              { key: "condition", label: "Nuages", icon: <MeteoIcon name="cloud_cover" size={16} />, color: "#3b82f6" },
+              { key: "precip", label: "Précipitations", icon: <MeteoIcon name="precipitation" size={16} />, color: "#06b6d4" },
+              { key: "wind", label: "Vent", icon: <MeteoIcon name="wind_param" size={16} />, color: "#22c55e" },
+              { key: "humidity", label: "Humidité", icon: <MeteoIcon name="humidity" size={16} />, color: "#8b5cf6" },
+              { key: "pressure", label: "Pression", icon: <MeteoIcon name="pressure" size={16} />, color: "#f59e0b" },
             ].map((w) => {
               const pct = Math.round((blendedWeights as any)[w.key] * 100);
               return (
@@ -250,7 +242,7 @@ export default function Ranking() {
                   }`}
                 >
                   <div className="w-8 h-8 mx-auto mb-1 flex items-center justify-center">
-                    <item.icon className={`h-6 w-6 ${item.iconColor}`} />
+                    <MeteoIcon name={getIconNameFromRegime(item.key)} size={24} />
                   </div>
                   <span className="text-[8px] text-slate-400 block leading-tight min-h-[22px]">{item.label}</span>
                   <span className={`text-[10px] font-bold block ${
@@ -274,10 +266,9 @@ export default function Ranking() {
             <h3 className="text-amber-400 font-bold text-xs mb-3">Facteurs clés du moment</h3>
             <div className="flex flex-wrap gap-2">
               {keyFactors.map((f: any, i: number) => {
-                const FactorIcon = getFactorLucideIcon(f.label);
                 return (
                   <div key={i} className="flex items-center gap-2 bg-[#1E293B] border border-slate-800 rounded-lg px-3 py-2">
-                    <FactorIcon className="h-4 w-4 text-slate-400" />
+                    <MeteoIcon name={getIconNameFromCondition(f.label)} size={16} />
                     <span className="text-[11px] text-slate-300">{f.label}</span>
                   </div>
                 );
@@ -291,7 +282,7 @@ export default function Ranking() {
           <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-amber-900/40 border border-amber-600/40">
-                <Trophy className="h-6 w-6 text-amber-400" />
+                <MeteoIcon name="trophy" size={24} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-slate-500 text-[10px]">Meilleur modèle</p>
@@ -308,11 +299,11 @@ export default function Ranking() {
               <div className="text-center pl-2 border-l border-slate-700">
                 <p className="text-slate-500 text-[9px]">Tendance</p>
                 <p className={`font-bold text-sm flex items-center gap-0.5 ${bestModel.trend >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {bestModel.trend >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {bestModel.trend >= 0 ? <MeteoIcon name="trend_up" size={16} /> : <MeteoIcon name="trend_down" size={16} />}
                   {bestModel.trend >= 0 ? "+" : ""}{bestModel.trend.toFixed(1)}
                 </p>
               </div>
-              <ChevronRight className="h-5 w-5 text-slate-600 ml-1" />
+              <MeteoIcon name="chevron_right" size={20} className="ml-1 opacity-60" />
             </div>
           </div>
         )}
@@ -350,94 +341,25 @@ function ParamCard({ icon, label, value, unit, impact }: {
   );
 }
 
-// ─── Lucide icon mapping for regimes ─────────────────────────────────────────
-
-function getRegimeLucideIcon(keyOrLabel: string): any {
-  const k = (keyOrLabel || "").toLowerCase();
-  if (k.includes("couvert") || k.includes("overcast")) return Cloud;
-  if (k.includes("partiellement") || k.includes("partly")) return CloudSun;
-  if (k.includes("peu nuageux") || k.includes("few")) return Sun;
-  if (k.includes("ensoleill") || k.includes("sunny") || k.includes("clear")) return Sun;
-  if (k.includes("brouillard") || k.includes("fog")) return CloudFog;
-  if (k.includes("averses") || k.includes("shower")) return CloudDrizzle;
-  if (k.includes("orage") || k.includes("storm") || k.includes("thunder")) return CloudLightning;
-  if (k.includes("pluie vergl") || k.includes("freezing")) return CloudHail;
-  if (k.includes("pluie") || k.includes("rain")) return CloudRain;
-  if (k.includes("vent fort") || k.includes("strong wind")) return Wind;
-  if (k.includes("neige") || k.includes("snow")) return Snowflake;
-  if (k.includes("verglas") || k.includes("ice")) return Snowflake;
-  if (k.includes("gel") || k.includes("frost")) return ThermometerSnowflake;
-  if (k.includes("canicule") || k.includes("heat")) return Flame;
-  if (k.includes("vague de froid") || k.includes("cold")) return ThermometerSnowflake;
-  if (k.includes("tempête") || k.includes("tempest")) return Tornado;
-  if (k.includes("variable")) return CloudSun;
-  if (k.includes("printemps") || k.includes("spring")) return Flower2;
-  if (k.includes("stable") || k.includes("summer") || k.includes("été")) return Sun;
-  if (k.includes("automne") || k.includes("autumn")) return Leaf;
-  return Cloud;
-}
-
-function getRegimeIconColor(keyOrLabel: string): string {
-  const k = (keyOrLabel || "").toLowerCase();
-  if (k.includes("couvert") || k.includes("overcast")) return "text-slate-400";
-  if (k.includes("partiellement") || k.includes("partly")) return "text-amber-300";
-  if (k.includes("peu nuageux") || k.includes("few")) return "text-yellow-400";
-  if (k.includes("ensoleill") || k.includes("sunny") || k.includes("clear")) return "text-yellow-400";
-  if (k.includes("brouillard") || k.includes("fog")) return "text-slate-400";
-  if (k.includes("averses") || k.includes("shower")) return "text-blue-400";
-  if (k.includes("orage") || k.includes("storm") || k.includes("thunder")) return "text-amber-400";
-  if (k.includes("pluie vergl") || k.includes("freezing")) return "text-cyan-400";
-  if (k.includes("pluie") || k.includes("rain")) return "text-blue-400";
-  if (k.includes("vent fort") || k.includes("strong wind")) return "text-cyan-400";
-  if (k.includes("neige") || k.includes("snow")) return "text-blue-200";
-  if (k.includes("verglas") || k.includes("ice")) return "text-cyan-300";
-  if (k.includes("gel") || k.includes("frost")) return "text-blue-300";
-  if (k.includes("canicule") || k.includes("heat")) return "text-red-400";
-  if (k.includes("vague de froid") || k.includes("cold")) return "text-blue-300";
-  if (k.includes("tempête") || k.includes("tempest")) return "text-slate-300";
-  if (k.includes("variable")) return "text-amber-300";
-  if (k.includes("printemps") || k.includes("spring")) return "text-pink-400";
-  if (k.includes("stable") || k.includes("summer") || k.includes("été")) return "text-yellow-400";
-  if (k.includes("automne") || k.includes("autumn")) return "text-orange-400";
-  return "text-slate-400";
-}
-
-function getFactorLucideIcon(label: string): any {
-  const l = (label || "").toLowerCase();
-  if (l.includes("couverture") || l.includes("nuage")) return Cloud;
-  if (l.includes("humidit")) return Droplets;
-  if (l.includes("pression")) return Gauge;
-  if (l.includes("averse") || l.includes("pluie") || l.includes("précip")) return CloudRain;
-  if (l.includes("vent")) return Wind;
-  if (l.includes("temp") || l.includes("chaleur") || l.includes("froid")) return Thermometer;
-  if (l.includes("brouillard")) return CloudFog;
-  if (l.includes("neige")) return Snowflake;
-  if (l.includes("orage")) return CloudLightning;
-  if (l.includes("soleil") || l.includes("ensoleill")) return Sun;
-  return Cloud;
-}
-
-// ─── Regime Grid Data (20 items, 5×4) using lucide-react icons ───────────────
-
 const REGIME_GRID = [
-  { key: "overcast", label: "Ciel couvert", defaultPct: 60, icon: Cloud, iconColor: "text-slate-400" },
-  { key: "partly_cloudy", label: "Partiellement nuageux", defaultPct: 30, icon: CloudSun, iconColor: "text-amber-300" },
-  { key: "few_clouds", label: "Peu nuageux", defaultPct: 25, icon: Sun, iconColor: "text-yellow-400" },
-  { key: "sunny", label: "Ensoleillé", defaultPct: 15, icon: Sun, iconColor: "text-yellow-400" },
-  { key: "fog", label: "Brouillard", defaultPct: 5, icon: CloudFog, iconColor: "text-slate-400" },
-  { key: "showers", label: "Averses", defaultPct: 15, icon: CloudDrizzle, iconColor: "text-blue-400" },
-  { key: "rainy", label: "Pluie", defaultPct: 10, icon: CloudRain, iconColor: "text-blue-400" },
-  { key: "thunderstorm", label: "Orages", defaultPct: 8, icon: CloudLightning, iconColor: "text-amber-400" },
-  { key: "windy", label: "Vent fort", defaultPct: 8, icon: Wind, iconColor: "text-cyan-400" },
-  { key: "snow", label: "Neige", defaultPct: 5, icon: Snowflake, iconColor: "text-blue-200" },
-  { key: "frost", label: "Verglas / Gel", defaultPct: 3, icon: Snowflake, iconColor: "text-cyan-300" },
-  { key: "freezing_rain", label: "Pluie verglaçante", defaultPct: 2, icon: CloudHail, iconColor: "text-cyan-400" },
-  { key: "deep_frost", label: "Gel", defaultPct: 2, icon: ThermometerSnowflake, iconColor: "text-blue-300" },
-  { key: "summer_heat", label: "Canicule", defaultPct: 1, icon: Flame, iconColor: "text-red-400" },
-  { key: "cold_wave", label: "Vague de froid", defaultPct: 1, icon: ThermometerSnowflake, iconColor: "text-blue-300" },
-  { key: "storm", label: "Tempête", defaultPct: 1, icon: Tornado, iconColor: "text-slate-300" },
-  { key: "variable", label: "Temps variable", defaultPct: 10, icon: CloudSun, iconColor: "text-amber-300" },
-  { key: "spring_unstable", label: "Printemps instable", defaultPct: 10, icon: Flower2, iconColor: "text-pink-400" },
-  { key: "stable", label: "Été stable", defaultPct: 15, icon: Sun, iconColor: "text-yellow-400" },
-  { key: "autumn_disturbed", label: "Automne perturbé", defaultPct: 10, icon: Leaf, iconColor: "text-orange-400" },
+  { key: "overcast", label: "Ciel couvert", defaultPct: 60 },
+  { key: "partly_cloudy", label: "Partiellement nuageux", defaultPct: 30 },
+  { key: "few_clouds", label: "Peu nuageux", defaultPct: 25 },
+  { key: "sunny", label: "Ensoleillé", defaultPct: 15 },
+  { key: "fog", label: "Brouillard", defaultPct: 5 },
+  { key: "showers", label: "Averses", defaultPct: 15 },
+  { key: "rainy", label: "Pluie", defaultPct: 10 },
+  { key: "thunderstorm", label: "Orages", defaultPct: 8 },
+  { key: "windy", label: "Vent fort", defaultPct: 8 },
+  { key: "snow", label: "Neige", defaultPct: 5 },
+  { key: "frost", label: "Verglas / Gel", defaultPct: 3 },
+  { key: "freezing_rain", label: "Pluie verglaçante", defaultPct: 2 },
+  { key: "deep_frost", label: "Gel", defaultPct: 2 },
+  { key: "summer_heat", label: "Canicule", defaultPct: 1 },
+  { key: "cold_wave", label: "Vague de froid", defaultPct: 1 },
+  { key: "storm", label: "Tempête", defaultPct: 1 },
+  { key: "variable", label: "Temps variable", defaultPct: 10 },
+  { key: "spring_unstable", label: "Printemps instable", defaultPct: 10 },
+  { key: "stable", label: "Été stable", defaultPct: 15 },
+  { key: "autumn_disturbed", label: "Automne perturbé", defaultPct: 10 },
 ];

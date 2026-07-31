@@ -1,0 +1,519 @@
+/**
+ * MeteoIcon — Pack d'icônes MeteoAI personnalisé
+ * Style moderne, couleurs vives sur fond sombre, conçu pour l'interface MeteoAI.
+ * Couvre : 30 régimes météo + paramètres + indicateurs + classement
+ */
+
+interface MeteoIconProps {
+  name: string;
+  size?: number;
+  className?: string;
+}
+
+export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
+  const icon = ICONS[name] ?? ICONS["variable"];
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      {icon}
+    </svg>
+  );
+}
+
+// ─── Helper: map condition string / regime ID to icon name ──────────────────
+export function getIconNameFromCondition(condition: string | null | undefined): string {
+  if (!condition) return "partly_cloudy";
+  const c = condition.toLowerCase();
+  
+  // Exact regime ID matches
+  if (c === "overcast" || c === "ciel couvert") return "overcast";
+  if (c === "partly_cloudy" || c === "partiellement nuageux") return "partly_cloudy";
+  if (c === "few_clouds" || c === "peu nuageux") return "few_clouds";
+  if (c === "sunny" || c === "ensoleillé") return "sunny";
+  if (c === "fog" || c === "brouillard") return "fog";
+  if (c === "showers" || c === "averses") return "showers";
+  if (c === "rainy" || c === "pluie") return "rainy";
+  if (c === "thunderstorm" || c === "orages" || c === "orage") return "thunderstorm";
+  if (c === "windy" || c === "vent fort") return "windy";
+  if (c === "snow" || c === "neige") return "snow";
+  if (c === "frost" || c === "gel") return "frost";
+  if (c === "freezing_rain" || c === "pluie verglaçante" || c === "verglas") return "freezing_rain";
+  if (c === "deep_frost" || c === "vague de froid") return "deep_frost";
+  if (c === "summer_heat" || c === "canicule") return "summer_heat";
+  if (c === "cold_wave") return "deep_frost";
+  if (c === "storm" || c === "tempête") return "storm";
+  if (c === "variable" || c === "temps variable") return "variable";
+  if (c === "spring_unstable" || c === "printemps instable") return "spring_unstable";
+  if (c === "stable" || c === "été stable") return "stable";
+  if (c === "autumn_disturbed" || c === "automne perturbé") return "autumn_disturbed";
+  
+  // Fuzzy matches from condition text
+  if (c.includes("orage")) return "thunderstorm";
+  if (c.includes("tempête") || c.includes("storm")) return "storm";
+  if (c.includes("neige")) return "snow";
+  if (c.includes("vergla")) return "freezing_rain";
+  if (c.includes("brouillard") || c.includes("brume")) return "fog";
+  if (c.includes("pluie forte") || c.includes("forte pluie")) return "heavy_rain";
+  if (c.includes("pluie") || c.includes("rain")) return "rainy";
+  if (c.includes("averse")) return "showers";
+  if (c.includes("bruine") || c.includes("drizzle")) return "showers";
+  if (c.includes("nuageux") && c.includes("partiel")) return "partly_cloudy";
+  if (c.includes("couvert") || c.includes("très nuageux")) return "overcast";
+  if (c.includes("nuageux")) return "partly_cloudy";
+  if (c.includes("soleil") || c.includes("ensoleillé") || c.includes("dégagé") || c.includes("clair")) return "sunny";
+  if (c.includes("vent")) return "windy";
+  if (c.includes("gel") || c.includes("givre")) return "frost";
+  if (c.includes("canicule") || c.includes("chaleur")) return "summer_heat";
+  
+  return "partly_cloudy";
+}
+
+// ─── Helper: map regime ID to icon name (for Ranking grid) ──────────────────
+export function getIconNameFromRegime(regimeId: string): string {
+  if (ICONS[regimeId]) return regimeId;
+  return getIconNameFromCondition(regimeId);
+}
+
+// ─── SVG Icon definitions ───────────────────────────────────────────────────
+
+const ICONS: Record<string, React.ReactNode> = {
+  // ═══ RÉGIMES MÉTÉO ═══
+
+  // Ciel couvert — nuages gris empilés
+  overcast: (
+    <>
+      <path d="M14 34c-4 0-7-3-7-7s3-7 7-7c1-6 6-10 12-10 7 0 13 5 14 11 4 0 7 3 7 7s-3 7-7 7H14z" fill="#6b7280" opacity="0.9"/>
+      <path d="M18 42c-3.5 0-6-2.5-6-5.5s2.5-5.5 6-5.5c1-5 5-8 10-8 6 0 11 4 12 9 3.5 0 6 2.5 6 5.5S49.5 42 46 42H18z" fill="#9ca3af"/>
+    </>
+  ),
+
+  // Partiellement nuageux — soleil + nuage
+  partly_cloudy: (
+    <>
+      <circle cx="24" cy="22" r="10" fill="#fbbf24"/>
+      <path d="M18 22l-4-2M24 12v-4M30 22l4-2M18 16l-3-3M30 16l3-3" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M20 40c-3.5 0-6-2.5-6-5.5 0-2.5 1.5-4.5 4-5.2C19 24 23 20 28 20c6 0 10 4 11 9 3.5.5 6 3 6 6s-2.5 5-6 5H20z" fill="#9ca3af"/>
+    </>
+  ),
+
+  // Peu nuageux — grand soleil + petit nuage
+  few_clouds: (
+    <>
+      <circle cx="28" cy="24" r="12" fill="#fbbf24"/>
+      <path d="M20 24l-5-2M28 10v-5M36 24l5-2M20 16l-4-4M36 16l4-4M20 32l-4 4M36 32l4 4" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M26 48c-2.5 0-4.5-2-4.5-4s2-4 4.5-4c.5-3.5 3.5-6 7-6 4 0 7 3 7.5 6.5 2.5.5 4 2 4 4s-1.5 3.5-4 3.5H26z" fill="#d1d5db" opacity="0.7"/>
+    </>
+  ),
+
+  // Ensoleillé — grand soleil rayonnant
+  sunny: (
+    <>
+      <circle cx="32" cy="32" r="13" fill="#fbbf24"/>
+      <path d="M32 8v-4M32 60v-4M8 32H4M60 32h-4M14 14l-3-3M50 14l3-3M14 50l-3 3M50 50l3 3" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round"/>
+      <circle cx="32" cy="32" r="9" fill="#f59e0b" opacity="0.4"/>
+    </>
+  ),
+
+  // Brouillard — lignes horizontales ondulées
+  fog: (
+    <>
+      <path d="M10 24h44M10 32h44M10 40h44" stroke="#9ca3af" strokeWidth="3" strokeLinecap="round" opacity="0.5"/>
+      <path d="M12 28h40M12 36h40M12 44h36" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+      <path d="M16 20c0-6 5-10 10-10 4 0 8 2 9 6 3 0 6 2 6 5" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.4"/>
+    </>
+  ),
+
+  // Averses — nuage + gouttes espacées
+  showers: (
+    <>
+      <path d="M16 30c-4 0-7-3-7-6.5S12 17 16 17c1-5.5 5.5-9 11-9 6.5 0 11.5 4.5 12 10 3.5.5 6 3 6 6s-2.5 6-6 6H16z" fill="#6b7280"/>
+      <line x1="20" y1="36" x2="18" y2="44" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="30" y1="36" x2="28" y2="44" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="40" y1="36" x2="38" y2="44" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="25" y1="44" x2="23" y2="52" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="35" y1="44" x2="33" y2="52" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Pluie — nuage sombre + pluie dense
+  rainy: (
+    <>
+      <path d="M14 28c-4 0-7-3-7-6.5S10 15 14 15c1-5.5 5.5-9 11-9 6.5 0 11.5 4.5 12 10 3.5.5 6 3 6 6s-2.5 6-6 6H14z" fill="#4b5563"/>
+      <line x1="18" y1="34" x2="14" y2="46" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="26" y1="34" x2="22" y2="46" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="34" y1="34" x2="30" y2="46" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="42" y1="34" x2="38" y2="46" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="22" y1="46" x2="18" y2="58" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="30" y1="46" x2="26" y2="58" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="38" y1="46" x2="34" y2="58" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Pluie forte
+  heavy_rain: (
+    <>
+      <path d="M12 26c-4 0-7-3-7-6.5S8 13 12 13c1-5.5 5.5-9 11-9 6.5 0 11.5 4.5 12 10 3.5.5 6 3 6 6s-2.5 6-6 6H12z" fill="#374151"/>
+      <line x1="16" y1="32" x2="10" y2="50" stroke="#2563eb" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="24" y1="32" x2="18" y2="50" stroke="#2563eb" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="32" y1="32" x2="26" y2="50" stroke="#2563eb" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="40" y1="32" x2="34" y2="50" stroke="#2563eb" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="48" y1="32" x2="42" y2="50" stroke="#2563eb" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="20" y1="50" x2="14" y2="60" stroke="#2563eb" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="36" y1="50" x2="30" y2="60" stroke="#2563eb" strokeWidth="3" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Orages — nuage + éclair
+  thunderstorm: (
+    <>
+      <path d="M14 28c-4 0-7-3-7-6.5S10 15 14 15c1-5.5 5.5-9 11-9 6.5 0 11.5 4.5 12 10 3.5.5 6 3 6 6s-2.5 6-6 6H14z" fill="#4b5563"/>
+      <path d="M30 30l-6 12h8l-4 14 14-18h-9l5-8z" fill="#fbbf24"/>
+      <line x1="18" y1="36" x2="16" y2="44" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="44" y1="36" x2="42" y2="44" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Vent modéré — lignes courbes
+  wind_moderate: (
+    <>
+      <path d="M8 24c8-2 16 2 24 0s12-4 20-2" stroke="#67e8f9" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <path d="M8 32c8-2 16 2 24 0s12-4 20-2" stroke="#67e8f9" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M8 40c8-2 16 2 24 0s12-4 20-2" stroke="#67e8f9" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <path d="M12 28c6-1 12 1 18 0" stroke="#67e8f9" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.5"/>
+    </>
+  ),
+
+  // Vent fort — lignes courbes + flèches
+  windy: (
+    <>
+      <path d="M6 20c10-3 20 3 30 0s14-5 22-2" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M6 32c10-3 20 3 30 0s14-5 22-2" stroke="#06b6d4" strokeWidth="3.5" strokeLinecap="round" fill="none"/>
+      <path d="M6 44c10-3 20 3 30 0s14-5 22-2" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M52 16l6 4-6 4" stroke="#06b6d4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M52 28l6 4-6 4" stroke="#06b6d4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M52 40l6 4-6 4" stroke="#06b6d4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </>
+  ),
+
+  // Neige — flocons
+  snow: (
+    <>
+      <path d="M16 26c-3.5 0-6-2.5-6-5.5s2.5-5.5 6-5.5c.5-4.5 4.5-8 9.5-8 5.5 0 10 4 10.5 8.5 3 .5 5.5 2.5 5.5 5.5s-2.5 5-5.5 5H16z" fill="#94a3b8"/>
+      <path d="M20 34v10M15 39h10M17 36l6 6M23 36l-6 6" stroke="#bfdbfe" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M36 38v10M31 43h10M33 40l6 6M39 40l-6 6" stroke="#bfdbfe" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M28 48v8M25 52h6M26 50l4 4M30 50l-4 4" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Verglas / Gel — glace + gouttes
+  freezing_rain: (
+    <>
+      <path d="M16 26c-3.5 0-6-2.5-6-5.5s2.5-5.5 6-5.5c.5-4.5 4.5-8 9.5-8 5.5 0 10 4 10.5 8.5 3 .5 5.5 2.5 5.5 5.5s-2.5 5-5.5 5H16z" fill="#6b7280"/>
+      <line x1="18" y1="32" x2="16" y2="40" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="28" y1="32" x2="26" y2="40" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="38" y1="32" x2="36" y2="40" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M20 44v8M17 48h6M18 46l4 4M22 46l-4 4" stroke="#67e8f9" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M34 44v8M31 48h6M32 46l4 4M36 46l-4 4" stroke="#67e8f9" strokeWidth="1.5" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Pluie verglaçante
+  sleet: (
+    <>
+      <path d="M16 26c-3.5 0-6-2.5-6-5.5s2.5-5.5 6-5.5c.5-4.5 4.5-8 9.5-8 5.5 0 10 4 10.5 8.5 3 .5 5.5 2.5 5.5 5.5s-2.5 5-5.5 5H16z" fill="#6b7280"/>
+      <line x1="18" y1="32" x2="16" y2="42" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="30" y1="32" x2="28" y2="42" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M40 34v8M37 38h6M38 36l4 4M42 36l-4 4" stroke="#67e8f9" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="22" y1="44" x2="20" y2="54" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M34 46v6M32 49h4" stroke="#67e8f9" strokeWidth="1.5" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Gel — flocon + thermomètre froid
+  frost: (
+    <>
+      <path d="M32 8v48M16 32h32M20 16l24 32M44 16L20 48" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+      <path d="M32 8v48M16 32h32" stroke="#bfdbfe" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="32" cy="8" r="3" fill="#bfdbfe"/>
+      <circle cx="32" cy="56" r="3" fill="#bfdbfe"/>
+      <circle cx="8" cy="32" r="3" fill="#bfdbfe" opacity="0.6"/>
+      <circle cx="56" cy="32" r="3" fill="#bfdbfe" opacity="0.6"/>
+      <circle cx="32" cy="32" r="5" fill="#60a5fa" opacity="0.3"/>
+    </>
+  ),
+
+  // Canicule — soleil rouge/orange intense
+  summer_heat: (
+    <>
+      <circle cx="32" cy="30" r="14" fill="#f97316"/>
+      <circle cx="32" cy="30" r="10" fill="#fbbf24" opacity="0.6"/>
+      <path d="M32 6v-2M32 58v-2M6 30H4M60 30h-2M12 12l-2-2M52 12l2-2M12 48l-2 2M52 48l2 2" stroke="#f97316" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M20 50c4 4 16 4 24 0" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <path d="M24 54c3 2 10 2 16 0" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.6"/>
+    </>
+  ),
+
+  // Vague de froid — thermomètre bleu
+  deep_frost: (
+    <>
+      <rect x="28" y="8" width="8" height="40" rx="4" fill="#1e3a5f" stroke="#60a5fa" strokeWidth="1.5"/>
+      <circle cx="32" cy="48" r="8" fill="#3b82f6"/>
+      <rect x="30" y="24" width="4" height="24" rx="2" fill="#3b82f6"/>
+      <path d="M12 20v8M9 24h6M10 22l4 4M14 22l-4 4" stroke="#bfdbfe" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M50 16v8M47 20h6M48 18l4 4M52 18l-4 4" stroke="#bfdbfe" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M14 44v6M12 47h4" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Tempête — vent + pluie + éclair
+  storm: (
+    <>
+      <path d="M12 24c-3.5 0-6-2.5-6-5.5s2.5-5.5 6-5.5c.5-4.5 4.5-8 9.5-8 5.5 0 10 4 10.5 8.5 3 .5 5.5 2.5 5.5 5.5s-2.5 5-5.5 5H12z" fill="#374151"/>
+      <path d="M26 26l-4 8h6l-3 10 10-12h-6l4-6z" fill="#fbbf24"/>
+      <path d="M6 34c8-2 14 2 20 0" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" fill="none"/>
+      <path d="M6 40c8-2 14 2 20 0" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" fill="none"/>
+      <line x1="42" y1="28" x2="38" y2="42" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="50" y1="28" x2="46" y2="42" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="46" y1="42" x2="42" y2="54" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Temps variable — soleil + nuage + goutte
+  variable: (
+    <>
+      <circle cx="20" cy="18" r="8" fill="#fbbf24"/>
+      <path d="M14 18l-3-1.5M20 8v-3M26 18l3-1.5M14 12l-2-2M26 12l2-2" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M22 38c-3 0-5.5-2-5.5-4.5s2.5-4.5 5.5-4.5c.5-4 4-7 8.5-7 5 0 9 3.5 9.5 7.5 3 .5 5 2 5 4.5s-2 4.5-5 4.5H22z" fill="#9ca3af"/>
+      <line x1="26" y1="42" x2="24" y2="50" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="34" y1="42" x2="32" y2="50" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Printemps instable — fleurs + nuage
+  spring_unstable: (
+    <>
+      <path d="M24 30c-2.5 0-4.5-2-4.5-4s2-4 4.5-4c.5-3.5 3.5-6 7-6 4 0 7 3 7.5 5.5 2.5.5 4 2 4 4s-1.5 3.5-4 3.5H24z" fill="#9ca3af" opacity="0.7"/>
+      <circle cx="20" cy="48" r="3" fill="#f472b6"/>
+      <circle cx="17" cy="45" r="2.5" fill="#f9a8d4"/>
+      <circle cx="23" cy="45" r="2.5" fill="#f9a8d4"/>
+      <circle cx="17" cy="51" r="2.5" fill="#f9a8d4"/>
+      <circle cx="23" cy="51" r="2.5" fill="#f9a8d4"/>
+      <circle cx="20" cy="48" r="2" fill="#fbbf24"/>
+      <line x1="20" y1="54" x2="20" y2="60" stroke="#22c55e" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M18 58c2-2 4 0 4 0" stroke="#22c55e" strokeWidth="1.5" fill="none"/>
+      <line x1="36" y1="34" x2="34" y2="42" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="42" y1="34" x2="40" y2="42" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Été stable — soleil + ciel dégagé
+  stable: (
+    <>
+      <circle cx="32" cy="28" r="14" fill="#fbbf24"/>
+      <path d="M32 6v-3M32 56v-3M6 28H3M61 28h-3M12 10l-2-2M52 10l2-2" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="32" cy="28" r="9" fill="#f59e0b" opacity="0.3"/>
+      <path d="M18 50c5 4 18 4 28 0" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.5"/>
+    </>
+  ),
+
+  // Automne perturbé — feuille + nuage
+  autumn_disturbed: (
+    <>
+      <path d="M20 32c-2.5 0-4.5-2-4.5-4s2-4 4.5-4c.5-3.5 3.5-6 7-6 4 0 7 3 7.5 5.5 2.5.5 4 2 4 4s-1.5 3.5-4 3.5H20z" fill="#6b7280"/>
+      <line x1="24" y1="36" x2="22" y2="44" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="32" y1="36" x2="30" y2="44" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M44 40c-2 8-10 14-10 14s8-2 12-6c4-4 4-10 2-14-2-4-6-4-8-2s-2 6 0 8c1 1 4 0 4 0z" fill="#f97316" opacity="0.9"/>
+      <line x1="44" y1="40" x2="38" y2="52" stroke="#92400e" strokeWidth="1.5" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Hiver anticyclonique — thermomètre froid + soleil pâle
+  winter_anticyclonic: (
+    <>
+      <circle cx="40" cy="20" r="10" fill="#94a3b8" opacity="0.5"/>
+      <path d="M40 6v-2M52 20h2M28 20h-2M40 34v2M48 12l1.5-1.5M48 28l1.5 1.5M32 12l-1.5-1.5M32 28l-1.5 1.5" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+      <rect x="14" y="24" width="6" height="30" rx="3" fill="#1e3a5f" stroke="#60a5fa" strokeWidth="1"/>
+      <circle cx="17" cy="50" r="5" fill="#3b82f6"/>
+      <rect x="15.5" y="36" width="3" height="14" rx="1.5" fill="#3b82f6"/>
+    </>
+  ),
+
+  // Influence maritime — vagues
+  maritime: (
+    <>
+      <path d="M4 32c4-4 8 0 12-4s8 0 12-4 8 0 12-4 8 0 12-4" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M4 42c4-4 8 0 12-4s8 0 12-4 8 0 12-4 8 0 12-4" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <path d="M4 52c4-4 8 0 12-4s8 0 12-4 8 0 12-4 8 0 12-4" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.6"/>
+      <circle cx="32" cy="16" r="6" fill="#94a3b8" opacity="0.3"/>
+    </>
+  ),
+
+  // Îlot de chaleur urbain — bâtiments + chaleur
+  urban_heat: (
+    <>
+      <rect x="10" y="30" width="12" height="24" fill="#475569"/>
+      <rect x="26" y="22" width="12" height="32" fill="#334155"/>
+      <rect x="42" y="34" width="12" height="20" fill="#475569"/>
+      <rect x="13" y="34" width="3" height="4" fill="#fbbf24" opacity="0.6"/>
+      <rect x="13" y="42" width="3" height="4" fill="#fbbf24" opacity="0.6"/>
+      <rect x="30" y="26" width="3" height="4" fill="#fbbf24" opacity="0.6"/>
+      <rect x="30" y="34" width="3" height="4" fill="#fbbf24" opacity="0.6"/>
+      <path d="M8 28c2-4 4-2 6-6s4-2 6-6" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.6"/>
+      <path d="M40 20c2-4 4-2 6-6s4-2 6-6" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.6"/>
+    </>
+  ),
+
+  // Influence montagneuse — montagnes
+  mountain: (
+    <>
+      <path d="M4 54l20-36 20 36H4z" fill="#475569"/>
+      <path d="M24 18l-6 10h12l-6-10z" fill="#e2e8f0" opacity="0.8"/>
+      <path d="M30 54l16-28 14 28H30z" fill="#334155"/>
+      <path d="M46 26l-4 7h8l-4-7z" fill="#e2e8f0" opacity="0.7"/>
+    </>
+  ),
+
+  // ═══ PARAMÈTRES MÉTÉO ═══
+
+  // Température — thermomètre
+  temperature: (
+    <>
+      <rect x="26" y="8" width="12" height="38" rx="6" fill="#1e293b" stroke="#ef4444" strokeWidth="2"/>
+      <circle cx="32" cy="48" r="9" fill="#ef4444"/>
+      <rect x="29" y="20" width="6" height="28" rx="3" fill="#ef4444"/>
+      <line x1="32" y1="16" x2="32" y2="12" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"/>
+    </>
+  ),
+
+  // Précipitations — gouttes
+  precipitation: (
+    <>
+      <path d="M32 8c0 0-16 18-16 28 0 9 7 16 16 16s16-7 16-16c0-10-16-28-16-28z" fill="#3b82f6" opacity="0.8"/>
+      <path d="M32 8c0 0-10 12-10 20 0 6 4 10 10 10" fill="#60a5fa" opacity="0.4"/>
+      <ellipse cx="28" cy="36" rx="3" ry="4" fill="#bfdbfe" opacity="0.5"/>
+    </>
+  ),
+
+  // Vent — icône vent paramètre
+  wind_param: (
+    <>
+      <path d="M8 22h30c4 0 7-3 7-7s-3-7-7-7c-2 0-4 1-5 3" stroke="#67e8f9" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M8 34h36c3 0 5-2 5-5s-2-5-5-5" stroke="#67e8f9" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M8 46h24c4 0 7 3 7 7s-3 7-7 7c-2 0-4-1-5-3" stroke="#67e8f9" strokeWidth="3" strokeLinecap="round" fill="none"/>
+    </>
+  ),
+
+  // Couverture nuageuse — nuage violet
+  cloud_cover: (
+    <>
+      <path d="M16 38c-5 0-9-4-9-8s4-8 9-8c1-7 7-12 14-12 8 0 14 6 15 13 4 1 7 4 7 8s-3 7-7 7H16z" fill="#a78bfa" opacity="0.8"/>
+      <path d="M20 38c-3 0-5.5-2.5-5.5-5.5 0-2 1-3.5 2.5-4.5" stroke="#c4b5fd" strokeWidth="1.5" fill="none" opacity="0.5"/>
+    </>
+  ),
+
+  // Humidité — goutte
+  humidity: (
+    <>
+      <path d="M32 10c0 0-14 16-14 24 0 8 6 14 14 14s14-6 14-14c0-8-14-24-14-24z" fill="#60a5fa"/>
+      <path d="M32 10c0 0-8 10-8 18 0 5 3 8 8 8" fill="#93c5fd" opacity="0.4"/>
+      <ellipse cx="27" cy="34" rx="3" ry="4" fill="#bfdbfe" opacity="0.6"/>
+    </>
+  ),
+
+  // Pression — baromètre
+  pressure: (
+    <>
+      <circle cx="32" cy="34" r="20" fill="none" stroke="#a78bfa" strokeWidth="2.5"/>
+      <circle cx="32" cy="34" r="16" fill="none" stroke="#a78bfa" strokeWidth="1" opacity="0.4"/>
+      <path d="M32 34l8-12" stroke="#c4b5fd" strokeWidth="3" strokeLinecap="round"/>
+      <circle cx="32" cy="34" r="3" fill="#a78bfa"/>
+      <text x="32" y="56" textAnchor="middle" fill="#a78bfa" fontSize="8" fontWeight="bold">hPa</text>
+    </>
+  ),
+
+  // ═══ INDICATEURS & INTERFACE ═══
+
+  // Confiance — bouclier vert
+  confidence: (
+    <>
+      <path d="M32 6L12 16v14c0 14 8 22 20 28 12-6 20-14 20-28V16L32 6z" fill="#166534" opacity="0.6"/>
+      <path d="M32 6L12 16v14c0 14 8 22 20 28 12-6 20-14 20-28V16L32 6z" fill="none" stroke="#22c55e" strokeWidth="2.5"/>
+      <path d="M24 32l6 6 12-12" stroke="#4ade80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+    </>
+  ),
+
+  // Mise à jour — flèche circulaire
+  refresh: (
+    <>
+      <path d="M32 10c12 0 22 10 22 22s-10 22-22 22" stroke="#6b7280" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M32 54c-12 0-22-10-22-22s10-22 22-22" stroke="#9ca3af" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M38 8l-6 4 6 4" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M26 56l6-4-6-4" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </>
+  ),
+
+  // Voir détails — chevron
+  chevron_right: (
+    <>
+      <circle cx="32" cy="32" r="22" fill="none" stroke="#6b7280" strokeWidth="2"/>
+      <path d="M26 20l12 12-12 12" stroke="#9ca3af" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </>
+  ),
+
+  // ═══ CLASSEMENT & PERFORMANCE ═══
+
+  // Meilleur modèle — trophée
+  trophy: (
+    <>
+      <path d="M20 12h24v14c0 8-5 14-12 14s-12-6-12-14V12z" fill="#fbbf24"/>
+      <path d="M20 16h-6c0 8 4 12 6 12" stroke="#f59e0b" strokeWidth="2.5" fill="none"/>
+      <path d="M44 16h6c0 8-4 12-6 12" stroke="#f59e0b" strokeWidth="2.5" fill="none"/>
+      <rect x="28" y="40" width="8" height="8" fill="#f59e0b"/>
+      <rect x="24" y="48" width="16" height="4" rx="2" fill="#f59e0b"/>
+    </>
+  ),
+
+  // Modèle sélectionné — médaille
+  medal: (
+    <>
+      <path d="M24 8l8 16 8-16" stroke="#f97316" strokeWidth="2.5" fill="none"/>
+      <circle cx="32" cy="36" r="14" fill="#f97316" opacity="0.8"/>
+      <circle cx="32" cy="36" r="10" fill="#fbbf24"/>
+      <path d="M28 36l3 3 6-6" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </>
+  ),
+
+  // Tendance hausse — flèche verte montante
+  trend_up: (
+    <>
+      <path d="M8 48L24 32l8 8L56 16" stroke="#22c55e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M44 16h12v12" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </>
+  ),
+
+  // Tendance baisse — flèche rouge descendante
+  trend_down: (
+    <>
+      <path d="M8 16L24 32l8-8L56 48" stroke="#ef4444" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M44 48h12v-12" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </>
+  ),
+
+  // Nuit claire — lune
+  clear_night: (
+    <>
+      <path d="M38 12c-12 0-22 10-22 22s10 22 22 22c-8 0-14-6-14-14s6-14 14-14c-4 0-8-4-8-8s4-8 8-8z" fill="#fbbf24" opacity="0.8"/>
+      <circle cx="44" cy="18" r="2" fill="#fbbf24" opacity="0.5"/>
+      <circle cx="50" cy="28" r="1.5" fill="#fbbf24" opacity="0.4"/>
+      <circle cx="48" cy="40" r="1" fill="#fbbf24" opacity="0.3"/>
+    </>
+  ),
+};
+
+export default MeteoIcon;

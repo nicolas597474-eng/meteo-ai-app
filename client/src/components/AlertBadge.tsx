@@ -1,8 +1,8 @@
 /**
  * AlertBadge — Badge d'alerte visuel animé (pulsation) pour les régimes météo dangereux.
- * Affiche un badge coloré avec icône lucide-react quand un régime dangereux est détecté.
+ * Affiche un badge coloré avec icône MeteoAI quand un régime dangereux est détecté.
  */
-import { CloudLightning, Wind, Flame, Snowflake, CloudRain, Tornado } from "lucide-react";
+import { MeteoIcon } from "@/components/MeteoIcon";
 
 export type DangerousRegimeId = "thunderstorm" | "storm" | "summer_heat" | "cold_wave" | "freezing_rain" | "windy";
 
@@ -11,7 +11,7 @@ interface DangerousRegimeConfig {
   bgClass: string;
   borderClass: string;
   pulseClass: string;
-  icon: React.ComponentType<{ className?: string }>;
+  meteoIconName: string;
   label: string;
 }
 
@@ -21,7 +21,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     bgClass: "bg-red-500/20",
     borderClass: "border-red-500/50",
     pulseClass: "animate-pulse",
-    icon: CloudLightning,
+    meteoIconName: "thunderstorm",
     label: "Alerte Orage",
   },
   storm: {
@@ -29,7 +29,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     bgClass: "bg-red-500/20",
     borderClass: "border-red-500/50",
     pulseClass: "animate-pulse",
-    icon: Tornado,
+    meteoIconName: "storm",
     label: "Alerte Tempête",
   },
   summer_heat: {
@@ -37,7 +37,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     bgClass: "bg-orange-500/20",
     borderClass: "border-orange-500/50",
     pulseClass: "animate-pulse",
-    icon: Flame,
+    meteoIconName: "summer_heat",
     label: "Alerte Canicule",
   },
   cold_wave: {
@@ -45,7 +45,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     bgClass: "bg-blue-500/20",
     borderClass: "border-blue-500/50",
     pulseClass: "animate-pulse",
-    icon: Snowflake,
+    meteoIconName: "deep_frost",
     label: "Alerte Vague de froid",
   },
   freezing_rain: {
@@ -53,7 +53,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     bgClass: "bg-cyan-500/20",
     borderClass: "border-cyan-500/50",
     pulseClass: "animate-pulse",
-    icon: CloudRain,
+    meteoIconName: "freezing_rain",
     label: "Alerte Verglas",
   },
   windy: {
@@ -61,7 +61,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     bgClass: "bg-teal-500/20",
     borderClass: "border-teal-500/50",
     pulseClass: "animate-pulse",
-    icon: Wind,
+    meteoIconName: "windy",
     label: "Alerte Vent fort",
   },
 };
@@ -88,14 +88,13 @@ export function AlertBadge({ regimeId, confidence = 100, confidenceThreshold = 6
   if (confidence < confidenceThreshold) return null;
 
   const config = DANGEROUS_REGIMES[regimeId];
-  const Icon = config.icon;
 
   if (compact) {
     return (
       <span
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold border ${config.bgClass} ${config.borderClass} ${config.colorClass} ${config.pulseClass}`}
       >
-        <Icon className="h-3 w-3" />
+        <MeteoIcon name={config.meteoIconName} size={14} />
         <span>{config.label}</span>
       </span>
     );
@@ -106,7 +105,7 @@ export function AlertBadge({ regimeId, confidence = 100, confidenceThreshold = 6
       className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${config.bgClass} ${config.borderClass} ${config.pulseClass}`}
     >
       <div className={`flex items-center justify-center rounded-full p-1.5 ${config.bgClass}`}>
-        <Icon className={`h-4 w-4 ${config.colorClass}`} />
+        <MeteoIcon name={config.meteoIconName} size={20} />
       </div>
       <div>
         <p className={`text-xs font-bold ${config.colorClass}`}>{config.label}</p>

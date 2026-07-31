@@ -8,60 +8,50 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weatherImages";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
+import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 
-// ─── Weather condition icons ──────────────────────────────────────────────────
-function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
-  const c = (condition ?? "").toLowerCase();
-  const s = size;
-  if (c.includes("orage")) return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-      <path d="M12 28c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H14c-6 0-10-4-10-9 0-4 3-7 7-8z" fill="#6b7280" opacity="0.8"/>
-      <path d="M36 34l-8 14h6l-4 10 14-18h-8l6-6z" fill="#fbbf24"/>
-    </svg>
-  );
-  if (c.includes("pluie forte") || (c.includes("averses") && !c.includes("légère"))) return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-      <path d="M12 28c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H14c-6 0-10-4-10-9 0-4 3-7 7-8z" fill="#6b7280" opacity="0.8"/>
-      <line x1="20" y1="48" x2="16" y2="58" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round"/>
-      <line x1="30" y1="48" x2="26" y2="58" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round"/>
-      <line x1="40" y1="48" x2="36" y2="58" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round"/>
-      <line x1="50" y1="48" x2="46" y2="58" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round"/>
-    </svg>
-  );
-  if (c.includes("pluie légère") || c.includes("bruine") || c.includes("averses")) return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-      <path d="M12 28c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H14c-6 0-10-4-10-9 0-4 3-7 7-8z" fill="#9ca3af" opacity="0.7"/>
-      <line x1="24" y1="48" x2="22" y2="56" stroke="#93c5fd" strokeWidth="2.5" strokeLinecap="round"/>
-      <line x1="34" y1="48" x2="32" y2="56" stroke="#93c5fd" strokeWidth="2.5" strokeLinecap="round"/>
-      <line x1="44" y1="48" x2="42" y2="56" stroke="#93c5fd" strokeWidth="2.5" strokeLinecap="round"/>
-    </svg>
-  );
-  if (c.includes("couvert")) return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-      <path d="M8 34c0-10 8-18 18-18 8 0 15 5 17 12 5 1 9 5 9 10 0 6-5 10-11 10H10c-6 0-10-4-10-9 0-4 3-7 8-5z" fill="#6b7280" opacity="0.9"/>
-    </svg>
-  );
-  if (c.includes("nuageux") && !c.includes("partiellement")) return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-      <circle cx="22" cy="26" r="8" fill="#fbbf24" opacity="0.6"/>
-      <path d="M16 34c0-8 6-14 14-14 6 0 11 4 13 9 4 1 7 4 7 8 0 5-4 8-9 8H18c-5 0-8-3-8-7 0-3 2-5 6-4z" fill="#9ca3af" opacity="0.85"/>
-    </svg>
-  );
-  if (c.includes("partiellement")) return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-      <circle cx="20" cy="24" r="10" fill="#fbbf24" opacity="0.9"/>
-      <path d="M22 36c0-7 5-13 12-13 5 0 10 3 11 8 3 0 6 3 6 7 0 4-3 7-8 7H24c-4 0-7-3-7-6 0-2 2-4 5-3z" fill="#d1d5db" opacity="0.9"/>
-    </svg>
-  );
-  return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none">
-      <circle cx="32" cy="32" r="12" fill="#fbbf24"/>
-      {[0,45,90,135,180,225,270,315].map((angle, i) => {
-        const rad = (angle * Math.PI) / 180;
-        return <line key={i} x1={32 + 16*Math.cos(rad)} y1={32 + 16*Math.sin(rad)} x2={32 + 22*Math.cos(rad)} y2={32 + 22*Math.sin(rad)} stroke="#fbbf24" strokeWidth="3" strokeLinecap="round"/>;
-      })}
-    </svg>
-  );
+// ─── Day Summary helper ──────────────────────────────────────────────────────
+function getDaySummary(hours: any[]): { text: string; trendIcon: string } {
+  const morningHours = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 6 && hr < 12; });
+  const afternoonHours = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 12 && hr < 19; });
+  const eveningHours = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 19 || hr < 6; });
+
+  const getMainCondition = (hrs: any[]) => {
+    if (hrs.length === 0) return "variable";
+    const conditions = hrs.map((h: any) => h.condition ?? "").filter(Boolean);
+    if (conditions.length === 0) {
+      const avgCloud = hrs.reduce((a: number, h: any) => a + (h.cloudCover ?? 50), 0) / hrs.length;
+      const totalPrecip = hrs.reduce((a: number, h: any) => a + (h.precipitation ?? 0), 0);
+      if (totalPrecip > 2) return "pluie";
+      if (avgCloud > 80) return "couvert";
+      if (avgCloud > 50) return "nuageux";
+      return "ensoleillé";
+    }
+    const freq: Record<string, number> = {};
+    conditions.forEach((c: string) => { freq[c] = (freq[c] ?? 0) + 1; });
+    return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+  };
+
+  const mCond = getMainCondition(morningHours);
+  const aCond = getMainCondition(afternoonHours);
+  const eCond = getMainCondition(eveningHours);
+
+  const condLabel = (c: string) => {
+    const cl = c.toLowerCase();
+    if (cl.includes("orage")) return "orages";
+    if (cl.includes("pluie forte")) return "pluie forte";
+    if (cl.includes("pluie") || cl.includes("averse")) return "averses";
+    if (cl.includes("couvert")) return "ciel couvert";
+    if (cl.includes("nuageux") || cl.includes("partiellement")) return "éclaircies";
+    if (cl.includes("ensoleillé") || cl.includes("dégagé")) return "soleil";
+    if (cl.includes("brouillard")) return "brouillard";
+    if (cl.includes("neige")) return "neige";
+    return cl || "variable";
+  };
+
+  const text = `Matin : ${condLabel(mCond)}. Après-midi : ${condLabel(aCond)}. Soir : ${condLabel(eCond)}.`;
+  const trendIcon = getIconNameFromCondition(aCond);
+  return { text, trendIcon };
 }
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
@@ -377,9 +367,9 @@ export default function Dashboard() {
 
             {/* Main temperature row */}
             <div className="flex items-center gap-4 sm:gap-6">
-              {/* Icon */}
+              {/* Icon — current hour condition (not day) */}
               <div className="flex-shrink-0">
-                <WeatherIcon condition={today?.condition ?? meteoAI?.condition ?? null} size={64} />
+                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={64} />
               </div>
 
               {/* Big current temp */}
@@ -483,6 +473,20 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Résumé de la journée avec icône tendance ── */}
+        {hours.length > 0 && (() => {
+          const summary = getDaySummary(hours);
+          return (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border">
+              <MeteoIcon name={summary.trendIcon} size={36} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-primary mb-0.5">Résumé de la journée</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{summary.text}</p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Ultra-local Mode Selector ── */}
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">

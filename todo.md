@@ -277,3 +277,12 @@
 - [x] Backend: Ajouter le régime détecté dans la réponse getDashboard (multiRegime avec activeRegimes, confidenceScore, blendedWeights)
 - [x] Backend: Ajouter multiRegime dans la réponse getLocationWeather (favorites.ts)
 - [x] Backend: Corriger fallback stale "standard" → "variable" dans fusionEngine.ts
+
+## Pack d'icônes MeteoAI personnalisé + résumé journée
+- [x] Frontend: Créer composant MeteoIcon.tsx avec tous les SVG du pack MeteoAI (30+ icônes régimes + paramètres + indicateurs)
+- [x] Frontend: Remplacer les icônes SVG inline du Dashboard par MeteoIcon
+- [x] Frontend: Remplacer les icônes de la page Classement par MeteoIcon
+- [x] Frontend: Dashboard — afficher l'icône météo de l'heure en cours (pas celle de la journée)
+- [x] Frontend: Dashboard — ajouter un résumé de la journée avec icône de tendance météo
+- [x] Frontend: Remplacer les icônes dans FifteenDayChart et HourlyChart par MeteoIcon
+- [x] Frontend: Remplacer les icônes lucide dans AlertBadge.tsx par MeteoIcon
