@@ -202,6 +202,144 @@ export function getRegimeWeights(regime: ExtendedRegime): RegimeWeights {
   return EXTENDED_REGIME_WEIGHTS[regime];
 }
 
+// ─── Extended Regime Info (labels, emojis, descriptions) ─────────────────────
+
+export type ExtendedRegimeInfo = {
+  id: ExtendedRegime;
+  label: string;
+  emoji: string;
+  description: string;
+  weights: RegimeWeights;
+};
+
+export const EXTENDED_REGIME_INFO: Record<ExtendedRegime, Omit<ExtendedRegimeInfo, 'id'>> = {
+  stable:       { label: "Temps stable",        emoji: "🌤",  description: "Conditions stables, peu de vent, ciel dégagé à partiellement nuageux.",         weights: EXTENDED_REGIME_WEIGHTS.stable },
+  summer_heat:  { label: "Canicule",             emoji: "🌡",  description: "Températures élevées (> 30°C), temps sec et calme.",                           weights: EXTENDED_REGIME_WEIGHTS.summer_heat },
+  cold_winter:  { label: "Hiver froid",          emoji: "❄️",  description: "Températures basses (< 5°C), précision thermique primordiale.",               weights: EXTENDED_REGIME_WEIGHTS.cold_winter },
+  frost:        { label: "Gel",                  emoji: "🧊",  description: "Températures négatives — risque de verglas et de gel.",                      weights: EXTENDED_REGIME_WEIGHTS.frost },
+  rainy:        { label: "Pluie modérée",        emoji: "🌧",  description: "Précipitations modérées (1–5 mm) — la détection des pluies est prioritaire.", weights: EXTENDED_REGIME_WEIGHTS.rainy },
+  heavy_rain:   { label: "Pluie forte",          emoji: "🌊",  description: "Précipitations intenses (> 5 mm) — risque d'inondations locales.",           weights: EXTENDED_REGIME_WEIGHTS.heavy_rain },
+  thunderstorm: { label: "Orage",                emoji: "⛈",  description: "Orages — vent fort et précipitations intenses combinés.",                     weights: EXTENDED_REGIME_WEIGHTS.thunderstorm },
+  fog:          { label: "Brouillard",           emoji: "🌫",  description: "Visibilité réduite (< 1 km), humidité très élevée (> 90%).",                  weights: EXTENDED_REGIME_WEIGHTS.fog },
+  snow:         { label: "Neige / Verglas",      emoji: "❄",  description: "Températures < 2°C avec précipitations — risque de neige ou verglas.",      weights: EXTENDED_REGIME_WEIGHTS.snow },
+  windy:        { label: "Vent fort",            emoji: "💨",  description: "Vents soutenus > 40 km/h sans précipitations significatives.",               weights: EXTENDED_REGIME_WEIGHTS.windy },
+  storm:        { label: "Tempête",              emoji: "🌀",  description: "Vents violents > 60 km/h — le vent est le paramètre critique.",             weights: EXTENDED_REGIME_WEIGHTS.storm },
+  standard:     { label: "Standard",             emoji: "⛅",  description: "Conditions normales — pondération équilibrée entre tous les paramètres.",   weights: EXTENDED_REGIME_WEIGHTS.standard },
+};
+
+// ─── Multi-Regime Detection ───────────────────────────────────────────────────
+
+export type ActiveRegime = {
+  id: ExtendedRegime;
+  label: string;
+  emoji: string;
+  influence: number; // 0-100 percentage
+};
+
+export type MultiRegimeResult = {
+  primaryRegime: ExtendedRegimeInfo;
+  activeRegimes: ActiveRegime[];
+  blendedWeights: RegimeWeights;
+  confidenceScore: number; // 0-100: how clear-cut the dominant regime is
+  description: string;
+};
+
+/**
+ * Detect multiple simultaneous weather regimes with influence percentages.
+ * Returns the primary regime, all active regimes with their influence,
+ * blended weights, and a global confidence score.
+ */
+export function detectMultiRegime(params: {
+  temperature?: number | null;
+  precipitation?: number | null;
+  windSpeed?: number | null;
+  humidity?: number | null;
+  visibility?: number | null;
+  cloudCover?: number | null;
+}): MultiRegimeResult {
+  const t = params.temperature ?? 15;
+  const p = params.precipitation ?? 0;
+  const w = params.windSpeed ?? 0;
+  const h = params.humidity ?? 60;
+  const v = params.visibility ?? 10000;
+  const c = params.cloudCover ?? 50;
+
+  // Compute raw scores for each regime (0-100)
+  const scores: Record<ExtendedRegime, number> = {
+    storm:       Math.max(0, Math.min(100, (w > 60 ? 80 + (w - 60) * 0.5 : w > 50 ? (w - 50) * 8 : 0))),
+    thunderstorm:Math.max(0, Math.min(100, (w > 40 && p > 5 ? 60 + Math.min(40, (w - 40) * 1.5 + (p - 5) * 2) : w > 30 && p > 3 ? 30 : 0))),
+    windy:       Math.max(0, Math.min(100, (w > 40 && p < 2 ? 50 + (w - 40) * 2 : w > 25 ? (w - 25) * 3 : 0))),
+    heavy_rain:  Math.max(0, Math.min(100, (p > 5 ? 50 + Math.min(50, (p - 5) * 5) : p > 3 ? (p - 3) * 25 : 0))),
+    rainy:       Math.max(0, Math.min(100, (p >= 1 && p <= 10 ? 40 + Math.min(40, p * 8) : p > 0.5 ? p * 20 : 0))),
+    snow:        Math.max(0, Math.min(100, (t <= 2 && p > 0 ? 50 + Math.min(50, (2 - t) * 10 + p * 5) : t < 0 && p > 0 ? 80 : 0))),
+    frost:       Math.max(0, Math.min(100, (t < 0 ? 50 + Math.min(50, (-t) * 10) : t < 2 ? (2 - t) * 25 : 0))),
+    fog:         Math.max(0, Math.min(100, (v < 1000 && h > 90 ? 60 + Math.min(40, (1000 - v) / 20 + (h - 90) * 2) : v < 3000 && h > 85 ? 30 : 0))),
+    summer_heat: Math.max(0, Math.min(100, (t > 30 ? 50 + Math.min(50, (t - 30) * 5) : t > 25 ? (t - 25) * 10 : 0))),
+    cold_winter: Math.max(0, Math.min(100, (t < 5 ? 40 + Math.min(40, (5 - t) * 8) : t < 10 ? (10 - t) * 8 : 0))),
+    stable:      Math.max(0, Math.min(100, (p < 0.5 && w < 20 && t > 10 && c < 60 ? 40 + Math.min(40, (20 - w) + (60 - c) * 0.5) : p < 1 && w < 15 ? 20 : 0))),
+    standard:    30, // always present as fallback
+  };
+
+  // Normalize to sum to 100
+  const total = Object.values(scores).reduce((a, b) => a + b, 0) || 1;
+  const normalized: Record<ExtendedRegime, number> = {} as any;
+  for (const key of Object.keys(scores) as ExtendedRegime[]) {
+    normalized[key] = Math.round((scores[key] / total) * 100);
+  }
+
+  // Active regimes: those with >= 5% influence
+  const active: ActiveRegime[] = (Object.keys(normalized) as ExtendedRegime[])
+    .filter(k => normalized[k] >= 5)
+    .sort((a, b) => normalized[b] - normalized[a])
+    .map(k => ({
+      id: k,
+      label: EXTENDED_REGIME_INFO[k].label,
+      emoji: EXTENDED_REGIME_INFO[k].emoji,
+      influence: normalized[k],
+    }));
+
+  const primaryKey = active[0]?.id ?? "standard";
+  const primaryInfo = EXTENDED_REGIME_INFO[primaryKey];
+
+  // Blend weights proportionally to influence
+  const blended: RegimeWeights = { temp: 0, precip: 0, wind: 0, condition: 0, humidity: 0, pressure: 0 };
+  for (const ar of active) {
+    const w2 = EXTENDED_REGIME_WEIGHTS[ar.id];
+    const frac = ar.influence / 100;
+    blended.temp      += w2.temp      * frac;
+    blended.precip    += w2.precip    * frac;
+    blended.wind      += w2.wind      * frac;
+    blended.condition += w2.condition * frac;
+    blended.humidity  += w2.humidity  * frac;
+    blended.pressure  += w2.pressure  * frac;
+  }
+  // Re-normalize blended weights to sum to 1
+  const bSum = blended.temp + blended.precip + blended.wind + blended.condition + blended.humidity + blended.pressure || 1;
+  blended.temp      = Math.round(blended.temp / bSum * 100) / 100;
+  blended.precip    = Math.round(blended.precip / bSum * 100) / 100;
+  blended.wind      = Math.round(blended.wind / bSum * 100) / 100;
+  blended.condition = Math.round(blended.condition / bSum * 100) / 100;
+  blended.humidity  = Math.round(blended.humidity / bSum * 100) / 100;
+  blended.pressure  = Math.round(blended.pressure / bSum * 100) / 100;
+
+  // Confidence: how dominant is the primary regime (0-100)
+  const primaryInfluence = active[0]?.influence ?? 0;
+  const secondInfluence  = active[1]?.influence ?? 0;
+  const confidenceScore  = Math.round(Math.min(100, primaryInfluence + (primaryInfluence - secondInfluence) * 0.5));
+
+  // Build description from active regimes
+  const topLabels = active.slice(0, 3).map(r => `${r.emoji} ${r.label} (${r.influence}%)`).join(', ');
+  const description = `Régimes actifs : ${topLabels}. ${primaryInfo.description}`;
+
+  return {
+    primaryRegime: { id: primaryKey, ...primaryInfo },
+    activeRegimes: active,
+    blendedWeights: blended,
+    confidenceScore,
+    description,
+  };
+}
+
 // ─── Scoring by Lead Time ─────────────────────────────────────────────────────
 
 export type LeadTimeBucket = "0-6h" | "6-24h" | "1-3d" | "4-7d" | "8-15d";

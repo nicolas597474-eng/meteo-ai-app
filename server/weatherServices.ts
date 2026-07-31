@@ -177,11 +177,16 @@ export type HourlyPoint = {
   apparentTemp: number | null;
   precipitation: number | null;
   windSpeed: number | null;
+  windGust: number | null;
   windDirection: number | null;  // degrees 0-360
   cloudCover: number | null;
   humidity: number | null;
   uvIndex: number | null;
   condition: string | null;
+  // Multi-model spread (optional, populated when available)
+  tempSpread?: number | null;    // Max - Min across models (°C)
+  precipProb?: number | null;    // % of models predicting rain
+  modelCount?: number;           // Number of models contributing
 };
 
 function deriveCondition(precip: number | null, cloud: number | null): string {
@@ -232,10 +237,10 @@ export async function collect15DayForecast(
       const daily = data.daily;
       if (!daily?.time) continue;
 
-      if (dates.length === 0) dates = daily.time.slice(0, 15);
+      if (dates.length === 0) dates = daily.time.slice(0, 16);
       modelsUsed.push(model.name);
 
-      for (let i = 0; i < Math.min(15, daily.time.length); i++) {
+      for (let i = 0; i < Math.min(16, daily.time.length); i++) {
         const d = daily.time[i];
         if (!allModelData[d]) {
           allModelData[d] = { tempMax: [], tempMin: [], precip: [], wind: [], windGust: [], windDir: [], humidity: [], cloud: [], uv: [], feelsMax: [], feelsMin: [] };
@@ -316,7 +321,7 @@ export async function collectHourlyForecast(
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", location.lat.toString());
     url.searchParams.set("longitude", location.lon.toString());
-    url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index");
+    url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index");
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", "2");
 
@@ -327,24 +332,68 @@ export async function collectHourlyForecast(
     const hourly = data.hourly;
     if (!hourly?.time) return [];
 
+    // Fetch a second model (AROME) for spread estimation
+    let aromeTemps: (number | null)[] = [];
+    let aromePrecips: (number | null)[] = [];
+    try {
+      const aromeUrl = new URL("https://api.open-meteo.com/v1/forecast");
+      aromeUrl.searchParams.set("latitude", location.lat.toString());
+      aromeUrl.searchParams.set("longitude", location.lon.toString());
+      aromeUrl.searchParams.set("hourly", "temperature_2m,precipitation");
+      aromeUrl.searchParams.set("timezone", "Europe/Paris");
+      aromeUrl.searchParams.set("forecast_days", "2");
+      aromeUrl.searchParams.set("models", "meteofrance_arome_france_hd");
+      const aromeResp = await fetch(aromeUrl.toString(), { signal: AbortSignal.timeout(8000) });
+      if (aromeResp.ok) {
+        const aromeData = await aromeResp.json();
+        if (aromeData.hourly?.time) {
+          for (let j = 0; j < aromeData.hourly.time.length; j++) {
+            if (aromeData.hourly.time[j].startsWith(targetDate)) {
+              aromeTemps.push(aromeData.hourly.temperature_2m?.[j] ?? null);
+              aromePrecips.push(aromeData.hourly.precipitation?.[j] ?? null);
+            }
+          }
+        }
+      }
+    } catch { /* AROME optional */ }
+
     const points: HourlyPoint[] = [];
+    let aromeIdx = 0;
     for (let i = 0; i < hourly.time.length; i++) {
       const dt = hourly.time[i]; // "2026-07-05T14:00"
       if (!dt.startsWith(targetDate)) continue;
       const hour = dt.slice(11, 16); // "14:00"
       const precip = hourly.precipitation?.[i] ?? null;
       const cloud = hourly.cloud_cover?.[i] ?? null;
+      const bestTemp = hourly.temperature_2m?.[i] ?? null;
+      const aromeTemp = aromeTemps[aromeIdx] ?? null;
+      const aromePrecip = aromePrecips[aromeIdx] ?? null;
+      aromeIdx++;
+
+      // Spread: difference between best_match and AROME
+      const tempSpread = (bestTemp != null && aromeTemp != null)
+        ? Math.abs(bestTemp - aromeTemp)
+        : null;
+      // Precip probability: 100% if both models predict rain, 50% if only one
+      const bestRain = (precip ?? 0) >= 0.1;
+      const aromeRain = (aromePrecip ?? 0) >= 0.1;
+      const precipProb = (bestRain && aromeRain) ? 100 : (bestRain || aromeRain) ? 50 : 0;
+
       points.push({
         hour,
-        temp: hourly.temperature_2m?.[i] ?? null,
+        temp: bestTemp,
         apparentTemp: hourly.apparent_temperature?.[i] ?? null,
         precipitation: precip,
         windSpeed: hourly.wind_speed_10m?.[i] ?? null,
+        windGust: hourly.wind_gusts_10m?.[i] ?? null,
         windDirection: hourly.wind_direction_10m?.[i] ?? null,
         cloudCover: cloud,
         humidity: hourly.relative_humidity_2m?.[i] ?? null,
         uvIndex: hourly.uv_index?.[i] ?? null,
         condition: deriveCondition(precip, cloud),
+        tempSpread,
+        precipProb,
+        modelCount: aromeTemp != null ? 2 : 1,
       });
     }
     return points;

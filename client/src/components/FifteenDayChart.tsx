@@ -232,11 +232,13 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const [animated, setAnimated] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [viewMode, setViewMode] = useState<7 | 15>(7);
+  const [viewMode, setViewMode] = useState<7 | 15 | 16>(7);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
-  const displayDays = days.slice(0, viewMode);
+  // Use 16 if available (days.length >= 16), otherwise cap at 15
+  const maxDays = days.length >= 16 ? 16 : days.length;
+  const displayDays = days.slice(0, Math.min(viewMode, maxDays));
   const N = displayDays.length;
 
   // ── Layout constants ────────────────────────────────────────────────────────
@@ -571,11 +573,17 @@ export default function FifteenDayChart({ days, locationName }: Props) {
             <button
               onClick={() => setViewMode(7)}
               className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 7 ? 'bg-indigo-500/90 text-white shadow-sm shadow-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-            >7 jours</button>
+            >7j</button>
             <button
               onClick={() => setViewMode(15)}
               className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 15 ? 'bg-indigo-500/90 text-white shadow-sm shadow-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-            >15 jours</button>
+            >15j</button>
+            {maxDays >= 16 && (
+              <button
+                onClick={() => setViewMode(16)}
+                className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 16 ? 'bg-violet-500/90 text-white shadow-sm shadow-violet-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+              >16j ✦</button>
+            )}
           </div>
         </div>
         {locationName && (

@@ -8,11 +8,16 @@ export interface HourData {
   apparentTemp: number | null;
   precipitation: number | null;
   windSpeed: number | null;
+  windGust?: number | null;
   windDirection: number | null;
   cloudCover: number | null;
   humidity: number | null;
   uvIndex: number | null;
   condition: string | null;
+  // Multi-model spread
+  tempSpread?: number | null;
+  precipProb?: number | null;
+  modelCount?: number;
 }
 
 interface Props {
@@ -70,11 +75,26 @@ function WeatherIconSVG({ condition, size = 20 }: { condition: string; size?: nu
 // ─── Detail Overlay ──────────────────────────────────────────────────────────
 function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => void }) {
   const cond = getConditionLabel(hour.cloudCover, hour.precipitation, hour.condition);
+  const hasSpread = hour.tempSpread != null && hour.tempSpread > 0;
+  const hasPrecipProb = hour.precipProb != null;
+  const hasGust = hour.windGust != null && hour.windGust > 0;
+
+  // Confidence from spread: low spread = high confidence
+  const spreadConfidence = hasSpread
+    ? Math.max(0, Math.round(100 - (hour.tempSpread! * 25)))
+    : null;
+  const confidenceColor = spreadConfidence == null ? "text-slate-400"
+    : spreadConfidence >= 80 ? "text-green-400"
+    : spreadConfidence >= 60 ? "text-yellow-400"
+    : "text-orange-400";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-blue-500/10 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <WeatherIconSVG condition={cond} size={32} />
             <div>
@@ -84,35 +104,90 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           </div>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 transition-colors active:scale-95"><X className="h-5 w-5 text-slate-400" /></button>
         </div>
+
+        {/* Multi-model confidence banner */}
+        {(hasSpread || hasPrecipProb) && (
+          <div className="mb-3 bg-slate-700/40 border border-slate-600/30 rounded-xl px-3 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400">🤖 {hour.modelCount ?? 2} modèles</span>
+              {hasSpread && (
+                <span className="text-xs text-slate-400">
+                  · Écart T: <span className={`font-mono font-bold ${(hour.tempSpread! < 0.5) ? 'text-green-400' : (hour.tempSpread! < 1.5) ? 'text-yellow-400' : 'text-orange-400'}`}>
+                    ±{hour.tempSpread!.toFixed(1)}°C
+                  </span>
+                </span>
+              )}
+            </div>
+            {spreadConfidence != null && (
+              <span className={`text-xs font-bold ${confidenceColor}`}>{spreadConfidence}% conf.</span>
+            )}
+          </div>
+        )}
+
+        {/* Main grid */}
         <div className="grid grid-cols-2 gap-2">
+          {/* Temperature */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Thermometer className="h-3.5 w-3.5 text-orange-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Température</span></div>
             <p className="text-sm font-bold text-white">{hour.temp != null ? `${hour.temp.toFixed(1)}°C` : "—"}</p>
+            {hasSpread && <p className="text-[10px] text-slate-500 mt-0.5">±{hour.tempSpread!.toFixed(1)}°C entre modèles</p>}
           </div>
+
+          {/* Ressenti */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Thermometer className="h-3.5 w-3.5 text-pink-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Ressenti</span></div>
             <p className="text-sm font-bold text-white">{hour.apparentTemp != null ? `${hour.apparentTemp.toFixed(1)}°C` : "—"}</p>
           </div>
+
+          {/* Vent */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Wind className="h-3.5 w-3.5 text-emerald-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Vent</span></div>
             <p className="text-sm font-bold text-white">{hour.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span></p>
+            {hasGust && <p className="text-[10px] text-orange-300 mt-0.5">Rafales: {hour.windGust!.toFixed(0)} km/h</p>}
           </div>
+
+          {/* Direction */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Navigation className="h-3.5 w-3.5 text-sky-400" style={{ transform: `rotate(${((hour.windDirection ?? 0) + 180) % 360}deg)` }} /><span className="text-[10px] uppercase tracking-wider text-slate-500">Direction</span></div>
             <p className="text-sm font-bold text-white">{degToCompass(hour.windDirection)}</p>
+            {hour.windDirection != null && <p className="text-[10px] text-slate-500 mt-0.5">{Math.round(hour.windDirection)}°</p>}
           </div>
+
+          {/* Précipitations */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Précipitations</span></div>
             <p className="text-sm font-bold text-blue-400">{hour.precipitation ?? 0} mm</p>
+            {hasPrecipProb && (
+              <div className="mt-1">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[9px] text-slate-500">Probabilité</span>
+                  <span className={`text-[10px] font-bold ${(hour.precipProb! >= 70) ? 'text-blue-400' : (hour.precipProb! >= 30) ? 'text-yellow-400' : 'text-slate-400'}`}>{hour.precipProb}%</span>
+                </div>
+                <div className="bg-slate-700 rounded-full h-1 overflow-hidden">
+                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${hour.precipProb}%` }} />
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Humidité */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-cyan-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Humidité</span></div>
             <p className="text-sm font-bold text-cyan-400">{hour.humidity != null ? `${Math.round(hour.humidity)}%` : "—"}</p>
           </div>
+
+          {/* UV */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Sun className="h-3.5 w-3.5 text-yellow-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">UV</span></div>
             <p className="text-sm font-bold text-yellow-400">{hour.uvIndex != null ? Math.round(hour.uvIndex) : "—"}</p>
+            {hour.uvIndex != null && (
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {hour.uvIndex <= 2 ? "Faible" : hour.uvIndex <= 5 ? "Modéré" : hour.uvIndex <= 7 ? "Élevé" : hour.uvIndex <= 10 ? "Très élevé" : "Extrême"}
+              </p>
+            )}
           </div>
+
+          {/* Nébulosité */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Cloud className="h-3.5 w-3.5 text-slate-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Nébulosité</span></div>
             <p className="text-sm font-bold text-white">{hour.cloudCover != null ? `${Math.round(hour.cloudCover)}%` : "—"}</p>

@@ -25,7 +25,7 @@ import { collectExpertForecasts, collectObservations, collect15DayForecast, coll
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
-import { generateAdaptiveForecast, detectExtendedRegime } from "../fusionEngine";
+import { generateAdaptiveForecast, detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, type ExtendedRegime, type MultiRegimeResult } from "../fusionEngine";
 
 function getTodayParis(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
@@ -88,15 +88,17 @@ export const weatherRouter = router({
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
     const ranking = await getCumulativeRankingForLocation(locKey);
 
-    // Use today's MeteoAI forecast for regime detection (same source as Dashboard)
+    // Use today's MeteoAI forecast for multi-regime detection
     const meteoAI = await getMeteoAIForecastByDate(today, locKey);
-    let regimeSource: { precipitation: number | null; windSpeed: number | null; tempMax: number | null; tempMin: number | null };
+    let regimeParams: { temperature?: number | null; precipitation?: number | null; windSpeed?: number | null; humidity?: number | null; cloudCover?: number | null };
     if (meteoAI) {
-      regimeSource = {
+      const avgTemp = ((meteoAI.tempMax ?? 15) + (meteoAI.tempMin ?? 5)) / 2;
+      regimeParams = {
+        temperature: avgTemp,
         precipitation: meteoAI.precipitation ?? null,
         windSpeed: meteoAI.windSpeed ?? null,
-        tempMax: meteoAI.tempMax ?? null,
-        tempMin: meteoAI.tempMin ?? null,
+        humidity: (meteoAI as any).humidity ?? null,
+        cloudCover: (meteoAI as any).cloudCover ?? null,
       };
     } else {
       // Fallback: use most recent observation
@@ -106,30 +108,44 @@ export const weatherRouter = router({
         locKey
       );
       const latestObs = recentObs[recentObs.length - 1];
-      regimeSource = {
+      const avgTemp = latestObs ? ((latestObs.tempMax ?? 15) + (latestObs.tempMin ?? 5)) / 2 : 15;
+      regimeParams = {
+        temperature: avgTemp,
         precipitation: latestObs?.precipitation ?? null,
         windSpeed: latestObs?.windSpeed ?? null,
-        tempMax: latestObs?.tempMax ?? null,
-        tempMin: latestObs?.tempMin ?? null,
       };
     }
-    const regimeInfo = detectWeatherRegime(regimeSource);
+    const multiRegime = detectMultiRegime(regimeParams);
 
-    // All regime definitions for the UI selector
-    const allRegimes = (Object.keys(REGIME_DEFINITIONS) as WeatherRegime[]).map(key => ({
+    // All 12 extended regime definitions for the UI
+    const allRegimes = (Object.keys(EXTENDED_REGIME_INFO) as ExtendedRegime[]).map(key => ({
       id: key,
-      ...REGIME_DEFINITIONS[key],
+      ...EXTENDED_REGIME_INFO[key],
     }));
 
     return {
       ranking,
       totalServices: WEATHER_SERVICES.expert.length + WEATHER_SERVICES.public.length,
+      // Legacy single-regime field (kept for backward compat)
       regime: {
-        id: regimeInfo.regime,
-        label: regimeInfo.label,
-        emoji: regimeInfo.emoji,
-        description: regimeInfo.description,
-        weights: regimeInfo.weights,
+        id: multiRegime.primaryRegime.id,
+        label: multiRegime.primaryRegime.label,
+        emoji: multiRegime.primaryRegime.emoji,
+        description: multiRegime.description,
+        weights: {
+          temp: multiRegime.blendedWeights.temp,
+          precip: multiRegime.blendedWeights.precip,
+          wind: multiRegime.blendedWeights.wind,
+          condition: multiRegime.blendedWeights.condition,
+        },
+      },
+      // New multi-regime data
+      multiRegime: {
+        primaryRegime: multiRegime.primaryRegime,
+        activeRegimes: multiRegime.activeRegimes,
+        blendedWeights: multiRegime.blendedWeights,
+        confidenceScore: multiRegime.confidenceScore,
+        description: multiRegime.description,
       },
       allRegimes,
     };

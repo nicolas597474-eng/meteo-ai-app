@@ -207,11 +207,20 @@
 - [x] Vérifier TypeScript + 47 tests passent
 
 ## Optimisation scientifique MeteoAI
-- [ ] Phase 1: Audit complet des algorithmes existants (ultraLocalService, stationService, scoring)
-- [ ] Phase 2: Implémenter moteur d'évaluation MAE/RMSE/biais sur données historiques
-- [ ] Phase 3: Implémenter fusion IDW (Inverse Distance Weighting) avec exposant adaptatif
-- [ ] Phase 4: Pondération adaptative par performance historique (station + modèle)
-- [ ] Phase 5: Détection et correction des microclimats (altitude, urbain, maritime)
-- [ ] Phase 6: Scoring contextuel dynamique (pondérations selon phénomène météo)
-- [ ] Phase 7: Tests A/B validation sur données réelles + rapport de précision
-- [ ] Phase 8: Déploiement des améliorations validées
+- [x] Phase 1: Audit complet des algorithmes existants (ultraLocalService, stationService, scoring)
+- [x] Phase 2: Implémenter moteur d'évaluation MAE/RMSE/biais sur données historiques
+- [x] Phase 3: Implémenter fusion IDW (Inverse Distance Weighting) avec exposant adaptatif
+- [x] Phase 4: Pondération adaptative par performance historique (station + modèle)
+- [x] Phase 5: Détection et correction des microclimats (altitude, urbain, maritime)
+- [x] Phase 6: Scoring contextuel dynamique (pondérations selon phénomène météo)
+- [x] Phase 7: Tests A/B validation sur données réelles + rapport de précision
+- [x] Phase 8: Déploiement des améliorations validées
+
+## Refonte multi-régimes + prévisions 16j + horaire détaillé
+- [x] Backend: collect15DayForecast — étendre de 15 à 16 jours (changer slice(0,15) → slice(0,16))
+- [x] Backend: getRanking + getDashboard — brancher detectExtendedRegime (12 régimes) au lieu de detectWeatherRegime (5 régimes)
+- [x] Backend: Implémenter détection multi-régimes simultanés avec pourcentages d'influence
+- [x] Backend: getHourlyForecast — retourner données multi-modèles (collectHourlyForecastAllModels) avec fusion synthétique
+- [x] Frontend: FifteenDayChart — toggle 7j/15j/16j + barre de progression adaptée
+- [x] Frontend: HourlyChart — overlay détaillé enrichi (confiance, multi-modèles si dispo)
+- [x] Frontend: Ranking — système multi-régimes avec illustration dynamique, pourcentages, confiance globale
