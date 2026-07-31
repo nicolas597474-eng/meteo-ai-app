@@ -379,6 +379,55 @@ export const weatherRouter = router({
     }),
 
   /**
+   * Detailed forecast page: 48h hourly + 15-day daily + regime + confidence
+   */
+  getDetailedForecast: publicProcedure
+    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .query(async ({ input }) => {
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+      const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
+      const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
+
+      // Fetch 48h hourly (forecast_days=2 already in collectHourlyForecast)
+      const hours = await collectHourlyForecast(today, coords);
+
+      // Fetch 15-day daily
+      const { days, modelsUsed } = await collect15DayForecast(coords);
+
+      // Get MeteoAI forecast for regime detection
+      const meteoAI = await getMeteoAIForecastByDate(today, locKey);
+      const avgTemp = meteoAI?.tempMax != null && meteoAI?.tempMin != null
+        ? (meteoAI.tempMax + meteoAI.tempMin) / 2
+        : meteoAI?.tempMax ?? meteoAI?.tempMin ?? 15;
+
+      const multiRegime = detectMultiRegime({
+        temperature: avgTemp,
+        precipitation: meteoAI?.precipitation ?? 0,
+        windSpeed: meteoAI?.windSpeed ?? 0,
+        humidity: (meteoAI as any)?.humidity ?? 60,
+        cloudCover: (meteoAI as any)?.cloudCover ?? 50,
+      });
+
+      // Best model
+      const ranking = await getCumulativeRankingForLocation(locKey);
+      const bestModel = ranking[0] ?? null;
+
+      return {
+        today,
+        hours,
+        days,
+        modelsUsed,
+        regime: {
+          primary: multiRegime.primaryRegime,
+          active: multiRegime.activeRegimes,
+          confidence: multiRegime.confidenceScore,
+          description: multiRegime.description,
+        },
+        bestModel: bestModel ? { name: bestModel.serviceName, score: bestModel.avgScore ?? 0 } : null,
+      };
+    }),
+
+  /**
    * Admin: Manual trigger for forecast collection (for testing)
    */
   triggerCollection: adminProcedure

@@ -488,6 +488,13 @@ export default function Dashboard() {
           );
         })()}
 
+        {/* ── Link to details page ── */}
+        <a href="/details" className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors">
+          <MeteoIcon name="chevron_right" size={16} />
+          <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
+          <span className="text-primary text-xs">→</span>
+        </a>
+
         {/* ── Ultra-local Mode Selector ── */}
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">
           <Radio className="h-4 w-4 text-primary flex-shrink-0" />

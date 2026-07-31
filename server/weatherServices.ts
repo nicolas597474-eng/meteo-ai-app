@@ -164,11 +164,17 @@ export type DayForecast = {
   precipitation: number | null;
   windSpeed: number | null;
   windGust: number | null;
+  windDirection?: number | null;
   humidity: number | null;
   cloudCover: number | null;
   condition: string | null;
   stabilityIndex: number;
   stabilityLabel: string;
+  uvIndex?: number | null;
+  feelsLikeMax?: number | null;
+  feelsLikeMin?: number | null;
+  sunrise?: string | null;
+  sunset?: string | null;
 };
 
 export type HourlyPoint = {
@@ -183,6 +189,16 @@ export type HourlyPoint = {
   humidity: number | null;
   uvIndex: number | null;
   condition: string | null;
+  // Extended fields for details page
+  pressure?: number | null;        // hPa
+  dewPoint?: number | null;        // °C
+  visibility?: number | null;      // km
+  solarRadiation?: number | null;  // W/m²
+  cloudLow?: number | null;        // %
+  cloudMid?: number | null;        // %
+  cloudHigh?: number | null;       // %
+  precipType?: string | null;      // rain, snow, freezing_rain, etc.
+  precipIntensity?: string | null; // light, moderate, heavy
   // Multi-model spread (optional, populated when available)
   tempSpread?: number | null;    // Max - Min across models (°C)
   precipProb?: number | null;    // % of models predicting rain
@@ -321,7 +337,7 @@ export async function collectHourlyForecast(
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", location.lat.toString());
     url.searchParams.set("longitude", location.lon.toString());
-    url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index");
+    url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index,surface_pressure,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall");
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", "2");
 
@@ -379,6 +395,16 @@ export async function collectHourlyForecast(
       const aromeRain = (aromePrecip ?? 0) >= 0.1;
       const precipProb = (bestRain && aromeRain) ? 100 : (bestRain || aromeRain) ? 50 : 0;
 
+      // Derive precipitation type and intensity
+      const snowfall = hourly.snowfall?.[i] ?? 0;
+      let precipType: string | null = null;
+      let precipIntensity: string | null = null;
+      if ((precip ?? 0) > 0 || snowfall > 0) {
+        precipType = snowfall > 0 ? "snow" : (bestTemp != null && bestTemp <= 0) ? "freezing_rain" : "rain";
+        const total = (precip ?? 0) + snowfall;
+        precipIntensity = total > 5 ? "heavy" : total > 1 ? "moderate" : "light";
+      }
+
       points.push({
         hour,
         temp: bestTemp,
@@ -391,6 +417,17 @@ export async function collectHourlyForecast(
         humidity: hourly.relative_humidity_2m?.[i] ?? null,
         uvIndex: hourly.uv_index?.[i] ?? null,
         condition: deriveCondition(precip, cloud),
+        // Extended fields
+        pressure: hourly.surface_pressure?.[i] ?? null,
+        dewPoint: hourly.dew_point_2m?.[i] ?? null,
+        visibility: hourly.visibility?.[i] != null ? Math.round((hourly.visibility[i] as number) / 1000 * 10) / 10 : null,
+        solarRadiation: hourly.shortwave_radiation?.[i] ?? null,
+        cloudLow: hourly.cloud_cover_low?.[i] ?? null,
+        cloudMid: hourly.cloud_cover_mid?.[i] ?? null,
+        cloudHigh: hourly.cloud_cover_high?.[i] ?? null,
+        precipType,
+        precipIntensity,
+        // Multi-model
         tempSpread,
         precipProb,
         modelCount: aromeTemp != null ? 2 : 1,

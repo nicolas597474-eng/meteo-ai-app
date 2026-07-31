@@ -286,3 +286,15 @@
 - [x] Frontend: Dashboard — ajouter un résumé de la journée avec icône de tendance météo
 - [x] Frontend: Remplacer les icônes dans FifteenDayChart et HourlyChart par MeteoIcon
 - [x] Frontend: Remplacer les icônes lucide dans AlertBadge.tsx par MeteoIcon
+
+## Page Détails météo (prévisions complètes)
+- [x] Backend: Étendre HourlyPoint avec pressure, dewPoint, visibility, solarRadiation, cloudLow/Mid/High, precipType, precipIntensity
+- [x] Backend: Étendre DayForecast avec uvIndex, feelsLikeMax, feelsLikeMin, sunrise, sunset, windDirection
+- [x] Backend: Endpoint getDetailedForecast (48h hourly + 15j daily + régime + confiance + meilleur modèle)
+- [x] Frontend: Créer page WeatherDetails.tsx — section prévisions horaires (frise défilante 30+ params)
+- [x] Frontend: Section graphiques interactifs (temp, vent, précip, pression, humidité, nuages)
+- [x] Frontend: Section résumé IA horaire
+- [x] Frontend: Section prévisions jours (16 jours avec icône + max/min + précip + vent + stabilité)
+- [x] Frontend: Section tendances (flèches hausse/stable/baisse par paramètre)
+- [x] Frontend: Indices de confiance (période en cours, aujourd'hui, 7 prochains jours)
+- [x] Frontend: Navigation et route /details dans App.tsx + lien depuis Dashboard
