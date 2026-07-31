@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "@/contexts/LocationContext";
+import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 
 /**
  * Page Classement — reproduction exacte de la maquette MeteoAI
@@ -38,6 +39,8 @@ export default function Ranking() {
   const regimeDescription = multiRegime?.description ?? "Ciel très nuageux dominant, peu d'éclaircies. Risque de pluie faible à modéré. Vent modéré.";
   const cleanDescription = regimeDescription.replace(/Régimes actifs : .*?\. /, "");
   const heroRegimes = activeRegimes.slice(0, 3);
+  const dominantRegime = activeRegimes[0]?.id || activeRegimes[0]?.label || '';
+  const heroImage = getWeatherLandscapeImage(dominantRegime);
 
   return (
     <div className="min-h-screen bg-[#0d1117]">
@@ -63,7 +66,7 @@ export default function Ranking() {
             {/* Image paysage */}
             <div className="w-[36%] min-h-[220px]">
               <img
-                src="/manus-storage/ranking-landscape_094b60d5.jpg"
+                src={heroImage}
                 alt="Paysage météo"
                 className="w-full h-full object-cover"
               />

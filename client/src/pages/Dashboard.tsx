@@ -6,6 +6,7 @@ import FifteenDayChart from "@/components/FifteenDayChart";
 import HourlyChart from "@/components/HourlyChart";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
+import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weatherImages";
 
 // ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
@@ -309,7 +310,13 @@ export default function Dashboard() {
 
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-blue-600/10 pointer-events-none" />
+          {/* Dynamic landscape image based on weather regime */}
+          <img
+            src={regime ? getWeatherLandscapeImage(regime.label) : getWeatherImageFromData({ temperature: currentTemp ?? undefined, cloudCover: (today as any)?.cloudCover ?? undefined, precipitation: (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
+            alt="Paysage météo"
+            className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
             <div className="flex items-center justify-between mb-3">

@@ -246,3 +246,10 @@
 - [x] Backend: facteurs clés du moment (top 5 facteurs influençant la météo actuelle)
 - [x] Frontend: refonte complète Ranking.tsx fidèle à la maquette (image paysage, détection IA, confiance, paramètres, pondérations, régimes, facteurs, meilleur modèle)
 - [x] Frontend: refonte pixel-perfect identique à la maquette fournie (fond noir, cartes arrondies, SVG icons, grille 5x4, image paysage uploadée)
+
+## Images paysages météo dynamiques (31 juillet 2026)
+
+- [x] Générer images paysages: ensoleillé, nuageux, partiellement nuageux, pluie, orage, neige, brouillard, vent fort
+- [x] Uploader toutes les images via manus-upload-file --webdev
+- [x] Intégrer sélection dynamique dans Ranking.tsx (hero card image change selon régime)
+- [x] Intégrer sélection dynamique dans Dashboard.tsx (image change selon régime)
