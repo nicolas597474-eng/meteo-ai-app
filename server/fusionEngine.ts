@@ -123,18 +123,26 @@ export type AnomalyReport = {
 // ─── Extended Weather Regimes (12 vs 5) ──────────────────────────────────────
 
 export type ExtendedRegime =
-  | "stable"          // Temps stable, peu de vent, pas de pluie
-  | "summer_heat"     // Canicule (T > 30°C)
-  | "cold_winter"     // Hiver froid (T < 2°C)
-  | "frost"           // Gel (T < 0°C)
-  | "rainy"           // Pluie modérée (1-5mm)
-  | "heavy_rain"      // Pluie forte (> 5mm)
-  | "thunderstorm"    // Orage (vent > 40km/h + précip > 5mm)
-  | "fog"             // Brouillard (visibilité < 1km, humidité > 90%)
-  | "snow"            // Neige/verglas (T < 2°C + précip > 0)
-  | "windy"           // Vent fort (> 40km/h)
-  | "storm"           // Tempête (vent > 60km/h)
-  | "standard";       // Conditions normales
+  | "overcast"          // Ciel couvert (nébulosité > 80%)
+  | "partly_cloudy"     // Partiellement nuageux (50-80%)
+  | "few_clouds"        // Peu nuageux (20-50%)
+  | "sunny"             // Ensoleillé (nébulosité < 20%)
+  | "fog"               // Brouillard (visibilité < 1km, humidité > 90%)
+  | "showers"           // Averses (précip légères intermittentes)
+  | "rainy"             // Pluie (précip modérées 2-10mm)
+  | "thunderstorm"      // Orages (vent > 35km/h + précip > 5mm)
+  | "windy"             // Vent fort (> 40km/h)
+  | "snow"              // Neige (T < 2°C + précip)
+  | "frost"             // Verglas / Gel (T < 0°C sans précip)
+  | "freezing_rain"     // Pluie verglaçante (T ~ 0°C + précip)
+  | "deep_frost"        // Gel intense (T < -5°C)
+  | "summer_heat"       // Canicule (> 33°C)
+  | "cold_wave"         // Vague de froid (T < -2°C prolongé)
+  | "storm"             // Tempête (vent > 60km/h)
+  | "variable"          // Temps variable (conditions changeantes)
+  | "spring_unstable"   // Printemps instable (alternance soleil/averses)
+  | "stable"            // Été stable (chaud, sec, calme)
+  | "autumn_disturbed"; // Automne perturbé (pluie + vent + frais)
 
 export type RegimeWeights = {
   temp: number;
@@ -146,18 +154,26 @@ export type RegimeWeights = {
 };
 
 const EXTENDED_REGIME_WEIGHTS: Record<ExtendedRegime, RegimeWeights> = {
-  stable:       { temp: 0.35, precip: 0.10, wind: 0.10, condition: 0.25, humidity: 0.10, pressure: 0.10 },
-  summer_heat:  { temp: 0.45, precip: 0.10, wind: 0.15, condition: 0.15, humidity: 0.10, pressure: 0.05 },
-  cold_winter:  { temp: 0.45, precip: 0.20, wind: 0.20, condition: 0.10, humidity: 0.03, pressure: 0.02 },
-  frost:        { temp: 0.50, precip: 0.15, wind: 0.15, condition: 0.10, humidity: 0.05, pressure: 0.05 },
-  rainy:        { temp: 0.20, precip: 0.40, wind: 0.15, condition: 0.15, humidity: 0.05, pressure: 0.05 },
-  heavy_rain:   { temp: 0.15, precip: 0.45, wind: 0.20, condition: 0.10, humidity: 0.05, pressure: 0.05 },
-  thunderstorm: { temp: 0.10, precip: 0.35, wind: 0.35, condition: 0.10, humidity: 0.05, pressure: 0.05 },
-  fog:          { temp: 0.20, precip: 0.10, wind: 0.05, condition: 0.20, humidity: 0.35, pressure: 0.10 },
-  snow:         { temp: 0.40, precip: 0.30, wind: 0.15, condition: 0.10, humidity: 0.03, pressure: 0.02 },
-  windy:        { temp: 0.15, precip: 0.15, wind: 0.45, condition: 0.15, humidity: 0.05, pressure: 0.05 },
-  storm:        { temp: 0.10, precip: 0.25, wind: 0.45, condition: 0.10, humidity: 0.05, pressure: 0.05 },
-  standard:     { temp: 0.30, precip: 0.25, wind: 0.20, condition: 0.15, humidity: 0.05, pressure: 0.05 },
+  overcast:        { temp: 0.25, precip: 0.15, wind: 0.10, condition: 0.30, humidity: 0.10, pressure: 0.10 },
+  partly_cloudy:   { temp: 0.25, precip: 0.15, wind: 0.10, condition: 0.30, humidity: 0.10, pressure: 0.10 },
+  few_clouds:      { temp: 0.30, precip: 0.10, wind: 0.10, condition: 0.30, humidity: 0.10, pressure: 0.10 },
+  sunny:           { temp: 0.35, precip: 0.05, wind: 0.10, condition: 0.30, humidity: 0.10, pressure: 0.10 },
+  fog:             { temp: 0.20, precip: 0.10, wind: 0.05, condition: 0.20, humidity: 0.35, pressure: 0.10 },
+  showers:         { temp: 0.20, precip: 0.35, wind: 0.15, condition: 0.15, humidity: 0.10, pressure: 0.05 },
+  rainy:           { temp: 0.20, precip: 0.40, wind: 0.15, condition: 0.15, humidity: 0.05, pressure: 0.05 },
+  thunderstorm:    { temp: 0.10, precip: 0.35, wind: 0.35, condition: 0.10, humidity: 0.05, pressure: 0.05 },
+  windy:           { temp: 0.15, precip: 0.15, wind: 0.45, condition: 0.15, humidity: 0.05, pressure: 0.05 },
+  snow:            { temp: 0.40, precip: 0.30, wind: 0.15, condition: 0.10, humidity: 0.03, pressure: 0.02 },
+  frost:           { temp: 0.50, precip: 0.15, wind: 0.15, condition: 0.10, humidity: 0.05, pressure: 0.05 },
+  freezing_rain:   { temp: 0.40, precip: 0.30, wind: 0.15, condition: 0.10, humidity: 0.03, pressure: 0.02 },
+  deep_frost:      { temp: 0.55, precip: 0.10, wind: 0.15, condition: 0.10, humidity: 0.05, pressure: 0.05 },
+  summer_heat:     { temp: 0.45, precip: 0.10, wind: 0.15, condition: 0.15, humidity: 0.10, pressure: 0.05 },
+  cold_wave:       { temp: 0.50, precip: 0.15, wind: 0.20, condition: 0.10, humidity: 0.03, pressure: 0.02 },
+  storm:           { temp: 0.10, precip: 0.25, wind: 0.45, condition: 0.10, humidity: 0.05, pressure: 0.05 },
+  variable:        { temp: 0.25, precip: 0.25, wind: 0.20, condition: 0.15, humidity: 0.10, pressure: 0.05 },
+  spring_unstable: { temp: 0.25, precip: 0.30, wind: 0.15, condition: 0.15, humidity: 0.10, pressure: 0.05 },
+  stable:          { temp: 0.35, precip: 0.10, wind: 0.10, condition: 0.25, humidity: 0.10, pressure: 0.10 },
+  autumn_disturbed:{ temp: 0.20, precip: 0.30, wind: 0.25, condition: 0.15, humidity: 0.05, pressure: 0.05 },
 };
 
 export function detectExtendedRegime(params: {
@@ -166,36 +182,42 @@ export function detectExtendedRegime(params: {
   windSpeed?: number | null;
   humidity?: number | null;
   visibility?: number | null;
+  cloudCover?: number | null;
 }): ExtendedRegime {
   const t = params.temperature ?? 15;
   const p = params.precipitation ?? 0;
   const w = params.windSpeed ?? 0;
   const h = params.humidity ?? 60;
   const v = params.visibility ?? 10000;
+  const c = params.cloudCover ?? 50;
 
-  // Storm: very strong wind
+  // Extreme events first
   if (w > 60) return "storm";
-  // Thunderstorm: strong wind + heavy rain
-  if (w > 40 && p > 5) return "thunderstorm";
-  // Windy: strong wind without rain
+  if (w > 35 && p > 5) return "thunderstorm";
   if (w > 40) return "windy";
-  // Snow/ice: cold + precipitation
+  // Cold + precipitation
+  if (t <= 0 && p > 0.5) return "freezing_rain";
   if (t <= 2 && p > 0) return "snow";
-  // Frost: below 0°C
+  if (t < -5) return "deep_frost";
   if (t < 0) return "frost";
-  // Fog: low visibility + high humidity
+  if (t < -2 && w > 15) return "cold_wave";
+  // Fog
   if (v < 1000 && h > 90) return "fog";
-  // Heavy rain
-  if (p > 5) return "heavy_rain";
-  // Rainy
-  if (p > 1) return "rainy";
-  // Summer heat
-  if (t > 30 && p < 1 && w < 30) return "summer_heat";
-  // Cold winter
-  if (t < 5) return "cold_winter";
-  // Stable: warm, dry, calm
-  if (p < 0.5 && w < 20 && t > 10) return "stable";
-  return "standard";
+  // Precipitation regimes
+  if (p > 5) return "rainy";
+  if (p > 0.5 && p <= 5) return "showers";
+  // Temperature extremes
+  if (t > 33 && p < 0.5) return "summer_heat";
+  // Seasonal patterns
+  if (t > 20 && p < 0.5 && w < 20 && c < 30) return "stable";
+  if (t >= 8 && t <= 18 && p > 0.2 && p <= 3 && c > 40) return "spring_unstable";
+  if (t >= 5 && t <= 15 && p > 1 && w > 15) return "autumn_disturbed";
+  if (p > 0.1 && c > 50 && w > 10) return "variable";
+  // Cloud-based regimes
+  if (c > 80) return "overcast";
+  if (c > 50) return "partly_cloudy";
+  if (c > 20) return "few_clouds";
+  return "sunny";
 }
 
 export function getRegimeWeights(regime: ExtendedRegime): RegimeWeights {
@@ -213,18 +235,26 @@ export type ExtendedRegimeInfo = {
 };
 
 export const EXTENDED_REGIME_INFO: Record<ExtendedRegime, Omit<ExtendedRegimeInfo, 'id'>> = {
-  stable:       { label: "Temps stable",        emoji: "🌤",  description: "Conditions stables, peu de vent, ciel dégagé à partiellement nuageux.",         weights: EXTENDED_REGIME_WEIGHTS.stable },
-  summer_heat:  { label: "Canicule",             emoji: "🌡",  description: "Températures élevées (> 30°C), temps sec et calme.",                           weights: EXTENDED_REGIME_WEIGHTS.summer_heat },
-  cold_winter:  { label: "Hiver froid",          emoji: "❄️",  description: "Températures basses (< 5°C), précision thermique primordiale.",               weights: EXTENDED_REGIME_WEIGHTS.cold_winter },
-  frost:        { label: "Gel",                  emoji: "🧊",  description: "Températures négatives — risque de verglas et de gel.",                      weights: EXTENDED_REGIME_WEIGHTS.frost },
-  rainy:        { label: "Pluie modérée",        emoji: "🌧",  description: "Précipitations modérées (1–5 mm) — la détection des pluies est prioritaire.", weights: EXTENDED_REGIME_WEIGHTS.rainy },
-  heavy_rain:   { label: "Pluie forte",          emoji: "🌊",  description: "Précipitations intenses (> 5 mm) — risque d'inondations locales.",           weights: EXTENDED_REGIME_WEIGHTS.heavy_rain },
-  thunderstorm: { label: "Orage",                emoji: "⛈",  description: "Orages — vent fort et précipitations intenses combinés.",                     weights: EXTENDED_REGIME_WEIGHTS.thunderstorm },
-  fog:          { label: "Brouillard",           emoji: "🌫",  description: "Visibilité réduite (< 1 km), humidité très élevée (> 90%).",                  weights: EXTENDED_REGIME_WEIGHTS.fog },
-  snow:         { label: "Neige / Verglas",      emoji: "❄",  description: "Températures < 2°C avec précipitations — risque de neige ou verglas.",      weights: EXTENDED_REGIME_WEIGHTS.snow },
-  windy:        { label: "Vent fort",            emoji: "💨",  description: "Vents soutenus > 40 km/h sans précipitations significatives.",               weights: EXTENDED_REGIME_WEIGHTS.windy },
-  storm:        { label: "Tempête",              emoji: "🌀",  description: "Vents violents > 60 km/h — le vent est le paramètre critique.",             weights: EXTENDED_REGIME_WEIGHTS.storm },
-  standard:     { label: "Standard",             emoji: "⛅",  description: "Conditions normales — pondération équilibrée entre tous les paramètres.",   weights: EXTENDED_REGIME_WEIGHTS.standard },
+  overcast:        { label: "Ciel couvert",         emoji: "☁️",  description: "Nébulosité > 80%, ciel entièrement couvert.",                              weights: EXTENDED_REGIME_WEIGHTS.overcast },
+  partly_cloudy:   { label: "Partiellement nuageux",emoji: "⛅",  description: "Nébulosité 50-80%, alternance de nuages et d'éclaircies.",                  weights: EXTENDED_REGIME_WEIGHTS.partly_cloudy },
+  few_clouds:      { label: "Peu nuageux",          emoji: "🌤️", description: "Nébulosité 20-50%, quelques nuages épars.",                                  weights: EXTENDED_REGIME_WEIGHTS.few_clouds },
+  sunny:           { label: "Ensoleillé",           emoji: "☀️",  description: "Ciel dégagé, nébulosité < 20%.",                                           weights: EXTENDED_REGIME_WEIGHTS.sunny },
+  fog:             { label: "Brouillard",           emoji: "🌫️", description: "Visibilité réduite (< 1 km), humidité > 90%.",                              weights: EXTENDED_REGIME_WEIGHTS.fog },
+  showers:         { label: "Averses",              emoji: "🌦️", description: "Précipitations légères intermittentes (0.5-5 mm).",                          weights: EXTENDED_REGIME_WEIGHTS.showers },
+  rainy:           { label: "Pluie",                emoji: "🌧️", description: "Précipitations modérées à fortes (> 5 mm).",                                weights: EXTENDED_REGIME_WEIGHTS.rainy },
+  thunderstorm:    { label: "Orages",               emoji: "⛈️",  description: "Orages — vent fort et précipitations intenses combinés.",                   weights: EXTENDED_REGIME_WEIGHTS.thunderstorm },
+  windy:           { label: "Vent fort",            emoji: "💨",  description: "Vents soutenus > 40 km/h.",                                                weights: EXTENDED_REGIME_WEIGHTS.windy },
+  snow:            { label: "Neige",                emoji: "❄️",  description: "Températures < 2°C avec précipitations — risque de neige.",                  weights: EXTENDED_REGIME_WEIGHTS.snow },
+  frost:           { label: "Verglas / Gel",        emoji: "🧊",  description: "Températures négatives sans précipitations — risque de gel.",               weights: EXTENDED_REGIME_WEIGHTS.frost },
+  freezing_rain:   { label: "Pluie verglaçante",    emoji: "🌧",  description: "Température ~ 0°C avec précipitations — verglas.",                          weights: EXTENDED_REGIME_WEIGHTS.freezing_rain },
+  deep_frost:      { label: "Gel",                  emoji: "❄",   description: "Gel intense (T < -5°C) — froid extrême.",                                   weights: EXTENDED_REGIME_WEIGHTS.deep_frost },
+  summer_heat:     { label: "Canicule",             emoji: "🔥",  description: "Températures > 33°C, temps sec et calme.",                                  weights: EXTENDED_REGIME_WEIGHTS.summer_heat },
+  cold_wave:       { label: "Vague de froid",       emoji: "🧊",  description: "Températures très basses prolongées (< -2°C).",                             weights: EXTENDED_REGIME_WEIGHTS.cold_wave },
+  storm:           { label: "Tempête",              emoji: "🌀",  description: "Vents violents > 60 km/h — paramètre critique.",                           weights: EXTENDED_REGIME_WEIGHTS.storm },
+  variable:        { label: "Temps variable",       emoji: "🌦",  description: "Conditions changeantes, alternance de soleil et nuages.",                  weights: EXTENDED_REGIME_WEIGHTS.variable },
+  spring_unstable: { label: "Printemps instable",   emoji: "🌸",  description: "Alternance soleil/averses typique du printemps.",                           weights: EXTENDED_REGIME_WEIGHTS.spring_unstable },
+  stable:          { label: "Été stable",           emoji: "☀️",  description: "Temps chaud, sec et calme — conditions estivales.",                        weights: EXTENDED_REGIME_WEIGHTS.stable },
+  autumn_disturbed:{ label: "Automne perturbé",     emoji: "🍂",  description: "Pluie + vent modéré + températures fraîches.",                              weights: EXTENDED_REGIME_WEIGHTS.autumn_disturbed },
 };
 
 // ─── Multi-Regime Detection ───────────────────────────────────────────────────
@@ -266,18 +296,33 @@ export function detectMultiRegime(params: {
 
   // Compute raw scores for each regime (0-100)
   const scores: Record<ExtendedRegime, number> = {
-    storm:       Math.max(0, Math.min(100, (w > 60 ? 80 + (w - 60) * 0.5 : w > 50 ? (w - 50) * 8 : 0))),
-    thunderstorm:Math.max(0, Math.min(100, (w > 40 && p > 5 ? 60 + Math.min(40, (w - 40) * 1.5 + (p - 5) * 2) : w > 30 && p > 3 ? 30 : 0))),
-    windy:       Math.max(0, Math.min(100, (w > 40 && p < 2 ? 50 + (w - 40) * 2 : w > 25 ? (w - 25) * 3 : 0))),
-    heavy_rain:  Math.max(0, Math.min(100, (p > 5 ? 50 + Math.min(50, (p - 5) * 5) : p > 3 ? (p - 3) * 25 : 0))),
-    rainy:       Math.max(0, Math.min(100, (p >= 1 && p <= 10 ? 40 + Math.min(40, p * 8) : p > 0.5 ? p * 20 : 0))),
-    snow:        Math.max(0, Math.min(100, (t <= 2 && p > 0 ? 50 + Math.min(50, (2 - t) * 10 + p * 5) : t < 0 && p > 0 ? 80 : 0))),
-    frost:       Math.max(0, Math.min(100, (t < 0 ? 50 + Math.min(50, (-t) * 10) : t < 2 ? (2 - t) * 25 : 0))),
-    fog:         Math.max(0, Math.min(100, (v < 1000 && h > 90 ? 60 + Math.min(40, (1000 - v) / 20 + (h - 90) * 2) : v < 3000 && h > 85 ? 30 : 0))),
-    summer_heat: Math.max(0, Math.min(100, (t > 30 ? 50 + Math.min(50, (t - 30) * 5) : t > 25 ? (t - 25) * 10 : 0))),
-    cold_winter: Math.max(0, Math.min(100, (t < 5 ? 40 + Math.min(40, (5 - t) * 8) : t < 10 ? (10 - t) * 8 : 0))),
-    stable:      Math.max(0, Math.min(100, (p < 0.5 && w < 20 && t > 10 && c < 60 ? 40 + Math.min(40, (20 - w) + (60 - c) * 0.5) : p < 1 && w < 15 ? 20 : 0))),
-    standard:    30, // always present as fallback
+    // Extreme events
+    storm:           Math.max(0, Math.min(100, (w > 60 ? 80 + (w - 60) * 0.5 : w > 50 ? (w - 50) * 8 : 0))),
+    thunderstorm:    Math.max(0, Math.min(100, (w > 35 && p > 5 ? 60 + Math.min(40, (w - 35) * 1.5 + (p - 5) * 2) : w > 25 && p > 3 ? 30 : 0))),
+    windy:           Math.max(0, Math.min(100, (w > 40 && p < 2 ? 50 + (w - 40) * 2 : w > 25 ? (w - 25) * 3 : 0))),
+    // Precipitation
+    rainy:           Math.max(0, Math.min(100, (p > 5 ? 50 + Math.min(50, (p - 5) * 5) : p > 3 ? (p - 3) * 25 : 0))),
+    showers:         Math.max(0, Math.min(100, (p > 0.5 && p <= 5 ? 40 + Math.min(40, p * 10) : p > 0.2 ? p * 30 : 0))),
+    // Cold
+    snow:            Math.max(0, Math.min(100, (t <= 2 && p > 0 ? 50 + Math.min(50, (2 - t) * 10 + p * 5) : t < 0 && p > 0 ? 80 : 0))),
+    frost:           Math.max(0, Math.min(100, (t < 0 && p < 0.5 ? 50 + Math.min(50, (-t) * 10) : t < 2 ? (2 - t) * 20 : 0))),
+    freezing_rain:   Math.max(0, Math.min(100, (t <= 0 && t >= -3 && p > 0.5 ? 60 + Math.min(40, p * 10) : t < 2 && t > -5 && p > 0.3 ? 25 : 0))),
+    deep_frost:      Math.max(0, Math.min(100, (t < -5 ? 60 + Math.min(40, (-t - 5) * 5) : t < -2 ? (Math.abs(t) - 2) * 20 : 0))),
+    cold_wave:       Math.max(0, Math.min(100, (t < -2 && w > 15 ? 50 + Math.min(50, (-t) * 5 + w * 0.5) : t < 0 ? 20 : 0))),
+    // Heat
+    summer_heat:     Math.max(0, Math.min(100, (t > 33 ? 60 + Math.min(40, (t - 33) * 5) : t > 28 ? (t - 28) * 12 : 0))),
+    // Fog
+    fog:             Math.max(0, Math.min(100, (v < 1000 && h > 90 ? 60 + Math.min(40, (1000 - v) / 20 + (h - 90) * 2) : v < 3000 && h > 85 ? 30 : 0))),
+    // Cloud-based
+    overcast:        Math.max(0, Math.min(100, (c > 80 ? 40 + Math.min(40, (c - 80) * 3) : c > 70 ? (c - 70) * 4 : 0))),
+    partly_cloudy:   Math.max(0, Math.min(100, (c >= 50 && c <= 80 ? 40 + Math.min(30, (c - 50)) : c > 35 ? (c - 35) * 2.5 : 0))),
+    few_clouds:      Math.max(0, Math.min(100, (c >= 20 && c < 50 ? 40 + Math.min(30, (50 - c)) : c < 60 && c > 10 ? 20 : 0))),
+    sunny:           Math.max(0, Math.min(100, (c < 20 ? 50 + Math.min(50, (20 - c) * 3) : c < 30 ? (30 - c) * 5 : 0))),
+    // Seasonal
+    stable:          Math.max(0, Math.min(100, (t > 20 && p < 0.5 && w < 20 && c < 30 ? 50 + Math.min(40, (t - 20) * 3 + (30 - c)) : t > 18 && p < 1 && w < 15 ? 25 : 0))),
+    spring_unstable: Math.max(0, Math.min(100, (t >= 8 && t <= 18 && p > 0.2 && p <= 3 && c > 40 ? 40 + Math.min(30, p * 10) : 0))),
+    autumn_disturbed:Math.max(0, Math.min(100, (t >= 5 && t <= 15 && p > 1 && w > 15 ? 40 + Math.min(30, p * 5 + (w - 15) * 2) : 0))),
+    variable:        Math.max(0, Math.min(100, (p > 0.1 && c > 50 && w > 10 ? 30 + Math.min(30, c * 0.3 + w * 0.5) : 0))),
   };
 
   // Normalize to sum to 100

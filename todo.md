@@ -259,3 +259,11 @@
 - [x] Frontend: Icônes lucide-react pour paramètres (Thermometer, CloudRain, Wind, Cloud, Droplets, Gauge)
 - [x] Frontend: Icônes lucide-react pour grille 20 régimes (Sun, CloudSun, CloudFog, Snowflake, CloudLightning, etc.)
 - [x] Frontend: Icônes lucide-react pour facteurs clés et pondérations
+
+## Suppression régime Standard + recalcul 20 régimes
+- [x] Backend: supprimer "standard" de EXTENDED_REGIME_WEIGHTS et EXTENDED_REGIME_INFO
+- [x] Backend: supprimer "standard" de detectMultiRegime — ne plus retomber sur Standard par défaut
+- [x] Backend: ajouter les 20 régimes spécifiques de la grille (overcast, partly_cloudy, few_clouds, sunny, fog, showers, rainy, thunderstorm, windy, snow, frost, freezing_rain, deep_frost, summer_heat, cold_wave, storm, variable, spring_unstable, stable, autumn_disturbed)
+- [x] Backend: recalculer detectMultiRegime pour attribuer toujours un des 20 régimes spécifiques
+- [x] Frontend: supprimer toute référence au régime "Standard" dans Ranking.tsx
+- [x] Tests: vérifier que detectMultiRegime ne retourne jamais "standard"

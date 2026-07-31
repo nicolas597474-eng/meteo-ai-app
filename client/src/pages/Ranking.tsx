@@ -228,7 +228,7 @@ export default function Ranking() {
           <div className="grid grid-cols-5 gap-2">
             {REGIME_GRID.map((item) => {
               const active = activeRegimes.find((r: any) =>
-                r.id === item.key || r.label?.toLowerCase().includes(item.matchKey)
+                r.id === item.key || r.label?.toLowerCase().includes(item.label.toLowerCase())
               );
               const pct = active?.influence ?? item.defaultPct;
               const isActive = !!active;
@@ -412,24 +412,24 @@ function getFactorLucideIcon(label: string): any {
 // ─── Regime Grid Data (20 items, 5×4) using lucide-react icons ───────────────
 
 const REGIME_GRID = [
-  { key: "ciel_couvert", label: "Ciel couvert", matchKey: "couvert", defaultPct: 60, icon: Cloud, iconColor: "text-slate-400" },
-  { key: "partiellement_nuageux", label: "Partiellement nuageux", matchKey: "partiellement", defaultPct: 30, icon: CloudSun, iconColor: "text-amber-300" },
-  { key: "peu_nuageux", label: "Peu nuageux", matchKey: "peu nuageux", defaultPct: 25, icon: Sun, iconColor: "text-yellow-400" },
-  { key: "ensoleille", label: "Ensoleillé", matchKey: "ensoleill", defaultPct: 15, icon: Sun, iconColor: "text-yellow-400" },
-  { key: "brouillard", label: "Brouillard", matchKey: "brouillard", defaultPct: 5, icon: CloudFog, iconColor: "text-slate-400" },
-  { key: "averses", label: "Averses", matchKey: "averses", defaultPct: 15, icon: CloudDrizzle, iconColor: "text-blue-400" },
-  { key: "pluie", label: "Pluie", matchKey: "pluie", defaultPct: 10, icon: CloudRain, iconColor: "text-blue-400" },
-  { key: "orages", label: "Orages", matchKey: "orage", defaultPct: 8, icon: CloudLightning, iconColor: "text-amber-400" },
-  { key: "vent_fort", label: "Vent fort", matchKey: "vent fort", defaultPct: 8, icon: Wind, iconColor: "text-cyan-400" },
-  { key: "neige", label: "Neige", matchKey: "neige", defaultPct: 5, icon: Snowflake, iconColor: "text-blue-200" },
-  { key: "verglas", label: "Verglas / Gel", matchKey: "verglas", defaultPct: 3, icon: Snowflake, iconColor: "text-cyan-300" },
-  { key: "pluie_verglacante", label: "Pluie verglaçante", matchKey: "pluie vergl", defaultPct: 2, icon: CloudHail, iconColor: "text-cyan-400" },
-  { key: "gel", label: "Gel", matchKey: "gel", defaultPct: 2, icon: ThermometerSnowflake, iconColor: "text-blue-300" },
-  { key: "canicule", label: "Canicule", matchKey: "canicule", defaultPct: 1, icon: Flame, iconColor: "text-red-400" },
-  { key: "vague_froid", label: "Vague de froid", matchKey: "vague de froid", defaultPct: 1, icon: ThermometerSnowflake, iconColor: "text-blue-300" },
-  { key: "tempete", label: "Tempête", matchKey: "tempête", defaultPct: 1, icon: Tornado, iconColor: "text-slate-300" },
-  { key: "temps_variable", label: "Temps variable", matchKey: "variable", defaultPct: 10, icon: CloudSun, iconColor: "text-amber-300" },
-  { key: "printemps_instable", label: "Printemps instable", matchKey: "printemps", defaultPct: 10, icon: Flower2, iconColor: "text-pink-400" },
-  { key: "ete_stable", label: "Été stable", matchKey: "stable", defaultPct: 15, icon: Sun, iconColor: "text-yellow-400" },
-  { key: "automne_perturbe", label: "Automne perturbé", matchKey: "automne", defaultPct: 10, icon: Leaf, iconColor: "text-orange-400" },
+  { key: "overcast", label: "Ciel couvert", defaultPct: 60, icon: Cloud, iconColor: "text-slate-400" },
+  { key: "partly_cloudy", label: "Partiellement nuageux", defaultPct: 30, icon: CloudSun, iconColor: "text-amber-300" },
+  { key: "few_clouds", label: "Peu nuageux", defaultPct: 25, icon: Sun, iconColor: "text-yellow-400" },
+  { key: "sunny", label: "Ensoleillé", defaultPct: 15, icon: Sun, iconColor: "text-yellow-400" },
+  { key: "fog", label: "Brouillard", defaultPct: 5, icon: CloudFog, iconColor: "text-slate-400" },
+  { key: "showers", label: "Averses", defaultPct: 15, icon: CloudDrizzle, iconColor: "text-blue-400" },
+  { key: "rainy", label: "Pluie", defaultPct: 10, icon: CloudRain, iconColor: "text-blue-400" },
+  { key: "thunderstorm", label: "Orages", defaultPct: 8, icon: CloudLightning, iconColor: "text-amber-400" },
+  { key: "windy", label: "Vent fort", defaultPct: 8, icon: Wind, iconColor: "text-cyan-400" },
+  { key: "snow", label: "Neige", defaultPct: 5, icon: Snowflake, iconColor: "text-blue-200" },
+  { key: "frost", label: "Verglas / Gel", defaultPct: 3, icon: Snowflake, iconColor: "text-cyan-300" },
+  { key: "freezing_rain", label: "Pluie verglaçante", defaultPct: 2, icon: CloudHail, iconColor: "text-cyan-400" },
+  { key: "deep_frost", label: "Gel", defaultPct: 2, icon: ThermometerSnowflake, iconColor: "text-blue-300" },
+  { key: "summer_heat", label: "Canicule", defaultPct: 1, icon: Flame, iconColor: "text-red-400" },
+  { key: "cold_wave", label: "Vague de froid", defaultPct: 1, icon: ThermometerSnowflake, iconColor: "text-blue-300" },
+  { key: "storm", label: "Tempête", defaultPct: 1, icon: Tornado, iconColor: "text-slate-300" },
+  { key: "variable", label: "Temps variable", defaultPct: 10, icon: CloudSun, iconColor: "text-amber-300" },
+  { key: "spring_unstable", label: "Printemps instable", defaultPct: 10, icon: Flower2, iconColor: "text-pink-400" },
+  { key: "stable", label: "Été stable", defaultPct: 15, icon: Sun, iconColor: "text-yellow-400" },
+  { key: "autumn_disturbed", label: "Automne perturbé", defaultPct: 10, icon: Leaf, iconColor: "text-orange-400" },
 ];
