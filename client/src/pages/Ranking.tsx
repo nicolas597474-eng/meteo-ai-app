@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "@/contexts/LocationContext";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
+import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import {
   Thermometer, CloudRain, Wind, Cloud, Droplets, Gauge,
   Sun, CloudSun, CloudFog, Snowflake, CloudLightning,
@@ -114,6 +115,13 @@ export default function Ranking() {
             </div>
           </div>
         </div>
+
+        {/* ═══ ALERT BADGE (dangerous regimes) ═══ */}
+        {isDangerousRegime(dominantRegime) && (
+          <div className="mb-3">
+            <AlertBadge regimeId={dominantRegime} confidence={confidence} confidenceThreshold={60} />
+          </div>
+        )}
 
         {/* ═══ CONFIANCE GLOBALE ═══ */}
         <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4 mb-3">

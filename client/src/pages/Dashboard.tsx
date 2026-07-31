@@ -7,6 +7,7 @@ import HourlyChart from "@/components/HourlyChart";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weatherImages";
+import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 
 // ─── Weather condition icons ──────────────────────────────────────────────────
 function WeatherIcon({ condition, size = 32 }: { condition: string | null; size?: number }) {
@@ -272,6 +273,13 @@ export default function Dashboard() {
       }
     : dash?.regime;
 
+  // Multi-regime data for alert badges
+  const multiRegime = lw
+    ? (lw as any).multiRegime ?? null
+    : (dash as any)?.multiRegime ?? null;
+  const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "variable";
+  const regimeConfidence: number = multiRegime?.confidenceScore ?? 70;
+
   // Current temperature from hourly (closest to now)
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
   const currentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
@@ -357,6 +365,13 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* ── Alert badge for dangerous regimes ── */}
+            {isDangerousRegime(primaryRegimeId) && (
+              <div className="mb-3">
+                <AlertBadge regimeId={primaryRegimeId} confidence={regimeConfidence} confidenceThreshold={60} />
               </div>
             )}
 

@@ -343,7 +343,7 @@ export function detectMultiRegime(params: {
       influence: normalized[k],
     }));
 
-  const primaryKey = active[0]?.id ?? "standard";
+  const primaryKey = active[0]?.id ?? "variable";
   const primaryInfo = EXTENDED_REGIME_INFO[primaryKey];
 
   // Blend weights proportionally to influence

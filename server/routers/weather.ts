@@ -54,12 +54,17 @@ export const weatherRouter = router({
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
 
-    // Detect current weather regime from today's MeteoAI forecast
-    const regimeInfo = detectWeatherRegime({
-      precipitation: meteoAI?.precipitation ?? null,
-      windSpeed: meteoAI?.windSpeed ?? null,
-      tempMax: meteoAI?.tempMax ?? null,
-      tempMin: meteoAI?.tempMin ?? null,
+    // Detect current weather regime using new multi-regime system
+    const avgTemp = meteoAI?.tempMax != null && meteoAI?.tempMin != null
+      ? (meteoAI.tempMax + meteoAI.tempMin) / 2
+      : meteoAI?.tempMax ?? meteoAI?.tempMin ?? 15;
+    const multiRegime = detectMultiRegime({
+      temperature: avgTemp,
+      precipitation: meteoAI?.precipitation ?? 0,
+      windSpeed: meteoAI?.windSpeed ?? 0,
+      cloudCover: null,
+      humidity: null,
+      visibility: null,
     });
 
     return {
@@ -70,11 +75,17 @@ export const weatherRouter = router({
       recentForecasts,
       allServices: [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public],
       regime: {
-        id: regimeInfo.regime,
-        label: regimeInfo.label,
-        emoji: regimeInfo.emoji,
-        description: regimeInfo.description,
-        weights: regimeInfo.weights,
+        id: multiRegime.primaryRegime.id,
+        label: multiRegime.primaryRegime.label,
+        emoji: multiRegime.primaryRegime.emoji,
+        description: multiRegime.description,
+        weights: multiRegime.blendedWeights,
+      },
+      multiRegime: {
+        activeRegimes: multiRegime.activeRegimes,
+        confidenceScore: multiRegime.confidenceScore,
+        blendedWeights: multiRegime.blendedWeights,
+        description: multiRegime.description,
       },
     };
   }),

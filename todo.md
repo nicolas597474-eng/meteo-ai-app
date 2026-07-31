@@ -267,3 +267,13 @@
 - [x] Backend: recalculer detectMultiRegime pour attribuer toujours un des 20 régimes spécifiques
 - [x] Frontend: supprimer toute référence au régime "Standard" dans Ranking.tsx
 - [x] Tests: vérifier que detectMultiRegime ne retourne jamais "standard"
+
+## Badges d'alerte régimes dangereux + Dashboard régime détecté
+- [x] Frontend: Créer composant AlertBadge pour régimes dangereux (thunderstorm, storm, summer_heat, cold_wave, freezing_rain, windy)
+- [x] Frontend: Afficher badge d'alerte animé (pulsation) sur Dashboard quand régime dangereux détecté
+- [x] Frontend: Afficher badge d'alerte sur page Classement dans le hero card
+- [x] Frontend: Dashboard — remplacer label "Standard" du mode par le nom du régime actif détecté
+- [x] Frontend: Dashboard — afficher le régime détecté avec icône + pourcentage dans la section prévision MeteoAI
+- [x] Backend: Ajouter le régime détecté dans la réponse getDashboard (multiRegime avec activeRegimes, confidenceScore, blendedWeights)
+- [x] Backend: Ajouter multiRegime dans la réponse getLocationWeather (favorites.ts)
+- [x] Backend: Corriger fallback stale "standard" → "variable" dans fusionEngine.ts

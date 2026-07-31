@@ -13,6 +13,7 @@ import {
 import { collectNearbyStations, rankStations, calculateGroundTruth } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
 import { generateMeteoAIForecast, detectWeatherRegime } from "../statsEngine";
+import { detectMultiRegime, EXTENDED_REGIME_INFO } from "../fusionEngine";
 import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ultraLocalService";
 
 export const favoritesRouter = router({
@@ -173,13 +174,26 @@ export const favoritesRouter = router({
       serviceNames.forEach(n => { defaultScores[n] = 50; });
       const meteoAI = forecastRows.length > 0 ? generateMeteoAIForecast(forecastRows, serviceNames, defaultScores) : null;
 
-      // Regime detection
-      const regimeInfo = detectWeatherRegime({
+      // Regime detection using new multi-regime system
+      const avgTemp = todayForecast?.tempMax != null && todayForecast?.tempMin != null
+        ? (todayForecast.tempMax + todayForecast.tempMin) / 2
+        : todayForecast?.tempMax ?? todayForecast?.tempMin ?? 15;
+      const multiRegimeResult = detectMultiRegime({
+        temperature: avgTemp,
         precipitation: todayForecast?.precipitation ?? 0,
         windSpeed: todayForecast?.windSpeed ?? 0,
-        tempMax: todayForecast?.tempMax ?? 15,
-        tempMin: todayForecast?.tempMin ?? 10,
+        cloudCover: todayForecast?.cloudCover ?? null,
+        humidity: null,
+        visibility: null,
       });
+      // Legacy compat
+      const regimeInfo = {
+        regime: multiRegimeResult.primaryRegime.id,
+        label: multiRegimeResult.primaryRegime.label,
+        emoji: multiRegimeResult.primaryRegime.emoji,
+        description: multiRegimeResult.description,
+        weights: multiRegimeResult.blendedWeights,
+      };
 
       // Confidence & stability — derive from model divergence
       const temps = forecastRows.map((f: { tempMax: number | null }) => f.tempMax).filter(Boolean) as number[];
@@ -255,6 +269,12 @@ export const favoritesRouter = router({
           regimeEmoji: regimeInfo.emoji,
           regimeDescription: regimeInfo.description,
           regimeWeights: regimeInfo.weights,
+        },
+        multiRegime: {
+          activeRegimes: multiRegimeResult.activeRegimes,
+          confidenceScore: multiRegimeResult.confidenceScore,
+          blendedWeights: multiRegimeResult.blendedWeights,
+          description: multiRegimeResult.description,
         },
       };
     }),
