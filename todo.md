@@ -253,3 +253,9 @@
 - [x] Uploader toutes les images via manus-upload-file --webdev
 - [x] Intégrer sélection dynamique dans Ranking.tsx (hero card image change selon régime)
 - [x] Intégrer sélection dynamique dans Dashboard.tsx (image change selon régime)
+
+## Migration icônes lucide-react
+- [x] Frontend: Remplacer tous les SVG inline par des icônes lucide-react dans Ranking.tsx
+- [x] Frontend: Icônes lucide-react pour paramètres (Thermometer, CloudRain, Wind, Cloud, Droplets, Gauge)
+- [x] Frontend: Icônes lucide-react pour grille 20 régimes (Sun, CloudSun, CloudFog, Snowflake, CloudLightning, etc.)
+- [x] Frontend: Icônes lucide-react pour facteurs clés et pondérations
