@@ -241,11 +241,15 @@ export default function Dashboard() {
     ?? 0;
   const stabilityIndex: number = officialForecast?.confidence?.stabilityIndex ?? today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0;
 
-  // Current temperature from hourly (closest to now)
+  // La température affichée utilise exactement la même fusion locale validée que
+  // la transparence Ultra-locale. Sans observation locale exploitable, elle
+  // conserve le flux officiel horaire.
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
   const nextConditionChange = findNextConditionChange(hours, currentHour?.hour ?? nowHour);
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
-  const currentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
+  const localCurrentObservation = lw?.currentObservation ?? null;
+  const officialCurrentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
+  const currentTemp = localCurrentObservation?.temperature ?? officialCurrentTemp;
   const apparentTemp = currentHour?.apparentTemp ?? null;
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
   const windDir = currentHour?.windDirection ?? null;
@@ -376,6 +380,14 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground mt-1">
                     {(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible") + " actuellement"}
                   </p>
+                  {localCurrentObservation ? (
+                    <p className="mt-1 text-[11px] font-medium text-emerald-300">
+                      Mesure locale validée · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}
+                      {officialCurrentTemp != null ? ` · prévision officielle ${officialCurrentTemp.toFixed(1)}°` : ""}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-sky-200/90">Prévision officielle consolidée</p>
+                  )}
                   {nextConditionChange && (
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
                       <Clock className="h-3 w-3" />

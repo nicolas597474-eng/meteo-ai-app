@@ -497,3 +497,8 @@
 - [x] Décision: Conserver Netatmo désactivé jusqu’à la fourniture d’identifiants OAuth, sans le présenter comme source physique.
 - [x] Backend: Ajouter le collecteur METAR mondial officiel avec filtrage géographique, conversion d’unités et délai réseau borné.
 - [x] Frontend: Clarifier que les références de grille ne sont pas des stations Netatmo, Weather Underground ou CWOP réelles sans accès fournisseur.
+
+## Cohérence température Dashboard et Fiabilité
+- [x] Backend: Utiliser la même observation locale validée pour la température actuelle du Dashboard et la page Fiabilité.
+- [x] Frontend: Expliquer la provenance de la température actuelle sans masquer la prévision officielle.
+- [x] Tests: Vérifier les cas observation valide, absente ou périmée dans le contrat Dashboard.

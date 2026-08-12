@@ -10,6 +10,28 @@ import {
   getLocationForecastsForUser,
   getLocationForecast,
 } from "../db";
+
+export type DashboardCurrentTemperature = {
+  temperature: number;
+  stationCount: number;
+  confidenceScore: number;
+  source: "local_validated";
+};
+
+export function buildDashboardCurrentTemperature(input: {
+  localMode: "standard" | "local" | "ultra-local";
+  temperature: number | null;
+  stationCount: number;
+  confidenceScore: number;
+}): DashboardCurrentTemperature | null {
+  if (input.localMode === "standard" || input.temperature == null || input.stationCount < 1) return null;
+  return {
+    temperature: input.temperature,
+    stationCount: input.stationCount,
+    confidenceScore: input.confidenceScore,
+    source: "local_validated",
+  };
+}
 import { collectNearbyStations, rankStations, calculateGroundTruth } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
 import { computeFusion, detectMultiRegime, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
@@ -265,6 +287,13 @@ export const favoritesRouter = router({
       const divergence = temps.length > 1 ? Math.max(...temps) - Math.min(...temps) : 0;
       const confidenceScore = advancedFusion.confidenceScore;
       const stabilityIndex = Math.max(0, Math.min(100, 100 - divergence * 4));
+      const localTemperature = advancedFusion.temperature ?? ultraLocalResult.temperature;
+      const currentObservation = buildDashboardCurrentTemperature({
+        localMode,
+        temperature: localTemperature,
+        stationCount: advancedFusion.stationCount,
+        confidenceScore,
+      });
 
       return {
         location: { lat, lon },
@@ -336,6 +365,7 @@ export const favoritesRouter = router({
             usedSources: advancedFusion.usedSources,
           },
         },
+        currentObservation,
         scores: {
           confidenceScore,
           stabilityIndex,
