@@ -324,6 +324,7 @@ export default function Dashboard() {
   const windSpeed = currentHour?.windSpeed ?? today?.windSpeed ?? meteoAI?.windSpeed ?? null;
   const currentCloudCover = currentHour?.cloudCover ?? today?.cloudCover ?? null;
   const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
+  const modelFallbackContributors = locationWeather?.ultraLocal?.modelFallback?.contributors ?? [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -478,8 +479,7 @@ export default function Dashboard() {
                   </p>
                   {localCurrentObservation ? (
                     <p className="mt-1 text-[11px] font-medium text-emerald-300">
-                      <span className="sm:hidden">Local {localObservedAt ?? "validé"} · {localCurrentObservation.stationCount} station{localCurrentObservation.stationCount > 1 ? "s" : ""}</span>
-                      <span className="hidden sm:inline">Relevé local {localObservedAt ? `à ${localObservedAt}` : "validé"} · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}</span>
+                      {localCurrentObservation.source === "model_fallback" ? <><span className="sm:hidden">Fusion modèles officielle</span><span className="hidden sm:inline">Fusion officielle multi-modèles · sans station locale validée</span></> : <><span className="sm:hidden">Local {localObservedAt ?? "validé"} · {localCurrentObservation.stationCount} station{localCurrentObservation.stationCount > 1 ? "s" : ""}</span><span className="hidden sm:inline">Relevé local {localObservedAt ? `à ${localObservedAt}` : "validé"} · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}</span></>}
                       {localDelta != null
                         ? <span>{localDelta >= 0 ? " +" : " "}{localDelta.toFixed(1)}°<span className="hidden sm:inline"> vs prévision officielle</span></span>
                         : officialCurrentTemp != null ? ` · prévision officielle ${officialCurrentTemp.toFixed(1)}°` : ""}
@@ -641,7 +641,9 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <Radio className="h-3.5 w-3.5 text-emerald-400" />
                 <span className="text-xs font-semibold text-emerald-300">
-                  {locationWeather.ultraLocal.usesOfficialFallback
+                  {locationWeather.ultraLocal.usesModelFallback
+                    ? "Repli sur la fusion officielle"
+                    : locationWeather.ultraLocal.usesOfficialFallback
                     ? "Repli sur la prévision officielle"
                     : localMode === "ultra-local" ? "Observation Ultra-locale" : "Observation Locale"}
                 </span>
@@ -652,7 +654,9 @@ export default function Dashboard() {
             </div>
 
             <p className="text-[11px] text-muted-foreground">
-              {locationWeather.ultraLocal.usesOfficialFallback
+              {locationWeather.ultraLocal.usesModelFallback
+                ? `Aucune observation physique validée : fusion officielle de ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèles, avec pondérations de température traçables.`
+                : locationWeather.ultraLocal.usesOfficialFallback
                 ? "Aucune observation physique validée : la valeur ci-dessous est strictement celle de la prévision officielle affichée au-dessus."
                 : "Mesure locale issue des stations : elle complète la prévision officielle affichée au-dessus, sans la remplacer."}
             </p>
@@ -664,11 +668,25 @@ export default function Dashboard() {
                   {Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C
                 </span>
                 <div className="text-xs text-muted-foreground">
-                  <p>{locationWeather.ultraLocal.usesOfficialFallback ? "Source : prévision officielle" : <>Confiance : <span className="font-semibold text-foreground">{locationWeather.ultraLocal.confidenceScore}%</span></>}</p>
-                  {!locationWeather.ultraLocal.usesOfficialFallback && locationWeather.ultraLocal.microclimateAdjustment !== 0 && (
+                  <p>{locationWeather.ultraLocal.usesModelFallback ? `Source : ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèles pondérés` : locationWeather.ultraLocal.usesOfficialFallback ? "Source : prévision officielle" : <>Confiance : <span className="font-semibold text-foreground">{locationWeather.ultraLocal.confidenceScore}%</span></>}</p>
+                  {!locationWeather.ultraLocal.usesOfficialFallback && !locationWeather.ultraLocal.usesModelFallback && locationWeather.ultraLocal.microclimateAdjustment !== 0 && (
                     <p>Microclimat : {locationWeather.ultraLocal.microclimateAdjustment > 0 ? "+" : ""}{Number(locationWeather.ultraLocal.microclimateAdjustment).toFixed(1)}°C</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {locationWeather.ultraLocal.usesModelFallback && modelFallbackContributors.length > 0 && (
+              <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-2.5 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Contributions de la fusion officielle</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {modelFallbackContributors.map((model: any) => (
+                    <span key={model.name} className="rounded-md border border-violet-500/20 bg-slate-950/40 px-1.5 py-1 text-[10px] text-slate-200">
+                      {model.name} {Number(model.temperature).toFixed(1)}° · {Math.round(Number(model.weight) * 100)}%
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">Poids de température issus de la trace de fusion officielle ; ce sont des modèles, pas des stations.</p>
               </div>
             )}
 

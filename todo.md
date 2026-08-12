@@ -768,3 +768,9 @@
 - [x] Backend: Forcer le repli exact sur la température officielle lorsqu’aucune observation physique n’est qualifiée.
 - [x] Frontend: Indiquer explicitement le repli officiel et masquer le micro-ajustement sans base station.
 - [x] Tests: Vérifier l’égalité Standard / Local / Ultra-local à zéro station validée.
+
+## Repli multi-modèles sans station physique
+- [x] Audit: Identifier les références de modèles réelles disponibles au lieu et leurs poids de fusion officiels.
+- [x] Backend: Utiliser la fusion officielle multi-modèles comme repli sans station physique, sans l’étiqueter comme station.
+- [x] Frontend: Expliquer la source multi-modèles et ses contributions sans ambiguïté.
+- [x] Tests: Vérifier le repli multi-modèles, la traçabilité et l’absence de micro-ajustement sans station.

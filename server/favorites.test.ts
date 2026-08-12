@@ -45,10 +45,12 @@ describe("buildDashboardCurrentTemperature", () => {
       localTemperature: 17.1,
       physicalStationCount: 0,
       microclimateAdjustment: -0.1,
+      modelFallbackTemperature: null,
     })).toEqual({
       temperature: 30.7,
       usesOfficialFallback: true,
       microclimateAdjustment: 0,
+      usesModelFallback: false,
     });
   });
 
@@ -58,10 +60,27 @@ describe("buildDashboardCurrentTemperature", () => {
       localTemperature: 29.9,
       physicalStationCount: 1,
       microclimateAdjustment: -0.2,
+      modelFallbackTemperature: 30.7,
     })).toEqual({
       temperature: 29.9,
       usesOfficialFallback: false,
       microclimateAdjustment: -0.2,
+      usesModelFallback: false,
+    });
+  });
+
+  it("utilise la fusion officielle traçable si aucune station physique n’est valide", () => {
+    expect(resolveLocalModeTemperature({
+      officialTemperature: 31.1,
+      localTemperature: null,
+      physicalStationCount: 0,
+      microclimateAdjustment: -0.1,
+      modelFallbackTemperature: 30.4,
+    })).toEqual({
+      temperature: 30.4,
+      usesOfficialFallback: false,
+      microclimateAdjustment: 0,
+      usesModelFallback: true,
     });
   });
 });
