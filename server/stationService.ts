@@ -22,6 +22,7 @@ export type StationSource =
   | "wunderground"
   | "cwop"
   | "noaa"
+  | "metar"
   | "openmeteo"
   | "synop"
   | "davis"
@@ -55,7 +56,7 @@ export type StationData = {
  * Les réseaux personnels simulés et points de grille restent des références de
  * modèle : ils ne doivent jamais être persistés comme observations de station.
  */
-export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance"]);
+export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance", "metar"]);
 
 export type StationSourceKind = "physical" | "reference";
 
@@ -122,6 +123,7 @@ export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: numb
 
 const SOURCE_DEFAULTS: Record<StationSource, { reliability: number; updateFreqMin: number; availability: number }> = {
   meteofrance:  { reliability: 92, updateFreqMin: 60, availability: 0.98 },
+  metar:        { reliability: 90, updateFreqMin: 60, availability: 0.97 },
   synop:        { reliability: 88, updateFreqMin: 60, availability: 0.95 },
   noaa:         { reliability: 85, updateFreqMin: 60, availability: 0.93 },
   infoclimat:   { reliability: 82, updateFreqMin: 30, availability: 0.88 },
@@ -284,7 +286,76 @@ async function fetchMeteoFranceStations(
   }
 }
 
-// ─── 3. Multi-point Open-Meteo grid (simulates personal weather stations) ─────
+// ─── 3. METAR — official worldwide airport observations (no key required) ─────
+
+export type MetarObservation = {
+  icaoId?: string;
+  reportTime?: string;
+  temp?: number;
+  dewp?: number;
+  wdir?: number;
+  wspd?: number;
+  wgst?: number;
+  altim?: number;
+  lat?: number;
+  lon?: number;
+  elev?: number;
+  name?: string;
+};
+
+export function mapMetarObservation(observation: MetarObservation, lat: number, lon: number, radiusKm: number): StationData | null {
+  if (!observation.icaoId || typeof observation.lat !== "number" || typeof observation.lon !== "number") return null;
+  const distanceKm = haversineKm(lat, lon, observation.lat, observation.lon);
+  if (distanceKm > radiusKm) return null;
+  const knotsToKmh = (knots: number | undefined) => knots === undefined ? null : Math.round(knots * 1.852 * 10) / 10;
+  return {
+    stationId: `metar-${observation.icaoId}`,
+    source: "metar",
+    name: observation.name ? `METAR · ${observation.name}` : `METAR · ${observation.icaoId}`,
+    lat: observation.lat,
+    lon: observation.lon,
+    altitude: observation.elev ?? null,
+    distanceKm: Math.round(distanceKm * 10) / 10,
+    temperature: observation.temp ?? null,
+    humidity: observation.temp !== undefined && observation.dewp !== undefined
+      ? Math.max(0, Math.min(100, Math.round(100 - 5 * (observation.temp - observation.dewp))))
+      : null,
+    pressure: observation.altim ?? null,
+    windSpeed: knotsToKmh(observation.wspd),
+    windGust: knotsToKmh(observation.wgst),
+    windDirection: observation.wdir ?? null,
+    precipitation: null,
+    updatedAt: observation.reportTime ?? null,
+    reliabilityScore: SOURCE_DEFAULTS.metar.reliability,
+    updateFrequencyMin: SOURCE_DEFAULTS.metar.updateFreqMin,
+    dataAvailability: SOURCE_DEFAULTS.metar.availability,
+    isActive: true,
+  };
+}
+
+async function fetchMetarStations(lat: number, lon: number, radiusKm: number): Promise<StationData[]> {
+  try {
+    const latitudePadding = Math.max(radiusKm / 111, 0.25);
+    const longitudePadding = Math.max(radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2)), 0.25);
+    const bbox = [lat - latitudePadding, lon - longitudePadding, lat + latitudePadding, lon + longitudePadding]
+      .map((coordinate) => coordinate.toFixed(4))
+      .join(",");
+    const params = new URLSearchParams({ format: "json", bbox });
+    const response = await fetch(`https://aviationweather.gov/api/data/metar?${params}`, {
+      headers: { "User-Agent": "MeteoAI/1.0 official-station-collector" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return [];
+    const observations = await response.json() as MetarObservation[];
+    return observations
+      .map((observation) => mapMetarObservation(observation, lat, lon, radiusKm))
+      .filter((station): station is StationData => station !== null);
+  } catch {
+    return [];
+  }
+}
+
+// ─── 4. Multi-point Open-Meteo grid (simulates personal weather stations) ─────
 //
 // We query Open-Meteo at several geographic offsets around the target location.
 // Each offset uses a different NWP model to add diversity. The resulting stations
@@ -373,7 +444,7 @@ async function fetchPersonalWeatherStations(
   return results;
 }
 
-// ─── 4. ECMWF IFS reference point (labeled as SYNOP/WMO) ─────────────────────
+// ─── 5. ECMWF IFS reference point (labeled as SYNOP/WMO) ─────────────────────
 
 async function fetchSYNOPReference(
   lat: number,
@@ -413,9 +484,10 @@ export async function collectNearbyStations(
   townName: string = "Local"
 ): Promise<StationData[]> {
   // Fetch from all sources in parallel
-  const [openMeteo, meteoFrance, personal, synopRef] = await Promise.allSettled([
+  const [openMeteo, meteoFrance, metar, personal, synopRef] = await Promise.allSettled([
     fetchOpenMeteoNearbyStations(lat, lon, radiusKm),
     fetchMeteoFranceStations(lat, lon, radiusKm),
+    fetchMetarStations(lat, lon, radiusKm),
     fetchPersonalWeatherStations(lat, lon, radiusKm, townName),
     fetchSYNOPReference(lat, lon),
   ]);
@@ -423,6 +495,7 @@ export async function collectNearbyStations(
   const all: StationData[] = [
     ...(openMeteo.status === "fulfilled" ? openMeteo.value : []),
     ...(meteoFrance.status === "fulfilled" ? meteoFrance.value : []),
+    ...(metar.status === "fulfilled" ? metar.value : []),
     ...(personal.status === "fulfilled" ? personal.value : []),
     ...(synopRef.status === "fulfilled" ? synopRef.value : []),
   ];

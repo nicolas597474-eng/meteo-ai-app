@@ -488,3 +488,11 @@
 - [x] Frontend: Renforcer les badges distinguant stations physiques locales et sources de référence.
 - [x] Frontend: Ajouter des filtres interactifs par statut de source et ordre de distance.
 - [x] Tests: Vérifier le filtrage et le tri déterministe des sources affichées.
+
+## Extension des stations physiques vérifiables
+- [x] Recherche: Sélectionner les réseaux d’observations physiques et vérifier leurs conditions d’accès.
+- [x] Backend: Intégrer les sources retenues sans clé au cycle de collecte de 05h00 avec provenance et fraîcheur.
+- [x] Backend: Appliquer une validation stricte et une classification distincte des stations physiques, références et sources écartées.
+- [x] Tests: Vérifier l’origine, les restrictions d’accès et la non-utilisation de données simulées.
+- [ ] Backend: Activer le réseau Netatmo public lorsque les identifiants OAuth seront fournis.
+- [x] Backend: Ajouter le collecteur METAR mondial officiel avec filtrage géographique, conversion d’unités et délai réseau borné.

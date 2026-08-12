@@ -5,6 +5,7 @@ import {
   calculateGroundTruth,
   getPhysicalActiveStations,
   getStationSourceKind,
+  mapMetarObservation,
   type StationData,
 } from "./stationService";
 
@@ -65,9 +66,36 @@ describe("haversineKm", () => {
 describe("getStationSourceKind", () => {
   it("distingue les observations physiques des références de modèle ou de réseau", () => {
     expect(getStationSourceKind("meteofrance")).toBe("physical");
+    expect(getStationSourceKind("metar")).toBe("physical");
     expect(getStationSourceKind("openmeteo")).toBe("reference");
     expect(getStationSourceKind("netatmo")).toBe("reference");
     expect(getStationSourceKind("synop")).toBe("reference");
+  });
+});
+
+describe("mapMetarObservation", () => {
+  it("convertit une observation aéroportuaire officielle en station physique et convertit le vent en km/h", () => {
+    const station = mapMetarObservation({
+      icaoId: "LFAC",
+      reportTime: "2026-08-12T06:30:00.000Z",
+      temp: 20,
+      dewp: 12,
+      wdir: 70,
+      wspd: 10,
+      wgst: 15,
+      altim: 1022,
+      lat: 50.962,
+      lon: 1.954,
+      elev: 12,
+      name: "Calais-Dunkerque Arpt, FR",
+    }, 50.95, 1.96, 30);
+
+    expect(station).toMatchObject({ source: "metar", stationId: "metar-LFAC", windSpeed: 18.5, windGust: 27.8, pressure: 1022, isActive: true });
+    expect(station?.distanceKm).toBeLessThan(30);
+  });
+
+  it("écarte une observation officielle au-delà du rayon choisi", () => {
+    expect(mapMetarObservation({ icaoId: "LFAC", lat: 50.962, lon: 1.954 }, 50.7567, 2.5204, 10)).toBeNull();
   });
 });
 

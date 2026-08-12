@@ -202,6 +202,7 @@ export default function Ranking() {
 
 const SOURCE_LABELS: Record<string, string> = {
   meteofrance: "Météo-France",
+  metar: "METAR officiel",
   synop: "SYNOP/WMO",
   noaa: "NOAA",
   openmeteo: "Open-Meteo",

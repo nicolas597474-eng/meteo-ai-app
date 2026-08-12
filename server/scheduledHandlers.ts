@@ -688,7 +688,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           physicalStationCount = physicalStations.length;
 
           if (physicalStations.length === 0) {
-            console.warn(`[Stations] ${fav.name}: aucune station physique Météo-France disponible dans le rayon de ${radiusKm} km`);
+            console.warn(`[Stations] ${fav.name}: aucune station physique officielle disponible dans le rayon de ${radiusKm} km`);
           }
 
           for (const station of physicalStations) {
