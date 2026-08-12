@@ -233,7 +233,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
           confidenceScore: trueConfidenceScore,
-          weights: meteoAI.weights as any,
+          weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         });
       }
@@ -789,7 +789,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
           confidenceScore: favConfidenceScore,
-          weights: meteoAI.weights as any,
+          weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         });
 

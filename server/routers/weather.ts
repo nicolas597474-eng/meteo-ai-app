@@ -34,6 +34,45 @@ function getTodayParis(): string {
   return getParisDate();
 }
 
+function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
+  const record = weights && typeof weights === "object" ? weights as Record<string, any> : null;
+  if (!record) return null;
+  if (record.trace) return record.trace;
+
+  // Les snapshots précédant la traçabilité v1 contiennent déjà les poids finaux
+  // par service. On les expose sans inventer les facteurs intermédiaires.
+  const weightByService = record.weightByService && typeof record.weightByService === "object"
+    ? record.weightByService as Record<string, any>
+    : record;
+  const services = Object.entries(weightByService).filter(([, weight]) =>
+    weight && typeof weight === "object" &&
+    (typeof weight.tempWeight === "number" || typeof weight.precipWeight === "number" || typeof weight.windWeight === "number")
+  );
+  if (services.length === 0) return null;
+
+  const parameterSources = (field: "tempWeight" | "precipWeight" | "windWeight") => services
+    .filter(([, weight]) => typeof weight[field] === "number")
+    .map(([name, weight]) => ({
+      id: `model:${name}`,
+      name,
+      type: "model" as const,
+      finalWeight: weight[field],
+    }));
+
+  return {
+    version: 0,
+    issuedAt: computedAt?.toISOString?.() ?? null,
+    method: "Fusion officielle — archive de pondérations",
+    sourceCount: services.length,
+    parameterSources: {
+      temperature: parameterSources("tempWeight"),
+      precipitation: parameterSources("precipWeight"),
+      wind: parameterSources("windWeight"),
+    },
+    excludedSources: [],
+  };
+}
+
 export const weatherRouter = router({
   /**
    * Dashboard: today's MeteoAI forecast + stability index + top services
@@ -68,10 +107,12 @@ export const weatherRouter = router({
       humidity: null,
       visibility: null,
     });
+    const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
     return {
       today,
       meteoAI,
+      trace,
       forecastCount: forecasts.length,
       topServices: ranking.slice(0, 5),
       recentForecasts,
@@ -437,6 +478,7 @@ export const weatherRouter = router({
         bestModelScore,
         leadTimeBucket: "4-7d",
       });
+      const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
       return {
         today,
@@ -456,6 +498,13 @@ export const weatherRouter = router({
           stabilityIndex: meteoAI?.stabilityIndex ?? null,
         },
         bestModel: bestModel ? { name: bestModel.serviceName, score: bestModel.avgScore ?? 0 } : null,
+        trace: trace
+          ? { ...trace, snapshotComputedAt: meteoAI?.computedAt?.toISOString?.() ?? null }
+          : {
+              available: false,
+              issuedAt: meteoAI?.computedAt?.toISOString?.() ?? null,
+              message: "La traçabilité détaillée sera disponible après la prochaine collecte officielle.",
+            },
       };
     }),
 
@@ -575,7 +624,7 @@ export const weatherRouter = router({
             bestModelScore: ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60,
             leadTimeBucket: "6-24h",
           }),
-          weights: meteoAI.weights as any,
+          weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation: `Prévision synthétisée à partir de ${allForecasts.length} modèles.`,
         });
 

@@ -9,6 +9,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weatherImages";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
+import { ForecastTraceability } from "@/components/ForecastTraceability";
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
@@ -450,6 +451,8 @@ export default function Dashboard() {
           <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
           <span className="text-primary text-xs">→</span>
         </a>
+
+        <ForecastTraceability trace={officialForecast?.trace} compact />
 
         {/* ── Ultra-local Mode Selector ── */}
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">

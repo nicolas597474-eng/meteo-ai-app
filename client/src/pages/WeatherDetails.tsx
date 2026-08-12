@@ -5,6 +5,7 @@
 import { useState, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
+import { ForecastTraceability } from "@/components/ForecastTraceability";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft } from "lucide-react";
 import { Link } from "wouter";
@@ -146,6 +147,7 @@ export default function WeatherDetails() {
   const regime = data?.regime;
   const confidence = data?.confidence;
   const bestModel = data?.bestModel;
+  const trace = data?.trace;
 
   return (
     <div className="min-h-screen bg-[#0B132B]">
@@ -166,6 +168,10 @@ export default function WeatherDetails() {
               <span className="text-xs text-slate-300">{regime.primary.label}</span>
             </div>
           )}
+        </div>
+
+        <div className="mb-4">
+          <ForecastTraceability trace={trace} />
         </div>
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}

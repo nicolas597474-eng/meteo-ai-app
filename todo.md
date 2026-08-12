@@ -335,3 +335,11 @@
 - [x] Frontend: Faire consommer au Dashboard et à la page Détails les mêmes données officielles pour l’instant courant et la journée.
 - [x] Frontend: Distinguer explicitement prévision officielle et observation locale/ultra-locale sans repli implicite.
 - [x] Tests: Ajouter des tests de fuseau Paris et de reproductibilité/pondération de la fusion officielle; TypeScript et Vitest validés.
+
+## Traçabilité des prévisions — sources et pondérations
+- [x] Backend: Définir le contrat de traçabilité d’une prévision officielle (sources, poids par paramètre, méthode, horodatage).
+- [x] DB: Persister les diagnostics exacts de fusion dans le JSON de chaque snapshot MeteoAI, sans migration destructive.
+- [x] Backend: Exposer la traçabilité dans les réponses Dashboard et Détails, avec un repli explicite pour les prévisions historiques.
+- [x] Frontend: Afficher les sources réellement utilisées, les poids température/précipitations/vent et l’horodatage dans le Dashboard.
+- [x] Frontend: Afficher la même traçabilité détaillée dans la page Détails.
+- [x] Tests: Vérifier la conservation exacte des sources et la somme des poids pour chaque paramètre.

@@ -16,10 +16,22 @@ describe("computeOfficialDailyForecast", () => {
     const first = computeOfficialDailyForecast(forecasts, performances);
     const second = computeOfficialDailyForecast(forecasts, performances);
 
-    expect(second).toEqual(first);
+    expect(second.tempMax).toBe(first.tempMax);
+    expect(second.tempMin).toBe(first.tempMin);
+    expect(second.precipitation).toBe(first.precipitation);
+    expect(second.windSpeed).toBe(first.windSpeed);
+    expect(second.weights).toEqual(first.weights);
+    expect(second.trace.parameterSources).toEqual(first.trace.parameterSources);
     expect(first.tempMax).toBeLessThan(23);
     expect(first.weights["Modèle précis"].tempWeight).toBeGreaterThan(
       first.weights["Modèle incertain"].tempWeight
     );
+    expect(first.trace.parameterSources.temperature.map((source) => source.name)).toEqual([
+      "Modèle précis",
+      "Modèle incertain",
+    ]);
+    expect(first.trace.parameterSources.temperature.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
+    expect(first.trace.parameterSources.precipitation.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
+    expect(first.trace.parameterSources.wind.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
   });
 });

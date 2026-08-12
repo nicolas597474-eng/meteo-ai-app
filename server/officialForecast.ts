@@ -1,4 +1,4 @@
-import { computeFusion, type FusionSource } from "./fusionEngine";
+import { computeFusion, type FusionResult, type FusionSource } from "./fusionEngine";
 
 export type OfficialDailyForecastInput = {
   serviceName: string;
@@ -16,6 +16,45 @@ export type OfficialServicePerformance = {
   maeWind?: number;
   weightedScore?: number;
 };
+
+export type ForecastTraceSource = {
+  id: string;
+  name: string;
+  type: "station" | "model" | "service";
+  finalWeight: number;
+  distanceKm: number;
+  distanceWeight: number;
+  qualityWeight: number;
+  freshnessWeight: number;
+  performanceWeight: number;
+};
+
+export type ForecastTrace = {
+  version: 1;
+  issuedAt: string;
+  method: string;
+  sourceCount: number;
+  parameterSources: {
+    temperature: ForecastTraceSource[];
+    precipitation: ForecastTraceSource[];
+    wind: ForecastTraceSource[];
+  };
+  excludedSources: Array<{ id: string; name: string; reason: string }>;
+};
+
+function toTraceSources(result: FusionResult): ForecastTraceSource[] {
+  return result.usedSources.map((source) => ({
+    id: source.id,
+    name: source.name,
+    type: source.type,
+    finalWeight: source.finalWeight,
+    distanceKm: source.distanceKm,
+    distanceWeight: source.distanceWeight,
+    qualityWeight: source.qualityWeight,
+    freshnessWeight: source.freshnessWeight,
+    performanceWeight: source.performanceWeight,
+  }));
+}
 
 /**
  * Fusion quotidienne officielle de MeteoAI.
@@ -83,6 +122,22 @@ export function computeOfficialDailyForecast(
     };
   }
 
+  const excludedSources = [...maxFusion.excludedSources, ...precipFusion.excludedSources, ...windFusion.excludedSources]
+    .filter((source, index, all) => all.findIndex((entry) => entry.id === source.id && entry.reason === source.reason) === index)
+    .map((source) => ({ id: source.id, name: source.name, reason: source.reason }));
+  const trace: ForecastTrace = {
+    version: 1,
+    issuedAt: now.toISOString(),
+    method: maxFusion.methodUsed,
+    sourceCount: forecasts.length,
+    parameterSources: {
+      temperature: toTraceSources(maxFusion),
+      precipitation: toTraceSources(precipFusion),
+      wind: toTraceSources(windFusion),
+    },
+    excludedSources,
+  };
+
   return {
     tempMax: maxFusion.temperature,
     tempMin: minFusion.temperature,
@@ -91,6 +146,7 @@ export function computeOfficialDailyForecast(
     windGust: windFusion.windGust,
     cloudCover: maxFusion.cloudCover,
     weights,
+    trace,
     methodNote: `Fusion officielle ${maxFusion.methodUsed} par paramètre (${forecasts.length} modèles)`,
   };
 }
