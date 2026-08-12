@@ -10,7 +10,7 @@ import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weather
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { ForecastTraceability } from "@/components/ForecastTraceability";
-import { findNextConditionChange } from "@/lib/weatherCondition";
+import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
@@ -245,6 +245,7 @@ export default function Dashboard() {
   // Current temperature from hourly (closest to now)
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
   const nextConditionChange = findNextConditionChange(hours, currentHour?.hour ?? nowHour);
+  const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
   const currentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
   const apparentTemp = currentHour?.apparentTemp ?? null;
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
@@ -335,6 +336,22 @@ export default function Dashboard() {
               <p className="mb-3 text-[11px] text-emerald-200/90">
                 Observation {localMode === "ultra-local" ? "ultra-locale" : "locale"} : {localObservedRegime.emoji} {localObservedRegime.label}. Elle complète le régime officiel sans le remplacer.
               </p>
+            )}
+
+            {nextWeatherAlert && (
+              <div className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 ${
+                nextWeatherAlert.kind === "thunderstorm"
+                  ? "border-red-400/50 bg-red-500/15 text-red-100"
+                  : nextWeatherAlert.kind === "wind"
+                    ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-100"
+                    : "border-blue-400/50 bg-blue-500/15 text-blue-100"
+              }`}>
+                <span className="animate-pulse"><MeteoIcon name={nextWeatherAlert.icon} size={24} /></span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold">{nextWeatherAlert.title}</p>
+                  <p className="text-[11px] opacity-90">{nextWeatherAlert.detail}</p>
+                </div>
+              </div>
             )}
 
             {/* ── Alert badge for dangerous regimes ── */}

@@ -370,3 +370,8 @@
 - [x] Frontend: Détecter le premier créneau horaire futur dont la condition diffère de la condition actuelle.
 - [x] Frontend: Afficher l’heure exacte et la nouvelle condition dans la carte principale du Dashboard.
 - [x] Tests: Vérifier la détection d’un changement, l’absence de changement et les heures de passage de jour.
+
+## Alertes visuelles de changement météo
+- [x] Frontend: Classifier le prochain changement en pluie, orage ou vent fort à partir des prévisions horaires officielles.
+- [x] Frontend: Afficher une alerte visuelle colorée avec icône MeteoAI, heure et détail du risque dans le Dashboard.
+- [x] Tests: Vérifier les alertes pluie, orage, vent fort et les changements non dangereux.
