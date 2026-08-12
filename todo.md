@@ -629,3 +629,10 @@
 - [x] Frontend: Remplacer les sections obsolètes par une lecture mobile cohérente avec le Dashboard et Fiabilité.
 - [x] Tests: Vérifier l’absence de modèle, station, score ou source simulé dans le contrat AI Lab.
 - [x] Validation: Vérifier l’AI Lab sur mobile et publier la mise à jour.
+
+## Audit transversal des pages
+- [x] Audit: Cartographier les pages restantes, leurs appels tRPC et les données affichées.
+- [x] Audit: Identifier les textes, compteurs, sources et algorithmes obsolètes ou non vérifiables.
+- [x] Frontend: Corriger les vues affectées sans changer les calculs non concernés.
+- [x] Tests: Couvrir les contrats corrigés et l’absence de valeurs héritées.
+- [x] Validation: Vérifier les écrans mobile et publier les corrections retenues.

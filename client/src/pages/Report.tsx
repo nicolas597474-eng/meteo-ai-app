@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { FileText, Thermometer, Droplets, Wind, Cloud, ChevronDown, ChevronUp } from "lucide-react";
+import { useLocation } from "@/contexts/LocationContext";
 
 type DimScore = {
   serviceName: string;
@@ -18,10 +19,14 @@ type DimScore = {
 };
 
 export default function Report() {
+  const { activeLocation } = useLocation();
   const [date] = useState(() =>
     new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" })
   );
-  const { data, isLoading } = trpc.weather.getReport.useQuery({ date });
+  const { data, isLoading } = trpc.weather.getReport.useQuery({
+    date,
+    ...(activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : {}),
+  });
   const [expandedService, setExpandedService] = useState<string | null>(null);
 
   const servicesByCategory = useMemo(() => {
@@ -59,7 +64,7 @@ export default function Report() {
             Rapport Détaillé
           </h1>
           <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-            Analyse complète pour le {data?.date ?? date} — Hondeghem
+            Analyse complète pour le {data?.date ?? date} — {activeLocation?.name ?? "Position actuelle"}
           </p>
         </div>
 
@@ -91,7 +96,7 @@ export default function Report() {
               <MetricCard icon={<Thermometer className="h-4 w-4" />} label="Temp. Min" value={`${data.observation.tempMin}°C`} />
               <MetricCard icon={<Droplets className="h-4 w-4" />} label="Précip." value={`${data.observation.precipitation} mm`} />
               <MetricCard icon={<Wind className="h-4 w-4" />} label="Vent" value={`${data.observation.windSpeed} km/h`} />
-              <MetricCard icon={<Cloud className="h-4 w-4" />} label="Source" value={data.observation.source ?? "Open-Meteo"} small />
+              <MetricCard icon={<Cloud className="h-4 w-4" />} label="Source" value={data.observation.source ?? "Non documentée"} small />
             </div>
           </div>
         )}

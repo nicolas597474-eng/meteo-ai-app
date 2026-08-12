@@ -33,6 +33,7 @@ import {
   InsertStationCollectionSnapshot,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { selectLatestForecasts } from "./forecastSelection";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -144,19 +145,21 @@ export async function insertForecasts(data: InsertForecast[]): Promise<void> {
 export async function getForecastsByDate(date: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(forecasts).where(
+  const rows = await db.select().from(forecasts).where(
     and(eq(forecasts.date, date), eq(forecasts.locationKey, locationKey))
   );
+  return selectLatestForecasts(rows);
 }
 
 export async function getForecastsByDateRange(startDate: string, endDate: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
-  return db
+  const rows = await db
     .select()
     .from(forecasts)
     .where(and(gte(forecasts.date, startDate), lte(forecasts.date, endDate), eq(forecasts.locationKey, locationKey)))
     .orderBy(forecasts.date);
+  return selectLatestForecasts(rows);
 }
 
 export async function getForecastsByService(serviceName: string, limit = 30) {

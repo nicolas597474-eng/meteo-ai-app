@@ -6,16 +6,9 @@ import { useState, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cloudCoverLabel } from "@shared/weatherConditionLabels";
 import { ChevronLeft } from "lucide-react";
 import { Link } from "wouter";
-
-function getStoredLocation(): { lat: number; lon: number; name: string } | null {
-  try {
-    const stored = localStorage.getItem("meteoai_last_location");
-    return stored ? JSON.parse(stored) : null;
-  } catch { return null; }
-}
+import { useLocation } from "@/contexts/LocationContext";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -34,14 +27,6 @@ function pressureTrend(hours: any[], currentIdx: number): "rising" | "falling" |
   if (diff > 1) return "rising";
   if (diff < -1) return "falling";
   return "stable";
-}
-
-function getConfidenceForHour(h: any): number {
-  // Based on model count and spread
-  const base = 75;
-  const modelBonus = (h.modelCount ?? 1) >= 2 ? 10 : 0;
-  const spreadPenalty = h.tempSpread != null ? Math.min(15, h.tempSpread * 5) : 0;
-  return Math.round(Math.min(100, Math.max(30, base + modelBonus - spreadPenalty)));
 }
 
 function getDayOfWeek(dateStr: string): string {
@@ -86,26 +71,10 @@ const CHART_OPTIONS: { key: ChartType; label: string }[] = [
   { key: "clouds", label: "Nuages" },
 ];
 
-function generateDaySummary(day: any, hours: any[]): string {
-  const tempRange = `${day.tempMin?.toFixed(0) ?? "?"}°C à ${day.tempMax?.toFixed(0) ?? "?"}°C`;
-  let summary = `Températures de ${tempRange}`;
-  
-  if ((day.precipitation ?? 0) > 2) summary += `, pluie attendue (${day.precipitation?.toFixed(1)} mm)`;
-  else if ((day.precipitation ?? 0) > 0.2) summary += ", faibles précipitations possibles";
-  else summary += ", temps sec";
-  
-  if ((day.windSpeed ?? 0) > 40) summary += `, vent fort (${day.windSpeed?.toFixed(0)} km/h)`;
-  else if ((day.windSpeed ?? 0) > 20) summary += `, vent modéré`;
-  
-  summary += `. ${cloudCoverLabel(day.cloudCover)}.`;
-  
-  return summary;
-}
-
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function WeatherDetails() {
-  const [activeLocation] = useState(getStoredLocation);
+  const { activeLocation } = useLocation();
   const coordsInput = useMemo(() => activeLocation
     ? { lat: activeLocation.lat, lon: activeLocation.lon }
     : undefined, [activeLocation?.lat, activeLocation?.lon]);
@@ -129,7 +98,7 @@ export default function WeatherDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0B132B]">
+      <div className="min-h-screen bg-[#0d1117]">
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -144,10 +113,9 @@ export default function WeatherDetails() {
   const days = data?.days ?? [];
   const regime = data?.regime;
   const confidence = data?.confidence;
-  const bestModel = data?.bestModel;
 
   return (
-    <div className="min-h-screen bg-[#0B132B]">
+    <div className="min-h-screen bg-[#0d1117]">
       <div className="max-w-2xl mx-auto px-3 pb-28">
 
         {/* ═══ HEADER ═══ */}
@@ -157,7 +125,7 @@ export default function WeatherDetails() {
           </Link>
           <div>
             <h1 className="text-white font-bold text-lg">Détails météo</h1>
-            <p className="text-slate-400 text-xs">{activeLocation?.name ?? "Hondeghem"} • {formatDate(data?.today ?? "")}</p>
+            <p className="text-slate-400 text-xs">{activeLocation?.name ?? "Position actuelle"} • {formatDate(data?.today ?? "")}</p>
           </div>
           {regime && (
             <div className="ml-auto flex items-center gap-1.5 bg-slate-800/50 rounded-full px-2.5 py-1">
@@ -179,7 +147,6 @@ export default function WeatherDetails() {
             <div className="flex gap-2" style={{ width: `${hours.length * 140}px` }}>
               {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
-                const confidence = getConfidenceForHour(h);
                 const pTrend = pressureTrend(hours, i);
                 return (
                   <div
@@ -274,25 +241,14 @@ export default function WeatherDetails() {
                       <div className="text-[8px] text-slate-500 mb-0.5">Rayonnement: {h.solarRadiation.toFixed(0)} W/m²</div>
                     )}
                     
-                    {/* Regime + confidence */}
+                    {/* Régime opérationnel partagé */}
                     {regime && (
                       <div className="mt-1 pt-1 border-t border-slate-700/50">
                         <div className="flex items-center gap-1">
                           <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={10} />
                           <span className="text-[8px] text-slate-400">{regime.primary.label}</span>
                         </div>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <div className="h-1 flex-1 bg-slate-700 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-green-500" style={{ width: `${confidence}%` }} />
-                          </div>
-                          <span className="text-[8px] text-slate-500">{confidence}%</span>
-                        </div>
                       </div>
-                    )}
-                    
-                    {/* Best model */}
-                    {bestModel && (
-                      <div className="text-[7px] text-slate-600 mt-0.5">📊 {bestModel.name}</div>
                     )}
                   </div>
                 );
@@ -334,14 +290,10 @@ export default function WeatherDetails() {
           <h2 className="text-cyan-400 font-bold text-sm mb-3">Prévisions des prochains jours</h2>
           
           <div className="space-y-2">
-            {days.map((day: any, dayIdx: number) => {
+            {days.map((day: any) => {
               const isExpanded = expandedDay === day.date;
               // Les données serveur distinguent la confiance (accord, qualité,
               // historique, échéance) de la simple dispersion des modèles.
-              const dayConfidence = dayIdx === 0
-                ? (confidence?.today ?? 0)
-                : (confidence?.week ?? 0);
-              
               return (
                 <div key={day.date} className="rounded-2xl bg-[#152238] border border-slate-800 overflow-hidden">
                   {/* Day summary card */}
@@ -366,15 +318,7 @@ export default function WeatherDetails() {
                         <span className="text-slate-500 text-xs">{day.windSpeed?.toFixed(0)} km/h</span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1">
-                        <div className="h-1.5 w-8 bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full bg-green-500" style={{ width: `${dayConfidence}%` }} />
-                        </div>
-                        <span className="text-[9px] text-slate-500">{dayConfidence}%</span>
-                      </div>
-                      <span className="text-[10px] text-slate-600">{isExpanded ? "▲" : "▼"}</span>
-                    </div>
+                    <span className="text-[10px] text-slate-600">{isExpanded ? "▲" : "▼"}</span>
                   </button>
                   
                   {/* Expanded day details */}
@@ -390,7 +334,6 @@ export default function WeatherDetails() {
                         <DetailCell label="Rafales" value={`${day.windGust?.toFixed(0) ?? "—"} km/h`} />
                         <DetailCell label="Précip." value={`${day.precipitation?.toFixed(1) ?? "0"} mm`} />
                         <DetailCell label="UV" value={`${(day as any).uvIndex?.toFixed(0) ?? "—"}`} />
-                        <DetailCell label="Confiance" value={`${dayConfidence}%`} />
                       </div>
                       
                       {/* Duration of sunshine */}
@@ -403,13 +346,6 @@ export default function WeatherDetails() {
                       {/* Period breakdown */}
                       <DayPeriodBreakdown dayDate={day.date} hours={hours} regime={regime} />
                       
-                      {/* AI Analysis */}
-                      <div className="bg-slate-800/30 rounded-xl p-2.5">
-                        <p className="text-[10px] text-amber-400 font-semibold mb-1">Analyse IA</p>
-                        <p className="text-[10px] text-slate-300 leading-relaxed">
-                          {generateDaySummary(day, hours)}
-                        </p>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -494,8 +430,6 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
         const avgHumidity = Math.round(periodHours.reduce((s: number, h: any) => s + (h.humidity ?? 0), 0) / periodHours.length);
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
-        const confidence = Math.round(periodHours.reduce((s: number, h: any) => s + getConfidenceForHour(h), 0) / periodHours.length);
-
         return (
           <div key={p} className="bg-slate-800/30 rounded-xl p-2">
             <div className="flex items-center gap-1.5 mb-1">
@@ -510,7 +444,6 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
               <div className="flex justify-between"><span>Précip.</span><span>{totalPrecip.toFixed(1)} mm</span></div>
               <div className="flex justify-between"><span>Humidité</span><span>{avgHumidity}%</span></div>
               <div className="flex justify-between"><span>Nuages</span><span>{avgCloud}%</span></div>
-              <div className="flex justify-between"><span>Confiance</span><span className="text-green-400">{confidence}%</span></div>
             </div>
             {regime && (
               <div className="flex items-center gap-1 mt-1 pt-1 border-t border-slate-700/30">

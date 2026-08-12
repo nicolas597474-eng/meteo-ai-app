@@ -3,22 +3,14 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
-
-function getStoredLocation(): { lat: number; lon: number; name: string } | null {
-  try {
-    const stored = localStorage.getItem("meteoai_last_location");
-    return stored ? JSON.parse(stored) : null;
-  } catch {
-    return null;
-  }
-}
+import { useLocation } from "@/contexts/LocationContext";
 
 function formatSnapshot(snapshot: any) {
   const date = new Date(snapshot.computedAt);
   const timestamp = Number.isNaN(date.getTime())
     ? snapshot.date
     : date.toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Paris" });
-  return `${timestamp} · confiance ${Math.round(snapshot.confidenceScore ?? 0)}%`;
+  return `${timestamp} · confiance ${snapshot.confidenceScore == null ? "indisponible" : `${Math.round(snapshot.confidenceScore)}%`}`;
 }
 
 const PARAMETER_META = {
@@ -28,7 +20,7 @@ const PARAMETER_META = {
 } as const;
 
 export default function WeightComparison() {
-  const [activeLocation] = useState(getStoredLocation);
+  const { activeLocation } = useLocation();
   const coords = useMemo(
     () => activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined,
     [activeLocation?.lat, activeLocation?.lon]
