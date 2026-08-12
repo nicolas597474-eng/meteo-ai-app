@@ -609,6 +609,32 @@
 - [x] Frontend: Retirer la section de connexion Netatmo de la page Fiabilité.
 - [x] Validation: Vérifier que la page conserve les stations correctement classifiées sans affichage de connexion Netatmo.
 
+## Étude Weather Underground
+- [ ] Étude: Vérifier les conditions d’accès, licences et API actuelles de Weather Underground.
+- [ ] Architecture: Définir une intégration de stations avec provenance, fraîcheur, qualité et repli vérifiables.
+- [ ] Décision: Présenter les prérequis, coûts éventuels et étapes avant toute implémentation.
+
+## Alternatives aux stations Weather Underground
+- [ ] Étude: Comparer les réseaux et APIs de stations personnelles accessibles gratuitement ou à coût réduit.
+- [ ] Décision: Recommander les options compatibles avec les exigences de provenance et qualité de MeteoAI.
+
+## Sources de stations sans clé API
+- [x] Étude: Retenir uniquement les réseaux gratuits, publics et accessibles sans clé API ni compte.
+- [x] Décision: Écarter explicitement les sources qui nécessitent une clé, un abonnement ou l’accès du propriétaire de station.
+
+## Conception d’intégration openSenseMap et CWOP
+- [x] Architecture: Définir les adaptateurs serveur, le schéma de provenance et les filtres communs aux deux sources.
+- [x] Qualité: Définir les règles mesurables de fraîcheur, exposition, complétude et cohérence locale avant la fusion.
+- [x] Collecte: Définir les points de collecte à la demande et planifiés sans clé API.
+- [x] Décision: Présenter les étapes d’implémentation pour accord avant tout développement.
+
+## Réseau d’observations multi-sources
+- [x] Architecture: Classer les sources en trois niveaux de confiance sans assimiler une source candidate à une station validée.
+- [x] Algorithme: Définir une qualité par station et par paramètre fondée sur distance, fraîcheur, historique, cohérence, type, altitude et environnement.
+- [x] Fusion: Définir une estimation locale robuste, explicable et vérifiable sans moyenne simple des stations.
+- [x] Déploiement: Définir une expérimentation contrôlée et des critères de gain mesurés avant activation dans la température finale.
+- [x] Décision: Présenter le plan multi-sources pour accord avant tout développement.
+
 ## Cohérence des prochains changements de régime
 - [x] Backend: Utiliser un unique régime de créneau horaire pour les annonces de transition.
 - [x] Frontend: Afficher le même libellé dans « Prochain changement » et « Régime à venir ».
