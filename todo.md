@@ -494,5 +494,6 @@
 - [x] Backend: Intégrer les sources retenues sans clé au cycle de collecte de 05h00 avec provenance et fraîcheur.
 - [x] Backend: Appliquer une validation stricte et une classification distincte des stations physiques, références et sources écartées.
 - [x] Tests: Vérifier l’origine, les restrictions d’accès et la non-utilisation de données simulées.
-- [ ] Backend: Activer le réseau Netatmo public lorsque les identifiants OAuth seront fournis.
+- [x] Décision: Conserver Netatmo désactivé jusqu’à la fourniture d’identifiants OAuth, sans le présenter comme source physique.
 - [x] Backend: Ajouter le collecteur METAR mondial officiel avec filtrage géographique, conversion d’unités et délai réseau borné.
+- [x] Frontend: Clarifier que les références de grille ne sont pas des stations Netatmo, Weather Underground ou CWOP réelles sans accès fournisseur.

@@ -4,9 +4,7 @@
  * Sources interrogated:
  * 1. Open-Meteo grid point (best-match model, always available)
  * 2. OpenDataSoft SYNOP (Météo-France official network, real data, free/no-key)
- * 3. Open-Meteo multi-point grid (simulates nearby personal stations with real model data)
- * 4. Netatmo-style stations (real Open-Meteo data at offset grid points, labeled by source type)
- * 5. CWOP/amateur stations (real Open-Meteo data at offset grid points)
+ * 3. Open-Meteo multi-point grid references (clearly not physical stations)
  *
  * Ground truth weighting:
  *   50% distance (closer = more weight)
@@ -355,12 +353,11 @@ async function fetchMetarStations(lat: number, lon: number, radiusKm: number): P
   }
 }
 
-// ─── 4. Multi-point Open-Meteo grid (simulates personal weather stations) ─────
+// ─── 4. Multi-point Open-Meteo grid references (not physical stations) ─────────
 //
 // We query Open-Meteo at several geographic offsets around the target location.
-// Each offset uses a different NWP model to add diversity. The resulting stations
-// are labeled as Netatmo/WU/CWOP/Infoclimat to reflect the type of network they
-// represent, while using real model data as the best available proxy.
+// Each offset uses a different NWP model to add diversity. These entries remain
+// clearly labeled as model-grid references until a provider returns real station data.
 
 const STATION_OFFSETS: Array<{
   dlat: number;
@@ -369,20 +366,16 @@ const STATION_OFFSETS: Array<{
   nameTemplate: string;
   model?: string;
 }> = [
-  // Netatmo-style personal stations (very close, high density)
-  { dlat:  0.018, dlon:  0.012, source: "netatmo",      nameTemplate: "Netatmo {town} Centre",    model: "best_match" },
-  { dlat: -0.012, dlon:  0.022, source: "netatmo",      nameTemplate: "Netatmo {town} Est",       model: "best_match" },
-  { dlat:  0.025, dlon: -0.018, source: "netatmo",      nameTemplate: "Netatmo {town} Nord-Ouest" },
-  { dlat: -0.020, dlon: -0.015, source: "netatmo",      nameTemplate: "Netatmo {town} Sud-Ouest" },
-  // Weather Underground PWS (medium distance)
-  { dlat:  0.040, dlon:  0.030, source: "wunderground",  nameTemplate: "WU PWS {town} N",         model: "gfs_seamless" },
-  { dlat: -0.035, dlon:  0.040, source: "wunderground",  nameTemplate: "WU PWS {town} SE",        model: "gfs_seamless" },
-  // Infoclimat StatIC amateur network
-  { dlat:  0.055, dlon: -0.040, source: "infoclimat",   nameTemplate: "Infoclimat {town} NO",     model: "meteofrance_arome_france_hd" },
-  { dlat: -0.048, dlon: -0.035, source: "infoclimat",   nameTemplate: "Infoclimat {town} SO",     model: "meteofrance_arome_france_hd" },
-  // CWOP/APRS amateur (farther, sparser)
-  { dlat:  0.070, dlon:  0.055, source: "cwop",         nameTemplate: "CWOP/APRS {town} NE",      model: "ecmwf_ifs025" },
-  { dlat: -0.060, dlon:  0.065, source: "cwop",         nameTemplate: "CWOP/APRS {town} E",       model: "ecmwf_ifs025" },
+  { dlat:  0.018, dlon:  0.012, source: "netatmo",      nameTemplate: "Référence de grille {town} Centre",    model: "best_match" },
+  { dlat: -0.012, dlon:  0.022, source: "netatmo",      nameTemplate: "Référence de grille {town} Est",       model: "best_match" },
+  { dlat:  0.025, dlon: -0.018, source: "netatmo",      nameTemplate: "Référence de grille {town} Nord-Ouest" },
+  { dlat: -0.020, dlon: -0.015, source: "netatmo",      nameTemplate: "Référence de grille {town} Sud-Ouest" },
+  { dlat:  0.040, dlon:  0.030, source: "wunderground", nameTemplate: "Référence de grille {town} Nord",        model: "gfs_seamless" },
+  { dlat: -0.035, dlon:  0.040, source: "wunderground", nameTemplate: "Référence de grille {town} Sud-Est",     model: "gfs_seamless" },
+  { dlat:  0.055, dlon: -0.040, source: "infoclimat",   nameTemplate: "Référence de grille {town} Nord-Ouest", model: "meteofrance_arome_france_hd" },
+  { dlat: -0.048, dlon: -0.035, source: "infoclimat",   nameTemplate: "Référence de grille {town} Sud-Ouest",  model: "meteofrance_arome_france_hd" },
+  { dlat:  0.070, dlon:  0.055, source: "cwop",         nameTemplate: "Référence de grille {town} Nord-Est",   model: "ecmwf_ifs025" },
+  { dlat: -0.060, dlon:  0.065, source: "cwop",         nameTemplate: "Référence de grille {town} Est",        model: "ecmwf_ifs025" },
 ];
 
 async function fetchPersonalWeatherStations(

@@ -206,11 +206,11 @@ const SOURCE_LABELS: Record<string, string> = {
   synop: "SYNOP/WMO",
   noaa: "NOAA",
   openmeteo: "Open-Meteo",
-  netatmo: "Netatmo (référence)",
-  wunderground: "Weather Underground (référence)",
-  cwop: "CWOP/APRS (référence)",
-  davis: "Davis (référence)",
-  infoclimat: "Infoclimat (référence)",
+  netatmo: "Grille locale · Best Match",
+  wunderground: "Grille régionale · GFS",
+  cwop: "Grille régionale · ECMWF",
+  davis: "Référence de grille",
+  infoclimat: "Grille locale · AROME",
 };
 
 function StationSourceCard({ station, rank, physical }: { station: any; rank: number; physical: boolean }) {
