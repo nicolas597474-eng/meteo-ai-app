@@ -470,3 +470,8 @@
 - [x] Frontend: Ajouter un sélecteur de rayon de recherche sur la page Fiabilité.
 - [x] Frontend: Afficher l’historique de disponibilité des stations et le dernier bilan de collecte.
 - [x] Tests: Vérifier la persistance, le rayon choisi et les contrats de disponibilité/bilan.
+
+## Simplification des prévisions
+- [x] Frontend: Retirer le panneau « Sources et pondérations de la prévision » du Dashboard.
+- [x] Frontend: Retirer le même panneau des prévisions détaillées.
+- [x] Tests: Vérifier que les prévisions restent accessibles après le retrait de la traçabilité visible.
