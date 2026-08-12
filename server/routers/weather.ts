@@ -1156,12 +1156,14 @@ export const weatherRouter = router({
     .input(z.object({
       lat: z.number().optional(),
       lon: z.number().optional(),
+      periodDays: z.union([z.literal(1), z.literal(7)]).optional(),
     }).optional())
     .query(async ({ input }) => {
       const lat = input?.lat ?? HONDEGHEM.lat;
       const lon = input?.lon ?? HONDEGHEM.lon;
+      const periodDays = input?.periodDays ?? 1;
       const now = Date.now();
-      const sinceMs = now - 24 * 60 * 60 * 1000;
+      const sinceMs = now - periodDays * 24 * 60 * 60 * 1000;
       const locationKey = makeLocationKey(lat, lon);
       const date = getTodayParis();
       const [stationData, hourlyRows] = await Promise.all([
@@ -1201,8 +1203,47 @@ export const weatherRouter = router({
         };
       });
 
+      const parisDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
+      const dateFormatter = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "short" });
+      const stationByDate = new Map<string, Array<{ temperature: number | null; windSpeed: number | null; precipitation: number | null }>>();
+      for (const station of stationData.stations) {
+        for (const reading of station.readings) {
+          const key = parisDate.format(new Date(reading.observedAt));
+          const list = stationByDate.get(key) ?? [];
+          list.push(reading);
+          stationByDate.set(key, list);
+        }
+      }
+      const officialHistory = await getLatestMeteoAIForecasts(7, locationKey);
+      const officialByDate = new Map(officialHistory.map((forecast) => [forecast.date, forecast]));
+      const comparison7d = Array.from({ length: 7 }, (_, index) => {
+        const targetDate = getParisDateDaysAgo(6 - index);
+        const readings = stationByDate.get(targetDate) ?? [];
+        const stationTemps = readings.map((reading) => reading.temperature).filter((value): value is number => value !== null);
+        const official = officialByDate.get(targetDate);
+        const officialTemperature = official && official.tempMax !== null && official.tempMin !== null
+          ? Math.round(((official.tempMax + official.tempMin) / 2) * 10) / 10
+          : null;
+        return {
+          label: dateFormatter.format(new Date(`${targetDate}T12:00:00+02:00`)),
+          stationTemperature: stationTemps.length ? Math.round((stationTemps.reduce((sum, value) => sum + value, 0) / stationTemps.length) * 10) / 10 : null,
+          officialTemperature,
+          stationSampleCount: readings.length,
+        };
+      });
+
+      const currentParisHour = Number(new Intl.DateTimeFormat("fr-FR", {
+        timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23",
+      }).format(new Date())) % 24;
+      const instant = comparison24h[currentParisHour];
+      const instantDeltaC = instant && instant.stationTemperature !== null && instant.officialTemperature !== null
+        ? Math.round((instant.stationTemperature - instant.officialTemperature) * 10) / 10
+        : null;
+
       return {
         locationKey,
+        center: { lat, lon },
+        periodDays,
         collectedAt: stationData.latestGroundTruth?.computedAt ?? null,
         latestGroundTruth: stationData.latestGroundTruth,
         stations: stationData.stations.map((station) => {
@@ -1211,6 +1252,8 @@ export const weatherRouter = router({
             stationId: station.stationId,
             name: station.name,
             source: station.source,
+            lat: station.lat,
+            lon: station.lon,
             distanceKm: station.distanceKm,
             reliabilityScore: station.reliabilityScore,
             updateFrequencyMin: station.updateFrequencyMin,
@@ -1220,6 +1263,8 @@ export const weatherRouter = router({
           };
         }),
         comparison24h,
+        comparison7d,
+        instantDeltaC,
       };
     }),
 });

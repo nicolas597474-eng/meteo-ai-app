@@ -443,3 +443,11 @@
 - [x] Frontend: Remplacer la page Classement par la vue Stations & fiabilité locale.
 - [x] Frontend: Afficher les âges des relevés, l’historique des stations et la comparaison 24 h.
 - [x] Tests: Vérifier les données de stations, les âges et les séries comparatives sans données simulées.
+
+## Rétablissement de collecte et enrichissement de la fiabilité locale
+- [x] Backend: Diagnostiquer et corriger l’échec de la collecte de stations de 05h00.
+- [ ] Backend: Exécuter une récupération contrôlée des relevés physiques manquants après correction.
+- [x] Frontend: Ajouter une carte des stations physiques autour du lieu.
+- [x] Frontend: Afficher l’écart instantané station/prévision officielle en °C.
+- [x] Frontend: Ajouter un filtre 24 h / 7 jours à l’historique et à la comparaison.
+- [x] Tests: Vérifier les écarts et les deux fenêtres de période.

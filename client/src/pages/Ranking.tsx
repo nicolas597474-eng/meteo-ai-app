@@ -1,17 +1,16 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
 import { MeteoIcon } from "@/components/MeteoIcon";
+import { StationMap } from "@/components/StationMap";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
 
 type ComparisonPoint = {
-  hour: number;
+  hour?: number;
+  label?: string;
   stationTemperature: number | null;
-  stationWindSpeed: number | null;
-  stationPrecipitation: number | null;
   stationSampleCount: number;
   officialTemperature: number | null;
-  officialWindSpeed: number | null;
-  officialPrecipitation: number | null;
 };
 
 function formatAge(minutes: number | null) {
@@ -27,7 +26,7 @@ function value(value: number | null | undefined, unit = "") {
   return value === null || value === undefined ? "—" : `${value.toFixed(1)}${unit}`;
 }
 
-function TemperatureComparison({ points }: { points: ComparisonPoint[] }) {
+function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint[]; periodDays: 1 | 7 }) {
   const usable = points.filter((point) => point.stationTemperature !== null || point.officialTemperature !== null);
   if (usable.length === 0) {
     return (
@@ -67,28 +66,32 @@ function TemperatureComparison({ points }: { points: ComparisonPoint[] }) {
           <polyline points={toPoint("stationTemperature")} fill="none" stroke="#34d399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           {usable.map((point, index) => {
             const x = padding + (index * (width - padding * 2)) / Math.max(usable.length - 1, 1);
-            return <text key={point.hour} x={x} y={height - 3} fill="#64748b" fontSize="10" textAnchor="middle">{String(point.hour).padStart(2, "0")}h</text>;
+            const label = point.label ?? `${String(point.hour ?? 0).padStart(2, "0")}h`;
+            return <text key={`${label}-${index}`} x={x} y={height - 3} fill="#64748b" fontSize="10" textAnchor="middle">{label}</text>;
           })}
         </svg>
       </div>
-      <p className="text-[11px] text-slate-500">Les points ne sont comparés qu’aux heures disposant d’un relevé station physique.</p>
+      <p className="text-[11px] text-slate-500">{periodDays === 1 ? "Les points sont comparés heure par heure lorsqu’un relevé station physique est disponible." : "Les mesures sont regroupées par jour à partir des relevés physiques disponibles."}</p>
     </div>
   );
 }
 
 export default function Ranking() {
   const { activeLocation } = useLocation();
+  const [periodDays, setPeriodDays] = useState<1 | 7>(1);
   const coords = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
-  const { data, isLoading } = trpc.weather.getStationReliabilityOverview.useQuery(coords);
+  const overviewInput = { ...(coords ?? {}), periodDays };
+  const { data, isLoading } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput);
 
   if (isLoading) {
     return <div className="min-h-screen bg-[#080a0f] max-w-2xl mx-auto px-4 pt-5 space-y-4"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
   }
 
   const stations = data?.stations ?? [];
-  const comparison = data?.comparison24h ?? [];
+  const comparison = periodDays === 1 ? (data?.comparison24h ?? []) : (data?.comparison7d ?? []);
   const latest = data?.latestGroundTruth;
   const locationName = activeLocation?.name ?? "Hondeghem";
+  const instantDeltaC = data?.instantDeltaC ?? null;
 
   return (
     <main className="min-h-screen bg-[#080a0f] pb-28">
@@ -112,6 +115,11 @@ export default function Ranking() {
         </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Bleu : lieu de référence · vert : relevé récent · ambre : relevé ancien.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
+          <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
+        </section>
+
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-white">Relevés des stations</h2><p className="text-xs text-slate-500">Stations physiques validées autour du lieu.</p></div><MeteoIcon name="stations" size={22} /></div>
           {stations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-500">Aucune station physique n’est encore archivée pour ce lieu. La première collecte est prévue à 05h00.</div>
@@ -129,8 +137,9 @@ export default function Ranking() {
         </section>
 
         <section className="rounded-2xl border border-slate-800 bg-[#10131a] p-4">
-          <div className="mb-4 flex items-start justify-between"><div><h2 className="font-semibold text-white">Stations vs prévision officielle</h2><p className="text-xs text-slate-500">Température sur 24 heures — heures de Paris.</p></div><MeteoIcon name="comparison" size={22} /></div>
-          <TemperatureComparison points={comparison} />
+          <div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Stations vs prévision officielle</h2><p className="text-xs text-slate-500">Température — heures de Paris.</p></div><div className="flex rounded-lg border border-slate-700 bg-[#090b10] p-0.5"><button type="button" onClick={() => setPeriodDays(1)} className={`rounded-md px-2.5 py-1 text-xs ${periodDays === 1 ? "bg-blue-600 text-white" : "text-slate-400"}`}>24 h</button><button type="button" onClick={() => setPeriodDays(7)} className={`rounded-md px-2.5 py-1 text-xs ${periodDays === 7 ? "bg-blue-600 text-white" : "text-slate-400"}`}>7 jours</button></div></div>
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-800 bg-[#090b10] px-3 py-2"><span className="text-xs text-slate-400">Écart instantané station / prévision</span><span className={`text-sm font-bold ${instantDeltaC === null ? "text-slate-400" : instantDeltaC > 0 ? "text-amber-300" : instantDeltaC < 0 ? "text-sky-300" : "text-emerald-400"}`}>{instantDeltaC === null ? "—" : `${instantDeltaC > 0 ? "+" : ""}${instantDeltaC.toFixed(1)} °C`}</span></div>
+          <TemperatureComparison points={comparison} periodDays={periodDays} />
         </section>
       </div>
     </main>
