@@ -483,3 +483,8 @@
 - [x] Navigation: Retirer l’accès redondant à la page Stations après transfert du contenu.
 - [x] Tests: Vérifier les catégories de sources et la continuité des données sur la page Fiabilité.
 - [x] Tests: Rendre déterministe le test de catégorisation des sources sans dépendre des appels météo externes.
+
+## Lisibilité et filtres des sources Fiabilité
+- [x] Frontend: Renforcer les badges distinguant stations physiques locales et sources de référence.
+- [x] Frontend: Ajouter des filtres interactifs par statut de source et ordre de distance.
+- [x] Tests: Vérifier le filtrage et le tri déterministe des sources affichées.
