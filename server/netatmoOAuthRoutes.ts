@@ -7,23 +7,41 @@ function queryValue(req: Request, key: string) {
   return typeof value === "string" ? value : undefined;
 }
 
+export function getNetatmoCallbackDiagnostic({
+  code,
+  state,
+  netatmoError,
+  verifiedState,
+}: {
+  code?: string;
+  state?: string;
+  netatmoError?: string;
+  verifiedState: unknown;
+}) {
+  const safeNetatmoError = netatmoError?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+  if (safeNetatmoError) return `netatmo_${safeNetatmoError}`;
+  if (!code) return "code_absent";
+  if (!state) return "state_absent";
+  if (!verifiedState) return "state_signature_invalide_ou_expiree";
+  return null;
+}
+
 export function registerNetatmoOAuthRoutes(app: Express) {
   app.get("/api/netatmo/callback", async (req: Request, res: Response) => {
     const code = queryValue(req, "code");
     const state = queryValue(req, "state");
     const netatmoError = queryValue(req, "error");
     const verifiedState = state ? verifyNetatmoState(state) : null;
-    if (!code || !verifiedState) {
-      const safeNetatmoError = netatmoError?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
-      const reason = safeNetatmoError
-        ? `netatmo_${safeNetatmoError}`
-        : !code
-          ? "code_absent"
-          : !state
-            ? "state_absent"
-            : "state_signature_invalide_ou_expiree";
+    const reason = getNetatmoCallbackDiagnostic({ code, state, netatmoError, verifiedState });
+    if (reason) {
       console.warn(`[Netatmo OAuth] Callback rejeté: ${reason}; longueur_state=${state?.length ?? 0}`);
       res.status(400).send(`Connexion Netatmo refusée (${reason}). Relancez l’autorisation depuis MeteoAI.`);
+      return;
+    }
+    // Défense explicite : le diagnostic nul implique ces deux valeurs, mais ce
+    // garde-fou maintient le contrat du callback et le raffinement TypeScript.
+    if (!code || !verifiedState) {
+      res.status(400).send("Connexion Netatmo refusée (callback_invalide). Relancez l’autorisation depuis MeteoAI.");
       return;
     }
     const stateConsumed = await consumeNetatmoOAuthState(hashNetatmoState(state!), verifiedState.userId);

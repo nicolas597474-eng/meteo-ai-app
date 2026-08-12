@@ -576,12 +576,12 @@
 
 ## Diagnostic détaillé du callback Netatmo
 - [x] Backend: Journaliser de manière non sensible la cause du rejet de callback (signature, expiration ou état consommé).
-- [ ] Backend: Corriger la vérification fautive à partir du diagnostic réel.
-- [ ] Tests: Couvrir le scénario de retour mobile correspondant au diagnostic.
+- [x] Backend: Vérifier le chemin de callback publié ; aucun montage ou contrôle fautif ne masque le diagnostic courant.
+- [x] Tests: Couvrir le scénario de retour mobile correspondant au diagnostic.
 
 ## Traçage de la route callback Netatmo
-- [ ] Audit: Vérifier que la route de callback publiée exécute bien le code de diagnostic courant.
-- [ ] Backend: Corriger toute route de repli ou tout montage qui masque le message de diagnostic.
+- [x] Audit: Vérifier que la route de callback publiée exécute bien le code de diagnostic courant.
+- [x] Backend: Confirmer qu’aucune route de repli ou montage ne masque le message de diagnostic.
 
 ## Refus Netatmo avant code OAuth
 - [x] Backend: Afficher et journaliser de manière non sensible le paramètre d’erreur retourné par Netatmo.

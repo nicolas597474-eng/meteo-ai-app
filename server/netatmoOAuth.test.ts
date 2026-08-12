@@ -6,6 +6,7 @@ import {
   hashNetatmoState,
   verifyNetatmoState,
 } from "./netatmoOAuth";
+import { getNetatmoCallbackDiagnostic } from "./netatmoOAuthRoutes";
 
 describe("sécurité OAuth Netatmo", () => {
   it("valide un état signé dans sa fenêtre de validité", () => {
@@ -34,5 +35,29 @@ describe("sécurité OAuth Netatmo", () => {
     const encrypted = encryptNetatmoRefreshToken(token);
     expect(encrypted).not.toContain(token);
     expect(decryptNetatmoRefreshToken(encrypted)).toBe(token);
+  });
+
+  it("distingue un refus mobile Netatmo de l’absence de code", () => {
+    expect(getNetatmoCallbackDiagnostic({
+      code: undefined,
+      state: "etat-mobile",
+      netatmoError: "access_denied",
+      verifiedState: { userId: 42 },
+    })).toBe("netatmo_access_denied");
+    expect(getNetatmoCallbackDiagnostic({
+      code: undefined,
+      state: undefined,
+      netatmoError: undefined,
+      verifiedState: null,
+    })).toBe("code_absent");
+  });
+
+  it("n’expose pas de texte non sûr provenant du fournisseur", () => {
+    expect(getNetatmoCallbackDiagnostic({
+      code: undefined,
+      state: "etat",
+      netatmoError: "access denied <script>",
+      verifiedState: { userId: 42 },
+    })).toBe("netatmo_accessdeniedscript");
   });
 });
