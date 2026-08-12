@@ -11,6 +11,7 @@ import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
+import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
@@ -421,16 +422,17 @@ export default function Dashboard() {
             )}
 
             {/* Main temperature row */}
-            <div className="flex items-center gap-4 sm:gap-6">
+            <div className="flex items-start gap-3 sm:gap-6">
               {/* Icon — current hour condition (not day) */}
-              <div className="flex-shrink-0">
-                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={64} />
+              <div className="w-14 shrink-0 pt-1 sm:w-auto sm:pt-0">
+                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={56} className="sm:hidden" />
+                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={64} className="hidden sm:block" />
               </div>
 
-              {/* Big current temp */}
-              <div className="flex items-start gap-3 sm:gap-5">
-                <div>
-                  <p className="text-7xl sm:text-8xl font-bold leading-none tracking-tight">
+              <div className={dashboardTemperatureLayout.content}>
+                {/* Big current temp */}
+                <div className="min-w-0">
+                  <p className={dashboardTemperatureLayout.currentValue}>
                     {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -457,16 +459,16 @@ export default function Dashboard() {
                 </div>
 
                 {/* Max / Min */}
-                <div className="flex flex-col gap-1.5 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-orange-400 uppercase tracking-wide">max</span>
-                    <span className="text-2xl sm:text-3xl font-bold text-orange-300">
+                <div className={dashboardTemperatureLayout.extremes}>
+                  <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                    <span className="text-[10px] sm:text-xs font-medium text-orange-400 uppercase tracking-normal sm:tracking-wide">max</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} text-orange-300`}>
                       {today?.tempMax != null ? Number(today.tempMax).toFixed(1) : meteoAI?.tempMax != null ? Number(meteoAI.tempMax).toFixed(1) : "—"}°
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-blue-400 uppercase tracking-wide">min</span>
-                    <span className="text-2xl sm:text-3xl font-bold text-blue-300">
+                  <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                    <span className="text-[10px] sm:text-xs font-medium text-blue-400 uppercase tracking-normal sm:tracking-wide">min</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} text-blue-300`}>
                       {today?.tempMin != null ? Number(today.tempMin).toFixed(1) : meteoAI?.tempMin != null ? Number(meteoAI.tempMin).toFixed(1) : "—"}°
                     </span>
                   </div>

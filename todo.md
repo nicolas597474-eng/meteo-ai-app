@@ -609,3 +609,7 @@
 - [x] Backend: Ajouter des garde-fous contre les poids instables lorsque les données observées sont insuffisantes.
 - [x] Tests: Vérifier que tout changement de pondération est fondé sur des mesures et conserve un repli robuste.
 - [x] Rapport: Présenter les sources privilégiées, les gains mesurés et les limites statistiques.
+
+## Lisibilité mobile de la carte de température
+- [x] Frontend: Empêcher le débordement à droite des températures maximale et minimale dans la carte principale du Dashboard.
+- [x] Validation: Vérifier le rendu à largeur mobile sans dégrader l’affichage tablette et bureau.
