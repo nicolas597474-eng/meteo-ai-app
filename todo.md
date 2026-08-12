@@ -502,3 +502,8 @@
 - [x] Backend: Utiliser la même observation locale validée pour la température actuelle du Dashboard et la page Fiabilité.
 - [x] Frontend: Expliquer la provenance de la température actuelle sans masquer la prévision officielle.
 - [x] Tests: Vérifier les cas observation valide, absente ou périmée dans le contrat Dashboard.
+
+## Transparence du relevé local Dashboard
+- [x] Backend: Exposer l’heure du dernier relevé local validé et l’écart avec la prévision officielle.
+- [x] Frontend: Afficher la fraîcheur du relevé et l’écart local/officiel dans la carte principale.
+- [x] Tests: Vérifier le calcul de l’écart et les replis sans relevé local.

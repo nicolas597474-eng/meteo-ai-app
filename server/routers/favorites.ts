@@ -16,6 +16,8 @@ export type DashboardCurrentTemperature = {
   stationCount: number;
   confidenceScore: number;
   source: "local_validated";
+  observedAt: string | null;
+  deltaFromOfficialC: number | null;
 };
 
 export function buildDashboardCurrentTemperature(input: {
@@ -23,13 +25,20 @@ export function buildDashboardCurrentTemperature(input: {
   temperature: number | null;
   stationCount: number;
   confidenceScore: number;
+  observedAt: string | Date | null;
+  officialTemperature: number | null;
 }): DashboardCurrentTemperature | null {
   if (input.localMode === "standard" || input.temperature == null || input.stationCount < 1) return null;
+  const observedAt = input.observedAt ? new Date(input.observedAt) : null;
   return {
     temperature: input.temperature,
     stationCount: input.stationCount,
     confidenceScore: input.confidenceScore,
     source: "local_validated",
+    observedAt: observedAt && Number.isFinite(observedAt.getTime()) ? observedAt.toISOString() : null,
+    deltaFromOfficialC: input.officialTemperature == null
+      ? null
+      : Math.round((input.temperature - input.officialTemperature) * 10) / 10,
   };
 }
 import { collectNearbyStations, rankStations, calculateGroundTruth } from "../stationService";
@@ -288,11 +297,23 @@ export const favoritesRouter = router({
       const confidenceScore = advancedFusion.confidenceScore;
       const stabilityIndex = Math.max(0, Math.min(100, 100 - divergence * 4));
       const localTemperature = advancedFusion.temperature ?? ultraLocalResult.temperature;
+      const usedLocalSourceIds = new Set(
+        advancedFusion.usedSources
+          .filter((source) => source.type === "station")
+          .map((source) => source.id)
+      );
+      const latestLocalSourceAt = fusionSources
+        .filter((source) => source.type === "station" && usedLocalSourceIds.has(source.id) && source.updatedAt)
+        .map((source) => new Date(source.updatedAt!))
+        .filter((date) => Number.isFinite(date.getTime()))
+        .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
       const currentObservation = buildDashboardCurrentTemperature({
         localMode,
         temperature: localTemperature,
         stationCount: advancedFusion.stationCount,
         confidenceScore,
+        observedAt: latestLocalSourceAt,
+        officialTemperature: hourly[0]?.temp ?? null,
       });
 
       return {

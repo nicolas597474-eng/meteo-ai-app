@@ -250,6 +250,10 @@ export default function Dashboard() {
   const localCurrentObservation = lw?.currentObservation ?? null;
   const officialCurrentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
   const currentTemp = localCurrentObservation?.temperature ?? officialCurrentTemp;
+  const localObservedAt = localCurrentObservation?.observedAt
+    ? new Date(localCurrentObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
+    : null;
+  const localDelta = localCurrentObservation?.deltaFromOfficialC ?? null;
   const apparentTemp = currentHour?.apparentTemp ?? null;
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
   const windDir = currentHour?.windDirection ?? null;
@@ -382,8 +386,10 @@ export default function Dashboard() {
                   </p>
                   {localCurrentObservation ? (
                     <p className="mt-1 text-[11px] font-medium text-emerald-300">
-                      Mesure locale validée · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}
-                      {officialCurrentTemp != null ? ` · prévision officielle ${officialCurrentTemp.toFixed(1)}°` : ""}
+                      Relevé local {localObservedAt ? `à ${localObservedAt}` : "validé"} · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}
+                      {localDelta != null
+                        ? ` · ${localDelta >= 0 ? "+" : ""}${localDelta.toFixed(1)}° vs prévision officielle`
+                        : officialCurrentTemp != null ? ` · prévision officielle ${officialCurrentTemp.toFixed(1)}°` : ""}
                     </p>
                   ) : (
                     <p className="mt-1 text-[11px] text-sky-200/90">Prévision officielle consolidée</p>
