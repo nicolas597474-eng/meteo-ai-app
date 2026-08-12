@@ -774,3 +774,17 @@
 - [x] Backend: Utiliser la fusion officielle multi-modèles comme repli sans station physique, sans l’étiqueter comme station.
 - [x] Frontend: Expliquer la source multi-modèles et ses contributions sans ambiguïté.
 - [x] Tests: Vérifier le repli multi-modèles, la traçabilité et l’absence de micro-ajustement sans station.
+
+## Audit général en lecture seule — en attente de validation
+- [x] Audit: Cartographier les pages, composants, contrats et flux de données existants.
+- [x] Audit: Distinguer observations réelles, prévisions, analyses/corrections et couches d’affichage.
+- [x] Audit: Examiner les automatisations, calculs frontend/backend/IA, unités, temps et provenance.
+- [x] Rapport: Qualifier les incohérences réelles, les duplications, les éléments corrects et les risques.
+- [x] Rapport: Proposer une architecture cible et un plan de migration, sans appliquer de changement.
+
+## Phase 1 — provenance et historisation vérifiables
+- [x] Schéma: Ajouter une table additive d’exécutions de prévision avec émetteur, validité, provenance et payload.
+- [x] Schéma: Ajouter une table additive d’observations qualifiées avec type de provenance explicite.
+- [x] Backend: Conserver chaque émission de modèle sans modifier les prévisions ou poids actuellement affichés.
+- [x] Backend: Empêcher les nouvelles pseudo-observations de devenir une vérité terrain ou un score opérationnel.
+- [x] Tests: Vérifier la provenance, l’historisation des runs et l’absence de régression sur la fusion actuelle.

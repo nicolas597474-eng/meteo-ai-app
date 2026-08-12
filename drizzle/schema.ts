@@ -46,6 +46,37 @@ export type Forecast = typeof forecasts.$inferSelect;
 export type InsertForecast = typeof forecasts.$inferInsert;
 
 /**
+ * Immutable archive of each provider/model forecast emission. Unlike `forecasts`,
+ * these rows are never replaced and therefore preserve the issue time required
+ * for reproducible lead-time evaluation.
+ */
+export const forecastRuns = mysqlTable("forecast_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  validDate: varchar("validDate", { length: 10 }).notNull(),
+  serviceName: varchar("serviceName", { length: 64 }).notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }),
+  sourceKind: mysqlEnum("sourceKind", ["model_forecast", "service_forecast"]).notNull(),
+  issuedAt: bigint("issuedAt", { mode: "number" }).notNull(),
+  tempMax: float("tempMax"),
+  tempMin: float("tempMin"),
+  precipitation: float("precipitation"),
+  windSpeed: float("windSpeed"),
+  windGust: float("windGust"),
+  humidity: float("humidity"),
+  cloudCover: float("cloudCover"),
+  condition: varchar("condition", { length: 128 }),
+  rawData: json("rawData"),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("forecast_runs_unique_emission").on(table.locationKey, table.validDate, table.serviceName, table.issuedAt),
+]);
+
+export type ForecastRun = typeof forecastRuns.$inferSelect;
+export type InsertForecastRun = typeof forecastRuns.$inferInsert;
+
+/**
  * Real weather observations from local stations.
  * Each row = one day's actual weather at Hondeghem.
  */
@@ -62,6 +93,10 @@ export const observations = mysqlTable("observations", {
   cloudCover: float("cloudCover"), // %
   condition: varchar("condition", { length: 128 }),
   source: varchar("source", { length: 128 }), // e.g. "Steenvoorde/Hazebrouck"
+  /** Explicitly differentiates a station-backed observation from a model reference. */
+  provenanceType: mysqlEnum("provenanceType", ["physical_observation", "model_reference", "legacy_unqualified"]).notNull().default("legacy_unqualified"),
+  /** Only qualified physical observations may be used by a future operational scorer. */
+  isQualified: int("isQualified").notNull().default(0),
   rawData: json("rawData"),
   collectedAt: timestamp("collectedAt").defaultNow().notNull(),
 });

@@ -11,6 +11,7 @@ import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectH
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
+import { isOperationalObservation } from "./observationProvenance";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
@@ -26,6 +27,7 @@ import {
 } from "./fusionEngine";
 import {
   insertForecasts,
+  insertForecastRuns,
   insertObservation,
   insertReliabilityScores,
   upsertMeteoAIForecast,
@@ -145,6 +147,25 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       }));
 
       await insertForecasts(forecastRows);
+      const issuedAt = Date.now();
+      await insertForecastRuns(expertData.map((f) => ({
+        locationKey: defaultLocKey,
+        validDate: today,
+        serviceName: f.serviceName,
+        provider: "open-meteo",
+        modelId: WEATHER_SERVICES.expert.find((service) => service.name === f.serviceName)?.modelId ?? null,
+        sourceKind: "model_forecast" as const,
+        issuedAt,
+        tempMax: f.tempMax,
+        tempMin: f.tempMin,
+        precipitation: f.precipitation,
+        windSpeed: f.windSpeed,
+        windGust: f.windGust,
+        humidity: f.humidity,
+        cloudCover: f.cloudCover,
+        condition: f.condition,
+        rawData: f.rawData as any,
+      })));
 
       // Also insert public service entries
       const publicForecasts = await generatePublicServiceForecasts(
@@ -391,134 +412,19 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             cloudCover: obsData.cloudCover,
             condition: obsData.condition,
             source: obsData.source,
+            provenanceType: obsData.provenanceType,
+            isQualified: obsData.isQualified,
             rawData: obsData.rawData as any,
           });
 
-          // Get forecasts for yesterday at this locationKey
-          const dayForecasts = await getForecastsByDate(yesterday, locKey);
-          const observation = await getObservationByDate(yesterday, locKey);
-
-          if (dayForecasts.length > 0 && observation) {
-            // Calculate per-model reliability scores with multi-dimensional scoring
-            const scoreRows = dayForecasts.map((f) => {
-              const score = calculateReliabilityScore(
-                [{ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed, windGust: f.windGust, cloudCover: f.cloudCover }],
-                [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed, windGust: observation.windGust, cloudCover: observation.cloudCover }]
-              );
-              return {
-                locationKey: locKey,
-                date: yesterday,
-                serviceName: f.serviceName,
-                // Legacy flat fields
-                maeTemp: score.maeTemp,
-                maePrecip: score.maePrecip,
-                maeWind: score.maeWind,
-                rmseTemp: score.rmseTemp,
-                rmsePrecip: score.rmsePrecip,
-                rmseWind: score.rmseWind,
-                biasTemp: score.biasTemp,
-                biasPrecip: score.biasPrecip,
-                biasWind: score.biasWind,
-                conditionAccuracy: score.conditionAccuracy,
-                weightedScore: score.weightedScore,
-                regime: score.regime,
-                // Temperature dimension
-                tempScore: score.dimensions.temperature.score,
-                tempMaxError: score.dimensions.temperature.maxError,
-                // Precipitation dimension
-                precipScore: score.dimensions.precipitation.score,
-                precipPod: score.dimensions.precipitation.pod,
-                precipFar: score.dimensions.precipitation.far,
-                precipCsi: score.dimensions.precipitation.csi,
-                precipFalsePositives: score.dimensions.precipitation.falsePositives,
-                precipFalseNegatives: score.dimensions.precipitation.falseNegatives,
-                // Wind dimension
-                windScore: score.dimensions.wind.score,
-                windMaeGusts: isNaN(score.dimensions.wind.maeGusts) ? null : score.dimensions.wind.maeGusts,
-                // Condition dimension
-                condScore: score.dimensions.condition.score,
-                condConcordance: score.dimensions.condition.concordance,
-                condMaeCloud: score.dimensions.condition.maeCloudCover,
-              };
-            });
-
-            await insertReliabilityScores(scoreRows);
-            totalScores += scoreRows.length;
-
-            // ─── Lead-time scoring per model ───────────────────────────────
-            // For each forecast, compute which lead-time bucket it falls into
-            // based on when it was collected (issueDate) vs the observation date
-            for (const f of dayForecasts) {
-              const issueDate = f.collectedAt
-                ? new Date(f.collectedAt).toISOString().slice(0, 10)
-                : f.date; // fallback: same day (bucket = 0-6h)
-              const bucket = classifyLeadTime(yesterday, issueDate);
-
-              // Compute errors for this forecast vs observation
-              const tempErrors: number[] = [];
-              if (f.tempMax != null && observation.tempMax != null) {
-                tempErrors.push(f.tempMax - observation.tempMax);
-              }
-              if (f.tempMin != null && observation.tempMin != null) {
-                tempErrors.push(f.tempMin - observation.tempMin);
-              }
-              const maeT = tempErrors.length > 0
-                ? tempErrors.reduce((s, e) => s + Math.abs(e), 0) / tempErrors.length
-                : null;
-              const rmseT = tempErrors.length > 0
-                ? Math.sqrt(tempErrors.reduce((s, e) => s + e * e, 0) / tempErrors.length)
-                : null;
-              const biasT = tempErrors.length > 0
-                ? tempErrors.reduce((s, e) => s + e, 0) / tempErrors.length
-                : null;
-              const maeP = (f.precipitation != null && observation.precipitation != null)
-                ? Math.abs(f.precipitation - observation.precipitation)
-                : null;
-              // Une ligne correspond à une observation : le RMSE élémentaire est
-              // |erreur| ; l'agrégation historique AVG(rmse²) est ensuite rendue
-              // disponible par l'historique par échéance.
-              const rmseP = (f.precipitation != null && observation.precipitation != null)
-                ? Math.sqrt(Math.pow(f.precipitation - observation.precipitation, 2))
-                : null;
-              const maeW = (f.windSpeed != null && observation.windSpeed != null)
-                ? Math.abs(f.windSpeed - observation.windSpeed)
-                : null;
-              const rmseW = (f.windSpeed != null && observation.windSpeed != null)
-                ? Math.sqrt(Math.pow(f.windSpeed - observation.windSpeed, 2))
-                : null;
-
-              await insertLeadTimeScores([{
-                locationKey: locKey,
-                date: yesterday,
-                serviceName: f.serviceName,
-                bucket,
-                maeTemp: maeT != null ? Math.round(maeT * 100) / 100 : null,
-                rmseTemp: rmseT != null ? Math.round(rmseT * 100) / 100 : null,
-                biasTemp: biasT != null ? Math.round(biasT * 100) / 100 : null,
-                maePrecip: maeP != null ? Math.round(maeP * 100) / 100 : null,
-                rmsePrecip: rmseP != null ? Math.round(rmseP * 100) / 100 : null,
-                maeWind: maeW != null ? Math.round(maeW * 100) / 100 : null,
-                rmseWind: rmseW != null ? Math.round(rmseW * 100) / 100 : null,
-                sampleSize: tempErrors.length,
-              }]);
-            }
-
-            // Get top model for this location
-            const locRanking = await getCumulativeRankingForLocation(locKey);
-            const topModel = locRanking[0];
-            if (topModel) {
-              locationSummaries.push(
-                `📍 ${locName}: ${scoreRows.length} scores — 🥇 ${topModel.serviceName} (${(topModel.avgScore ?? 0).toFixed(1)}/100)`
-              );
-            } else {
-              locationSummaries.push(`📍 ${locName}: ${scoreRows.length} scores calculés`);
-            }
-          } else {
-            locationSummaries.push(`📍 ${locName}: observation collectée, aucune prévision à comparer`);
+          if (!isOperationalObservation(obsData)) {
+            // collectObservations currently returns a retrospective model reference.
+            // It is retained for audit only and must not update operational scores,
+            // bias corrections or weights until a qualified physical collector exists.
+            locationSummaries.push(`📍 ${locName}: référence de modèle archivée — score opérationnel non mis à jour`);
+            continue;
           }
 
-          // Rate limit between locations
-          await new Promise((r) => setTimeout(r, 500));
         } catch (err: any) {
           console.error(`[MeteoAI] Error processing ${locName}:`, err.message);
           errors.push(`${locName}: ${err.message}`);
@@ -840,6 +746,45 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // Also add public service forecasts (real APIs when keys available, simulation otherwise)
         const publicRowsForLoc = await generatePublicServiceForecasts(today, locKey, fav.lat, fav.lon);
         await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);
+        const issuedAt = Date.now();
+        await insertForecastRuns([
+          ...expertData.map((f) => ({
+            locationKey: locKey,
+            validDate: today,
+            serviceName: f.serviceName,
+            provider: "open-meteo",
+            modelId: WEATHER_SERVICES.expert.find((service) => service.name === f.serviceName)?.modelId ?? null,
+            sourceKind: "model_forecast" as const,
+            issuedAt,
+            tempMax: f.tempMax,
+            tempMin: f.tempMin,
+            precipitation: f.precipitation,
+            windSpeed: f.windSpeed,
+            windGust: f.windGust,
+            humidity: f.humidity,
+            cloudCover: f.cloudCover,
+            condition: f.condition,
+            rawData: f.rawData as any,
+          })),
+          ...publicRowsForLoc.map((f) => ({
+            locationKey: locKey,
+            validDate: today,
+            serviceName: f.serviceName,
+            provider: f.serviceName === "OpenWeatherMap" ? "openweathermap" : "meteofrance-or-open-meteo",
+            modelId: null,
+            sourceKind: "service_forecast" as const,
+            issuedAt,
+            tempMax: f.tempMax,
+            tempMin: f.tempMin,
+            precipitation: f.precipitation,
+            windSpeed: f.windSpeed,
+            windGust: f.windGust,
+            humidity: f.humidity,
+            cloudCover: f.cloudCover,
+            condition: f.condition,
+            rawData: f.rawData as any,
+          })),
+        ]);
 
         // ── Correction automatique des biais (favoris) ──────────────────────────────
         const activeRanking = locRanking.length > 0 ? locRanking : ranking;

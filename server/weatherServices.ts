@@ -109,8 +109,8 @@ export async function collectExpertForecasts(
 }
 
 /**
- * Collect real observations from Open-Meteo historical API.
- * Accepts optional lat/lon to collect for any location (defaults to HONDEGHEM).
+ * Collect a retrospective model reference from Open-Meteo's forecast endpoint.
+ * This is deliberately not represented as a physical observation.
  */
 export async function collectObservations(
   targetDate: string,
@@ -148,7 +148,9 @@ export async function collectObservations(
       humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
       cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
       condition: null,
-      source: `Open-Meteo Historical (${locationName})`,
+      source: `Open-Meteo forecast reference (${locationName})`,
+      provenanceType: "model_reference" as const,
+      isQualified: 0 as const,
       rawData: data,
     };
   } catch (err) {

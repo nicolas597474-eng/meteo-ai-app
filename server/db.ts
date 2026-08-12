@@ -4,6 +4,7 @@ import {
   InsertUser,
   users,
   forecasts,
+  forecastRuns,
   observations,
   reliabilityScores,
   meteoaiForecast,
@@ -13,6 +14,7 @@ import {
   hourlyForecasts,
   leadTimeScores,
   InsertForecast,
+  InsertForecastRun,
   InsertObservation,
   InsertReliabilityScore,
   InsertMeteoAIForecast,
@@ -149,6 +151,17 @@ export async function insertForecasts(data: InsertForecast[]): Promise<void> {
   });
 }
 
+/** Persist an immutable forecast emission for reproducible lead-time scoring. */
+export async function insertForecastRuns(data: InsertForecastRun[]): Promise<void> {
+  const db = await getDb();
+  if (!db || data.length === 0) return;
+  for (const row of data) {
+    await db.insert(forecastRuns).values(row).onDuplicateKeyUpdate({
+      set: { capturedAt: new Date() },
+    });
+  }
+}
+
 export async function getForecastsByDate(date: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
@@ -197,6 +210,8 @@ export async function insertObservation(data: InsertObservation): Promise<void> 
       cloudCover: data.cloudCover,
       condition: data.condition,
       source: data.source,
+      provenanceType: data.provenanceType,
+      isQualified: data.isQualified,
       rawData: data.rawData,
     },
   });
