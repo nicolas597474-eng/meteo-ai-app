@@ -27,7 +27,7 @@ import {
   getStationCollectionSnapshots,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
-import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
+import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
@@ -39,6 +39,7 @@ import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialR
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights } from "../aiLabTrace";
+import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 
 function getTodayParis(): string {
@@ -1045,10 +1046,20 @@ export const weatherRouter = router({
       const lon = input.lon ?? HONDEGHEM.lon;
       const radiusKm = input.radiusKm;
 
-      const stations = await collectNearbyStations(lat, lon, radiusKm, "Local", { netatmoUserId: ctx.user?.id });
+      const [stations, currentModelReferences] = await Promise.all([
+        collectNearbyStations(lat, lon, radiusKm, "Local", { netatmoUserId: ctx.user?.id }),
+        fetchCurrentModelReferences(lat, lon),
+      ]);
       const ranked = rankStations(stations);
-      // Use the unified engine (same as Mode Local in Dashboard)
-      const ultraResult = calculateUltraLocal(ranked, "local", lat, lon, null, null);
+      const physicalStations = getPhysicalActiveStations(ranked);
+      // La vérité terrain locale ne repose que sur des observations physiques validées.
+      const ultraResult = calculateUltraLocal(physicalStations, "local", lat, lon, null, null);
+      const modelReferences = buildModelReferenceCoherence(
+        currentModelReferences,
+        physicalStations
+          .map((station) => station.temperature)
+          .filter((temperature): temperature is number => temperature !== null),
+      );
       const groundTruth = {
         temperature: ultraResult.temperature,
         humidity: ultraResult.humidity,
@@ -1111,12 +1122,13 @@ export const weatherRouter = router({
           qualificationStatus: s.qualificationStatus,
           sourceTier: s.sourceTier,
         })),
+        modelReferences,
         groundTruth,
         totalFound: stations.length,
-        activeCount: stations.filter(s => s.isActive).length,
+        activeCount: physicalStations.length,
         ignoredCount: stations.filter(s => !s.isActive).length,
-        physicalStationCount: stations.filter(s => s.isActive && getStationSourceKind(s.source) === "physical").length,
-        referenceSourceCount: stations.filter(s => s.isActive && getStationSourceKind(s.source) === "reference").length,
+        physicalStationCount: physicalStations.length,
+        referenceSourceCount: modelReferences.length,
         fetchedAt: new Date().toISOString(),
       };
     }),

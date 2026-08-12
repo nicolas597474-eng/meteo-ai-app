@@ -15,6 +15,8 @@
  */
 
 import { fetchOpenSenseMapCandidates } from "./openSenseMapService";
+import { WEATHER_SERVICES } from "./weatherServices";
+import type { CurrentModelReference } from "./modelReferenceCoherence";
 
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
 
@@ -189,6 +191,33 @@ async function fetchOpenMeteoPoint(lat: number, lon: number, model?: string): Pr
   } catch {
     return null;
   }
+}
+
+/** Références des modèles au point demandé : elles ne sont jamais des stations. */
+export async function fetchCurrentModelReferences(lat: number, lon: number): Promise<CurrentModelReference[]> {
+  const responses = await Promise.allSettled(
+    WEATHER_SERVICES.expert.map(async (service) => {
+      const point = await fetchOpenMeteoPoint(lat, lon, service.modelId === "best_match" ? undefined : service.modelId);
+      if (!point) return null;
+      return {
+        id: `model-${service.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+        name: service.name,
+        temperature: point.temperature,
+        humidity: point.humidity,
+        pressure: point.pressure,
+        windSpeed: point.windSpeed,
+        windGust: point.windGust,
+        windDirection: point.windDirection,
+        precipitation: point.precipitation,
+        updatedAt: point.time ? `${point.time}:00` : null,
+      } satisfies CurrentModelReference;
+    }),
+  );
+
+  return responses
+    .filter((response): response is PromiseFulfilledResult<CurrentModelReference | null> => response.status === "fulfilled")
+    .map((response) => response.value)
+    .filter((reference): reference is CurrentModelReference => reference !== null);
 }
 
 // ─── 1. Open-Meteo reference grid point ──────────────────────────────────────
@@ -415,21 +444,18 @@ export async function collectNearbyStations(
   options: { netatmoUserId?: number } = {},
 ): Promise<StationData[]> {
   const { fetchNetatmoPublicStations } = await import("./netatmoService");
-  // Fetch from all sources in parallel
-  const [openMeteo, meteoFrance, metar, synopRef, netatmo, openSenseMap] = await Promise.allSettled([
-    fetchOpenMeteoNearbyStations(lat, lon, radiusKm),
+  // Seules les observations de station et les candidats sont assemblés ici.
+  // Les modèles sont exposés séparément par fetchCurrentModelReferences().
+  const [meteoFrance, metar, netatmo, openSenseMap] = await Promise.allSettled([
     fetchMeteoFranceStations(lat, lon, radiusKm),
     fetchMetarStations(lat, lon, radiusKm),
-    fetchSYNOPReference(lat, lon),
     fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm),
     fetchOpenSenseMapCandidates(lat, lon, radiusKm),
   ]);
 
   const all: StationData[] = [
-    ...(openMeteo.status === "fulfilled" ? openMeteo.value : []),
     ...(meteoFrance.status === "fulfilled" ? meteoFrance.value : []),
     ...(metar.status === "fulfilled" ? metar.value : []),
-    ...(synopRef.status === "fulfilled" ? synopRef.value : []),
     ...(netatmo.status === "fulfilled" ? netatmo.value : []),
     ...(openSenseMap.status === "fulfilled" ? openSenseMap.value.map((candidate): StationData => ({
       stationId: `opensensemap-${candidate.providerStationId}`,

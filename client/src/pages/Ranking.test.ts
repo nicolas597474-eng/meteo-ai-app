@@ -14,4 +14,11 @@ describe("page Fiabilité", () => {
     expect(source).toContain("Comprendre le statut capteur en validation");
     expect(source).toContain("il n’influence pas la température locale tant qu’un gain de précision n’est pas démontré");
   });
+
+  it("distingue explicitement les références de modèles des stations locales", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Références de modèles — non stations");
+    expect(source).toContain("MODÈLE · NON STATION");
+    expect(source).toContain("il ne modifie pas la température locale avant une validation historique mesurée");
+  });
 });

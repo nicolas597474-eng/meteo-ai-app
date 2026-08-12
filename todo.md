@@ -740,3 +740,14 @@
 ## Infobulle du statut capteur citoyen
 - [x] Frontend: Ajouter une infobulle accessible expliquant le statut « CAPTEUR EN VALIDATION » dans la page Fiabilité.
 - [x] Tests: Vérifier le contenu et l’accessibilité de l’aide contextuelle.
+
+## Sources de stations absentes dans Fiabilité
+- [x] Diagnostic: Identifier pourquoi les sources supplémentaires attendues ne sont plus visibles dans la page Fiabilité.
+- [x] Frontend: Rétablir l’affichage des sources disponibles sans les présenter comme stations physiques validées.
+- [x] Tests: Vérifier le nombre, le filtrage et la visibilité des sources retournées.
+
+## Références de modèles et cohérence locale
+- [x] Backend: Exposer les références de modèles comme références distinctes, sans les assimiler à des observations de station.
+- [x] Backend: Calculer un indicateur de cohérence des références avec les stations physiques locales validées lorsqu’elles sont disponibles.
+- [x] Frontend: Afficher les références de modèles avec leur cohérence, leur écart local et leurs limites explicites.
+- [x] Tests: Vérifier l’exclusion des références de la vérité terrain et les replis sans station physique.
