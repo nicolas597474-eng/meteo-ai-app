@@ -179,8 +179,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const scaleRange = scaleTop - scaleBot || 1;
 
   const maxPrecip = Math.max(...displayDays.map(d => d.precipitation ?? 0), 2);
-  const maxWind = Math.max(...displayDays.map(d => d.windSpeed ?? 0), 10);
-
   // Zone allocation: temp 55%, wind 20%, precip 20%, gaps 5%
   const tempZoneTop = PAD_T;
   const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.55;
@@ -190,7 +188,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const precipZoneBot = CHART_H - 2;
 
   const tempToY = useCallback((t: number) => tempZoneTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempZoneTop), [scaleBot, scaleRange, tempZoneTop, tempZoneBot]);
-  const windToY = useCallback((w: number) => windZoneTop + (1 - w / maxWind) * (windZoneBot - windZoneTop), [maxWind, windZoneTop, windZoneBot]);
   const colX = useCallback((i: number) => i * COL_W + COL_W / 2, []);
 
   // ── Draw scrollable canvas ──────────────────────────────────────────────────
@@ -220,17 +217,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.moveTo(x, 0);
       ctx.lineTo(x, CHART_H);
       ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-
-    // ── Horizontal grid (temp) ───────────────────────────────────────────────
-    for (let t = scaleBot; t <= scaleTop; t += gridStep) {
-      const y = tempToY(t);
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(scrollableW, y);
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.06)";
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -295,14 +281,14 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         ctx.bezierCurveTo(cpx, maxPts[i - 1].y, cpx, maxPts[i].y, maxPts[i].x, maxPts[i].y);
       }
       ctx.save();
-      ctx.strokeStyle = "rgba(249, 115, 22, 0.52)";
-      ctx.lineWidth = 8;
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.45)";
+      ctx.lineWidth = 5;
       ctx.shadowColor = "#f97316";
-      ctx.shadowBlur = 16;
+      ctx.shadowBlur = 10;
       ctx.stroke();
       ctx.restore();
       ctx.strokeStyle = "#fb923c";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 1.8;
       ctx.stroke();
     }
     // Points + values
@@ -335,7 +321,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         ctx.bezierCurveTo(cpx, minPts[i - 1].y, cpx, minPts[i].y, minPts[i].x, minPts[i].y);
       }
       ctx.strokeStyle = "#60a5fa";
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 1.8;
       ctx.stroke();
     }
     minPts.forEach((pt, i) => {
@@ -356,30 +342,21 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillText(`${v.toFixed(1)}`, pt.x, pt.y - 10);
     });
 
-    // ── Wind dashed line (green) ─────────────────────────────────────────────
-    const windPts = displayDays.slice(0, visibleN).map((d, i) => ({ x: colX(i), y: windToY(d.windSpeed ?? 0) }));
-    if (windPts.length > 1) {
-      ctx.beginPath();
-      ctx.setLineDash([6, 4]);
-      ctx.moveTo(windPts[0].x, windPts[0].y);
-      for (let i = 1; i < windPts.length; i++) ctx.lineTo(windPts[i].x, windPts[i].y);
-      ctx.strokeStyle = "#4ade80";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    windPts.forEach((pt, i) => {
+    // ── Wind readings by column (no wind curve) ─────────────────────────────
+    displayDays.slice(0, visibleN).forEach((d, i) => {
       const v = displayDays[i].windSpeed;
       const dir = displayDays[i].windDirection;
       if (v == null) return;
+      const x = colX(i);
+      const y = windZoneTop + 17;
       ctx.fillStyle = "#4ade80";
       ctx.font = "bold 10px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(v)}`, pt.x, pt.y - 8);
+      ctx.fillText(`${Math.round(v)}`, x, y);
       if (dir != null) {
         const angle = ((dir + 180) % 360) * (Math.PI / 180);
         ctx.save();
-        ctx.translate(pt.x, pt.y + 3);
+        ctx.translate(x + 15, y - 4);
         ctx.rotate(angle);
         ctx.beginPath();
         ctx.moveTo(0, -4);
@@ -429,7 +406,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillStyle = today ? "#a5b4fc" : "rgba(107, 114, 128, 0.7)";
       ctx.fillText(line2, x, lblY + 24);
     });
-  }, [displayDays, N, selectedDay, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, maxWind, tempToY, windToY, colX, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
+  }, [displayDays, N, selectedDay, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
 
   // ── Resize observer ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -489,10 +466,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
   if (displayDays.length === 0) return null;
 
-  // ── Fixed axis ticks (rendered as DOM, stays in place) ──────────────────────
-  const tempTicks: number[] = [];
-  for (let t = scaleBot; t <= scaleTop; t += gridStep) tempTicks.push(t);
-
   return (
     <section ref={containerRef} className="w-full rounded-[22px] border border-slate-700/70 bg-[#080b10] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.38)]">
       {/* Header with toggle */}
@@ -537,12 +510,8 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
       {/* ── Chart area: fixed axis + scrollable content ───────────────────── */}
       <div className="flex overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
-        {/* Fixed left axis — only temperature scale */}
+        {/* Fixed left labels — wind and rain only */}
         <div className="relative flex-shrink-0 border-r border-slate-700/60 bg-[#090c11]" style={{ width: AXIS_W, height: TOTAL_H }}>
-          <span className="absolute text-[9px] text-slate-500 font-bold" style={{ top: 0, left: 2 }}>°C</span>
-          {tempTicks.map(t => (
-            <span key={`t-${t}`} className="absolute text-[11px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 6 }}>{t}°</span>
-          ))}
           <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: windZoneTop + 4 }}>Vent<br /><span className="text-[7px] text-slate-500">km/h</span></span>
           <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: precipZoneTop + 4 }}>Pluie<br /><span className="text-[7px] text-slate-500">mm</span></span>
         </div>

@@ -404,3 +404,10 @@
 - [x] Frontend: Appliquer un fond et un contour bleus à la colonne de l’heure actuelle.
 - [x] Frontend: Remplacer la barre de défilement violette par un indicateur bleu.
 - [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile.
+
+## Simplification du graphique Prévisions météo
+- [x] Frontend: Affiner les deux courbes de température du graphique journalier.
+- [x] Frontend: Supprimer la grille et les repères de température latéraux du graphique journalier.
+- [x] Frontend: Supprimer la courbe de vent et afficher uniquement le vent en km/h par colonne.
+- [x] Frontend: Afficher la pluie en mm par colonne, avec barre seulement en cas de cumul.
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile.
