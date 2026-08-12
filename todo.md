@@ -548,6 +548,12 @@
 - [ ] Frontend: Afficher les stations Netatmo validées parmi les stations physiques locales.
 - [ ] Tests: Vérifier l’authentification, le filtrage et l’absence de données simulées.
 
+## Correction de provenance des stations Netatmo
+- [x] Audit: Identifier pourquoi des références de grille apparaissent sous le libellé Netatmo public.
+- [x] Backend: Empêcher toute classification Netatmo sans observation authentifiée et provenance `netatmo` réelle.
+- [x] Frontend: Afficher les références de grille dans leur catégorie exacte, sans badge de station réelle.
+- [x] Tests: Vérifier qu’une référence de grille ne peut jamais devenir une station Netatmo réelle.
+
 ## Diagnostic OAuth Netatmo
 - [x] Audit: Distinguer un Access Token d’un Refresh Token et relever le code de refus OAuth sans exposer de secret.
 - [x] Configuration: Corriger le flux d’autorisation Netatmo requis pour la collecte récurrente.

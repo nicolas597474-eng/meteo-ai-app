@@ -152,11 +152,16 @@ describe("getPhysicalActiveStations", () => {
     const stations = [
       makeStation({ stationId: "mf-1", source: "meteofrance" }),
       makeStation({ stationId: "grid-1", source: "openmeteo" }),
-      makeStation({ stationId: "personal-1", source: "netatmo" }),
+      makeStation({ stationId: "netatmo-personal-1", source: "netatmo" }),
       makeStation({ stationId: "mf-old", source: "meteofrance", isActive: false }),
     ];
 
-    expect(getPhysicalActiveStations(stations).map((station) => station.stationId)).toEqual(["mf-1", "personal-1"]);
+    expect(getPhysicalActiveStations(stations).map((station) => station.stationId)).toEqual(["mf-1", "netatmo-personal-1"]);
+  });
+
+  it("ne classe pas une ancienne référence de grille comme une station Netatmo physique", () => {
+    expect(getStationSourceKind("netatmo", "grid-local-est")).toBe("reference");
+    expect(getStationSourceKind("netatmo", "netatmo-public-42")).toBe("physical");
   });
 });
 

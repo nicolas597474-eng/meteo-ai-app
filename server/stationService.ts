@@ -59,12 +59,15 @@ export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<Stat
 
 export type StationSourceKind = "physical" | "reference";
 
-export function getStationSourceKind(source: StationSource): StationSourceKind {
+export function getStationSourceKind(source: StationSource, stationId?: string): StationSourceKind {
+  if (source === "netatmo" && stationId && !stationId.startsWith("netatmo-")) {
+    return "reference";
+  }
   return PHYSICAL_STATION_SOURCES.has(source) ? "physical" : "reference";
 }
 
 export function getPhysicalActiveStations(stations: StationData[]): StationData[] {
-  return stations.filter((station) => station.isActive && getStationSourceKind(station.source) === "physical");
+  return stations.filter((station) => station.isActive && getStationSourceKind(station.source, station.stationId) === "physical");
 }
 
 export type GroundTruthResult = {
@@ -367,10 +370,10 @@ const STATION_OFFSETS: Array<{
   nameTemplate: string;
   model?: string;
 }> = [
-  { dlat:  0.018, dlon:  0.012, source: "netatmo",      nameTemplate: "Référence de grille {town} Centre",    model: "best_match" },
-  { dlat: -0.012, dlon:  0.022, source: "netatmo",      nameTemplate: "Référence de grille {town} Est",       model: "best_match" },
-  { dlat:  0.025, dlon: -0.018, source: "netatmo",      nameTemplate: "Référence de grille {town} Nord-Ouest" },
-  { dlat: -0.020, dlon: -0.015, source: "netatmo",      nameTemplate: "Référence de grille {town} Sud-Ouest" },
+  { dlat:  0.018, dlon:  0.012, source: "openmeteo",    nameTemplate: "Référence de grille {town} Centre",    model: "best_match" },
+  { dlat: -0.012, dlon:  0.022, source: "openmeteo",    nameTemplate: "Référence de grille {town} Est",       model: "best_match" },
+  { dlat:  0.025, dlon: -0.018, source: "openmeteo",    nameTemplate: "Référence de grille {town} Nord-Ouest" },
+  { dlat: -0.020, dlon: -0.015, source: "openmeteo",    nameTemplate: "Référence de grille {town} Sud-Ouest" },
   { dlat:  0.040, dlon:  0.030, source: "wunderground", nameTemplate: "Référence de grille {town} Nord",        model: "gfs_seamless" },
   { dlat: -0.035, dlon:  0.040, source: "wunderground", nameTemplate: "Référence de grille {town} Sud-Est",     model: "gfs_seamless" },
   { dlat:  0.055, dlon: -0.040, source: "infoclimat",   nameTemplate: "Référence de grille {town} Nord-Ouest", model: "meteofrance_arome_france_hd" },
