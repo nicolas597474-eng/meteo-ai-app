@@ -557,3 +557,8 @@
 - [x] Backend: Échanger le code d’autorisation et stocker les jetons chiffrés côté serveur.
 - [x] Frontend: Ajouter le lancement de l’autorisation et l’état de connexion Netatmo.
 - [x] Tests: Vérifier la validation d’état, le rejet des callbacks incomplets et le stockage sécurisé.
+
+## Correctif OAuth Netatmo mobile
+- [x] Audit: Vérifier pourquoi le cookie d’état OAuth n’est pas renvoyé lors du retour depuis Netatmo sur mobile.
+- [x] Backend: Rendre la validation anti-CSRF indépendante du cookie tiers perdu pendant la redirection mobile.
+- [x] Tests: Vérifier le retour OAuth avec et sans cookie d’état, sans accepter un état falsifié.

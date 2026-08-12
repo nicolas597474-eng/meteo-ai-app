@@ -1,21 +1,15 @@
 import crypto from "crypto";
-import type { Request, Response } from "express";
 import { ENV } from "./_core/env";
+import { createNetatmoOAuthState } from "./db";
 
 export const NETATMO_REDIRECT_URI = process.env.NETATMO_REDIRECT_URI
   ?? "https://meteoai-7i8fkmsr.manus.space/api/netatmo/callback";
 export const NETATMO_SCOPE = "read_station";
-const STATE_COOKIE = "netatmo_oauth_state";
-const STATE_TTL_MS = 10 * 60 * 1000;
+export const NETATMO_STATE_TTL_MS = 10 * 60 * 1000;
 
 function signingKey() {
   if (!ENV.cookieSecret) throw new Error("JWT_SECRET is required for Netatmo OAuth state");
   return crypto.createHash("sha256").update(ENV.cookieSecret).digest();
-}
-
-function getCookie(req: Request, name: string) {
-  const cookieHeader = req.headers.cookie ?? "";
-  return cookieHeader.split(";").map((entry) => entry.trim()).find((entry) => entry.startsWith(`${name}=`))?.slice(name.length + 1);
 }
 
 export function createNetatmoState(userId: number, now = Date.now()) {
@@ -33,33 +27,23 @@ export function verifyNetatmoState(state: string, now = Date.now()) {
   if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
   const userId = Number(userIdRaw);
   const issuedAt = Number(issuedAtRaw);
-  if (!Number.isInteger(userId) || !Number.isFinite(issuedAt) || now - issuedAt > STATE_TTL_MS || issuedAt > now + 60_000) return null;
+  if (!Number.isInteger(userId) || !Number.isFinite(issuedAt) || now - issuedAt > NETATMO_STATE_TTL_MS || issuedAt > now + 60_000) return null;
   return { userId, issuedAt };
 }
 
-export function startNetatmoAuthorization(userId: number, req: Request, res: Response) {
+export function hashNetatmoState(state: string) {
+  return crypto.createHash("sha256").update(state).digest("hex");
+}
+
+export async function startNetatmoAuthorization(userId: number) {
   const state = createNetatmoState(userId);
-  res.cookie(STATE_COOKIE, state, {
-    httpOnly: true,
-    secure: ENV.isProduction,
-    sameSite: "lax",
-    maxAge: STATE_TTL_MS,
-    path: "/api/netatmo",
-  });
+  await createNetatmoOAuthState(hashNetatmoState(state), userId, new Date(Date.now() + NETATMO_STATE_TTL_MS));
   const authorizationUrl = new URL("https://api.netatmo.com/oauth2/authorize");
   authorizationUrl.searchParams.set("client_id", process.env.NETATMO_CLIENT_ID ?? "");
   authorizationUrl.searchParams.set("redirect_uri", NETATMO_REDIRECT_URI);
   authorizationUrl.searchParams.set("scope", NETATMO_SCOPE);
   authorizationUrl.searchParams.set("state", state);
   return authorizationUrl.toString();
-}
-
-export function consumeNetatmoState(req: Request, res: Response, returnedState?: string) {
-  const storedState = getCookie(req, STATE_COOKIE);
-  res.clearCookie(STATE_COOKIE, { path: "/api/netatmo" });
-  if (!storedState || !returnedState || storedState.length !== returnedState.length) return null;
-  if (!crypto.timingSafeEqual(Buffer.from(storedState), Buffer.from(returnedState))) return null;
-  return verifyNetatmoState(storedState);
 }
 
 export function encryptNetatmoRefreshToken(refreshToken: string) {

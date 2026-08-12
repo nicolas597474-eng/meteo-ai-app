@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -26,6 +26,7 @@ import {
   groundTruth,
   stationCollectionSnapshots,
   netatmoOAuthTokens,
+  netatmoOAuthStates,
   InsertWeatherStation,
   InsertStationObservation,
   InsertGroundTruth,
@@ -652,6 +653,26 @@ export async function getNetatmoOAuthToken(userId: number) {
   if (!db) return null;
   const rows = await db.select().from(netatmoOAuthTokens).where(eq(netatmoOAuthTokens.userId, userId)).limit(1);
   return rows[0] ?? null;
+}
+
+export async function createNetatmoOAuthState(stateHash: string, userId: number, expiresAt: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable for Netatmo OAuth state");
+  await db.insert(netatmoOAuthStates).values({ stateHash, userId, expiresAt });
+}
+
+export async function consumeNetatmoOAuthState(stateHash: string, userId: number, now = new Date()) {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.update(netatmoOAuthStates)
+    .set({ consumedAt: now })
+    .where(and(
+      eq(netatmoOAuthStates.stateHash, stateHash),
+      eq(netatmoOAuthStates.userId, userId),
+      gte(netatmoOAuthStates.expiresAt, now),
+      isNull(netatmoOAuthStates.consumedAt),
+    ));
+  return (result as unknown as { affectedRows?: number }).affectedRows === 1;
 }
 
 // ─── Location Forecasts (pre-fetched per favorite) ───────────────────────────

@@ -3,6 +3,7 @@ import {
   createNetatmoState,
   decryptNetatmoRefreshToken,
   encryptNetatmoRefreshToken,
+  hashNetatmoState,
   verifyNetatmoState,
 } from "./netatmoOAuth";
 
@@ -18,6 +19,14 @@ describe("sécurité OAuth Netatmo", () => {
     const state = createNetatmoState(42, now);
     expect(verifyNetatmoState(`${state}x`, now + 1_000)).toBeNull();
     expect(verifyNetatmoState(state, now + 11 * 60_000)).toBeNull();
+  });
+
+  it("produit une empreinte stable à conserver sans exposer l’état signé", () => {
+    const state = createNetatmoState(42, Date.now());
+    const hash = hashNetatmoState(state);
+    expect(hash).toHaveLength(64);
+    expect(hash).not.toContain(state);
+    expect(hashNetatmoState(state)).toBe(hash);
   });
 
   it("chiffre le refresh token sans le conserver en clair", () => {

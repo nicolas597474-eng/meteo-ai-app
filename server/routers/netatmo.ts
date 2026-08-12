@@ -12,10 +12,10 @@ export const netatmoRouter = router({
       scopes: connection?.scopes ?? null,
     };
   }),
-  startAuthorization: protectedProcedure.mutation(({ ctx }) => {
+  startAuthorization: protectedProcedure.mutation(async ({ ctx }) => {
     if (!process.env.NETATMO_CLIENT_ID || !process.env.NETATMO_CLIENT_SECRET) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Identifiants Netatmo manquants" });
     }
-    return { authorizationUrl: startNetatmoAuthorization(ctx.user.id, ctx.req, ctx.res) };
+    return { authorizationUrl: await startNetatmoAuthorization(ctx.user.id) };
   }),
 });

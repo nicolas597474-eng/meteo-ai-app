@@ -269,6 +269,15 @@ export const netatmoOAuthTokens = mysqlTable("netatmo_oauth_tokens", {
 export type NetatmoOAuthToken = typeof netatmoOAuthTokens.$inferSelect;
 export type InsertNetatmoOAuthToken = typeof netatmoOAuthTokens.$inferInsert;
 
+/** One-time OAuth states prevent callback forgery without relying on mobile cookies. */
+export const netatmoOAuthStates = mysqlTable("netatmo_oauth_states", {
+  stateHash: varchar("stateHash", { length: 64 }).primaryKey(),
+  userId: int("userId").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  consumedAt: timestamp("consumedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 /**
  * User favorite locations (max 5 per user).
  * Each location stores coordinates, custom settings, and display preferences.

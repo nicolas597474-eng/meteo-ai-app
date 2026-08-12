@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
-import { upsertNetatmoOAuthToken } from "./db";
-import { consumeNetatmoState, encryptNetatmoRefreshToken, NETATMO_REDIRECT_URI, NETATMO_SCOPE } from "./netatmoOAuth";
+import { consumeNetatmoOAuthState, upsertNetatmoOAuthToken } from "./db";
+import { encryptNetatmoRefreshToken, hashNetatmoState, NETATMO_REDIRECT_URI, NETATMO_SCOPE, verifyNetatmoState } from "./netatmoOAuth";
 
 function queryValue(req: Request, key: string) {
   const value = req.query[key];
@@ -11,9 +11,14 @@ export function registerNetatmoOAuthRoutes(app: Express) {
   app.get("/api/netatmo/callback", async (req: Request, res: Response) => {
     const code = queryValue(req, "code");
     const state = queryValue(req, "state");
-    const verifiedState = consumeNetatmoState(req, res, state);
+    const verifiedState = state ? verifyNetatmoState(state) : null;
     if (!code || !verifiedState) {
       res.status(400).send("Connexion Netatmo refusée ou expirée. Relancez l’autorisation depuis MeteoAI.");
+      return;
+    }
+    const stateConsumed = await consumeNetatmoOAuthState(hashNetatmoState(state!), verifiedState.userId);
+    if (!stateConsumed) {
+      res.status(400).send("Connexion Netatmo expirée ou déjà utilisée. Relancez l’autorisation depuis MeteoAI.");
       return;
     }
 
