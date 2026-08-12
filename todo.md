@@ -365,3 +365,8 @@
 - [x] Frontend: Renommer le badge de régime en « Tendance officielle de la journée ».
 - [x] Frontend: Renommer la condition sous la température en « [condition] actuellement ».
 - [x] Frontend: Vérifier la lisibilité mobile, TypeScript et Vitest.
+
+## Prochain changement de condition météo
+- [x] Frontend: Détecter le premier créneau horaire futur dont la condition diffère de la condition actuelle.
+- [x] Frontend: Afficher l’heure exacte et la nouvelle condition dans la carte principale du Dashboard.
+- [x] Tests: Vérifier la détection d’un changement, l’absence de changement et les heures de passage de jour.

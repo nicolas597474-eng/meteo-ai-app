@@ -10,6 +10,7 @@ import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weather
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { ForecastTraceability } from "@/components/ForecastTraceability";
+import { findNextConditionChange } from "@/lib/weatherCondition";
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
@@ -243,6 +244,7 @@ export default function Dashboard() {
 
   // Current temperature from hourly (closest to now)
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
+  const nextConditionChange = findNextConditionChange(hours, currentHour?.hour ?? nowHour);
   const currentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
   const apparentTemp = currentHour?.apparentTemp ?? null;
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
@@ -358,6 +360,12 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground mt-1">
                     {(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible") + " actuellement"}
                   </p>
+                  {nextConditionChange && (
+                    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
+                      <Clock className="h-3 w-3" />
+                      Prochain changement : {nextConditionChange.condition} à {nextConditionChange.hour}
+                    </p>
+                  )}
                 </div>
 
                 {/* Max / Min */}
