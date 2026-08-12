@@ -360,3 +360,8 @@
 - [x] Frontend: Afficher le régime officiel commun dans le Dashboard, même en mode Local/Ultra-local.
 - [x] Frontend: Afficher l’observation locale comme information distincte et non comme régime officiel.
 - [x] Tests: Vérifier l’identité du régime officiel retourné par Dashboard et Classement pour une même localisation; Détails utilise le même constructeur serveur.
+
+## Clarification condition actuelle et tendance journalière
+- [x] Frontend: Renommer le badge de régime en « Tendance officielle de la journée ».
+- [x] Frontend: Renommer la condition sous la température en « [condition] actuellement ».
+- [x] Frontend: Vérifier la lisibilité mobile, TypeScript et Vitest.

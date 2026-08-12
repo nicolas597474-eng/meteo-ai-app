@@ -291,7 +291,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-primary">Régime officiel MeteoAI</span>
+                <span className="text-xs font-medium text-primary">Tendance officielle de la journée</span>
                 {selectedLocation && <span className="text-xs text-primary/60">· {selectedLocation.name}</span>}
               </div>
               <span className="text-xs text-muted-foreground hidden sm:block">
@@ -356,7 +356,7 @@ export default function Dashboard() {
                     {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {today?.condition ?? meteoAI?.condition ?? ""}
+                    {(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible") + " actuellement"}
                   </p>
                 </div>
 
