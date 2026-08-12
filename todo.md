@@ -381,3 +381,9 @@
 - [x] Frontend: Recomposer FifteenDayChart avec le même style : sélecteur 7j/15j/16j, températures max/min, vent et barres de précipitations.
 - [x] Frontend: Conserver les données officielles, le responsive mobile et les interactions existantes.
 - [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile des deux graphiques.
+
+## Colonnes météo enrichies dans les graphiques
+- [x] Frontend: Afficher l’heure, une grande icône, températures, vent et pluie dans chaque colonne du graphique horaire.
+- [x] Frontend: Afficher le jour, une grande icône, températures, vent et pluie dans chaque colonne du graphique journalier.
+- [x] Frontend: Conserver les courbes et le clic vers le détail tout en rapprochant la hiérarchie de la maquette.
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile des colonnes enrichies.

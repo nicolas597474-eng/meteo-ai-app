@@ -161,10 +161,10 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   // ── Layout constants ────────────────────────────────────────────────────────
   const AXIS_W = 38;         // fixed axis width on left
   const COL_W = 76;          // width per day column
-  const CHART_H = 236;       // main chart height (temp + wind + precip combined)
-  const ICON_ROW = 30;       // icon row
-  const LABEL_ROW = 36;      // date labels
-  const PAD_T = 16;
+  const CHART_H = 310;       // main chart height (temp + wind + precip combined)
+  const ICON_ROW = 0;        // weather header is positioned inside the chart columns
+  const LABEL_ROW = 0;       // weather header is positioned inside the chart columns
+  const PAD_T = 82;
   const TOTAL_H = CHART_H + ICON_ROW + LABEL_ROW;
   const scrollableW = COL_W * N;
 
@@ -389,20 +389,19 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     const precipH = precipZoneBot - precipZoneTop;
     displayDays.slice(0, visibleN).forEach((d, i) => {
       const p = d.precipitation ?? 0;
+      const x = colX(i);
+      ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
+      ctx.font = "bold 9px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(p.toFixed(1), x, precipZoneTop + 11);
       if (p <= 0) return;
       const barH = Math.max(4, (p / maxPrecip) * precipH);
-      const x = colX(i);
       const barW = Math.min(COL_W * 0.45, 24);
       const g = ctx.createLinearGradient(0, precipZoneBot - barH, 0, precipZoneBot);
       g.addColorStop(0, "rgba(96, 165, 250, 0.9)");
       g.addColorStop(1, "rgba(37, 99, 235, 0.5)");
       ctx.fillStyle = g;
       ctx.fillRect(x - barW / 2, precipZoneBot - barH, barW, barH);
-      // Value
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 9px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText(`${p}`, x, precipZoneBot - barH - 3);
     });
 
     // ── Date labels + icons ──────────────────────────────────────────────────
@@ -534,18 +533,24 @@ export default function FifteenDayChart({ days, locationName }: Props) {
           {tempTicks.map(t => (
             <span key={`t-${t}`} className="absolute text-[11px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 6 }}>{t}°</span>
           ))}
+          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: windZoneTop + 4 }}>Vent<br /><span className="text-[7px] text-slate-500">km/h</span></span>
+          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: precipZoneTop + 4 }}>Pluie<br /><span className="text-[7px] text-slate-500">mm</span></span>
         </div>
 
         {/* Scrollable chart */}
         <div ref={scrollRef} className="flex-1 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           <div className="relative" style={{ width: scrollableW, height: TOTAL_H }}>
-            {/* Weather icons row */}
-            <div className="absolute flex" style={{ top: CHART_H, height: ICON_ROW, left: 0, width: scrollableW }}>
+            {/* En-tête de chaque journée : jour + grande icône météo */}
+            <div className="pointer-events-none absolute left-0 top-0 flex" style={{ height: 78, width: scrollableW }}>
               {displayDays.map((d, i) => {
                 const cond = getConditionLabel(d.cloudCover, d.precipitation, d.condition);
+                const date = formatDate(d.date);
+                const isSelected = i === selectedDay;
                 return (
-                  <div key={d.date} className="flex items-center justify-center cursor-pointer hover:scale-110 transition-transform active:scale-95" style={{ width: COL_W, scrollSnapAlign: "start" }} onClick={() => setSelectedDay(p => p === i ? null : i)}>
-                    <WeatherIconSVG condition={cond} size={20} />
+                  <div key={d.date} className={`flex flex-col items-center justify-start pt-2 ${isSelected ? "rounded-xl border border-blue-300/50 bg-blue-500/20 shadow-[0_0_18px_rgba(59,130,246,0.38)]" : ""}`} style={{ width: COL_W }}>
+                    <span className={`text-[10px] font-semibold ${isSelected ? "text-blue-100" : "text-slate-200"}`}>{date.line1}</span>
+                    <span className="text-[9px] text-slate-500">{date.line2}</span>
+                    <span className="mt-1"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>
                 );
               })}

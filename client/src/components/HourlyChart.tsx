@@ -199,10 +199,10 @@ export default function HourlyChart({ hours, locationName }: Props) {
 
   // Layout constants
   const COL_W = 64;
-  const CHART_H = 228;
-  const ICON_ROW = 30;
-  const LABEL_ROW = 30;
-  const PAD_T = 14;
+  const CHART_H = 300;
+  const ICON_ROW = 0;
+  const LABEL_ROW = 0;
+  const PAD_T = 82;
   const TOTAL_H = CHART_H + ICON_ROW + LABEL_ROW;
   const scrollableW = COL_W * N;
 
@@ -429,22 +429,19 @@ export default function HourlyChart({ hours, locationName }: Props) {
     const precipH = precipZoneBot - precipZoneTop;
     hours.slice(0, visibleN).forEach((h, i) => {
       const p = h.precipitation ?? 0;
+      const x = colX(i);
+      ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
+      ctx.font = "bold 8px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(p.toFixed(1), x, precipZoneTop + 10);
       if (p <= 0) return;
       const barH = Math.max(3, (p / maxPrecip) * precipH);
-      const x = colX(i);
       const barW = Math.min(COL_W * 0.5, 20);
       const g = ctx.createLinearGradient(0, precipZoneBot - barH, 0, precipZoneBot);
       g.addColorStop(0, "rgba(96, 165, 250, 0.9)");
       g.addColorStop(1, "rgba(37, 99, 235, 0.5)");
       ctx.fillStyle = g;
       ctx.fillRect(x - barW / 2, precipZoneBot - barH, barW, barH);
-      // Value
-      if (p >= 0.5) {
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 8px system-ui";
-        ctx.textAlign = "center";
-        ctx.fillText(`${p}`, x, precipZoneBot - barH - 2);
-      }
     });
 
     // Hour labels
@@ -560,18 +557,22 @@ export default function HourlyChart({ hours, locationName }: Props) {
           {tempTicks.map(t => (
             <span key={`t-${t}`} className="absolute text-[10px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 5 }}>{t}°</span>
           ))}
+          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: windZoneTop + 4 }}>Vent<br /><span className="text-[7px] text-slate-500">km/h</span></span>
+          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: precipZoneTop + 4 }}>Pluie<br /><span className="text-[7px] text-slate-500">mm</span></span>
         </div>
 
         {/* Scrollable chart */}
         <div ref={scrollRef} className="flex-1 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           <div className="relative" style={{ width: scrollableW, height: TOTAL_H }}>
-            {/* Weather icons row */}
-            <div className="absolute flex" style={{ top: CHART_H, height: ICON_ROW, left: 0, width: scrollableW }}>
+            {/* En-tête de chaque créneau : heure + grande icône météo */}
+            <div className="pointer-events-none absolute left-0 top-0 flex" style={{ height: 78, width: scrollableW }}>
               {hours.map((h, i) => {
                 const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
+                const isCurrent = i === nowHour;
                 return (
-                  <div key={h.hour} className="flex items-center justify-center cursor-pointer hover:scale-110 transition-transform active:scale-95" style={{ width: COL_W, scrollSnapAlign: "start" }} onClick={() => setSelectedHour(p => p === i ? null : i)}>
-                    <WeatherIconSVG condition={cond} size={16} />
+                  <div key={h.hour} className={`flex flex-col items-center justify-start pt-2 ${isCurrent ? "rounded-xl border border-blue-300/50 bg-blue-500/20 shadow-[0_0_18px_rgba(59,130,246,0.38)]" : ""}`} style={{ width: COL_W }}>
+                    <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
+                    <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>
                 );
               })}
