@@ -91,6 +91,12 @@ export default function Ranking() {
     { staleTime: 5 * 60 * 1000 },
   );
   const { data: rankingCriteria } = trpc.weather.getStationRankingCriteria.useQuery();
+  const { data: netatmoConnection, isLoading: netatmoLoading } = trpc.netatmo.connectionStatus.useQuery(undefined, { retry: false });
+  const startNetatmoAuthorization = trpc.netatmo.startAuthorization.useMutation({
+    onSuccess: ({ authorizationUrl }) => {
+      window.location.assign(authorizationUrl);
+    },
+  });
   const updateFavorite = trpc.favorites.update.useMutation({
     onSuccess: () => {
       utils.weather.getStationReliabilityOverview.invalidate();
@@ -145,6 +151,18 @@ export default function Ranking() {
           <Metric label="Stations actives" value={String(stations.length)} icon="stations" color="text-emerald-400" />
           <Metric label="Confiance locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
           <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
+        </section>
+
+        <section className={`mb-4 rounded-2xl border p-4 ${netatmoConnection?.connected ? "border-emerald-500/35 bg-emerald-500/5" : "border-sky-500/30 bg-sky-500/5"}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2"><MeteoIcon name="stations" size={19} className={netatmoConnection?.connected ? "text-emerald-400" : "text-sky-400"} /><h2 className="font-semibold text-white">Stations Netatmo</h2></div>
+              <p className="mt-1 text-xs text-slate-400">{netatmoConnection?.connected ? `Connexion active · ${netatmoConnection.scopes ?? "read_station"}` : "Connectez votre compte pour ajouter les stations physiques publiques compatibles."}</p>
+              {netatmoConnection?.connectedAt && <p className="mt-1 text-[11px] text-emerald-300">Connecté le {new Date(netatmoConnection.connectedAt).toLocaleDateString("fr-FR")}</p>}
+            </div>
+            {!netatmoConnection?.connected && <button type="button" disabled={netatmoLoading || startNetatmoAuthorization.isPending} onClick={() => startNetatmoAuthorization.mutate()} className="shrink-0 rounded-lg border border-sky-400/40 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-200 disabled:opacity-60">{startNetatmoAuthorization.isPending ? "Ouverture…" : "Connecter"}</button>}
+            {netatmoConnection?.connected && <span className="rounded-full bg-emerald-400 px-2 py-1 text-[10px] font-bold text-slate-950">CONNECTÉ</span>}
+          </div>
         </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">

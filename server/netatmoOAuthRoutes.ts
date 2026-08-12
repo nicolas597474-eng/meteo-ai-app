@@ -1,0 +1,44 @@
+import type { Express, Request, Response } from "express";
+import { upsertNetatmoOAuthToken } from "./db";
+import { consumeNetatmoState, encryptNetatmoRefreshToken, NETATMO_REDIRECT_URI, NETATMO_SCOPE } from "./netatmoOAuth";
+
+function queryValue(req: Request, key: string) {
+  const value = req.query[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+export function registerNetatmoOAuthRoutes(app: Express) {
+  app.get("/api/netatmo/callback", async (req: Request, res: Response) => {
+    const code = queryValue(req, "code");
+    const state = queryValue(req, "state");
+    const verifiedState = consumeNetatmoState(req, res, state);
+    if (!code || !verifiedState) {
+      res.status(400).send("Connexion Netatmo refusée ou expirée. Relancez l’autorisation depuis MeteoAI.");
+      return;
+    }
+
+    try {
+      const form = new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: process.env.NETATMO_CLIENT_ID ?? "",
+        client_secret: process.env.NETATMO_CLIENT_SECRET ?? "",
+        code,
+        redirect_uri: NETATMO_REDIRECT_URI,
+        scope: NETATMO_SCOPE,
+      });
+      const response = await fetch("https://api.netatmo.com/oauth2/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: form,
+        signal: AbortSignal.timeout(15_000),
+      });
+      const token = await response.json() as { refresh_token?: string };
+      if (!response.ok || !token.refresh_token) throw new Error("Netatmo token exchange failed");
+      await upsertNetatmoOAuthToken(verifiedState.userId, encryptNetatmoRefreshToken(token.refresh_token), NETATMO_SCOPE);
+      res.redirect(302, "/reliability?netatmo=connected");
+    } catch (error) {
+      console.error("[Netatmo OAuth] Callback failed", error);
+      res.status(502).send("Connexion Netatmo impossible. Vérifiez l’application et relancez l’autorisation.");
+    }
+  });
+}

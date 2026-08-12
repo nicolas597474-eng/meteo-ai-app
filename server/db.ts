@@ -25,6 +25,7 @@ import {
   stationObservations,
   groundTruth,
   stationCollectionSnapshots,
+  netatmoOAuthTokens,
   InsertWeatherStation,
   InsertStationObservation,
   InsertGroundTruth,
@@ -634,6 +635,23 @@ export async function getStationCollectionSnapshots(locationKey: string, limit =
     .where(eq(stationCollectionSnapshots.locationKey, locationKey))
     .orderBy(desc(stationCollectionSnapshots.collectedAt))
     .limit(limit);
+}
+
+// ─── Netatmo OAuth tokens ───────────────────────────────────────────────────
+
+export async function upsertNetatmoOAuthToken(userId: number, encryptedRefreshToken: string, scopes = "read_station") {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable for Netatmo OAuth connection");
+  await db.insert(netatmoOAuthTokens).values({ userId, encryptedRefreshToken, scopes }).onDuplicateKeyUpdate({
+    set: { encryptedRefreshToken, scopes, updatedAt: new Date() },
+  });
+}
+
+export async function getNetatmoOAuthToken(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(netatmoOAuthTokens).where(eq(netatmoOAuthTokens.userId, userId)).limit(1);
+  return rows[0] ?? null;
 }
 
 // ─── Location Forecasts (pre-fetched per favorite) ───────────────────────────

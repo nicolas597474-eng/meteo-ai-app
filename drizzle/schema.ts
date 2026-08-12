@@ -254,6 +254,22 @@ export type StationCollectionSnapshot = typeof stationCollectionSnapshots.$infer
 export type InsertStationCollectionSnapshot = typeof stationCollectionSnapshots.$inferInsert;
 
 /**
+ * OAuth Netatmo connection for a MeteoAI user. Only the refresh token is
+ * retained, encrypted at rest; each access token is renewed server-side.
+ */
+export const netatmoOAuthTokens = mysqlTable("netatmo_oauth_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  encryptedRefreshToken: text("encryptedRefreshToken").notNull(),
+  scopes: varchar("scopes", { length: 256 }).notNull().default("read_station"),
+  connectedAt: timestamp("connectedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type NetatmoOAuthToken = typeof netatmoOAuthTokens.$inferSelect;
+export type InsertNetatmoOAuthToken = typeof netatmoOAuthTokens.$inferInsert;
+
+/**
  * User favorite locations (max 5 per user).
  * Each location stores coordinates, custom settings, and display preferences.
  */

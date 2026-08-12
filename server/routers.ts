@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { weatherRouter } from "./routers/weather";
 import { favoritesRouter } from "./routers/favorites";
+import { netatmoRouter } from "./routers/netatmo";
 
 export const appRouter = router({
   system: systemRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   }),
   weather: weatherRouter,
   favorites: favoritesRouter,
+  netatmo: netatmoRouter,
 });
 
 export type AppRouter = typeof appRouter;

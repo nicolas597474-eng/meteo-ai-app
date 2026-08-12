@@ -540,3 +540,20 @@
 - [x] Frontend: Ajouter un bouton d’actualisation immédiate du Dashboard.
 - [x] Frontend: Afficher l’âge de la donnée et le prochain changement de régime.
 - [x] Tests: Vérifier les transitions, l’absence de transition et la fraîcheur affichée.
+
+## Intégration des stations Netatmo
+- [ ] Configuration: Enregistrer les identifiants Netatmo requis de manière sécurisée.
+- [ ] Backend: Collecter et valider les stations Netatmo publiques dans le rayon du favori.
+- [ ] Backend: Persister les observations Netatmo avec provenance, fraîcheur et règles d’anomalie.
+- [ ] Frontend: Afficher les stations Netatmo validées parmi les stations physiques locales.
+- [ ] Tests: Vérifier l’authentification, le filtrage et l’absence de données simulées.
+
+## Diagnostic OAuth Netatmo
+- [x] Audit: Distinguer un Access Token d’un Refresh Token et relever le code de refus OAuth sans exposer de secret.
+- [x] Configuration: Corriger le flux d’autorisation Netatmo requis pour la collecte récurrente.
+
+## Callback OAuth Netatmo sécurisé
+- [x] Backend: Créer l’endpoint callback OAuth Netatmo avec validation d’état anti-CSRF.
+- [x] Backend: Échanger le code d’autorisation et stocker les jetons chiffrés côté serveur.
+- [x] Frontend: Ajouter le lancement de l’autorisation et l’état de connexion Netatmo.
+- [x] Tests: Vérifier la validation d’état, le rejet des callbacks incomplets et le stockage sécurisé.
