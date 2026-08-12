@@ -43,6 +43,8 @@ import {
   insertHourlyForecasts,
   insertLeadTimeScores,
   getLeadTimeScoresForLocation,
+  getQualifiedCumulativeRankingForLocation,
+  getQualifiedLeadTimeScoresForLocation,
   upsertWeatherStation,
   upsertStationObservation,
   upsertGroundTruthSnapshot,
@@ -193,7 +195,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         );
 
         // Get cumulative ranking for weights
-        const ranking = await getCumulativeRanking();
+        const ranking = await getQualifiedCumulativeRankingForLocation(defaultLocKey);
         const reliabilityMap: Record<string, number> = {};
         ranking.forEach((r) => {
           reliabilityMap[r.serviceName] = r.avgScore ?? 50;
@@ -226,7 +228,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
 
         // ── Scoring par échéance (lead-time) ──────────────────────────────────
         // Utiliser les scores par horizon pour pondérer les modèles selon J+0
-        const leadTimeData = await getLeadTimeScoresForLocation(defaultLocKey, 14);
+        const leadTimeData = await getQualifiedLeadTimeScoresForLocation(defaultLocKey, 14);
         const leadTimePerfs: LeadTimePerf[] = leadTimeData.map((d) => ({
           serviceName: d.serviceName,
           bucket: d.bucket as LeadTimeBucket,
@@ -558,8 +560,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
     console.log(`[MeteoAI] Processing ${uniqueLocations.length} unique locations (${allFavorites.length} total favorites)`);
 
-    // Get cumulative ranking for model weights
-    const ranking = await getCumulativeRanking();
+    // Get only qualified evidence for operational model weights.
+    const ranking = await getQualifiedCumulativeRankingForLocation("default");
     const reliabilityMap: Record<string, number> = {};
     ranking.forEach((r) => {
       reliabilityMap[r.serviceName] = r.avgScore ?? 50;
@@ -689,7 +691,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         }
 
         // Get location-specific ranking (fallback to global)
-        const locRanking = await getCumulativeRankingForLocation(locKey);
+        const locRanking = await getQualifiedCumulativeRankingForLocation(locKey);
         const locReliabilityMap: Record<string, number> = {};
         (locRanking.length > 0 ? locRanking : ranking).forEach((r) => {
           locReliabilityMap[r.serviceName] = r.avgScore ?? 50;
@@ -812,7 +814,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           : rawLocForecasts;
 
         // ── Scoring par échéance (favoris) ─────────────────────────────────────
-        const locLeadTimeData = await getLeadTimeScoresForLocation(locKey, 14);
+        const locLeadTimeData = await getQualifiedLeadTimeScoresForLocation(locKey, 14);
         const locLeadTimePerfs: LeadTimePerf[] = locLeadTimeData.map((d) => ({
           serviceName: d.serviceName,
           bucket: d.bucket as LeadTimeBucket,

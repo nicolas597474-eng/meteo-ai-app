@@ -794,3 +794,9 @@
 - [x] Backend: Centraliser la résolution de la température et des paramètres horaires officiels.
 - [x] API: Raccorder le Dashboard et les prévisions détaillées au même snapshot lorsque le lieu et l’instant sont identiques.
 - [x] Tests: Vérifier l’égalité des valeurs et de la provenance entre les vues pour un même lieu et instant.
+
+## Phase 3 — scores hérités non qualifiés
+- [x] Audit: Identifier chaque lecture de score ou de biais capable d’influencer une pondération opérationnelle.
+- [x] Schéma: Marquer explicitement les scores comme qualifiés ou historiques non vérifiés.
+- [x] Backend: Exclure les scores non qualifiés des poids, biais et corrections opérationnels.
+- [x] Tests: Vérifier un repli transparent quand aucune observation physique qualifiée n’est disponible.

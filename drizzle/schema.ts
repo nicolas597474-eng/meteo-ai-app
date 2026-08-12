@@ -141,6 +141,7 @@ export const reliabilityScores = mysqlTable("reliability_scores", {
   condScore: float("condScore"),
   condConcordance: float("condConcordance"),
   condMaeCloud: float("condMaeCloud"),
+  evidenceType: mysqlEnum("evidenceType", ["physical_observation", "model_reference", "legacy_unqualified"]).notNull().default("legacy_unqualified"),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
 });
 
@@ -423,6 +424,7 @@ export const leadTimeScores = mysqlTable("lead_time_scores", {
   maeWind: float("maeWind"),
   rmseWind: float("rmseWind"),
   sampleSize: int("sampleSize").notNull().default(0),
+  evidenceType: mysqlEnum("evidenceType", ["physical_observation", "model_reference", "legacy_unqualified"]).notNull().default("legacy_unqualified"),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
 });
 export type LeadTimeScore = typeof leadTimeScores.$inferSelect;

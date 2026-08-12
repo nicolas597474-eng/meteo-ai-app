@@ -21,6 +21,8 @@ import {
   upsertMeteoAIForecast,
   getHistoricalScoreTimeSeries,
   getLeadTimeScoresForLocation,
+  getQualifiedCumulativeRankingForLocation,
+  getQualifiedLeadTimeScoresForLocation,
   makeLocationKey,
   getPhysicalStationHistory,
   getStoredHourlyForecasts,
@@ -41,6 +43,7 @@ import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
+import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 
 function getTodayParis(): string {
@@ -682,8 +685,8 @@ export const weatherRouter = router({
           }))
         );
 
-        const locationRanking = await getCumulativeRankingForLocation(locationKey);
-        const ranking = locationRanking.length > 0 ? locationRanking : await getCumulativeRanking();
+        const locationRanking = await getQualifiedCumulativeRankingForLocation(locationKey);
+        const ranking = locationRanking;
 
         const biases: ServiceBias[] = ranking
           .filter((row) => row.avgBiasTemp != null || row.avgBiasPrecip != null)
@@ -706,7 +709,7 @@ export const weatherRouter = router({
           ? applyBiasCorrection(rawForecasts, biases)
           : rawForecasts;
 
-        const leadTimeRows = await getLeadTimeScoresForLocation(locationKey, 14);
+        const leadTimeRows = await getQualifiedLeadTimeScoresForLocation(locationKey, 14);
         const leadTimePerfs: LeadTimePerf[] = leadTimeRows.map((row) => ({
           serviceName: row.serviceName,
           bucket: row.bucket as LeadTimeBucket,
@@ -768,8 +771,14 @@ export const weatherRouter = router({
           cloudCover: obsData.cloudCover,
           condition: obsData.condition,
           source: obsData.source,
+          provenanceType: obsData.provenanceType,
+          isQualified: obsData.isQualified,
           rawData: obsData.rawData as any,
         });
+
+        if (!isOperationalObservation(obsData)) {
+          return { success: true, date: targetDate, scoreSkipped: true, reason: "Référence de modèle archivée : aucune observation physique qualifiée disponible" };
+        }
 
         // Compute reliability scores
         const dayForecasts = await getForecastsByDate(targetDate);

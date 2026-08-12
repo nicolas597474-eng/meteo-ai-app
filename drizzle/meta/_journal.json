@@ -141,6 +141,13 @@
       "when": 1786560466112,
       "tag": "0019_vengeful_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1786562281700,
+      "tag": "0020_fuzzy_inhumans",
+      "breakpoints": true
     }
   ]
 }

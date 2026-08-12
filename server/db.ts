@@ -346,6 +346,32 @@ export async function getCumulativeRankingForLocation(locationKey = "default") {
   return result;
 }
 
+/** Les poids opérationnels exigent une observation physique explicitement qualifiée. */
+export async function getQualifiedCumulativeRankingForLocation(locationKey = "default") {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      serviceName: reliabilityScores.serviceName,
+      avgScore: sql<number>`AVG(${reliabilityScores.weightedScore})`,
+      avgMaeTemp: sql<number>`AVG(${reliabilityScores.maeTemp})`,
+      avgMaePrecip: sql<number>`AVG(${reliabilityScores.maePrecip})`,
+      avgMaeWind: sql<number>`AVG(${reliabilityScores.maeWind})`,
+      avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
+      avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
+      daysTracked: sql<number>`COUNT(*)`,
+      latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`,
+      avgCondMaeCloud: sql<number>`AVG(${reliabilityScores.condMaeCloud})`,
+    })
+    .from(reliabilityScores)
+    .where(and(
+      eq(reliabilityScores.locationKey, locationKey),
+      eq(reliabilityScores.evidenceType, "physical_observation"),
+    ))
+    .groupBy(reliabilityScores.serviceName)
+    .orderBy(sql`AVG(${reliabilityScores.weightedScore}) DESC`);
+}
+
 // ─── METEOAI FORECAST HELPERS ───────────────────────────────────────────────
 
 export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast): Promise<void> {
@@ -870,6 +896,29 @@ export async function getLeadTimeScoresForLocation(locationKey: string, days = 1
         sql`${leadTimeScores.date} >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`
       )
     )
+    .groupBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`)
+    .orderBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`);
+}
+
+export async function getQualifiedLeadTimeScoresForLocation(locationKey: string, days = 14) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      serviceName: leadTimeScores.serviceName,
+      bucket: leadTimeScores.bucket,
+      avgMaeTemp: sql<number>`AVG(${leadTimeScores.maeTemp})`.as("avgMaeTemp"),
+      avgMaePrecip: sql<number>`AVG(${leadTimeScores.maePrecip})`.as("avgMaePrecip"),
+      avgMaeWind: sql<number>`AVG(${leadTimeScores.maeWind})`.as("avgMaeWind"),
+      totalSamples: sql<number>`SUM(${leadTimeScores.sampleSize})`.as("totalSamples"),
+      latestScoreDate: sql<string>`MAX(${leadTimeScores.date})`.as("latestScoreDate"),
+    })
+    .from(leadTimeScores)
+    .where(and(
+      eq(leadTimeScores.locationKey, locationKey),
+      eq(leadTimeScores.evidenceType, "physical_observation"),
+      sql`${leadTimeScores.date} >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`,
+    ))
     .groupBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`)
     .orderBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`);
 }
