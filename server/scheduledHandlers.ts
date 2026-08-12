@@ -7,7 +7,7 @@
 import type { Request, Response } from "express";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
-import { collectExpertForecasts, collectObservations, collectHourlyForecastAllModels } from "./weatherServices";
+import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { computeOfficialDailyForecast } from "./officialForecast";
@@ -56,6 +56,16 @@ function getTodayParis(): string {
  */
 function getYesterdayParis(): string {
   return getParisDateDaysAgo(1);
+}
+
+export function getModelCoverage(receivedNames: string[]) {
+  const expectedNames = WEATHER_SERVICES.expert.map((service) => service.name);
+  const received = new Set(receivedNames);
+  return {
+    expected: expectedNames,
+    collected: expectedNames.filter((name) => received.has(name)),
+    missing: expectedNames.filter((name) => !received.has(name)),
+  };
 }
 
 /**
@@ -625,10 +635,17 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
     let locationsProcessed = 0;
     const errors: string[] = [];
+    const coverageByLocation: Array<{
+      location: string;
+      daily: ReturnType<typeof getModelCoverage>;
+      hourly: ReturnType<typeof getModelCoverage>;
+      physicalStationCount: number;
+    }> = [];
 
     for (const fav of uniqueLocations) {
       try {
         console.log(`[MeteoAI] Collecting forecasts for ${fav.name} (${fav.lat}, ${fav.lon})`);
+        let physicalStationCount = 0;
 
         // Compute locationKey for this favorite
         const locKey = makeLocationKey(fav.lat, fav.lon);
@@ -639,6 +656,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         try {
           const discoveredStations = await collectNearbyStations(fav.lat, fav.lon, 50, fav.customName ?? fav.name);
           const physicalStations = getPhysicalActiveStations(discoveredStations);
+          physicalStationCount = physicalStations.length;
+
+          if (physicalStations.length === 0) {
+            console.warn(`[Stations] ${fav.name}: aucune station physique Météo-France disponible dans le rayon de 50 km`);
+          }
 
           for (const station of physicalStations) {
             await upsertWeatherStation({
@@ -704,6 +726,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
         // Collect expert forecasts for this location
         const expertData = await collectExpertForecasts(today, { lat: fav.lat, lon: fav.lon });
+        const dailyCoverage = getModelCoverage(expertData.map((forecast) => forecast.serviceName));
+        console.log(`[Models] ${fav.name}: quotidien ${dailyCoverage.collected.length}/${dailyCoverage.expected.length}`);
+        if (dailyCoverage.missing.length > 0) {
+          console.warn(`[Models] ${fav.name}: quotidien indisponible — ${dailyCoverage.missing.join(", ")}`);
+        }
 
         if (expertData.length === 0) {
           console.warn(`[MeteoAI] No data for ${fav.name}`);
@@ -807,28 +834,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           ? Math.round((meteoAI.tempMin + (meteoAI.tempMax - meteoAI.tempMin) * Math.sin(dayProgress * Math.PI / 2)) * 10) / 10
           : null;
 
-        // Generate AI explanation
-        let explanation = `Prévision pour ${fav.customName ?? fav.name} — ${expertData.length} modèles consultés. Indice de stabilité: ${stability.index}/100.`;
-        try {
-          const { invokeLLM } = await import("./_core/llm");
-          const llmResult = await invokeLLM({
-            messages: [
-              {
-                role: "system",
-                content: `Tu es MeteoAI, un assistant météo expert. Génère une explication concise (2-3 phrases) de la prévision du jour pour ${fav.customName ?? fav.name} en français.`,
-              },
-              {
-                role: "user",
-                content: `Prévision MeteoAI pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- Stabilité: ${stability.index}/100 (${stability.label})\n- ${expertData.length} modèles consultés`,
-              },
-            ],
-            maxTokens: 200,
-          });
-          const rawContent = llmResult.choices?.[0]?.message?.content;
-          if (typeof rawContent === "string") explanation = rawContent;
-        } catch (e) {
-          console.warn(`[MeteoAI] LLM explanation failed for ${fav.name}:`, e);
-        }
+        const explanation = `Prévision officielle pour ${fav.customName ?? fav.name}, fusionnée à partir de ${dailyCoverage.collected.length}/${dailyCoverage.expected.length} modèles experts disponibles. Indice de stabilité : ${stability.index}/100.`;
 
         // Find all favorites with this location (same lat/lon) and upsert for each
         const matchingFavorites = allFavorites.filter(
@@ -881,8 +887,14 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         }
 
         // Collect hourly forecasts for all models for this location
+        let hourlyCoverage = getModelCoverage([]);
         try {
           const hourlyAllModels = await collectHourlyForecastAllModels(today, { lat: fav.lat, lon: fav.lon });
+          hourlyCoverage = getModelCoverage(hourlyAllModels.map((forecast) => forecast.modelName === "best_match" ? "Open-Meteo" : forecast.modelName));
+          console.log(`[Models] ${fav.name}: horaire ${hourlyCoverage.collected.length}/${hourlyCoverage.expected.length}`);
+          if (hourlyCoverage.missing.length > 0) {
+            console.warn(`[Models] ${fav.name}: horaire indisponible — ${hourlyCoverage.missing.join(", ")}`);
+          }
           for (const { modelName, hours } of hourlyAllModels) {
             const rows = hours.map((h) => ({
               locationKey: locKey,
@@ -906,6 +918,13 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           console.warn(`[HourlyAll] Failed for ${fav.name}:`, hourlyErr.message);
         }
 
+        coverageByLocation.push({
+          location: fav.customName ?? fav.name,
+          daily: dailyCoverage,
+          hourly: hourlyCoverage,
+          physicalStationCount,
+        });
+
         locationsProcessed++;
 
         // Rate limit between locations
@@ -921,6 +940,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       date: today,
       locationsProcessed,
       totalFavorites: allFavorites.length,
+      coverageByLocation,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {

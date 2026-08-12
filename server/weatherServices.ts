@@ -55,57 +55,54 @@ export async function collectExpertForecasts(
   coords?: { lat: number; lon: number }
 ): Promise<ForecastData[]> {
   const location = coords ?? HONDEGHEM;
-  const results: ForecastData[] = [];
+  const responses = await Promise.all(
+    WEATHER_SERVICES.expert.map(async (service): Promise<ForecastData | null> => {
+      try {
+        const url = new URL("https://api.open-meteo.com/v1/forecast");
+        url.searchParams.set("latitude", location.lat.toString());
+        url.searchParams.set("longitude", location.lon.toString());
+        url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
+        url.searchParams.set("timezone", "Europe/Paris");
+        url.searchParams.set("forecast_days", "16");
 
-  for (const service of WEATHER_SERVICES.expert) {
-    try {
-      const url = new URL("https://api.open-meteo.com/v1/forecast");
-      url.searchParams.set("latitude", location.lat.toString());
-      url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
-      url.searchParams.set("timezone", "Europe/Paris");
-      url.searchParams.set("forecast_days", "16");
+        if (service.modelId !== "best_match") {
+          url.searchParams.set("models", service.modelId);
+        }
 
-      if (service.modelId !== "best_match") {
-        url.searchParams.set("models", service.modelId);
+        const response = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
+        if (!response.ok) {
+          console.warn(`[Collector] ${service.name} HTTP ${response.status}`);
+          return null;
+        }
+
+        const data = await response.json();
+        const daily = data.daily;
+        if (!daily?.time) return null;
+
+        const dateIndex = daily.time.indexOf(targetDate);
+        if (dateIndex === -1) return null;
+
+        return {
+          serviceName: service.name,
+          serviceCategory: service.category,
+          tempMax: daily.temperature_2m_max?.[dateIndex] ?? null,
+          tempMin: daily.temperature_2m_min?.[dateIndex] ?? null,
+          precipitation: daily.precipitation_sum?.[dateIndex] ?? null,
+          windSpeed: daily.wind_speed_10m_max?.[dateIndex] ?? null,
+          windGust: daily.wind_gusts_10m_max?.[dateIndex] ?? null,
+          humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
+          cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
+          condition: null,
+          rawData: data,
+        };
+      } catch (err) {
+        console.warn(`[Collector] Error fetching ${service.name}:`, err);
+        return null;
       }
+    })
+  );
 
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        console.error(`[Collector] ${service.name} HTTP ${response.status}`);
-        continue;
-      }
-
-      const data = await response.json();
-      const daily = data.daily;
-      if (!daily || !daily.time) continue;
-
-      // Find the target date index
-      const dateIndex = daily.time.indexOf(targetDate);
-      if (dateIndex === -1) continue;
-
-      results.push({
-        serviceName: service.name,
-        serviceCategory: service.category,
-        tempMax: daily.temperature_2m_max?.[dateIndex] ?? null,
-        tempMin: daily.temperature_2m_min?.[dateIndex] ?? null,
-        precipitation: daily.precipitation_sum?.[dateIndex] ?? null,
-        windSpeed: daily.wind_speed_10m_max?.[dateIndex] ?? null,
-        windGust: daily.wind_gusts_10m_max?.[dateIndex] ?? null,
-        humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
-        cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
-        condition: null, // Open-Meteo doesn't provide text conditions
-        rawData: data,
-      });
-
-      // Rate limit: small delay between requests
-      await new Promise(r => setTimeout(r, 300));
-    } catch (err) {
-      console.error(`[Collector] Error fetching ${service.name}:`, err);
-    }
-  }
-
-  return results;
+  return responses.filter((forecast): forecast is ForecastData => forecast !== null);
 }
 
 /**
@@ -475,7 +472,7 @@ export async function collectHourlyForecastAllModels(
     { name: "best_match", modelId: null }, // Open-Meteo best match
   ];
 
-  const results: Array<{
+  const results = await Promise.all(modelsToCollect.map(async (model): Promise<{
     modelName: string;
     hours: Array<{
       hour: number;
@@ -489,9 +486,7 @@ export async function collectHourlyForecastAllModels(
       cloudCover: number | null;
       weatherCode: number | null;
     }>;
-  }> = [];
-
-  for (const model of modelsToCollect) {
+  } | null> => {
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
@@ -503,15 +498,15 @@ export async function collectHourlyForecastAllModels(
         url.searchParams.set("models", model.modelId);
       }
 
-      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(15000) });
+      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
       if (!response.ok) {
         console.warn(`[HourlyAll] ${model.name} HTTP ${response.status}`);
-        continue;
+        return null;
       }
 
       const data = await response.json();
       const hourly = data.hourly;
-      if (!hourly?.time) continue;
+      if (!hourly?.time) return null;
 
       const hours: Array<{
         hour: number;
@@ -545,15 +540,14 @@ export async function collectHourlyForecastAllModels(
       }
 
       if (hours.length > 0) {
-        results.push({ modelName: model.name, hours });
+        return { modelName: model.name, hours };
       }
-
-      // Rate limit between models
-      await new Promise(r => setTimeout(r, 400));
+      return null;
     } catch (err) {
-      console.error(`[HourlyAll] Error fetching ${model.name}:`, err);
+      console.warn(`[HourlyAll] Error fetching ${model.name}:`, err);
+      return null;
     }
-  }
+  }));
 
-  return results;
+  return results.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null);
 }
