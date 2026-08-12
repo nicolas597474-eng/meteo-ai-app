@@ -31,7 +31,7 @@ import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm,
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
-import { getParisDate, getParisDateDaysAgo } from "../weatherTime";
+import { getParisDate, getParisDateDaysAgo, getParisHour } from "../weatherTime";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
 import { buildOperationalRegime } from "../officialRegime";
@@ -39,6 +39,20 @@ import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 
 function getTodayParis(): string {
   return getParisDate();
+}
+
+function getCurrentHourlyRegimeInput(hours: Array<any>) {
+  const nowHour = `${getParisHour()}:00`;
+  const current = hours.find((hour) => hour.hour === nowHour) ?? null;
+  if (!current) return null;
+  return {
+    temp: current.temp ?? null,
+    precipitation: current.precipitation ?? null,
+    windSpeed: current.windSpeed ?? null,
+    humidity: current.humidity ?? null,
+    cloudCover: current.cloudCover ?? null,
+    updatedAt: new Date(),
+  };
 }
 
 function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
@@ -129,10 +143,13 @@ export const weatherRouter = router({
     const today = getTodayParis();
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
-    // Snapshot et observation sont comparés par le sélecteur partagé.
-    const [meteoAI, observation] = await Promise.all([
+    // Snapshot, observation et prévision horaire actualisée sont comparés par
+    // le sélecteur partagé.
+    const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
+    const [meteoAI, observation, hourly] = await Promise.all([
       getMeteoAIForecastByDate(today, locKey),
       getObservationByDate(today, locKey),
+      collectHourlyForecast(today, coords),
     ]);
 
     // Get all forecasts for today
@@ -144,7 +161,7 @@ export const weatherRouter = router({
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
 
-    const officialRegime = buildOperationalRegime(meteoAI, observation);
+    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly));
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
     return {
@@ -263,11 +280,13 @@ export const weatherRouter = router({
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
     const ranking = await getCumulativeRankingForLocation(locKey);
 
-    const [meteoAI, observation] = await Promise.all([
+    const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
+    const [meteoAI, observation, hourly] = await Promise.all([
       getMeteoAIForecastByDate(today, locKey),
       getObservationByDate(today, locKey),
+      collectHourlyForecast(today, coords),
     ]);
-    const officialRegime = buildOperationalRegime(meteoAI, observation);
+    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly));
     const regimeParams = officialRegime.params;
     const multiRegime = {
       primaryRegime: officialRegime.primary,
@@ -549,7 +568,7 @@ export const weatherRouter = router({
         getMeteoAIForecastByDate(today, locKey),
         getObservationByDate(today, locKey),
       ]);
-      const officialRegime = buildOperationalRegime(meteoAI, observation);
+      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours));
 
       // Best model
       const ranking = await getCumulativeRankingForLocation(locKey);
@@ -841,7 +860,8 @@ export const weatherRouter = router({
     // 1. Régime opérationnel partagé avec le Dashboard. Une observation ne peut
     // remplacer la fusion officielle que si elle est plus récente, fraîche et
     // couvre notamment la nébulosité.
-    const operationalRegime = buildOperationalRegime(meteoAI, observation);
+    const liveHours = await collectHourlyForecast(today, input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined);
+    const operationalRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(liveHours));
     const regime = operationalRegime.primary.id;
     const regimeDef = operationalRegime.primary;
     const weights = operationalRegime.blendedWeights;

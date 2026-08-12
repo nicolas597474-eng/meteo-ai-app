@@ -266,6 +266,7 @@ export default function Dashboard() {
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
   const windDir = currentHour?.windDirection ?? null;
   const windSpeed = currentHour?.windSpeed ?? today?.windSpeed ?? meteoAI?.windSpeed ?? null;
+  const currentCloudCover = currentHour?.cloudCover ?? today?.cloudCover ?? null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -299,7 +300,7 @@ export default function Dashboard() {
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
           {/* Dynamic landscape image based on weather regime */}
           <img
-            src={regime ? getWeatherLandscapeImage(regime.label) : getWeatherImageFromData({ temperature: currentTemp ?? undefined, cloudCover: (today as any)?.cloudCover ?? undefined, precipitation: (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
+            src={regime ? getWeatherLandscapeImage(regime.label) : getWeatherImageFromData({ temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
             alt="Paysage météo"
             className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
           />
@@ -491,7 +492,7 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
                   <Eye className="h-3 w-3" />Nuages
                 </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.cloudCover ?? "—"}%</p>
+                <p className="text-base sm:text-lg font-semibold">{currentCloudCover ?? "—"}%</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">

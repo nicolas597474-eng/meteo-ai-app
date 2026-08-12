@@ -522,3 +522,9 @@
 - [x] Audit: Comparer les horodatages, la couverture et les paramètres des régimes Dashboard et AI Lab.
 - [x] Backend: Sélectionner le régime le plus récent et le mieux étayé selon des règles mesurables.
 - [x] Frontend: Indiquer la fraîcheur de la source de régime affichée.
+
+## Validation du régime de nébulosité
+- [x] Audit: Comparer la nébulosité affichée aux valeurs actuelles de prévision et d’observation.
+- [x] Backend: Ajuster le régime uniquement si les données vérifiées justifient un seuil différent.
+- [x] Frontend: Rendre visible la valeur de nébulosité qui motive le libellé de régime.
+- [x] Backend: Prioriser la nébulosité horaire actualisée pour la condition actuelle, sans confondre cette prévision avec une observation physique.

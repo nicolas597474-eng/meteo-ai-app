@@ -21,6 +21,15 @@ export type FreshRegimeObservation = {
   collectedAt?: Date | string | null;
 } | null | undefined;
 
+export type CurrentHourlyRegimeForecast = {
+  temp?: number | null;
+  precipitation?: number | null;
+  windSpeed?: number | null;
+  humidity?: number | null;
+  cloudCover?: number | null;
+  updatedAt?: Date | string | null;
+} | null | undefined;
+
 function toTimestamp(value: Date | string | null | undefined) {
   if (!value) return null;
   const time = new Date(value).getTime();
@@ -67,6 +76,7 @@ export function buildOfficialRegime(snapshot: OfficialSnapshot) {
 export function buildOperationalRegime(
   snapshot: OfficialSnapshot,
   observation: FreshRegimeObservation,
+  currentHourly?: CurrentHourlyRegimeForecast,
   nowMs = Date.now(),
 ) {
   const official = buildOfficialRegime(snapshot);
@@ -108,6 +118,48 @@ export function buildOperationalRegime(
       sourceLabel: "Observation récente validée",
       sourceAgeMinutes: Math.max(0, Math.round((nowMs - observationAt!) / 60000)),
       dataCoverage: coverage,
+    };
+  }
+
+  const hourlyAt = toTimestamp(currentHourly?.updatedAt);
+  const hourlyCoverage = [currentHourly?.temp, currentHourly?.precipitation, currentHourly?.windSpeed, currentHourly?.humidity, currentHourly?.cloudCover]
+    .filter((value) => value != null).length;
+  const hourlyIsFresh = hourlyAt != null && nowMs - hourlyAt >= 0 && nowMs - hourlyAt <= 20 * 60 * 1000;
+  const canUseHourly = hourlyIsFresh && currentHourly?.cloudCover != null && hourlyCoverage >= 3;
+
+  // Une prévision horaire générée pendant la requête décrit mieux la condition
+  // actuelle qu’un snapshot journalier âgé de plusieurs heures. Elle reste
+  // explicitement libellée comme prévision, jamais comme observation physique.
+  if (canUseHourly) {
+    const regimeId = detectExtendedRegime({
+      temperature: currentHourly?.temp ?? null,
+      precipitation: currentHourly?.precipitation ?? 0,
+      windSpeed: currentHourly?.windSpeed ?? 0,
+      humidity: currentHourly?.humidity ?? null,
+      cloudCover: currentHourly?.cloudCover ?? null,
+    });
+    const info = EXTENDED_REGIME_INFO[regimeId];
+    const primary = { id: regimeId, ...info };
+    return {
+      primary,
+      active: [{ id: regimeId, label: info.label, emoji: info.emoji, influence: 100 }],
+      confidence: Math.min(90, 55 + hourlyCoverage * 7),
+      blendedWeights: info.weights,
+      description: `${info.description} Déterminé par la prévision horaire actualisée.`,
+      params: {
+        temperature: currentHourly?.temp ?? null,
+        precipitation: currentHourly?.precipitation ?? 0,
+        windSpeed: currentHourly?.windSpeed ?? 0,
+        humidity: currentHourly?.humidity ?? null,
+        cloudCover: currentHourly?.cloudCover ?? null,
+        pressure: null,
+      },
+      snapshotComputedAt: official.snapshotComputedAt,
+      source: "hourly_forecast" as const,
+      sourceUpdatedAt: new Date(hourlyAt!).toISOString(),
+      sourceLabel: "Prévision horaire actualisée",
+      sourceAgeMinutes: Math.max(0, Math.round((nowMs - hourlyAt!) / 60000)),
+      dataCoverage: hourlyCoverage,
     };
   }
 
