@@ -581,3 +581,8 @@
 - [x] Backend: Utiliser un unique régime de créneau horaire pour les annonces de transition.
 - [x] Frontend: Afficher le même libellé dans « Prochain changement » et « Régime à venir ».
 - [x] Tests: Vérifier l’identité des deux annonces pour un même créneau de transition.
+
+## Cohérence nébulosité horaire et régime
+- [x] Backend: Centraliser les seuils et libellés de nébulosité utilisés par les conditions horaires et les régimes.
+- [x] Frontend: Afficher un libellé identique pour le créneau détaillé et le régime à venir.
+- [x] Tests: Vérifier la catégorie commune pour les niveaux de nébulosité de transition.

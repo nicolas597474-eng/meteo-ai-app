@@ -3,6 +3,8 @@
  * Location: Hondeghem (lat: 50.7567, lon: 2.5204)
  */
 
+import { conditionFromWeatherValues } from "./weatherConditionLabels";
+
 // Hondeghem coordinates
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
 
@@ -203,15 +205,7 @@ export type HourlyPoint = {
 };
 
 function deriveCondition(precip: number | null, cloud: number | null): string {
-  const p = precip ?? 0;
-  const c = cloud ?? 0;
-  if (p > 5) return "Pluie forte";
-  if (p > 1) return "Averses";
-  if (p > 0.2) return "Pluie légère";
-  if (c > 80) return "Couvert";
-  if (c > 50) return "Nuageux";
-  if (c > 25) return "Partiellement nuageux";
-  return "Ensoleillé";
+  return conditionFromWeatherValues(precip, cloud);
 }
 
 /**

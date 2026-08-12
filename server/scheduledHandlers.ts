@@ -10,6 +10,7 @@ import { invokeLLM } from "./_core/llm";
 import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
+import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
 import { collectNearbyStations, calculateGroundTruth, getPhysicalActiveStations } from "./stationService";
@@ -608,14 +609,7 @@ function determineMajorityCondition(forecasts: any[]): string {
   // Since Open-Meteo doesn't provide text conditions, infer from data
   const avgPrecip = forecasts.reduce((sum, f) => sum + (f.precipitation ?? 0), 0) / forecasts.length;
   const avgCloud = forecasts.reduce((sum, f) => sum + (f.cloudCover ?? 50), 0) / forecasts.length;
-
-  if (avgPrecip > 5) return "Pluie";
-  if (avgPrecip > 1) return "Averses";
-  if (avgPrecip > 0.2) return "Pluie légère";
-  if (avgCloud > 80) return "Couvert";
-  if (avgCloud > 50) return "Nuageux";
-  if (avgCloud > 25) return "Partiellement nuageux";
-  return "Ensoleillé";
+  return conditionFromWeatherValues(avgPrecip, avgCloud);
 }
 
 /**

@@ -32,6 +32,7 @@ import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "../weatherTime";
+import { conditionFromWeatherValues } from "../weatherConditionLabels";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
@@ -726,13 +727,7 @@ export const weatherRouter = router({
         // Determine condition
         const avgPrecip = allForecasts.reduce((sum, f) => sum + (f.precipitation ?? 0), 0) / allForecasts.length;
         const avgCloud = allForecasts.reduce((sum, f) => sum + (f.cloudCover ?? 50), 0) / allForecasts.length;
-        let condition = "Ensoleillé";
-        if (avgPrecip > 5) condition = "Pluie";
-        else if (avgPrecip > 1) condition = "Averses";
-        else if (avgPrecip > 0.2) condition = "Pluie légère";
-        else if (avgCloud > 80) condition = "Couvert";
-        else if (avgCloud > 50) condition = "Nuageux";
-        else if (avgCloud > 25) condition = "Partiellement nuageux";
+        const condition = conditionFromWeatherValues(avgPrecip, avgCloud);
 
         await upsertMeteoAIForecast({
           locationKey,
