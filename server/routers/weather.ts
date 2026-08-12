@@ -27,7 +27,7 @@ import {
   getStationCollectionSnapshots,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
-import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
+import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
@@ -993,6 +993,7 @@ export const weatherRouter = router({
         stations: ranked.map(s => ({
           stationId: s.stationId,
           source: s.source,
+          sourceKind: getStationSourceKind(s.source),
           name: s.name,
           lat: s.lat,
           lon: s.lon,
@@ -1016,6 +1017,8 @@ export const weatherRouter = router({
         totalFound: stations.length,
         activeCount: stations.filter(s => s.isActive).length,
         ignoredCount: stations.filter(s => !s.isActive).length,
+        physicalStationCount: stations.filter(s => s.isActive && getStationSourceKind(s.source) === "physical").length,
+        referenceSourceCount: stations.filter(s => s.isActive && getStationSourceKind(s.source) === "reference").length,
         fetchedAt: new Date().toISOString(),
       };
     }),

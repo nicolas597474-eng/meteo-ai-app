@@ -145,7 +145,7 @@ function StationsSection() {
             <Radio className={`h-4 w-4 text-${modeColor}-400`} />
             <span className="text-sm font-semibold">Mode {modeLabel} — Stations</span>
           </div>
-          <Link href="/stations" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
+          <Link href="/ranking" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
             <LinkIcon className="h-3 w-3" />Voir tout
           </Link>
         </div>
@@ -289,7 +289,7 @@ function StationsSection() {
               <Radio className="h-4 w-4 text-primary" />
               <span className="text-sm font-semibold">Stations locales</span>
             </div>
-            <Link href="/stations" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
+            <Link href="/ranking" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
               <LinkIcon className="h-3 w-3" />Voir tout
             </Link>
           </div>
@@ -328,7 +328,7 @@ function StationsSection() {
           <Radio className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">Stations locales utilisées</span>
         </div>
-        <Link href="/stations" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
+        <Link href="/ranking" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
           <LinkIcon className="h-3 w-3" />Voir tout
         </Link>
       </div>

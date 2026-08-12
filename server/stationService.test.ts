@@ -4,6 +4,7 @@ import {
   rankStations,
   calculateGroundTruth,
   getPhysicalActiveStations,
+  getStationSourceKind,
   type StationData,
 } from "./stationService";
 
@@ -58,6 +59,15 @@ describe("haversineKm", () => {
     const d1 = haversineKm(50.76, 2.52, 51.0, 3.0);
     const d2 = haversineKm(51.0, 3.0, 50.76, 2.52);
     expect(Math.abs(d1 - d2)).toBeLessThan(0.001);
+  });
+});
+
+describe("getStationSourceKind", () => {
+  it("distingue les observations physiques des références de modèle ou de réseau", () => {
+    expect(getStationSourceKind("meteofrance")).toBe("physical");
+    expect(getStationSourceKind("openmeteo")).toBe("reference");
+    expect(getStationSourceKind("netatmo")).toBe("reference");
+    expect(getStationSourceKind("synop")).toBe("reference");
   });
 });
 

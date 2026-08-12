@@ -475,3 +475,11 @@
 - [x] Frontend: Retirer le panneau « Sources et pondérations de la prévision » du Dashboard.
 - [x] Frontend: Retirer le même panneau des prévisions détaillées.
 - [x] Tests: Vérifier que les prévisions restent accessibles après le retrait de la traçabilité visible.
+
+## Fusion Stations vers Fiabilité
+- [x] Backend: Exposer dans Fiabilité les sources locales réelles et les sources de référence distinctement.
+- [x] Frontend: Regrouper la synthèse multi-source, les critères de classement et la liste des stations dans Fiabilité.
+- [x] Frontend: Distinguer visuellement les stations physiques locales des sources de grille ou de référence.
+- [x] Navigation: Retirer l’accès redondant à la page Stations après transfert du contenu.
+- [x] Tests: Vérifier les catégories de sources et la continuité des données sur la page Fiabilité.
+- [x] Tests: Rendre déterministe le test de catégorisation des sources sans dépendre des appels météo externes.

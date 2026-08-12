@@ -57,8 +57,14 @@ export type StationData = {
  */
 export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance"]);
 
+export type StationSourceKind = "physical" | "reference";
+
+export function getStationSourceKind(source: StationSource): StationSourceKind {
+  return PHYSICAL_STATION_SOURCES.has(source) ? "physical" : "reference";
+}
+
 export function getPhysicalActiveStations(stations: StationData[]): StationData[] {
-  return stations.filter((station) => station.isActive && PHYSICAL_STATION_SOURCES.has(station.source));
+  return stations.filter((station) => station.isActive && getStationSourceKind(station.source) === "physical");
 }
 
 export type GroundTruthResult = {

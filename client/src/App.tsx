@@ -9,7 +9,6 @@ import Ranking from "./pages/Ranking";
 import History from "./pages/History";
 import Report from "./pages/Report";
 import WeatherAILab from "./pages/WeatherAILab";
-import Stations from "./pages/Stations";
 import FavoriteSettings from "./pages/FavoriteSettings";
 import WeatherDetails from "./pages/WeatherDetails";
 import WeightComparison from "./pages/WeightComparison";
@@ -20,14 +19,12 @@ import {
   FileText,
   Activity,
   FlaskConical,
-  Radio,
 } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/ranking", label: "Fiabilité", icon: Trophy },
   { path: "/history", label: "Historique", icon: Calendar },
-  { path: "/stations", label: "Stations", icon: Radio },
   { path: "/ai-lab", label: "AI Lab", icon: FlaskConical },
 ];
 
@@ -104,7 +101,7 @@ function Router() {
       <Route path="/history" component={History} />
       <Route path="/report" component={Report} />
       <Route path="/ai-lab" component={WeatherAILab} />
-      <Route path="/stations" component={Stations} />
+      <Route path="/stations" component={Ranking} />
       <Route path="/details" component={WeatherDetails} />
       <Route path="/weight-comparison" component={WeightComparison} />
       <Route path="/favorites" component={FavoriteSettings} />

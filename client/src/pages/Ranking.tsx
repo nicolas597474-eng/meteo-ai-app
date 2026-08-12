@@ -80,10 +80,16 @@ export default function Ranking() {
   const { activeLocation, setActiveLocation } = useLocation();
   const [periodDays, setPeriodDays] = useState<1 | 7>(1);
   const [radiusKm, setRadiusKm] = useState(activeLocation?.radiusKm ?? 20);
+  const [showReferenceSources, setShowReferenceSources] = useState(false);
   const coords = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const utils = trpc.useUtils();
   const overviewInput = useMemo(() => ({ ...(coords ?? {}), periodDays, radiusKm }), [coords?.lat, coords?.lon, periodDays, radiusKm]);
   const { data, isLoading } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput);
+  const { data: liveStationData, isLoading: liveStationsLoading } = trpc.weather.searchStations.useQuery(
+    { ...(coords ?? { lat: 50.7567, lon: 2.5204 }), radiusKm },
+    { staleTime: 5 * 60 * 1000 },
+  );
+  const { data: rankingCriteria } = trpc.weather.getStationRankingCriteria.useQuery();
   const updateFavorite = trpc.favorites.update.useMutation({
     onSuccess: () => {
       utils.weather.getStationReliabilityOverview.invalidate();
@@ -114,6 +120,10 @@ export default function Ranking() {
   const availabilityHistory = (data?.availabilityHistory ?? []) as any[];
   const locationName = activeLocation?.name ?? "Hondeghem";
   const instantDeltaC = data?.instantDeltaC ?? null;
+  const currentSources = liveStationData?.stations ?? [];
+  const realLocalStations = currentSources.filter((station) => station.isActive && station.sourceKind === "physical");
+  const referenceSources = currentSources.filter((station) => station.isActive && station.sourceKind === "reference");
+  const ignoredSources = currentSources.filter((station) => !station.isActive);
 
   return (
     <main className="min-h-screen bg-[#080a0f] pb-28">
@@ -143,6 +153,17 @@ export default function Ranking() {
         </section>
 
         <CollectionReport latest={latestCollection as any} history={availabilityHistory} />
+
+        <LiveSourceSummary
+          groundTruth={liveStationData?.groundTruth}
+          realLocalStations={realLocalStations}
+          referenceSources={referenceSources}
+          ignoredCount={ignoredSources.length}
+          criteria={rankingCriteria}
+          isLoading={liveStationsLoading}
+          showReferenceSources={showReferenceSources}
+          onToggleReferenceSources={() => setShowReferenceSources((current) => !current)}
+        />
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Bleu : lieu de référence · vert : relevé récent · ambre : relevé ancien.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
@@ -174,6 +195,52 @@ export default function Ranking() {
       </div>
     </main>
   );
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  meteofrance: "Météo-France",
+  synop: "SYNOP/WMO",
+  noaa: "NOAA",
+  openmeteo: "Open-Meteo",
+  netatmo: "Netatmo (référence)",
+  wunderground: "Weather Underground (référence)",
+  cwop: "CWOP/APRS (référence)",
+  davis: "Davis (référence)",
+  infoclimat: "Infoclimat (référence)",
+};
+
+function StationSourceCard({ station, rank, physical }: { station: any; rank: number; physical: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const temperature = station.temperature === null || station.temperature === undefined ? "—" : `${Number(station.temperature).toFixed(1)}°`;
+  const badgeClass = physical ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-sky-500/30 bg-sky-500/10 text-sky-300";
+  return <article className="rounded-xl border border-slate-800 bg-[#090b10]">
+    <button type="button" onClick={() => setExpanded((value) => !value)} className="flex w-full items-center gap-3 p-3 text-left">
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${rank <= 3 ? "bg-blue-500/15 text-blue-300" : "bg-slate-800 text-slate-400"}`}>{rank}</span>
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${physical ? "bg-emerald-400" : "bg-sky-400"}`} />
+      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-1.5"><span className="truncate text-sm font-medium text-white">{station.name}</span><span className={`rounded border px-1.5 py-0.5 text-[10px] ${badgeClass}`}>{SOURCE_LABELS[station.source] ?? station.source}</span></span><span className="mt-0.5 block text-[11px] text-slate-500">{Number(station.distanceKm).toFixed(1)} km{station.altitude !== null && station.altitude !== undefined ? ` · ${station.altitude} m` : ""}</span></span>
+      <span className="text-right"><span className="block text-lg font-semibold text-white">{temperature}</span><span className="text-[10px] text-slate-500">Temp.</span></span>
+      <span className="text-slate-500">{expanded ? "⌃" : "⌄"}</span>
+    </button>
+    {expanded && <div className="border-t border-slate-800 px-3 pt-3"><div className="grid grid-cols-3 gap-2 text-center"><Reading label="Humidité" value={station.humidity === null || station.humidity === undefined ? "—" : `${station.humidity}%`} /><Reading label="Vent" value={station.windSpeed === null || station.windSpeed === undefined ? "—" : `${Number(station.windSpeed).toFixed(1)} km/h`} /><Reading label="Rafales" value={station.windGust === null || station.windGust === undefined ? "—" : `${Number(station.windGust).toFixed(1)} km/h`} /><Reading label="Pression" value={station.pressure === null || station.pressure === undefined ? "—" : `${Number(station.pressure).toFixed(0)} hPa`} /><Reading label="Pluie" value={station.precipitation === null || station.precipitation === undefined ? "—" : `${Number(station.precipitation).toFixed(1)} mm`} /><Reading label="Fiabilité" value={`${Math.round(station.reliabilityScore)}%`} /></div><p className="pb-3 pt-3 text-[11px] text-slate-500">Disponibilité {Math.round((station.dataAvailability ?? 0) * 100)}% · mise à jour estimée toutes les {station.updateFrequencyMin ?? "—"} min.</p></div>}
+  </article>;
+}
+
+function LiveSourceSummary({ groundTruth, realLocalStations, referenceSources, ignoredCount, criteria, isLoading, showReferenceSources, onToggleReferenceSources }: { groundTruth: any; realLocalStations: any[]; referenceSources: any[]; ignoredCount: number; criteria: any; isLoading: boolean; showReferenceSources: boolean; onToggleReferenceSources: () => void }) {
+  const values = [
+    ["Température", groundTruth?.temperature === null || groundTruth?.temperature === undefined ? "—" : `${Number(groundTruth.temperature).toFixed(1)}°C`],
+    ["Humidité", groundTruth?.humidity === null || groundTruth?.humidity === undefined ? "—" : `${Number(groundTruth.humidity).toFixed(0)}%`],
+    ["Pression", groundTruth?.pressure === null || groundTruth?.pressure === undefined ? "—" : `${Number(groundTruth.pressure).toFixed(0)} hPa`],
+    ["Vent", groundTruth?.windSpeed === null || groundTruth?.windSpeed === undefined ? "—" : `${Number(groundTruth.windSpeed).toFixed(1)} km/h`],
+    ["Rafales", groundTruth?.windGust === null || groundTruth?.windGust === undefined ? "—" : `${Number(groundTruth.windGust).toFixed(1)} km/h`],
+    ["Précip.", groundTruth?.precipitation === null || groundTruth?.precipitation === undefined ? "—" : `${Number(groundTruth.precipitation).toFixed(1)} mm`],
+  ];
+  return <section className="mb-4 space-y-4">
+    <div className="rounded-2xl border border-sky-500/25 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Synthèse multi-source</h2><p className="text-xs text-slate-500">Références de modèle et observations disponibles, distinguées ci-dessous.</p></div><span className="rounded-full bg-sky-500/10 px-2 py-1 text-[10px] text-sky-300">Confiance {groundTruth?.confidenceScore ?? "—"}/100</span></div><div className="grid grid-cols-3 gap-2">{values.map(([label, value]) => <div key={label} className="rounded-lg bg-[#090b10] px-2 py-2 text-center"><p className="text-sm font-bold text-white">{value}</p><p className="mt-0.5 text-[10px] text-slate-500">{label}</p></div>)}</div><p className="mt-3 text-[11px] text-slate-500">Une synthèse multi-source ne remplace pas une observation physique locale validée.</p></div>
+    <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-800 bg-[#10131a] p-3"><Metric label="Locales réelles" value={String(realLocalStations.length)} icon="stations" color="text-emerald-400" /><Metric label="Références" value={String(referenceSources.length)} icon="confidence" color="text-sky-400" /><Metric label="Ignorées" value={String(ignoredCount)} icon="refresh" color="text-slate-300" /></div>
+    <div className="rounded-2xl border border-emerald-500/20 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Stations locales réelles</h2><p className="text-xs text-slate-500">Observations physiques identifiées et compatibles avec la collecte officielle.</p></div><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300">Météo-France</span></div>{isLoading ? <div className="h-20 animate-pulse rounded-xl bg-slate-800" /> : realLocalStations.length > 0 ? <div className="space-y-2">{realLocalStations.map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical />)}</div> : <div className="rounded-xl border border-dashed border-emerald-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucune station physique locale n’est disponible dans le rayon actuel.</div>}</div>
+    <div className="rounded-2xl border border-sky-500/20 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Autres sources de référence</h2><p className="text-xs text-slate-500">Points de grille, modèles et réseaux non confirmés comme observations physiques locales.</p></div><span className="rounded-full bg-sky-500/10 px-2 py-1 text-[10px] text-sky-300">{referenceSources.length}</span></div>{referenceSources.length === 0 ? <div className="rounded-xl border border-dashed border-sky-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucune source de référence disponible.</div> : <><div className="space-y-2">{(showReferenceSources ? referenceSources : referenceSources.slice(0, 3)).map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical={false} />)}</div>{referenceSources.length > 3 && <button type="button" onClick={onToggleReferenceSources} className="mt-3 w-full rounded-lg border border-slate-700 bg-[#090b10] px-3 py-2 text-xs font-medium text-sky-300">{showReferenceSources ? "Réduire la liste" : `Afficher les ${referenceSources.length} sources de référence`}</button>}</>}</div>
+    {criteria && <div className="rounded-2xl border border-slate-800 bg-[#10131a] p-4"><h2 className="mb-3 font-semibold text-white">Critères de classement</h2><div className="grid grid-cols-2 gap-2">{criteria.criteria.map((criterion: any) => <div key={criterion.name} className="flex items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-bold text-blue-300">{criterion.weight}%</span><span><span className="block text-xs font-medium text-slate-200">{criterion.name}</span><span className="block text-[10px] leading-tight text-slate-500">{criterion.description}</span></span></div>)}</div></div>}
+  </section>;
 }
 
 function CollectionReport({ latest, history }: { latest: any; history: any[] }) {
