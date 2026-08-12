@@ -11,9 +11,17 @@ export function registerNetatmoOAuthRoutes(app: Express) {
   app.get("/api/netatmo/callback", async (req: Request, res: Response) => {
     const code = queryValue(req, "code");
     const state = queryValue(req, "state");
+    const netatmoError = queryValue(req, "error");
     const verifiedState = state ? verifyNetatmoState(state) : null;
     if (!code || !verifiedState) {
-      const reason = !code ? "code_absent" : !state ? "state_absent" : "state_signature_invalide_ou_expiree";
+      const safeNetatmoError = netatmoError?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+      const reason = safeNetatmoError
+        ? `netatmo_${safeNetatmoError}`
+        : !code
+          ? "code_absent"
+          : !state
+            ? "state_absent"
+            : "state_signature_invalide_ou_expiree";
       console.warn(`[Netatmo OAuth] Callback rejeté: ${reason}; longueur_state=${state?.length ?? 0}`);
       res.status(400).send(`Connexion Netatmo refusée (${reason}). Relancez l’autorisation depuis MeteoAI.`);
       return;
