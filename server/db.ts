@@ -630,6 +630,25 @@ export async function upsertQualifiedObservationSnapshot(data: InsertQualifiedOb
   await db.insert(qualifiedObservationSnapshots).values(data);
 }
 
+export async function getQualifiedObservationSnapshotsForDate(locationKey: string, date: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(qualifiedObservationSnapshots).where(and(
+    eq(qualifiedObservationSnapshots.locationKey, locationKey),
+    eq(qualifiedObservationSnapshots.date, date),
+  )).orderBy(qualifiedObservationSnapshots.hour);
+}
+
+/** Immutable forecast emissions targeting one daily observation. */
+export async function getForecastRunsForValidDate(locationKey: string, validDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(forecastRuns).where(and(
+    eq(forecastRuns.locationKey, locationKey),
+    eq(forecastRuns.validDate, validDate),
+  )).orderBy(desc(forecastRuns.issuedAt));
+}
+
 /** Upsert the daily local synthesis for one reference location. */
 export async function upsertGroundTruthSnapshot(data: InsertGroundTruth): Promise<void> {
   const db = await getDb();

@@ -12,6 +12,8 @@ import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { isOperationalObservation } from "./observationProvenance";
+import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
+import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
@@ -50,6 +52,8 @@ import {
   upsertGroundTruthSnapshot,
   upsertQualifiedObservationSnapshot,
   insertStationCollectionSnapshot,
+  getQualifiedObservationSnapshotsForDate,
+  getStoredHourlyForecasts,
 } from "./db";
 
 /**
@@ -393,40 +397,52 @@ export async function collectObservationsHandler(req: Request, res: Response) {
         try {
           console.log(`[MeteoAI] Collecting observations for ${locName} (${loc.lat}, ${loc.lon})`);
 
-          // Collect real observations for this location
-          const obsData = await collectObservations(yesterday, { lat: loc.lat, lon: loc.lon, name: locName });
-
-          if (!obsData) {
-            console.warn(`[MeteoAI] No observation data for ${locName}`);
-            errors.push(`${locName}: aucune donnée d'observation`);
+          const snapshots = await getQualifiedObservationSnapshotsForDate(locKey, yesterday);
+          const dailyObservation = buildQualifiedDailyObservation(snapshots);
+          if (!dailyObservation.isQualified) {
+            locationSummaries.push(`📍 ${locName}: ${dailyObservation.reason} — score opérationnel non mis à jour`);
             continue;
           }
 
-          // Store observation with locationKey
           await insertObservation({
             locationKey: locKey,
-            date: obsData.date,
-            tempMax: obsData.tempMax,
-            tempMin: obsData.tempMin,
-            precipitation: obsData.precipitation,
-            windSpeed: obsData.windSpeed,
-            windGust: obsData.windGust,
-            humidity: obsData.humidity,
-            cloudCover: obsData.cloudCover,
-            condition: obsData.condition,
-            source: obsData.source,
-            provenanceType: obsData.provenanceType,
-            isQualified: obsData.isQualified,
-            rawData: obsData.rawData as any,
+            date: yesterday,
+            tempMax: dailyObservation.tempMax,
+            tempMin: dailyObservation.tempMin,
+            precipitation: dailyObservation.precipitation,
+            windSpeed: dailyObservation.windSpeed,
+            windGust: dailyObservation.windGust,
+            humidity: null,
+            cloudCover: null,
+            condition: "Observation physique agrégée",
+            source: "Stations physiques qualifiées",
+            provenanceType: "physical_observation",
+            isQualified: 1,
+            rawData: { coverageHours: dailyObservation.coverageHours, aggregation: dailyObservation.reason } as any,
           });
 
-          if (!isOperationalObservation(obsData)) {
-            // collectObservations currently returns a retrospective model reference.
-            // It is retained for audit only and must not update operational scores,
-            // bias corrections or weights until a qualified physical collector exists.
-            locationSummaries.push(`📍 ${locName}: référence de modèle archivée — score opérationnel non mis à jour`);
+          const hourlyForecasts = await getStoredHourlyForecasts(locKey, yesterday);
+          const hourlyScores = scoreQualifiedHourlyModels(snapshots, hourlyForecasts);
+          if (hourlyScores.length === 0) {
+            locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune prévision horaire alignée`);
             continue;
           }
+          await insertReliabilityScores(hourlyScores.map((score) => ({
+            locationKey: locKey,
+            date: yesterday,
+            serviceName: score.serviceName,
+            maeTemp: score.maeTemp,
+            maePrecip: score.maePrecip,
+            maeWind: score.maeWind,
+            rmseTemp: score.rmseTemp,
+            rmsePrecip: score.rmsePrecip,
+            rmseWind: score.rmseWind,
+            biasTemp: score.biasTemp,
+            weightedScore: score.weightedScore,
+            evidenceType: "physical_observation",
+            regime: null,
+          })));
+          locationSummaries.push(`📍 ${locName}: ${hourlyScores.length} score(s) calculé(s) sur ${dailyObservation.coverageHours} h physiques qualifiées`);
 
         } catch (err: any) {
           console.error(`[MeteoAI] Error processing ${locName}:`, err.message);
