@@ -49,11 +49,11 @@ function getConditionLabel(cloudCover: number | null, precip: number | null, con
 
 function getConditionBg(cloudCover: number | null, precip: number | null, condition: string | null): string {
   const cond = (condition ?? "").toLowerCase();
-  if (cond.includes("orage")) return "rgba(55, 48, 83, 0.08)";
-  if ((precip ?? 0) > 3 || cond.includes("pluie") || cond.includes("averse")) return "rgba(59, 130, 246, 0.06)";
-  if ((cloudCover ?? 0) > 75 || cond.includes("couvert")) return "rgba(148, 163, 184, 0.05)";
-  if ((cloudCover ?? 0) < 30 || cond.includes("ensoleillé")) return "rgba(251, 191, 36, 0.05)";
-  return "rgba(148, 163, 184, 0.02)";
+  if (cond.includes("orage")) return "rgba(148, 163, 184, 0.045)";
+  if ((precip ?? 0) > 3 || cond.includes("pluie") || cond.includes("averse")) return "rgba(148, 163, 184, 0.032)";
+  if ((cloudCover ?? 0) > 75 || cond.includes("couvert")) return "rgba(148, 163, 184, 0.04)";
+  if ((cloudCover ?? 0) < 30 || cond.includes("ensoleillé")) return "rgba(255, 255, 255, 0.025)";
+  return "rgba(255, 255, 255, 0.014)";
 }
 
 function degToCompass(deg: number | null): string {
@@ -234,6 +234,16 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.lineWidth = 1;
       ctx.stroke();
     }
+
+    // Clear reading bands: temperatures, wind, then precipitation.
+    [windZoneTop - 3, precipZoneTop - 3].forEach((y) => {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(scrollableW, y);
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.26)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
 
     // ── Selected day highlight ───────────────────────────────────────────────
     if (selectedDay !== null && selectedDay < N) {
@@ -484,7 +494,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   for (let t = scaleBot; t <= scaleTop; t += gridStep) tempTicks.push(t);
 
   return (
-    <section ref={containerRef} className="w-full rounded-[22px] border border-blue-500/25 bg-[linear-gradient(145deg,rgba(18,32,78,0.98),rgba(4,14,35,0.98))] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.26)]">
+    <section ref={containerRef} className="w-full rounded-[22px] border border-slate-700/70 bg-[#080b10] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.38)]">
       {/* Header with toggle */}
       <div className="mb-3">
         <div className="flex items-center justify-between">
@@ -526,9 +536,9 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       </div>
 
       {/* ── Chart area: fixed axis + scrollable content ───────────────────── */}
-      <div className="flex overflow-hidden rounded-[16px] border border-white/10 bg-[#061126]/85" style={{ height: TOTAL_H }}>
+      <div className="flex overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
         {/* Fixed left axis — only temperature scale */}
-        <div className="relative flex-shrink-0 border-r border-white/8 bg-[#07142b]/75" style={{ width: AXIS_W, height: TOTAL_H }}>
+        <div className="relative flex-shrink-0 border-r border-slate-700/60 bg-[#090c11]" style={{ width: AXIS_W, height: TOTAL_H }}>
           <span className="absolute text-[9px] text-slate-500 font-bold" style={{ top: 0, left: 2 }}>°C</span>
           {tempTicks.map(t => (
             <span key={`t-${t}`} className="absolute text-[11px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 6 }}>{t}°</span>

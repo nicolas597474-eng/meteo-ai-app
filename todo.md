@@ -387,3 +387,14 @@
 - [x] Frontend: Afficher le jour, une grande icône, températures, vent et pluie dans chaque colonne du graphique journalier.
 - [x] Frontend: Conserver les courbes et le clic vers le détail tout en rapprochant la hiérarchie de la maquette.
 - [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile des colonnes enrichies.
+
+## Fond noir et zones de données structurées
+- [x] Frontend: Remplacer les dégradés bleus des cartes de graphiques par des surfaces noires cohérentes avec le thème MeteoAI.
+- [x] Frontend: Distinguer visuellement les zones températures, vent et pluie avec séparateurs et libellés fixes.
+- [x] Frontend: Préserver la lisibilité des courbes, des colonnes et des sélections actives.
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile.
+
+## Fond sombre des graphiques
+- [x] Frontend: Remplacer les dégradés bleus des cartes de graphiques par des surfaces noires cohérentes avec le thème MeteoAI. Couvert par « Fond noir et zones de données structurées ».
+- [x] Frontend: Préserver la lisibilité des colonnes, quadrillages, courbes et sélections actives. Couvert par « Fond noir et zones de données structurées ».
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile. Couvert par la validation finale.
