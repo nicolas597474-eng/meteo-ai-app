@@ -1042,3 +1042,188 @@ export function generateAdaptiveForecast(
     methodNote: `Fusion adaptative par paramètre: ${forecasts.length} services, pondération 1/MAE`,
   };
 }
+
+// ─── Bias Correction ──────────────────────────────────────────────────────────
+/**
+ * Historical bias per service per parameter.
+ * biasTemp > 0 means the model OVERESTIMATES temperature → subtract bias.
+ * biasTemp < 0 means the model UNDERESTIMATES temperature → add |bias|.
+ */
+export type ServiceBias = {
+  serviceName: string;
+  biasTemp: number | null;   // °C — average (forecast - observed)
+  biasPrecip: number | null; // mm
+  biasWind: number | null;   // km/h
+};
+
+/**
+ * Apply historical bias correction to a set of forecasts before fusion.
+ * Each forecast value is shifted by -bias so the corrected value is closer
+ * to the expected observation.
+ *
+ * Example: if AROME has biasTemp = +0.8°C (overestimates by 0.8°C),
+ * we subtract 0.8°C from every AROME temperature forecast.
+ *
+ * A dampening factor (0.7) is applied to avoid over-correction when the
+ * bias estimate is based on few samples.
+ */
+export function applyBiasCorrection<T extends {
+  serviceName: string;
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGust?: number | null;
+}>(
+  forecasts: T[],
+  biases: ServiceBias[],
+  dampening = 0.7
+): T[] {
+  const biasMap = new Map<string, ServiceBias>();
+  for (const b of biases) biasMap.set(b.serviceName, b);
+
+  return forecasts.map(f => {
+    const bias = biasMap.get(f.serviceName);
+    if (!bias) return f;
+
+    const corrected = { ...f };
+
+    if (bias.biasTemp != null && Math.abs(bias.biasTemp) > 0.1) {
+      const correction = bias.biasTemp * dampening;
+      if (corrected.tempMax != null) corrected.tempMax = Math.round((corrected.tempMax - correction) * 10) / 10;
+      if (corrected.tempMin != null) corrected.tempMin = Math.round((corrected.tempMin - correction) * 10) / 10;
+    }
+
+    if (bias.biasPrecip != null && Math.abs(bias.biasPrecip) > 0.2) {
+      const correction = bias.biasPrecip * dampening;
+      if (corrected.precipitation != null) {
+        corrected.precipitation = Math.max(0, Math.round((corrected.precipitation - correction) * 10) / 10);
+      }
+    }
+
+    if (bias.biasWind != null && Math.abs(bias.biasWind) > 1.0) {
+      const correction = bias.biasWind * dampening;
+      if (corrected.windSpeed != null) {
+        corrected.windSpeed = Math.max(0, Math.round((corrected.windSpeed - correction) * 10) / 10);
+      }
+      if (corrected.windGust != null) {
+        corrected.windGust = Math.max(0, Math.round((corrected.windGust - correction) * 10) / 10);
+      }
+    }
+
+    return corrected;
+  });
+}
+
+// ─── Lead-Time Weighted Fusion ────────────────────────────────────────────────
+/**
+ * Scores per service per lead-time bucket (from DB).
+ */
+export type LeadTimePerf = {
+  serviceName: string;
+  bucket: LeadTimeBucket;
+  avgMaeTemp: number | null;
+  avgMaePrecip: number | null;
+  avgMaeWind: number | null;
+};
+
+/**
+ * Select the best performance metrics for a given lead-time bucket.
+ * Falls back to adjacent buckets if the exact bucket has no data.
+ * Returns a map of serviceName → { maeTemp, maePrecip, maeWind }.
+ */
+export function getLeadTimeWeights(
+  leadTimePerfs: LeadTimePerf[],
+  targetBucket: LeadTimeBucket
+): Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number }> {
+  const bucketPriority: LeadTimeBucket[] = [
+    targetBucket,
+    ...["0-6h", "6-24h", "1-3d", "4-7d", "8-15d"].filter(b => b !== targetBucket) as LeadTimeBucket[],
+  ];
+
+  const result: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number }> = {};
+
+  const uniqueServices = Array.from(new Set(leadTimePerfs.map(p => p.serviceName)));
+  for (const svc of uniqueServices) {
+    let found: LeadTimePerf | undefined;
+    for (const bucket of bucketPriority) {
+      found = leadTimePerfs.find(p => p.serviceName === svc && p.bucket === bucket);
+      if (found) break;
+    }
+    if (found) {
+      result[svc] = {
+        maeTemp: found.avgMaeTemp ?? undefined,
+        maePrecip: found.avgMaePrecip ?? undefined,
+        maeWind: found.avgMaeWind ?? undefined,
+      };
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Compute a true confidence score based on:
+ * 1. Model agreement (divergence between forecasts) — 40%
+ * 2. Historical performance of the best model — 30%
+ * 3. Station coherence (if available) — 20%
+ * 4. Lead-time factor (shorter horizon = more reliable) — 10%
+ *
+ * Returns 0–100.
+ */
+export function computeConfidenceScore(params: {
+  forecasts: Array<{ tempMax: number | null; tempMin: number | null; precipitation: number | null; windSpeed: number | null }>;
+  bestModelScore?: number | null;
+  stationCoherence?: number | null;
+  leadTimeBucket?: LeadTimeBucket | null;
+}): number {
+  const { forecasts, bestModelScore, stationCoherence, leadTimeBucket } = params;
+
+  // 1. Model agreement (40%)
+  const temps = forecasts.map(f => f.tempMax).filter((v): v is number => v != null);
+  const precips = forecasts.map(f => f.precipitation).filter((v): v is number => v != null);
+  const winds = forecasts.map(f => f.windSpeed).filter((v): v is number => v != null);
+
+  let agreementScore = 100;
+  if (temps.length > 1) {
+    const tempRange = Math.max(...temps) - Math.min(...temps);
+    agreementScore = Math.max(0, 100 - tempRange * 8);
+  }
+  if (precips.length > 1) {
+    const precipRange = Math.max(...precips) - Math.min(...precips);
+    agreementScore = Math.min(agreementScore, Math.max(0, 100 - precipRange * 15));
+  }
+  if (winds.length > 1) {
+    const windRange = Math.max(...winds) - Math.min(...winds);
+    agreementScore = Math.min(agreementScore, Math.max(0, 100 - windRange * 3));
+  }
+
+  // 2. Historical performance (30%)
+  const perfScore = bestModelScore != null
+    ? Math.min(100, Math.max(0, bestModelScore))
+    : 60;
+
+  // 3. Station coherence (20%)
+  const stationScore = stationCoherence != null
+    ? Math.min(100, Math.max(0, stationCoherence))
+    : 65;
+
+  // 4. Lead-time factor (10%)
+  const leadTimeFactors: Record<LeadTimeBucket, number> = {
+    "0-6h": 95,
+    "6-24h": 85,
+    "1-3d": 75,
+    "4-7d": 60,
+    "8-15d": 45,
+  };
+  const leadFactor = leadTimeBucket ? leadTimeFactors[leadTimeBucket] : 70;
+
+  const confidence = Math.round(
+    agreementScore * 0.40 +
+    perfScore * 0.30 +
+    stationScore * 0.20 +
+    leadFactor * 0.10
+  );
+
+  return Math.max(0, Math.min(100, confidence));
+}

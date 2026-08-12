@@ -332,7 +332,9 @@ export const leadTimeScores = mysqlTable("lead_time_scores", {
   rmseTemp: float("rmseTemp"),
   biasTemp: float("biasTemp"),
   maePrecip: float("maePrecip"),
+  rmsePrecip: float("rmsePrecip"),
   maeWind: float("maeWind"),
+  rmseWind: float("rmseWind"),
   sampleSize: int("sampleSize").notNull().default(0),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
 });

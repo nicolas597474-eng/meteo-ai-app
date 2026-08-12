@@ -33,18 +33,24 @@
 
 // ─── Regime definitions ───────────────────────────────────────────────────────
 
-export type WeatherRegime =
-  | "rainy"
-  | "summer"
-  | "storm"
-  | "cold_winter"
-  | "standard";
+// ─── Unified regime system (20 régimes — aligned with fusionEngine display) ────
+// Import the 20-regime system from fusionEngine to unify calculation and display
+import {
+  detectExtendedRegime,
+  getRegimeWeights,
+  EXTENDED_REGIME_INFO,
+  type ExtendedRegime,
+} from "./fusionEngine";
 
+// Alias for backward compatibility throughout this file
+export type WeatherRegime = ExtendedRegime;
 export type RegimeWeights = {
   temp: number;
   precip: number;
   wind: number;
   condition: number;
+  humidity?: number;
+  pressure?: number;
 };
 
 export type RegimeInfo = {
@@ -55,38 +61,31 @@ export type RegimeInfo = {
   weights: RegimeWeights;
 };
 
-export const REGIME_DEFINITIONS: Record<WeatherRegime, Omit<RegimeInfo, "regime">> = {
-  rainy: {
-    label: "Jour pluvieux",
-    emoji: "🌧️",
-    description: "Précipitations significatives — la précision des pluies est prioritaire.",
-    weights: { temp: 0.20, precip: 0.50, wind: 0.15, condition: 0.15 },
-  },
-  summer: {
-    label: "Été stable",
-    emoji: "🌞",
-    description: "Temps chaud et stable — la température et les conditions dominent.",
-    weights: { temp: 0.40, precip: 0.20, wind: 0.10, condition: 0.30 },
-  },
-  storm: {
-    label: "Tempête",
-    emoji: "🌬️",
-    description: "Vents forts — le vent et les précipitations sont critiques.",
-    weights: { temp: 0.15, precip: 0.30, wind: 0.40, condition: 0.15 },
-  },
-  cold_winter: {
-    label: "Hiver froid",
-    emoji: "❄️",
-    description: "Températures basses — la précision thermique est primordiale.",
-    weights: { temp: 0.45, precip: 0.25, wind: 0.20, condition: 0.10 },
-  },
-  standard: {
-    label: "Standard",
-    emoji: "⛅",
-    description: "Conditions normales — pondération équilibrée.",
-    weights: { temp: 0.30, precip: 0.30, wind: 0.20, condition: 0.20 },
-  },
-};
+/**
+ * Le moteur de fiabilité mesure actuellement quatre dimensions : température,
+ * précipitations, vent et conditions. Les poids humidité/pression du moteur de
+ * fusion sont donc intégrés au score « conditions » afin de conserver une somme
+ * de 100 %, sans perdre l'importance contextuelle de ces deux paramètres.
+ */
+function toScoredWeights(weights: {
+  temp: number;
+  precip: number;
+  wind: number;
+  condition: number;
+  humidity?: number;
+  pressure?: number;
+}): RegimeWeights {
+  return {
+    temp: weights.temp,
+    precip: weights.precip,
+    wind: weights.wind,
+    condition: weights.condition + (weights.humidity ?? 0) + (weights.pressure ?? 0),
+  };
+}
+
+// REGIME_DEFINITIONS is now EXTENDED_REGIME_INFO in fusionEngine.ts
+// Use EXTENDED_REGIME_INFO[regime] for label/emoji/description
+export const REGIME_DEFINITIONS = EXTENDED_REGIME_INFO;
 
 export function detectWeatherRegime(params: {
   precipitation: number | null;
@@ -94,17 +93,22 @@ export function detectWeatherRegime(params: {
   tempMax: number | null;
   tempMin: number | null;
 }): RegimeInfo {
-  const precip = params.precipitation ?? 0;
-  const wind = params.windSpeed ?? 0;
-  const tempMax = params.tempMax ?? 15;
-  const tempMin = params.tempMin ?? 5;
-  const avgTemp = (tempMax + tempMin) / 2;
-
-  if (wind > 50 || (wind > 35 && precip > 5)) return { regime: "storm", ...REGIME_DEFINITIONS.storm };
-  if (precip > 3) return { regime: "rainy", ...REGIME_DEFINITIONS.rainy };
-  if (avgTemp < 5) return { regime: "cold_winter", ...REGIME_DEFINITIONS.cold_winter };
-  if (avgTemp > 22 && precip < 1 && wind < 25) return { regime: "summer", ...REGIME_DEFINITIONS.summer };
-  return { regime: "standard", ...REGIME_DEFINITIONS.standard };
+  // Delegate to the unified 20-regime system in fusionEngine
+  const avgTemp = ((params.tempMax ?? 15) + (params.tempMin ?? 5)) / 2;
+  const regime = detectExtendedRegime({
+    temperature: avgTemp,
+    precipitation: params.precipitation,
+    windSpeed: params.windSpeed,
+  });
+  const info = EXTENDED_REGIME_INFO[regime];
+  const weights = toScoredWeights(getRegimeWeights(regime));
+  return {
+    regime,
+    label: info.label,
+    emoji: info.emoji,
+    description: info.description,
+    weights,
+  };
 }
 
 // ─── Row types ────────────────────────────────────────────────────────────────
@@ -468,7 +472,14 @@ export function calculateReliabilityScore(
   // Detect regime from observations
   let regimeInfo: RegimeInfo;
   if (forcedRegime) {
-    regimeInfo = { regime: forcedRegime, ...REGIME_DEFINITIONS[forcedRegime] };
+    const definition = REGIME_DEFINITIONS[forcedRegime];
+    regimeInfo = {
+      regime: forcedRegime,
+      label: definition.label,
+      emoji: definition.emoji,
+      description: definition.description,
+      weights: toScoredWeights(definition.weights),
+    };
   } else {
     // Average precipitation and wind across observations for regime detection
     const obsPrecips = observations.filter(o => o.precipitation != null).map(o => o.precipitation!);

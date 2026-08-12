@@ -13,8 +13,9 @@ import {
 import { collectNearbyStations, rankStations, calculateGroundTruth } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
 import { generateMeteoAIForecast, detectWeatherRegime } from "../statsEngine";
-import { detectMultiRegime, EXTENDED_REGIME_INFO } from "../fusionEngine";
+import { computeFusion, detectMultiRegime, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
 import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ultraLocalService";
+import { getPreviousReadings, recordStationReadings } from "../stationReadingsCache";
 
 export const favoritesRouter = router({
   /**
@@ -160,6 +161,77 @@ export const favoritesRouter = router({
       const modelTemp = hourly[0]?.temp ?? null;
       const ultraLocalResult = calculateUltraLocal(ranked, localMode, lat, lon, null, modelTemp);
 
+      // ── Fusion avancée en production (IDW + qualité + fraîcheur + MAE + anomalies) ──
+      // Les stations locales représentent la réalité observée ; la prévision horaire
+      // Open-Meteo sert de contribution modèle limitée. L'historique est récupéré
+      // avant le calcul, puis enrichi après celui-ci pour détecter les valeurs figées
+      // ou les sauts brusques lors de l'appel suivant.
+      const previousReadings = getPreviousReadings();
+      const fusionSources: FusionSource[] = ranked
+        .filter((station) => station.isActive && station.temperature != null)
+        .map((station) => ({
+          id: station.stationId,
+          name: station.name,
+          distanceKm: station.distanceKm,
+          altitude: station.altitude,
+          temperature: station.temperature,
+          humidity: station.humidity,
+          pressure: station.pressure,
+          windSpeed: station.windSpeed,
+          windGust: station.windGust,
+          windDirection: station.windDirection,
+          precipitation: station.precipitation,
+          updatedAt: station.updatedAt,
+          reliabilityScore: station.reliabilityScore,
+          type: "station",
+        }));
+
+      // Le point de grille au lieu demandé demeure disponible lorsque les stations
+      // sont rares, sans écraser leur contribution locale dans les modes Local/Ultra-local.
+      if (hourly[0]) {
+        fusionSources.push({
+          id: "openmeteo_best_match",
+          name: "Open-Meteo Best Match",
+          distanceKm: 0,
+          temperature: hourly[0].temp ?? null,
+          apparentTemp: hourly[0].apparentTemp ?? null,
+          humidity: hourly[0].humidity ?? null,
+          pressure: hourly[0].pressure ?? null,
+          windSpeed: hourly[0].windSpeed ?? null,
+          windGust: hourly[0].windGust ?? null,
+          windDirection: hourly[0].windDirection ?? null,
+          precipitation: hourly[0].precipitation ?? null,
+          cloudCover: hourly[0].cloudCover ?? null,
+          updatedAt: new Date(),
+          reliabilityScore: 75,
+          type: "model",
+        });
+      }
+
+      const advancedFusion = computeFusion(
+        fusionSources,
+        {
+          idwExponent: 2,
+          maxDistanceKm: searchRadius,
+          maxFreshnessMin: 180,
+          maxTempDeviationC: 6,
+          minReliabilityScore: 40,
+          altitudeCorrectionEnabled: true,
+          anomalyDetectionEnabled: true,
+          adaptiveWeightingEnabled: true,
+          // Le modèle est davantage sollicité en mode Standard, prioritairement
+          // local en mode Ultra-local.
+          modelWeightFraction: localMode === "ultra-local" ? 0.10 : localMode === "local" ? 0.15 : 0.25,
+        },
+        previousReadings
+      );
+
+      recordStationReadings(
+        ranked
+          .filter((station) => station.isActive && station.temperature != null)
+          .map((station) => ({ stationId: station.stationId, temperature: station.temperature! }))
+      );
+
       // Standard ground truth (for comparison)
       const groundTruth = calculateGroundTruth(ranked);
 
@@ -195,10 +267,11 @@ export const favoritesRouter = router({
         weights: multiRegimeResult.blendedWeights,
       };
 
-      // Confidence & stability — derive from model divergence
+      // Stabilité = dispersion entre modèles. Confiance = qualité, fraîcheur,
+      // accord et anomalies des sources utilisées par la fusion avancée.
       const temps = forecastRows.map((f: { tempMax: number | null }) => f.tempMax).filter(Boolean) as number[];
       const divergence = temps.length > 1 ? Math.max(...temps) - Math.min(...temps) : 0;
-      const confidenceScore = Math.max(0, Math.min(100, 100 - divergence * 5));
+      const confidenceScore = advancedFusion.confidenceScore;
       const stabilityIndex = Math.max(0, Math.min(100, 100 - divergence * 4));
 
       return {
@@ -228,10 +301,12 @@ export const favoritesRouter = router({
           },
         },
         ultraLocal: {
-          temperature: ultraLocalResult.temperature,
-          humidity: ultraLocalResult.humidity,
-          windSpeed: ultraLocalResult.windSpeed,
-          precipitation: ultraLocalResult.precipitation,
+          // Valeurs affichées : fusion avancée validée, avec repli sur le moteur
+          // ultra-local existant lorsque la donnée correspondante est indisponible.
+          temperature: advancedFusion.temperature ?? ultraLocalResult.temperature,
+          humidity: advancedFusion.humidity ?? ultraLocalResult.humidity,
+          windSpeed: advancedFusion.windSpeed ?? ultraLocalResult.windSpeed,
+          precipitation: advancedFusion.precipitation ?? ultraLocalResult.precipitation,
           stationsUsed: ultraLocalResult.stationsUsed.map(s => ({
             name: s.name,
             source: s.source,
@@ -257,9 +332,17 @@ export const favoritesRouter = router({
           modelWeight: ultraLocalResult.modelWeight,
           microclimateAdjustment: ultraLocalResult.microclimateAdjustment,
           microclimateFactors: ultraLocalResult.microclimateFactors,
-          confidenceScore: ultraLocalResult.confidenceScore,
-          explanation: ultraLocalResult.explanation,
-          stationCount: ultraLocalResult.stationCount,
+          confidenceScore: advancedFusion.confidenceScore,
+          explanation: `${ultraLocalResult.explanation} ${advancedFusion.validationNote}`,
+          stationCount: advancedFusion.stationCount,
+          advancedFusion: {
+            methodUsed: advancedFusion.methodUsed,
+            modelCount: advancedFusion.modelCount,
+            altitudeAdjustmentC: advancedFusion.altitudeAdjustmentC,
+            anomaliesDetected: advancedFusion.anomaliesDetected,
+            excludedSources: advancedFusion.excludedSources,
+            usedSources: advancedFusion.usedSources,
+          },
         },
         scores: {
           confidenceScore,

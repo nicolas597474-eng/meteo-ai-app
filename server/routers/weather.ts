@@ -26,7 +26,7 @@ import { collectExpertForecasts, collectObservations, collect15DayForecast, coll
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
-import { generateAdaptiveForecast, detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, type ExtendedRegime, type MultiRegimeResult } from "../fusionEngine";
+import { generateAdaptiveForecast, detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
 
 function getTodayParis(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
@@ -411,6 +411,28 @@ export const weatherRouter = router({
       // Best model
       const ranking = await getCumulativeRankingForLocation(locKey);
       const bestModel = ranking[0] ?? null;
+      const dailyModelForecasts = await getForecastsByDate(today, locKey);
+      const confidenceForecasts = dailyModelForecasts.map((forecast) => ({
+        tempMax: forecast.tempMax,
+        tempMin: forecast.tempMin,
+        precipitation: forecast.precipitation,
+        windSpeed: forecast.windSpeed,
+      }));
+      const bestModelScore = bestModel?.avgScore != null ? Number(bestModel.avgScore) : 60;
+      // La confiance courante stockée par le cron combine accord, historique,
+      // stations et horizon. Le repli conserve exactement la même formule.
+      const todayConfidence = meteoAI?.confidenceScore ?? computeConfidenceScore({
+        forecasts: confidenceForecasts,
+        bestModelScore,
+        leadTimeBucket: "6-24h",
+      });
+      // À J+4/J+7, le facteur d'échéance réduit la confiance de manière
+      // explicite sans usurper l'indice de stabilité des modèles.
+      const weekConfidence = computeConfidenceScore({
+        forecasts: confidenceForecasts,
+        bestModelScore,
+        leadTimeBucket: "4-7d",
+      });
 
       return {
         today,
@@ -422,6 +444,12 @@ export const weatherRouter = router({
           active: multiRegime.activeRegimes,
           confidence: multiRegime.confidenceScore,
           description: multiRegime.description,
+        },
+        confidence: {
+          current: todayConfidence,
+          today: todayConfidence,
+          week: weekConfidence,
+          stabilityIndex: meteoAI?.stabilityIndex ?? null,
         },
         bestModel: bestModel ? { name: bestModel.serviceName, score: bestModel.avgScore ?? 0 } : null,
       };
@@ -542,7 +570,11 @@ export const weatherRouter = router({
           condition,
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
-          confidenceScore: stability.index,
+          confidenceScore: computeConfidenceScore({
+            forecasts: allForecasts.map(f => ({ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed })),
+            bestModelScore: ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60,
+            leadTimeBucket: "6-24h",
+          }),
           weights: meteoAI.weights as any,
           explanation: `Prévision synthétisée à partir de ${allForecasts.length} modèles.`,
         });

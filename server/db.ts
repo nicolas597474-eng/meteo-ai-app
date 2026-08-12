@@ -635,7 +635,9 @@ export async function getLeadTimeScoresForLocation(locationKey: string, days = 1
       avgRmseTemp: sql<number>`AVG(${leadTimeScores.rmseTemp})`.as("avgRmseTemp"),
       avgBiasTemp: sql<number>`AVG(${leadTimeScores.biasTemp})`.as("avgBiasTemp"),
       avgMaePrecip: sql<number>`AVG(${leadTimeScores.maePrecip})`.as("avgMaePrecip"),
+      avgRmsePrecip: sql<number>`SQRT(AVG(POWER(${leadTimeScores.rmsePrecip}, 2)))`.as("avgRmsePrecip"),
       avgMaeWind: sql<number>`AVG(${leadTimeScores.maeWind})`.as("avgMaeWind"),
+      avgRmseWind: sql<number>`SQRT(AVG(POWER(${leadTimeScores.rmseWind}, 2)))`.as("avgRmseWind"),
       totalSamples: sql<number>`SUM(${leadTimeScores.sampleSize})`.as("totalSamples"),
     })
     .from(leadTimeScores)

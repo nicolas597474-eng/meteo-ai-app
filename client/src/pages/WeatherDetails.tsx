@@ -185,6 +185,7 @@ export default function WeatherDetails() {
   const hours = data?.hours ?? [];
   const days = data?.days ?? [];
   const regime = data?.regime;
+  const confidence = data?.confidence;
   const bestModel = data?.bestModel;
 
   return (
@@ -382,7 +383,7 @@ export default function WeatherDetails() {
             </p>
             {bestModel && (
               <p className="text-[10px] text-slate-500 mt-2">
-                Basé sur {bestModel.name} (score {bestModel.score.toFixed(1)}/100) • Confiance {regime?.confidence ?? 0}%
+                Basé sur {bestModel.name} (score {bestModel.score.toFixed(1)}/100) • Confiance {Math.round(confidence?.current ?? 0)}%
               </p>
             )}
           </div>
@@ -395,7 +396,11 @@ export default function WeatherDetails() {
           <div className="space-y-2">
             {days.map((day: any, dayIdx: number) => {
               const isExpanded = expandedDay === day.date;
-              const dayConfidence = day.stabilityIndex ?? 70;
+              // Les données serveur distinguent la confiance (accord, qualité,
+              // historique, échéance) de la simple dispersion des modèles.
+              const dayConfidence = dayIdx === 0
+                ? (confidence?.today ?? 0)
+                : (confidence?.week ?? 0);
               
               return (
                 <div key={day.date} className="rounded-2xl bg-[#152238] border border-slate-800 overflow-hidden">
@@ -488,7 +493,7 @@ export default function WeatherDetails() {
               <MeteoIcon name="confidence" size={14} />
               Indices de confiance
             </h2>
-            <ConfidenceSection hours={hours} days={days} regime={regime} />
+            <ConfidenceSection confidence={confidence} regime={regime} />
           </div>
         </section>
 
@@ -740,35 +745,26 @@ function TrendSection({ days }: { days: any[] }) {
   );
 }
 
-function ConfidenceSection({ hours, days, regime }: { hours: any[]; days: any[]; regime: any }) {
-  // Hourly confidence (current period)
-  const now = new Date();
-  const currentHour = now.getHours();
-  const periodHours = hours.filter((h: any) => {
-    const hr = parseInt(h.hour);
-    if (currentHour >= 6 && currentHour < 12) return hr >= 6 && hr < 12;
-    if (currentHour >= 12 && currentHour < 18) return hr >= 12 && hr < 18;
-    if (currentHour >= 18 && currentHour < 22) return hr >= 18 && hr < 22;
-    return hr >= 22 || hr < 6;
-  });
-  
-  const periodConfidence = periodHours.length > 0
-    ? Math.round(periodHours.reduce((s: number, h: any) => s + getConfidenceForHour(h), 0) / periodHours.length)
-    : regime?.confidence ?? 70;
-
-  const todayConfidence = days[0]?.stabilityIndex ?? 75;
-  const weekConfidence = days.length >= 7
-    ? Math.round(days.slice(0, 7).reduce((s: number, d: any) => s + (d.stabilityIndex ?? 50), 0) / 7)
-    : todayConfidence;
+function ConfidenceSection({
+  confidence,
+  regime,
+}: {
+  confidence?: { current?: number; today?: number; week?: number; stabilityIndex?: number | null };
+  regime: any;
+}) {
+  const periodConfidence = Math.round(confidence?.current ?? 0);
+  const todayConfidence = Math.round(confidence?.today ?? 0);
+  const weekConfidence = Math.round(confidence?.week ?? 0);
 
   return (
     <div className="space-y-3">
       <ConfidenceBar label="Période en cours" value={periodConfidence} />
       <ConfidenceBar label="Aujourd'hui" value={todayConfidence} />
-      <ConfidenceBar label="7 prochains jours" value={weekConfidence} />
+      <ConfidenceBar label="J+4 à J+7" value={weekConfidence} />
       {regime && (
         <div className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-700/50">
-          Calculé à partir de l'accord entre {hours[0]?.modelCount ?? 2} modèles, des stations locales et des performances historiques.
+          Confiance : accord des sources, performances historiques, cohérence des stations et horizon de prévision.
+          {confidence?.stabilityIndex != null && ` Stabilité des modèles : ${Math.round(confidence.stabilityIndex)}%.`}
         </div>
       )}
     </div>

@@ -298,3 +298,24 @@
 - [x] Frontend: Section tendances (flèches hausse/stable/baisse par paramètre)
 - [x] Frontend: Indices de confiance (période en cours, aujourd'hui, 7 prochains jours)
 - [x] Frontend: Navigation et route /details dans App.tsx + lien depuis Dashboard
+
+## Corrections Audit MeteoAI (8 points)
+- [x] Backend: Correction automatique des biais — applyBiasCorrection() dans fusionEngine, appliquée dans scheduledHandlers (default + favoris)
+- [x] Backend: Scoring par échéance — getLeadTimeWeights() dans fusionEngine, appliqué dans scheduledHandlers (default + favoris)
+- [x] Backend: Unifier les régimes — statsEngine importe detectExtendedRegime (20 régimes) depuis fusionEngine, WeatherRegime = ExtendedRegime
+- [x] Backend: Corriger confidenceScore — computeConfidenceScore() dans fusionEngine (accord modèles 40% + perf historiques 30% + stations 20% + échéance 10%)
+- [x] Backend: Activer computeFusion avancé (IDW + qualité + fiabilité historique) dans les collectes journalières et la fusion ultra-locale active
+- [x] Backend: Calcul et stockage RMSE vent/précipitations dans lead_time_scores par échéance, avec agrégation RMS dans db.ts
+- [x] Backend: Activer détection persistante des anomalies — transmettre previousReadings depuis stationReadingsCache à computeFusion puis enregistrer les nouveaux relevés
+- [x] Frontend: Afficher le vrai indice de confiance (vs stabilité) dans Dashboard et WeatherDetails
+- [x] Tests: Ajouter tests IDW et pénalité de station figée dans fusionEngine.test.ts
+
+## Système de notifications personnalisées — annulé à la demande de l'utilisateur
+- [x] Annulation : router, intégration frontend et schéma applicatif supprimés. Les tables vides déjà créées en DB sont conservées à la demande de l'utilisateur et ne sont référencées par aucun code.
+- [x] DB: Table `notification_preferences` (userId, locationId, alertType, threshold, enabled, channels) — annulée, table vide conservée en DB.
+- [x] DB: Table `alert_history` (userId, locationId, alertType, triggeredAt, message, read) — annulée, table vide conservée en DB.
+- [x] Backend: Procédures tRPC getNotificationPreferences / updateNotificationPreferences / getAlertHistory / markAlertsRead — annulées.
+- [x] Backend: Logique de déclenchement d'alertes dans le cron de collecte — annulée.
+- [x] Frontend: Page Notifications.tsx avec historique des alertes et configuration des seuils par lieu — annulée.
+- [x] Frontend: Badge de notification dans la navigation — annulé.
+- [x] Frontend: Toast in-app lors de la détection d'un régime dangereux au chargement du Dashboard — annulé.

@@ -10,7 +10,18 @@ import { invokeLLM } from "./_core/llm";
 import { collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, WEATHER_SERVICES } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "./statsEngine";
-import { generateAdaptiveForecast, classifyLeadTime, type LeadTimeBucket } from "./fusionEngine";
+import {
+  computeFusion,
+  generateAdaptiveForecast,
+  classifyLeadTime,
+  applyBiasCorrection,
+  computeConfidenceScore,
+  getLeadTimeWeights,
+  type LeadTimeBucket,
+  type ServiceBias,
+  type LeadTimePerf,
+  type FusionSource,
+} from "./fusionEngine";
 import {
   insertForecasts,
   insertObservation,
@@ -27,6 +38,7 @@ import {
   getCumulativeRankingForLocation,
   insertHourlyForecasts,
   insertLeadTimeScores,
+  getLeadTimeScoresForLocation,
 } from "./db";
 
 /**
@@ -43,6 +55,106 @@ function getYesterdayParis(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+}
+
+type DailyFusionForecast = {
+  serviceName: string;
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGust?: number | null;
+  cloudCover?: number | null;
+};
+
+type ServicePerformance = {
+  maeTemp?: number;
+  maePrecip?: number;
+  maeWind?: number;
+  weightedScore?: number;
+};
+
+/**
+ * Synthèse journalière par computeFusion.
+ *
+ * La température maximale, la minimale, les précipitations et le vent sont
+ * fusionnés indépendamment : chacun utilise son propre MAE historique. Cela
+ * préserve l'avantage du scoring par paramètre, tout en appliquant la méthode
+ * avancée de computeFusion (pondération IDW, qualité, fraîcheur et fiabilité).
+ */
+function computeAdvancedDailyFusion(
+  forecasts: DailyFusionForecast[],
+  performanceByService: Record<string, ServicePerformance>
+) {
+  const now = new Date();
+  const makeSources = (metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed"): FusionSource[] =>
+    forecasts.map((forecast) => {
+      const perf = performanceByService[forecast.serviceName] ?? {};
+      const metricMae = metric === "precipitation"
+        ? perf.maePrecip
+        : metric === "windSpeed"
+          ? perf.maeWind
+          : perf.maeTemp;
+      return {
+        id: `model:${forecast.serviceName}`,
+        name: forecast.serviceName,
+        // Tous les modèles sont interpolés au point cible : distance neutre,
+        // puis pondération par qualité / performance historique.
+        distanceKm: 1,
+        temperature: metric === "tempMax"
+          ? forecast.tempMax
+          : metric === "tempMin"
+            ? forecast.tempMin
+            : forecast.tempMax != null && forecast.tempMin != null
+              ? (forecast.tempMax + forecast.tempMin) / 2
+              : null,
+        precipitation: forecast.precipitation,
+        windSpeed: forecast.windSpeed,
+        windGust: forecast.windGust ?? null,
+        cloudCover: forecast.cloudCover ?? null,
+        updatedAt: now,
+        reliabilityScore: perf.weightedScore ?? 50,
+        // computeFusion emploie ce MAE comme facteur adaptatif pour la métrique
+        // actuellement fusionnée.
+        maeTemp: metricMae,
+        type: "model" as const,
+      };
+    });
+
+  const config = {
+    idwExponent: 2,
+    maxDistanceKm: 5,
+    maxFreshnessMin: 24 * 60,
+    minReliabilityScore: 0,
+    anomalyDetectionEnabled: false, // données de prévision, pas des relevés station
+    adaptiveWeightingEnabled: true,
+    modelWeightFraction: 1,
+  };
+
+  const maxFusion = computeFusion(makeSources("tempMax"), config);
+  const minFusion = computeFusion(makeSources("tempMin"), config);
+  const precipFusion = computeFusion(makeSources("precipitation"), config);
+  const windFusion = computeFusion(makeSources("windSpeed"), config);
+
+  const weights: Record<string, { tempWeight: number; precipWeight: number; windWeight: number }> = {};
+  for (const source of maxFusion.usedSources) {
+    weights[source.name] = {
+      tempWeight: source.finalWeight,
+      precipWeight: precipFusion.usedSources.find((entry) => entry.name === source.name)?.finalWeight ?? 0,
+      windWeight: windFusion.usedSources.find((entry) => entry.name === source.name)?.finalWeight ?? 0,
+    };
+  }
+
+  return {
+    tempMax: maxFusion.temperature,
+    tempMin: minFusion.temperature,
+    precipitation: precipFusion.precipitation,
+    windSpeed: windFusion.windSpeed,
+    windGust: windFusion.windGust,
+    cloudCover: maxFusion.cloudCover,
+    weights,
+    methodNote: `Fusion avancée ${maxFusion.methodUsed} par paramètre (${forecasts.length} modèles)`,
+  };
 }
 
 /**
@@ -120,40 +232,57 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           reliabilityMap[r.serviceName] = r.avgScore ?? 50;
         });
 
-        // Generate MeteoAI forecast — adaptive per-parameter MAE weighting if enough historical data
-        const hasHistoricalData = ranking.some((r) => r.avgMaeTemp != null && Number(r.daysTracked) >= 3);
+        // ── Correction automatique des biais ─────────────────────────────────
+        // Récupérer les biais historiques par modèle et les appliquer avant fusion
+        const biases: ServiceBias[] = ranking
+          .filter((r) => r.avgBiasTemp != null || r.avgBiasPrecip != null)
+          .map((r) => ({
+            serviceName: r.serviceName,
+            biasTemp: r.avgBiasTemp != null ? Number(r.avgBiasTemp) : null,
+            biasPrecip: r.avgBiasPrecip != null ? Number(r.avgBiasPrecip) : null,
+            biasWind: null, // avgBiasWind not in getCumulativeRanking yet
+          }));
+
+        const rawForecastsForFusion = allForecasts.map((f) => ({
+          serviceName: f.serviceName,
+          tempMax: f.tempMax,
+          tempMin: f.tempMin,
+          precipitation: f.precipitation,
+          windSpeed: f.windSpeed,
+          windGust: null as number | null,
+          cloudCover: f.cloudCover ?? null,
+        }));
+
+        const biasCorrectedForecasts = biases.length > 0
+          ? applyBiasCorrection(rawForecastsForFusion, biases)
+          : rawForecastsForFusion;
+
+        // ── Scoring par échéance (lead-time) ──────────────────────────────────
+        // Utiliser les scores par horizon pour pondérer les modèles selon J+0
+        const leadTimeData = await getLeadTimeScoresForLocation(defaultLocKey, 14);
+        const leadTimePerfs: LeadTimePerf[] = leadTimeData.map((d) => ({
+          serviceName: d.serviceName,
+          bucket: d.bucket as LeadTimeBucket,
+          avgMaeTemp: d.avgMaeTemp != null ? Number(d.avgMaeTemp) : null,
+          avgMaePrecip: d.avgMaePrecip != null ? Number(d.avgMaePrecip) : null,
+          avgMaeWind: d.avgMaeWind != null ? Number(d.avgMaeWind) : null,
+        }));
+
+        // Merge lead-time weights with global performance map (lead-time takes priority)
+        const leadTimeWeights = getLeadTimeWeights(leadTimePerfs, "6-24h"); // today = 6-24h horizon
         const performanceMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
         ranking.forEach((r) => {
+          const ltw = leadTimeWeights[r.serviceName];
           performanceMap[r.serviceName] = {
-            maeTemp: r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined,
-            maePrecip: r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined,
-            maeWind: r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined,
+            // Lead-time MAE takes priority over global MAE if available
+            maeTemp: ltw?.maeTemp ?? (r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined),
+            maePrecip: ltw?.maePrecip ?? (r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined),
+            maeWind: ltw?.maeWind ?? (r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined),
             weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
           };
         });
-        const meteoAI = hasHistoricalData
-          ? generateAdaptiveForecast(
-              allForecasts.map((f) => ({
-                serviceName: f.serviceName,
-                tempMax: f.tempMax,
-                tempMin: f.tempMin,
-                precipitation: f.precipitation,
-                windSpeed: f.windSpeed,
-                windGust: null,
-                cloudCover: f.cloudCover ?? null,
-              })),
-              performanceMap
-            )
-          : generateMeteoAIForecast(
-              allForecasts.map((f) => ({
-                tempMax: f.tempMax,
-                tempMin: f.tempMin,
-                precipitation: f.precipitation,
-                windSpeed: f.windSpeed,
-              })),
-              allForecasts.map((f) => f.serviceName),
-              reliabilityMap
-            );
+
+        const meteoAI = computeAdvancedDailyFusion(biasCorrectedForecasts, performanceMap);
 
         // Generate AI explanation
         let explanation = "";
@@ -182,10 +311,13 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         // Determine condition from majority
         const condition = determineMajorityCondition(allForecasts);
 
-        // Compute true confidence score from model agreement (divergence)
-        const allTemps = allForecasts.map((f: any) => f.tempMax).filter((v: any) => v != null) as number[];
-        const modelDivergence = allTemps.length > 1 ? Math.max(...allTemps) - Math.min(...allTemps) : 0;
-        const trueConfidenceScore = Math.max(0, Math.min(100, Math.round(100 - modelDivergence * 5)));
+        // Compute true confidence score (accord modèles + performances historiques + échéance)
+        const bestModelScore = ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60;
+        const trueConfidenceScore = computeConfidenceScore({
+          forecasts: biasCorrectedForecasts,
+          bestModelScore,
+          leadTimeBucket: "6-24h",
+        });
 
         // Save MeteoAI forecast with locationKey
         await upsertMeteoAIForecast({
@@ -393,8 +525,17 @@ export async function collectObservationsHandler(req: Request, res: Response) {
               const maeP = (f.precipitation != null && observation.precipitation != null)
                 ? Math.abs(f.precipitation - observation.precipitation)
                 : null;
+              // Une ligne correspond à une observation : le RMSE élémentaire est
+              // |erreur| ; l'agrégation historique AVG(rmse²) est ensuite rendue
+              // disponible par l'historique par échéance.
+              const rmseP = (f.precipitation != null && observation.precipitation != null)
+                ? Math.sqrt(Math.pow(f.precipitation - observation.precipitation, 2))
+                : null;
               const maeW = (f.windSpeed != null && observation.windSpeed != null)
                 ? Math.abs(f.windSpeed - observation.windSpeed)
+                : null;
+              const rmseW = (f.windSpeed != null && observation.windSpeed != null)
+                ? Math.sqrt(Math.pow(f.windSpeed - observation.windSpeed, 2))
                 : null;
 
               await insertLeadTimeScores([{
@@ -406,7 +547,9 @@ export async function collectObservationsHandler(req: Request, res: Response) {
                 rmseTemp: rmseT != null ? Math.round(rmseT * 100) / 100 : null,
                 biasTemp: biasT != null ? Math.round(biasT * 100) / 100 : null,
                 maePrecip: maeP != null ? Math.round(maeP * 100) / 100 : null,
+                rmsePrecip: rmseP != null ? Math.round(rmseP * 100) / 100 : null,
                 maeWind: maeW != null ? Math.round(maeW * 100) / 100 : null,
+                rmseWind: rmseW != null ? Math.round(rmseW * 100) / 100 : null,
                 sampleSize: tempErrors.length,
               }]);
             }
@@ -680,40 +823,54 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         const publicRowsForLoc = await generatePublicServiceForecasts(expertData, today, locKey, fav.lat, fav.lon);
         await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);
 
-        // Generate MeteoAI synthesis — adaptive per-parameter MAE weighting if enough historical data
-        const locHasHistoricalData = locRanking.some((r) => r.avgMaeTemp != null && Number(r.daysTracked) >= 3);
+        // ── Correction automatique des biais (favoris) ──────────────────────────────
+        const activeRanking = locRanking.length > 0 ? locRanking : ranking;
+        const locBiases: ServiceBias[] = activeRanking
+          .filter((r) => r.avgBiasTemp != null || r.avgBiasPrecip != null)
+          .map((r) => ({
+            serviceName: r.serviceName,
+            biasTemp: r.avgBiasTemp != null ? Number(r.avgBiasTemp) : null,
+            biasPrecip: r.avgBiasPrecip != null ? Number(r.avgBiasPrecip) : null,
+            biasWind: null,
+          }));
+
+        const rawLocForecasts = expertData.map((f) => ({
+          serviceName: f.serviceName,
+          tempMax: f.tempMax,
+          tempMin: f.tempMin,
+          precipitation: f.precipitation,
+          windSpeed: f.windSpeed,
+          windGust: null as number | null,
+          cloudCover: f.cloudCover ?? null,
+        }));
+
+        const biasCorrectedLocForecasts = locBiases.length > 0
+          ? applyBiasCorrection(rawLocForecasts, locBiases)
+          : rawLocForecasts;
+
+        // ── Scoring par échéance (favoris) ─────────────────────────────────────
+        const locLeadTimeData = await getLeadTimeScoresForLocation(locKey, 14);
+        const locLeadTimePerfs: LeadTimePerf[] = locLeadTimeData.map((d) => ({
+          serviceName: d.serviceName,
+          bucket: d.bucket as LeadTimeBucket,
+          avgMaeTemp: d.avgMaeTemp != null ? Number(d.avgMaeTemp) : null,
+          avgMaePrecip: d.avgMaePrecip != null ? Number(d.avgMaePrecip) : null,
+          avgMaeWind: d.avgMaeWind != null ? Number(d.avgMaeWind) : null,
+        }));
+
+        const locLeadTimeWeights = getLeadTimeWeights(locLeadTimePerfs, "6-24h");
         const locPerfMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
-        (locRanking.length > 0 ? locRanking : ranking).forEach((r) => {
+        activeRanking.forEach((r) => {
+          const ltw = locLeadTimeWeights[r.serviceName];
           locPerfMap[r.serviceName] = {
-            maeTemp: r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined,
-            maePrecip: r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined,
-            maeWind: r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined,
+            maeTemp: ltw?.maeTemp ?? (r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined),
+            maePrecip: ltw?.maePrecip ?? (r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined),
+            maeWind: ltw?.maeWind ?? (r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined),
             weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
           };
         });
-        const meteoAI = locHasHistoricalData
-          ? generateAdaptiveForecast(
-              expertData.map((f) => ({
-                serviceName: f.serviceName,
-                tempMax: f.tempMax,
-                tempMin: f.tempMin,
-                precipitation: f.precipitation,
-                windSpeed: f.windSpeed,
-                windGust: null,
-                cloudCover: f.cloudCover ?? null,
-              })),
-              locPerfMap
-            )
-          : generateMeteoAIForecast(
-              expertData.map((f) => ({
-                tempMax: f.tempMax,
-                tempMin: f.tempMin,
-                precipitation: f.precipitation,
-                windSpeed: f.windSpeed,
-              })),
-              expertData.map((f) => f.serviceName),
-              locReliabilityMap
-            );
+
+        const meteoAI = computeAdvancedDailyFusion(biasCorrectedLocForecasts, locPerfMap);
 
         // Determine condition
         const avgPrecip = expertData.reduce((s, f) => s + (f.precipitation ?? 0), 0) / expertData.length;
@@ -761,10 +918,13 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           (f) => Math.abs(f.lat - fav.lat) < 0.001 && Math.abs(f.lon - fav.lon) < 0.001
         );
 
-        // Compute true confidence score from model agreement (divergence)
-        const favTemps = expertData.map((f: any) => f.tempMax).filter((v: any) => v != null) as number[];
-        const favDivergence = favTemps.length > 1 ? Math.max(...favTemps) - Math.min(...favTemps) : 0;
-        const favConfidenceScore = Math.max(0, Math.min(100, Math.round(100 - favDivergence * 5)));
+        // Compute true confidence score (accord modèles + performances historiques + échéance)
+        const locBestModelScore = activeRanking.length > 0 ? Number(activeRanking[0].avgScore ?? 60) : 60;
+        const favConfidenceScore = computeConfidenceScore({
+          forecasts: biasCorrectedLocForecasts,
+          bestModelScore: locBestModelScore,
+          leadTimeBucket: "6-24h",
+        });
 
         // Also save MeteoAI forecast for this location
         await upsertMeteoAIForecast({

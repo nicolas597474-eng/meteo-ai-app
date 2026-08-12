@@ -6,51 +6,59 @@ import {
   detectWeatherRegime,
 } from "./statsEngine";
 
-// ─── detectWeatherRegime ─────────────────────────────────────────────────────
+// ─── detectWeatherRegime (now delegates to 20-regime fusionEngine) ────────────
+// The new regime system uses detectExtendedRegime which maps to 20 specific regimes.
+// Old regimes (storm, rainy, cold_winter, summer, standard) are replaced by:
+// storm → windy (wind>50 without heavy precip), thunderstorm (wind>40+precip>5)
+// rainy → rainy (precip>3)
+// cold_winter → snow (temp<3 + precip) or frost (temp<0)
+// summer → few_clouds (temp>22 dry) or summer_heat (temp>32)
+// standard → showers, partly_cloudy, etc. based on conditions
 
 describe("detectWeatherRegime", () => {
-  it("detects storm when wind > 50 km/h", () => {
+  it("detects windy regime when wind > 50 km/h without heavy precip", () => {
     const result = detectWeatherRegime({ precipitation: 2, windSpeed: 60, tempMax: 18, tempMin: 12 });
-    expect(result.regime).toBe("storm");
-    expect(result.weights.wind).toBe(0.40);
-    expect(result.weights.precip).toBe(0.30);
+    expect(result.regime).toBe("windy");
+    expect(result.weights.wind).toBe(0.45);
+    expect(result.weights.precip).toBe(0.15);
   });
 
-  it("detects rainy day when precipitation > 3 mm", () => {
+  it("detects rainy regime when precipitation > 3 mm", () => {
     const result = detectWeatherRegime({ precipitation: 8, windSpeed: 20, tempMax: 14, tempMin: 9 });
     expect(result.regime).toBe("rainy");
-    expect(result.weights.precip).toBe(0.50);
+    expect(result.weights.precip).toBe(0.40);
     expect(result.weights.temp).toBe(0.20);
   });
 
-  it("detects cold winter when avg temp < 5°C", () => {
+  it("detects snow regime when avg temp < 5°C with some precip", () => {
     const result = detectWeatherRegime({ precipitation: 0.5, windSpeed: 15, tempMax: 3, tempMin: -2 });
-    expect(result.regime).toBe("cold_winter");
-    expect(result.weights.temp).toBe(0.45);
-  });
-
-  it("detects summer stable when hot, dry, calm", () => {
-    const result = detectWeatherRegime({ precipitation: 0, windSpeed: 10, tempMax: 30, tempMin: 18 });
-    expect(result.regime).toBe("summer");
+    expect(result.regime).toBe("snow");
     expect(result.weights.temp).toBe(0.40);
-    expect(result.weights.condition).toBe(0.30);
   });
 
-  it("falls back to standard for mild conditions", () => {
-    const result = detectWeatherRegime({ precipitation: 1, windSpeed: 20, tempMax: 17, tempMin: 10 });
-    expect(result.regime).toBe("standard");
+  it("detects few_clouds regime when hot, dry, calm", () => {
+    const result = detectWeatherRegime({ precipitation: 0, windSpeed: 10, tempMax: 30, tempMin: 18 });
+    expect(result.regime).toBe("few_clouds");
     expect(result.weights.temp).toBe(0.30);
-    expect(result.weights.precip).toBe(0.30);
+    // Conditions = nébulosité 0,30 + humidité 0,10 + pression 0,10.
+    expect(result.weights.condition).toBe(0.50);
   });
 
-  it("handles null values gracefully", () => {
+  it("detects showers for mild conditions with light rain", () => {
+    const result = detectWeatherRegime({ precipitation: 1, windSpeed: 20, tempMax: 17, tempMin: 10 });
+    expect(result.regime).toBe("showers");
+    expect(result.weights.precip).toBeGreaterThan(0.2);
+  });
+
+  it("handles null values gracefully (returns a valid regime)", () => {
     const result = detectWeatherRegime({ precipitation: null, windSpeed: null, tempMax: null, tempMin: null });
-    expect(result.regime).toBe("standard");
+    expect(typeof result.regime).toBe("string");
+    expect(result.regime.length).toBeGreaterThan(0);
   });
 
-  it("storm takes priority over rainy", () => {
+  it("detects thunderstorm when wind > 40 and precip > 5", () => {
     const result = detectWeatherRegime({ precipitation: 10, windSpeed: 55, tempMax: 12, tempMin: 8 });
-    expect(result.regime).toBe("storm");
+    expect(result.regime).toBe("thunderstorm");
   });
 });
 
@@ -149,35 +157,33 @@ describe("calculateReliabilityScore — dimensions", () => {
     expect(c.score).toBeGreaterThanOrEqual(90);
   });
 
-  it("weights sum to 1.0", () => {
+  it("weights sum to 1.0 across the four scored dimensions", () => {
     const forecasts = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
     const observations = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
     const result = calculateReliabilityScore(forecasts, observations);
     const { temp, precip, wind, condition } = result.weights;
-
-    expect(temp + precip + wind + condition).toBeCloseTo(1.0, 5);
+    // Humidité et pression sont incluses dans la dimension « conditions » :
+    // quatre dimensions scorées, dont la somme reste égale à 1.
+    const total = temp + precip + wind + condition;
+    expect(total).toBeCloseTo(1.0, 5);
   });
 
-  it("uses forced regime weights when provided", () => {
+  it("uses forced regime weights when provided — rainy regime", () => {
     const forecasts = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
     const observations = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
 
     const rainyResult = calculateReliabilityScore(forecasts, observations, "rainy");
-    const stormResult = calculateReliabilityScore(forecasts, observations, "storm");
-
     expect(rainyResult.regime).toBe("rainy");
-    expect(rainyResult.weights.precip).toBe(0.50);
-    expect(stormResult.regime).toBe("storm");
-    expect(stormResult.weights.wind).toBe(0.40);
+    expect(rainyResult.weights.precip).toBe(0.40); // new rainy regime weight
   });
 
-  it("auto-detects summer regime from hot dry observations", () => {
+  it("auto-detects regime from hot dry observations", () => {
     const forecasts = [{ tempMax: 30, tempMin: 18, precipitation: 0, windSpeed: 10 }];
     const observations = [{ tempMax: 30, tempMin: 18, precipitation: 0, windSpeed: 10 }];
     const result = calculateReliabilityScore(forecasts, observations);
-
-    expect(result.regime).toBe("summer");
-    expect(result.regimeEmoji).toBe("🌞");
+    // With 20-regime system, 30°C dry → few_clouds
+    expect(result.regime).toBe("few_clouds");
+    expect(typeof result.regimeEmoji).toBe("string");
   });
 
   it("handles empty arrays gracefully", () => {

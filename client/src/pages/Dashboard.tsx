@@ -269,6 +269,12 @@ export default function Dashboard() {
     : (dash as any)?.multiRegime ?? null;
   const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "variable";
   const regimeConfidence: number = multiRegime?.confidenceScore ?? 70;
+  // La confiance mesure la qualité / accord des sources ; la stabilité mesure
+  // seulement la dispersion des modèles. Ne jamais les confondre dans l'UI.
+  const forecastConfidence: number = lw?.scores?.confidenceScore
+    ?? dash?.meteoAI?.confidenceScore
+    ?? 0;
+  const stabilityIndex: number = today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0;
 
   // Current temperature from hourly (closest to now)
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
@@ -446,11 +452,12 @@ export default function Dashboard() {
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Activity className="h-3 w-3" />Fiabilité
+                  <Activity className="h-3 w-3" />Confiance
                 </p>
-                <p className={`text-base sm:text-lg font-semibold ${stabilityColor(today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0)}`}>
-                  {today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0}%
+                <p className={`text-base sm:text-lg font-semibold ${stabilityColor(forecastConfidence)}`}>
+                  {Math.round(forecastConfidence)}%
                 </p>
+                <p className="text-[10px] text-muted-foreground">Stabilité {Math.round(stabilityIndex)}%</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
