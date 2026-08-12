@@ -562,3 +562,8 @@
 - [x] Audit: Vérifier pourquoi le cookie d’état OAuth n’est pas renvoyé lors du retour depuis Netatmo sur mobile.
 - [x] Backend: Rendre la validation anti-CSRF indépendante du cookie tiers perdu pendant la redirection mobile.
 - [x] Tests: Vérifier le retour OAuth avec et sans cookie d’état, sans accepter un état falsifié.
+
+## Diagnostic détaillé du callback Netatmo
+- [x] Backend: Journaliser de manière non sensible la cause du rejet de callback (signature, expiration ou état consommé).
+- [ ] Backend: Corriger la vérification fautive à partir du diagnostic réel.
+- [ ] Tests: Couvrir le scénario de retour mobile correspondant au diagnostic.

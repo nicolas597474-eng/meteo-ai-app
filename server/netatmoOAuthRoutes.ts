@@ -13,11 +13,14 @@ export function registerNetatmoOAuthRoutes(app: Express) {
     const state = queryValue(req, "state");
     const verifiedState = state ? verifyNetatmoState(state) : null;
     if (!code || !verifiedState) {
-      res.status(400).send("Connexion Netatmo refusée ou expirée. Relancez l’autorisation depuis MeteoAI.");
+      const reason = !code ? "code_absent" : !state ? "state_absent" : "state_signature_invalide_ou_expiree";
+      console.warn(`[Netatmo OAuth] Callback rejeté: ${reason}; longueur_state=${state?.length ?? 0}`);
+      res.status(400).send(`Connexion Netatmo refusée (${reason}). Relancez l’autorisation depuis MeteoAI.`);
       return;
     }
     const stateConsumed = await consumeNetatmoOAuthState(hashNetatmoState(state!), verifiedState.userId);
     if (!stateConsumed) {
+      console.warn("[Netatmo OAuth] Callback rejeté: état absent, expiré ou déjà consommé");
       res.status(400).send("Connexion Netatmo expirée ou déjà utilisée. Relancez l’autorisation depuis MeteoAI.");
       return;
     }
