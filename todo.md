@@ -810,5 +810,5 @@
 ## Phase 4A — snapshots physiques horaires
 - [x] Schéma: Conserver des snapshots horaires idempotents des stations physiques par lieu.
 - [x] Backend: Agréger une journée uniquement si la couverture et la fraîcheur respectent les seuils définis.
-- [ ] Automatisation: Ajouter un cycle Heartbeat horaire sans modifier les poids opérationnels.
+- [x] Automatisation: Ajouter un cycle Heartbeat horaire sans modifier les poids opérationnels.
 - [x] Tests: Vérifier l’exclusion des capteurs candidats et l’idempotence des snapshots.
