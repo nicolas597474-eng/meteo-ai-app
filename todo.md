@@ -528,3 +528,9 @@
 - [x] Backend: Ajuster le régime uniquement si les données vérifiées justifient un seuil différent.
 - [x] Frontend: Rendre visible la valeur de nébulosité qui motive le libellé de régime.
 - [x] Backend: Prioriser la nébulosité horaire actualisée pour la condition actuelle, sans confondre cette prévision avec une observation physique.
+
+## Diagnostic du régime affiché obsolète
+- [x] Audit: Vérifier le créneau horaire, le cache client et la réponse Dashboard réellement affichée.
+- [x] Backend: Corriger tout décalage entre l’heure de Paris et le créneau de nébulosité sélectionné.
+- [x] Frontend: Invalider les réponses de régime à l’heure courante et signaler explicitement leur actualisation.
+- [x] Frontend: Rafraîchir automatiquement les régimes dépendant de la condition actuelle sans attendre une navigation manuelle.

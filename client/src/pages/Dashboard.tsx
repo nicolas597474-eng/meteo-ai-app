@@ -161,12 +161,22 @@ export default function Dashboard() {
 
   // Dashboard (MeteoAI synthesis) — always location-aware
   const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery(
-    coordsInput, { staleTime: 5 * 60 * 1000 }
+    coordsInput,
+    {
+      staleTime: 60 * 1000,
+      refetchInterval: 5 * 60 * 1000,
+      refetchOnWindowFocus: true,
+    }
   );
   // Réponse officielle consolidée : la même source alimente désormais Dashboard
   // et Détails pour les heures, les jours et les indices de confiance.
   const { data: officialForecast, isLoading: officialLoading, isError: officialError } = trpc.weather.getDetailedForecast.useQuery(
-    coordsInput, { staleTime: 5 * 60 * 1000 }
+    coordsInput,
+    {
+      staleTime: 60 * 1000,
+      refetchInterval: 5 * 60 * 1000,
+      refetchOnWindowFocus: true,
+    }
   );
   const { data: localOfficialHistory } = trpc.weather.getLocalOfficialDeltaHistory.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
