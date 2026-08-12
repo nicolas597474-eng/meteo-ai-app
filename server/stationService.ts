@@ -147,7 +147,9 @@ async function fetchOpenMeteoPoint(lat: number, lon: number, model?: string): Pr
       timezone: "Europe/Paris",
     });
     if (model) params.set("models", model);
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+      signal: AbortSignal.timeout(8000),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     const c = data.current;

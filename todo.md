@@ -447,7 +447,10 @@
 ## Rétablissement de collecte et enrichissement de la fiabilité locale
 - [x] Backend: Diagnostiquer et corriger l’échec de la collecte de stations de 05h00.
 - [x] Opérations: Renouveler l’autorisation du job de 05h00 après l’échec 403 « cron cookie ».
-- [ ] Backend: Exécuter une récupération contrôlée des relevés physiques manquants après correction.
+- [x] Backend: Exécuter une récupération contrôlée des relevés physiques manquants après correction.
+- [x] Opérations: Déclencher immédiatement une collecte ponctuelle des huit modèles et des stations physiques, sans modifier la collecte quotidienne.
+- [x] Backend: Exécuter le même cycle de collecte une fois avec une identité planifiée locale, sans assouplir l’authentification de production.
+- [x] Backend: Borner les appels aux services publics externes pour qu’une indisponibilité ne bloque pas la collecte.
 - [x] Frontend: Ajouter une carte des stations physiques autour du lieu.
 - [x] Frontend: Afficher l’écart instantané station/prévision officielle en °C.
 - [x] Frontend: Ajouter un filtre 24 h / 7 jours à l’historique et à la comparaison.
