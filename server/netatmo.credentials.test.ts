@@ -7,6 +7,23 @@ describe("identifiants Netatmo", () => {
     expect(process.env.NETATMO_REFRESH_TOKEN?.trim()).toBeTruthy();
   });
 
+  it.runIf(process.env.NETATMO_VERIFY_CREDENTIALS === "true")("fait accepter l’application par le point OAuth Netatmo sans demander de jeton", async () => {
+    const form = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: process.env.NETATMO_CLIENT_ID ?? "",
+      client_secret: process.env.NETATMO_CLIENT_SECRET ?? "",
+      code: "validation_probe_without_user_authorization",
+    });
+    const response = await fetch("https://api.netatmo.com/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form,
+    });
+    const body = await response.json() as { error?: string };
+    expect(response.status).toBeGreaterThan(0);
+    expect(body.error, "Netatmo a rejeté l’identifiant ou le secret de l’application").not.toBe("invalid_client");
+  }, 20_000);
+
   it.runIf(process.env.NETATMO_VERIFY_LIVE === "true")("obtient un jeton d’accès Netatmo via le renouvellement OAuth", async () => {
     const form = new URLSearchParams({
       grant_type: "refresh_token",

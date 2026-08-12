@@ -548,6 +548,10 @@
 - [ ] Frontend: Afficher les stations Netatmo validées parmi les stations physiques locales.
 - [ ] Tests: Vérifier l’authentification, le filtrage et l’absence de données simulées.
 
+## Reprise guidée de la configuration Netatmo
+- [x] Configuration: Créer ou vérifier l’application Netatmo avec la Redirect URI de production exacte et le scope requis.
+- [x] Configuration: Réenregistrer les identifiants de la même application Netatmo après validation de l’utilisateur.
+
 ## Correction de provenance des stations Netatmo
 - [x] Audit: Identifier pourquoi des références de grille apparaissent sous le libellé Netatmo public.
 - [x] Backend: Empêcher toute classification Netatmo sans observation authentifiée et provenance `netatmo` réelle.
@@ -587,6 +591,23 @@
 - [x] Backend: Afficher et journaliser de manière non sensible le paramètre d’erreur retourné par Netatmo.
 - [ ] Configuration: Corriger la Redirect URI ou les identifiants selon le code de refus reçu.
 - [x] Backend: Ajouter le paramètre OAuth obligatoire `response_type=code` à l’autorisation Netatmo.
+
+## Rejet Netatmo invalid_client
+- [ ] Diagnostic: Vérifier la cohérence entre le Client ID, le Client Secret et l’application Netatmo créée.
+- [ ] Configuration: Réenregistrer les identifiants de la même application puis confirmer l’échange OAuth.
+
+## Données Netatmo sans connexion de compte
+- [ ] Étude: Sélectionner avec l’utilisateur une voie d’accès légitime aux données de stations publiques sans lier son compte personnel.
+- [ ] Backend: Mettre en œuvre uniquement la source retenue avec provenance et limites d’accès vérifiables.
+- [ ] Validation: Vérifier l’authenticité, la fraîcheur et l’affichage des stations obtenues.
+
+## Compte Netatmo dédié
+- [ ] Configuration: Créer ou utiliser un compte Netatmo distinct, réservé à l’accès aux stations publiques de MeteoAI.
+- [ ] OAuth: Autoriser uniquement le scope `read_station` avec ce compte dédié.
+
+## Simplification de Fiabilité
+- [x] Frontend: Retirer la section de connexion Netatmo de la page Fiabilité.
+- [x] Validation: Vérifier que la page conserve les stations correctement classifiées sans affichage de connexion Netatmo.
 
 ## Cohérence des prochains changements de régime
 - [x] Backend: Utiliser un unique régime de créneau horaire pour les annonces de transition.
