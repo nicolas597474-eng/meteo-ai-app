@@ -48,6 +48,21 @@ describe("weather.getDashboard", () => {
   });
 });
 
+describe("weather.getAILab", () => {
+  it("n’expose des modèles appliqués que depuis la trace de fusion officielle", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.weather.getAILab();
+
+    expect(Array.isArray(result.appliedModelWeights)).toBe(true);
+    expect(Object.hasOwn(result, "latestStationCollection")).toBe(true);
+    expect(Object.hasOwn(result, "modelIndicator")).toBe(true);
+    for (const model of result.appliedModelWeights) {
+      expect(model.name).toBeTruthy();
+      expect(model.averageWeight).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("weather.getRanking", () => {
   it("returns ranking array with scores", async () => {
     const ctx = createPublicContext();

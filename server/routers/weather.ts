@@ -38,6 +38,7 @@ import { compareTraceWeights } from "../weightComparison";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
+import { buildAppliedModelWeights } from "../aiLabTrace";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -871,10 +872,22 @@ export const weatherRouter = router({
     const regimeDef = operationalRegime.primary;
     const weights = operationalRegime.blendedWeights;
 
-    // 2. Build model details from today's forecasts
+    // La trace persistée est la source de vérité des modèles réellement
+    // contributeurs. Les prévisions archivées ne sont pas présentées comme
+    // appliquées si elles n'apparaissent pas dans cette trace.
+    const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
+    const appliedModelWeights = buildAppliedModelWeights(trace);
+    const contributingNames = new Set(appliedModelWeights.map((model) => model.name));
+    const appliedForecasts = contributingNames.size > 0
+      ? forecasts.filter((forecast) => contributingNames.has(forecast.serviceName))
+      : forecasts;
+    const modelIndicator = buildModelIndicator(trace);
+
+    // Détails des prévisions quotidiennes persistées.
     const allServicesList = [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public];
-    const modelDetails = forecasts.map(f => {
+    const modelDetails = appliedForecasts.map(f => {
       const service = allServicesList.find((s: { name: string }) => s.name === f.serviceName);
+      const applied = appliedModelWeights.find((model) => model.name === f.serviceName);
       return {
         name: f.serviceName,
         label: service?.name ?? f.serviceName,
@@ -884,13 +897,14 @@ export const weatherRouter = router({
         windSpeed: f.windSpeed,
         cloudCover: f.cloudCover,
         condition: f.condition,
+        averageWeight: applied?.averageWeight ?? null,
       };
     });
 
-    // 3. Compute divergence between models
-    const tempValues = forecasts.map(f => f.tempMax ?? 0).filter(v => v > 0);
-    const precipValues = forecasts.map(f => f.precipitation ?? 0);
-    const windValues = forecasts.map(f => f.windSpeed ?? 0).filter(v => v > 0);
+    // Écart calculé sur les contributeurs réels lorsque la trace est disponible.
+    const tempValues = appliedForecasts.map(f => f.tempMax ?? 0).filter(v => v > 0);
+    const precipValues = appliedForecasts.map(f => f.precipitation ?? 0);
+    const windValues = appliedForecasts.map(f => f.windSpeed ?? 0).filter(v => v > 0);
     const divergence = {
       tempRange: tempValues.length > 1 ? Math.round((Math.max(...tempValues) - Math.min(...tempValues)) * 10) / 10 : 0,
       precipRange: precipValues.length > 1 ? Math.round((Math.max(...precipValues) - Math.min(...precipValues)) * 10) / 10 : 0,
@@ -899,11 +913,8 @@ export const weatherRouter = router({
       precipMean: precipValues.length > 0 ? Math.round(precipValues.reduce((a, b) => a + b, 0) / precipValues.length * 10) / 10 : 0,
     };
 
-    // 4. Confidence score (0-100): based on model agreement
-    const tempCV = tempValues.length > 1 ? (Math.sqrt(tempValues.reduce((s, v) => s + Math.pow(v - divergence.tempMean, 2), 0) / tempValues.length) / (divergence.tempMean || 1)) * 100 : 0;
-    const confidenceScore = Math.max(0, Math.min(100, Math.round(100 - tempCV * 2 - divergence.tempRange * 3)));
-
-    // 5. Stability score from MeteoAI
+    // Les scores sont ceux du même snapshot officiel que le Dashboard.
+    const confidenceScore = meteoAI?.confidenceScore ?? operationalRegime.confidence ?? 0;
     const stabilityScore = meteoAI?.stabilityIndex ?? 0;
 
     // 6. Transparency score (always high — we expose everything)
@@ -967,6 +978,7 @@ export const weatherRouter = router({
       { name: "Stations Météo-France", type: "Observations", models: [], updateFrequency: "1h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Haute" },
       { name: "Open-Meteo ERA5", type: "Réanalyse", models: ["ERA5"], updateFrequency: "24h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Très haute" },
     ];
+    const latestStationCollection = (await getStationCollectionSnapshots(locationKey ?? "default", 1))[0] ?? null;
 
     return {
       date: today,
@@ -981,18 +993,38 @@ export const weatherRouter = router({
       confidenceScore,
       stabilityScore,
       transparencyScore,
+      trace,
+      modelIndicator,
+      appliedModelWeights,
+      officialForecast: {
+        tempMax: meteoAI?.tempMax ?? null,
+        tempMin: meteoAI?.tempMin ?? null,
+        precipitation: meteoAI?.precipitation ?? null,
+        windSpeed: meteoAI?.windSpeed ?? null,
+        computedAt: meteoAI?.computedAt ?? null,
+      },
+      latestStationCollection: latestStationCollection ? {
+        physicalStationCount: latestStationCollection.physicalStationCount,
+        radiusKm: latestStationCollection.radiusKm,
+        dailyModelCount: latestStationCollection.dailyModelCount,
+        hourlyModelCount: latestStationCollection.hourlyModelCount,
+        dailyMissingModels: latestStationCollection.dailyMissingModels,
+        hourlyMissingModels: latestStationCollection.hourlyMissingModels,
+        status: latestStationCollection.status,
+        collectedAt: latestStationCollection.collectedAt,
+      } : null,
       aiAnalysis,
       formula,
       replaySteps,
       sources,
       engineVersion: "MeteoAI v2.0 — Multi-Dimension",
-      calculatedAt: new Date().toISOString(),
+      calculatedAt: meteoAI?.computedAt ?? null,
       regimeSource: operationalRegime.source,
       regimeSourceLabel: operationalRegime.sourceLabel,
       regimeSourceUpdatedAt: operationalRegime.sourceUpdatedAt,
       regimeSourceAgeMinutes: operationalRegime.sourceAgeMinutes,
       regimeDataCoverage: operationalRegime.dataCoverage,
-      modelsUsed: forecasts.length,
+      modelsUsed: appliedModelWeights.length || modelDetails.length,
       historicalTimeSeries,
       historicalServices: allServices,
     };

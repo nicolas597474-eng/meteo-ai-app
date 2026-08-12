@@ -622,3 +622,10 @@
 - [x] Frontend: Hiérarchiser les détails secondaires de température et de régime pour limiter la hauteur de la carte mobile.
 - [x] Frontend: Réduire l’espace avant les graphiques et préserver leur accès rapide sur mobile.
 - [x] Validation: Vérifier la lisibilité mobile et l’absence de régression tablette et bureau.
+
+## Actualisation de l’AI Lab
+- [x] Audit: Identifier les modèles, scores, stations, régimes et explications obsolètes encore affichés dans l’AI Lab.
+- [x] Backend: Exposer les traces et indicateurs réellement appliqués à la prévision officielle actuelle.
+- [x] Frontend: Remplacer les sections obsolètes par une lecture mobile cohérente avec le Dashboard et Fiabilité.
+- [x] Tests: Vérifier l’absence de modèle, station, score ou source simulé dans le contrat AI Lab.
+- [x] Validation: Vérifier l’AI Lab sur mobile et publier la mise à jour.
