@@ -375,3 +375,9 @@
 - [x] Frontend: Classifier le prochain changement en pluie, orage ou vent fort à partir des prévisions horaires officielles.
 - [x] Frontend: Afficher une alerte visuelle colorée avec icône MeteoAI, heure et détail du risque dans le Dashboard.
 - [x] Tests: Vérifier les alertes pluie, orage, vent fort et les changements non dangereux.
+
+## Refonte visuelle des graphiques météo
+- [x] Frontend: Recomposer HourlyChart avec le style de référence : grille en colonnes, courbes orange/bleue lumineuses, créneaux, vent et pluie.
+- [x] Frontend: Recomposer FifteenDayChart avec le même style : sélecteur 7j/15j/16j, températures max/min, vent et barres de précipitations.
+- [x] Frontend: Conserver les données officielles, le responsive mobile et les interactions existantes.
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile des deux graphiques.

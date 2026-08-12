@@ -160,9 +160,9 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
   // ── Layout constants ────────────────────────────────────────────────────────
   const AXIS_W = 38;         // fixed axis width on left
-  const COL_W = 72;          // width per day column
-  const CHART_H = 220;       // main chart height (temp + wind + precip combined)
-  const ICON_ROW = 28;       // icon row
+  const COL_W = 76;          // width per day column
+  const CHART_H = 236;       // main chart height (temp + wind + precip combined)
+  const ICON_ROW = 30;       // icon row
   const LABEL_ROW = 36;      // date labels
   const PAD_T = 16;
   const TOTAL_H = CHART_H + ICON_ROW + LABEL_ROW;
@@ -284,6 +284,13 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         const cpx = (maxPts[i - 1].x + maxPts[i].x) / 2;
         ctx.bezierCurveTo(cpx, maxPts[i - 1].y, cpx, maxPts[i].y, maxPts[i].x, maxPts[i].y);
       }
+      ctx.save();
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.52)";
+      ctx.lineWidth = 8;
+      ctx.shadowColor = "#f97316";
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+      ctx.restore();
       ctx.strokeStyle = "#fb923c";
       ctx.lineWidth = 3;
       ctx.stroke();
@@ -478,28 +485,31 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   for (let t = scaleBot; t <= scaleTop; t += gridStep) tempTicks.push(t);
 
   return (
-    <div ref={containerRef} className="w-full">
+    <section ref={containerRef} className="w-full rounded-[22px] border border-blue-500/25 bg-[linear-gradient(145deg,rgba(18,32,78,0.98),rgba(4,14,35,0.98))] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.26)]">
       {/* Header with toggle */}
-      <div className="mb-2">
+      <div className="mb-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            <span>Températures & Météo</span>
+          <h2 className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-300/40 bg-blue-500/25 shadow-[0_0_18px_rgba(59,130,246,0.45)]"><TrendingUp className="h-4 w-4 text-blue-200" /></span>
+            <span>
+              <span className="block text-base font-bold text-white">Températures & Météo</span>
+              <span className="block text-[11px] font-normal text-slate-400">Prévisions sur {viewMode} jours</span>
+            </span>
           </h2>
-          <div className="flex items-center bg-slate-800/80 rounded-full p-0.5 border border-slate-700/50">
+          <div className="flex items-center rounded-full border border-slate-600/50 bg-slate-950/65 p-0.5">
             <button
               onClick={() => setViewMode(7)}
-              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 7 ? 'bg-indigo-500/90 text-white shadow-sm shadow-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 7 ? 'bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.65)]' : 'text-slate-400 hover:text-slate-200'}`}
             >7j</button>
             <button
               onClick={() => setViewMode(15)}
-              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 15 ? 'bg-indigo-500/90 text-white shadow-sm shadow-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 15 ? 'bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.65)]' : 'text-slate-400 hover:text-slate-200'}`}
             >15j</button>
             {maxDays >= 16 && (
               <button
                 onClick={() => setViewMode(16)}
-                className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 16 ? 'bg-violet-500/90 text-white shadow-sm shadow-violet-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-              >16j ✦</button>
+                className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 16 ? 'bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.65)]' : 'text-slate-400 hover:text-slate-200'}`}
+              >16j+</button>
             )}
           </div>
         </div>
@@ -508,7 +518,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
             <MapPin className="h-3 w-3" /> {locationName}
           </p>
         )}
-        <div className="flex items-center gap-3 text-[11px] mt-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Max °C</span>
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-blue-400 inline-block" /> Min °C</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
@@ -517,9 +527,9 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       </div>
 
       {/* ── Chart area: fixed axis + scrollable content ───────────────────── */}
-      <div className="flex" style={{ height: TOTAL_H }}>
+      <div className="flex overflow-hidden rounded-[16px] border border-white/10 bg-[#061126]/85" style={{ height: TOTAL_H }}>
         {/* Fixed left axis — only temperature scale */}
-        <div className="flex-shrink-0 relative" style={{ width: AXIS_W, height: TOTAL_H }}>
+        <div className="relative flex-shrink-0 border-r border-white/8 bg-[#07142b]/75" style={{ width: AXIS_W, height: TOTAL_H }}>
           <span className="absolute text-[9px] text-slate-500 font-bold" style={{ top: 0, left: 2 }}>°C</span>
           {tempTicks.map(t => (
             <span key={`t-${t}`} className="absolute text-[11px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 6 }}>{t}°</span>
@@ -578,6 +588,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       {selectedDay !== null && selectedDay < displayDays.length && (
         <DayDetailOverlay day={displayDays[selectedDay]} onClose={() => setSelectedDay(null)} />
       )}
-    </div>
+    </section>
   );
 }

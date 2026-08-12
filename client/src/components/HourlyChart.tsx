@@ -198,10 +198,10 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const VISIBLE_HOURS = 8; // hours visible at once
 
   // Layout constants
-  const COL_W = 56;
-  const CHART_H = 180;
-  const ICON_ROW = 24;
-  const LABEL_ROW = 28;
+  const COL_W = 64;
+  const CHART_H = 228;
+  const ICON_ROW = 30;
+  const LABEL_ROW = 30;
   const PAD_T = 14;
   const TOTAL_H = CHART_H + ICON_ROW + LABEL_ROW;
   const scrollableW = COL_W * N;
@@ -321,6 +321,13 @@ export default function HourlyChart({ hours, locationName }: Props) {
         const cpx = (tempPts[i - 1].x + tempPts[i].x) / 2;
         ctx.bezierCurveTo(cpx, tempPts[i - 1].y, cpx, tempPts[i].y, tempPts[i].x, tempPts[i].y);
       }
+      ctx.save();
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.55)";
+      ctx.lineWidth = 7;
+      ctx.shadowColor = "#f97316";
+      ctx.shadowBlur = 14;
+      ctx.stroke();
+      ctx.restore();
       ctx.strokeStyle = "#fb923c";
       ctx.lineWidth = 2.5;
       ctx.stroke();
@@ -347,7 +354,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       }
     });
 
-    // Apparent temperature curve (pink dashed)
+    // Apparent temperature curve (blue dashed)
     const apparentPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.apparentTemp ?? h.temp ?? 0) }));
     if (apparentPts.length > 1) {
       ctx.beginPath();
@@ -357,7 +364,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
         const cpx = (apparentPts[i - 1].x + apparentPts[i].x) / 2;
         ctx.bezierCurveTo(cpx, apparentPts[i - 1].y, cpx, apparentPts[i].y, apparentPts[i].x, apparentPts[i].y);
       }
-      ctx.strokeStyle = "#f472b6";
+      ctx.strokeStyle = "#60a5fa";
       ctx.lineWidth = 1.8;
       ctx.stroke();
       ctx.setLineDash([]);
@@ -368,7 +375,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       if (v == null) return;
       const sel = selectedHour === i;
       if (i % 3 === 1 || sel) {
-        ctx.fillStyle = "#f9a8d4";
+        ctx.fillStyle = "#93c5fd";
         ctx.font = `${sel ? "bold 10" : "9"}px system-ui`;
         ctx.textAlign = "center";
         ctx.fillText(`${v.toFixed(0)}°`, pt.x, pt.y + 14);
@@ -391,7 +398,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
     windPts.forEach((pt, i) => {
       const v = hours[i].windSpeed;
       if (v == null) return;
-      if (i % 3 === 0 || selectedHour === i) {
+      if (i % 1 === 0 || selectedHour === i) {
         ctx.fillStyle = "#4ade80";
         ctx.font = "bold 9px system-ui";
         ctx.textAlign = "center";
@@ -399,7 +406,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       }
       // Wind direction arrow every 3 hours
       const dir = hours[i].windDirection;
-      if (dir != null && i % 3 === 0) {
+      if (dir != null && i % 1 === 0) {
         const angle = ((dir + 180) % 360) * (Math.PI / 180);
         ctx.save();
         ctx.translate(pt.x, pt.y + 2);
@@ -519,33 +526,36 @@ export default function HourlyChart({ hours, locationName }: Props) {
   if (hours.length === 0) return null;
 
   return (
-    <div ref={containerRef} className="w-full">
+    <section ref={containerRef} className="w-full rounded-[22px] border border-blue-500/25 bg-[linear-gradient(145deg,rgba(18,32,78,0.98),rgba(4,14,35,0.98))] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.26)]">
       {/* Header */}
-      <div className="mb-2">
+      <div className="mb-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" />
-            <span>Heure par heure</span>
+          <h2 className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-300/40 bg-blue-500/25 shadow-[0_0_18px_rgba(59,130,246,0.45)]"><Clock className="h-4 w-4 text-blue-200" /></span>
+            <span>
+              <span className="block text-base font-bold text-white">Heure par heure</span>
+              <span className="block text-[11px] font-normal text-slate-400">Prévisions détaillées</span>
+            </span>
           </h2>
-          <span className="text-[11px] text-slate-400">{N}h</span>
+          <span className="rounded-full border border-slate-500/45 bg-slate-900/60 px-3 py-1.5 text-[11px] font-semibold text-slate-200">24h⌄</span>
         </div>
         {locationName && (
           <p className="text-[11px] text-primary/70 flex items-center gap-1 mt-0.5">
             <MapPin className="h-3 w-3" /> {locationName}
           </p>
         )}
-        <div className="flex items-center gap-3 text-[11px] mt-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Temp °C</span>
-          <span className="flex items-center gap-1.5 text-pink-300"><span className="w-4 h-0 border-t-2 border-dashed border-pink-400 inline-block" /> Ressenti</span>
+          <span className="flex items-center gap-1.5 text-blue-300"><span className="w-4 h-0 border-t-2 border-dashed border-blue-400 inline-block" /> Ressenti</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
           <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
         </div>
       </div>
 
       {/* Chart area */}
-      <div className="flex" style={{ height: TOTAL_H }}>
+      <div className="flex overflow-hidden rounded-[16px] border border-white/10 bg-[#061126]/85" style={{ height: TOTAL_H }}>
         {/* Fixed left axis */}
-        <div className="flex-shrink-0 relative" style={{ width: AXIS_W, height: TOTAL_H }}>
+        <div className="relative flex-shrink-0 border-r border-white/8 bg-[#07142b]/75" style={{ width: AXIS_W, height: TOTAL_H }}>
           <span className="absolute text-[8px] text-slate-500 font-bold" style={{ top: 0, left: 2 }}>°C</span>
           {tempTicks.map(t => (
             <span key={`t-${t}`} className="absolute text-[10px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 5 }}>{t}°</span>
@@ -573,7 +583,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
 
       {/* Progress bar (interactive) */}
       {N > VISIBLE_HOURS && (
-        <div className="mt-2 mx-auto" style={{ width: "60%", maxWidth: 200 }}>
+          <div className="mt-2 mx-auto" style={{ width: "60%", maxWidth: 200 }}>
           <div
             ref={progressBarRef}
             className="h-[6px] rounded-full bg-slate-700/40 relative cursor-pointer group"
@@ -604,6 +614,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
       {selectedHour !== null && selectedHour < hours.length && (
         <HourDetailOverlay hour={hours[selectedHour]} onClose={() => setSelectedHour(null)} />
       )}
-    </div>
+    </section>
   );
 }
