@@ -15,3 +15,9 @@ La correction a été appliquée et validée : les doublons historiques ont ét�
 ## Rendu mobile
 
 Le contrôle à 375 px a confirmé la lisibilité de Fiabilité, Historique, AI Lab, Rapport et Comparaison des pondérations. La légende dense de l’Historique a été remplacée par des pastilles horizontales défilantes, qui conservent l’ensemble des modèles sans écraser la zone de tracé. Les captures isolées de Dashboard et Prévisions détaillées restent à l’état de chargement faute de session utilisateur partagée ; elles doivent être confirmées dans une session connectée.
+
+## Recette avec session réelle
+
+Le 12 août 2026, l’utilisateur a confirmé depuis son téléphone que Dashboard, Fiabilité, Historique, AI Lab, Rapport, Prévisions détaillées et Comparaison fonctionnent correctement avec ses données réelles. Cette recette valide les parcours authentifiés, les rendus mobiles et les états de données réels.
+
+La seule limite connue reste la collecte de stations Netatmo : elle nécessite l’autorisation OAuth explicite de l’utilisateur et ne peut pas être validée sans ce consentement.

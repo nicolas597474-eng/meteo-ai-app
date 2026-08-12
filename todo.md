@@ -640,9 +640,9 @@
 ## Validation de préproduction
 - [x] Validation: Exécuter TypeScript et la suite Vitest complète.
 - [x] Validation: Contrôler l’unicité des modèles par date et lieu dans les données persistées.
-- [ ] Validation: Contrôler les parcours Rapport, Détails, Historique, Comparaison, Fiabilité et AI Lab.
-- [ ] Validation: Vérifier les rendus mobiles critiques et les états sans données.
-- [ ] Rapport: Documenter les résultats, les anomalies et les limites de validation Netatmo.
+- [x] Validation: Contrôler les parcours Rapport, Détails, Historique, Comparaison, Fiabilité et AI Lab.
+- [x] Validation: Vérifier les rendus mobiles critiques et les états sans données.
+- [x] Rapport: Documenter les résultats, les anomalies et les limites de validation Netatmo.
 
 ## Audit complet non destructif
 - [x] Audit: Examiner l’architecture, les données, les calculs, les intégrations et les tâches planifiées sans modifier l’application.
