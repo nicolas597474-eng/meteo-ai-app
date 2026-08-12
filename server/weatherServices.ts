@@ -4,6 +4,7 @@
  */
 
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
+import { fetchWeather } from "./weatherFetch";
 
 // Hondeghem coordinates
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
@@ -71,7 +72,7 @@ export async function collectExpertForecasts(
           url.searchParams.set("models", service.modelId);
         }
 
-        const response = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
+        const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
         if (!response.ok) {
           console.warn(`[Collector] ${service.name} HTTP ${response.status}`);
           return null;
@@ -127,7 +128,7 @@ export async function collectObservations(
     url.searchParams.set("past_days", "7");
     url.searchParams.set("forecast_days", "0");
 
-    const response = await fetch(url.toString());
+    const response = await fetchWeather(url.toString(), {}, { timeoutMs: 10_000, attempts: 2 });
     if (!response.ok) return null;
 
     const data = await response.json();
@@ -237,7 +238,7 @@ export async function collect15DayForecast(
       url.searchParams.set("forecast_days", "16");
       if (model.modelId) url.searchParams.set("models", model.modelId);
 
-      const response = await fetch(url.toString());
+      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 10_000, attempts: 2 });
       if (!response.ok) continue;
 
       const data = await response.json();
@@ -332,7 +333,7 @@ export async function collectHourlyForecast(
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", "2");
 
-    const response = await fetch(url.toString());
+    const response = await fetchWeather(url.toString(), {}, { timeoutMs: 10_000, attempts: 2 });
     if (!response.ok) return [];
 
     const data = await response.json();
@@ -350,7 +351,7 @@ export async function collectHourlyForecast(
       aromeUrl.searchParams.set("timezone", "Europe/Paris");
       aromeUrl.searchParams.set("forecast_days", "2");
       aromeUrl.searchParams.set("models", "meteofrance_arome_france_hd");
-      const aromeResp = await fetch(aromeUrl.toString(), { signal: AbortSignal.timeout(8000) });
+      const aromeResp = await fetchWeather(aromeUrl.toString(), {}, { timeoutMs: 8_000, attempts: 2 });
       if (aromeResp.ok) {
         const aromeData = await aromeResp.json();
         if (aromeData.hourly?.time) {

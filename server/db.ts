@@ -34,6 +34,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { selectLatestForecasts } from "./forecastSelection";
+import { buildForecastUpdateSet } from "./forecastWrite";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -139,7 +140,13 @@ export function makeLocationKey(lat: number, lon: number): string {
 export async function insertForecasts(data: InsertForecast[]): Promise<void> {
   const db = await getDb();
   if (!db || data.length === 0) return;
-  await db.insert(forecasts).values(data);
+  await db.transaction(async (tx) => {
+    for (const row of data) {
+      await tx.insert(forecasts).values(row).onDuplicateKeyUpdate({
+        set: buildForecastUpdateSet(row, new Date()),
+      });
+    }
+  });
 }
 
 export async function getForecastsByDate(date: string, locationKey = "default") {

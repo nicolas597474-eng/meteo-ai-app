@@ -38,7 +38,9 @@ export const forecasts = mysqlTable("forecasts", {
   condition: varchar("condition", { length: 128 }),
   rawData: json("rawData"),
   collectedAt: timestamp("collectedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("forecasts_location_date_service_unique").on(table.locationKey, table.date, table.serviceName),
+]);
 
 export type Forecast = typeof forecasts.$inferSelect;
 export type InsertForecast = typeof forecasts.$inferInsert;

@@ -98,6 +98,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/ranking" component={Ranking} />
+      <Route path="/reliability" component={Ranking} />
       <Route path="/history" component={History} />
       <Route path="/report" component={Report} />
       <Route path="/ai-lab" component={WeatherAILab} />

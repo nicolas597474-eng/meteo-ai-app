@@ -11,6 +11,7 @@
  */
 
 import { ENV } from "./_core/env";
+import { fetchWeather } from "./weatherFetch";
 
 const PUBLIC_API_TIMEOUT_MS = 8000;
 
@@ -50,7 +51,7 @@ export async function fetchOpenWeatherMap(
     url.searchParams.set("lang", "fr");
     url.searchParams.set("cnt", "40"); // 5 jours × 8 tranches/jour
 
-    const response = await fetch(url.toString(), { signal: AbortSignal.timeout(PUBLIC_API_TIMEOUT_MS) });
+    const response = await fetchWeather(url.toString(), {}, { timeoutMs: PUBLIC_API_TIMEOUT_MS, attempts: 2 });
     if (!response.ok) {
       console.warn(`[OWM] HTTP ${response.status} for ${lat},${lon}`);
       return null;
@@ -120,15 +121,14 @@ async function getMFBearerToken(oauthKey: string): Promise<string | null> {
     return mfTokenCache.token;
   }
   try {
-    const res = await fetch("https://portail-api.meteofrance.fr/token", {
+    const res = await fetchWeather("https://portail-api.meteofrance.fr/token", {
       method: "POST",
       headers: {
         Authorization: `Basic ${oauthKey}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: "grant_type=client_credentials",
-      signal: AbortSignal.timeout(PUBLIC_API_TIMEOUT_MS),
-    });
+    }, { timeoutMs: PUBLIC_API_TIMEOUT_MS, attempts: 2 });
     if (!res.ok) {
       console.warn(`[MF] Token exchange failed: HTTP ${res.status}`);
       return null;
@@ -163,13 +163,12 @@ export async function fetchMeteoFrance(
     url.searchParams.set("lon", lon.toString());
     url.searchParams.set("lang", "fr");
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchWeather(url.toString(), {
       headers: {
         Authorization: `Bearer ${bearerToken}`,
         Accept: "application/json",
       },
-      signal: AbortSignal.timeout(PUBLIC_API_TIMEOUT_MS),
-    });
+    }, { timeoutMs: PUBLIC_API_TIMEOUT_MS, attempts: 2 });
 
     if (!response.ok) {
       console.warn(`[MF] Forecast HTTP ${response.status}`);
@@ -261,7 +260,7 @@ export async function fetchMeteoFranceViaOpenMeteo(
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", "15");
 
-    const response = await fetch(url.toString(), { signal: AbortSignal.timeout(PUBLIC_API_TIMEOUT_MS) });
+    const response = await fetchWeather(url.toString(), {}, { timeoutMs: PUBLIC_API_TIMEOUT_MS, attempts: 2 });
     if (!response.ok) {
       console.warn(`[MF-OM] HTTP ${response.status}`);
       return null;

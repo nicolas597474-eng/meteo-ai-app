@@ -636,3 +636,36 @@
 - [x] Frontend: Corriger les vues affectées sans changer les calculs non concernés.
 - [x] Tests: Couvrir les contrats corrigés et l’absence de valeurs héritées.
 - [x] Validation: Vérifier les écrans mobile et publier les corrections retenues.
+
+## Validation de préproduction
+- [x] Validation: Exécuter TypeScript et la suite Vitest complète.
+- [x] Validation: Contrôler l’unicité des modèles par date et lieu dans les données persistées.
+- [ ] Validation: Contrôler les parcours Rapport, Détails, Historique, Comparaison, Fiabilité et AI Lab.
+- [ ] Validation: Vérifier les rendus mobiles critiques et les états sans données.
+- [ ] Rapport: Documenter les résultats, les anomalies et les limites de validation Netatmo.
+
+## Audit complet non destructif
+- [x] Audit: Examiner l’architecture, les données, les calculs, les intégrations et les tâches planifiées sans modifier l’application.
+- [x] Audit: Examiner les parcours, l’interface mobile et les erreurs d’exécution sans appliquer de correctif.
+- [x] Rapport: Restituer les défaillances mesurées, leur impact, leurs preuves et les corrections proposées pour accord utilisateur.
+
+## Corrections issues de l’audit
+- [x] Sécurité: Mettre à niveau de manière contrôlée les dépendances présentant des vulnérabilités critiques ou élevées.
+- [x] Backend: Borner les coordonnées géographiques dans toutes les procédures météo publiques.
+- [x] Backend: Uniformiser les délais, les reprises bornées et les replis de fraîcheur des appels météo externes.
+- [x] Frontend: Ajouter un état d’échec accessible et une relance contrôlée pour la carte des stations.
+- [x] Exploitation: Vérifier et clarifier la source active des collectes planifiées sans interrompre les données utiles.
+- [x] Tests: Couvrir les correctifs de sécurité, coordonnées, résilience réseau et état de carte indisponible.
+- [x] Validation: Rejouer TypeScript, Vitest, l’audit de dépendances et les parcours affectés avant publication.
+
+## Route Fiabilité mobile
+- [x] Frontend: Rétablir le parcours `/reliability` vers la page Fiabilité et vérifier l’absence de page 404 sur mobile.
+
+## Lisibilité mobile de l’Historique
+- [x] Frontend: Rendre la légende multi-modèles de l’Historique lisible sur mobile sans masquer les données.
+- [x] Validation: Vérifier les graphiques Historique à 375 px avec plusieurs modèles présents.
+
+## Idempotence des prévisions collectées
+- [x] Backend: Empêcher l’insertion de doublons pour un même lieu, jour et modèle lors de collectes répétées.
+- [x] Données: Dédupliquer prudemment les doublons historiques sans supprimer la dernière collecte.
+- [x] Tests: Vérifier l’idempotence d’une collecte répétée et la sélection de la dernière collecte.

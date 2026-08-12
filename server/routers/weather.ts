@@ -39,6 +39,7 @@ import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialR
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights } from "../aiLabTrace";
+import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -141,7 +142,7 @@ export const weatherRouter = router({
    * Dashboard: today's MeteoAI forecast + stability index + top services
    */
   getDashboard: publicProcedure
-    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
     const today = getTodayParis();
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
@@ -196,7 +197,7 @@ export const weatherRouter = router({
 
   /** Snapshots successifs pouvant être comparés dans la vue des pondérations. */
   getWeightTraceHistory: publicProcedure
-    .input(z.object({ lat: z.number().optional(), lon: z.number().optional(), limit: z.number().min(2).max(60).optional() }).optional())
+    .input(z.object({ lat: latitudeSchema.optional(), lon: longitudeSchema.optional(), limit: z.number().min(2).max(60).optional() }).optional())
     .query(async ({ input }) => {
       const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
       const snapshots = await getMeteoAIForecastHistory(locationKey, input?.limit ?? 30);
@@ -213,7 +214,7 @@ export const weatherRouter = router({
 
   /** Série horaire vérifiable pour le graphique local/officiel du Dashboard. */
   getLocalOfficialDeltaHistory: publicProcedure
-    .input(z.object({ lat: z.number(), lon: z.number() }))
+    .input(requiredCoordinatesSchema)
     .query(async ({ input }) => {
       const sinceMs = Date.now() - 24 * 60 * 60 * 1000;
       const locationKey = makeLocationKey(input.lat, input.lon);
@@ -240,8 +241,8 @@ export const weatherRouter = router({
   /** Écarts de poids, source par source, entre deux snapshots du même lieu. */
   compareWeightSnapshots: publicProcedure
     .input(z.object({
-      lat: z.number().optional(),
-      lon: z.number().optional(),
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
       beforeId: z.number().int().positive(),
       afterId: z.number().int().positive(),
     }))
@@ -279,7 +280,7 @@ export const weatherRouter = router({
    * Full ranking of all services with cumulative scores
    */
   getRanking: publicProcedure
-    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
     const today = getTodayParis();
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
@@ -400,8 +401,8 @@ export const weatherRouter = router({
     .input(
       z.object({
         days: z.number().min(1).max(30).default(7),
-        lat: z.number().optional(),
-        lon: z.number().optional(),
+        lat: latitudeSchema.optional(),
+        lon: longitudeSchema.optional(),
       })
     )
     .query(async ({ input }) => {
@@ -435,8 +436,8 @@ export const weatherRouter = router({
     .input(
       z.object({
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-        lat: z.number().optional(),
-        lon: z.number().optional(),
+        lat: latitudeSchema.optional(),
+        lon: longitudeSchema.optional(),
       })
     )
     .query(async ({ input }) => {
@@ -531,7 +532,7 @@ export const weatherRouter = router({
    * 15-day MeteoAI forecast from multiple models
    */
   get15DayForecast: publicProcedure
-    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
@@ -543,7 +544,7 @@ export const weatherRouter = router({
    * Hourly forecast for today
    */
   getHourlyForecast: publicProcedure
-    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
@@ -555,7 +556,7 @@ export const weatherRouter = router({
    * Detailed forecast page: 48h hourly + 15-day daily + regime + confidence
    */
   getDetailedForecast: publicProcedure
-    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
@@ -845,7 +846,7 @@ export const weatherRouter = router({
    * Weather AI Lab — full transparency data for the AI Lab page
    */
   getAILab: publicProcedure
-    .input(z.object({ lat: z.number().optional(), lon: z.number().optional() }).optional())
+    .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
     const today = getTodayParis();
     const locationKey = input?.lat && input?.lon ? makeLocationKey(input.lat, input.lon) : undefined;
@@ -1035,8 +1036,8 @@ export const weatherRouter = router({
    */
   searchStations: publicProcedure
     .input(z.object({
-      lat: z.number().optional(),
-      lon: z.number().optional(),
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
       radiusKm: z.number().min(1).max(50).default(20),
     }))
     .query(async ({ input, ctx }) => {
@@ -1123,8 +1124,8 @@ export const weatherRouter = router({
    */
   getGroundTruth: publicProcedure
     .input(z.object({
-      lat: z.number().optional(),
-      lon: z.number().optional(),
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
       radiusKm: z.number().min(1).max(50).default(20),
     }))
     .query(async ({ input }) => {
@@ -1209,8 +1210,8 @@ export const weatherRouter = router({
   getStationDetail: publicProcedure
     .input(z.object({
       stationId: z.string(),
-      lat: z.number().optional(),
-      lon: z.number().optional(),
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
       radiusKm: z.number().min(1).max(50).default(20),
     }))
     .query(async ({ input }) => {
@@ -1237,8 +1238,8 @@ export const weatherRouter = router({
    */
   getLeadTimeScores: publicProcedure
     .input(z.object({
-      lat: z.number().optional(),
-      lon: z.number().optional(),
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
       days: z.number().min(1).max(90).default(14),
     }).optional())
     .query(async ({ input }) => {
@@ -1253,8 +1254,8 @@ export const weatherRouter = router({
   /** Physical station evidence and official forecast, aligned by Paris hour. */
   getStationReliabilityOverview: publicProcedure
     .input(z.object({
-      lat: z.number().optional(),
-      lon: z.number().optional(),
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
       periodDays: z.union([z.literal(1), z.literal(7)]).optional(),
       radiusKm: z.number().min(5).max(50).optional(),
     }).optional())

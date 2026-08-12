@@ -42,6 +42,19 @@ function getModelColor(name: string): string {
   return MODEL_COLORS[name] || `hsl(${(name.charCodeAt(0) * 37) % 360}, 70%, 55%)`;
 }
 
+function ChartLegend({ entries }: { entries: Array<{ label: string; color: string }> }) {
+  return (
+    <div className="mt-3 flex max-w-full gap-3 overflow-x-auto pb-1 text-[10px] text-muted-foreground scrollbar-hide" aria-label="Légende du graphique">
+      {entries.map((entry) => (
+        <span key={entry.label} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          {entry.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function History() {
   const [days, setDays] = useState(14);
   const [activeTab, setActiveTab] = useState<"temperature" | "precip" | "wind" | "scores" | "leadtime">("temperature");
@@ -222,6 +235,11 @@ export default function History() {
                 <Thermometer className="h-5 w-5 text-primary" />
                 Températures Max — Modèles vs Observations
               </h3>
+              <ChartLegend entries={[
+                { label: "Obs. Max", color: "#34d399" },
+                { label: "MeteoAI", color: "#60a5fa" },
+                ...modelNames.map((name) => ({ label: name, color: getModelColor(name) })),
+              ]} />
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
@@ -229,7 +247,6 @@ export default function History() {
                     <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
                     <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit="°C" />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
                     {/* Observation line (thick, dashed) */}
                     <Line type="monotone" dataKey="obsMax" name="Obs. Max" stroke="#34d399" strokeWidth={3} strokeDasharray="6 3" dot={{ r: 4 }} />
                     {/* MeteoAI line (thick, solid) */}
@@ -257,6 +274,11 @@ export default function History() {
                 <Thermometer className="h-5 w-5 text-blue-400" />
                 Températures Min — Modèles vs Observations
               </h3>
+              <ChartLegend entries={[
+                { label: "Obs. Min", color: "#6ee7b7" },
+                { label: "MeteoAI", color: "#93c5fd" },
+                ...modelNames.map((name) => ({ label: name, color: getModelColor(name) })),
+              ]} />
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
@@ -264,7 +286,6 @@ export default function History() {
                     <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
                     <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit="°C" />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Line type="monotone" dataKey="obsMin" name="Obs. Min" stroke="#6ee7b7" strokeWidth={3} strokeDasharray="6 3" dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="meteoAIMin" name="MeteoAI" stroke="#93c5fd" strokeWidth={3} dot={{ r: 3 }} />
                     {modelNames.map((name) => (
