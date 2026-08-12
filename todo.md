@@ -575,3 +575,8 @@
 ## Refus Netatmo avant code OAuth
 - [x] Backend: Afficher et journaliser de manière non sensible le paramètre d’erreur retourné par Netatmo.
 - [ ] Configuration: Corriger la Redirect URI ou les identifiants selon le code de refus reçu.
+
+## Cohérence des prochains changements de régime
+- [x] Backend: Utiliser un unique régime de créneau horaire pour les annonces de transition.
+- [x] Frontend: Afficher le même libellé dans « Prochain changement » et « Régime à venir ».
+- [x] Tests: Vérifier l’identité des deux annonces pour un même créneau de transition.

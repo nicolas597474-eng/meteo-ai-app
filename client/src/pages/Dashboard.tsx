@@ -436,16 +436,12 @@ export default function Dashboard() {
                   ) : (
                     <p className="mt-1 text-[11px] text-sky-200/90">Prévision officielle consolidée</p>
                   )}
-                  {nextConditionChange && (
+                  {(nextRegimeChange ?? nextConditionChange) && (
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
                       <Clock className="h-3 w-3" />
-                      Prochain changement : {nextConditionChange.condition} à {nextConditionChange.hour}
-                    </p>
-                  )}
-                  {nextRegimeChange && (
-                    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-300">
-                      <MeteoIcon name="cloud_cover" size={13} />
-                      Régime à venir : {nextRegimeChange.emoji} {nextRegimeChange.label} à {nextRegimeChange.hour}
+                      Prochain changement de régime : {nextRegimeChange
+                        ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} à ${nextRegimeChange.hour}`
+                        : `${nextConditionChange!.condition} à ${nextConditionChange!.hour}`}
                     </p>
                   )}
                 </div>
