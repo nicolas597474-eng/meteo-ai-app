@@ -1,121 +1,79 @@
-/**
- * Weather landscape images - dynamically selected based on the active weather regime.
- * Each image is a realistic oil painting style landscape matching the weather condition.
- * Maps directly to the 20 ExtendedRegime IDs from fusionEngine.ts.
- */
-
+/** Fonds photographiques de la grande carte de conditions actuelles du Dashboard. */
 const WEATHER_IMAGES: Record<string, string> = {
-  // Cloud-based regimes
-  overcast: '/manus-storage/weather-cloudy_8ce5d14c.jpg',
-  partly_cloudy: '/manus-storage/weather-partly-cloudy_f78acb3b.jpg',
-  few_clouds: '/manus-storage/weather-partly-cloudy_f78acb3b.jpg',
-  sunny: '/manus-storage/weather-sunny_b9457972.jpg',
-
-  // Fog
-  fog: '/manus-storage/weather-fog_8537592c.jpg',
-
-  // Precipitation
-  showers: '/manus-storage/weather-rain_73f27126.jpg',
-  rainy: '/manus-storage/weather-rain_73f27126.jpg',
-  thunderstorm: '/manus-storage/weather-storm_32351de6.jpg',
-
-  // Wind
-  windy: '/manus-storage/weather-wind_056d4f5a.jpg',
-  storm: '/manus-storage/weather-storm_32351de6.jpg',
-
-  // Cold
-  snow: '/manus-storage/weather-snow_835ed640.jpg',
-  frost: '/manus-storage/weather-frost_8d70ce79.jpg',
-  freezing_rain: '/manus-storage/weather-snow_835ed640.jpg',
-  deep_frost: '/manus-storage/weather-frost_8d70ce79.jpg',
-  cold_wave: '/manus-storage/weather-frost_8d70ce79.jpg',
-
-  // Heat
-  summer_heat: '/manus-storage/weather-heatwave_ffafe03d.jpg',
-
-  // Seasonal
-  variable: '/manus-storage/weather-partly-cloudy_f78acb3b.jpg',
-  spring_unstable: '/manus-storage/weather-partly-cloudy_f78acb3b.jpg',
-  stable: '/manus-storage/weather-sunny_b9457972.jpg',
-  autumn_disturbed: '/manus-storage/weather-rain_73f27126.jpg',
+  sunny: "/manus-storage/meteoai-weather-sunny-master_e597fa3a.jpg",
+  few_clouds: "/manus-storage/meteoai-weather-few-clouds_ff8a0419.jpg",
+  cloudy: "/manus-storage/meteoai-weather-cloudy_0c7e1be9.jpg",
+  overcast: "/manus-storage/meteoai-weather-overcast_d7af5581.jpg",
+  fog: "/manus-storage/meteoai-weather-fog_413e0cc3.jpg",
+  showers: "/manus-storage/meteoai-weather-showers_4efd169c.jpg",
+  drizzle: "/manus-storage/meteoai-weather-drizzle_23214653.jpg",
+  rainy: "/manus-storage/meteoai-weather-rain_6ed21a21.jpg",
+  heavy_rain: "/manus-storage/meteoai-weather-heavy-rain_08d62cb0.jpg",
+  thunderstorm: "/manus-storage/meteoai-weather-thunderstorm_851b62da.jpg",
+  violent_storm: "/manus-storage/meteoai-weather-violent-storm_f79f94a5.jpg",
+  snow: "/manus-storage/meteoai-weather-snow_7b345883.jpg",
+  heavy_snow: "/manus-storage/meteoai-weather-heavy-snow_c321957c.jpg",
+  freezing_rain: "/manus-storage/meteoai-weather-freezing-rain_b20385ef.jpg",
+  frost: "/manus-storage/meteoai-weather-frost_910ff338.jpg",
+  cold_sun: "/manus-storage/meteoai-weather-cold-sun_7cb7d792.jpg",
+  windy: "/manus-storage/meteoai-weather-windy_e1c61512.jpg",
+  heat: "/manus-storage/meteoai-weather-heat_c9ae1fc3.jpg",
+  dust_haze: "/manus-storage/meteoai-weather-dust-haze_9044262d.jpg",
 };
 
-// Default fallback image (partly cloudy - neutral)
-const DEFAULT_IMAGE = '/manus-storage/weather-partly-cloudy_f78acb3b.jpg';
+const DEFAULT_IMAGE = WEATHER_IMAGES.few_clouds;
 
-/**
- * Get the landscape image URL based on the dominant weather regime ID.
- * Matches directly against the 20 ExtendedRegime IDs.
- */
+function normalize(value: string | null | undefined) {
+  return (value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\s-]+/g, "_").trim();
+}
+
+const CONDITION_RULES: Array<[string[], keyof typeof WEATHER_IMAGES]> = [
+  [["pluie_verglacante", "verglas", "freezing"], "freezing_rain"],
+  [["neige_forte", "forte_neige", "heavy_snow"], "heavy_snow"],
+  [["neige", "snow"], "snow"],
+  [["orage_violent", "violent_storm"], "violent_storm"],
+  [["fort_orage", "thunderstorm", "orage"], "thunderstorm"],
+  [["pluie_forte", "heavy_rain", "forte_pluie"], "heavy_rain"],
+  [["bruine", "drizzle"], "drizzle"],
+  [["averse", "showers"], "showers"],
+  [["pluie", "rain", "rainy"], "rainy"],
+  [["brouillard", "brume", "fog", "mist"], "fog"],
+  [["poussiere", "brume_seche", "dust", "haze"], "dust_haze"],
+  [["vent_fort", "windy", "rafale", "wind"], "windy"],
+  [["givre", "gel", "frost"], "frost"],
+  [["grand_soleil", "cold_sun"], "cold_sun"],
+  [["canicule", "chaleur", "heat"], "heat"],
+  [["couvert", "tres_nuageux", "overcast"], "overcast"],
+  [["nuageux", "cloudy"], "cloudy"],
+  [["eclaircies", "peu_nuageux", "partiellement_nuageux", "few_clouds", "partly_cloudy"], "few_clouds"],
+  [["ensoleille", "sunny", "clear", "soleil"], "sunny"],
+];
+
 export function getWeatherLandscapeImage(regime: string | undefined | null): string {
-  if (!regime) return DEFAULT_IMAGE;
-
-  // Normalize: lowercase, replace spaces/hyphens with underscores, remove accents
-  const normalized = regime
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\s-]+/g, '_')
-    .trim();
-
-  // Direct match against regime IDs
-  if (WEATHER_IMAGES[normalized]) {
-    return WEATHER_IMAGES[normalized];
-  }
-
-  // Keyword-based fallback matching
-  const keywords: [string[], string][] = [
-    [['soleil', 'sunny', 'clear', 'ensoleill', 'beau'], 'sunny'],
-    [['orage', 'thunder', 'foudre', 'eclair'], 'thunderstorm'],
-    [['tempete', 'storm'], 'storm'],
-    [['neige', 'snow', 'vergla'], 'snow'],
-    [['brouillard', 'fog', 'brume', 'mist'], 'fog'],
-    [['pluie', 'rain', 'averse', 'precip'], 'rainy'],
-    [['vent', 'wind', 'rafale'], 'windy'],
-    [['canicule', 'heat', 'chaleur', 'chaud'], 'summer_heat'],
-    [['gel', 'frost', 'froid', 'glace', 'givre'], 'frost'],
-    [['couvert', 'overcast', 'gris'], 'overcast'],
-    [['nuageux', 'cloud', 'nuage'], 'partly_cloudy'],
-    [['stable', 'calme', 'ete'], 'stable'],
-    [['variable', 'instable', 'perturb', 'automne'], 'variable'],
-  ];
-
-  for (const [kws, key] of keywords) {
-    if (kws.some(kw => normalized.includes(kw))) {
-      return WEATHER_IMAGES[key] || DEFAULT_IMAGE;
-    }
-  }
-
+  const normalized = normalize(regime);
+  for (const [keywords, key] of CONDITION_RULES) if (keywords.some((keyword) => normalized.includes(keyword))) return WEATHER_IMAGES[key];
   return DEFAULT_IMAGE;
 }
 
-/**
- * Get image based on weather data (temperature, cloud cover, precipitation, wind).
- * Used when no regime string is available but raw data is.
- */
-export function getWeatherImageFromData(params: {
-  temperature?: number;
-  cloudCover?: number;
-  precipitation?: number;
-  windSpeed?: number;
-  visibility?: number;
-}): string {
+export function getWeatherImageFromData(params: { temperature?: number; cloudCover?: number; precipitation?: number; windSpeed?: number; visibility?: number }): string {
   const { temperature, cloudCover, precipitation, windSpeed, visibility } = params;
-
-  // Priority-based selection (most impactful condition first)
-  if (precipitation && precipitation > 10) return WEATHER_IMAGES.rainy;
-  if (windSpeed && windSpeed > 60) return WEATHER_IMAGES.storm;
-  if (windSpeed && windSpeed > 40) return WEATHER_IMAGES.windy;
-  if (visibility !== undefined && visibility < 1000) return WEATHER_IMAGES.fog;
-  if (temperature !== undefined && temperature > 33) return WEATHER_IMAGES.summer_heat;
-  if (temperature !== undefined && temperature < -5) return WEATHER_IMAGES.deep_frost;
-  if (temperature !== undefined && temperature < 0) return WEATHER_IMAGES.frost;
-  if (precipitation && precipitation > 5) return WEATHER_IMAGES.rainy;
-  if (precipitation && precipitation > 0.5) return WEATHER_IMAGES.showers;
+  if ((precipitation ?? 0) > 10) return WEATHER_IMAGES.heavy_rain;
+  if ((windSpeed ?? 0) > 60) return WEATHER_IMAGES.violent_storm;
+  if ((visibility ?? Infinity) < 1000) return WEATHER_IMAGES.fog;
+  if ((temperature ?? -Infinity) > 33) return WEATHER_IMAGES.heat;
+  if ((temperature ?? Infinity) < -5) return WEATHER_IMAGES.cold_sun;
+  if ((temperature ?? Infinity) < 0) return WEATHER_IMAGES.frost;
+  if ((precipitation ?? 0) > 0.5) return WEATHER_IMAGES.rainy;
+  if ((windSpeed ?? 0) > 40) return WEATHER_IMAGES.windy;
   if (cloudCover !== undefined && cloudCover > 80) return WEATHER_IMAGES.overcast;
-  if (cloudCover !== undefined && cloudCover > 50) return WEATHER_IMAGES.partly_cloudy;
+  if (cloudCover !== undefined && cloudCover > 50) return WEATHER_IMAGES.cloudy;
   if (cloudCover !== undefined && cloudCover > 20) return WEATHER_IMAGES.few_clouds;
-  if (cloudCover !== undefined && cloudCover <= 20) return WEATHER_IMAGES.sunny;
+  return cloudCover !== undefined ? WEATHER_IMAGES.sunny : DEFAULT_IMAGE;
+}
 
-  return DEFAULT_IMAGE;
+/** La condition de l’heure courante est toujours prioritaire sur le régime journalier. */
+export function getDashboardWeatherImage(params: { condition?: string | null; temperature?: number; cloudCover?: number; precipitation?: number; windSpeed?: number; visibility?: number; regime?: string | null }): string {
+  if (normalize(params.condition)) return getWeatherLandscapeImage(params.condition);
+  if (params.regime) return getWeatherLandscapeImage(params.regime);
+  return getWeatherImageFromData(params);
 }

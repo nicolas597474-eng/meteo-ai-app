@@ -756,3 +756,9 @@
 - [x] Frontend: Ouvrir une modale au clic sur une source affichant ses mesures brutes et sa provenance.
 - [x] Frontend: Expliquer dans la modale la contribution réelle ou l’exclusion de la source du calcul local.
 - [x] Tests: Vérifier la présence des données de transparence et les messages de garde-fou par type de source.
+
+## Fonds illustrés du Dashboard selon la météo
+- [x] Assets: Produire un ensemble cohérent de paysages météo, sans texte ni élément d’interface.
+- [x] Frontend: Associer le fond de la carte Dashboard à la condition actuelle du lieu actif.
+- [x] Cible: Appliquer le fond uniquement dans la grande carte de conditions actuelles, derrière les indicateurs météo.
+- [x] Tests: Vérifier le mapping des conditions vers les fonds et la conservation de la lisibilité.

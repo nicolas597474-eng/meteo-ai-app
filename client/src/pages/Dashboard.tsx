@@ -4,7 +4,7 @@ import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, 
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
-import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weatherImages";
+import { getDashboardWeatherImage } from "@/lib/weatherImages";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
@@ -361,13 +361,13 @@ export default function Dashboard() {
 
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
-          {/* Dynamic landscape image based on weather regime */}
+          {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
           <img
-            src={regime ? getWeatherLandscapeImage(regime.label) : getWeatherImageFromData({ temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
+            src={getDashboardWeatherImage({ condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
             alt="Paysage météo"
-            className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
+            className="absolute inset-0 h-full w-full object-cover opacity-45 pointer-events-none"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/52 to-slate-950/88 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
             <div className={dashboardTemperatureLayout.mobileHeader}>
