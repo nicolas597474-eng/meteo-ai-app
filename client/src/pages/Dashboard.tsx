@@ -10,50 +10,6 @@ import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weather
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 
-// ─── Day Summary helper ──────────────────────────────────────────────────────
-function getDaySummary(hours: any[]): { text: string; trendIcon: string } {
-  const morningHours = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 6 && hr < 12; });
-  const afternoonHours = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 12 && hr < 19; });
-  const eveningHours = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 19 || hr < 6; });
-
-  const getMainCondition = (hrs: any[]) => {
-    if (hrs.length === 0) return "variable";
-    const conditions = hrs.map((h: any) => h.condition ?? "").filter(Boolean);
-    if (conditions.length === 0) {
-      const avgCloud = hrs.reduce((a: number, h: any) => a + (h.cloudCover ?? 50), 0) / hrs.length;
-      const totalPrecip = hrs.reduce((a: number, h: any) => a + (h.precipitation ?? 0), 0);
-      if (totalPrecip > 2) return "pluie";
-      if (avgCloud > 80) return "couvert";
-      if (avgCloud > 50) return "nuageux";
-      return "ensoleillé";
-    }
-    const freq: Record<string, number> = {};
-    conditions.forEach((c: string) => { freq[c] = (freq[c] ?? 0) + 1; });
-    return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
-  };
-
-  const mCond = getMainCondition(morningHours);
-  const aCond = getMainCondition(afternoonHours);
-  const eCond = getMainCondition(eveningHours);
-
-  const condLabel = (c: string) => {
-    const cl = c.toLowerCase();
-    if (cl.includes("orage")) return "orages";
-    if (cl.includes("pluie forte")) return "pluie forte";
-    if (cl.includes("pluie") || cl.includes("averse")) return "averses";
-    if (cl.includes("couvert")) return "ciel couvert";
-    if (cl.includes("nuageux") || cl.includes("partiellement")) return "éclaircies";
-    if (cl.includes("ensoleillé") || cl.includes("dégagé")) return "soleil";
-    if (cl.includes("brouillard")) return "brouillard";
-    if (cl.includes("neige")) return "neige";
-    return cl || "variable";
-  };
-
-  const text = `Matin : ${condLabel(mCond)}. Après-midi : ${condLabel(aCond)}. Soir : ${condLabel(eCond)}.`;
-  const trendIcon = getIconNameFromCondition(aCond);
-  return { text, trendIcon };
-}
-
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
   const dir = direction ?? 0;
@@ -480,20 +436,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
-        {/* ── Résumé de la journée avec icône tendance ── */}
-        {hours.length > 0 && (() => {
-          const summary = getDaySummary(hours);
-          return (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border">
-              <MeteoIcon name={summary.trendIcon} size={36} />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-primary mb-0.5">Résumé de la journée</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{summary.text}</p>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* ── Link to details page ── */}
         <a href="/details" className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors">

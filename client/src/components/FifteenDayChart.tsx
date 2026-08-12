@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset, Gauge, Navigation, Eye, MapPin } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 
@@ -136,70 +136,6 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ─── AI Analysis ──────────────────────────────────────────────────────────────
-function AIAnalysis({ days }: { days: DayData[] }) {
-  const analysis = useMemo(() => {
-    if (days.length === 0) return null;
-    const maxTemps = days.map(d => d.tempMax ?? 0);
-    const minTemps = days.map(d => d.tempMin ?? 0);
-    const precips = days.map(d => d.precipitation ?? 0);
-    const winds = days.map(d => d.windSpeed ?? 0);
-
-    const hottestIdx = maxTemps.indexOf(Math.max(...maxTemps));
-    const coldestIdx = minTemps.indexOf(Math.min(...minTemps));
-    const rainyDays = days.filter(d => (d.precipitation ?? 0) > 1);
-    const avgMax = maxTemps.reduce((a, b) => a + b, 0) / maxTemps.length;
-    const avgWind = winds.reduce((a, b) => a + b, 0) / winds.length;
-    const maxWind = Math.max(...winds);
-    const totalPrecip = precips.reduce((a, b) => a + b, 0);
-
-    // Trend
-    const firstHalf = maxTemps.slice(0, 7).reduce((a, b) => a + b, 0) / 7;
-    const secondHalf = maxTemps.slice(7).reduce((a, b) => a + b, 0) / Math.max(maxTemps.length - 7, 1);
-    const trend = secondHalf - firstHalf > 2 ? "hausse" : secondHalf - firstHalf < -2 ? "baisse" : "stable";
-
-    // Events
-    const events: string[] = [];
-    if (Math.max(...maxTemps) >= 33) events.push("🌡️ Épisode de forte chaleur détecté");
-    if (days.some(d => (d.condition ?? "").toLowerCase().includes("orage"))) events.push("⚡ Risque orageux identifié");
-    if (maxWind > 50) events.push("💨 Rafales importantes prévues");
-    if (Math.min(...minTemps) < 5) events.push("❄️ Fraîcheur marquée en matinée");
-
-    const hottestDate = formatDate(days[hottestIdx].date);
-    const coldestDate = formatDate(days[coldestIdx].date);
-
-    let summary = `**Tendance générale :** Températures en ${trend} sur la période, avec une moyenne des maximales de ${avgMax.toFixed(1)}°C. `;
-    summary += `**Jour le plus chaud :** ${hottestDate.line1} ${hottestDate.line2} (${maxTemps[hottestIdx].toFixed(1)}°C). `;
-    summary += `**Jour le plus frais :** ${coldestDate.line1} ${coldestDate.line2} (${minTemps[coldestIdx].toFixed(1)}°C). `;
-    if (rainyDays.length > 0) {
-      summary += `**Pluie :** ${rainyDays.length} jour${rainyDays.length > 1 ? "s" : ""} avec précipitations (cumul ${totalPrecip.toFixed(1)} mm). `;
-    } else {
-      summary += `**Pluie :** Aucune précipitation significative prévue. `;
-    }
-    summary += `**Vent :** Moyenne ${avgWind.toFixed(0)} km/h, pointes à ${maxWind.toFixed(0)} km/h.`;
-
-    return { summary, events };
-  }, [days]);
-
-  if (!analysis) return null;
-
-  return (
-    <div className="mt-3 p-3 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-500/10 rounded-xl">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">🤖 Analyse IA</span>
-      </div>
-      <p className="text-[11px] text-slate-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: analysis.summary.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>') }} />
-      {analysis.events.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {analysis.events.map((e, i) => (
-            <span key={i} className="text-[10px] px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-slate-300">{e}</span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -637,9 +573,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
           <p className="text-center text-[9px] text-slate-500 mt-1">Cliquez ou glissez pour naviguer</p>
         </div>
       )}
-
-      {/* ── AI Analysis ───────────────────────────────────────────────────── */}
-      <AIAnalysis days={displayDays} />
 
       {/* ── Overlay detail panel ──────────────────────────────────────────── */}
       {selectedDay !== null && selectedDay < displayDays.length && (

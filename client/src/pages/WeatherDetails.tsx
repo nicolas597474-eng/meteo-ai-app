@@ -85,47 +85,6 @@ const CHART_OPTIONS: { key: ChartType; label: string }[] = [
   { key: "clouds", label: "Nuages" },
 ];
 
-// ─── AI Summary generator ───────────────────────────────────────────────────
-
-function generateHourlySummary(hours: any[]): string {
-  if (!hours || hours.length === 0) return "";
-  
-  // Group by period
-  const morning = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 6 && hr < 12; });
-  const afternoon = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 12 && hr < 18; });
-  const evening = hours.filter((h: any) => { const hr = parseInt(h.hour); return hr >= 18 && hr < 22; });
-
-  const describePeriod = (period: any[], name: string) => {
-    if (period.length === 0) return "";
-    const avgTemp = Math.round(period.reduce((s: number, h: any) => s + (h.temp ?? 0), 0) / period.length);
-    const maxWind = Math.round(Math.max(...period.map((h: any) => h.windSpeed ?? 0)));
-    const totalPrecip = period.reduce((s: number, h: any) => s + (h.precipitation ?? 0), 0);
-    const avgCloud = Math.round(period.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / period.length);
-    
-    let desc = `${name} : ${avgTemp}°C`;
-    if (avgCloud > 80) desc += ", ciel couvert";
-    else if (avgCloud > 50) desc += ", nuageux";
-    else if (avgCloud > 25) desc += ", partiellement nuageux";
-    else desc += ", ensoleillé";
-    
-    if (totalPrecip > 2) desc += `, pluie (${totalPrecip.toFixed(1)} mm)`;
-    else if (totalPrecip > 0.2) desc += ", faibles averses possibles";
-    
-    if (maxWind > 40) desc += `, vent fort (${maxWind} km/h)`;
-    else if (maxWind > 20) desc += `, vent modéré (${maxWind} km/h)`;
-    
-    return desc + ".";
-  };
-
-  const parts = [
-    describePeriod(morning, "Matin"),
-    describePeriod(afternoon, "Après-midi"),
-    describePeriod(evening, "Soirée"),
-  ].filter(Boolean);
-
-  return parts.join(" ");
-}
-
 function generateDaySummary(day: any, hours: any[]): string {
   const tempRange = `${day.tempMin?.toFixed(0) ?? "?"}°C à ${day.tempMax?.toFixed(0) ?? "?"}°C`;
   let summary = `Températures de ${tempRange}`;
@@ -371,25 +330,7 @@ export default function WeatherDetails() {
           </div>
         </section>
 
-        {/* ═══ SECTION 3: RÉSUMÉ IA ═══ */}
-        <section className="mb-4">
-          <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
-            <h2 className="text-amber-400 font-bold text-sm mb-2 flex items-center gap-2">
-              <MeteoIcon name="confidence" size={14} />
-              Résumé IA des prochaines heures
-            </h2>
-            <p className="text-slate-300 text-xs leading-relaxed">
-              {generateHourlySummary(hours)}
-            </p>
-            {bestModel && (
-              <p className="text-[10px] text-slate-500 mt-2">
-                Basé sur {bestModel.name} (score {bestModel.score.toFixed(1)}/100) • Confiance {Math.round(confidence?.current ?? 0)}%
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* ═══ SECTION 4: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
+        {/* ═══ SECTION 3: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
         <section className="mb-4">
           <h2 className="text-cyan-400 font-bold text-sm mb-3">Prévisions des prochains jours</h2>
           

@@ -319,3 +319,9 @@
 - [x] Frontend: Page Notifications.tsx avec historique des alertes et configuration des seuils par lieu — annulée.
 - [x] Frontend: Badge de notification dans la navigation — annulé.
 - [x] Frontend: Toast in-app lors de la détection d'un régime dangereux au chargement du Dashboard — annulé.
+
+## Simplification du Dashboard — suppression des résumés
+- [x] Frontend: Supprimer le bloc « Résumé de la journée » sous la carte principale du Dashboard.
+- [x] Frontend: Supprimer le bloc « Analyse IA » sous le graphique des prévisions à 16 jours.
+- [x] Frontend: Supprimer le bloc « Résumé IA des prochaines heures » de la page Détails météo.
+- [x] Frontend: Nettoyer les helpers, props et imports devenus inutiles puis vérifier TypeScript et Vitest.
