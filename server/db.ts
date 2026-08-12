@@ -27,12 +27,14 @@ import {
   stationObservations,
   groundTruth,
   stationCollectionSnapshots,
+  qualifiedObservationSnapshots,
   netatmoOAuthTokens,
   netatmoOAuthStates,
   InsertWeatherStation,
   InsertStationObservation,
   InsertGroundTruth,
   InsertStationCollectionSnapshot,
+  InsertQualifiedObservationSnapshot,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { selectLatestForecasts } from "./forecastSelection";
@@ -606,6 +608,26 @@ export async function upsertStationObservation(data: InsertStationObservation): 
     return;
   }
   await db.insert(stationObservations).values(data);
+}
+
+/** Idempotent physical synthesis for one location and Paris hour. */
+export async function upsertQualifiedObservationSnapshot(data: InsertQualifiedObservationSnapshot): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db
+    .select({ id: qualifiedObservationSnapshots.id })
+    .from(qualifiedObservationSnapshots)
+    .where(and(
+      eq(qualifiedObservationSnapshots.locationKey, data.locationKey),
+      eq(qualifiedObservationSnapshots.date, data.date),
+      eq(qualifiedObservationSnapshots.hour, data.hour),
+    ))
+    .limit(1);
+  if (existing[0]) {
+    await db.update(qualifiedObservationSnapshots).set({ ...data, collectedAt: new Date() }).where(eq(qualifiedObservationSnapshots.id, existing[0].id));
+    return;
+  }
+  await db.insert(qualifiedObservationSnapshots).values(data);
 }
 
 /** Upsert the daily local synthesis for one reference location. */

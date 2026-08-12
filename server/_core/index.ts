@@ -39,10 +39,11 @@ async function startServer() {
   registerOAuthRoutes(app);
   registerNetatmoOAuthRoutes(app);
   // Scheduled handlers (heartbeat cron callbacks)
-  const { collectForecastsHandler, collectObservationsHandler, collectFavoritesForecastsHandler } = await import("../scheduledHandlers");
+  const { collectForecastsHandler, collectObservationsHandler, collectFavoritesForecastsHandler, collectPhysicalObservationSnapshotsHandler } = await import("../scheduledHandlers");
   app.post("/api/scheduled/collect-forecasts", collectForecastsHandler);
   app.post("/api/scheduled/collect-observations", collectObservationsHandler);
   app.post("/api/scheduled/collect-favorites-forecasts", collectFavoritesForecastsHandler);
+  app.post("/api/scheduled/collect-physical-observation-snapshots", collectPhysicalObservationSnapshotsHandler);
 
   // tRPC API
   app.use(

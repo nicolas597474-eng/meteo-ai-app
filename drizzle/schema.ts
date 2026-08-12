@@ -245,6 +245,32 @@ export type StationObservation = typeof stationObservations.$inferSelect;
 export type InsertStationObservation = typeof stationObservations.$inferInsert;
 
 /**
+ * Physical-station synthesis captured for one location and Paris hour.
+ * It is separate from model references and is the sole eligible input for
+ * a later daily observation used in model scoring.
+ */
+export const qualifiedObservationSnapshots = mysqlTable("qualified_observation_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  hour: int("hour").notNull(),
+  stationCount: int("stationCount").notNull(),
+  confidenceScore: float("confidenceScore"),
+  temperature: float("temperature"),
+  humidity: float("humidity"),
+  pressure: float("pressure"),
+  windSpeed: float("windSpeed"),
+  windGust: float("windGust"),
+  precipitation: float("precipitation"),
+  stationsUsed: json("stationsUsed"),
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("qualified_observation_snapshot_location_date_hour_unique").on(table.locationKey, table.date, table.hour),
+]);
+export type QualifiedObservationSnapshot = typeof qualifiedObservationSnapshots.$inferSelect;
+export type InsertQualifiedObservationSnapshot = typeof qualifiedObservationSnapshots.$inferInsert;
+
+/**
  * Ground truth computed from multiple nearby stations (weighted average).
  * Stored per location + date for use in forecast accuracy scoring.
  */

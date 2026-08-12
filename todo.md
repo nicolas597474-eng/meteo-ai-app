@@ -800,3 +800,15 @@
 - [x] Schéma: Marquer explicitement les scores comme qualifiés ou historiques non vérifiés.
 - [x] Backend: Exclure les scores non qualifiés des poids, biais et corrections opérationnels.
 - [x] Tests: Vérifier un repli transparent quand aucune observation physique qualifiée n’est disponible.
+
+## Phase 4 — scoring par observation physique qualifiée
+- [ ] Contrat: Définir l’alignement temporel entre une émission de prévision et une observation physique.
+- [ ] Backend: Calculer des erreurs par modèle uniquement lorsque la couverture station satisfait les seuils de qualité.
+- [ ] Automatisation: Raccorder ce calcul idempotent à la collecte d’observations existante.
+- [ ] Tests: Vérifier les cas alignés, incomplets, trop anciens et sans station qualifiée.
+
+## Phase 4A — snapshots physiques horaires
+- [x] Schéma: Conserver des snapshots horaires idempotents des stations physiques par lieu.
+- [x] Backend: Agréger une journée uniquement si la couverture et la fraîcheur respectent les seuils définis.
+- [ ] Automatisation: Ajouter un cycle Heartbeat horaire sans modifier les poids opérationnels.
+- [x] Tests: Vérifier l’exclusion des capteurs candidats et l’idempotence des snapshots.

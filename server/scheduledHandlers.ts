@@ -48,6 +48,7 @@ import {
   upsertWeatherStation,
   upsertStationObservation,
   upsertGroundTruthSnapshot,
+  upsertQualifiedObservationSnapshot,
   insertStationCollectionSnapshot,
 } from "./db";
 
@@ -978,5 +979,54 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       context: { url: req.url },
       timestamp: new Date().toISOString(),
     });
+  }
+}
+
+/**
+ * Hourly physical evidence collection. Candidate sensors and model references
+ * are excluded before the location synthesis is persisted.
+ */
+export async function collectPhysicalObservationSnapshotsHandler(req: Request, res: Response) {
+  try {
+    const user = await sdk.authenticateRequest(req);
+    if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+
+    const favorites = await getAllFavoriteLocations();
+    const unique = new Map<string, typeof favorites[number]>();
+    for (const favorite of favorites) unique.set(makeLocationKey(favorite.lat, favorite.lon), favorite);
+
+    const date = getTodayParis();
+    const hour = getParisHour();
+    const results: Array<{ locationKey: string; stationCount: number; stored: boolean; reason?: string }> = [];
+    for (const favorite of Array.from(unique.values())) {
+      const locationKey = makeLocationKey(favorite.lat, favorite.lon);
+      const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
+      const discovered = await collectNearbyStations(favorite.lat, favorite.lon, radiusKm, favorite.customName ?? favorite.name, { netatmoUserId: favorite.userId });
+      const physical = getPhysicalActiveStations(discovered);
+      const synthesis = calculateGroundTruth(physical);
+      if (synthesis.stationCount < 1 || synthesis.temperature == null) {
+        results.push({ locationKey, stationCount: synthesis.stationCount, stored: false, reason: "Aucune station physique qualifiée" });
+        continue;
+      }
+      await upsertQualifiedObservationSnapshot({
+        locationKey,
+        date,
+        hour,
+        stationCount: synthesis.stationCount,
+        confidenceScore: synthesis.confidenceScore,
+        temperature: synthesis.temperature,
+        humidity: synthesis.humidity,
+        pressure: synthesis.pressure,
+        windSpeed: synthesis.windSpeed,
+        windGust: synthesis.windGust,
+        precipitation: synthesis.precipitation,
+        stationsUsed: synthesis.stationsUsed as any,
+      });
+      results.push({ locationKey, stationCount: synthesis.stationCount, stored: true });
+    }
+    res.json({ ok: true, date, hour, locations: results });
+  } catch (error: any) {
+    console.error("[MeteoAI] Physical snapshot collection error:", error);
+    res.status(500).json({ error: error.message, stack: error.stack, context: { url: req.url }, timestamp: new Date().toISOString() });
   }
 }
