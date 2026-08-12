@@ -554,6 +554,11 @@
 - [x] Frontend: Afficher les références de grille dans leur catégorie exacte, sans badge de station réelle.
 - [x] Tests: Vérifier qu’une référence de grille ne peut jamais devenir une station Netatmo réelle.
 
+## Indicateur du modèle météo utilisé
+- [x] Backend: Déterminer le modèle dominant et les modèles de fusion à partir des poids réellement appliqués.
+- [x] Frontend: Afficher l’indicateur de modèle principal dans la carte de prévision du Dashboard.
+- [x] Tests: Vérifier le modèle dominant, les égalités et le repli multi-modèles.
+
 ## Diagnostic OAuth Netatmo
 - [x] Audit: Distinguer un Access Token d’un Refresh Token et relever le code de refus OAuth sans exposer de secret.
 - [x] Configuration: Corriger le flux d’autorisation Netatmo requis pour la collecte récurrente.

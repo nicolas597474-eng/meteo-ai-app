@@ -258,6 +258,7 @@ export default function Dashboard() {
     : regimeAgeMinutes === 0
       ? "Mis à jour à l’instant"
       : `Mis à jour il y a ${regimeAgeMinutes} min`;
+  const modelIndicator = dash?.modelIndicator ?? null;
 
   // Multi-regime data for alert badges
   const multiRegime = officialRegime
@@ -378,6 +379,15 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt}` : ""}</p>
+                {modelIndicator && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-blue-400/25 bg-blue-400/10 px-2 py-1 text-[10px] text-blue-100">
+                    <Activity className="h-3 w-3 text-blue-300" />
+                    <span>
+                      {modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion ${modelIndicator.modelCount} modèles`} : <strong>{modelIndicator.primaryModel}</strong>
+                      {modelIndicator.mode === "multi_model" ? ` · poids moyen ${Math.round(modelIndicator.primaryWeight * 100)}%` : ""}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

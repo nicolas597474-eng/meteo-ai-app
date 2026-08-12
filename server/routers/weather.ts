@@ -37,6 +37,7 @@ import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
+import { buildModelIndicator } from "../modelIndicator";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -164,11 +165,13 @@ export const weatherRouter = router({
 
     const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly));
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
+    const modelIndicator = buildModelIndicator(trace);
 
     return {
       today,
       meteoAI,
       trace,
+      modelIndicator,
       forecastCount: forecasts.length,
       topServices: ranking.slice(0, 5),
       recentForecasts,
