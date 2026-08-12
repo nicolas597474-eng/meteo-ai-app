@@ -6,12 +6,15 @@
  * 2. OpenDataSoft SYNOP (Météo-France official network, real data, free/no-key)
  * 3. Netatmo public stations (OAuth, when a user connection is active)
  * 4. Open-Meteo multi-point grid references (clearly not physical stations)
+ * 5. openSenseMap outdoor citizen sensors (candidates, excluded from ground truth)
  *
  * Ground truth weighting:
  *   50% distance (closer = more weight)
  *   30% historical quality (reliability score)
  *   20% data freshness (how recent the last reading is)
  */
+
+import { fetchOpenSenseMapCandidates } from "./openSenseMapService";
 
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
 
@@ -25,7 +28,8 @@ export type StationSource =
   | "openmeteo"
   | "synop"
   | "davis"
-  | "infoclimat";
+  | "infoclimat"
+  | "opensensemap";
 
 export type StationData = {
   stationId: string;
@@ -48,6 +52,8 @@ export type StationData = {
   dataAvailability: number; // 0-1
   isActive: boolean;
   exclusionReason?: string;
+  qualificationStatus?: "candidate" | "validated" | "excluded";
+  sourceTier?: 1 | 2 | 3;
 };
 
 /**
@@ -68,6 +74,10 @@ export function getStationSourceKind(source: StationSource, stationId?: string):
 
 export function getPhysicalActiveStations(stations: StationData[]): StationData[] {
   return stations.filter((station) => station.isActive && getStationSourceKind(station.source, station.stationId) === "physical");
+}
+
+export function getCandidateStations(stations: StationData[]): StationData[] {
+  return stations.filter((station) => station.qualificationStatus === "candidate");
 }
 
 export type GroundTruthResult = {
@@ -134,6 +144,7 @@ const SOURCE_DEFAULTS: Record<StationSource, { reliability: number; updateFreqMi
   netatmo:      { reliability: 65, updateFreqMin: 10, availability: 0.75 },
   cwop:         { reliability: 60, updateFreqMin: 15, availability: 0.70 },
   wunderground: { reliability: 58, updateFreqMin: 5,  availability: 0.65 },
+  opensensemap: { reliability: 0, updateFreqMin: 15, availability: 0 },
 };
 
 // ─── Helper: fetch one Open-Meteo grid point ──────────────────────────────────
@@ -363,84 +374,6 @@ async function fetchMetarStations(lat: number, lon: number, radiusKm: number): P
 // Each offset uses a different NWP model to add diversity. These entries remain
 // clearly labeled as model-grid references until a provider returns real station data.
 
-const STATION_OFFSETS: Array<{
-  dlat: number;
-  dlon: number;
-  source: StationSource;
-  nameTemplate: string;
-  model?: string;
-}> = [
-  { dlat:  0.018, dlon:  0.012, source: "openmeteo",    nameTemplate: "Référence de grille {town} Centre",    model: "best_match" },
-  { dlat: -0.012, dlon:  0.022, source: "openmeteo",    nameTemplate: "Référence de grille {town} Est",       model: "best_match" },
-  { dlat:  0.025, dlon: -0.018, source: "openmeteo",    nameTemplate: "Référence de grille {town} Nord-Ouest" },
-  { dlat: -0.020, dlon: -0.015, source: "openmeteo",    nameTemplate: "Référence de grille {town} Sud-Ouest" },
-  { dlat:  0.040, dlon:  0.030, source: "wunderground", nameTemplate: "Référence de grille {town} Nord",        model: "gfs_seamless" },
-  { dlat: -0.035, dlon:  0.040, source: "wunderground", nameTemplate: "Référence de grille {town} Sud-Est",     model: "gfs_seamless" },
-  { dlat:  0.055, dlon: -0.040, source: "infoclimat",   nameTemplate: "Référence de grille {town} Nord-Ouest", model: "meteofrance_arome_france_hd" },
-  { dlat: -0.048, dlon: -0.035, source: "infoclimat",   nameTemplate: "Référence de grille {town} Sud-Ouest",  model: "meteofrance_arome_france_hd" },
-  { dlat:  0.070, dlon:  0.055, source: "cwop",         nameTemplate: "Référence de grille {town} Nord-Est",   model: "ecmwf_ifs025" },
-  { dlat: -0.060, dlon:  0.065, source: "cwop",         nameTemplate: "Référence de grille {town} Est",        model: "ecmwf_ifs025" },
-];
-
-async function fetchPersonalWeatherStations(
-  lat: number,
-  lon: number,
-  radiusKm: number,
-  townName: string
-): Promise<StationData[]> {
-  const results: StationData[] = [];
-
-  // Fetch all offsets in parallel (with a timeout to avoid blocking)
-  const fetches = await Promise.allSettled(
-    STATION_OFFSETS.map(async (off) => {
-      const stLat = lat + off.dlat;
-      const stLon = lon + off.dlon;
-      const dist = haversineKm(lat, lon, stLat, stLon);
-      if (dist > radiusKm) return null;
-
-      const pt = await fetchOpenMeteoPoint(stLat, stLon, off.model);
-      if (!pt) return null;
-
-      const name = off.nameTemplate.replace("{town}", townName);
-      const defaults = SOURCE_DEFAULTS[off.source];
-
-      // Add small realistic variation to temperature (±0.3°C) to reflect micro-climate differences
-      const tempVariation = (Math.sin(stLat * 1000 + stLon * 1000) * 0.3);
-      const tempC = pt.temperature != null ? Math.round((pt.temperature + tempVariation) * 10) / 10 : null;
-
-      return {
-        stationId: `${off.source}-${stLat.toFixed(4)}-${stLon.toFixed(4)}`,
-        source: off.source,
-        name,
-        lat: stLat,
-        lon: stLon,
-        altitude: pt.elevation,
-        distanceKm: Math.round(dist * 10) / 10,
-        temperature: tempC,
-        humidity: pt.humidity,
-        pressure: pt.pressure,
-        windSpeed: pt.windSpeed,
-        windGust: pt.windGust,
-        windDirection: pt.windDirection,
-        precipitation: pt.precipitation,
-        updatedAt: pt.time ? `${pt.time}:00` : new Date().toISOString(),
-        reliabilityScore: defaults.reliability,
-        updateFrequencyMin: defaults.updateFreqMin,
-        dataAvailability: defaults.availability,
-        isActive: true,
-      } as StationData;
-    })
-  );
-
-  for (const result of fetches) {
-    if (result.status === "fulfilled" && result.value) {
-      results.push(result.value);
-    }
-  }
-
-  return results;
-}
-
 // ─── 5. ECMWF IFS reference point (labeled as SYNOP/WMO) ─────────────────────
 
 async function fetchSYNOPReference(
@@ -452,7 +385,7 @@ async function fetchSYNOPReference(
   return [{
     stationId: `synop-ecmwf-${lat.toFixed(3)}-${lon.toFixed(3)}`,
     source: "synop" as StationSource,
-    name: `SYNOP/WMO (réseau international, ECMWF IFS)`,
+    name: `Référence de grille ECMWF IFS`,
     lat,
     lon,
     altitude: pt.elevation,
@@ -483,22 +416,45 @@ export async function collectNearbyStations(
 ): Promise<StationData[]> {
   const { fetchNetatmoPublicStations } = await import("./netatmoService");
   // Fetch from all sources in parallel
-  const [openMeteo, meteoFrance, metar, personal, synopRef, netatmo] = await Promise.allSettled([
+  const [openMeteo, meteoFrance, metar, synopRef, netatmo, openSenseMap] = await Promise.allSettled([
     fetchOpenMeteoNearbyStations(lat, lon, radiusKm),
     fetchMeteoFranceStations(lat, lon, radiusKm),
     fetchMetarStations(lat, lon, radiusKm),
-    fetchPersonalWeatherStations(lat, lon, radiusKm, townName),
     fetchSYNOPReference(lat, lon),
     fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm),
+    fetchOpenSenseMapCandidates(lat, lon, radiusKm),
   ]);
 
   const all: StationData[] = [
     ...(openMeteo.status === "fulfilled" ? openMeteo.value : []),
     ...(meteoFrance.status === "fulfilled" ? meteoFrance.value : []),
     ...(metar.status === "fulfilled" ? metar.value : []),
-    ...(personal.status === "fulfilled" ? personal.value : []),
     ...(synopRef.status === "fulfilled" ? synopRef.value : []),
     ...(netatmo.status === "fulfilled" ? netatmo.value : []),
+    ...(openSenseMap.status === "fulfilled" ? openSenseMap.value.map((candidate): StationData => ({
+      stationId: `opensensemap-${candidate.providerStationId}`,
+      source: "opensensemap",
+      name: candidate.name,
+      lat: candidate.lat,
+      lon: candidate.lon,
+      altitude: candidate.altitude,
+      distanceKm: candidate.distanceKm,
+      temperature: candidate.temperature,
+      humidity: candidate.humidity,
+      pressure: candidate.pressure,
+      windSpeed: candidate.windSpeed,
+      windGust: candidate.windGust,
+      windDirection: candidate.windDirection,
+      precipitation: candidate.precipitation,
+      updatedAt: candidate.updatedAt,
+      reliabilityScore: SOURCE_DEFAULTS.opensensemap.reliability,
+      updateFrequencyMin: SOURCE_DEFAULTS.opensensemap.updateFreqMin,
+      dataAvailability: SOURCE_DEFAULTS.opensensemap.availability,
+      isActive: false,
+      qualificationStatus: "candidate",
+      sourceTier: 3,
+      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
+    })) : []),
   ];
 
   // Deduplicate by stationId

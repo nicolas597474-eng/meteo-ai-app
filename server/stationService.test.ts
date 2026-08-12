@@ -3,6 +3,7 @@ import {
   haversineKm,
   rankStations,
   calculateGroundTruth,
+  getCandidateStations,
   getPhysicalActiveStations,
   getStationSourceKind,
   mapMetarObservation,
@@ -70,6 +71,9 @@ describe("getStationSourceKind", () => {
     expect(getStationSourceKind("openmeteo")).toBe("reference");
     expect(getStationSourceKind("netatmo")).toBe("physical");
     expect(getStationSourceKind("synop")).toBe("reference");
+    expect(getStationSourceKind("cwop")).toBe("reference");
+    expect(getStationSourceKind("wunderground")).toBe("reference");
+    expect(getStationSourceKind("opensensemap")).toBe("reference");
   });
 });
 
@@ -162,6 +166,19 @@ describe("getPhysicalActiveStations", () => {
   it("ne classe pas une ancienne référence de grille comme une station Netatmo physique", () => {
     expect(getStationSourceKind("netatmo", "grid-local-est")).toBe("reference");
     expect(getStationSourceKind("netatmo", "netatmo-public-42")).toBe("physical");
+  });
+});
+
+describe("getCandidateStations", () => {
+  it("conserve les capteurs citoyens candidats sans les transformer en station physique", () => {
+    const candidates = getCandidateStations([
+      makeStation({ stationId: "opensensemap-box-1", source: "opensensemap", isActive: false, qualificationStatus: "candidate", sourceTier: 3 }),
+      makeStation({ stationId: "metar-LFAC", source: "metar", qualificationStatus: "validated", sourceTier: 1 }),
+    ]);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].stationId).toBe("opensensemap-box-1");
+    expect(getStationSourceKind(candidates[0].source, candidates[0].stationId)).toBe("reference");
   });
 });
 

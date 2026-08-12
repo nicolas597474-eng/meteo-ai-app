@@ -518,7 +518,7 @@ export async function setDefaultFavorite(id: number, userId: number) {
 
 // ─── Physical station snapshots ─────────────────────────────────────────────
 
-/** Upsert the immutable identity and latest metadata of a physical station. */
+/** Upsert the immutable identity and latest metadata of a station candidate or validated. */
 export async function upsertWeatherStation(data: InsertWeatherStation): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -537,6 +537,8 @@ export async function upsertWeatherStation(data: InsertWeatherStation): Promise<
       dataAvailability: data.dataAvailability ?? null,
       isActive: data.isActive ?? 1,
       exclusionReason: data.exclusionReason ?? null,
+      qualificationStatus: data.qualificationStatus ?? "validated",
+      sourceTier: data.sourceTier ?? null,
       lastSeen: new Date(),
     },
   });

@@ -176,6 +176,8 @@ export const weatherStations = mysqlTable("weather_stations", {
   // Status
   isActive: int("isActive").default(1), // 1=active, 0=excluded
   exclusionReason: varchar("exclusionReason", { length: 256 }), // reason if excluded
+  qualificationStatus: varchar("qualificationStatus", { length: 24 }).notNull().default("validated"), // candidate, validated, excluded
+  sourceTier: int("sourceTier"), // 1=très haute confiance, 2=haute confiance, 3=ultra local
   firstSeen: timestamp("firstSeen").defaultNow().notNull(),
   lastSeen: timestamp("lastSeen").defaultNow().notNull(),
 });

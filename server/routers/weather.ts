@@ -1089,7 +1089,7 @@ export const weatherRouter = router({
         stations: ranked.map(s => ({
           stationId: s.stationId,
           source: s.source,
-          sourceKind: getStationSourceKind(s.source),
+          sourceKind: getStationSourceKind(s.source, s.stationId),
           name: s.name,
           lat: s.lat,
           lon: s.lon,
@@ -1108,6 +1108,8 @@ export const weatherRouter = router({
           dataAvailability: s.dataAvailability,
           isActive: s.isActive,
           exclusionReason: s.exclusionReason,
+          qualificationStatus: s.qualificationStatus,
+          sourceTier: s.sourceTier,
         })),
         groundTruth,
         totalFound: stations.length,

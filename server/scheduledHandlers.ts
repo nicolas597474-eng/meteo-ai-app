@@ -13,7 +13,7 @@ import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
-import { collectNearbyStations, calculateGroundTruth, getPhysicalActiveStations } from "./stationService";
+import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
 import {
   classifyLeadTime,
   applyBiasCorrection,
@@ -705,6 +705,44 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               dataAvailability: station.dataAvailability,
               isActive: station.isActive ? 1 : 0,
               exclusionReason: station.exclusionReason ?? null,
+            });
+
+            const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
+            if (!Number.isFinite(observedAt)) continue;
+            await upsertStationObservation({
+              stationId: station.stationId,
+              observedAt,
+              temperature: station.temperature,
+              humidity: station.humidity,
+              pressure: station.pressure,
+              windSpeed: station.windSpeed,
+              windGust: station.windGust,
+              windDirection: station.windDirection,
+              precipitation: station.precipitation,
+            });
+          }
+
+          // Citizen sensors are persisted as candidates for history and later quality
+          // evaluation, but are deliberately excluded from the local ground truth.
+          const candidateStations = getCandidateStations(discoveredStations);
+          for (const station of candidateStations) {
+            await upsertWeatherStation({
+              stationId: station.stationId,
+              source: station.source,
+              name: station.name,
+              lat: station.lat,
+              lon: station.lon,
+              altitude: station.altitude,
+              refLat: fav.lat,
+              refLon: fav.lon,
+              distanceKm: station.distanceKm,
+              reliabilityScore: station.reliabilityScore,
+              updateFrequencyMin: station.updateFrequencyMin,
+              dataAvailability: station.dataAvailability,
+              isActive: 0,
+              exclusionReason: station.exclusionReason ?? "Capteur citoyen en validation — non utilisé dans la température locale",
+              qualificationStatus: "candidate",
+              sourceTier: station.sourceTier ?? 3,
             });
 
             const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;

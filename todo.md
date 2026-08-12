@@ -635,6 +635,14 @@
 - [x] Déploiement: Définir une expérimentation contrôlée et des critères de gain mesurés avant activation dans la température finale.
 - [x] Décision: Présenter le plan multi-sources pour accord avant tout développement.
 
+## Phase 1 — openSenseMap en observation
+- [x] Backend: Retirer les références de grille qui utilisent abusivement des libellés de réseaux de stations.
+- [x] Backend: Interroger openSenseMap sans clé et mapper uniquement des capteurs extérieurs identifiés comme candidats.
+- [x] Données: Persister provenance, fraîcheur, mesures disponibles et statut `candidate`, sans contribution à la température locale.
+- [x] Frontend: Afficher les capteurs citoyens avec un statut de validation distinct des stations physiques validées.
+- [x] Tests: Vérifier le filtrage des capteurs, l’absence de données simulées et l’exclusion de la fusion locale.
+- [ ] Mesure: Évaluer la couverture openSenseMap et CWOP/MADIS autour des favoris avant l’activation d’une source supplémentaire.
+
 ## Cohérence des prochains changements de régime
 - [x] Backend: Utiliser un unique régime de créneau horaire pour les annonces de transition.
 - [x] Frontend: Afficher le même libellé dans « Prochain changement » et « Régime à venir ».
