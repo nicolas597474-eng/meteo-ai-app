@@ -512,3 +512,13 @@
 - [x] Backend: Construire une série horaire vérifiable des écarts sur les dernières 24 heures.
 - [x] Frontend: Ajouter un graphique compact local/officiel au Dashboard.
 - [x] Tests: Vérifier les paires d’observations comparables et les créneaux sans données.
+
+## Régime officiel cohérent dans l’AI Lab
+- [x] Backend: Exposer le régime opérationnel versionné dans les données de l’AI Lab.
+- [x] Frontend: Remplacer le calcul local de régime de l’AI Lab par le régime opérationnel partagé.
+- [x] Tests: Vérifier la sélection commune Dashboard / AI Lab pour une même localisation et date.
+
+## Priorité de fraîcheur du régime
+- [x] Audit: Comparer les horodatages, la couverture et les paramètres des régimes Dashboard et AI Lab.
+- [x] Backend: Sélectionner le régime le plus récent et le mieux étayé selon des règles mesurables.
+- [x] Frontend: Indiquer la fraîcheur de la source de régime affichée.

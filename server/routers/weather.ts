@@ -34,7 +34,7 @@ import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeC
 import { getParisDate, getParisDateDaysAgo } from "../weatherTime";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
-import { buildOfficialRegime } from "../officialRegime";
+import { buildOperationalRegime } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 
 function getTodayParis(): string {
@@ -129,8 +129,11 @@ export const weatherRouter = router({
     const today = getTodayParis();
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
-    // Get MeteoAI forecast for today
-    const meteoAI = await getMeteoAIForecastByDate(today, locKey);
+    // Snapshot et observation sont comparés par le sélecteur partagé.
+    const [meteoAI, observation] = await Promise.all([
+      getMeteoAIForecastByDate(today, locKey),
+      getObservationByDate(today, locKey),
+    ]);
 
     // Get all forecasts for today
     const forecasts = await getForecastsByDate(today, locKey);
@@ -141,7 +144,7 @@ export const weatherRouter = router({
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
 
-    const officialRegime = buildOfficialRegime(meteoAI);
+    const officialRegime = buildOperationalRegime(meteoAI, observation);
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
     return {
@@ -260,8 +263,11 @@ export const weatherRouter = router({
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
     const ranking = await getCumulativeRankingForLocation(locKey);
 
-    const meteoAI = await getMeteoAIForecastByDate(today, locKey);
-    const officialRegime = buildOfficialRegime(meteoAI);
+    const [meteoAI, observation] = await Promise.all([
+      getMeteoAIForecastByDate(today, locKey),
+      getObservationByDate(today, locKey),
+    ]);
+    const officialRegime = buildOperationalRegime(meteoAI, observation);
     const regimeParams = officialRegime.params;
     const multiRegime = {
       primaryRegime: officialRegime.primary,
@@ -539,8 +545,11 @@ export const weatherRouter = router({
       ]);
       const { days, modelsUsed } = dailyForecast;
 
-      const meteoAI = await getMeteoAIForecastByDate(today, locKey);
-      const officialRegime = buildOfficialRegime(meteoAI);
+      const [meteoAI, observation] = await Promise.all([
+        getMeteoAIForecastByDate(today, locKey),
+        getObservationByDate(today, locKey),
+      ]);
+      const officialRegime = buildOperationalRegime(meteoAI, observation);
 
       // Best model
       const ranking = await getCumulativeRankingForLocation(locKey);
@@ -829,16 +838,13 @@ export const weatherRouter = router({
       : await getCumulativeRanking();
     const jobs = await getRecentCollectionJobs(5);
 
-    // 1. Detect current regime
-    const regimeInfo = detectWeatherRegime({
-      precipitation: observation?.precipitation ?? (meteoAI?.precipitation ?? 0),
-      windSpeed: observation?.windSpeed ?? (meteoAI?.windSpeed ?? 0),
-      tempMax: observation?.tempMax ?? (meteoAI?.tempMax ?? 15),
-      tempMin: observation?.tempMin ?? (meteoAI?.tempMin ?? 5),
-    });
-    const regime = regimeInfo.regime;
-    const regimeDef = REGIME_DEFINITIONS[regime];
-    const weights = regimeDef.weights;
+    // 1. Régime opérationnel partagé avec le Dashboard. Une observation ne peut
+    // remplacer la fusion officielle que si elle est plus récente, fraîche et
+    // couvre notamment la nébulosité.
+    const operationalRegime = buildOperationalRegime(meteoAI, observation);
+    const regime = operationalRegime.primary.id;
+    const regimeDef = operationalRegime.primary;
+    const weights = operationalRegime.blendedWeights;
 
     // 2. Build model details from today's forecasts
     const allServicesList = [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public];
@@ -944,7 +950,7 @@ export const weatherRouter = router({
       regimeEmoji: regimeDef.emoji,
       regimeDescription: regimeDef.description,
       weights,
-      allRegimes: REGIME_DEFINITIONS,
+      allRegimes: EXTENDED_REGIME_INFO,
       modelDetails,
       divergence,
       confidenceScore,
@@ -956,6 +962,11 @@ export const weatherRouter = router({
       sources,
       engineVersion: "MeteoAI v2.0 — Multi-Dimension",
       calculatedAt: new Date().toISOString(),
+      regimeSource: operationalRegime.source,
+      regimeSourceLabel: operationalRegime.sourceLabel,
+      regimeSourceUpdatedAt: operationalRegime.sourceUpdatedAt,
+      regimeSourceAgeMinutes: operationalRegime.sourceAgeMinutes,
+      regimeDataCoverage: operationalRegime.dataCoverage,
       modelsUsed: forecasts.length,
       historicalTimeSeries,
       historicalServices: allServices,

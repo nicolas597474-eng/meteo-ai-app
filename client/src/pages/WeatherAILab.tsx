@@ -520,6 +520,9 @@ export default function WeatherAILab() {
           <div>
             <div className="text-sm font-bold">{data.regimeLabel}</div>
             <div className="text-xs text-muted-foreground">{data.regimeDescription}</div>
+            <div className="mt-1 text-[10px] text-primary/80">
+              {data.regimeSourceLabel}{data.regimeSourceUpdatedAt ? ` · mise à jour à ${new Date(data.regimeSourceUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : ""}
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

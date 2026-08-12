@@ -230,6 +230,10 @@ export default function Dashboard() {
           weights: officialPrimaryRegime.weights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
         }
       : dash?.regime;
+  const regimeSourceLabel = officialRegime?.sourceLabel ?? "Fusion officielle multi-modèles";
+  const regimeSourceUpdatedAt = officialRegime?.sourceUpdatedAt
+    ? new Date(officialRegime.sourceUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
+    : null;
 
   // Multi-regime data for alert badges
   const multiRegime = officialRegime
@@ -305,7 +309,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-primary">Tendance officielle de la journée</span>
+                <span className="text-xs font-medium text-primary">Tendance · {regimeSourceLabel}</span>
                 {selectedLocation && <span className="text-xs text-primary/60">· {selectedLocation.name}</span>}
               </div>
               <span className="text-xs text-muted-foreground hidden sm:block">
@@ -340,6 +344,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
+                {regimeSourceUpdatedAt && <p className="mt-1 text-[10px] text-slate-400">Source mise à jour à {regimeSourceUpdatedAt}</p>}
               </div>
             )}
 
