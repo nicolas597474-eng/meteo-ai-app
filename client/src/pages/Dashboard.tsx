@@ -95,17 +95,17 @@ function storeLocalMode(mode: "standard" | "local" | "ultra-local") {
 export default function Dashboard() {
   const { user } = useAuth();
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
-  const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number } | null>(getStoredLocation);
+  const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
   const selectedLocation = contextLocation ?? activeLocation;
 
-  const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number; localMode?: "standard" | "local" | "ultra-local" }) => {
+  const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" }) => {
     setActiveLocation(loc);
     storeLocation(loc);
     // Sync to LocationContext so all pages (Ranking, History, AI Lab) use this location
-    setContextLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, localMode: loc.localMode });
+    setContextLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, favoriteId: loc.favoriteId, radiusKm: loc.radiusKm, localMode: loc.localMode });
     // If the favorite has a per-location mode, apply it
     if (loc.localMode) {
       setLocalMode(loc.localMode);

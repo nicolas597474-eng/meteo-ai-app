@@ -24,9 +24,11 @@ import {
   weatherStations,
   stationObservations,
   groundTruth,
+  stationCollectionSnapshots,
   InsertWeatherStation,
   InsertStationObservation,
   InsertGroundTruth,
+  InsertStationCollectionSnapshot,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -613,6 +615,25 @@ export async function getPhysicalStationHistory(
     .limit(1);
 
   return { stations: stationSeries, latestGroundTruth: latestGroundTruth[0] ?? null };
+}
+
+/** Persist one collection coverage result, including a zero-station discovery. */
+export async function insertStationCollectionSnapshot(data: InsertStationCollectionSnapshot): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(stationCollectionSnapshots).values(data);
+}
+
+/** Read latest availability/coverage attempts for a reference location. */
+export async function getStationCollectionSnapshots(locationKey: string, limit = 14) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(stationCollectionSnapshots)
+    .where(eq(stationCollectionSnapshots.locationKey, locationKey))
+    .orderBy(desc(stationCollectionSnapshots.collectedAt))
+    .limit(limit);
 }
 
 // ─── Location Forecasts (pre-fetched per favorite) ───────────────────────────

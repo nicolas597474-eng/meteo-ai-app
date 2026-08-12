@@ -462,3 +462,11 @@
 - [x] Backend: Réduire la durée des appels multi-modèles pour respecter la fenêtre d’exécution planifiée.
 - [x] Backend: Persister les relevés des stations physiques disponibles et distinguer explicitement les sources sans observation réelle.
 - [x] Tests: Vérifier la couverture des modèles et la terminaison du cycle de collecte dans la fenêtre planifiée.
+
+## Fiabilité locale — disponibilité, rayon et bilan de collecte
+- [x] Backend: Enregistrer un historique de disponibilité par lieu pour chaque cycle de collecte de stations.
+- [x] Backend: Utiliser le rayon de recherche configurable du lieu favori lors de la collecte des stations physiques.
+- [x] Backend: Exposer le dernier bilan de collecte et la série de disponibilité dans la réponse Fiabilité.
+- [x] Frontend: Ajouter un sélecteur de rayon de recherche sur la page Fiabilité.
+- [x] Frontend: Afficher l’historique de disponibilité des stations et le dernier bilan de collecte.
+- [x] Tests: Vérifier la persistance, le rayon choisi et les contrats de disponibilité/bilan.

@@ -24,6 +24,7 @@ import {
   makeLocationKey,
   getPhysicalStationHistory,
   getStoredHourlyForecasts,
+  getStationCollectionSnapshots,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
@@ -1157,6 +1158,7 @@ export const weatherRouter = router({
       lat: z.number().optional(),
       lon: z.number().optional(),
       periodDays: z.union([z.literal(1), z.literal(7)]).optional(),
+      radiusKm: z.number().min(5).max(50).optional(),
     }).optional())
     .query(async ({ input }) => {
       const lat = input?.lat ?? HONDEGHEM.lat;
@@ -1166,9 +1168,10 @@ export const weatherRouter = router({
       const sinceMs = now - periodDays * 24 * 60 * 60 * 1000;
       const locationKey = makeLocationKey(lat, lon);
       const date = getTodayParis();
-      const [stationData, hourlyRows] = await Promise.all([
+      const [stationData, hourlyRows, collectionSnapshots] = await Promise.all([
         getPhysicalStationHistory(lat, lon, sinceMs),
         getStoredHourlyForecasts(locationKey, date),
+        getStationCollectionSnapshots(locationKey, 14),
       ]);
 
       const officialRows = hourlyRows.filter((row) => row.modelName === "best_match");
@@ -1244,8 +1247,21 @@ export const weatherRouter = router({
         locationKey,
         center: { lat, lon },
         periodDays,
+        radiusKm: input?.radiusKm ?? stationData.latestGroundTruth?.radiusKm ?? 20,
         collectedAt: stationData.latestGroundTruth?.computedAt ?? null,
         latestGroundTruth: stationData.latestGroundTruth,
+        latestCollection: collectionSnapshots[0] ?? null,
+        availabilityHistory: [...collectionSnapshots].reverse().map((snapshot) => ({
+          date: snapshot.date,
+          collectedAt: snapshot.collectedAt,
+          radiusKm: snapshot.radiusKm,
+          physicalStationCount: snapshot.physicalStationCount,
+          dailyModelCount: snapshot.dailyModelCount,
+          hourlyModelCount: snapshot.hourlyModelCount,
+          dailyMissingModels: snapshot.dailyMissingModels,
+          hourlyMissingModels: snapshot.hourlyMissingModels,
+          status: snapshot.status,
+        })),
         stations: stationData.stations.map((station) => {
           const latest = station.readings.at(-1) ?? null;
           return {

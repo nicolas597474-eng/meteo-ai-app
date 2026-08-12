@@ -233,6 +233,27 @@ export type GroundTruth = typeof groundTruth.$inferSelect;
 export type InsertGroundTruth = typeof groundTruth.$inferInsert;
 
 /**
+ * Availability and coverage record for a physical-station and model collection
+ * cycle. Empty station discoveries are recorded explicitly.
+ */
+export const stationCollectionSnapshots = mysqlTable("station_collection_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  radiusKm: int("radiusKm").notNull(),
+  physicalStationCount: int("physicalStationCount").notNull(),
+  dailyModelCount: int("dailyModelCount").notNull(),
+  hourlyModelCount: int("hourlyModelCount").notNull(),
+  dailyMissingModels: json("dailyMissingModels"),
+  hourlyMissingModels: json("hourlyMissingModels"),
+  status: mysqlEnum("status", ["completed", "partial", "failed"]).notNull(),
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(),
+});
+
+export type StationCollectionSnapshot = typeof stationCollectionSnapshots.$inferSelect;
+export type InsertStationCollectionSnapshot = typeof stationCollectionSnapshots.$inferInsert;
+
+/**
  * User favorite locations (max 5 per user).
  * Each location stores coordinates, custom settings, and display preferences.
  */

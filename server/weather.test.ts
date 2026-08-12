@@ -109,14 +109,17 @@ describe("weather.getStationReliabilityOverview", () => {
       expect(Array.isArray(station.readings)).toBe(true);
     }
 
-    const weekly = await caller.weather.getStationReliabilityOverview({ periodDays: 7 });
+    const weekly = await caller.weather.getStationReliabilityOverview({ periodDays: 7, radiusKm: 30 });
     expect(weekly.periodDays).toBe(7);
+    expect(weekly.radiusKm).toBe(30);
     expect(weekly.comparison7d).toHaveLength(7);
     expect(weekly.center).toEqual(expect.objectContaining({
       lat: expect.any(Number),
       lon: expect.any(Number),
     }));
     expect(Object.hasOwn(weekly, "instantDeltaC")).toBe(true);
+    expect(Array.isArray(weekly.availabilityHistory)).toBe(true);
+    expect(Object.hasOwn(weekly, "latestCollection")).toBe(true);
   });
 });
 

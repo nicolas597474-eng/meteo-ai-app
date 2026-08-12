@@ -42,6 +42,7 @@ import {
   upsertWeatherStation,
   upsertStationObservation,
   upsertGroundTruthSnapshot,
+  insertStationCollectionSnapshot,
 } from "./db";
 
 /**
@@ -65,6 +66,33 @@ export function getModelCoverage(receivedNames: string[]) {
     expected: expectedNames,
     collected: expectedNames.filter((name) => received.has(name)),
     missing: expectedNames.filter((name) => !received.has(name)),
+  };
+}
+
+export function buildStationCollectionSnapshot(input: {
+  locationKey: string;
+  date: string;
+  radiusKm: number;
+  physicalStationCount: number;
+  daily: ReturnType<typeof getModelCoverage>;
+  hourly: ReturnType<typeof getModelCoverage>;
+  forceFailed?: boolean;
+}) {
+  const status = input.forceFailed
+    ? "failed" as const
+    : input.daily.missing.length === 0 && input.hourly.missing.length === 0
+      ? "completed" as const
+      : "partial" as const;
+  return {
+    locationKey: input.locationKey,
+    date: input.date,
+    radiusKm: input.radiusKm,
+    physicalStationCount: input.physicalStationCount,
+    dailyModelCount: input.daily.collected.length,
+    hourlyModelCount: input.hourly.collected.length,
+    dailyMissingModels: input.daily.missing,
+    hourlyMissingModels: input.hourly.missing,
+    status,
   };
 }
 
@@ -646,6 +674,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       try {
         console.log(`[MeteoAI] Collecting forecasts for ${fav.name} (${fav.lat}, ${fav.lon})`);
         let physicalStationCount = 0;
+        const radiusKm = Math.max(5, Math.min(50, fav.radiusKm ?? 20));
 
         // Compute locationKey for this favorite
         const locKey = makeLocationKey(fav.lat, fav.lon);
@@ -654,12 +683,12 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // networks/model grid points are deliberately excluded from persistence
         // as station observations (see stationService.PHYSICAL_STATION_SOURCES).
         try {
-          const discoveredStations = await collectNearbyStations(fav.lat, fav.lon, 50, fav.customName ?? fav.name);
+          const discoveredStations = await collectNearbyStations(fav.lat, fav.lon, radiusKm, fav.customName ?? fav.name);
           const physicalStations = getPhysicalActiveStations(discoveredStations);
           physicalStationCount = physicalStations.length;
 
           if (physicalStations.length === 0) {
-            console.warn(`[Stations] ${fav.name}: aucune station physique Météo-France disponible dans le rayon de 50 km`);
+            console.warn(`[Stations] ${fav.name}: aucune station physique Météo-France disponible dans le rayon de ${radiusKm} km`);
           }
 
           for (const station of physicalStations) {
@@ -700,7 +729,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             date: today,
             refLat: fav.lat,
             refLon: fav.lon,
-            radiusKm: 50,
+            radiusKm,
             stationsUsed: localSynthesis.stationsUsed as any,
             stationsIgnored: localSynthesis.stationsIgnored as any,
             temperature: localSynthesis.temperature,
@@ -734,6 +763,15 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
         if (expertData.length === 0) {
           console.warn(`[MeteoAI] No data for ${fav.name}`);
+          await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
+            locationKey: locKey,
+            date: today,
+            radiusKm,
+            physicalStationCount,
+            daily: dailyCoverage,
+            hourly: dailyCoverage,
+            forceFailed: true,
+          }));
           continue;
         }
 
@@ -924,6 +962,15 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           hourly: hourlyCoverage,
           physicalStationCount,
         });
+
+        await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
+          locationKey: locKey,
+          date: today,
+          radiusKm,
+          physicalStationCount,
+          daily: dailyCoverage,
+          hourly: hourlyCoverage,
+        }));
 
         locationsProcessed++;
 

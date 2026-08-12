@@ -21,6 +21,7 @@ type FavoriteLocation = {
 type LocationItem = {
   type: "current" | "favorite" | "local";
   id: string;
+  favoriteId?: number;
   name: string;
   lat: number;
   lon: number;
@@ -95,7 +96,7 @@ export function FavoritesBar({
   prefetchedWeather,
 }: {
   activeLocation: { lat: number; lon: number; name: string } | null;
-  onLocationChange: (loc: { lat: number; lon: number; name: string; radiusKm: number; localMode?: "standard" | "local" | "ultra-local" }) => void;
+  onLocationChange: (loc: { lat: number; lon: number; name: string; radiusKm: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" }) => void;
   prefetchedWeather?: Map<string, { temp: number | null; condition: string | null; confidenceScore: number | null }>;
 }) {
   const { user } = useAuth();
@@ -147,6 +148,7 @@ export function FavoritesBar({
       locations.push({
         type: "favorite",
         id: `fav-${fav.id}`,
+        favoriteId: fav.id,
         name: fav.customName || fav.name,
         lat: fav.lat,
         lon: fav.lon,
@@ -177,6 +179,7 @@ export function FavoritesBar({
         lon: defaultLoc.lon,
         name: defaultLoc.name,
         radiusKm: defaultLoc.radiusKm,
+        favoriteId: defaultLoc.favoriteId,
         localMode: defaultLoc.localMode,
       });
     }
@@ -214,7 +217,7 @@ export function FavoritesBar({
           {locations.map((loc) => (
             <button
               key={loc.id}
-              onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, localMode: loc.localMode })}
+            onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full border whitespace-nowrap text-xs font-medium transition-all flex-shrink-0 ${
                 isActive(loc)
                   ? "bg-primary/20 border-primary text-primary shadow-sm shadow-primary/20"

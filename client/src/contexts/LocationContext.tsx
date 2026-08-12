@@ -11,6 +11,8 @@ export interface ActiveLocation {
   name: string;
   /** If this is a saved favorite, its DB id */
   favoriteId?: number;
+  /** Station search radius selected for this location */
+  radiusKm?: number;
   /** Local mode for this location */
   localMode?: "standard" | "local" | "ultra-local";
 }

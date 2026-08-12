@@ -1,5 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { StationMap } from "@/components/StationMap";
 import { trpc } from "@/lib/trpc";
@@ -77,11 +77,31 @@ function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint
 }
 
 export default function Ranking() {
-  const { activeLocation } = useLocation();
+  const { activeLocation, setActiveLocation } = useLocation();
   const [periodDays, setPeriodDays] = useState<1 | 7>(1);
+  const [radiusKm, setRadiusKm] = useState(activeLocation?.radiusKm ?? 20);
   const coords = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
-  const overviewInput = { ...(coords ?? {}), periodDays };
+  const utils = trpc.useUtils();
+  const overviewInput = useMemo(() => ({ ...(coords ?? {}), periodDays, radiusKm }), [coords?.lat, coords?.lon, periodDays, radiusKm]);
   const { data, isLoading } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput);
+  const updateFavorite = trpc.favorites.update.useMutation({
+    onSuccess: () => {
+      utils.weather.getStationReliabilityOverview.invalidate();
+      utils.favorites.list.invalidate();
+    },
+  });
+
+  useEffect(() => {
+    setRadiusKm(activeLocation?.radiusKm ?? 20);
+  }, [activeLocation?.favoriteId, activeLocation?.lat, activeLocation?.lon, activeLocation?.radiusKm]);
+
+  const changeRadius = (nextRadius: number) => {
+    setRadiusKm(nextRadius);
+    if (activeLocation?.favoriteId) {
+      updateFavorite.mutate({ id: activeLocation.favoriteId, radiusKm: nextRadius });
+      setActiveLocation({ ...activeLocation, radiusKm: nextRadius });
+    }
+  };
 
   if (isLoading) {
     return <div className="min-h-screen bg-[#080a0f] max-w-2xl mx-auto px-4 pt-5 space-y-4"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
@@ -90,6 +110,8 @@ export default function Ranking() {
   const stations = data?.stations ?? [];
   const comparison = periodDays === 1 ? (data?.comparison24h ?? []) : (data?.comparison7d ?? []);
   const latest = data?.latestGroundTruth;
+  const latestCollection = data?.latestCollection;
+  const availabilityHistory = (data?.availabilityHistory ?? []) as any[];
   const locationName = activeLocation?.name ?? "Hondeghem";
   const instantDeltaC = data?.instantDeltaC ?? null;
 
@@ -113,6 +135,14 @@ export default function Ranking() {
           <Metric label="Confiance locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
           <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
         </section>
+
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Rayon de recherche</h2><p className="text-xs text-slate-500">Utilisé à la prochaine collecte de stations physiques.</p></div><MeteoIcon name="location" size={20} className="text-blue-400" /></div>
+          <div className="flex flex-wrap gap-2">{[5, 10, 20, 30, 50].map((radius) => <button key={radius} type="button" disabled={updateFavorite.isPending} onClick={() => changeRadius(radius)} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${radiusKm === radius ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-[#090b10] text-slate-300"}`}>{radius} km</button>)}</div>
+          <p className="mt-3 text-[11px] text-slate-600">{activeLocation?.favoriteId ? "Le rayon est enregistré pour ce lieu favori." : "Le rayon est utilisé pour cette consultation ; enregistrez ce lieu pour le conserver."}</p>
+        </section>
+
+        <CollectionReport latest={latestCollection as any} history={availabilityHistory} />
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Bleu : lieu de référence · vert : relevé récent · ambre : relevé ancien.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
@@ -143,6 +173,21 @@ export default function Ranking() {
         </section>
       </div>
     </main>
+  );
+}
+
+function CollectionReport({ latest, history }: { latest: any; history: any[] }) {
+  return (
+    <>
+      <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+        <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Dernier bilan de collecte</h2><p className="text-xs text-slate-500">Couverture réelle des modèles et des stations lors du dernier passage.</p></div><MeteoIcon name="refresh" size={20} className="text-blue-400" /></div>
+        {latest ? <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-800 bg-[#090b10] p-3 text-center"><Reading label="Modèles jour" value={`${latest.dailyModelCount}/8`} /><Reading label="Modèles heure" value={`${latest.hourlyModelCount}/8`} /><Reading label="Stations" value={String(latest.physicalStationCount)} /><p className="col-span-3 border-t border-slate-800 pt-2 text-[11px] text-slate-500">{new Date(latest.collectedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} · rayon {latest.radiusKm} km</p></div> : <div className="rounded-xl border border-dashed border-slate-800 px-4 py-5 text-center text-sm text-slate-500">Le premier bilan apparaîtra après la prochaine collecte.</div>}
+      </section>
+      <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+        <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Disponibilité des stations</h2><p className="text-xs text-slate-500">Historique des recherches de stations physiques par collecte.</p></div><MeteoIcon name="stations" size={20} className="text-emerald-400" /></div>
+        {history.length === 0 ? <div className="rounded-xl border border-dashed border-slate-800 px-4 py-5 text-center text-sm text-slate-500">Aucun cycle archivé pour ce lieu.</div> : <div className="space-y-2">{history.slice(-7).reverse().map((snapshot, index) => <div key={`${snapshot.collectedAt}-${index}`} className="flex items-center justify-between rounded-xl border border-slate-800 bg-[#090b10] px-3 py-2.5"><div><p className="text-xs font-medium text-slate-200">{new Date(snapshot.collectedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</p><p className="mt-0.5 text-[11px] text-slate-500">Rayon {snapshot.radiusKm} km · modèles {snapshot.dailyModelCount}/8 et {snapshot.hourlyModelCount}/8</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${snapshot.physicalStationCount > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"}`}>{snapshot.physicalStationCount} station{snapshot.physicalStationCount > 1 ? "s" : ""}</span></div>)}</div>}
+      </section>
+    </>
   );
 }
 
