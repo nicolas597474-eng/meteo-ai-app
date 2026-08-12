@@ -50,6 +50,17 @@ export type StationData = {
   exclusionReason?: string;
 };
 
+/**
+ * Sources dont les relevés sont associés à une station physique identifiée.
+ * Les réseaux personnels simulés et points de grille restent des références de
+ * modèle : ils ne doivent jamais être persistés comme observations de station.
+ */
+export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance"]);
+
+export function getPhysicalActiveStations(stations: StationData[]): StationData[] {
+  return stations.filter((station) => station.isActive && PHYSICAL_STATION_SOURCES.has(station.source));
+}
+
 export type GroundTruthResult = {
   temperature: number | null;
   humidity: number | null;

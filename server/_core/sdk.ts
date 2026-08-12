@@ -279,11 +279,11 @@ class SDKServer {
 
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
       const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
-      const taskUid = userInfo.taskUid ?? null;
+      const taskUid = userInfo.taskUid ?? (userInfo as any).task_uid ?? (userInfo as any).taskUID ?? null;
       if (!taskUid) {
         throw ForbiddenError("Cron session missing task_uid");
       }
-      return buildCronUser(userInfo);
+      return buildCronUser({ ...userInfo, taskUid });
     }
 
     const sessionUserId = session.openId;

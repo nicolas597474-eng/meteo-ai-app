@@ -100,23 +100,34 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
   const uv = uvLabel(day.uvIndex);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" onClick={onClose} role="presentation">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-blue-500/10 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+      <div className="relative w-full max-w-md max-h-[88vh] overflow-y-auto rounded-t-[28px] border border-white/10 bg-[#0a0e14] p-5 shadow-2xl shadow-blue-500/10 animate-in slide-in-from-bottom-4 duration-200 sm:rounded-2xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="day-detail-title">
+        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-600 sm:hidden" />
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <WeatherIconSVG condition={cond} size={36} />
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-400/25 bg-blue-500/10">
+              <WeatherIconSVG condition={cond} size={44} />
+            </span>
             <div>
-              <h3 className="font-semibold text-white text-base">{dateLabel}</h3>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-300">Prévision détaillée</p>
+              <h3 id="day-detail-title" className="font-semibold text-white text-base">{dateLabel}</h3>
               <p className="text-xs text-slate-400">{cond}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 transition-colors active:scale-95"><X className="h-5 w-5 text-slate-400" /></button>
+          <button onClick={onClose} aria-label="Fermer les détails de la prévision" className="p-2 rounded-xl hover:bg-white/10 transition-colors active:scale-95"><X className="h-5 w-5 text-slate-400" /></button>
         </div>
+        <div className="mb-4 grid grid-cols-3 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03]">
+          <div className="border-r border-white/8 px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Max.</p><p className="mt-0.5 text-base font-bold text-orange-300">{day.tempMax != null ? `${day.tempMax}°` : "—"}</p></div>
+          <div className="border-r border-white/8 px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Min.</p><p className="mt-0.5 text-base font-bold text-blue-300">{day.tempMin != null ? `${day.tempMin}°` : "—"}</p></div>
+          <div className="px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Pluie</p><p className="mt-0.5 text-base font-bold text-sky-300">{day.precipitation ?? 0} mm</p></div>
+        </div>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Paramètres météo</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-orange-400" />} label="Température" value={<>{day.tempMax ?? "—"}° <span className="text-blue-400 text-xs">/ {day.tempMin ?? "—"}°</span></>} />
           <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-pink-400" />} label="Ressenti" value={<>{day.feelsLikeMax ?? "—"}° <span className="text-blue-400 text-xs">/ {day.feelsLikeMin ?? "—"}°</span></>} />
-          <DetailCard icon={<Wind className="h-3.5 w-3.5 text-emerald-400" />} label="Vent" value={<>{day.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span>{day.windGust ? <span className="block text-[10px] text-orange-400 mt-0.5">Raf. {Math.round(day.windGust)}</span> : null}</>} />
+          <DetailCard icon={<Wind className="h-3.5 w-3.5 text-emerald-400" />} label="Vent moyen" value={<>{day.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
+          <DetailCard icon={<Wind className="h-3.5 w-3.5 text-orange-400" />} label="Rafales" value={<>{day.windGust != null ? Math.round(day.windGust) : "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
           <DetailCard icon={<Navigation className="h-3.5 w-3.5 text-sky-400" style={{ transform: `rotate(${(day.windDirection ?? 0) + 180}deg)` }} />} label="Direction" value={<>{degToCompass(day.windDirection)} <span className="text-[10px] text-slate-500">{day.windDirection != null ? `${Math.round(day.windDirection)}°` : ""}</span></>} />
           <DetailCard icon={<Droplets className="h-3.5 w-3.5 text-blue-400" />} label="Précipitations" value={<span className="text-blue-400">{day.precipitation ?? 0} mm</span>} />
           <DetailCard icon={<Eye className="h-3.5 w-3.5 text-cyan-400" />} label="Humidité" value={<span className="text-cyan-400">{day.humidity != null ? `${Math.round(day.humidity)}%` : "—"}</span>} />
@@ -127,7 +138,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5 col-span-2 sm:col-span-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Gauge className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Confiance</span>
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Confiance de la prévision</span>
               <span className={`ml-auto text-sm font-bold ${stabilityColor}`}>{day.stabilityIndex}%</span>
             </div>
             <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">

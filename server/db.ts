@@ -21,6 +21,12 @@ import {
   InsertLocationForecast,
   InsertHourlyForecast,
   InsertLeadTimeScore,
+  weatherStations,
+  stationObservations,
+  groundTruth,
+  InsertWeatherStation,
+  InsertStationObservation,
+  InsertGroundTruth,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -492,6 +498,76 @@ export async function setDefaultFavorite(id: number, userId: number) {
     .set({ isDefault: 1 })
     .where(and(eq(favoriteLocations.id, id), eq(favoriteLocations.userId, userId)));
   return true;
+}
+
+// ─── Physical station snapshots ─────────────────────────────────────────────
+
+/** Upsert the immutable identity and latest metadata of a physical station. */
+export async function upsertWeatherStation(data: InsertWeatherStation): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(weatherStations).values(data).onDuplicateKeyUpdate({
+    set: {
+      source: data.source,
+      name: data.name,
+      lat: data.lat,
+      lon: data.lon,
+      altitude: data.altitude ?? null,
+      refLat: data.refLat,
+      refLon: data.refLon,
+      distanceKm: data.distanceKm,
+      reliabilityScore: data.reliabilityScore ?? null,
+      updateFrequencyMin: data.updateFrequencyMin ?? null,
+      dataAvailability: data.dataAvailability ?? null,
+      isActive: data.isActive ?? 1,
+      exclusionReason: data.exclusionReason ?? null,
+      lastSeen: new Date(),
+    },
+  });
+}
+
+/**
+ * Idempotent station reading write. The station timestamp is the natural key so
+ * cron retries refresh the same reading rather than creating duplicate evidence.
+ */
+export async function upsertStationObservation(data: InsertStationObservation): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db
+    .select({ id: stationObservations.id })
+    .from(stationObservations)
+    .where(and(
+      eq(stationObservations.stationId, data.stationId),
+      eq(stationObservations.observedAt, data.observedAt),
+    ))
+    .limit(1);
+
+  if (existing[0]) {
+    await db.update(stationObservations).set({ ...data, collectedAt: new Date() }).where(eq(stationObservations.id, existing[0].id));
+    return;
+  }
+  await db.insert(stationObservations).values(data);
+}
+
+/** Upsert the daily local synthesis for one reference location. */
+export async function upsertGroundTruthSnapshot(data: InsertGroundTruth): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db
+    .select({ id: groundTruth.id })
+    .from(groundTruth)
+    .where(and(
+      eq(groundTruth.date, data.date),
+      eq(groundTruth.refLat, data.refLat),
+      eq(groundTruth.refLon, data.refLon),
+    ))
+    .limit(1);
+
+  if (existing[0]) {
+    await db.update(groundTruth).set({ ...data, computedAt: new Date() }).where(eq(groundTruth.id, existing[0].id));
+    return;
+  }
+  await db.insert(groundTruth).values(data);
 }
 
 // ─── Location Forecasts (pre-fetched per favorite) ───────────────────────────

@@ -12,6 +12,7 @@ import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
+import { collectNearbyStations, calculateGroundTruth, getPhysicalActiveStations } from "./stationService";
 import {
   classifyLeadTime,
   applyBiasCorrection,
@@ -38,6 +39,9 @@ import {
   insertHourlyForecasts,
   insertLeadTimeScores,
   getLeadTimeScoresForLocation,
+  upsertWeatherStation,
+  upsertStationObservation,
+  upsertGroundTruthSnapshot,
 } from "./db";
 
 /**
@@ -628,6 +632,68 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
         // Compute locationKey for this favorite
         const locKey = makeLocationKey(fav.lat, fav.lon);
+
+        // Collect physical station evidence once per unique location. Proxy
+        // networks/model grid points are deliberately excluded from persistence
+        // as station observations (see stationService.PHYSICAL_STATION_SOURCES).
+        try {
+          const discoveredStations = await collectNearbyStations(fav.lat, fav.lon, 50, fav.customName ?? fav.name);
+          const physicalStations = getPhysicalActiveStations(discoveredStations);
+
+          for (const station of physicalStations) {
+            await upsertWeatherStation({
+              stationId: station.stationId,
+              source: station.source,
+              name: station.name,
+              lat: station.lat,
+              lon: station.lon,
+              altitude: station.altitude,
+              refLat: fav.lat,
+              refLon: fav.lon,
+              distanceKm: station.distanceKm,
+              reliabilityScore: station.reliabilityScore,
+              updateFrequencyMin: station.updateFrequencyMin,
+              dataAvailability: station.dataAvailability,
+              isActive: station.isActive ? 1 : 0,
+              exclusionReason: station.exclusionReason ?? null,
+            });
+
+            const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
+            if (!Number.isFinite(observedAt)) continue;
+            await upsertStationObservation({
+              stationId: station.stationId,
+              observedAt,
+              temperature: station.temperature,
+              humidity: station.humidity,
+              pressure: station.pressure,
+              windSpeed: station.windSpeed,
+              windGust: station.windGust,
+              windDirection: station.windDirection,
+              precipitation: station.precipitation,
+            });
+          }
+
+          const localSynthesis = calculateGroundTruth(physicalStations);
+          await upsertGroundTruthSnapshot({
+            date: today,
+            refLat: fav.lat,
+            refLon: fav.lon,
+            radiusKm: 50,
+            stationsUsed: localSynthesis.stationsUsed as any,
+            stationsIgnored: localSynthesis.stationsIgnored as any,
+            temperature: localSynthesis.temperature,
+            humidity: localSynthesis.humidity,
+            pressure: localSynthesis.pressure,
+            windSpeed: localSynthesis.windSpeed,
+            windGust: localSynthesis.windGust,
+            precipitation: localSynthesis.precipitation,
+            stationCount: localSynthesis.stationCount,
+            confidenceScore: localSynthesis.confidenceScore,
+          });
+          console.log(`[Stations] ${fav.name}: ${physicalStations.length} station(s) physique(s) stockée(s)`);
+        } catch (stationError: any) {
+          console.warn(`[Stations] Collection échouée pour ${fav.name}:`, stationError.message);
+        }
 
         // Get location-specific ranking (fallback to global)
         const locRanking = await getCumulativeRankingForLocation(locKey);

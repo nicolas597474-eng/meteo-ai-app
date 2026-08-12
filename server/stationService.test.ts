@@ -3,6 +3,7 @@ import {
   haversineKm,
   rankStations,
   calculateGroundTruth,
+  getPhysicalActiveStations,
   type StationData,
 } from "./stationService";
 
@@ -103,6 +104,21 @@ describe("rankStations", () => {
     const original = [...stations];
     rankStations(stations);
     expect(stations[0].stationId).toBe(original[0].stationId);
+  });
+});
+
+// ─── Physical station evidence ───────────────────────────────────────────────
+
+describe("getPhysicalActiveStations", () => {
+  it("keeps active Météo-France stations while excluding model proxies and inactive readings", () => {
+    const stations = [
+      makeStation({ stationId: "mf-1", source: "meteofrance" }),
+      makeStation({ stationId: "grid-1", source: "openmeteo" }),
+      makeStation({ stationId: "personal-1", source: "netatmo" }),
+      makeStation({ stationId: "mf-old", source: "meteofrance", isActive: false }),
+    ];
+
+    expect(getPhysicalActiveStations(stations).map((station) => station.stationId)).toEqual(["mf-1"]);
   });
 });
 

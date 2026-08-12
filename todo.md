@@ -423,3 +423,16 @@
 - [x] Frontend: Afficher exclusivement les quinze prochains jours et permettre la navigation horizontale par glissement.
 - [x] Frontend: Harmoniser la barre de défilement du graphique journalier avec l’indicateur bleu du graphique horaire.
 - [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile.
+
+## Panneau de détails d’une prévision journalière
+- [x] Frontend: Enrichir le panneau au clic avec les paramètres météo disponibles du jour sélectionné.
+- [x] Frontend: Améliorer la hiérarchie mobile et l’accessibilité de fermeture du panneau.
+- [x] Tests: Vérifier TypeScript, Vitest et l’ouverture/fermeture du panneau depuis le graphique.
+
+## Collecte prévisions et stations à 05h00
+- [x] Backend: Étendre le job actif de 05h00 pour collecter et persister les stations réellement disponibles par lieu favori.
+- [x] Backend: Persister les métadonnées de station et leurs relevés horodatés de manière idempotente.
+- [x] Backend: Calculer et stocker la synthèse locale issue des stations actives au sein du même cycle de collecte.
+- [x] Backend: Conserver les prévisions quotidiennes et horaires de tous les modèles réellement disponibles, sans ajouter de job planifié.
+- [x] Tests: Vérifier la collecte de stations, le filtrage des sources non physiques et l’idempotence des écritures.
+- [x] Opérations: Confirmer le job actif « meteoai-collect-favorites-forecasts » à 05h00 Paris (03h00 UTC en été), prochaine exécution planifiée le 13 août 2026 à 03:00 UTC.
