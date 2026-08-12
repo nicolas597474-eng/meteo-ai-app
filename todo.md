@@ -507,3 +507,8 @@
 - [x] Backend: Exposer l’heure du dernier relevé local validé et l’écart avec la prévision officielle.
 - [x] Frontend: Afficher la fraîcheur du relevé et l’écart local/officiel dans la carte principale.
 - [x] Tests: Vérifier le calcul de l’écart et les replis sans relevé local.
+
+## Historique local vs prévision officielle
+- [x] Backend: Construire une série horaire vérifiable des écarts sur les dernières 24 heures.
+- [x] Frontend: Ajouter un graphique compact local/officiel au Dashboard.
+- [x] Tests: Vérifier les paires d’observations comparables et les créneaux sans données.

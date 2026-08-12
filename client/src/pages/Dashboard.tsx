@@ -10,6 +10,7 @@ import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weather
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
+import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
@@ -165,6 +166,9 @@ export default function Dashboard() {
   // Réponse officielle consolidée : la même source alimente désormais Dashboard
   // et Détails pour les heures, les jours et les indices de confiance.
   const { data: officialForecast, isLoading: officialLoading, isError: officialError } = trpc.weather.getDetailedForecast.useQuery(
+    coordsInput, { staleTime: 5 * 60 * 1000 }
+  );
+  const { data: localOfficialHistory } = trpc.weather.getLocalOfficialDeltaHistory.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
 
@@ -500,6 +504,16 @@ export default function Dashboard() {
           <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
           <span className="text-primary text-xs">→</span>
         </a>
+
+        {localMode !== "standard" && (
+          <section className="space-y-2" aria-labelledby="local-history-title">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <h2 id="local-history-title" className="text-sm font-semibold text-slate-100">Historique local / officiel</h2>
+              <span className="text-[10px] text-muted-foreground">Observations physiques validées</span>
+            </div>
+            <LocalOfficialDeltaChart points={localOfficialHistory} />
+          </section>
+        )}
 
         {/* ── Ultra-local Mode Selector ── */}
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">

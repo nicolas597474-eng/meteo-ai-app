@@ -35,6 +35,7 @@ import { getParisDate, getParisDateDaysAgo } from "../weatherTime";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
 import { buildOfficialRegime } from "../officialRegime";
+import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -183,6 +184,32 @@ export const weatherRouter = router({
           trace: getPersistedForecastTrace(snapshot.weights, snapshot.computedAt),
         }))
         .filter((snapshot) => snapshot.trace != null);
+    }),
+
+  /** Série horaire vérifiable pour le graphique local/officiel du Dashboard. */
+  getLocalOfficialDeltaHistory: publicProcedure
+    .input(z.object({ lat: z.number(), lon: z.number() }))
+    .query(async ({ input }) => {
+      const sinceMs = Date.now() - 24 * 60 * 60 * 1000;
+      const locationKey = makeLocationKey(input.lat, input.lon);
+      const [physicalHistory, todayRows, yesterdayRows] = await Promise.all([
+        getPhysicalStationHistory(input.lat, input.lon, sinceMs),
+        getStoredHourlyForecasts(locationKey, getTodayParis()),
+        getStoredHourlyForecasts(locationKey, getParisDateDaysAgo(1)),
+      ]);
+      const readings = physicalHistory.stations.flatMap((station) => station.readings.map((reading) => ({
+        stationId: station.stationId,
+        observedAt: reading.observedAt,
+        temperature: reading.temperature,
+        distanceKm: Number(station.distanceKm),
+        reliabilityScore: Number(station.reliabilityScore),
+      })));
+      return buildLocalOfficialDeltaHistory(readings, [...todayRows, ...yesterdayRows].map((row) => ({
+        date: row.date,
+        hour: row.hour,
+        modelName: row.modelName,
+        temperature: row.temperature,
+      })));
     }),
 
   /** Écarts de poids, source par source, entre deux snapshots du même lieu. */
