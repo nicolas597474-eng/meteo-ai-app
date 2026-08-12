@@ -575,6 +575,7 @@
 ## Refus Netatmo avant code OAuth
 - [x] Backend: Afficher et journaliser de manière non sensible le paramètre d’erreur retourné par Netatmo.
 - [ ] Configuration: Corriger la Redirect URI ou les identifiants selon le code de refus reçu.
+- [x] Backend: Ajouter le paramètre OAuth obligatoire `response_type=code` à l’autorisation Netatmo.
 
 ## Cohérence des prochains changements de régime
 - [x] Backend: Utiliser un unique régime de créneau horaire pour les annonces de transition.

@@ -40,6 +40,7 @@ export async function startNetatmoAuthorization(userId: number) {
   await createNetatmoOAuthState(hashNetatmoState(state), userId, new Date(Date.now() + NETATMO_STATE_TTL_MS));
   const authorizationUrl = new URL("https://api.netatmo.com/oauth2/authorize");
   authorizationUrl.searchParams.set("client_id", process.env.NETATMO_CLIENT_ID ?? "");
+  authorizationUrl.searchParams.set("response_type", "code");
   authorizationUrl.searchParams.set("redirect_uri", NETATMO_REDIRECT_URI);
   authorizationUrl.searchParams.set("scope", NETATMO_SCOPE);
   authorizationUrl.searchParams.set("state", state);
