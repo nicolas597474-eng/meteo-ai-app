@@ -683,7 +683,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // networks/model grid points are deliberately excluded from persistence
         // as station observations (see stationService.PHYSICAL_STATION_SOURCES).
         try {
-          const discoveredStations = await collectNearbyStations(fav.lat, fav.lon, radiusKm, fav.customName ?? fav.name);
+          const discoveredStations = await collectNearbyStations(fav.lat, fav.lon, radiusKm, fav.customName ?? fav.name, { netatmoUserId: fav.userId });
           const physicalStations = getPhysicalActiveStations(discoveredStations);
           physicalStationCount = physicalStations.length;
 

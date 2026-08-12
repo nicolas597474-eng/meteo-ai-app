@@ -224,7 +224,7 @@ const SOURCE_LABELS: Record<string, string> = {
   synop: "SYNOP/WMO",
   noaa: "NOAA",
   openmeteo: "Open-Meteo",
-  netatmo: "Grille locale · Best Match",
+  netatmo: "Netatmo public",
   wunderground: "Grille régionale · GFS",
   cwop: "Grille régionale · ECMWF",
   davis: "Référence de grille",

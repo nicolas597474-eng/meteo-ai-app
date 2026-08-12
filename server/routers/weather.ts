@@ -1009,12 +1009,12 @@ export const weatherRouter = router({
       lon: z.number().optional(),
       radiusKm: z.number().min(1).max(50).default(20),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const lat = input.lat ?? HONDEGHEM.lat;
       const lon = input.lon ?? HONDEGHEM.lon;
       const radiusKm = input.radiusKm;
 
-      const stations = await collectNearbyStations(lat, lon, radiusKm);
+      const stations = await collectNearbyStations(lat, lon, radiusKm, "Local", { netatmoUserId: ctx.user?.id });
       const ranked = rankStations(stations);
       // Use the unified engine (same as Mode Local in Dashboard)
       const ultraResult = calculateUltraLocal(ranked, "local", lat, lon, null, null);

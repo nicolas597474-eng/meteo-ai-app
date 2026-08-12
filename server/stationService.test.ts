@@ -64,11 +64,11 @@ describe("haversineKm", () => {
 });
 
 describe("getStationSourceKind", () => {
-  it("distingue les observations physiques des références de modèle ou de réseau", () => {
+  it("distingue les observations physiques des références de modèle", () => {
     expect(getStationSourceKind("meteofrance")).toBe("physical");
     expect(getStationSourceKind("metar")).toBe("physical");
     expect(getStationSourceKind("openmeteo")).toBe("reference");
-    expect(getStationSourceKind("netatmo")).toBe("reference");
+    expect(getStationSourceKind("netatmo")).toBe("physical");
     expect(getStationSourceKind("synop")).toBe("reference");
   });
 });
@@ -148,7 +148,7 @@ describe("rankStations", () => {
 // ─── Physical station evidence ───────────────────────────────────────────────
 
 describe("getPhysicalActiveStations", () => {
-  it("keeps active Météo-France stations while excluding model proxies and inactive readings", () => {
+  it("conserve les stations physiques actives tout en excluant les références et relevés inactifs", () => {
     const stations = [
       makeStation({ stationId: "mf-1", source: "meteofrance" }),
       makeStation({ stationId: "grid-1", source: "openmeteo" }),
@@ -156,7 +156,7 @@ describe("getPhysicalActiveStations", () => {
       makeStation({ stationId: "mf-old", source: "meteofrance", isActive: false }),
     ];
 
-    expect(getPhysicalActiveStations(stations).map((station) => station.stationId)).toEqual(["mf-1"]);
+    expect(getPhysicalActiveStations(stations).map((station) => station.stationId)).toEqual(["mf-1", "personal-1"]);
   });
 });
 

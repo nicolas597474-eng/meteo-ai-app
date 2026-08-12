@@ -4,7 +4,8 @@
  * Sources interrogated:
  * 1. Open-Meteo grid point (best-match model, always available)
  * 2. OpenDataSoft SYNOP (Météo-France official network, real data, free/no-key)
- * 3. Open-Meteo multi-point grid references (clearly not physical stations)
+ * 3. Netatmo public stations (OAuth, when a user connection is active)
+ * 4. Open-Meteo multi-point grid references (clearly not physical stations)
  *
  * Ground truth weighting:
  *   50% distance (closer = more weight)
@@ -54,7 +55,7 @@ export type StationData = {
  * Les réseaux personnels simulés et points de grille restent des références de
  * modèle : ils ne doivent jamais être persistés comme observations de station.
  */
-export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance", "metar"]);
+export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance", "metar", "netatmo"]);
 
 export type StationSourceKind = "physical" | "reference";
 
@@ -474,15 +475,18 @@ export async function collectNearbyStations(
   lat: number,
   lon: number,
   radiusKm: number = 20,
-  townName: string = "Local"
+  townName: string = "Local",
+  options: { netatmoUserId?: number } = {},
 ): Promise<StationData[]> {
+  const { fetchNetatmoPublicStations } = await import("./netatmoService");
   // Fetch from all sources in parallel
-  const [openMeteo, meteoFrance, metar, personal, synopRef] = await Promise.allSettled([
+  const [openMeteo, meteoFrance, metar, personal, synopRef, netatmo] = await Promise.allSettled([
     fetchOpenMeteoNearbyStations(lat, lon, radiusKm),
     fetchMeteoFranceStations(lat, lon, radiusKm),
     fetchMetarStations(lat, lon, radiusKm),
     fetchPersonalWeatherStations(lat, lon, radiusKm, townName),
     fetchSYNOPReference(lat, lon),
+    fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm),
   ]);
 
   const all: StationData[] = [
@@ -491,6 +495,7 @@ export async function collectNearbyStations(
     ...(metar.status === "fulfilled" ? metar.value : []),
     ...(personal.status === "fulfilled" ? personal.value : []),
     ...(synopRef.status === "fulfilled" ? synopRef.value : []),
+    ...(netatmo.status === "fulfilled" ? netatmo.value : []),
   ];
 
   // Deduplicate by stationId
