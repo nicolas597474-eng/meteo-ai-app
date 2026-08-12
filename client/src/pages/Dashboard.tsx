@@ -297,7 +297,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 sm:px-6 sm:py-8 sm:space-y-6">
+      <div className="max-w-2xl mx-auto px-3 py-3 space-y-3 sm:px-6 sm:py-8 sm:space-y-6">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
@@ -334,17 +334,18 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-1.5">
+            <div className={dashboardTemperatureLayout.mobileHeader}>
+              <div className="flex min-w-0 items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-primary">Tendance · {regimeSourceLabel}</span>
-                {selectedLocation && <span className="text-xs text-primary/60">· {selectedLocation.name}</span>}
+                <span className="text-xs font-medium text-primary sm:hidden">Tendance</span>
+                <span className="hidden text-xs font-medium text-primary sm:inline">Tendance · {regimeSourceLabel}</span>
+                {selectedLocation && <span className="hidden text-xs text-primary/60 sm:inline">· {selectedLocation.name}</span>}
               </div>
               <button
                 type="button"
                 onClick={refreshCurrentWeather}
                 disabled={isRefreshing}
-                className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary disabled:opacity-60"
+                className={dashboardTemperatureLayout.refreshButton}
                 aria-label="Actualiser la météo maintenant"
               >
                 <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
@@ -379,14 +380,15 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-                <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt}` : ""}</p>
+                <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}<span className="hidden sm:inline">{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt}` : ""}</span></p>
                 {modelIndicator && (
                   <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-blue-400/25 bg-blue-400/10 px-2 py-1 text-[10px] text-blue-100">
                     <Activity className="h-3 w-3 text-blue-300" />
-                    <span>
+                    <span className="hidden sm:inline">
                       {modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion ${modelIndicator.modelCount} modèles`} : <strong>{modelIndicator.primaryModel}</strong>
                       {modelIndicator.mode === "multi_model" ? ` · poids moyen ${Math.round(modelIndicator.primaryWeight * 100)}%` : ""}
                     </span>
+                    <span className="sm:hidden">{modelIndicator.mode === "single_model" ? "Modèle" : "Fusion"} · <strong>{modelIndicator.primaryModel}</strong>{modelIndicator.mode === "multi_model" ? ` ${Math.round(modelIndicator.primaryWeight * 100)}%` : ""}</span>
                   </div>
                 )}
               </div>
@@ -440,9 +442,10 @@ export default function Dashboard() {
                   </p>
                   {localCurrentObservation ? (
                     <p className="mt-1 text-[11px] font-medium text-emerald-300">
-                      Relevé local {localObservedAt ? `à ${localObservedAt}` : "validé"} · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}
+                      <span className="sm:hidden">Local {localObservedAt ?? "validé"} · {localCurrentObservation.stationCount} station{localCurrentObservation.stationCount > 1 ? "s" : ""}</span>
+                      <span className="hidden sm:inline">Relevé local {localObservedAt ? `à ${localObservedAt}` : "validé"} · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}</span>
                       {localDelta != null
-                        ? ` · ${localDelta >= 0 ? "+" : ""}${localDelta.toFixed(1)}° vs prévision officielle`
+                        ? <span>{localDelta >= 0 ? " +" : " "}{localDelta.toFixed(1)}°<span className="hidden sm:inline"> vs prévision officielle</span></span>
                         : officialCurrentTemp != null ? ` · prévision officielle ${officialCurrentTemp.toFixed(1)}°` : ""}
                     </p>
                   ) : (
@@ -451,9 +454,12 @@ export default function Dashboard() {
                   {(nextRegimeChange ?? nextConditionChange) && (
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
                       <Clock className="h-3 w-3" />
-                      Prochain changement de régime : {nextRegimeChange
+                      <span className="sm:hidden">Prochain : {nextRegimeChange
+                        ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} · ${nextRegimeChange.hour}`
+                        : `${nextConditionChange!.condition} · ${nextConditionChange!.hour}`}</span>
+                      <span className="hidden sm:inline">Prochain changement de régime : {nextRegimeChange
                         ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} à ${nextRegimeChange.hour}`
-                        : `${nextConditionChange!.condition} à ${nextConditionChange!.hour}`}
+                        : `${nextConditionChange!.condition} à ${nextConditionChange!.hour}`}</span>
                     </p>
                   )}
                 </div>
@@ -477,7 +483,7 @@ export default function Dashboard() {
             </div>
 
             {/* Apparent temp + UV + Wind rose highlight row */}
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-700/60">
+            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700/60`}>
               {/* Ressenti */}
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
@@ -506,7 +512,7 @@ export default function Dashboard() {
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-700">
+            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700`}>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
                   <Droplets className="h-3 w-3" />Précip.
@@ -551,7 +557,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── Link to details page ── */}
-        <a href="/details" className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors">
+        <a href="/details" className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
           <MeteoIcon name="chevron_right" size={16} />
           <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
           <span className="text-primary text-xs">→</span>
@@ -568,7 +574,7 @@ export default function Dashboard() {
         )}
 
         {/* ── Ultra-local Mode Selector ── */}
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border">
+        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2">
           <Radio className="h-4 w-4 text-primary flex-shrink-0" />
           <span className="text-xs font-semibold text-muted-foreground mr-auto">Mode</span>
           <div className="flex gap-1">

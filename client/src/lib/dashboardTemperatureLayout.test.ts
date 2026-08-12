@@ -12,4 +12,10 @@ describe("mise en page de température du Dashboard", () => {
     expect(dashboardTemperatureLayout.currentValue).toContain("whitespace-nowrap");
     expect(dashboardTemperatureLayout.extremeValue).toContain("whitespace-nowrap");
   });
+
+  it("préserve une zone tactile de 44 px tout en compactant les sections mobiles", () => {
+    expect(dashboardTemperatureLayout.refreshButton).toContain("min-h-11");
+    expect(dashboardTemperatureLayout.compactMetrics).toContain("mt-2");
+    expect(dashboardTemperatureLayout.compactMetrics).toContain("sm:mt-3");
+  });
 });

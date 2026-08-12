@@ -542,7 +542,7 @@
 - [x] Tests: Vérifier les transitions, l’absence de transition et la fraîcheur affichée.
 
 ## Intégration des stations Netatmo
-- [ ] Configuration: Enregistrer les identifiants Netatmo requis de manière sécurisée.
+- [x] Configuration: Enregistrer les identifiants Netatmo requis de manière sécurisée.
 - [ ] Backend: Collecter et valider les stations Netatmo publiques dans le rayon du favori.
 - [ ] Backend: Persister les observations Netatmo avec provenance, fraîcheur et règles d’anomalie.
 - [ ] Frontend: Afficher les stations Netatmo validées parmi les stations physiques locales.
@@ -613,3 +613,12 @@
 ## Lisibilité mobile de la carte de température
 - [x] Frontend: Empêcher le débordement à droite des températures maximale et minimale dans la carte principale du Dashboard.
 - [x] Validation: Vérifier le rendu à largeur mobile sans dégrader l’affichage tablette et bureau.
+
+## Aperçu des optimisations mobile
+- [x] Validation: Produire un aperçu mobile du Dashboard et signaler les zones restantes à optimiser.
+
+## Densité et hiérarchie du Dashboard mobile
+- [x] Frontend: Compacter l’en-tête de la carte principale sur petits écrans sans réduire les zones tactiles.
+- [x] Frontend: Hiérarchiser les détails secondaires de température et de régime pour limiter la hauteur de la carte mobile.
+- [x] Frontend: Réduire l’espace avant les graphiques et préserver leur accès rapide sur mobile.
+- [x] Validation: Vérifier la lisibilité mobile et l’absence de régression tablette et bureau.
