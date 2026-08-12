@@ -18,6 +18,7 @@ import {
   classifyLeadTime,
   applyBiasCorrection,
   computeConfidenceScore,
+  isEligibleGlobalReliabilityScore,
   getLeadTimeWeights,
   type LeadTimeBucket,
   type ServiceBias,
@@ -211,18 +212,21 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           avgMaeTemp: d.avgMaeTemp != null ? Number(d.avgMaeTemp) : null,
           avgMaePrecip: d.avgMaePrecip != null ? Number(d.avgMaePrecip) : null,
           avgMaeWind: d.avgMaeWind != null ? Number(d.avgMaeWind) : null,
+          sampleSize: d.totalSamples != null ? Number(d.totalSamples) : 0,
+          latestScoreDate: d.latestScoreDate ?? null,
         }));
 
         // Merge lead-time weights with global performance map (lead-time takes priority)
         const leadTimeWeights = getLeadTimeWeights(leadTimePerfs, "6-24h"); // today = 6-24h horizon
-        const performanceMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
-        ranking.forEach((r) => {
+        const performanceMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; maeCloud?: number; weightedScore?: number }> = {};
+        ranking.filter((r) => isEligibleGlobalReliabilityScore(Number(r.daysTracked ?? 0), r.latestScoreDate ?? null)).forEach((r) => {
           const ltw = leadTimeWeights[r.serviceName];
           performanceMap[r.serviceName] = {
             // Lead-time MAE takes priority over global MAE if available
             maeTemp: ltw?.maeTemp ?? (r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined),
             maePrecip: ltw?.maePrecip ?? (r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined),
             maeWind: ltw?.maeWind ?? (r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined),
+            maeCloud: r.avgCondMaeCloud != null ? Number(r.avgCondMaeCloud) : undefined,
             weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
           };
         });
@@ -832,16 +836,19 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           avgMaeTemp: d.avgMaeTemp != null ? Number(d.avgMaeTemp) : null,
           avgMaePrecip: d.avgMaePrecip != null ? Number(d.avgMaePrecip) : null,
           avgMaeWind: d.avgMaeWind != null ? Number(d.avgMaeWind) : null,
+          sampleSize: d.totalSamples != null ? Number(d.totalSamples) : 0,
+          latestScoreDate: d.latestScoreDate ?? null,
         }));
 
         const locLeadTimeWeights = getLeadTimeWeights(locLeadTimePerfs, "6-24h");
-        const locPerfMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
-        activeRanking.forEach((r) => {
+        const locPerfMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; maeCloud?: number; weightedScore?: number }> = {};
+        activeRanking.filter((r) => isEligibleGlobalReliabilityScore(Number(r.daysTracked ?? 0), r.latestScoreDate ?? null)).forEach((r) => {
           const ltw = locLeadTimeWeights[r.serviceName];
           locPerfMap[r.serviceName] = {
             maeTemp: ltw?.maeTemp ?? (r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined),
             maePrecip: ltw?.maePrecip ?? (r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined),
             maeWind: ltw?.maeWind ?? (r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined),
+            maeCloud: r.avgCondMaeCloud != null ? Number(r.avgCondMaeCloud) : undefined,
             weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
           };
         });
@@ -851,13 +858,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // Determine condition
         const avgPrecip = expertData.reduce((s, f) => s + (f.precipitation ?? 0), 0) / expertData.length;
         const avgCloud = expertData.reduce((s, f) => s + (f.cloudCover ?? 50), 0) / expertData.length;
-        let condition = "Ensoleillé";
-        if (avgPrecip > 5) condition = "Pluie";
-        else if (avgPrecip > 1) condition = "Averses";
-        else if (avgPrecip > 0.2) condition = "Pluie légère";
-        else if (avgCloud > 80) condition = "Couvert";
-        else if (avgCloud > 50) condition = "Nuageux";
-        else if (avgCloud > 25) condition = "Partiellement nuageux";
+        const condition = conditionFromWeatherValues(avgPrecip, avgCloud);
 
         // Estimate current temperature (midpoint of min/max adjusted for time of day)
         const hour = getParisHour();

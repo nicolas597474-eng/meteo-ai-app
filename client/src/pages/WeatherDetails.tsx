@@ -6,6 +6,7 @@ import { useState, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cloudCoverLabel } from "@shared/weatherConditionLabels";
 import { ChevronLeft } from "lucide-react";
 import { Link } from "wouter";
 
@@ -96,9 +97,7 @@ function generateDaySummary(day: any, hours: any[]): string {
   if ((day.windSpeed ?? 0) > 40) summary += `, vent fort (${day.windSpeed?.toFixed(0)} km/h)`;
   else if ((day.windSpeed ?? 0) > 20) summary += `, vent modéré`;
   
-  if ((day.cloudCover ?? 0) > 80) summary += ". Ciel couvert.";
-  else if ((day.cloudCover ?? 0) > 50) summary += ". Ciel nuageux.";
-  else summary += ". Belles éclaircies.";
+  summary += `. ${cloudCoverLabel(day.cloudCover)}.`;
   
   return summary;
 }

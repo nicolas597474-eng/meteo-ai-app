@@ -297,11 +297,12 @@ export async function fetchMeteoFranceViaOpenMeteo(
   }
 }
 
-/** Convertit un code WMO en description française */
-function wmoToConditionFr(code: number): string {
+/** Convertit un code WMO en description française alignée sur les régimes. */
+export function wmoToConditionFr(code: number): string {
   if (code === 0) return "Ensoleillé";
-  if (code <= 2) return "Partiellement nuageux";
-  if (code === 3) return "Couvert";
+  if (code === 1) return "Peu nuageux";
+  if (code === 2) return "Partiellement nuageux";
+  if (code === 3) return "Ciel couvert";
   if (code <= 49) return "Brouillard";
   if (code <= 59) return "Bruine";
   if (code <= 69) return "Pluie";

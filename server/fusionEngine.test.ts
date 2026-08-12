@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFusion, type FusionSource } from "./fusionEngine";
+import { computeFusion, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
 
 function station(
   id: string,
@@ -64,5 +64,29 @@ describe("computeFusion — fusion IDW avancée", () => {
     const baselineWeight = baseline.usedSources.find((source) => source.id === "figee")?.finalWeight ?? 0;
     const penalizedWeight = result.usedSources.find((source) => source.id === "figee")?.finalWeight ?? 0;
     expect(penalizedWeight).toBeLessThan(baselineWeight);
+  });
+});
+
+describe("getLeadTimeWeights", () => {
+  it("ignore les scores par échéance trop peu nombreux ou périmés", () => {
+    const weights = getLeadTimeWeights([
+      { serviceName: "Faible", bucket: "0-6h", avgMaeTemp: 0.1, avgMaePrecip: 0.1, avgMaeWind: 0.1, sampleSize: 2, latestScoreDate: "2026-08-12" },
+      { serviceName: "Ancien", bucket: "0-6h", avgMaeTemp: 0.1, avgMaePrecip: 0.1, avgMaeWind: 0.1, sampleSize: 12, latestScoreDate: "2026-08-01" },
+      { serviceName: "Validé", bucket: "0-6h", avgMaeTemp: 0.4, avgMaePrecip: 0.2, avgMaeWind: 1.2, sampleSize: 9, latestScoreDate: "2026-08-10" },
+    ], "0-6h", new Date("2026-08-12T12:00:00.000Z"));
+
+    expect(weights).toEqual({
+      "Validé": { maeTemp: 0.4, maePrecip: 0.2, maeWind: 1.2 },
+    });
+  });
+});
+
+describe("isEligibleGlobalReliabilityScore", () => {
+  const now = new Date("2026-08-12T12:00:00.000Z");
+
+  it("retient uniquement les scores globaux récents avec un effectif suffisant", () => {
+    expect(isEligibleGlobalReliabilityScore(10, "2026-08-11", now)).toBe(true);
+    expect(isEligibleGlobalReliabilityScore(3, "2026-08-12", now)).toBe(false);
+    expect(isEligibleGlobalReliabilityScore(10, "2026-08-01", now)).toBe(false);
   });
 });

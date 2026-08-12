@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset, Gauge, Navigation, Eye, MapPin } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
+import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface DayData {
@@ -39,12 +40,9 @@ function formatDate(dateStr: string) {
 }
 
 function getConditionLabel(cloudCover: number | null, precip: number | null, condition: string | null): string {
-  if (condition) return condition;
-  if ((precip ?? 0) > 5) return "Pluie";
-  if ((precip ?? 0) > 1) return "Averses";
-  if ((cloudCover ?? 0) > 80) return "Couvert";
-  if ((cloudCover ?? 0) > 50) return "Partiellement nuageux";
-  return "Ensoleillé";
+  if (condition && /(orage|brouillard|neige|pluie|averse)/i.test(condition)) return condition;
+  if (cloudCover != null || precip != null) return conditionFromWeatherValues(precip, cloudCover);
+  return condition ?? "Ensoleillé";
 }
 
 function getConditionBg(cloudCover: number | null, precip: number | null, condition: string | null): string {

@@ -14,6 +14,7 @@ export type OfficialServicePerformance = {
   maeTemp?: number;
   maePrecip?: number;
   maeWind?: number;
+  maeCloud?: number;
   weightedScore?: number;
 };
 
@@ -66,13 +67,15 @@ export function computeOfficialDailyForecast(
   performanceByService: Record<string, OfficialServicePerformance>
 ) {
   const now = new Date();
-  const makeSources = (metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed"): FusionSource[] =>
+  const makeSources = (metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "cloudCover"): FusionSource[] =>
     forecasts.map((forecast) => {
       const performance = performanceByService[forecast.serviceName] ?? {};
       const metricMae = metric === "precipitation"
         ? performance.maePrecip
         : metric === "windSpeed"
           ? performance.maeWind
+          : metric === "cloudCover"
+            ? performance.maeCloud
           : performance.maeTemp;
       return {
         id: `model:${forecast.serviceName}`,
@@ -80,7 +83,9 @@ export function computeOfficialDailyForecast(
         // Les modèles sont interpolés au point cible : seule la performance
         // historique doit les départager, pas une distance géographique fictive.
         distanceKm: 1,
-        temperature: metric === "tempMax"
+        temperature: metric === "cloudCover"
+          ? forecast.cloudCover ?? null
+          : metric === "tempMax"
           ? forecast.tempMax
           : metric === "tempMin"
             ? forecast.tempMin
@@ -112,6 +117,7 @@ export function computeOfficialDailyForecast(
   const minFusion = computeFusion(makeSources("tempMin"), config);
   const precipFusion = computeFusion(makeSources("precipitation"), config);
   const windFusion = computeFusion(makeSources("windSpeed"), config);
+  const cloudFusion = computeFusion(makeSources("cloudCover"), config);
 
   const weights: Record<string, { tempWeight: number; precipWeight: number; windWeight: number }> = {};
   for (const source of maxFusion.usedSources) {
@@ -144,7 +150,7 @@ export function computeOfficialDailyForecast(
     precipitation: precipFusion.precipitation,
     windSpeed: windFusion.windSpeed,
     windGust: windFusion.windGust,
-    cloudCover: maxFusion.cloudCover,
+    cloudCover: cloudFusion.temperature,
     weights,
     trace,
     methodNote: `Fusion officielle ${maxFusion.methodUsed} par paramètre (${forecasts.length} modèles)`,

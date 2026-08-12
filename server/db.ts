@@ -256,6 +256,7 @@ export async function getCumulativeRanking() {
       avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
       daysTracked: sql<number>`COUNT(*)`,
+      latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`,
       // 🌡️ Temperature dimension
       avgTempScore: sql<number>`AVG(${reliabilityScores.tempScore})`,
       avgTempMae: sql<number>`AVG(${reliabilityScores.maeTemp})`,
@@ -296,6 +297,7 @@ export async function getCumulativeRankingForLocation(locationKey = "default") {
       avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
       daysTracked: sql<number>`COUNT(*)`,
+      latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`,
       avgTempScore: sql<number>`AVG(${reliabilityScores.tempScore})`,
       avgTempMae: sql<number>`AVG(${reliabilityScores.maeTemp})`,
       avgTempBias: sql<number>`AVG(${reliabilityScores.biasTemp})`,
@@ -832,6 +834,7 @@ export async function getLeadTimeScoresForLocation(locationKey: string, days = 1
       avgMaeWind: sql<number>`AVG(${leadTimeScores.maeWind})`.as("avgMaeWind"),
       avgRmseWind: sql<number>`SQRT(AVG(POWER(${leadTimeScores.rmseWind}, 2)))`.as("avgRmseWind"),
       totalSamples: sql<number>`SUM(${leadTimeScores.sampleSize})`.as("totalSamples"),
+      latestScoreDate: sql<string>`MAX(${leadTimeScores.date})`.as("latestScoreDate"),
     })
     .from(leadTimeScores)
     .where(

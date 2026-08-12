@@ -9,8 +9,8 @@ const forecasts = [
 describe("computeOfficialDailyForecast", () => {
   it("produit une synthèse déterministe sans données simulées", () => {
     const performances = {
-      "Modèle précis": { maeTemp: 0.5, maePrecip: 0.4, maeWind: 1, weightedScore: 90 },
-      "Modèle incertain": { maeTemp: 2, maePrecip: 2, maeWind: 4, weightedScore: 70 },
+      "Modèle précis": { maeTemp: 0.5, maePrecip: 0.4, maeWind: 1, maeCloud: 2, weightedScore: 90 },
+      "Modèle incertain": { maeTemp: 2, maePrecip: 2, maeWind: 4, maeCloud: 18, weightedScore: 70 },
     };
 
     const first = computeOfficialDailyForecast(forecasts, performances);
@@ -33,5 +33,6 @@ describe("computeOfficialDailyForecast", () => {
     expect(first.trace.parameterSources.temperature.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
     expect(first.trace.parameterSources.precipitation.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
     expect(first.trace.parameterSources.wind.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
+    expect(first.cloudCover).toBeLessThan(57.5);
   });
 });

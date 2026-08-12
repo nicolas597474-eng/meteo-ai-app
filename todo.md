@@ -586,3 +586,15 @@
 - [x] Backend: Centraliser les seuils et libellés de nébulosité utilisés par les conditions horaires et les régimes.
 - [x] Frontend: Afficher un libellé identique pour le créneau détaillé et le régime à venir.
 - [x] Tests: Vérifier la catégorie commune pour les niveaux de nébulosité de transition.
+
+## Audit complet des descriptions de nébulosité
+- [x] Audit: Recenser les libellés, seuils et descriptions de nébulosité restants dans les écrans et services.
+- [x] Backend: Remplacer les derniers calculs ou descriptions divergents par la catégorisation commune.
+- [x] Tests: Couvrir les seuils partagés et les descriptions visibles pour chaque catégorie de ciel.
+
+## Fiabilité mesurée par paramètre et modèle
+- [x] Audit: Mesurer la couverture et les erreurs historiques disponibles par modèle, paramètre, lieu et échéance.
+- [x] Backend: Sélectionner et pondérer séparément les modèles sur les performances réelles récentes et historiques.
+- [x] Backend: Ajouter des garde-fous contre les poids instables lorsque les données observées sont insuffisantes.
+- [x] Tests: Vérifier que tout changement de pondération est fondé sur des mesures et conserve un repli robuste.
+- [x] Rapport: Présenter les sources privilégiées, les gains mesurés et les limites statistiques.

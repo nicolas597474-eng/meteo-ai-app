@@ -1125,7 +1125,35 @@ export type LeadTimePerf = {
   avgMaeTemp: number | null;
   avgMaePrecip: number | null;
   avgMaeWind: number | null;
+  sampleSize?: number | null;
+  latestScoreDate?: string | null;
 };
+
+export const MIN_LEAD_TIME_SAMPLES = 7;
+export const MAX_LEAD_TIME_SCORE_AGE_DAYS = 7;
+export const MIN_GLOBAL_RELIABILITY_SAMPLES = 7;
+export const MAX_GLOBAL_RELIABILITY_SCORE_AGE_DAYS = 7;
+
+function isEligibleLeadTimePerf(perf: LeadTimePerf, now: Date): boolean {
+  if ((perf.sampleSize ?? 0) < MIN_LEAD_TIME_SAMPLES) return false;
+  if (!perf.latestScoreDate) return false;
+  const parsed = new Date(`${perf.latestScoreDate}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const ageMs = now.getTime() - parsed.getTime();
+  return ageMs >= 0 && ageMs <= MAX_LEAD_TIME_SCORE_AGE_DAYS * 24 * 60 * 60 * 1000;
+}
+
+export function isEligibleGlobalReliabilityScore(
+  sampleSize: number | null | undefined,
+  latestScoreDate: string | null | undefined,
+  now = new Date(),
+): boolean {
+  if ((sampleSize ?? 0) < MIN_GLOBAL_RELIABILITY_SAMPLES || !latestScoreDate) return false;
+  const parsed = new Date(`${latestScoreDate}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const ageMs = now.getTime() - parsed.getTime();
+  return ageMs >= 0 && ageMs <= MAX_GLOBAL_RELIABILITY_SCORE_AGE_DAYS * 24 * 60 * 60 * 1000;
+}
 
 /**
  * Select the best performance metrics for a given lead-time bucket.
@@ -1134,7 +1162,8 @@ export type LeadTimePerf = {
  */
 export function getLeadTimeWeights(
   leadTimePerfs: LeadTimePerf[],
-  targetBucket: LeadTimeBucket
+  targetBucket: LeadTimeBucket,
+  now = new Date(),
 ): Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number }> {
   const bucketPriority: LeadTimeBucket[] = [
     targetBucket,
@@ -1143,11 +1172,12 @@ export function getLeadTimeWeights(
 
   const result: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number }> = {};
 
-  const uniqueServices = Array.from(new Set(leadTimePerfs.map(p => p.serviceName)));
+  const eligiblePerfs = leadTimePerfs.filter((perf) => isEligibleLeadTimePerf(perf, now));
+  const uniqueServices = Array.from(new Set(eligiblePerfs.map(p => p.serviceName)));
   for (const svc of uniqueServices) {
     let found: LeadTimePerf | undefined;
     for (const bucket of bucketPriority) {
-      found = leadTimePerfs.find(p => p.serviceName === svc && p.bucket === bucket);
+      found = eligiblePerfs.find(p => p.serviceName === svc && p.bucket === bucket);
       if (found) break;
     }
     if (found) {
