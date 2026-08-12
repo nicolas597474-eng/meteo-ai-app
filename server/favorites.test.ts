@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDashboardCurrentTemperature } from "./routers/favorites";
+import { buildDashboardCurrentTemperature, resolveLocalModeTemperature } from "./routers/favorites";
 
 describe("buildDashboardCurrentTemperature", () => {
   it("utilise l’observation locale validée en modes Local et Ultra-local", () => {
@@ -37,5 +37,31 @@ describe("buildDashboardCurrentTemperature", () => {
       observedAt: null,
       officialTemperature: 14.4,
     })).toBeNull();
+  });
+
+  it("aligne exactement les modes Local et Ultra-local sur l’officiel sans station physique", () => {
+    expect(resolveLocalModeTemperature({
+      officialTemperature: 30.7,
+      localTemperature: 17.1,
+      physicalStationCount: 0,
+      microclimateAdjustment: -0.1,
+    })).toEqual({
+      temperature: 30.7,
+      usesOfficialFallback: true,
+      microclimateAdjustment: 0,
+    });
+  });
+
+  it("préserve la température locale et le micro-ajustement seulement avec une station qualifiée", () => {
+    expect(resolveLocalModeTemperature({
+      officialTemperature: 30.7,
+      localTemperature: 29.9,
+      physicalStationCount: 1,
+      microclimateAdjustment: -0.2,
+    })).toEqual({
+      temperature: 29.9,
+      usesOfficialFallback: false,
+      microclimateAdjustment: -0.2,
+    });
   });
 });

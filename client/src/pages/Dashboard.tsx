@@ -641,7 +641,9 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <Radio className="h-3.5 w-3.5 text-emerald-400" />
                 <span className="text-xs font-semibold text-emerald-300">
-                  {localMode === "ultra-local" ? "Observation Ultra-locale" : "Observation Locale"}
+                  {locationWeather.ultraLocal.usesOfficialFallback
+                    ? "Repli sur la prévision officielle"
+                    : localMode === "ultra-local" ? "Observation Ultra-locale" : "Observation Locale"}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">
@@ -650,7 +652,9 @@ export default function Dashboard() {
             </div>
 
             <p className="text-[11px] text-muted-foreground">
-              Mesure locale issue des stations : elle complète la prévision officielle affichée au-dessus, sans la remplacer.
+              {locationWeather.ultraLocal.usesOfficialFallback
+                ? "Aucune observation physique validée : la valeur ci-dessous est strictement celle de la prévision officielle affichée au-dessus."
+                : "Mesure locale issue des stations : elle complète la prévision officielle affichée au-dessus, sans la remplacer."}
             </p>
 
             {/* Temperature from ultra-local */}
@@ -660,8 +664,8 @@ export default function Dashboard() {
                   {Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C
                 </span>
                 <div className="text-xs text-muted-foreground">
-                  <p>Confiance : <span className="font-semibold text-foreground">{locationWeather.ultraLocal.confidenceScore}%</span></p>
-                  {locationWeather.ultraLocal.microclimateAdjustment !== 0 && (
+                  <p>{locationWeather.ultraLocal.usesOfficialFallback ? "Source : prévision officielle" : <>Confiance : <span className="font-semibold text-foreground">{locationWeather.ultraLocal.confidenceScore}%</span></>}</p>
+                  {!locationWeather.ultraLocal.usesOfficialFallback && locationWeather.ultraLocal.microclimateAdjustment !== 0 && (
                     <p>Microclimat : {locationWeather.ultraLocal.microclimateAdjustment > 0 ? "+" : ""}{Number(locationWeather.ultraLocal.microclimateAdjustment).toFixed(1)}°C</p>
                   )}
                 </div>

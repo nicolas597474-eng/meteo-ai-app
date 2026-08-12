@@ -762,3 +762,9 @@
 - [x] Frontend: Associer le fond de la carte Dashboard à la condition actuelle du lieu actif.
 - [x] Cible: Appliquer le fond uniquement dans la grande carte de conditions actuelles, derrière les indicateurs météo.
 - [x] Tests: Vérifier le mapping des conditions vers les fonds et la conservation de la lisibilité.
+
+## Cohérence des modes Local et Ultra-local
+- [x] Diagnostic: Identifier pourquoi les modes locaux divergent de la température officielle sans station physique validée.
+- [x] Backend: Forcer le repli exact sur la température officielle lorsqu’aucune observation physique n’est qualifiée.
+- [x] Frontend: Indiquer explicitement le repli officiel et masquer le micro-ajustement sans base station.
+- [x] Tests: Vérifier l’égalité Standard / Local / Ultra-local à zéro station validée.
