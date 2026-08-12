@@ -5,3 +5,5 @@ Le rendu authentifié du Dashboard confirme que la carte de température utilise
 L’aperçu du 12 août montre que les températures maximale et minimale demeurent désormais entièrement visibles. Les prochaines améliorations d’affichage concernent principalement la densité de l’en-tête de carte, les libellés secondaires et l’espace disponible pour les graphiques sous la ligne de flottaison.
 
 La vérification suivante confirme que l’en-tête est condensé sur mobile, que le bouton d’actualisation conserve une hauteur tactile de 44 px et que les marges des lignes de mesures sont réduites uniquement sous le point de rupture `sm`.
+
+Le rendu vérifié après optimisation conserve la hiérarchie de la température, des extrêmes et des six indicateurs, tout en rapprochant le lien de détail, le sélecteur de mode et le graphique horaire.
