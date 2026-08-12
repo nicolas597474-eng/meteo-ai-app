@@ -325,3 +325,13 @@
 - [x] Frontend: Supprimer le bloc « Analyse IA » sous le graphique des prévisions à 16 jours.
 - [x] Frontend: Supprimer le bloc « Résumé IA des prochaines heures » de la page Détails météo.
 - [x] Frontend: Nettoyer les helpers, props et imports devenus inutiles puis vérifier TypeScript et Vitest.
+
+## Corrections de cohérence — audit source de vérité
+- [x] Backend: Transmettre les coordonnées de la localisation aux collecteurs horaire et 16 jours dans `favorites.getLocationWeather`.
+- [x] Backend: Centraliser les dates métier avec `weatherTime.ts` (Europe/Paris) et supprimer les usages UTC / système qui affectent les prévisions.
+- [x] Backend: Exclure les services publics simulés des ensembles de prévision et de scoring officiels.
+- [x] Backend: Unifier le chemin de collecte manuelle sur la même fusion avancée que le cron planifié.
+- [x] Backend: Exposer une réponse de prévision consolidée cohérente par localisation et instant de calcul.
+- [x] Frontend: Faire consommer au Dashboard et à la page Détails les mêmes données officielles pour l’instant courant et la journée.
+- [x] Frontend: Distinguer explicitement prévision officielle et observation locale/ultra-locale sans repli implicite.
+- [x] Tests: Ajouter des tests de fuseau Paris et de reproductibilité/pondération de la fusion officielle; TypeScript et Vitest validés.

@@ -158,18 +158,14 @@ export default function Dashboard() {
   const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
-  // 15-day forecast — always location-aware
-  const { data: f15, isLoading: f15Loading, isError: f15Error } = trpc.weather.get15DayForecast.useQuery(
-    coordsInput, { staleTime: 5 * 60 * 1000 }
-  );
-  // Hourly forecast — always location-aware
-  const { data: hourly, isLoading: hourlyLoading } = trpc.weather.getHourlyForecast.useQuery(
+  // Réponse officielle consolidée : la même source alimente désormais Dashboard
+  // et Détails pour les heures, les jours et les indices de confiance.
+  const { data: officialForecast, isLoading: officialLoading, isError: officialError } = trpc.weather.getDetailedForecast.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
 
-  // Loading: wait for MeteoAI (dash or locationWeather) + 15-day + hourly
-  const isLoading = (activeLocation ? locLoading : dashLoading) && f15Loading && hourlyLoading;
-  const isError = activeLocation ? false : dashError;
+  const isLoading = (activeLocation ? locLoading : dashLoading) || officialLoading;
+  const isError = (activeLocation ? false : dashError) || officialError;
 
   if (isLoading) {
     return (
@@ -200,14 +196,14 @@ export default function Dashboard() {
     );
   }
 
-  // Merge data: location-aware query (getLocationWeather) takes priority for MeteoAI/regime/ultraLocal
-  // but 15-day forecast and hourly always come from their dedicated location-aware endpoints
+  // Le mode local reste explicitement distinct pour les stations; les prévisions
+  // horaires et journalières proviennent d'un seul objet officiel consolidé.
   const lw = locationWeather;
   const meteoAI = lw ? (lw as any).meteoAI ?? null : dash?.meteoAI;
-  // 15-day and hourly always use their dedicated location-aware endpoints
-  const days: any[] = f15?.days ?? (lw ? lw.forecast15d : []);
+  const officialPrimaryRegime = officialForecast?.regime?.primary as any;
+  const days: any[] = officialForecast?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
-  const hours: any[] = hourly?.hours ?? (lw ? lw.hourly : []);
+  const hours: any[] = officialForecast?.hours ?? (lw ? lw.hourly : []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const regime = lw
     ? {
@@ -217,20 +213,31 @@ export default function Dashboard() {
         description: (lw.scores as any).regimeDescription ?? "",
         weights: (lw.scores as any).regimeWeights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
       }
-    : dash?.regime;
+    : officialPrimaryRegime
+      ? {
+          regime: officialPrimaryRegime.id,
+          label: officialPrimaryRegime.label,
+          emoji: officialPrimaryRegime.emoji,
+          description: officialPrimaryRegime.description,
+          weights: officialPrimaryRegime.weights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
+        }
+      : dash?.regime;
 
   // Multi-regime data for alert badges
   const multiRegime = lw
     ? (lw as any).multiRegime ?? null
-    : (dash as any)?.multiRegime ?? null;
+    : officialForecast?.regime
+      ? { activeRegimes: officialForecast.regime.active, confidenceScore: officialForecast.regime.confidence }
+      : (dash as any)?.multiRegime ?? null;
   const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "variable";
   const regimeConfidence: number = multiRegime?.confidenceScore ?? 70;
   // La confiance mesure la qualité / accord des sources ; la stabilité mesure
   // seulement la dispersion des modèles. Ne jamais les confondre dans l'UI.
   const forecastConfidence: number = lw?.scores?.confidenceScore
+    ?? officialForecast?.confidence?.current
     ?? dash?.meteoAI?.confidenceScore
     ?? 0;
-  const stabilityIndex: number = today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0;
+  const stabilityIndex: number = officialForecast?.confidence?.stabilityIndex ?? today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0;
 
   // Current temperature from hourly (closest to now)
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
@@ -257,7 +264,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-lg px-2.5 py-1.5">
             <Clock className="h-3 w-3" />
-            <span>{dash?.today}</span>
+            <span>{officialForecast?.today ?? dash?.today}</span>
           </div>
         </div>
 
@@ -286,7 +293,7 @@ export default function Dashboard() {
                 {activeLocation && <span className="text-xs text-primary/60">· {activeLocation.name}</span>}
               </div>
               <span className="text-xs text-muted-foreground hidden sm:block">
-                {f15?.modelsUsed?.join(", ")}
+                {officialForecast?.modelsUsed?.join(", ")}
               </span>
             </div>
 
@@ -476,13 +483,17 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <Radio className="h-3.5 w-3.5 text-emerald-400" />
                 <span className="text-xs font-semibold text-emerald-300">
-                  {localMode === "ultra-local" ? "Mode Ultra-local" : "Mode Local"}
+                  {localMode === "ultra-local" ? "Observation Ultra-locale" : "Observation Locale"}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">
                 {locationWeather.ultraLocal.stationCount} station{locationWeather.ultraLocal.stationCount !== 1 ? "s" : ""}
               </span>
             </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              Mesure locale issue des stations : elle complète la prévision officielle affichée au-dessus, sans la remplacer.
+            </p>
 
             {/* Temperature from ultra-local */}
             {locationWeather.ultraLocal.temperature != null && (
@@ -540,7 +551,7 @@ export default function Dashboard() {
 
                 {/* Hourly Chart */}
         <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
-          {hourlyLoading ? (
+          {officialLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
             <HourlyChart hours={hours} locationName={activeLocation?.name} />
@@ -551,7 +562,7 @@ export default function Dashboard() {
 
         {/* ── 15-day chart enriched ── */}
         <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
-          {f15Loading ? (
+          {officialLoading ? (
             <div className="h-72 bg-muted rounded-xl animate-pulse" />
           ) : days.length > 0 ? (
             <FifteenDayChart days={days} locationName={activeLocation?.name} />

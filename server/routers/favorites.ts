@@ -12,10 +12,10 @@ import {
 } from "../db";
 import { collectNearbyStations, rankStations, calculateGroundTruth } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
-import { generateMeteoAIForecast, detectWeatherRegime } from "../statsEngine";
 import { computeFusion, detectMultiRegime, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
 import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ultraLocalService";
 import { getPreviousReadings, recordStationReadings } from "../stationReadingsCache";
+import { getParisDate } from "../weatherTime";
 
 export const favoritesRouter = router({
   /**
@@ -148,10 +148,11 @@ export const favoritesRouter = router({
       const searchRadius = localMode === "ultra-local" ? Math.max(radiusKm, 20) : radiusKm;
 
       // Parallel fetch: 15-day, hourly, stations
-      const todayDate = new Date().toISOString().split("T")[0];
+      const todayDate = getParisDate();
+      const coords = { lat, lon };
       const [forecast15dResult, hourly, stations] = await Promise.all([
-        collect15DayForecast(),
-        collectHourlyForecast(todayDate),
+        collect15DayForecast(coords),
+        collectHourlyForecast(todayDate, coords),
         collectNearbyStations(lat, lon, searchRadius, input.name ?? "Local"),
       ]);
       const forecast15d = forecast15dResult.days;
@@ -237,15 +238,6 @@ export const favoritesRouter = router({
 
       // Today's synthesis
       const todayForecast = forecast15d[0];
-      const forecastRows = forecast15d.slice(0, 6).map((f: { tempMax: number | null; tempMin: number | null; precipitation: number | null; windSpeed: number | null; cloudCover: number | null; condition: string | null }) => ({
-        tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation,
-        windSpeed: f.windSpeed, cloudCover: f.cloudCover, condition: f.condition,
-      }));
-      const serviceNames = ["ECMWF", "GFS", "ICON", "Meteoblue", "Open-Meteo", "JMA"];
-      const defaultScores: Record<string, number> = {};
-      serviceNames.forEach(n => { defaultScores[n] = 50; });
-      const meteoAI = forecastRows.length > 0 ? generateMeteoAIForecast(forecastRows, serviceNames, defaultScores) : null;
-
       // Regime detection using new multi-regime system
       const avgTemp = todayForecast?.tempMax != null && todayForecast?.tempMin != null
         ? (todayForecast.tempMax + todayForecast.tempMin) / 2
@@ -269,7 +261,7 @@ export const favoritesRouter = router({
 
       // Stabilité = dispersion entre modèles. Confiance = qualité, fraîcheur,
       // accord et anomalies des sources utilisées par la fusion avancée.
-      const temps = forecastRows.map((f: { tempMax: number | null }) => f.tempMax).filter(Boolean) as number[];
+      const temps = forecast15d.map((forecast) => forecast.tempMax).filter((value): value is number => value != null);
       const divergence = temps.length > 1 ? Math.max(...temps) - Math.min(...temps) : 0;
       const confidenceScore = advancedFusion.confidenceScore;
       const stabilityIndex = Math.max(0, Math.min(100, 100 - divergence * 4));
@@ -367,7 +359,7 @@ export const favoritesRouter = router({
    * Returns null for favorites that haven't been collected yet.
    */
   getPreloadedForecasts: protectedProcedure.query(async ({ ctx }) => {
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+    const today = getParisDate();
     const favorites = await getFavoriteLocations(ctx.user.id);
     const forecasts = await getLocationForecastsForUser(ctx.user.id, today);
 

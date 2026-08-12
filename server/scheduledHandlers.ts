@@ -7,12 +7,12 @@
 import type { Request, Response } from "express";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
-import { collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, WEATHER_SERVICES } from "./weatherServices";
+import { collectExpertForecasts, collectObservations, collectHourlyForecastAllModels } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
-import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore } from "./statsEngine";
+import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
+import { computeOfficialDailyForecast } from "./officialForecast";
+import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
 import {
-  computeFusion,
-  generateAdaptiveForecast,
   classifyLeadTime,
   applyBiasCorrection,
   computeConfidenceScore,
@@ -20,7 +20,6 @@ import {
   type LeadTimeBucket,
   type ServiceBias,
   type LeadTimePerf,
-  type FusionSource,
 } from "./fusionEngine";
 import {
   insertForecasts,
@@ -45,116 +44,14 @@ import {
  * Get today's date in YYYY-MM-DD format (Paris timezone)
  */
 function getTodayParis(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+  return getParisDate();
 }
 
 /**
  * Get yesterday's date in YYYY-MM-DD format (Paris timezone)
  */
 function getYesterdayParis(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
-}
-
-type DailyFusionForecast = {
-  serviceName: string;
-  tempMax: number | null;
-  tempMin: number | null;
-  precipitation: number | null;
-  windSpeed: number | null;
-  windGust?: number | null;
-  cloudCover?: number | null;
-};
-
-type ServicePerformance = {
-  maeTemp?: number;
-  maePrecip?: number;
-  maeWind?: number;
-  weightedScore?: number;
-};
-
-/**
- * Synthèse journalière par computeFusion.
- *
- * La température maximale, la minimale, les précipitations et le vent sont
- * fusionnés indépendamment : chacun utilise son propre MAE historique. Cela
- * préserve l'avantage du scoring par paramètre, tout en appliquant la méthode
- * avancée de computeFusion (pondération IDW, qualité, fraîcheur et fiabilité).
- */
-function computeAdvancedDailyFusion(
-  forecasts: DailyFusionForecast[],
-  performanceByService: Record<string, ServicePerformance>
-) {
-  const now = new Date();
-  const makeSources = (metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed"): FusionSource[] =>
-    forecasts.map((forecast) => {
-      const perf = performanceByService[forecast.serviceName] ?? {};
-      const metricMae = metric === "precipitation"
-        ? perf.maePrecip
-        : metric === "windSpeed"
-          ? perf.maeWind
-          : perf.maeTemp;
-      return {
-        id: `model:${forecast.serviceName}`,
-        name: forecast.serviceName,
-        // Tous les modèles sont interpolés au point cible : distance neutre,
-        // puis pondération par qualité / performance historique.
-        distanceKm: 1,
-        temperature: metric === "tempMax"
-          ? forecast.tempMax
-          : metric === "tempMin"
-            ? forecast.tempMin
-            : forecast.tempMax != null && forecast.tempMin != null
-              ? (forecast.tempMax + forecast.tempMin) / 2
-              : null,
-        precipitation: forecast.precipitation,
-        windSpeed: forecast.windSpeed,
-        windGust: forecast.windGust ?? null,
-        cloudCover: forecast.cloudCover ?? null,
-        updatedAt: now,
-        reliabilityScore: perf.weightedScore ?? 50,
-        // computeFusion emploie ce MAE comme facteur adaptatif pour la métrique
-        // actuellement fusionnée.
-        maeTemp: metricMae,
-        type: "model" as const,
-      };
-    });
-
-  const config = {
-    idwExponent: 2,
-    maxDistanceKm: 5,
-    maxFreshnessMin: 24 * 60,
-    minReliabilityScore: 0,
-    anomalyDetectionEnabled: false, // données de prévision, pas des relevés station
-    adaptiveWeightingEnabled: true,
-    modelWeightFraction: 1,
-  };
-
-  const maxFusion = computeFusion(makeSources("tempMax"), config);
-  const minFusion = computeFusion(makeSources("tempMin"), config);
-  const precipFusion = computeFusion(makeSources("precipitation"), config);
-  const windFusion = computeFusion(makeSources("windSpeed"), config);
-
-  const weights: Record<string, { tempWeight: number; precipWeight: number; windWeight: number }> = {};
-  for (const source of maxFusion.usedSources) {
-    weights[source.name] = {
-      tempWeight: source.finalWeight,
-      precipWeight: precipFusion.usedSources.find((entry) => entry.name === source.name)?.finalWeight ?? 0,
-      windWeight: windFusion.usedSources.find((entry) => entry.name === source.name)?.finalWeight ?? 0,
-    };
-  }
-
-  return {
-    tempMax: maxFusion.temperature,
-    tempMin: minFusion.temperature,
-    precipitation: precipFusion.precipitation,
-    windSpeed: windFusion.windSpeed,
-    windGust: windFusion.windGust,
-    cloudCover: maxFusion.cloudCover,
-    weights,
-    methodNote: `Fusion avancée ${maxFusion.methodUsed} par paramètre (${forecasts.length} modèles)`,
-  };
+  return getParisDateDaysAgo(1);
 }
 
 /**
@@ -206,7 +103,12 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       await insertForecasts(forecastRows);
 
       // Also insert public service entries
-      const publicForecasts = await generatePublicServiceForecasts(expertData, today, defaultLocKey);
+      const publicForecasts = await generatePublicServiceForecasts(
+        today,
+        defaultLocKey,
+        HONDEGHEM.lat,
+        HONDEGHEM.lon
+      );
       if (publicForecasts.length > 0) {
         await insertForecasts(publicForecasts);
       }
@@ -282,7 +184,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           };
         });
 
-        const meteoAI = computeAdvancedDailyFusion(biasCorrectedForecasts, performanceMap);
+        const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, performanceMap);
 
         // Generate AI explanation
         let explanation = "";
@@ -617,95 +519,44 @@ export async function collectObservationsHandler(req: Request, res: Response) {
 }
 
 /**
- * Generate public service forecasts.
- * - OpenWeatherMap et Météo-France : vraies APIs si clé présente, sinon simulation.
- * - Autres services publics : simulation basée sur Open-Meteo best_match.
+ * Generate public service forecasts from real provider responses only.
+ * Aucune donnée synthétique ou aléatoire ne peut alimenter les prévisions,
+ * les scores de fiabilité ou la fusion officielle.
  */
 async function generatePublicServiceForecasts(
-  expertData: any[],
   date: string,
   locationKey = "default",
   lat?: number,
   lon?: number
 ): Promise<any[]> {
-  const bestMatch = expertData.find((d) => d.serviceName === "Open-Meteo");
-  if (!bestMatch) return [];
+  if (lat === undefined || lon === undefined) return [];
 
-  // Tenter les vraies APIs si coordonnées disponibles
-  let realOwm: any = null;
-  let realMf: any = null;
-  if (lat !== undefined && lon !== undefined) {
-    try {
-      const real = await fetchRealPublicForecasts(date, lat, lon);
-      realOwm = real.owm;
-      realMf = real.mf;
-      if (realOwm) console.log(`[MeteoAI] ✅ OpenWeatherMap real data for ${lat},${lon}`);
-      if (realMf) console.log(`[MeteoAI] ✅ Météo-France real data for ${lat},${lon}`);
-    } catch (e: any) {
-      console.warn(`[MeteoAI] Real APIs fetch failed: ${e.message}`);
+  try {
+    const real = await fetchRealPublicForecasts(date, lat, lon);
+    const rows: any[] = [];
+    if (real.owm) {
+      rows.push({
+        locationKey, date, serviceName: "OpenWeatherMap", serviceCategory: "public",
+        tempMax: real.owm.tempMax, tempMin: real.owm.tempMin,
+        precipitation: real.owm.precipitation, windSpeed: real.owm.windSpeed,
+        windGust: real.owm.windGust, humidity: real.owm.humidity,
+        cloudCover: real.owm.cloudCover, condition: real.owm.condition, rawData: null,
+      });
     }
+    if (real.mf) {
+      rows.push({
+        locationKey, date, serviceName: "Météo-France", serviceCategory: "public",
+        tempMax: real.mf.tempMax, tempMin: real.mf.tempMin,
+        precipitation: real.mf.precipitation, windSpeed: real.mf.windSpeed,
+        windGust: real.mf.windGust, humidity: real.mf.humidity,
+        cloudCover: real.mf.cloudCover, condition: real.mf.condition, rawData: null,
+      });
+    }
+    return rows;
+  } catch (e: any) {
+    console.warn(`[MeteoAI] Real public APIs unavailable: ${e.message}`);
+    return [];
   }
-
-  const variation = () => (Math.random() - 0.5) * 2;
-  const precipVar = () => Math.max(0, (Math.random() - 0.3) * 3);
-  const windVar = () => (Math.random() - 0.5) * 6;
-
-  return WEATHER_SERVICES.public.map((service) => {
-    // OpenWeatherMap — utiliser les vraies données si disponibles
-    if (service.name === "OpenWeatherMap" && realOwm) {
-      return {
-        locationKey,
-        date,
-        serviceName: service.name,
-        serviceCategory: service.category,
-        tempMax: realOwm.tempMax,
-        tempMin: realOwm.tempMin,
-        precipitation: realOwm.precipitation,
-        windSpeed: realOwm.windSpeed,
-        windGust: realOwm.windGust,
-        humidity: realOwm.humidity,
-        cloudCover: realOwm.cloudCover,
-        condition: realOwm.condition,
-        rawData: null, // ne pas stocker le payload complet
-      };
-    }
-
-    // Météo-France — utiliser les vraies données si disponibles
-    if ((service.name === "Météo-France" || service.name === "Meteo-France") && realMf) {
-      return {
-        locationKey,
-        date,
-        serviceName: service.name,
-        serviceCategory: service.category,
-        tempMax: realMf.tempMax,
-        tempMin: realMf.tempMin,
-        precipitation: realMf.precipitation,
-        windSpeed: realMf.windSpeed,
-        windGust: realMf.windGust,
-        humidity: realMf.humidity,
-        cloudCover: realMf.cloudCover,
-        condition: realMf.condition,
-        rawData: null,
-      };
-    }
-
-    // Autres services publics — simulation basée sur Open-Meteo best_match
-    return {
-      locationKey,
-      date,
-      serviceName: service.name,
-      serviceCategory: service.category,
-      tempMax: bestMatch.tempMax != null ? Math.round((bestMatch.tempMax + variation()) * 10) / 10 : null,
-      tempMin: bestMatch.tempMin != null ? Math.round((bestMatch.tempMin + variation()) * 10) / 10 : null,
-      precipitation: bestMatch.precipitation != null ? Math.round(Math.max(0, bestMatch.precipitation + precipVar()) * 10) / 10 : null,
-      windSpeed: bestMatch.windSpeed != null ? Math.round(Math.max(0, bestMatch.windSpeed + windVar()) * 10) / 10 : null,
-      windGust: bestMatch.windGust,
-      humidity: bestMatch.humidity,
-      cloudCover: bestMatch.cloudCover,
-      condition: null,
-      rawData: null,
-    };
-  });
 }
 
 /**
@@ -820,7 +671,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           rawData: f.rawData as any,
         }));
         // Also add public service forecasts (real APIs when keys available, simulation otherwise)
-        const publicRowsForLoc = await generatePublicServiceForecasts(expertData, today, locKey, fav.lat, fav.lon);
+        const publicRowsForLoc = await generatePublicServiceForecasts(today, locKey, fav.lat, fav.lon);
         await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);
 
         // ── Correction automatique des biais (favoris) ──────────────────────────────
@@ -870,7 +721,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           };
         });
 
-        const meteoAI = computeAdvancedDailyFusion(biasCorrectedLocForecasts, locPerfMap);
+        const meteoAI = computeOfficialDailyForecast(biasCorrectedLocForecasts, locPerfMap);
 
         // Determine condition
         const avgPrecip = expertData.reduce((s, f) => s + (f.precipitation ?? 0), 0) / expertData.length;
@@ -884,7 +735,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         else if (avgCloud > 25) condition = "Partiellement nuageux";
 
         // Estimate current temperature (midpoint of min/max adjusted for time of day)
-        const hour = new Date().getHours();
+        const hour = getParisHour();
         const dayProgress = Math.max(0, Math.min(1, (hour - 6) / 12)); // 0 at 6h, 1 at 18h
         const tempCurrent = meteoAI.tempMin !== null && meteoAI.tempMax !== null
           ? Math.round((meteoAI.tempMin + (meteoAI.tempMax - meteoAI.tempMin) * Math.sin(dayProgress * Math.PI / 2)) * 10) / 10

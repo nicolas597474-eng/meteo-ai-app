@@ -25,11 +25,13 @@ import {
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
-import { calculateStabilityIndex, generateMeteoAIForecast, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
-import { generateAdaptiveForecast, detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
+import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
+import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
+import { getParisDate, getParisDateDaysAgo } from "../weatherTime";
+import { computeOfficialDailyForecast } from "../officialForecast";
 
 function getTodayParis(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+  return getParisDate();
 }
 
 export const weatherRouter = router({
@@ -115,7 +117,7 @@ export const weatherRouter = router({
     } else {
       // Fallback: use most recent observation
       const recentObs = await getObservationsByDateRange(
-        new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }),
+        getParisDateDaysAgo(7),
         today,
         locKey
       );
@@ -388,11 +390,13 @@ export const weatherRouter = router({
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
-      // Fetch 48h hourly (forecast_days=2 already in collectHourlyForecast)
-      const hours = await collectHourlyForecast(today, coords);
-
-      // Fetch 15-day daily
-      const { days, modelsUsed } = await collect15DayForecast(coords);
+      // Les deux séries viennent du même endpoint public, mais leurs appels
+      // réseau restent parallèles pour éviter d'allonger le chargement du Dashboard.
+      const [hours, dailyForecast] = await Promise.all([
+        collectHourlyForecast(today, coords),
+        collect15DayForecast(coords),
+      ]);
+      const { days, modelsUsed } = dailyForecast;
 
       // Get MeteoAI forecast for regime detection
       const meteoAI = await getMeteoAIForecastByDate(today, locKey);
@@ -469,8 +473,11 @@ export const weatherRouter = router({
       const targetDate = input.date || getTodayParis();
 
       if (input.type === "forecast") {
+        const { HONDEGHEM } = await import("../weatherServices");
+        const locationKey = makeLocationKey(HONDEGHEM.lat, HONDEGHEM.lon);
         const expertData = await collectExpertForecasts(targetDate);
         const forecastRows = expertData.map((f) => ({
+          locationKey,
           date: targetDate,
           serviceName: f.serviceName,
           serviceCategory: f.serviceCategory,
@@ -487,7 +494,7 @@ export const weatherRouter = router({
         await insertForecasts(forecastRows);
 
         // Compute MeteoAI
-        const allForecasts = await getForecastsByDate(targetDate);
+        const allForecasts = await getForecastsByDate(targetDate, locationKey);
         const stability = calculateStabilityIndex(
           allForecasts.map((f) => ({
             tempMax: f.tempMax,
@@ -497,58 +504,50 @@ export const weatherRouter = router({
           }))
         );
 
-        const ranking = await getCumulativeRanking();
-        const reliabilityMap: Record<string, number> = {};
-        ranking.forEach((r) => {
-          reliabilityMap[r.serviceName] = r.avgScore ?? 50;
-        });
+        const locationRanking = await getCumulativeRankingForLocation(locationKey);
+        const ranking = locationRanking.length > 0 ? locationRanking : await getCumulativeRanking();
 
-        // Build per-parameter performance map for adaptive fusion
+        const biases: ServiceBias[] = ranking
+          .filter((row) => row.avgBiasTemp != null || row.avgBiasPrecip != null)
+          .map((row) => ({
+            serviceName: row.serviceName,
+            biasTemp: row.avgBiasTemp != null ? Number(row.avgBiasTemp) : null,
+            biasPrecip: row.avgBiasPrecip != null ? Number(row.avgBiasPrecip) : null,
+            biasWind: null,
+          }));
+        const rawForecasts = allForecasts.map((forecast) => ({
+          serviceName: forecast.serviceName,
+          tempMax: forecast.tempMax,
+          tempMin: forecast.tempMin,
+          precipitation: forecast.precipitation,
+          windSpeed: forecast.windSpeed,
+          windGust: forecast.windGust,
+          cloudCover: forecast.cloudCover ?? null,
+        }));
+        const correctedForecasts = biases.length > 0
+          ? applyBiasCorrection(rawForecasts, biases)
+          : rawForecasts;
+
+        const leadTimeRows = await getLeadTimeScoresForLocation(locationKey, 14);
+        const leadTimePerfs: LeadTimePerf[] = leadTimeRows.map((row) => ({
+          serviceName: row.serviceName,
+          bucket: row.bucket as LeadTimeBucket,
+          avgMaeTemp: row.avgMaeTemp != null ? Number(row.avgMaeTemp) : null,
+          avgMaePrecip: row.avgMaePrecip != null ? Number(row.avgMaePrecip) : null,
+          avgMaeWind: row.avgMaeWind != null ? Number(row.avgMaeWind) : null,
+        }));
+        const leadTimeWeights = getLeadTimeWeights(leadTimePerfs, "6-24h");
         const performanceByService: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
-        ranking.forEach((r) => {
-          performanceByService[r.serviceName] = {
-            maeTemp: r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined,
-            maePrecip: r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined,
-            maeWind: r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined,
-            weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
+        ranking.forEach((row) => {
+          const leadTime = leadTimeWeights[row.serviceName];
+          performanceByService[row.serviceName] = {
+            maeTemp: leadTime?.maeTemp ?? (row.avgMaeTemp != null ? Number(row.avgMaeTemp) : undefined),
+            maePrecip: leadTime?.maePrecip ?? (row.avgMaePrecip != null ? Number(row.avgMaePrecip) : undefined),
+            maeWind: leadTime?.maeWind ?? (row.avgMaeWind != null ? Number(row.avgMaeWind) : undefined),
+            weightedScore: row.avgScore != null ? Number(row.avgScore) : 50,
           };
         });
-        // Use adaptive fusion (per-parameter MAE weighting) if enough historical data
-        const hasPerformanceData = ranking.some(r => r.avgMaeTemp != null && Number(r.daysTracked) >= 3);
-        let meteoAI: { tempMax: number | null; tempMin: number | null; precipitation: number | null; windSpeed: number | null; weights: Record<string, any> };
-        if (hasPerformanceData) {
-          const adaptiveResult = generateAdaptiveForecast(
-            allForecasts.map((f) => ({
-              serviceName: f.serviceName,
-              tempMax: f.tempMax,
-              tempMin: f.tempMin,
-              precipitation: f.precipitation,
-              windSpeed: f.windSpeed,
-              windGust: null,
-              cloudCover: f.cloudCover ?? null,
-            })),
-            performanceByService
-          );
-          meteoAI = {
-            tempMax: adaptiveResult.tempMax,
-            tempMin: adaptiveResult.tempMin,
-            precipitation: adaptiveResult.precipitation,
-            windSpeed: adaptiveResult.windSpeed,
-            weights: adaptiveResult.weights,
-          };
-        } else {
-          // Fallback to legacy weighted average when no historical data yet
-          meteoAI = generateMeteoAIForecast(
-            allForecasts.map((f) => ({
-              tempMax: f.tempMax,
-              tempMin: f.tempMin,
-              precipitation: f.precipitation,
-              windSpeed: f.windSpeed,
-            })),
-            allForecasts.map((f) => f.serviceName),
-            reliabilityMap
-          );
-        }
+        const meteoAI = computeOfficialDailyForecast(correctedForecasts, performanceByService);
 
         // Determine condition
         const avgPrecip = allForecasts.reduce((sum, f) => sum + (f.precipitation ?? 0), 0) / allForecasts.length;
@@ -562,6 +561,7 @@ export const weatherRouter = router({
         else if (avgCloud > 25) condition = "Partiellement nuageux";
 
         await upsertMeteoAIForecast({
+          locationKey,
           date: targetDate,
           tempMax: meteoAI.tempMax,
           tempMin: meteoAI.tempMin,
@@ -571,7 +571,7 @@ export const weatherRouter = router({
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
           confidenceScore: computeConfidenceScore({
-            forecasts: allForecasts.map(f => ({ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed })),
+            forecasts: correctedForecasts.map(f => ({ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed })),
             bestModelScore: ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60,
             leadTimeBucket: "6-24h",
           }),
