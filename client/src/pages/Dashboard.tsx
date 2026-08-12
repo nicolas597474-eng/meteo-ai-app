@@ -93,9 +93,12 @@ function storeLocalMode(mode: "standard" | "local" | "ultra-local") {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { setActiveLocation: setContextLocation } = useLocation();
+  const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
+  // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
+  // alors strictement les mêmes coordonnées pour la prévision officielle.
+  const selectedLocation = contextLocation ?? activeLocation;
 
   const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number; localMode?: "standard" | "local" | "ultra-local" }) => {
     setActiveLocation(loc);
@@ -116,15 +119,15 @@ export default function Dashboard() {
 
   // Use location-aware query when a location is selected
   const queryInput = useMemo(() => ({
-    lat: activeLocation?.lat ?? 50.76,
-    lon: activeLocation?.lon ?? 2.52,
+    lat: selectedLocation?.lat ?? 50.76,
+    lon: selectedLocation?.lon ?? 2.52,
     radiusKm: activeLocation?.radiusKm ?? 20,
     localMode,
-  }), [activeLocation?.lat, activeLocation?.lon, activeLocation?.radiusKm, localMode]);
+  }), [selectedLocation?.lat, selectedLocation?.lon, activeLocation?.radiusKm, localMode]);
 
   const { data: locationWeather, isLoading: locLoading } = trpc.favorites.getLocationWeather.useQuery(
     queryInput,
-    { enabled: !!activeLocation }
+    { enabled: !!selectedLocation }
   );
 
   // Pre-loaded forecasts for all favorites (from 05h00 cron)
@@ -151,9 +154,9 @@ export default function Dashboard() {
 
   // Coordinates for weather queries — use active location or Hondeghem default
   const coordsInput = useMemo(() => ({
-    lat: activeLocation?.lat ?? 50.76,
-    lon: activeLocation?.lon ?? 2.52,
-  }), [activeLocation?.lat, activeLocation?.lon]);
+    lat: selectedLocation?.lat ?? 50.76,
+    lon: selectedLocation?.lon ?? 2.52,
+  }), [selectedLocation?.lat, selectedLocation?.lon]);
 
   // Dashboard (MeteoAI synthesis) — always location-aware
   const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery(
@@ -165,8 +168,8 @@ export default function Dashboard() {
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
 
-  const isLoading = (activeLocation ? locLoading : dashLoading) || officialLoading;
-  const isError = (activeLocation ? false : dashError) || officialError;
+  const isLoading = (selectedLocation ? locLoading : dashLoading) || officialLoading;
+  const isError = (selectedLocation ? false : dashError) || officialError;
 
   if (isLoading) {
     return (
@@ -200,21 +203,21 @@ export default function Dashboard() {
   // Le mode local reste explicitement distinct pour les stations; les prévisions
   // horaires et journalières proviennent d'un seul objet officiel consolidé.
   const lw = locationWeather;
-  const meteoAI = lw ? (lw as any).meteoAI ?? null : dash?.meteoAI;
-  const officialPrimaryRegime = officialForecast?.regime?.primary as any;
+  const meteoAI = dash?.meteoAI;
+  const officialRegime = officialForecast?.regime ?? (dash as any)?.officialRegime ?? null;
+  const officialPrimaryRegime = officialRegime?.primary as any;
   const days: any[] = officialForecast?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
   const hours: any[] = officialForecast?.hours ?? (lw ? lw.hourly : []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
-  const regime = lw
+  const localObservedRegime = lw
     ? {
-        regime: lw.scores.regime,
+        id: lw.scores.regime,
         label: lw.scores.regimeLabel,
         emoji: lw.scores.regimeEmoji,
-        description: (lw.scores as any).regimeDescription ?? "",
-        weights: (lw.scores as any).regimeWeights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
       }
-    : officialPrimaryRegime
+    : null;
+  const regime = officialPrimaryRegime
       ? {
           regime: officialPrimaryRegime.id,
           label: officialPrimaryRegime.label,
@@ -225,11 +228,9 @@ export default function Dashboard() {
       : dash?.regime;
 
   // Multi-regime data for alert badges
-  const multiRegime = lw
-    ? (lw as any).multiRegime ?? null
-    : officialForecast?.regime
-      ? { activeRegimes: officialForecast.regime.active, confidenceScore: officialForecast.regime.confidence }
-      : (dash as any)?.multiRegime ?? null;
+  const multiRegime = officialRegime
+    ? { activeRegimes: officialRegime.active, confidenceScore: officialRegime.confidence }
+    : (dash as any)?.multiRegime ?? null;
   const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "variable";
   const regimeConfidence: number = multiRegime?.confidenceScore ?? 70;
   // La confiance mesure la qualité / accord des sources ; la stabilité mesure
@@ -260,7 +261,7 @@ export default function Dashboard() {
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground text-xs sm:text-sm">
               <MapPin className="h-3 w-3 flex-shrink-0" />
-              <span>{activeLocation?.name ?? "Hondeghem, Nord"}</span>
+              <span>{selectedLocation?.name ?? "Hondeghem, Nord"}</span>
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-lg px-2.5 py-1.5">
@@ -290,8 +291,8 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-primary">Prévision MeteoAI</span>
-                {activeLocation && <span className="text-xs text-primary/60">· {activeLocation.name}</span>}
+                <span className="text-xs font-medium text-primary">Régime officiel MeteoAI</span>
+                {selectedLocation && <span className="text-xs text-primary/60">· {selectedLocation.name}</span>}
               </div>
               <span className="text-xs text-muted-foreground hidden sm:block">
                 {officialForecast?.modelsUsed?.join(", ")}
@@ -326,6 +327,12 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {localObservedRegime && localMode !== "standard" && (
+              <p className="mb-3 text-[11px] text-emerald-200/90">
+                Observation {localMode === "ultra-local" ? "ultra-locale" : "locale"} : {localObservedRegime.emoji} {localObservedRegime.label}. Elle complète le régime officiel sans le remplacer.
+              </p>
             )}
 
             {/* ── Alert badge for dangerous regimes ── */}

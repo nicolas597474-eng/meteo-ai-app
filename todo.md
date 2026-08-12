@@ -350,3 +350,13 @@
 - [x] Frontend: Créer une vue comparative avec sélecteurs de snapshots, barres avant/après et écarts chiffrés.
 - [x] Frontend: Ajouter l’accès à la comparaison depuis la zone de traçabilité des prévisions.
 - [x] Tests: Vérifier les écarts positifs, négatifs et les sources ajoutées ou retirées.
+
+## Diagnostic de cohérence des régimes
+- [x] Audit: Identifier la divergence de régime actif entre Dashboard et Classement sans modifier le code.
+
+## Unification du régime actif officiel
+- [x] Backend: Créer un contrat de régime officiel commun depuis le snapshot MeteoAI versionné.
+- [x] Backend: Faire consommer ce même régime officiel par `getDashboard`, `getRanking` et `getDetailedForecast`.
+- [x] Frontend: Afficher le régime officiel commun dans le Dashboard, même en mode Local/Ultra-local.
+- [x] Frontend: Afficher l’observation locale comme information distincte et non comme régime officiel.
+- [x] Tests: Vérifier l’identité du régime officiel retourné par Dashboard et Classement pour une même localisation; Détails utilise le même constructeur serveur.

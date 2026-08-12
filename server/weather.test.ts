@@ -73,6 +73,19 @@ describe("weather.getRanking", () => {
       }
     }
   });
+
+  it("partage exactement le régime officiel du Dashboard pour une même localisation", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    const [dashboard, ranking] = await Promise.all([
+      caller.weather.getDashboard(),
+      caller.weather.getRanking(),
+    ]);
+
+    expect(ranking.officialRegime.primary.id).toBe(dashboard.officialRegime.primary.id);
+    expect(ranking.officialRegime.active).toEqual(dashboard.officialRegime.active);
+    expect(ranking.officialRegime.blendedWeights).toEqual(dashboard.officialRegime.blendedWeights);
+  });
 });
 
 describe("weather.getHistory", () => {

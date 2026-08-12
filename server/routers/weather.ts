@@ -31,6 +31,7 @@ import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeC
 import { getParisDate, getParisDateDaysAgo } from "../weatherTime";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
+import { buildOfficialRegime } from "../officialRegime";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -136,18 +137,7 @@ export const weatherRouter = router({
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
 
-    // Detect current weather regime using new multi-regime system
-    const avgTemp = meteoAI?.tempMax != null && meteoAI?.tempMin != null
-      ? (meteoAI.tempMax + meteoAI.tempMin) / 2
-      : meteoAI?.tempMax ?? meteoAI?.tempMin ?? 15;
-    const multiRegime = detectMultiRegime({
-      temperature: avgTemp,
-      precipitation: meteoAI?.precipitation ?? 0,
-      windSpeed: meteoAI?.windSpeed ?? 0,
-      cloudCover: null,
-      humidity: null,
-      visibility: null,
-    });
+    const officialRegime = buildOfficialRegime(meteoAI);
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
     return {
@@ -159,18 +149,19 @@ export const weatherRouter = router({
       recentForecasts,
       allServices: [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public],
       regime: {
-        id: multiRegime.primaryRegime.id,
-        label: multiRegime.primaryRegime.label,
-        emoji: multiRegime.primaryRegime.emoji,
-        description: multiRegime.description,
-        weights: multiRegime.blendedWeights,
+        id: officialRegime.primary.id,
+        label: officialRegime.primary.label,
+        emoji: officialRegime.primary.emoji,
+        description: officialRegime.description,
+        weights: officialRegime.blendedWeights,
       },
       multiRegime: {
-        activeRegimes: multiRegime.activeRegimes,
-        confidenceScore: multiRegime.confidenceScore,
-        blendedWeights: multiRegime.blendedWeights,
-        description: multiRegime.description,
+        activeRegimes: officialRegime.active,
+        confidenceScore: officialRegime.confidence,
+        blendedWeights: officialRegime.blendedWeights,
+        description: officialRegime.description,
       },
+      officialRegime,
     };
   }),
 
@@ -239,34 +230,16 @@ export const weatherRouter = router({
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
     const ranking = await getCumulativeRankingForLocation(locKey);
 
-    // Use today's MeteoAI forecast for multi-regime detection
     const meteoAI = await getMeteoAIForecastByDate(today, locKey);
-    let regimeParams: { temperature?: number | null; precipitation?: number | null; windSpeed?: number | null; humidity?: number | null; cloudCover?: number | null };
-    if (meteoAI) {
-      const avgTemp = ((meteoAI.tempMax ?? 15) + (meteoAI.tempMin ?? 5)) / 2;
-      regimeParams = {
-        temperature: avgTemp,
-        precipitation: meteoAI.precipitation ?? null,
-        windSpeed: meteoAI.windSpeed ?? null,
-        humidity: (meteoAI as any).humidity ?? null,
-        cloudCover: (meteoAI as any).cloudCover ?? null,
-      };
-    } else {
-      // Fallback: use most recent observation
-      const recentObs = await getObservationsByDateRange(
-        getParisDateDaysAgo(7),
-        today,
-        locKey
-      );
-      const latestObs = recentObs[recentObs.length - 1];
-      const avgTemp = latestObs ? ((latestObs.tempMax ?? 15) + (latestObs.tempMin ?? 5)) / 2 : 15;
-      regimeParams = {
-        temperature: avgTemp,
-        precipitation: latestObs?.precipitation ?? null,
-        windSpeed: latestObs?.windSpeed ?? null,
-      };
-    }
-    const multiRegime = detectMultiRegime(regimeParams);
+    const officialRegime = buildOfficialRegime(meteoAI);
+    const regimeParams = officialRegime.params;
+    const multiRegime = {
+      primaryRegime: officialRegime.primary,
+      activeRegimes: officialRegime.active,
+      blendedWeights: officialRegime.blendedWeights,
+      confidenceScore: officialRegime.confidence,
+      description: officialRegime.description,
+    };
 
     // All 12 extended regime definitions for the UI
     const allRegimes = (Object.keys(EXTENDED_REGIME_INFO) as ExtendedRegime[]).map(key => ({
@@ -281,7 +254,7 @@ export const weatherRouter = router({
       windSpeed: regimeParams.windSpeed ?? 0,
       humidity: regimeParams.humidity ?? 60,
       cloudCover: regimeParams.cloudCover ?? 50,
-      pressure: (meteoAI as any)?.pressure ?? 1013,
+      pressure: regimeParams.pressure ?? 1013,
     };
 
     // Determine impact level per parameter based on regime weights
@@ -325,6 +298,7 @@ export const weatherRouter = router({
     return {
       ranking,
       totalServices: WEATHER_SERVICES.expert.length + WEATHER_SERVICES.public.length,
+      officialRegime,
       // Legacy single-regime field (kept for backward compat)
       regime: {
         id: multiRegime.primaryRegime.id,
@@ -535,19 +509,8 @@ export const weatherRouter = router({
       ]);
       const { days, modelsUsed } = dailyForecast;
 
-      // Get MeteoAI forecast for regime detection
       const meteoAI = await getMeteoAIForecastByDate(today, locKey);
-      const avgTemp = meteoAI?.tempMax != null && meteoAI?.tempMin != null
-        ? (meteoAI.tempMax + meteoAI.tempMin) / 2
-        : meteoAI?.tempMax ?? meteoAI?.tempMin ?? 15;
-
-      const multiRegime = detectMultiRegime({
-        temperature: avgTemp,
-        precipitation: meteoAI?.precipitation ?? 0,
-        windSpeed: meteoAI?.windSpeed ?? 0,
-        humidity: (meteoAI as any)?.humidity ?? 60,
-        cloudCover: (meteoAI as any)?.cloudCover ?? 50,
-      });
+      const officialRegime = buildOfficialRegime(meteoAI);
 
       // Best model
       const ranking = await getCumulativeRankingForLocation(locKey);
@@ -582,10 +545,11 @@ export const weatherRouter = router({
         days,
         modelsUsed,
         regime: {
-          primary: multiRegime.primaryRegime,
-          active: multiRegime.activeRegimes,
-          confidence: multiRegime.confidenceScore,
-          description: multiRegime.description,
+          primary: officialRegime.primary,
+          active: officialRegime.active,
+          confidence: officialRegime.confidence,
+          description: officialRegime.description,
+          snapshotComputedAt: officialRegime.snapshotComputedAt,
         },
         confidence: {
           current: todayConfidence,
