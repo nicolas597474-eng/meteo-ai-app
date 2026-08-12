@@ -11,6 +11,7 @@ import {
   getObservationsByDateRange,
   getMeteoAIForecastByDate,
   getLatestMeteoAIForecasts,
+  getMeteoAIForecastHistory,
   getCumulativeRanking,
   getCumulativeRankingForLocation,
   getRecentCollectionJobs,
@@ -29,13 +30,22 @@ import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
 import { getParisDate, getParisDateDaysAgo } from "../weatherTime";
 import { computeOfficialDailyForecast } from "../officialForecast";
+import { compareTraceWeights } from "../weightComparison";
 
 function getTodayParis(): string {
   return getParisDate();
 }
 
 function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
-  const record = weights && typeof weights === "object" ? weights as Record<string, any> : null;
+  let normalizedWeights = weights;
+  if (typeof normalizedWeights === "string") {
+    try {
+      normalizedWeights = JSON.parse(normalizedWeights);
+    } catch {
+      normalizedWeights = null;
+    }
+  }
+  const record = normalizedWeights && typeof normalizedWeights === "object" ? normalizedWeights as Record<string, any> : null;
   if (!record) return null;
   if (record.trace) return record.trace;
 
@@ -44,13 +54,44 @@ function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
   const weightByService = record.weightByService && typeof record.weightByService === "object"
     ? record.weightByService as Record<string, any>
     : record;
-  const services = Object.entries(weightByService).filter(([, weight]) =>
+  const services = Object.entries(weightByService);
+  if (services.length === 0) return null;
+
+  const hasParameterWeights = services.some(([, weight]) =>
     weight && typeof weight === "object" &&
     (typeof weight.tempWeight === "number" || typeof weight.precipWeight === "number" || typeof weight.windWeight === "number")
   );
-  if (services.length === 0) return null;
 
-  const parameterSources = (field: "tempWeight" | "precipWeight" | "windWeight") => services
+  if (!hasParameterWeights) {
+    const numericServices = services.filter(([, weight]) => typeof weight === "number");
+    const total = numericServices.reduce((sum, [, weight]) => sum + Number(weight), 0);
+    if (numericServices.length === 0 || total <= 0) return null;
+    const globalSources = numericServices.map(([name, weight]) => ({
+      id: `model:${name}`,
+      name,
+      type: "model" as const,
+      finalWeight: Number(weight) / total,
+    }));
+    return {
+      version: 0,
+      issuedAt: computedAt?.toISOString?.() ?? null,
+      method: "Fusion officielle — archive de pondérations globales",
+      sourceCount: globalSources.length,
+      parameterSources: {
+        temperature: globalSources,
+        precipitation: globalSources,
+        wind: globalSources,
+      },
+      excludedSources: [],
+    };
+  }
+
+  const parameterServices = services.filter(([, weight]) =>
+    weight && typeof weight === "object" &&
+    (typeof weight.tempWeight === "number" || typeof weight.precipWeight === "number" || typeof weight.windWeight === "number")
+  );
+
+  const parameterSources = (field: "tempWeight" | "precipWeight" | "windWeight") => parameterServices
     .filter(([, weight]) => typeof weight[field] === "number")
     .map(([name, weight]) => ({
       id: `model:${name}`,
@@ -63,7 +104,7 @@ function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
     version: 0,
     issuedAt: computedAt?.toISOString?.() ?? null,
     method: "Fusion officielle — archive de pondérations",
-    sourceCount: services.length,
+    sourceCount: parameterServices.length,
     parameterSources: {
       temperature: parameterSources("tempWeight"),
       precipitation: parameterSources("precipWeight"),
@@ -132,6 +173,61 @@ export const weatherRouter = router({
       },
     };
   }),
+
+  /** Snapshots successifs pouvant être comparés dans la vue des pondérations. */
+  getWeightTraceHistory: publicProcedure
+    .input(z.object({ lat: z.number().optional(), lon: z.number().optional(), limit: z.number().min(2).max(60).optional() }).optional())
+    .query(async ({ input }) => {
+      const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
+      const snapshots = await getMeteoAIForecastHistory(locationKey, input?.limit ?? 30);
+      return snapshots
+        .map((snapshot) => ({
+          id: snapshot.id,
+          date: snapshot.date,
+          computedAt: snapshot.computedAt,
+          confidenceScore: snapshot.confidenceScore,
+          trace: getPersistedForecastTrace(snapshot.weights, snapshot.computedAt),
+        }))
+        .filter((snapshot) => snapshot.trace != null);
+    }),
+
+  /** Écarts de poids, source par source, entre deux snapshots du même lieu. */
+  compareWeightSnapshots: publicProcedure
+    .input(z.object({
+      lat: z.number().optional(),
+      lon: z.number().optional(),
+      beforeId: z.number().int().positive(),
+      afterId: z.number().int().positive(),
+    }))
+    .query(async ({ input }) => {
+      const locationKey = input.lat != null && input.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
+      const snapshots = await getMeteoAIForecastHistory(locationKey, 60);
+      const beforeSnapshot = snapshots.find((snapshot) => snapshot.id === input.beforeId);
+      const afterSnapshot = snapshots.find((snapshot) => snapshot.id === input.afterId);
+      if (!beforeSnapshot || !afterSnapshot) return null;
+
+      const beforeTrace = getPersistedForecastTrace(beforeSnapshot.weights, beforeSnapshot.computedAt);
+      const afterTrace = getPersistedForecastTrace(afterSnapshot.weights, afterSnapshot.computedAt);
+      if (!beforeTrace?.parameterSources || !afterTrace?.parameterSources) return null;
+
+      return {
+        before: {
+          id: beforeSnapshot.id,
+          date: beforeSnapshot.date,
+          computedAt: beforeSnapshot.computedAt,
+          confidenceScore: beforeSnapshot.confidenceScore,
+          trace: beforeTrace,
+        },
+        after: {
+          id: afterSnapshot.id,
+          date: afterSnapshot.date,
+          computedAt: afterSnapshot.computedAt,
+          confidenceScore: afterSnapshot.confidenceScore,
+          trace: afterTrace,
+        },
+        parameters: compareTraceWeights(beforeTrace, afterTrace),
+      };
+    }),
 
   /**
    * Full ranking of all services with cumulative scores

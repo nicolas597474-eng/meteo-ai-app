@@ -12,6 +12,7 @@ import WeatherAILab from "./pages/WeatherAILab";
 import Stations from "./pages/Stations";
 import FavoriteSettings from "./pages/FavoriteSettings";
 import WeatherDetails from "./pages/WeatherDetails";
+import WeightComparison from "./pages/WeightComparison";
 import {
   LayoutDashboard,
   Trophy,
@@ -105,6 +106,7 @@ function Router() {
       <Route path="/ai-lab" component={WeatherAILab} />
       <Route path="/stations" component={Stations} />
       <Route path="/details" component={WeatherDetails} />
+      <Route path="/weight-comparison" component={WeightComparison} />
       <Route path="/favorites" component={FavoriteSettings} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

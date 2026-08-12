@@ -1,4 +1,5 @@
 import { MeteoIcon } from "@/components/MeteoIcon";
+import { Link } from "wouter";
 
 type TraceSource = {
   id: string;
@@ -115,6 +116,10 @@ export function ForecastTraceability({ trace, compact = false }: { trace?: Forec
           </ul>
         </details>
       )}
+
+      <Link href="/weight-comparison" className="mt-4 inline-flex text-xs font-semibold text-sky-300 underline-offset-4 hover:underline">
+        Comparer deux prévisions successives
+      </Link>
     </section>
   );
 }

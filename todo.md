@@ -343,3 +343,10 @@
 - [x] Frontend: Afficher les sources réellement utilisées, les poids température/précipitations/vent et l’horodatage dans le Dashboard.
 - [x] Frontend: Afficher la même traçabilité détaillée dans la page Détails.
 - [x] Tests: Vérifier la conservation exacte des sources et la somme des poids pour chaque paramètre.
+
+## Comparaison des pondérations entre prévisions
+- [x] Backend: Exposer l’historique de snapshots avec leur traçabilité par localisation.
+- [x] Backend: Calculer les écarts de poids par source et par paramètre entre deux snapshots sélectionnés.
+- [x] Frontend: Créer une vue comparative avec sélecteurs de snapshots, barres avant/après et écarts chiffrés.
+- [x] Frontend: Ajouter l’accès à la comparaison depuis la zone de traçabilité des prévisions.
+- [x] Tests: Vérifier les écarts positifs, négatifs et les sources ajoutées ou retirées.

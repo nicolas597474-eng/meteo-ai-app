@@ -354,6 +354,18 @@ export async function getLatestMeteoAIForecasts(limit = 7, locationKey = "defaul
     .limit(limit);
 }
 
+/** Get successive MeteoAI snapshots for trace and weight comparisons. */
+export async function getMeteoAIForecastHistory(locationKey = "default", limit = 30) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(meteoaiForecast)
+    .where(eq(meteoaiForecast.locationKey, locationKey))
+    .orderBy(desc(meteoaiForecast.computedAt))
+    .limit(limit);
+}
+
 /**
  * Get daily weighted scores per service for the last N days (for AI Lab historical chart)
  */
