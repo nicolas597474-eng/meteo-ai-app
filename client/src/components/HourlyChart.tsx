@@ -198,7 +198,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const VISIBLE_HOURS = 8; // hours visible at once
 
   // Layout constants
-  const COL_W = 64;
+  const COL_W = 76;
   const CHART_H = 300;
   const ICON_ROW = 0;
   const LABEL_ROW = 0;
@@ -216,8 +216,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const scaleRange = scaleTop - scaleBot || 1;
 
   const maxPrecip = Math.max(...hours.map(h => h.precipitation ?? 0), 1);
-  const maxWind = Math.max(...hours.map(h => h.windSpeed ?? 0), 10);
-
   // Zone allocation: temp 55%, wind 20%, precip 20%
   const tempZoneTop = PAD_T;
   const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.55;
@@ -227,7 +225,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const precipZoneBot = CHART_H - 2;
 
   const tempToY = useCallback((t: number) => tempZoneTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempZoneTop), [scaleBot, scaleRange, tempZoneTop, tempZoneBot]);
-  const windToY = useCallback((w: number) => windZoneTop + (1 - w / maxWind) * (windZoneBot - windZoneTop), [maxWind, windZoneTop, windZoneBot]);
   const colX = useCallback((i: number) => i * COL_W + COL_W / 2, []);
 
   // Current hour index
@@ -235,11 +232,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
     const h = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
     return hours.findIndex(hr => hr.hour === h);
   }, [hours]);
-
-  // Temp ticks
-  const tempTicks: number[] = [];
-  for (let t = scaleBot; t <= scaleTop; t += gridStep) tempTicks.push(t);
-  const AXIS_W = 32;
 
   // ── Draw canvas ──────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -392,34 +384,21 @@ export default function HourlyChart({ hours, locationName }: Props) {
       }
     });
 
-    // Wind dashed line (green)
-    const windPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: windToY(h.windSpeed ?? 0) }));
-    if (windPts.length > 1) {
-      ctx.beginPath();
-      ctx.setLineDash([5, 3]);
-      ctx.moveTo(windPts[0].x, windPts[0].y);
-      for (let i = 1; i < windPts.length; i++) ctx.lineTo(windPts[i].x, windPts[i].y);
-      ctx.strokeStyle = "#4ade80";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    // Wind values every 3 hours
-    windPts.forEach((pt, i) => {
+    // Wind readings by column (no wind curve).
+    hours.slice(0, visibleN).forEach((h, i) => {
       const v = hours[i].windSpeed;
       if (v == null) return;
-      if (i % 1 === 0 || selectedHour === i) {
-        ctx.fillStyle = "#4ade80";
-        ctx.font = "bold 9px system-ui";
-        ctx.textAlign = "center";
-        ctx.fillText(`${Math.round(v)}`, pt.x, pt.y - 6);
-      }
-      // Wind direction arrow every 3 hours
+      const x = colX(i);
+      const y = windZoneTop + 17;
+      ctx.fillStyle = "#4ade80";
+      ctx.font = "bold 10px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(`${Math.round(v)}`, x, y);
       const dir = hours[i].windDirection;
-      if (dir != null && i % 1 === 0) {
+      if (dir != null) {
         const angle = ((dir + 180) % 360) * (Math.PI / 180);
         ctx.save();
-        ctx.translate(pt.x, pt.y + 2);
+        ctx.translate(x + 15, y - 4);
         ctx.rotate(angle);
         ctx.beginPath();
         ctx.moveTo(0, -3);
@@ -454,18 +433,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.fillRect(x - barW / 2, precipZoneBot - barH, barW, barH);
     });
 
-    // Hour labels
-    hours.forEach((h, i) => {
-      const x = colX(i);
-      const lblY = CHART_H + ICON_ROW;
-      const isCurrent = i === nowHour;
-      const sel = i === selectedHour;
-      ctx.fillStyle = isCurrent ? "#818cf8" : sel ? "#e2e8f0" : "rgba(148, 163, 184, 0.7)";
-      ctx.font = `${isCurrent || sel ? "bold " : ""}10px system-ui`;
-      ctx.textAlign = "center";
-      ctx.fillText(h.hour, x, lblY + 14);
-    });
-  }, [hours, N, selectedHour, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, maxWind, tempToY, windToY, colX, nowHour, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
+  }, [hours, N, selectedHour, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
 
   // Resize observer
   useEffect(() => {
@@ -560,19 +528,8 @@ export default function HourlyChart({ hours, locationName }: Props) {
       </div>
 
       {/* Chart area */}
-      <div className="flex overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
-        {/* Fixed left axis */}
-        <div className="relative flex-shrink-0 border-r border-slate-700/60 bg-[#090c11]" style={{ width: AXIS_W, height: TOTAL_H }}>
-          <span className="absolute text-[8px] text-slate-500 font-bold" style={{ top: 0, left: 2 }}>°C</span>
-          {tempTicks.map(t => (
-            <span key={`t-${t}`} className="absolute text-[10px] font-bold text-slate-400 right-1" style={{ top: tempToY(t) - 5 }}>{t}°</span>
-          ))}
-          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: windZoneTop + 4 }}>Vent<br /><span className="text-[7px] text-slate-500">km/h</span></span>
-          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: precipZoneTop + 4 }}>Pluie<br /><span className="text-[7px] text-slate-500">mm</span></span>
-        </div>
-
-        {/* Scrollable chart */}
-        <div ref={scrollRef} className="flex-1 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+      <div className="overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
+        <div ref={scrollRef} className="w-full overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           <div className="relative" style={{ width: scrollableW, height: TOTAL_H }}>
             {/* En-tête de chaque créneau : heure + grande icône météo */}
             <div className="pointer-events-none absolute left-0 top-0 flex" style={{ height: 78, width: scrollableW }}>

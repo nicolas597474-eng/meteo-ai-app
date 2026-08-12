@@ -585,7 +585,7 @@ export default function Dashboard() {
 
 
                 {/* Hourly Chart */}
-        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
+        <div className="bg-card border border-border rounded-2xl p-0 overflow-hidden">
           {officialLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
@@ -596,7 +596,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── 15-day chart enriched ── */}
-        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
+        <div className="bg-card border border-border rounded-2xl p-0 overflow-hidden">
           {officialLoading ? (
             <div className="h-72 bg-muted rounded-xl animate-pulse" />
           ) : days.length > 0 ? (

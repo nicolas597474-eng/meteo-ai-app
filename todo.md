@@ -411,3 +411,9 @@
 - [x] Frontend: Supprimer la courbe de vent et afficher uniquement le vent en km/h par colonne.
 - [x] Frontend: Afficher la pluie en mm par colonne, avec barre seulement en cas de cumul.
 - [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile.
+
+## Graphiques pleine largeur sans axes latéraux
+- [x] Frontend: Supprimer la courbe de vent du graphique horaire et afficher le vent en km/h par colonne.
+- [x] Frontend: Retirer l’axe latéral et les libellés de température, vent et pluie des deux graphiques.
+- [x] Frontend: Élargir les graphiques sur toute la largeur disponible du Dashboard mobile.
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile des deux graphiques.

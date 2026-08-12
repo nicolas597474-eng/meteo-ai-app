@@ -159,7 +159,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const N = displayDays.length;
 
   // ── Layout constants ────────────────────────────────────────────────────────
-  const AXIS_W = 38;         // fixed axis width on left
   const COL_W = 76;          // width per day column
   const CHART_H = 310;       // main chart height (temp + wind + precip combined)
   const ICON_ROW = 0;        // weather header is positioned inside the chart columns
@@ -508,16 +507,9 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         </div>
       </div>
 
-      {/* ── Chart area: fixed axis + scrollable content ───────────────────── */}
-      <div className="flex overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
-        {/* Fixed left labels — wind and rain only */}
-        <div className="relative flex-shrink-0 border-r border-slate-700/60 bg-[#090c11]" style={{ width: AXIS_W, height: TOTAL_H }}>
-          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: windZoneTop + 4 }}>Vent<br /><span className="text-[7px] text-slate-500">km/h</span></span>
-          <span className="absolute left-1 text-[8px] font-semibold leading-tight text-slate-400" style={{ top: precipZoneTop + 4 }}>Pluie<br /><span className="text-[7px] text-slate-500">mm</span></span>
-        </div>
-
-        {/* Scrollable chart */}
-        <div ref={scrollRef} className="flex-1 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+      {/* ── Full-width scrollable chart ───────────────────────────────────── */}
+      <div className="overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
+        <div ref={scrollRef} className="w-full overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           <div className="relative" style={{ width: scrollableW, height: TOTAL_H }}>
             {/* En-tête de chaque journée : jour + grande icône météo */}
             <div className="pointer-events-none absolute left-0 top-0 flex" style={{ height: 78, width: scrollableW }}>
