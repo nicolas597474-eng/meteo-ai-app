@@ -534,3 +534,9 @@
 - [x] Backend: Corriger tout décalage entre l’heure de Paris et le créneau de nébulosité sélectionné.
 - [x] Frontend: Invalider les réponses de régime à l’heure courante et signaler explicitement leur actualisation.
 - [x] Frontend: Rafraîchir automatiquement les régimes dépendant de la condition actuelle sans attendre une navigation manuelle.
+
+## Actualisation et transitions de régime
+- [x] Backend: Exposer le prochain créneau de changement de régime à partir de la série horaire.
+- [x] Frontend: Ajouter un bouton d’actualisation immédiate du Dashboard.
+- [x] Frontend: Afficher l’âge de la donnée et le prochain changement de régime.
+- [x] Tests: Vérifier les transitions, l’absence de transition et la fraîcheur affichée.

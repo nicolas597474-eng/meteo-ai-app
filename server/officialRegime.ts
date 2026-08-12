@@ -30,6 +30,15 @@ export type CurrentHourlyRegimeForecast = {
   updatedAt?: Date | string | null;
 } | null | undefined;
 
+export type HourlyRegimePoint = {
+  hour: string;
+  temp?: number | null;
+  precipitation?: number | null;
+  windSpeed?: number | null;
+  humidity?: number | null;
+  cloudCover?: number | null;
+};
+
 function toTimestamp(value: Date | string | null | undefined) {
   if (!value) return null;
   const time = new Date(value).getTime();
@@ -172,4 +181,31 @@ export function buildOperationalRegime(
     dataCoverage: [snapshot?.tempMax ?? snapshot?.tempMin, snapshot?.precipitation, snapshot?.windSpeed, snapshot?.humidity, snapshot?.cloudCover]
       .filter((value) => value != null).length,
   };
+}
+
+/** Retourne le premier créneau futur dont le régime diffère du régime courant. */
+export function findNextHourlyRegimeChange(
+  hours: HourlyRegimePoint[],
+  currentHour: string,
+  currentRegimeId: string,
+) {
+  const currentIndex = hours.findIndex((point) => point.hour === currentHour);
+  const startIndex = currentIndex >= 0 ? currentIndex : hours.findIndex((point) => point.hour >= currentHour);
+  if (startIndex < 0) return null;
+
+  for (let index = startIndex + 1; index < hours.length; index += 1) {
+    const point = hours[index];
+    const id = detectExtendedRegime({
+      temperature: point.temp ?? null,
+      precipitation: point.precipitation ?? 0,
+      windSpeed: point.windSpeed ?? 0,
+      humidity: point.humidity ?? null,
+      cloudCover: point.cloudCover ?? null,
+    });
+    if (id !== currentRegimeId) {
+      const info = EXTENDED_REGIME_INFO[id];
+      return { hour: point.hour, id, label: info.label, emoji: info.emoji, cloudCover: point.cloudCover ?? null };
+    }
+  }
+  return null;
 }

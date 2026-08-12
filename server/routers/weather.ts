@@ -34,7 +34,7 @@ import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeC
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "../weatherTime";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
-import { buildOperationalRegime } from "../officialRegime";
+import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 
 function getTodayParis(): string {
@@ -569,6 +569,7 @@ export const weatherRouter = router({
         getObservationByDate(today, locKey),
       ]);
       const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours));
+      const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id);
 
       // Best model
       const ranking = await getCumulativeRankingForLocation(locKey);
@@ -608,7 +609,13 @@ export const weatherRouter = router({
           confidence: officialRegime.confidence,
           description: officialRegime.description,
           snapshotComputedAt: officialRegime.snapshotComputedAt,
+          source: officialRegime.source,
+          sourceLabel: officialRegime.sourceLabel,
+          sourceUpdatedAt: officialRegime.sourceUpdatedAt,
+          sourceAgeMinutes: officialRegime.sourceAgeMinutes,
+          dataCoverage: officialRegime.dataCoverage,
         },
+        nextRegimeChange,
         confidence: {
           current: todayConfidence,
           today: todayConfidence,

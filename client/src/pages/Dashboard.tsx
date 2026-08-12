@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import FifteenDayChart from "@/components/FifteenDayChart";
 import HourlyChart from "@/components/HourlyChart";
@@ -160,7 +160,7 @@ export default function Dashboard() {
   }), [selectedLocation?.lat, selectedLocation?.lon]);
 
   // Dashboard (MeteoAI synthesis) — always location-aware
-  const { data: dash, isLoading: dashLoading, isError: dashError } = trpc.weather.getDashboard.useQuery(
+  const { data: dash, isLoading: dashLoading, isError: dashError, isFetching: dashFetching, refetch: refetchDashboard } = trpc.weather.getDashboard.useQuery(
     coordsInput,
     {
       staleTime: 60 * 1000,
@@ -170,7 +170,7 @@ export default function Dashboard() {
   );
   // Réponse officielle consolidée : la même source alimente désormais Dashboard
   // et Détails pour les heures, les jours et les indices de confiance.
-  const { data: officialForecast, isLoading: officialLoading, isError: officialError } = trpc.weather.getDetailedForecast.useQuery(
+  const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast, dataUpdatedAt: officialDataUpdatedAt } = trpc.weather.getDetailedForecast.useQuery(
     coordsInput,
     {
       staleTime: 60 * 1000,
@@ -184,6 +184,10 @@ export default function Dashboard() {
 
   const isLoading = (selectedLocation ? locLoading : dashLoading) || officialLoading;
   const isError = (selectedLocation ? false : dashError) || officialError;
+  const isRefreshing = dashFetching || officialFetching;
+  const refreshCurrentWeather = async () => {
+    await Promise.all([refetchDashboard(), refetchOfficialForecast()]);
+  };
 
   if (isLoading) {
     return (
@@ -244,6 +248,16 @@ export default function Dashboard() {
   const regimeSourceUpdatedAt = officialRegime?.sourceUpdatedAt
     ? new Date(officialRegime.sourceUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
     : null;
+  const regimeAgeMinutes = officialRegime?.sourceUpdatedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(officialRegime.sourceUpdatedAt).getTime()) / 60000))
+    : officialDataUpdatedAt
+      ? Math.max(0, Math.floor((Date.now() - officialDataUpdatedAt) / 60000))
+      : null;
+  const regimeFreshnessLabel = regimeAgeMinutes == null
+    ? "Mise à jour en cours"
+    : regimeAgeMinutes === 0
+      ? "Mis à jour à l’instant"
+      : `Mis à jour il y a ${regimeAgeMinutes} min`;
 
   // Multi-regime data for alert badges
   const multiRegime = officialRegime
@@ -277,6 +291,7 @@ export default function Dashboard() {
   const windDir = currentHour?.windDirection ?? null;
   const windSpeed = currentHour?.windSpeed ?? today?.windSpeed ?? meteoAI?.windSpeed ?? null;
   const currentCloudCover = currentHour?.cloudCover ?? today?.cloudCover ?? null;
+  const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -317,15 +332,22 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs font-medium text-primary">Tendance · {regimeSourceLabel}</span>
                 {selectedLocation && <span className="text-xs text-primary/60">· {selectedLocation.name}</span>}
               </div>
-              <span className="text-xs text-muted-foreground hidden sm:block">
-                {officialForecast?.modelsUsed?.join(", ")}
-              </span>
+              <button
+                type="button"
+                onClick={refreshCurrentWeather}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary disabled:opacity-60"
+                aria-label="Actualiser la météo maintenant"
+              >
+                <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                Actualiser
+              </button>
             </div>
 
             {/* ── Regime badge ── */}
@@ -355,7 +377,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-                {regimeSourceUpdatedAt && <p className="mt-1 text-[10px] text-slate-400">Source mise à jour à {regimeSourceUpdatedAt}</p>}
+                <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt}` : ""}</p>
               </div>
             )}
 
@@ -418,6 +440,12 @@ export default function Dashboard() {
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
                       <Clock className="h-3 w-3" />
                       Prochain changement : {nextConditionChange.condition} à {nextConditionChange.hour}
+                    </p>
+                  )}
+                  {nextRegimeChange && (
+                    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-300">
+                      <MeteoIcon name="cloud_cover" size={13} />
+                      Régime à venir : {nextRegimeChange.emoji} {nextRegimeChange.label} à {nextRegimeChange.hour}
                     </p>
                   )}
                 </div>

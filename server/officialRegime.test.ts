@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOperationalRegime } from "./officialRegime";
+import { buildOperationalRegime, findNextHourlyRegimeChange } from "./officialRegime";
 
 describe("buildOperationalRegime", () => {
   it("privilégie une observation plus récente, fraîche et couvrant la nébulosité", () => {
@@ -37,5 +37,14 @@ describe("buildOperationalRegime", () => {
     );
     expect(regime.source).toBe("hourly_forecast");
     expect(regime.primary.id).toBe("sunny");
+  });
+
+  it("retourne le premier changement de régime dans les créneaux futurs", () => {
+    const change = findNextHourlyRegimeChange([
+      { hour: "09:00", temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
+      { hour: "10:00", temp: 19, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
+      { hour: "11:00", temp: 19, precipitation: 0, windSpeed: 10, humidity: 55, cloudCover: 60 },
+    ], "09:00", "sunny");
+    expect(change).toMatchObject({ hour: "11:00", id: "partly_cloudy", cloudCover: 60 });
   });
 });
