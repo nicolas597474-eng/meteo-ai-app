@@ -92,6 +92,7 @@ import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ult
 import { getPreviousReadings, recordStationReadings } from "../stationReadingsCache";
 import { getParisDate } from "../weatherTime";
 import { buildOfficialModelFallback } from "../modelFallback";
+import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 
 export const favoritesRouter = router({
   /**
@@ -227,14 +228,14 @@ export const favoritesRouter = router({
       const todayDate = getParisDate();
       const coords = { lat, lon };
       const locationKey = makeLocationKey(lat, lon);
-      const [forecast15dResult, hourly, stations, currentModelReferences, meteoAI] = await Promise.all([
-        collect15DayForecast(coords),
-        collectHourlyForecast(todayDate, coords),
+      const [officialSnapshot, stations, currentModelReferences, meteoAI] = await Promise.all([
+        resolveOfficialWeatherSnapshot(coords),
         collectNearbyStations(lat, lon, searchRadius, input.name ?? "Local"),
         fetchCurrentModelReferences(lat, lon),
         getMeteoAIForecastByDate(todayDate, locationKey),
       ]);
-      const forecast15d = forecast15dResult.days;
+      const hourly = officialSnapshot.hourly;
+      const forecast15d = officialSnapshot.daily;
 
       // Ultra-local calculation
       const ranked = rankStations(stations);
@@ -378,6 +379,12 @@ export const favoritesRouter = router({
 
       return {
         location: { lat, lon },
+        officialSnapshot: {
+          validAt: officialSnapshot.validAt,
+          computedAt: officialSnapshot.computedAt,
+          sourceKind: officialSnapshot.sourceKind,
+          source: officialSnapshot.source,
+        },
         localMode,
         today: todayForecast ? {
           tempMax: todayForecast.tempMax,

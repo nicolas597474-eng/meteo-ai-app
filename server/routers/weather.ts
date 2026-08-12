@@ -40,6 +40,7 @@ import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
+import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 
 function getTodayParis(): string {
@@ -535,10 +536,9 @@ export const weatherRouter = router({
   get15DayForecast: publicProcedure
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
-      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
-      const { days, modelsUsed } = await collect15DayForecast(coords);
-      return { today, days, modelsUsed };
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+      return { today: snapshot.weatherDate, days: snapshot.daily, modelsUsed: snapshot.modelsUsed, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
 
   /**
@@ -547,10 +547,9 @@ export const weatherRouter = router({
   getHourlyForecast: publicProcedure
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
-      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
-      const hours = await collectHourlyForecast(today, coords);
-      return { today, hours };
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+      return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
 
   /**
@@ -563,13 +562,10 @@ export const weatherRouter = router({
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
-      // Les deux séries viennent du même endpoint public, mais leurs appels
-      // réseau restent parallèles pour éviter d'allonger le chargement du Dashboard.
-      const [hours, dailyForecast] = await Promise.all([
-        collectHourlyForecast(today, coords),
-        collect15DayForecast(coords),
-      ]);
-      const { days, modelsUsed } = dailyForecast;
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+      const hours = snapshot.hourly;
+      const days = snapshot.daily;
+      const modelsUsed = snapshot.modelsUsed;
 
       const [meteoAI, observation] = await Promise.all([
         getMeteoAIForecastByDate(today, locKey),
@@ -606,7 +602,8 @@ export const weatherRouter = router({
       const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
       return {
-        today,
+        today: snapshot.weatherDate,
+        officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source },
         hours,
         days,
         modelsUsed,

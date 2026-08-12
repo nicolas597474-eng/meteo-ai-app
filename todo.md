@@ -788,3 +788,9 @@
 - [x] Backend: Conserver chaque émission de modèle sans modifier les prévisions ou poids actuellement affichés.
 - [x] Backend: Empêcher les nouvelles pseudo-observations de devenir une vérité terrain ou un score opérationnel.
 - [x] Tests: Vérifier la provenance, l’historisation des runs et l’absence de régression sur la fusion actuelle.
+
+## Phase 2 — snapshot météo officiel central
+- [x] Contrat: Définir un résultat officiel avec lieu, instant de validité, instant de calcul, provenance et type de donnée.
+- [x] Backend: Centraliser la résolution de la température et des paramètres horaires officiels.
+- [x] API: Raccorder le Dashboard et les prévisions détaillées au même snapshot lorsque le lieu et l’instant sont identiques.
+- [x] Tests: Vérifier l’égalité des valeurs et de la provenance entre les vues pour un même lieu et instant.
