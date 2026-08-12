@@ -751,3 +751,8 @@
 - [x] Backend: Calculer un indicateur de cohérence des références avec les stations physiques locales validées lorsqu’elles sont disponibles.
 - [x] Frontend: Afficher les références de modèles avec leur cohérence, leur écart local et leurs limites explicites.
 - [x] Tests: Vérifier l’exclusion des références de la vérité terrain et les replis sans station physique.
+
+## Modale de transparence des sources
+- [x] Frontend: Ouvrir une modale au clic sur une source affichant ses mesures brutes et sa provenance.
+- [x] Frontend: Expliquer dans la modale la contribution réelle ou l’exclusion de la source du calcul local.
+- [x] Tests: Vérifier la présence des données de transparence et les messages de garde-fou par type de source.

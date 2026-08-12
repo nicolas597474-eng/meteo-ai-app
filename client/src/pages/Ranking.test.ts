@@ -21,4 +21,14 @@ describe("page Fiabilité", () => {
     expect(source).toContain("MODÈLE · NON STATION");
     expect(source).toContain("il ne modifie pas la température locale avant une validation historique mesurée");
   });
+
+  it("ouvre une modale de transparence depuis chaque source", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    const dialog = readFileSync(new URL("./SourceDetailsDialog.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Ouvrir les données brutes et la contribution de");
+    expect(source).toContain("SourceDetailsDialog");
+    expect(dialog).toContain("Données brutes du dernier relevé");
+    expect(dialog).toContain("poids de fusion locale 0 %");
+    expect(dialog).toContain("Décomposition du poids appliqué");
+  });
 });
