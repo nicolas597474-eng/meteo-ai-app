@@ -417,3 +417,9 @@
 - [x] Frontend: Retirer l’axe latéral et les libellés de température, vent et pluie des deux graphiques.
 - [x] Frontend: Élargir les graphiques sur toute la largeur disponible du Dashboard mobile.
 - [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile des deux graphiques.
+
+## Graphique journalier fixe sur quinze jours
+- [x] Frontend: Supprimer les choix 7j, 15j et 16j du graphique journalier.
+- [x] Frontend: Afficher exclusivement les quinze prochains jours et permettre la navigation horizontale par glissement.
+- [x] Frontend: Harmoniser la barre de défilement du graphique journalier avec l’indicateur bleu du graphique horaire.
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile.

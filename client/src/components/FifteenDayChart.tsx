@@ -149,13 +149,11 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const [animated, setAnimated] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [viewMode, setViewMode] = useState<7 | 15 | 16>(7);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
-  // Use 16 if available (days.length >= 16), otherwise cap at 15
-  const maxDays = days.length >= 16 ? 16 : days.length;
-  const displayDays = days.slice(0, Math.min(viewMode, maxDays));
+  // The chart deliberately stays on one consistent 15-day horizon.
+  const displayDays = days.slice(0, 15);
   const N = displayDays.length;
 
   // ── Layout constants ────────────────────────────────────────────────────────
@@ -467,32 +465,16 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
   return (
     <section ref={containerRef} className="w-full rounded-[22px] border border-slate-700/70 bg-[#080b10] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.38)]">
-      {/* Header with toggle */}
+      {/* Header */}
       <div className="mb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <h2 className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-300/40 bg-blue-500/25 shadow-[0_0_18px_rgba(59,130,246,0.45)]"><TrendingUp className="h-4 w-4 text-blue-200" /></span>
             <span>
               <span className="block text-base font-bold text-white">Températures & Météo</span>
-              <span className="block text-[11px] font-normal text-slate-400">Prévisions sur {viewMode} jours</span>
+              <span className="block text-[11px] font-normal text-slate-400">Prévisions détaillées</span>
             </span>
           </h2>
-          <div className="flex items-center rounded-full border border-slate-600/50 bg-slate-950/65 p-0.5">
-            <button
-              onClick={() => setViewMode(7)}
-              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 7 ? 'bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.65)]' : 'text-slate-400 hover:text-slate-200'}`}
-            >7j</button>
-            <button
-              onClick={() => setViewMode(15)}
-              className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 15 ? 'bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.65)]' : 'text-slate-400 hover:text-slate-200'}`}
-            >15j</button>
-            {maxDays >= 16 && (
-              <button
-                onClick={() => setViewMode(16)}
-                className={`px-3 py-1 text-[11px] font-medium rounded-full transition-all duration-200 ${viewMode === 16 ? 'bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.65)]' : 'text-slate-400 hover:text-slate-200'}`}
-              >16j+</button>
-            )}
-          </div>
         </div>
         {locationName && (
           <p className="text-[11px] text-primary/70 flex items-center gap-1 mt-0.5">
@@ -502,7 +484,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Max °C</span>
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-blue-400 inline-block" /> Min °C</span>
-          <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
+          <span className="flex items-center gap-1.5 text-green-400"><span className="w-2.5 h-2.5 rounded-full bg-green-400 inline-block" /> Vent km/h</span>
           <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
         </div>
       </div>
@@ -549,7 +531,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
             }}
           >
             <div
-              className="absolute h-full rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 transition-transform duration-150 group-hover:from-indigo-300 group-hover:to-purple-300"
+              className="absolute h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-transform duration-150 group-hover:from-blue-500 group-hover:to-blue-300"
               style={{
                 width: `${(7 / N) * 100}%`,
                 transform: `translateX(${scrollProgress * ((N / 7) - 1) * 100}%)`
