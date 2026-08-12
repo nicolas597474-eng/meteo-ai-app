@@ -8,4 +8,10 @@ describe("page Fiabilité", () => {
     expect(source).not.toContain("Connectez votre compte");
     expect(source).not.toContain(">Connecter<");
   });
+
+  it("explique le statut des capteurs citoyens en validation", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Comprendre le statut capteur en validation");
+    expect(source).toContain("il n’influence pas la température locale tant qu’un gain de précision n’est pas démontré");
+  });
 });

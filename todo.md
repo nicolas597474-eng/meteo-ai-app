@@ -736,3 +736,7 @@
 - [x] Backend: Empêcher l’insertion de doublons pour un même lieu, jour et modèle lors de collectes répétées.
 - [x] Données: Dédupliquer prudemment les doublons historiques sans supprimer la dernière collecte.
 - [x] Tests: Vérifier l’idempotence d’une collecte répétée et la sélection de la dernière collecte.
+
+## Infobulle du statut capteur citoyen
+- [x] Frontend: Ajouter une infobulle accessible expliquant le statut « CAPTEUR EN VALIDATION » dans la page Fiabilité.
+- [x] Tests: Vérifier le contenu et l’accessibilité de l’aide contextuelle.
