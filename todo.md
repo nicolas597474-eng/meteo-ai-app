@@ -818,3 +818,8 @@
 - [x] Backend: Comparer les prévisions archivées alignées à cette observation physique et écrire des scores qualifiés.
 - [x] Automatisation: Utiliser le cycle nocturne existant et signaler explicitement une couverture insuffisante.
 - [x] Tests: Vérifier les scores qualifiés, l’absence de score sans couverture et l’idempotence nocturne.
+
+## Phase 5 — transparence des preuves physiques
+- [x] Backend: Exposer la couverture horaire physique et le dernier score qualifié par lieu.
+- [x] Frontend: Afficher l’éligibilité du scoring et l’explication en cas de données insuffisantes.
+- [x] Tests: Vérifier les états sans donnée, incomplet et qualifié de la page Fiabilité.

@@ -27,6 +27,7 @@ import {
   getPhysicalStationHistory,
   getStoredHourlyForecasts,
   getStationCollectionSnapshots,
+  getQualifiedEvidenceStatus,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
@@ -1037,6 +1038,20 @@ export const weatherRouter = router({
       historicalServices: allServices,
     };
   }),
+
+  /** Couverture des observations physiques requise avant tout score qualifié. */
+  getEvidenceStatus: publicProcedure
+    .input(z.object({ lat: latitudeSchema.optional(), lon: longitudeSchema.optional() }))
+    .query(async ({ input }) => {
+      const lat = input.lat ?? HONDEGHEM.lat;
+      const lon = input.lon ?? HONDEGHEM.lon;
+      const evidence = await getQualifiedEvidenceStatus(makeLocationKey(lat, lon));
+      return {
+        ...evidence,
+        requiredCoverageHours: 18,
+        isEligible: evidence.coverageHours >= 18,
+      };
+    }),
 
   /**
    * Search nearby weather stations from all sources within a configurable radius.

@@ -639,6 +639,30 @@ export async function getQualifiedObservationSnapshotsForDate(locationKey: strin
   )).orderBy(qualifiedObservationSnapshots.hour);
 }
 
+export async function getQualifiedEvidenceStatus(locationKey: string) {
+  const db = await getDb();
+  if (!db) return { date: null, coverageHours: 0, lastCollectedAt: null, qualifiedScoreCount: 0, lastQualifiedScoreAt: null };
+  const latest = await db.select().from(qualifiedObservationSnapshots)
+    .where(eq(qualifiedObservationSnapshots.locationKey, locationKey))
+    .orderBy(desc(qualifiedObservationSnapshots.date), desc(qualifiedObservationSnapshots.hour))
+    .limit(1);
+  if (!latest[0]) return { date: null, coverageHours: 0, lastCollectedAt: null, qualifiedScoreCount: 0, lastQualifiedScoreAt: null };
+  const date = latest[0].date;
+  const snapshots = await getQualifiedObservationSnapshotsForDate(locationKey, date);
+  const scores = await db.select().from(reliabilityScores).where(and(
+    eq(reliabilityScores.locationKey, locationKey),
+    eq(reliabilityScores.date, date),
+    eq(reliabilityScores.evidenceType, "physical_observation"),
+  ));
+  return {
+    date,
+    coverageHours: snapshots.length,
+    lastCollectedAt: latest[0].collectedAt,
+    qualifiedScoreCount: scores.length,
+    lastQualifiedScoreAt: scores.reduce<Date | null>((current, score) => !current || score.computedAt > current ? score.computedAt : current, null),
+  };
+}
+
 /** Immutable forecast emissions targeting one daily observation. */
 export async function getForecastRunsForValidDate(locationKey: string, validDate: string) {
   const db = await getDb();
