@@ -641,7 +641,7 @@
 - [x] Données: Persister provenance, fraîcheur, mesures disponibles et statut `candidate`, sans contribution à la température locale.
 - [x] Frontend: Afficher les capteurs citoyens avec un statut de validation distinct des stations physiques validées.
 - [x] Tests: Vérifier le filtrage des capteurs, l’absence de données simulées et l’exclusion de la fusion locale.
-- [ ] Mesure: Évaluer la couverture openSenseMap et CWOP/MADIS autour des favoris avant l’activation d’une source supplémentaire.
+- [x] Mesure: Évaluer la couverture openSenseMap et CWOP/MADIS autour des favoris avant l’activation d’une source supplémentaire.
 
 ## Cohérence des prochains changements de régime
 - [x] Backend: Utiliser un unique régime de créneau horaire pour les annonces de transition.
