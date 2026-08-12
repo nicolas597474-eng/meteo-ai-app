@@ -570,6 +570,51 @@ export async function upsertGroundTruthSnapshot(data: InsertGroundTruth): Promis
   await db.insert(groundTruth).values(data);
 }
 
+/**
+ * Read physical station evidence collected for one reference location. Each
+ * station keeps its own history so the UI can disclose freshness and compare
+ * observations to the official forecast without inventing measurements.
+ */
+export async function getPhysicalStationHistory(
+  refLat: number,
+  refLon: number,
+  sinceMs: number,
+) {
+  const db = await getDb();
+  if (!db) return { stations: [], latestGroundTruth: null };
+
+  const stations = await db
+    .select()
+    .from(weatherStations)
+    .where(and(
+      eq(weatherStations.refLat, refLat),
+      eq(weatherStations.refLon, refLon),
+      eq(weatherStations.isActive, 1),
+    ))
+    .orderBy(desc(weatherStations.reliabilityScore));
+
+  const stationSeries = await Promise.all(stations.map(async (station) => {
+    const readings = await db
+      .select()
+      .from(stationObservations)
+      .where(and(
+        eq(stationObservations.stationId, station.stationId),
+        gte(stationObservations.observedAt, sinceMs),
+      ))
+      .orderBy(stationObservations.observedAt);
+    return { ...station, readings };
+  }));
+
+  const latestGroundTruth = await db
+    .select()
+    .from(groundTruth)
+    .where(and(eq(groundTruth.refLat, refLat), eq(groundTruth.refLon, refLon)))
+    .orderBy(desc(groundTruth.computedAt))
+    .limit(1);
+
+  return { stations: stationSeries, latestGroundTruth: latestGroundTruth[0] ?? null };
+}
+
 // ─── Location Forecasts (pre-fetched per favorite) ───────────────────────────
 
 /**

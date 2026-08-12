@@ -436,3 +436,10 @@
 - [x] Backend: Conserver les prévisions quotidiennes et horaires de tous les modèles réellement disponibles, sans ajouter de job planifié.
 - [x] Tests: Vérifier la collecte de stations, le filtrage des sources non physiques et l’idempotence des écritures.
 - [x] Opérations: Confirmer le job actif « meteoai-collect-favorites-forecasts » à 05h00 Paris (03h00 UTC en été), prochaine exécution planifiée le 13 août 2026 à 03:00 UTC.
+
+## Remplacement de la page Classement par Stations & fiabilité locale
+- [x] Backend: Exposer les stations physiques actives, leur dernier relevé, leur âge et leur historique par lieu.
+- [x] Backend: Exposer une série 24 h comparant synthèse de stations et prévision officielle.
+- [x] Frontend: Remplacer la page Classement par la vue Stations & fiabilité locale.
+- [x] Frontend: Afficher les âges des relevés, l’historique des stations et la comparaison 24 h.
+- [x] Tests: Vérifier les données de stations, les âges et les séries comparatives sans données simulées.

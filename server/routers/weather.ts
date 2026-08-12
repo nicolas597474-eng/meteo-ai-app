@@ -22,6 +22,8 @@ import {
   getHistoricalScoreTimeSeries,
   getLeadTimeScoresForLocation,
   makeLocationKey,
+  getPhysicalStationHistory,
+  getStoredHourlyForecasts,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { collectNearbyStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM } from "../stationService";
@@ -1147,5 +1149,77 @@ export const weatherRouter = router({
       const days = input?.days ?? 14;
       const scores = await getLeadTimeScoresForLocation(locKey, days);
       return { locationKey: locKey, days, scores };
+    }),
+
+  /** Physical station evidence and official forecast, aligned by Paris hour. */
+  getStationReliabilityOverview: publicProcedure
+    .input(z.object({
+      lat: z.number().optional(),
+      lon: z.number().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const lat = input?.lat ?? HONDEGHEM.lat;
+      const lon = input?.lon ?? HONDEGHEM.lon;
+      const now = Date.now();
+      const sinceMs = now - 24 * 60 * 60 * 1000;
+      const locationKey = makeLocationKey(lat, lon);
+      const date = getTodayParis();
+      const [stationData, hourlyRows] = await Promise.all([
+        getPhysicalStationHistory(lat, lon, sinceMs),
+        getStoredHourlyForecasts(locationKey, date),
+      ]);
+
+      const officialRows = hourlyRows.filter((row) => row.modelName === "best_match");
+      const byHour = new Map<number, Array<{ temperature: number | null; windSpeed: number | null; precipitation: number | null }>>();
+      for (const station of stationData.stations) {
+        for (const reading of station.readings) {
+          const hour = Number(new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23",
+          }).format(new Date(reading.observedAt)));
+          const list = byHour.get(hour) ?? [];
+          list.push(reading);
+          byHour.set(hour, list);
+        }
+      }
+
+      const comparison24h = Array.from({ length: 24 }, (_, hour) => {
+        const readings = byHour.get(hour) ?? [];
+        const average = (key: "temperature" | "windSpeed" | "precipitation") => {
+          const values = readings.map((reading) => reading[key]).filter((value): value is number => value !== null);
+          return values.length ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10 : null;
+        };
+        const forecast = officialRows.find((row) => row.hour === hour);
+        return {
+          hour,
+          stationTemperature: average("temperature"),
+          stationWindSpeed: average("windSpeed"),
+          stationPrecipitation: average("precipitation"),
+          stationSampleCount: readings.length,
+          officialTemperature: forecast?.temperature ?? null,
+          officialWindSpeed: forecast?.windSpeed ?? null,
+          officialPrecipitation: forecast?.precipitation ?? null,
+        };
+      });
+
+      return {
+        locationKey,
+        collectedAt: stationData.latestGroundTruth?.computedAt ?? null,
+        latestGroundTruth: stationData.latestGroundTruth,
+        stations: stationData.stations.map((station) => {
+          const latest = station.readings.at(-1) ?? null;
+          return {
+            stationId: station.stationId,
+            name: station.name,
+            source: station.source,
+            distanceKm: station.distanceKm,
+            reliabilityScore: station.reliabilityScore,
+            updateFrequencyMin: station.updateFrequencyMin,
+            latest,
+            ageMinutes: latest ? Math.max(0, Math.round((now - latest.observedAt) / 60000)) : null,
+            readings: station.readings,
+          };
+        }),
+        comparison24h,
+      };
     }),
 });

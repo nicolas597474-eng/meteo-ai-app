@@ -25,7 +25,7 @@ import {
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/ranking", label: "Classement", icon: Trophy },
+  { path: "/ranking", label: "Fiabilité", icon: Trophy },
   { path: "/history", label: "Historique", icon: Calendar },
   { path: "/stations", label: "Stations", icon: Radio },
   { path: "/ai-lab", label: "AI Lab", icon: FlaskConical },

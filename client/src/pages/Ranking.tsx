@@ -1,365 +1,146 @@
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MeteoIcon } from "@/components/MeteoIcon";
+import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
-import { getWeatherLandscapeImage } from "@/lib/weatherImages";
-import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
-import { MapPin, Info, Sparkles, Eye } from "lucide-react";
-import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
 
-/**
- * Page Classement — reproduction exacte de la maquette MeteoAI
- * Utilise le pack d'icônes MeteoAI personnalisé
- */
+type ComparisonPoint = {
+  hour: number;
+  stationTemperature: number | null;
+  stationWindSpeed: number | null;
+  stationPrecipitation: number | null;
+  stationSampleCount: number;
+  officialTemperature: number | null;
+  officialWindSpeed: number | null;
+  officialPrecipitation: number | null;
+};
 
-export default function Ranking() {
-  const { user } = useAuth();
-  const { activeLocation } = useLocation();
+function formatAge(minutes: number | null) {
+  if (minutes === null) return "Aucun relevé";
+  if (minutes < 2) return "À l’instant";
+  if (minutes < 60) return `Il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `Il y a ${hours} h ${rest}` : `Il y a ${hours} h`;
+}
 
-  const coordsInput = activeLocation
-    ? { lat: activeLocation.lat, lon: activeLocation.lon }
-    : undefined;
+function value(value: number | null | undefined, unit = "") {
+  return value === null || value === undefined ? "—" : `${value.toFixed(1)}${unit}`;
+}
 
-  const { data, isLoading } = trpc.weather.getRanking.useQuery(coordsInput);
-
-  if (isLoading) {
+function TemperatureComparison({ points }: { points: ComparisonPoint[] }) {
+  const usable = points.filter((point) => point.stationTemperature !== null || point.officialTemperature !== null);
+  if (usable.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0B132B] px-4 pt-4 space-y-4 max-w-md mx-auto">
-        <Skeleton className="h-6 w-40 bg-slate-800" />
-        <Skeleton className="h-52 w-full rounded-2xl bg-slate-800" />
-        <Skeleton className="h-20 w-full rounded-2xl bg-slate-800" />
-        <Skeleton className="h-44 w-full rounded-2xl bg-slate-800" />
+      <div className="border border-dashed border-slate-800 rounded-xl px-4 py-8 text-center text-sm text-slate-500">
+        La comparaison apparaîtra après les premiers relevés physiques collectés à 05h00.
       </div>
     );
   }
 
-  if (!data) return null;
-
-  const { multiRegime, currentParams, paramImpacts, keyFactors, bestModel } = data;
-  const confidence = multiRegime?.confidenceScore ?? 87;
-  const activeRegimes = multiRegime?.activeRegimes ?? [];
-  const blendedWeights = multiRegime?.blendedWeights ?? { temp: 0.25, precip: 0.2, wind: 0.1, condition: 0.3, humidity: 0.1, pressure: 0.05 };
-  const regimeDescription = multiRegime?.description ?? "Ciel très nuageux dominant, peu d'éclaircies. Risque de pluie faible à modéré. Vent modéré.";
-  const cleanDescription = regimeDescription.replace(/Régimes actifs : .*?\. /, "");
-  const heroRegimes = activeRegimes.slice(0, 3);
-  const dominantRegime = activeRegimes[0]?.id || activeRegimes[0]?.label || '';
-  const heroImage = getWeatherLandscapeImage(dominantRegime);
+  const values = usable.flatMap((point) => [point.stationTemperature, point.officialTemperature]).filter((item): item is number => item !== null);
+  const min = Math.floor(Math.min(...values) - 1);
+  const max = Math.ceil(Math.max(...values) + 1);
+  const width = 560;
+  const height = 168;
+  const padding = 14;
+  const toPoint = (series: "stationTemperature" | "officialTemperature") => usable
+    .map((point, index) => {
+      const valueAtPoint = point[series];
+      if (valueAtPoint === null) return null;
+      const x = padding + (index * (width - padding * 2)) / Math.max(usable.length - 1, 1);
+      const y = padding + (1 - (valueAtPoint - min) / Math.max(max - min, 1)) * (height - padding * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .filter((item): item is string => item !== null)
+    .join(" ");
 
   return (
-    <div className="min-h-screen bg-[#0B132B]">
-      <div className="max-w-md mx-auto px-3 pb-28">
-
-        {/* ═══ HEADER ═══ */}
-        <div className="flex items-center justify-between py-3">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 text-blue-400" />
-            <span className="text-white font-semibold text-sm">
-              {activeLocation?.name || "Hondeghem"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>Mise à jour : {new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
-            <MeteoIcon name="refresh" size={14} className="cursor-pointer hover:opacity-80 transition-opacity" />
-          </div>
-        </div>
-
-        {/* ═══ HERO: DÉTECTION IA ═══ */}
-        <div className="rounded-2xl overflow-hidden bg-[#152238] border border-slate-800 mb-3">
-          <div className="flex">
-            {/* Image paysage */}
-            <div className="w-[36%] min-h-[220px]">
-              <img
-                src={heroImage}
-                alt="Paysage météo"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {/* Contenu détection */}
-            <div className="flex-1 p-4 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[11px] bg-[#1E293B] text-slate-300 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                    <MeteoIcon name="confidence" size={12} /> DÉTECTION IA
-                  </span>
-                  <span className="text-[11px] bg-blue-600/30 text-blue-300 px-2.5 py-1 rounded-full font-medium">
-                    Aujourd'hui
-                  </span>
-                </div>
-                <h2 className="text-white font-bold text-base mb-1.5">Régimes actifs détectés</h2>
-                <p className="text-slate-400 text-xs leading-relaxed">
-                  {cleanDescription}
-                </p>
-              </div>
-              {/* Top 3 régimes */}
-              <div className="flex justify-between mt-4">
-                {heroRegimes.map((r: any, i: number) => {
-                  return (
-                    <div key={i} className="flex flex-col items-center gap-1">
-                      <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800/50">
-                        <MeteoIcon name={getIconNameFromRegime(r.id || r.label)} size={28} />
-                      </div>
-                      <span className="text-[10px] text-slate-400 text-center leading-tight max-w-[70px]">{r.label}</span>
-                      <span className="text-sm font-bold text-blue-400">{r.influence}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ═══ ALERT BADGE (dangerous regimes) ═══ */}
-        {isDangerousRegime(dominantRegime) && (
-          <div className="mb-3">
-            <AlertBadge regimeId={dominantRegime} confidence={confidence} confidenceThreshold={60} />
-          </div>
-        )}
-
-        {/* ═══ CONFIANCE GLOBALE ═══ */}
-        <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4 mb-3">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 flex items-center justify-center rounded-full bg-green-900/40 border border-green-600/40">
-                <MeteoIcon name="confidence" size={28} />
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs">Confiance globale</p>
-                <p className="text-white font-bold text-2xl">{confidence}%</p>
-              </div>
-            </div>
-            <button className="text-xs text-slate-400 border border-slate-700 rounded-lg px-3 py-2 hover:bg-slate-800 transition-colors flex items-center gap-1">
-              Voir détails <MeteoIcon name="chevron_right" size={12} />
-            </button>
-          </div>
-          <div className="h-3 bg-[#1E293B] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{
-                width: `${confidence}%`,
-                background: "linear-gradient(90deg, #16a34a 0%, #4ade80 60%, #86efac 100%)",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* ═══ POURQUOI CES RÉGIMES ? ═══ */}
-        <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4 mb-3">
-          <h3 className="text-amber-400 font-bold text-sm mb-3">Pourquoi ces régimes ?</h3>
-          <div className="grid grid-cols-4 gap-2 mb-2">
-            <ParamCard
-              icon={<MeteoIcon name="temperature" size={20} />}
-              label="Température"
-              value={`${currentParams?.temperature?.toFixed(1) ?? "18.2"}`}
-              unit="°C"
-              impact={paramImpacts?.temperature ?? "Élevé"}
-            />
-            <ParamCard
-              icon={<MeteoIcon name="precipitation" size={20} />}
-              label="Précipitations"
-              value={`${currentParams?.precipitation?.toFixed(0) ?? "20"}`}
-              unit="%"
-              impact={paramImpacts?.precipitation ?? "Modéré"}
-            />
-            <ParamCard
-              icon={<MeteoIcon name="wind_param" size={20} />}
-              label="Vent"
-              value={`${currentParams?.windSpeed?.toFixed(0) ?? "14"}`}
-              unit=" km/h"
-              impact={paramImpacts?.wind ?? "Élevé"}
-            />
-            <ParamCard
-              icon={<MeteoIcon name="cloud_cover" size={20} />}
-              label="Couverture nuageuse"
-              value={`${currentParams?.cloudCover?.toFixed(0) ?? "92"}`}
-              unit="%"
-              impact={paramImpacts?.cloudCover ?? "Élevé"}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <ParamCard
-              icon={<MeteoIcon name="humidity" size={20} />}
-              label="Humidité"
-              value={`${currentParams?.humidity?.toFixed(0) ?? "78"}`}
-              unit="%"
-              impact={paramImpacts?.humidity ?? "Élevé"}
-            />
-            <ParamCard
-              icon={<MeteoIcon name="pressure" size={20} />}
-              label="Pression"
-              value={`${currentParams?.pressure?.toFixed(0) ?? "1016"}`}
-              unit=" hPa"
-              impact={paramImpacts?.pressure ?? "Modéré"}
-            />
-          </div>
-        </div>
-
-        {/* ═══ PONDÉRATION UTILISÉE ═══ */}
-        <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4 mb-3">
-          <h3 className="text-purple-400 font-bold text-sm mb-4">Pondération utilisée (combinaison des régimes)</h3>
-          <div className="grid grid-cols-6 gap-2">
-            {[
-              { key: "temp", label: "Température", icon: <MeteoIcon name="temperature" size={16} />, color: "#ef4444" },
-              { key: "condition", label: "Nuages", icon: <MeteoIcon name="cloud_cover" size={16} />, color: "#3b82f6" },
-              { key: "precip", label: "Précipitations", icon: <MeteoIcon name="precipitation" size={16} />, color: "#06b6d4" },
-              { key: "wind", label: "Vent", icon: <MeteoIcon name="wind_param" size={16} />, color: "#22c55e" },
-              { key: "humidity", label: "Humidité", icon: <MeteoIcon name="humidity" size={16} />, color: "#8b5cf6" },
-              { key: "pressure", label: "Pression", icon: <MeteoIcon name="pressure" size={16} />, color: "#f59e0b" },
-            ].map((w) => {
-              const pct = Math.round((blendedWeights as any)[w.key] * 100);
-              return (
-                <div key={w.key} className="flex flex-col items-center gap-1">
-                  <div className="text-slate-400">{w.icon}</div>
-                  <span className="text-[8px] text-slate-500 text-center leading-tight">{w.label}</span>
-                  <span className="text-white font-bold text-xs">{pct}%</span>
-                  <div className="h-1 w-8 rounded-full" style={{ backgroundColor: w.color }} />
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-slate-600 mt-3 flex items-start gap-1.5">
-            <Info className="h-3 w-3 text-slate-500 flex-shrink-0 mt-0.5" />
-            <span>Les pondérations s'adaptent automatiquement en fonction de l'intensité de chaque régime.</span>
-          </p>
-        </div>
-
-        {/* ═══ TOUS LES RÉGIMES POSSIBLES ═══ */}
-        <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4 mb-3">
-          <h3 className="text-cyan-400 font-bold text-sm mb-3">Tous les régimes possibles</h3>
-          <div className="grid grid-cols-5 gap-2">
-            {REGIME_GRID.map((item) => {
-              const active = activeRegimes.find((r: any) =>
-                r.id === item.key || r.label?.toLowerCase().includes(item.label.toLowerCase())
-              );
-              const pct = active?.influence ?? item.defaultPct;
-              const isActive = !!active;
-              return (
-                <div
-                  key={item.key}
-                  className={`rounded-xl py-2.5 px-1 text-center transition-all ${
-                    isActive
-                      ? "bg-blue-950/50 border-2 border-blue-500/60"
-                      : "bg-[#1E293B] border border-slate-800"
-                  }`}
-                >
-                  <div className="w-8 h-8 mx-auto mb-1 flex items-center justify-center">
-                    <MeteoIcon name={getIconNameFromRegime(item.key)} size={24} />
-                  </div>
-                  <span className="text-[8px] text-slate-400 block leading-tight min-h-[22px]">{item.label}</span>
-                  <span className={`text-[10px] font-bold block ${
-                    isActive ? "text-green-400" : "text-slate-600"
-                  }`}>
-                    {pct}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-slate-600 mt-3 flex items-start gap-1.5">
-            <Sparkles className="h-3 w-3 text-cyan-500 flex-shrink-0 mt-0.5" />
-            <span>Sélection et pourcentages calculés automatiquement par l'IA en temps réel.</span>
-          </p>
-        </div>
-
-        {/* ═══ FACTEURS CLÉS DU MOMENT ═══ */}
-        {keyFactors && keyFactors.length > 0 && (
-          <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4 mb-3">
-            <h3 className="text-amber-400 font-bold text-xs mb-3">Facteurs clés du moment</h3>
-            <div className="flex flex-wrap gap-2">
-              {keyFactors.map((f: any, i: number) => {
-                return (
-                  <div key={i} className="flex items-center gap-2 bg-[#1E293B] border border-slate-800 rounded-lg px-3 py-2">
-                    <MeteoIcon name={getIconNameFromCondition(f.label)} size={16} />
-                    <span className="text-[11px] text-slate-300">{f.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ═══ MEILLEUR MODÈLE ═══ */}
-        {bestModel && (
-          <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-amber-900/40 border border-amber-600/40">
-                <MeteoIcon name="trophy" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-500 text-[10px]">Meilleur modèle</p>
-                <p className="text-white font-bold text-sm flex items-center gap-1.5">
-                  <span className="text-amber-400 font-bold">①</span> {bestModel.name}
-                </p>
-              </div>
-              <div className="text-center px-2">
-                <p className="text-slate-500 text-[9px]">Score global</p>
-                <p className="text-white font-bold text-xl leading-tight">
-                  {bestModel.score.toFixed(1)} <span className="text-[10px] text-slate-500 font-normal">/100</span>
-                </p>
-              </div>
-              <div className="text-center pl-2 border-l border-slate-700">
-                <p className="text-slate-500 text-[9px]">Tendance</p>
-                <p className={`font-bold text-sm flex items-center gap-0.5 ${bestModel.trend >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {bestModel.trend >= 0 ? <MeteoIcon name="trend_up" size={16} /> : <MeteoIcon name="trend_down" size={16} />}
-                  {bestModel.trend >= 0 ? "+" : ""}{bestModel.trend.toFixed(1)}
-                </p>
-              </div>
-              <MeteoIcon name="chevron_right" size={20} className="ml-1 opacity-60" />
-            </div>
-          </div>
-        )}
-
+    <div className="space-y-3">
+      <div className="flex items-center gap-4 text-[11px] text-slate-400">
+        <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Stations physiques</span>
+        <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-blue-400" /> Prévision officielle</span>
       </div>
+      <div className="h-[168px] rounded-xl border border-slate-800 bg-[#090b10] px-2 py-1">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label="Comparaison température station et prévision officielle sur 24 heures">
+          {[0.25, 0.5, 0.75].map((ratio) => <line key={ratio} x1="0" x2={width} y1={height * ratio} y2={height * ratio} stroke="#1e293b" strokeWidth="1" />)}
+          <polyline points={toPoint("officialTemperature")} fill="none" stroke="#60a5fa" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points={toPoint("stationTemperature")} fill="none" stroke="#34d399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          {usable.map((point, index) => {
+            const x = padding + (index * (width - padding * 2)) / Math.max(usable.length - 1, 1);
+            return <text key={point.hour} x={x} y={height - 3} fill="#64748b" fontSize="10" textAnchor="middle">{String(point.hour).padStart(2, "0")}h</text>;
+          })}
+        </svg>
+      </div>
+      <p className="text-[11px] text-slate-500">Les points ne sont comparés qu’aux heures disposant d’un relevé station physique.</p>
     </div>
   );
 }
 
-// ─── ParamCard ───────────────────────────────────────────────────────────────
+export default function Ranking() {
+  const { activeLocation } = useLocation();
+  const coords = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
+  const { data, isLoading } = trpc.weather.getStationReliabilityOverview.useQuery(coords);
 
-function ParamCard({ icon, label, value, unit, impact }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  unit: string;
-  impact: string;
-}) {
-  const impactColor = impact === "Critique" ? "text-red-400"
-    : impact === "Élevé" ? "text-orange-400"
-    : impact === "Modéré" ? "text-yellow-400"
-    : "text-green-400";
+  if (isLoading) {
+    return <div className="min-h-screen bg-[#080a0f] max-w-2xl mx-auto px-4 pt-5 space-y-4"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
+  }
+
+  const stations = data?.stations ?? [];
+  const comparison = data?.comparison24h ?? [];
+  const latest = data?.latestGroundTruth;
+  const locationName = activeLocation?.name ?? "Hondeghem";
 
   return (
-    <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-2.5 text-center">
-      <div className="mx-auto mb-1.5 w-6 h-6 flex items-center justify-center">{icon}</div>
-      <p className="text-[9px] text-slate-500 leading-tight mb-0.5">{label}</p>
-      <p className="text-white font-bold text-lg leading-tight">
-        {value}<span className="text-[9px] text-slate-500 font-normal">{unit}</span>
-      </p>
-      <p className={`text-[8px] font-medium mt-1 ${impactColor}`}>
-        Impact : {impact}
-      </p>
-    </div>
+    <main className="min-h-screen bg-[#080a0f] pb-28">
+      <div className="mx-auto max-w-2xl px-3 pt-4 sm:px-5">
+        <header className="mb-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-blue-400"><MeteoIcon name="location" size={19} /><span className="text-sm font-semibold">{locationName}</span></div>
+            <h1 className="mt-2 text-xl font-bold text-white">Stations & fiabilité locale</h1>
+            <p className="mt-1 text-xs text-slate-500">Relevés physiques et comparaison avec la prévision officielle.</p>
+          </div>
+          <div className="rounded-full border border-slate-800 bg-[#10131a] px-3 py-2 text-right">
+            <p className="text-[10px] uppercase tracking-wide text-slate-500">Collecte</p>
+            <p className="text-xs font-medium text-blue-300">05h00 Paris</p>
+          </div>
+        </header>
+
+        <section className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
+          <Metric label="Stations actives" value={String(stations.length)} icon="stations" color="text-emerald-400" />
+          <Metric label="Confiance locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
+          <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
+        </section>
+
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-white">Relevés des stations</h2><p className="text-xs text-slate-500">Stations physiques validées autour du lieu.</p></div><MeteoIcon name="stations" size={22} /></div>
+          {stations.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-500">Aucune station physique n’est encore archivée pour ce lieu. La première collecte est prévue à 05h00.</div>
+          ) : (
+            <div className="space-y-2">
+              {stations.map((station: any) => (
+                <article key={station.stationId} className="rounded-xl border border-slate-800 bg-[#090b10] p-3">
+                  <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-sm text-white">{station.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{station.source} · {station.distanceKm.toFixed(1)} km · fiabilité {Math.round(station.reliabilityScore)}%</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${station.ageMinutes !== null && station.ageMinutes <= 90 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"}`}>{formatAge(station.ageMinutes)}</span></div>
+                  <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-800 pt-3 text-center"><Reading label="Temp." value={value(station.latest?.temperature, "°")} /><Reading label="Vent" value={value(station.latest?.windSpeed, " km/h")} /><Reading label="Rafales" value={value(station.latest?.windGust, " km/h")} /><Reading label="Pluie" value={value(station.latest?.precipitation, " mm")} /></div>
+                  <p className="mt-3 text-[11px] text-slate-600">{station.readings.length} relevé(s) conservé(s) sur les dernières 24 h.</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <div className="mb-4 flex items-start justify-between"><div><h2 className="font-semibold text-white">Stations vs prévision officielle</h2><p className="text-xs text-slate-500">Température sur 24 heures — heures de Paris.</p></div><MeteoIcon name="comparison" size={22} /></div>
+          <TemperatureComparison points={comparison} />
+        </section>
+      </div>
+    </main>
   );
 }
 
-const REGIME_GRID = [
-  { key: "overcast", label: "Ciel couvert", defaultPct: 60 },
-  { key: "partly_cloudy", label: "Partiellement nuageux", defaultPct: 30 },
-  { key: "few_clouds", label: "Peu nuageux", defaultPct: 25 },
-  { key: "sunny", label: "Ensoleillé", defaultPct: 15 },
-  { key: "fog", label: "Brouillard", defaultPct: 5 },
-  { key: "showers", label: "Averses", defaultPct: 15 },
-  { key: "rainy", label: "Pluie", defaultPct: 10 },
-  { key: "thunderstorm", label: "Orages", defaultPct: 8 },
-  { key: "windy", label: "Vent fort", defaultPct: 8 },
-  { key: "snow", label: "Neige", defaultPct: 5 },
-  { key: "frost", label: "Verglas / Gel", defaultPct: 3 },
-  { key: "freezing_rain", label: "Pluie verglaçante", defaultPct: 2 },
-  { key: "deep_frost", label: "Gel", defaultPct: 2 },
-  { key: "summer_heat", label: "Canicule", defaultPct: 1 },
-  { key: "cold_wave", label: "Vague de froid", defaultPct: 1 },
-  { key: "storm", label: "Tempête", defaultPct: 1 },
-  { key: "variable", label: "Temps variable", defaultPct: 10 },
-  { key: "spring_unstable", label: "Printemps instable", defaultPct: 10 },
-  { key: "stable", label: "Été stable", defaultPct: 15 },
-  { key: "autumn_disturbed", label: "Automne perturbé", defaultPct: 10 },
-];
+function Metric({ label, value, icon, color }: { label: string; value: string; icon: any; color: string }) {
+  return <div className="min-w-0 border-r border-slate-800 last:border-0 px-2 first:pl-0 last:pr-0"><MeteoIcon name={icon} size={16} className={color} /><p className="mt-1 truncate text-[10px] text-slate-500">{label}</p><p className="mt-0.5 text-sm font-bold text-white">{value}</p></div>;
+}
+
+function Reading({ label, value }: { label: string; value: string }) {
+  return <div><p className="text-[10px] text-slate-500">{label}</p><p className="mt-0.5 text-xs font-medium text-slate-200">{value}</p></div>;
+}

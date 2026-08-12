@@ -88,6 +88,29 @@ describe("weather.getRanking", () => {
   });
 });
 
+describe("weather.getStationReliabilityOverview", () => {
+  it("expose uniquement une comparaison physique/officielle structurée sur 24 heures", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.weather.getStationReliabilityOverview();
+
+    expect(result).toHaveProperty("locationKey");
+    expect(Array.isArray(result.stations)).toBe(true);
+    expect(result.comparison24h).toHaveLength(24);
+    expect(result.comparison24h[0]).toEqual(expect.objectContaining({
+      hour: 0,
+      stationSampleCount: expect.any(Number),
+    }));
+    expect(Object.hasOwn(result.comparison24h[0], "stationTemperature")).toBe(true);
+    expect(Object.hasOwn(result.comparison24h[0], "officialTemperature")).toBe(true);
+    for (const station of result.stations) {
+      expect(station.source).toBe("meteofrance");
+      expect(station).toHaveProperty("ageMinutes");
+      expect(Array.isArray(station.readings)).toBe(true);
+    }
+  });
+});
+
 describe("weather.getHistory", () => {
   it("returns history data for 7 days", async () => {
     const ctx = createPublicContext();
