@@ -1,9 +1,7 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
-import FifteenDayChart from "@/components/FifteenDayChart";
-import HourlyChart from "@/components/HourlyChart";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { getWeatherLandscapeImage, getWeatherImageFromData } from "@/lib/weatherImages";
@@ -12,6 +10,10 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
+import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
+
+const HourlyChart = lazy(() => import("@/components/HourlyChart"));
+const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
@@ -94,10 +96,11 @@ function storeLocalMode(mode: "standard" | "local" | "ultra-local") {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
+  const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
   const selectedLocation = contextLocation ?? activeLocation;
@@ -187,8 +190,35 @@ export default function Dashboard() {
   const isError = (selectedLocation ? false : dashError) || officialError;
   const isRefreshing = dashFetching || officialFetching;
   const refreshCurrentWeather = async () => {
+    setHasWaitTimedOut(false);
     await Promise.all([refetchDashboard(), refetchOfficialForecast()]);
   };
+
+  useEffect(() => {
+    if (!isLoading) {
+      setHasWaitTimedOut(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setHasWaitTimedOut(true), DASHBOARD_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [isLoading]);
+
+  if (hasWaitTimedOut) {
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <div className="mx-auto flex min-h-[52vh] max-w-md flex-col items-center justify-center gap-4 text-center">
+          <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-6">
+            <Clock className="mx-auto mb-3 h-9 w-9 text-blue-300" />
+            <h2 className="text-lg font-semibold">Prévisions toujours en cours de chargement</h2>
+            <p className="mt-2 text-sm text-muted-foreground">La source météo répond plus lentement que prévu. Aucune donnée estimée n’est affichée.</p>
+            <button type="button" onClick={() => void refreshCurrentWeather()} className="mt-5 min-h-11 rounded-md border border-primary/50 px-4 text-sm font-medium text-primary">
+              Réessayer maintenant
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -315,6 +345,12 @@ export default function Dashboard() {
             <span>{officialForecast?.today ?? dash?.today}</span>
           </div>
         </div>
+
+        {!authLoading && !user && (
+          <div role="status" className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-xs text-blue-100">
+            {DASHBOARD_PREVIEW_MESSAGE}
+          </div>
+        )}
 
         {/* ── Favorites Bar ── */}
         <FavoritesBar
@@ -676,7 +712,9 @@ export default function Dashboard() {
           {officialLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
-            <HourlyChart hours={hours} locationName={activeLocation?.name} />
+            <Suspense fallback={<div className="h-56 bg-muted rounded-xl animate-pulse" />}>
+              <HourlyChart hours={hours} locationName={activeLocation?.name} />
+            </Suspense>
           ) : (
             <p className="text-sm text-muted-foreground">Données horaires indisponibles.</p>
           )}
@@ -687,7 +725,9 @@ export default function Dashboard() {
           {officialLoading ? (
             <div className="h-72 bg-muted rounded-xl animate-pulse" />
           ) : days.length > 0 ? (
-            <FifteenDayChart days={days} locationName={activeLocation?.name} />
+            <Suspense fallback={<div className="h-72 bg-muted rounded-xl animate-pulse" />}>
+              <FifteenDayChart days={days} locationName={activeLocation?.name} />
+            </Suspense>
           ) : null}
         </div>
 

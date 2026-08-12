@@ -661,6 +661,18 @@
 ## Route Fiabilité mobile
 - [x] Frontend: Rétablir le parcours `/reliability` vers la page Fiabilité et vérifier l’absence de page 404 sur mobile.
 
+## Vérification de la page d’accueil
+- [x] Audit: Examiner le Dashboard sur mobile et bureau pour identifier les ajustements justifiés.
+- [x] Frontend: Appliquer les ajustements retenus sans modifier les données météo.
+- [x] Validation: Vérifier les rendus de la page d’accueil après correction.
+
+## Résilience et performance de l’accueil
+- [x] Frontend: Afficher un état explicite lorsque la session MeteoAI est absente.
+- [x] Frontend: Borner l’attente de prévision et proposer une action de relance lorsque les données restent indisponibles.
+- [x] Performance: Charger les graphiques du Dashboard de manière différée sans modifier les données affichées.
+- [x] Tests: Vérifier les états de session, d’expiration d’attente et le contrat de chargement différé.
+- [x] Validation: Vérifier mobile, bureau, TypeScript et Vitest après amélioration de l’accueil.
+
 ## Lisibilité mobile de l’Historique
 - [x] Frontend: Rendre la légende multi-modèles de l’Historique lisible sur mobile sans masquer les données.
 - [x] Validation: Vérifier les graphiques Historique à 375 px avec plusieurs modèles présents.
