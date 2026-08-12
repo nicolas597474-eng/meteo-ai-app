@@ -297,12 +297,12 @@ export default function HourlyChart({ hours, locationName }: Props) {
     if (nowHour >= 0 && nowHour < N) {
       const x = nowHour * COL_W;
       const g = ctx.createLinearGradient(x, 0, x + COL_W, 0);
-      g.addColorStop(0, "rgba(99, 102, 241, 0)");
-      g.addColorStop(0.5, "rgba(99, 102, 241, 0.12)");
-      g.addColorStop(1, "rgba(99, 102, 241, 0)");
+      g.addColorStop(0, "rgba(37, 99, 235, 0)");
+      g.addColorStop(0.5, "rgba(37, 99, 235, 0.16)");
+      g.addColorStop(1, "rgba(37, 99, 235, 0)");
       ctx.fillStyle = g;
       ctx.fillRect(x, 0, COL_W, TOTAL_H);
-      ctx.strokeStyle = "rgba(129, 140, 248, 0.3)";
+      ctx.strokeStyle = "rgba(96, 165, 250, 0.7)";
       ctx.lineWidth = 1.5;
       ctx.strokeRect(x + 0.5, 0.5, COL_W - 1, CHART_H - 1);
     }
@@ -332,14 +332,14 @@ export default function HourlyChart({ hours, locationName }: Props) {
         ctx.bezierCurveTo(cpx, tempPts[i - 1].y, cpx, tempPts[i].y, tempPts[i].x, tempPts[i].y);
       }
       ctx.save();
-      ctx.strokeStyle = "rgba(249, 115, 22, 0.55)";
-      ctx.lineWidth = 7;
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.45)";
+      ctx.lineWidth = 5;
       ctx.shadowColor = "#f97316";
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 10;
       ctx.stroke();
       ctx.restore();
       ctx.strokeStyle = "#fb923c";
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
     // Points + values (every 2 hours to avoid clutter)
@@ -580,7 +580,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
                 const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
                 const isCurrent = i === nowHour;
                 return (
-                  <div key={h.hour} className={`flex flex-col items-center justify-start pt-2 ${isCurrent ? "rounded-xl border border-blue-300/50 bg-blue-500/20 shadow-[0_0_18px_rgba(59,130,246,0.38)]" : ""}`} style={{ width: COL_W }}>
+                  <div key={h.hour} className={`flex flex-col items-center justify-start pt-2 ${isCurrent ? "rounded-xl border border-blue-300/70 bg-blue-500/25 shadow-[0_0_18px_rgba(37,99,235,0.4)]" : ""}`} style={{ width: COL_W }}>
                     <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
                     <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>
@@ -610,7 +610,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
             }}
           >
             <div
-              className="absolute h-full rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 transition-transform duration-150 group-hover:from-indigo-300 group-hover:to-purple-300"
+              className="absolute h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-transform duration-150 group-hover:from-blue-500 group-hover:to-blue-300"
               style={{
                 width: `${(VISIBLE_HOURS / N) * 100}%`,
                 transform: `translateX(${scrollProgress * ((N / VISIBLE_HOURS) - 1) * 100}%)`

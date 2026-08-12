@@ -398,3 +398,9 @@
 - [x] Frontend: Remplacer les dégradés bleus des cartes de graphiques par des surfaces noires cohérentes avec le thème MeteoAI. Couvert par « Fond noir et zones de données structurées ».
 - [x] Frontend: Préserver la lisibilité des colonnes, quadrillages, courbes et sélections actives. Couvert par « Fond noir et zones de données structurées ».
 - [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile. Couvert par la validation finale.
+
+## Ajustements fins du graphique horaire
+- [x] Frontend: Affiner l’épaisseur et la lueur de la courbe de température.
+- [x] Frontend: Appliquer un fond et un contour bleus à la colonne de l’heure actuelle.
+- [x] Frontend: Remplacer la barre de défilement violette par un indicateur bleu.
+- [x] Tests: Vérifier TypeScript, Vitest et le rendu mobile.
