@@ -9,6 +9,18 @@ describe("scoreQualifiedHourlyModels", () => {
     expect(scores).toHaveLength(1);
     expect(scores[0].sampleSize).toBe(18);
     expect(scores[0].maeTemp).toBe(0);
+    expect(scores[0].precipPod).toBe(0);
+    expect(scores[0].precipFar).toBe(0);
+    expect(scores[0].precipFalsePositives).toBe(0);
+    expect(scores[0].precipFalseNegatives).toBe(0);
+  });
+
+  it("conserve les faux positifs de pluie mesurés contre les snapshots physiques", () => {
+    const forecasts = snapshots.map((snapshot) => ({ modelName: "ECMWF", hour: snapshot.hour, temperature: snapshot.temperature, precipitation: 1, windSpeed: 8 }));
+    const [score] = scoreQualifiedHourlyModels(snapshots, forecasts);
+    expect(score.precipFalsePositives).toBe(18);
+    expect(score.precipFar).toBe(1);
+    expect(score.precipCsi).toBe(0);
   });
 
   it("refuse une série incomplète", () => {

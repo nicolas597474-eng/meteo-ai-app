@@ -547,7 +547,7 @@ export default function Dashboard() {
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Activity className="h-3 w-3" />Confiance
+                  <Activity className="h-3 w-3" />Confiance prévision
                 </p>
                 <p className={`text-base sm:text-lg font-semibold ${stabilityColor(forecastConfidence)}`}>
                   {Math.round(forecastConfidence)}%
@@ -615,7 +615,7 @@ export default function Dashboard() {
                       : `Repli explicite sur ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèle${locationWeather.ultraLocal.modelFallback?.modelCount === 1 ? "" : "s"}`}
                   </p>
                 </div>
-                <span className="text-xs text-emerald-200">Confiance {locationWeather.ultraLocal.confidenceScore}%</span>
+                <span className="text-xs text-emerald-200">Confiance observation locale {locationWeather.ultraLocal.confidenceScore}%</span>
               </div>
               {locationWeather.ultraLocal.stationsUsed.length > 0 ? (
                 <div className="mt-3 space-y-1.5 border-t border-emerald-500/15 pt-2">

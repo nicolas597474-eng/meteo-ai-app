@@ -1,7 +1,7 @@
 import { calculateReliabilityScore } from "./statsEngine";
 
-type PhysicalSnapshot = { hour: number; stationCount: number; temperature: number | null; precipitation: number | null; windSpeed: number | null };
-type HourlyForecast = { modelName: string; hour: number; temperature: number | null; precipitation: number | null; windSpeed: number | null };
+type PhysicalSnapshot = { hour: number; stationCount: number; temperature: number | null; precipitation: number | null; windSpeed: number | null; windGust?: number | null };
+type HourlyForecast = { modelName: string; hour: number; temperature: number | null; precipitation: number | null; windSpeed: number | null; windGusts?: number | null };
 
 export type QualifiedHourlyModelScore = {
   serviceName: string;
@@ -11,8 +11,16 @@ export type QualifiedHourlyModelScore = {
   biasTemp: number | null;
   maePrecip: number | null;
   rmsePrecip: number | null;
+  precipScore: number | null;
+  precipPod: number | null;
+  precipFar: number | null;
+  precipCsi: number | null;
+  precipFalsePositives: number;
+  precipFalseNegatives: number;
   maeWind: number | null;
   rmseWind: number | null;
+  windScore: number | null;
+  windMaeGusts: number | null;
   weightedScore: number | null;
 };
 
@@ -31,8 +39,8 @@ export function scoreQualifiedHourlyModels(snapshots: PhysicalSnapshot[], foreca
     });
     if (pairs.length < MINIMUM_ALIGNED_HOURS) return [];
     const score = calculateReliabilityScore(
-      pairs.map(({ forecast }) => ({ tempMax: forecast.temperature, tempMin: forecast.temperature, precipitation: forecast.precipitation, windSpeed: forecast.windSpeed })),
-      pairs.map(({ observation }) => ({ tempMax: observation.temperature, tempMin: observation.temperature, precipitation: observation.precipitation, windSpeed: observation.windSpeed })),
+      pairs.map(({ forecast }) => ({ tempMax: forecast.temperature, tempMin: forecast.temperature, precipitation: forecast.precipitation, windSpeed: forecast.windSpeed, windGust: forecast.windGusts ?? null })),
+      pairs.map(({ observation }) => ({ tempMax: observation.temperature, tempMin: observation.temperature, precipitation: observation.precipitation, windSpeed: observation.windSpeed, windGust: observation.windGust ?? null })),
     );
     return [{
       serviceName,
@@ -42,8 +50,16 @@ export function scoreQualifiedHourlyModels(snapshots: PhysicalSnapshot[], foreca
       biasTemp: score.biasTemp,
       maePrecip: score.maePrecip,
       rmsePrecip: score.rmsePrecip,
+      precipScore: score.dimensions.precipitation.score,
+      precipPod: score.dimensions.precipitation.pod,
+      precipFar: score.dimensions.precipitation.far,
+      precipCsi: score.dimensions.precipitation.csi,
+      precipFalsePositives: score.dimensions.precipitation.falsePositives,
+      precipFalseNegatives: score.dimensions.precipitation.falseNegatives,
       maeWind: score.maeWind,
       rmseWind: score.rmseWind,
+      windScore: score.dimensions.wind.score,
+      windMaeGusts: score.dimensions.wind.maeGusts,
       weightedScore: score.weightedScore,
     }];
   });

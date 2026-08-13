@@ -362,12 +362,12 @@ export default function WeatherDetails() {
           </div>
         </section>
 
-        {/* ═══ SECTION 6: CONFIANCE GLOBALE ═══ */}
+        {/* ═══ SECTION 6: CONFIANCE DE PRÉVISION ═══ */}
         <section className="mb-4">
           <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
             <h2 className="text-green-400 font-bold text-sm mb-3 flex items-center gap-2">
               <MeteoIcon name="confidence" size={14} />
-              Indices de confiance
+              Confiance de prévision officielle
             </h2>
             <ConfidenceSection confidence={confidence} regime={regime} />
           </div>
@@ -636,7 +636,7 @@ function ConfidenceSection({
       <ConfidenceBar label="J+4 à J+7" value={weekConfidence} />
       {regime && (
         <div className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-700/50">
-          Confiance : accord des sources, performances historiques, cohérence des stations et horizon de prévision.
+          Cette confiance de prévision combine l’accord des modèles, leurs performances historiques qualifiées, la cohérence des stations si disponible et l’horizon de prévision.
           {confidence?.stabilityIndex != null && ` Stabilité des modèles : ${Math.round(confidence.stabilityIndex)}%.`}
         </div>
       )}

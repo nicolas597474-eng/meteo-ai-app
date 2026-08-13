@@ -61,6 +61,29 @@ describe("weather.getDashboard", () => {
   });
 });
 
+describe("contrat de snapshot officiel inter-pages", () => {
+  it("partage la même validité, provenance et type entre quinze jours, horaire et détails", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const [daily, hourly, details] = await Promise.all([
+      caller.weather.get15DayForecast(),
+      caller.weather.getHourlyForecast(),
+      caller.weather.getDetailedForecast(),
+    ]);
+
+    expect(daily.officialSnapshot).toEqual(expect.objectContaining({
+      validAt: expect.any(String),
+      sourceKind: expect.any(String),
+      source: expect.any(String),
+    }));
+    expect(hourly.officialSnapshot.validAt).toBe(daily.officialSnapshot.validAt);
+    expect(details.officialSnapshot.validAt).toBe(daily.officialSnapshot.validAt);
+    expect(hourly.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
+    expect(details.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
+    expect(hourly.officialSnapshot.source).toBe(daily.officialSnapshot.source);
+    expect(details.officialSnapshot.source).toBe(daily.officialSnapshot.source);
+  }, 25_000);
+});
+
 describe("weather.getAILab", () => {
   it("n’expose des modèles appliqués que depuis la trace de fusion officielle", async () => {
     const caller = appRouter.createCaller(createPublicContext());
