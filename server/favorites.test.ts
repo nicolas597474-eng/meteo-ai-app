@@ -94,4 +94,13 @@ describe("getDashboardNetatmoCollectionOptions", () => {
     expect(getDashboardNetatmoCollectionOptions(null)).toEqual({});
     expect(getDashboardNetatmoCollectionOptions(undefined)).toEqual({});
   });
+
+  it("peut exposer un statut Netatmo serveur sans faire remonter de jeton", () => {
+    const statuses: string[] = [];
+    const options = getDashboardNetatmoCollectionOptions({ id: 42 }, (status) => statuses.push(status));
+    options.onNetatmoStatus?.("fresh_cache");
+    expect(statuses).toEqual(["fresh_cache"]);
+    expect(options).not.toHaveProperty("accessToken");
+    expect(options).not.toHaveProperty("refreshToken");
+  });
 });

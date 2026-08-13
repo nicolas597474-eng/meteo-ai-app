@@ -441,7 +441,7 @@ export async function collectNearbyStations(
   lon: number,
   radiusKm: number = 20,
   townName: string = "Local",
-  options: { netatmoUserId?: number } = {},
+  options: { netatmoUserId?: number; onNetatmoStatus?: (status: import("./netatmoService").NetatmoAvailability) => void } = {},
 ): Promise<StationData[]> {
   const { fetchNetatmoPublicStations } = await import("./netatmoService");
   // Seules les observations de station et les candidats sont assemblés ici.
@@ -449,7 +449,7 @@ export async function collectNearbyStations(
   const [meteoFrance, metar, netatmo, openSenseMap] = await Promise.allSettled([
     fetchMeteoFranceStations(lat, lon, radiusKm),
     fetchMetarStations(lat, lon, radiusKm),
-    fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm),
+    fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm, { onStatus: options.onNetatmoStatus }),
     fetchOpenSenseMapCandidates(lat, lon, radiusKm),
   ]);
 

@@ -920,3 +920,9 @@
 - [x] Backend: Utiliser les observations Netatmo persistées et encore fraîches lorsque getpublicdata est temporairement indisponible.
 - [x] Collecte: Archiver les relevés physiques individuels à chaque snapshot horaire pour entretenir ce repli.
 - [x] Tests: Vérifier le repli, le filtre géographique et l’exclusion des relevés expirés.
+
+## Garde-fous Netatmo proposés
+- [x] Temps: Rendre explicites les heures UTC et Europe/Paris dans les snapshots et la fiabilité.
+- [x] Ultra-local: Exposer la preuve des contrôles altitude et stabilité, sans les présenter comme validés lorsqu’ils ne sont pas mesurés.
+- [x] Autorisation: Exposer un état explicite connexion absente / temporairement indisponible sans divulguer de secret.
+- [x] Scoring: Garantir que le cycle quotidien ne score qu’après la couverture physique minimale de 18 heures.

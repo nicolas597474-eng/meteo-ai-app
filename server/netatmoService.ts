@@ -34,6 +34,9 @@ type NetatmoPublicStation = {
 const pendingAccessTokenRefreshes = new Map<number, Promise<string | null>>();
 const NETATMO_DASHBOARD_FALLBACK_MAX_AGE_MINUTES = 30;
 
+export type NetatmoAvailability = "not_connected" | "temporarily_unavailable" | "fresh_cache" | "live" | "connected_empty";
+export type NetatmoFetchOptions = { onStatus?: (status: NetatmoAvailability) => void };
+
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -232,7 +235,7 @@ export function mapPersistedNetatmoObservation(
   };
 }
 
-async function fetchPersistedNetatmoFallback(lat: number, lon: number, radiusKm: number) {
+async function fetchPersistedNetatmoFallback(lat: number, lon: number, radiusKm: number, onStatus?: NetatmoFetchOptions["onStatus"]) {
   const sinceMs = Date.now() - NETATMO_DASHBOARD_FALLBACK_MAX_AGE_MINUTES * 60_000;
   const persisted = await getRecentValidatedNetatmoObservations(sinceMs);
   const stations = persisted
@@ -240,6 +243,9 @@ async function fetchPersistedNetatmoFallback(lat: number, lon: number, radiusKm:
     .filter((station): station is StationData => station !== null);
   if (stations.length > 0) {
     console.info(`[Netatmo] ${stations.length} station(s) persistée(s) fraîche(s) utilisée(s) pendant l’indisponibilité de getpublicdata`);
+    onStatus?.("fresh_cache");
+  } else {
+    onStatus?.("temporarily_unavailable");
   }
   return stations;
 }
@@ -286,10 +292,22 @@ async function getNetatmoAccessToken(userId: number) {
   }
 }
 
-export async function fetchNetatmoPublicStations(userId: number | undefined, lat: number, lon: number, radiusKm: number) {
-  if (!userId) return [];
+export async function fetchNetatmoPublicStations(
+  userId: number | undefined,
+  lat: number,
+  lon: number,
+  radiusKm: number,
+  options: NetatmoFetchOptions = {},
+) {
+  if (!userId) {
+    options.onStatus?.("not_connected");
+    return [];
+  }
   const accessToken = await getNetatmoAccessToken(userId);
-  if (!accessToken) return [];
+  if (!accessToken) {
+    options.onStatus?.("not_connected");
+    return [];
+  }
   const deltaLat = radiusKm / 111.32;
   const deltaLon = radiusKm / Math.max(111.32 * Math.cos((lat * Math.PI) / 180), 1);
   const query = new URLSearchParams({
@@ -308,17 +326,18 @@ export async function fetchNetatmoPublicStations(userId: number | undefined, lat
     if (!response.ok) {
       const errorCode = typeof body.error === "object" ? body.error.code : body.error;
       console.warn(`[Netatmo] getpublicdata indisponible (${response.status}${errorCode ? ` · ${errorCode}` : ""})`);
-      return fetchPersistedNetatmoFallback(lat, lon, radiusKm);
+      return fetchPersistedNetatmoFallback(lat, lon, radiusKm, options.onStatus);
     }
     if (!Array.isArray(body.body)) {
       console.warn("[Netatmo] getpublicdata a renvoyé un format inattendu");
-      return fetchPersistedNetatmoFallback(lat, lon, radiusKm);
+      return fetchPersistedNetatmoFallback(lat, lon, radiusKm, options.onStatus);
     }
     const stations = body.body.map((station) => mapNetatmoPublicStation(station, lat, lon)).filter((station): station is StationData => station !== null);
     console.info(`[Netatmo] ${stations.length} station(s) publique(s) authentifiée(s) trouvée(s) dans ${radiusKm} km`);
+    options.onStatus?.(stations.length > 0 ? "live" : "connected_empty");
     return stations;
   } catch {
     console.warn("[Netatmo] getpublicdata est indisponible");
-    return fetchPersistedNetatmoFallback(lat, lon, radiusKm);
+    return fetchPersistedNetatmoFallback(lat, lon, radiusKm, options.onStatus);
   }
 }

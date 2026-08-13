@@ -287,6 +287,13 @@ export default function Dashboard() {
     : regimeAgeMinutes === 0
       ? "Mis à jour à l’instant"
       : `Mis à jour il y a ${regimeAgeMinutes} min`;
+  const netatmoStatusLabel: Record<string, string> = {
+    live: "Netatmo : relevés directs authentifiés",
+    fresh_cache: "Netatmo : cache authentifié récent (service temporairement indisponible)",
+    connected_empty: "Netatmo : connecté, aucune station exploitable dans le rayon",
+    temporarily_unavailable: "Netatmo : service temporairement indisponible",
+    not_connected: "Netatmo : aucune autorisation active pour cette session",
+  };
   const modelIndicator = dash?.modelIndicator ?? null;
 
   // Multi-regime data for alert badges
@@ -409,7 +416,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-                <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}<span className="hidden sm:inline">{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt}` : ""}</span></p>
+                <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}<span className="hidden sm:inline">{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</span></p>
                 {modelIndicator && (
                   <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-blue-400/25 bg-blue-400/10 px-2 py-1 text-[10px] text-blue-100">
                     <Activity className="h-3 w-3 text-blue-300" />
@@ -604,7 +611,7 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold text-emerald-300">{locationWeather.ultraLocal.temperature != null ? `${Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C` : "—"}</p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     {locationWeather.ultraLocal.stationCount > 0
-                      ? `${locationWeather.ultraLocal.stationCount} station${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} physique${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} qualifiée${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""}`
+                      ? `${locationWeather.ultraLocal.stationCount} station${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} physique${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} admise${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} pour ce calcul`
                       : `Repli explicite sur ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèle${locationWeather.ultraLocal.modelFallback?.modelCount === 1 ? "" : "s"}`}
                   </p>
                 </div>
@@ -618,11 +625,12 @@ export default function Dashboard() {
                       <span className="shrink-0 text-emerald-200">{station.adjustedTemperature?.toFixed(1) ?? "—"}° · {Math.round(station.weight * 100)}%</span>
                     </div>
                   ))}
-                  <p className="pt-1 text-[10px] leading-relaxed text-slate-400">Poids : distance, fraîcheur, fiabilité historique, cohérence et correction d’altitude.</p>
+                  <p className="pt-1 text-[10px] leading-relaxed text-slate-400">Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée. La stabilité longue durée exige un historique et n’est pas déduite de ce seul affichage.</p>
                 </div>
               ) : modelFallbackContributors.length > 0 ? (
                 <p className="mt-3 border-t border-emerald-500/15 pt-2 text-[10px] leading-relaxed text-slate-400">Contributeurs de repli : {modelFallbackContributors.map((model: any) => `${model.name} ${Math.round(Number(model.weight) * 100)}%`).join(" · ")}. Aucun modèle n’est présenté comme station.</p>
               ) : null}
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{netatmoStatusLabel[locationWeather.netatmo?.status ?? "not_connected"]}</p>
             </div>
             <LocalOfficialDeltaChart points={localOfficialHistory} />
           </section>

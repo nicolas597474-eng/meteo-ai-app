@@ -1053,6 +1053,9 @@ export const weatherRouter = router({
         ...evidence,
         requiredCoverageHours: 18,
         isEligible: evidence.coverageHours >= 18,
+        evidenceTimeZone: "Europe/Paris",
+        snapshotCadence: "Chaque heure à :05 UTC",
+        dailyScoringSchedule: "22:30 UTC, sur la journée Europe/Paris précédente",
       };
     }),
 

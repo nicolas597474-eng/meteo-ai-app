@@ -1075,7 +1075,8 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
       });
       results.push({ locationKey, stationCount: synthesis.stationCount, stored: true });
     }
-    res.json({ ok: true, date, hour, locations: results });
+    // date/hour are deliberately Paris business time: raw station observedAt stays UTC milliseconds.
+    res.json({ ok: true, date, hour, timeZone: "Europe/Paris", locations: results });
   } catch (error: any) {
     console.error("[MeteoAI] Physical snapshot collection error:", error);
     res.status(500).json({ error: error.message, stack: error.stack, context: { url: req.url }, timestamp: new Date().toISOString() });

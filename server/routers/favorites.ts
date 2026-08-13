@@ -90,8 +90,13 @@ export function buildDashboardCurrentTemperature(input: {
  * Les identifiants Netatmo proviennent exclusivement de la session résolue côté
  * serveur. Aucun identifiant de compte ne doit être reçu depuis le navigateur.
  */
-export function getDashboardNetatmoCollectionOptions(user: { id: number } | null | undefined) {
-  return user?.id !== undefined ? { netatmoUserId: user.id } : {};
+export function getDashboardNetatmoCollectionOptions(
+  user: { id: number } | null | undefined,
+  onNetatmoStatus?: (status: import("../netatmoService").NetatmoAvailability) => void,
+) {
+  return user?.id !== undefined
+    ? { netatmoUserId: user.id, onNetatmoStatus }
+    : { onNetatmoStatus };
 }
 
 import { collectNearbyStations, rankStations, calculateGroundTruth, getPhysicalActiveStations, fetchCurrentModelReferences } from "../stationService";
@@ -237,6 +242,7 @@ export const favoritesRouter = router({
       const todayDate = getParisDate();
       const coords = { lat, lon };
       const locationKey = makeLocationKey(lat, lon);
+      let netatmoStatus: import("../netatmoService").NetatmoAvailability = ctx.user ? "temporarily_unavailable" : "not_connected";
       const [officialSnapshot, stations, currentModelReferences, meteoAI] = await Promise.all([
         resolveOfficialWeatherSnapshot(coords),
         collectNearbyStations(
@@ -244,7 +250,7 @@ export const favoritesRouter = router({
           lon,
           searchRadius,
           input.name ?? "Local",
-          getDashboardNetatmoCollectionOptions(ctx.user),
+          getDashboardNetatmoCollectionOptions(ctx.user, (status) => { netatmoStatus = status; }),
         ),
         fetchCurrentModelReferences(lat, lon),
         getMeteoAIForecastByDate(todayDate, locationKey),
@@ -401,6 +407,7 @@ export const favoritesRouter = router({
           source: officialSnapshot.source,
         },
         localMode,
+        netatmo: { status: netatmoStatus },
         today: todayForecast ? {
           tempMax: todayForecast.tempMax,
           tempMin: todayForecast.tempMin,
