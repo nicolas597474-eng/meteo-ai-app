@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
+import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -79,7 +80,7 @@ function HourlyScaleLabels({
   windMax: number;
   precipMax: number;
 }) {
-  const tempTicks = Array.from({ length: Math.max(0, Math.round((scaleTop - scaleBot) / 10) + 1) }, (_, index) => scaleBot + index * 10);
+  const tempTicks = getChartTemperatureScale([scaleBot, scaleTop], 0).ticks;
   const tempToAxisY = (value: number) => tempTop + (1 - (value - scaleBot) / (scaleTop - scaleBot || 1)) * (tempBottom - tempTop);
   return (
     <aside aria-label="Échelles du graphique horaire" className="relative z-10 w-10 shrink-0 border-r border-slate-700/70 bg-[#06080d] text-right text-[8px] font-medium text-slate-500" style={{ height: totalHeight }}>
@@ -246,13 +247,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const scrollableW = COL_W * N;
 
   // Scales
-  const allTemps = hours.map(h => h.temp ?? 0);
-  const dataHigh = Math.max(...allTemps);
-  const dataLow = Math.min(...allTemps);
-  const gridStep = 10;
-  const scaleTop = Math.ceil((dataHigh + 2) / gridStep) * gridStep;
-  const scaleBot = Math.floor((dataLow - 2) / gridStep) * gridStep;
-  const scaleRange = scaleTop - scaleBot || 1;
+  const { scaleTop, scaleBot, scaleRange, gridStep } = getChartTemperatureScale(hours.map(h => h.temp), 2);
 
   const maxPrecip = Math.max(...hours.map(h => h.precipitation ?? 0), 1);
   const maxWind = Math.max(...hours.map(h => h.windSpeed ?? 0), 5);

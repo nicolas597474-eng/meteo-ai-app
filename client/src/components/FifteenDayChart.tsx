@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset, Gauge, Navigation, Eye, MapPin } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
+import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface DayData {
@@ -99,7 +100,7 @@ function ForecastScaleLabels({
   windMax: number;
   precipMax: number;
 }) {
-  const tempTicks = Array.from({ length: Math.max(0, Math.round((scaleTop - scaleBot) / 10) + 1) }, (_, index) => scaleBot + index * 10);
+  const tempTicks = getChartTemperatureScale([scaleBot, scaleTop], 0).ticks;
   const tempToAxisY = (value: number) => tempTop + (1 - (value - scaleBot) / (scaleTop - scaleBot || 1)) * (tempBottom - tempTop);
   return (
     <aside aria-label="Échelles du graphique de prévisions" className="relative z-10 w-10 shrink-0 border-r border-slate-700/70 bg-[#06080d] text-right text-[8px] font-medium text-slate-500" style={{ height: totalHeight }}>
@@ -216,14 +217,10 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const scrollableW = COL_W * N;
 
   // ── Scales ──────────────────────────────────────────────────────────────────
-  const allMax = displayDays.map(d => d.tempMax ?? 0);
-  const allMin = displayDays.map(d => d.tempMin ?? 0);
-  const dataHigh = Math.max(...allMax);
-  const dataLow = Math.min(...allMin);
-  const gridStep = 10;
-  const scaleTop = Math.ceil((dataHigh + 3) / gridStep) * gridStep;
-  const scaleBot = Math.floor((dataLow - 3) / gridStep) * gridStep;
-  const scaleRange = scaleTop - scaleBot || 1;
+  const { scaleTop, scaleBot, scaleRange, gridStep } = getChartTemperatureScale(
+    displayDays.flatMap(day => [day.tempMin, day.tempMax]),
+    3,
+  );
 
   const maxPrecip = Math.max(...displayDays.map(d => d.precipitation ?? 0), 2);
   const maxWind = Math.max(...displayDays.map(d => d.windSpeed ?? 0), 5);

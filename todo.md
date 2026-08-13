@@ -996,6 +996,9 @@
 - [x] Interface: Étendre automatiquement les échelles aux températures négatives.
 - [x] Tests: Vérifier des plages strictement positives et des plages franchissant 0 °C.
 
+## Vérification isolée de gel
+- [x] Tests: Simuler des plages négatives dans les tests de graphique sans injecter de données météo applicatives.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
