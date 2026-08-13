@@ -446,18 +446,24 @@ export default function Dashboard() {
                       <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">Tous les régimes</p>
                       <span className="rounded-full border border-slate-600/50 bg-slate-900/60 px-1.5 py-0.5 text-[9px] text-slate-400">{regimeCatalogue.length || 20}</span>
                     </div>
-                    <div className="max-h-72 overflow-y-auto pr-0.5 [-webkit-overflow-scrolling:touch]">
-                      <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
+                    <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
                       {regimeCatalogue.map((candidate: any) => {
                         const isActive = candidate.id === primaryRegimeId;
                         return (
-                          <div key={candidate.id} className={`flex min-w-0 items-start gap-1.5 rounded-md px-1.5 py-1.5 text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
+                          <div key={candidate.id} className={`min-w-0 rounded-md px-1.5 py-1.5 text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
+                            <div className="flex min-w-0 items-start gap-1.5">
                             <span className="pt-px">{candidate.emoji}</span>
                             <span className="min-w-0"><strong className="block truncate">{candidate.label}{isActive ? " · actif" : ""}</strong><span className="mt-0.5 hidden leading-snug text-slate-400 sm:block">{candidate.description}</span></span>
+                            </div>
+                            <div className="mt-1 grid grid-cols-2 gap-x-1 gap-y-0.5 border-t border-slate-700/40 pt-1 text-[8px] leading-tight text-slate-400">
+                              <span>Temp. {Math.round(candidate.weights.temp * 100)}%</span>
+                              <span>Pluie {Math.round(candidate.weights.precip * 100)}%</span>
+                              <span>Vent {Math.round(candidate.weights.wind * 100)}%</span>
+                              <span>Cond. {Math.round(candidate.weights.condition * 100)}%</span>
+                            </div>
                           </div>
                         );
                       })}
-                      </div>
                     </div>
                   </div>
                 )}

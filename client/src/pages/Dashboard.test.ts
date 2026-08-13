@@ -11,6 +11,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Tous les régimes");
     expect(source).toContain("Comment est calculée la fusion officielle ?");
     expect(source).toContain("Voir les 20 régimes");
-    expect(source).toContain("max-h-72 overflow-y-auto");
+    expect(source).not.toContain("max-h-72 overflow-y-auto");
+    expect(source).toContain("candidate.weights.temp");
+    expect(source).toContain("candidate.weights.condition");
   });
 });

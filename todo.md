@@ -960,6 +960,11 @@
 - [x] Interface: Affiner le menu déroulant des régimes pour une intégration mobile plus fluide à la carte Tendance.
 - [x] Tests: Préserver le catalogue, le régime actif et l’accessibilité du menu après la retouche visuelle.
 
+## Catalogue complet des régimes
+- [x] Interface: Supprimer le défilement interne et afficher tous les régimes ouverts dans la page.
+- [x] Interface: Afficher les pondérations température, pluie, vent et conditions pour chaque régime.
+- [x] Tests: Vérifier que chaque régime conserve ses pondérations et reste visible sans défilement interne.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
