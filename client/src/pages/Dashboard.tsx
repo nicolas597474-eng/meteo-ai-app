@@ -5,6 +5,7 @@ import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { getDashboardWeatherImage } from "@/lib/weatherImages";
+import { formatDashboardDate } from "@/lib/dashboardDate";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
@@ -342,7 +343,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-lg px-2.5 py-1.5">
             <Clock className="h-3 w-3" />
-            <span>{officialForecast?.today ?? dash?.today}</span>
+            <span>{formatDashboardDate(officialForecast?.today ?? dash?.today)}</span>
           </div>
         </div>
 

@@ -938,3 +938,15 @@
 - [x] Confiance: Distinguer et expliquer les confiances observation locale, prévision officielle et régime.
 - [x] Cohérence: Ajouter des contrôles automatisés entre les pages qui doivent partager un même snapshot.
 - [x] Scoring: Étendre les métriques seulement lorsque les observations physiques qualifiées rendent la comparaison possible.
+
+## Diagnostic écart officiel / Ultra-local — lecture seule
+- [x] Audit: Comparer les valeurs, dates, sources et contributions des deux températures affichées.
+- [x] Rapport: Expliquer l’écart et distinguer une différence de provenance légitime d’une éventuelle incohérence.
+
+## Feuille de route Ultra-local — proposition
+- [x] Analyse: Prioriser les garde-fous de dispersion, d’admissibilité et de communication de l’écart local/officiel.
+- [x] Recommandation: Présenter les améliorations sans modifier les modes ni les pondérations.
+
+## Date complète du Dashboard
+- [x] Interface: Remplacer la date ISO par une date française complète dans le sélecteur Dashboard.
+- [x] Tests: Vérifier le format de date affiché sans modifier la date métier sous-jacente.
