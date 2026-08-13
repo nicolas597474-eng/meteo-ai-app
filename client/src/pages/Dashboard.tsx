@@ -415,12 +415,13 @@ export default function Dashboard() {
                     onClick={() => setShowRegimeMenu((open) => !open)}
                     aria-expanded={showRegimeMenu}
                     aria-controls="regime-catalogue"
-                    className="flex min-w-0 items-center gap-2 text-left"
+                    className="-mx-1 flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
-                    <span className="text-base">{regime.emoji}</span>
-                    <div>
-                      <p className="flex items-center gap-1 text-xs font-semibold text-white">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-slate-300" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-950/35 text-base">{regime.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1 text-xs font-semibold text-white">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
+                      <p className="mt-0.5 text-[10px] text-primary/80 sm:hidden">Voir les 20 régimes</p>
                     </div>
                   </button>
                   {/* Weight pills */}
@@ -440,18 +441,23 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {showRegimeMenu && (
-                  <div id="regime-catalogue" className="mt-2 border-t border-slate-600/40 pt-2" aria-label="Tous les régimes météo possibles">
-                    <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-slate-400">Tous les régimes possibles</p>
-                    <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  <div id="regime-catalogue" className="mt-2 rounded-lg border border-slate-600/35 bg-slate-950/30 p-2" aria-label="Tous les régimes météo possibles">
+                    <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">Tous les régimes</p>
+                      <span className="rounded-full border border-slate-600/50 bg-slate-900/60 px-1.5 py-0.5 text-[9px] text-slate-400">{regimeCatalogue.length || 20}</span>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto pr-0.5 [-webkit-overflow-scrolling:touch]">
+                      <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
                       {regimeCatalogue.map((candidate: any) => {
                         const isActive = candidate.id === primaryRegimeId;
                         return (
-                          <div key={candidate.id} className={`flex items-start gap-2 rounded-lg px-2 py-1.5 text-[11px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-slate-300"}`}>
-                            <span className="pt-0.5">{candidate.emoji}</span>
-                            <span className="min-w-0"><strong>{candidate.label}{isActive ? " · actif" : ""}</strong><span className="mt-0.5 block leading-snug text-slate-400">{candidate.description}</span></span>
+                          <div key={candidate.id} className={`flex min-w-0 items-start gap-1.5 rounded-md px-1.5 py-1.5 text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
+                            <span className="pt-px">{candidate.emoji}</span>
+                            <span className="min-w-0"><strong className="block truncate">{candidate.label}{isActive ? " · actif" : ""}</strong><span className="mt-0.5 hidden leading-snug text-slate-400 sm:block">{candidate.description}</span></span>
                           </div>
                         );
                       })}
+                      </div>
                     </div>
                   </div>
                 )}

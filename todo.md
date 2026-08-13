@@ -955,3 +955,7 @@
 - [x] Interface: Ajouter un menu déroulant des régimes météo possibles avec régime actif mis en évidence.
 - [x] Interface: Ajouter une vue explicative de « Fusion · AROME 13 % » et des pondérations de modèles disponibles.
 - [x] Tests: Vérifier les deux interactions de transparence sans modifier les calculs de régime ou de fusion.
+
+## Design du menu de régimes
+- [x] Interface: Affiner le menu déroulant des régimes pour une intégration mobile plus fluide à la carte Tendance.
+- [x] Tests: Préserver le catalogue, le régime actif et l’accessibilité du menu après la retouche visuelle.
