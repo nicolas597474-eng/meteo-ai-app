@@ -892,3 +892,10 @@
 - [x] Backend: Raccorder les observations Netatmo authentifiées au cycle de collecte existant avec provenance `netatmo-*`.
 - [x] Frontend: Afficher les stations Netatmo authentifiées dans Fiabilité avec un badge de niveau 1.
 - [x] Tests: Vérifier la provenance, l’absence de simulation et les états sans station proche.
+
+## Correctif format getpublicdata Netatmo
+- [x] Backend: Décoder la structure publique `measures` avec séries horodatées, vent et pluie.
+- [x] Tests: Couvrir le mapping d’une réponse getpublicdata publique documentée.
+- [x] Opérations: Persister une collecte ponctuelle des stations Netatmo authentifiées pour les favoris actuels.
+- [x] Backend: Lire les stations par tolérance géographique afin d’éviter les écarts binaires de coordonnées flottantes.
+- [x] Tests: Vérifier le retour des stations persistées pour les coordonnées de référence demandées.

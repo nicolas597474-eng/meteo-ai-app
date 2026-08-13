@@ -42,6 +42,15 @@ import { buildForecastUpdateSet } from "./forecastWrite";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+export const REFERENCE_COORDINATE_TOLERANCE = 0.0001;
+
+export function referenceCoordinateBounds(value: number) {
+  return {
+    min: value - REFERENCE_COORDINATE_TOLERANCE,
+    max: value + REFERENCE_COORDINATE_TOLERANCE,
+  };
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -706,13 +715,17 @@ export async function getPhysicalStationHistory(
 ) {
   const db = await getDb();
   if (!db) return { stations: [], latestGroundTruth: null };
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
 
   const stations = await db
     .select()
     .from(weatherStations)
     .where(and(
-      eq(weatherStations.refLat, refLat),
-      eq(weatherStations.refLon, refLon),
+      gte(weatherStations.refLat, latBounds.min),
+      lte(weatherStations.refLat, latBounds.max),
+      gte(weatherStations.refLon, lonBounds.min),
+      lte(weatherStations.refLon, lonBounds.max),
       eq(weatherStations.isActive, 1),
     ))
     .orderBy(desc(weatherStations.reliabilityScore));

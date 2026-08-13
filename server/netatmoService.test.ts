@@ -52,4 +52,31 @@ describe("stations Netatmo publiques", () => {
       sourceTier: 1,
     });
   });
+
+  it("décode les séries publiques getpublicdata avec les mesures de vent et de pluie", () => {
+    const station = mapNetatmoPublicStation({
+      _id: "public-series-1",
+      place: { location: [2.52, 50.76] },
+      measures: {
+        weather: {
+          type: ["temperature", "humidity", "pressure"],
+          res: { "1786524000": [20.3, 57, 1015.6] },
+        },
+        wind: { type: ["wind"], wind_strength: 14, gust_strength: 28, wind_angle: 135, wind_timeutc: 1_786_524_000 },
+        rain: { type: ["rain"], rain_60min: 0.6, rain_utc: 1_786_524_000 },
+      },
+    }, 50.7567, 2.5204);
+
+    expect(station).toMatchObject({
+      stationId: "netatmo-public-series-1",
+      temperature: 20.3,
+      humidity: 57,
+      pressure: 1015.6,
+      windSpeed: 14,
+      windGust: 28,
+      windDirection: 135,
+      precipitation: 0.6,
+    });
+    expect(station?.updatedAt).toBe(new Date(1_786_524_000 * 1000).toISOString());
+  });
 });
