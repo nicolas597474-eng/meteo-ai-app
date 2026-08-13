@@ -838,6 +838,12 @@
 - [x] Frontend: Afficher la moyenne, les contributions station et le repli multi-modèles explicite.
 - [x] Tests: Vérifier l’exclusion des capteurs candidats et les pondérations des stations qualifiées.
 
+## Intégration Netatmo autorisée
+- [ ] OAuth: Vérifier les identifiants, le callback et le scope `read_station` Netatmo.
+- [ ] Backend: Collecter les stations Netatmo proches avec identifiant vérifiable, fraîcheur et filtrage d’anomalies.
+- [ ] Frontend: Présenter les stations Netatmo autorisées et leurs contributions locales.
+- [ ] Tests: Vérifier l’autorisation, la provenance `netatmo-*` et l’exclusion des données non authentifiées.
+
 ## Contrôle comparatif des modes météo
 - [x] Validation: Comparer Officiel, Local et Ultra-local pour les mêmes coordonnées et le même instant.
 - [x] Validation: Vérifier les stations, poids, repli et provenance retournés par chaque mode.
