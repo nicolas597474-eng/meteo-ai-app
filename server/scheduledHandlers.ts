@@ -630,6 +630,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               dataAvailability: station.dataAvailability,
               isActive: station.isActive ? 1 : 0,
               exclusionReason: station.exclusionReason ?? null,
+              qualificationStatus: station.qualificationStatus ?? "validated",
+              sourceTier: station.sourceTier ?? null,
             });
 
             const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;

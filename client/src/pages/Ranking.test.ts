@@ -22,6 +22,13 @@ describe("page Fiabilité", () => {
     expect(source).toContain("il ne modifie pas la température locale avant une validation historique mesurée");
   });
 
+  it("distingue une station Netatmo authentifiée d’une référence ou d’un capteur citoyen", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("STATION NETATMO");
+    expect(source).toContain("NIVEAU 1 · AUTHENTIFIÉE");
+    expect(source).toContain("identifiant de station vérifiable et provenance physique");
+  });
+
   it("ouvre une modale de transparence depuis chaque source", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     const dialog = readFileSync(new URL("./SourceDetailsDialog.tsx", import.meta.url), "utf8");

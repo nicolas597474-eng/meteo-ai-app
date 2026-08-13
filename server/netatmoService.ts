@@ -10,12 +10,15 @@ type NetatmoModule = {
 
 type NetatmoPublicStation = {
   _id?: string;
+  type?: string;
   station_name?: string;
   place?: { location?: [number, number]; altitude?: number; city?: string };
   dashboard_data?: Record<string, unknown>;
   measures?: Record<string, unknown>;
   modules?: NetatmoModule[];
 };
+
+const pendingAccessTokenRefreshes = new Map<number, Promise<string | null>>();
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -46,7 +49,8 @@ export function mapNetatmoPublicStation(station: NetatmoPublicStation, refLat: n
   const [lon, lat] = coordinates;
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   const modules = station.modules ?? [];
-  const outdoor = modules.find((module) => module.type === "NAModule1");
+  const outdoor = modules.find((module) => module.type === "NAModule1")
+    ?? (station.type === "NAModule1" ? station : undefined);
   const anemometer = modules.find((module) => module.type === "NAModule2");
   const rainGauge = modules.find((module) => module.type === "NAModule3");
   const temperature = dashboardNumber(outdoor, "Temperature", "temperature");
@@ -77,10 +81,12 @@ export function mapNetatmoPublicStation(station: NetatmoPublicStation, refLat: n
     updateFrequencyMin: 10,
     dataAvailability: 0.75,
     isActive: true,
+    qualificationStatus: "validated",
+    sourceTier: 1,
   };
 }
 
-async function getNetatmoAccessToken(userId: number) {
+async function refreshNetatmoAccessToken(userId: number) {
   const stored = await getNetatmoOAuthToken(userId);
   if (!stored) return null;
   try {
@@ -97,11 +103,28 @@ async function getNetatmoAccessToken(userId: number) {
       signal: AbortSignal.timeout(15_000),
     });
     const body = await response.json() as { access_token?: string; refresh_token?: string };
-    if (!response.ok || !body.access_token || !body.refresh_token) return null;
+    if (!response.ok || !body.access_token || !body.refresh_token) {
+      console.warn(`[Netatmo] Renouvellement du jeton indisponible (${response.status})`);
+      return null;
+    }
     await upsertNetatmoOAuthToken(userId, encryptNetatmoRefreshToken(body.refresh_token), stored.scopes);
     return body.access_token;
   } catch {
+    console.warn("[Netatmo] Renouvellement du jeton impossible");
     return null;
+  }
+}
+
+async function getNetatmoAccessToken(userId: number) {
+  const pending = pendingAccessTokenRefreshes.get(userId);
+  if (pending) return pending;
+
+  const refresh = refreshNetatmoAccessToken(userId);
+  pendingAccessTokenRefreshes.set(userId, refresh);
+  try {
+    return await refresh;
+  } finally {
+    pendingAccessTokenRefreshes.delete(userId);
   }
 }
 
@@ -123,10 +146,21 @@ export async function fetchNetatmoPublicStations(userId: number | undefined, lat
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(15_000),
     });
-    const body = await response.json() as { body?: NetatmoPublicStation[] };
-    if (!response.ok || !Array.isArray(body.body)) return [];
-    return body.body.map((station) => mapNetatmoPublicStation(station, lat, lon)).filter((station): station is StationData => station !== null);
+    const body = await response.json() as { body?: NetatmoPublicStation[]; error?: { code?: number; message?: string } | string };
+    if (!response.ok) {
+      const errorCode = typeof body.error === "object" ? body.error.code : body.error;
+      console.warn(`[Netatmo] getpublicdata indisponible (${response.status}${errorCode ? ` · ${errorCode}` : ""})`);
+      return [];
+    }
+    if (!Array.isArray(body.body)) {
+      console.warn("[Netatmo] getpublicdata a renvoyé un format inattendu");
+      return [];
+    }
+    const stations = body.body.map((station) => mapNetatmoPublicStation(station, lat, lon)).filter((station): station is StationData => station !== null);
+    console.info(`[Netatmo] ${stations.length} station(s) publique(s) authentifiée(s) trouvée(s) dans ${radiusKm} km`);
+    return stations;
   } catch {
+    console.warn("[Netatmo] getpublicdata est indisponible");
     return [];
   }
 }

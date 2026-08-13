@@ -839,10 +839,10 @@
 - [x] Tests: Vérifier l’exclusion des capteurs candidats et les pondérations des stations qualifiées.
 
 ## Intégration Netatmo autorisée
-- [ ] OAuth: Vérifier les identifiants, le callback et le scope `read_station` Netatmo.
-- [ ] Backend: Collecter les stations Netatmo proches avec identifiant vérifiable, fraîcheur et filtrage d’anomalies.
-- [ ] Frontend: Présenter les stations Netatmo autorisées et leurs contributions locales.
-- [ ] Tests: Vérifier l’autorisation, la provenance `netatmo-*` et l’exclusion des données non authentifiées.
+- [x] OAuth: Vérifier les identifiants, le callback et le scope `read_station` Netatmo.
+- [x] Backend: Collecter les stations Netatmo proches avec identifiant vérifiable, fraîcheur et filtrage d’anomalies.
+- [x] Frontend: Présenter les stations Netatmo autorisées et leurs contributions locales.
+- [x] Tests: Vérifier l’autorisation, la provenance `netatmo-*` et l’exclusion des données non authentifiées.
 
 ## Contrôle comparatif des modes météo
 - [x] Validation: Comparer Officiel, Local et Ultra-local pour les mêmes coordonnées et le même instant.
@@ -885,3 +885,10 @@
 - [x] Diagnostic: Corréler l’empreinte du state créée, stockée et reçue par le callback publié.
 - [x] Backend: Corriger uniquement la cause vérifiée du rejet persistant.
 - [x] Tests: Couvrir le scénario de callback consenti jusqu’à l’échange de jeton.
+
+## Activation des stations Netatmo autorisées
+- [x] Validation: Confirmer la persistance du refresh token chiffré et du scope `read_station` après consentement.
+- [x] Backend: Tester la collecte Netatmo réelle autour des lieux favoris et tracer le résultat sans exposer de jeton.
+- [x] Backend: Raccorder les observations Netatmo authentifiées au cycle de collecte existant avec provenance `netatmo-*`.
+- [x] Frontend: Afficher les stations Netatmo authentifiées dans Fiabilité avec un badge de niveau 1.
+- [x] Tests: Vérifier la provenance, l’absence de simulation et les états sans station proche.
