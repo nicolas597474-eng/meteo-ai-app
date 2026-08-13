@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql, isNull } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, isNull, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -617,6 +617,43 @@ export async function upsertStationObservation(data: InsertStationObservation): 
     return;
   }
   await db.insert(stationObservations).values(data);
+}
+
+/**
+ * Read the latest fresh, explicitly validated Netatmo observations without
+ * exposing OAuth credentials. Used only when Netatmo's public endpoint is
+ * temporarily unavailable to the Dashboard.
+ */
+export async function getRecentValidatedNetatmoObservations(sinceMs: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const stations = await db
+    .select()
+    .from(weatherStations)
+    .where(and(
+      eq(weatherStations.source, "netatmo"),
+      eq(weatherStations.isActive, 1),
+      eq(weatherStations.qualificationStatus, "validated"),
+    ));
+  if (stations.length === 0) return [];
+
+  const readings = await db
+    .select()
+    .from(stationObservations)
+    .where(and(
+      inArray(stationObservations.stationId, stations.map((station) => station.stationId)),
+      gte(stationObservations.observedAt, sinceMs),
+    ))
+    .orderBy(desc(stationObservations.observedAt));
+
+  const latestByStation = new Map<number | string, typeof readings[number]>();
+  for (const reading of readings) {
+    if (!latestByStation.has(reading.stationId)) latestByStation.set(reading.stationId, reading);
+  }
+  return stations.flatMap((station) => {
+    const observation = latestByStation.get(station.stationId);
+    return observation ? [{ station, observation }] : [];
+  });
 }
 
 /** Idempotent physical synthesis for one location and Paris hour. */

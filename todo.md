@@ -915,3 +915,8 @@
 ## Correctif Dashboard Netatmo proposé
 - [x] Backend: Transmettre `ctx.user?.id` au collecteur Netatmo dans le parcours Dashboard, après accord explicite.
 - [x] Tests: Vérifier session autorisée, session absente, absence de jeton et exclusion de tout identifiant client.
+
+## Résilience Dashboard Netatmo
+- [x] Backend: Utiliser les observations Netatmo persistées et encore fraîches lorsque getpublicdata est temporairement indisponible.
+- [x] Collecte: Archiver les relevés physiques individuels à chaque snapshot horaire pour entretenir ce repli.
+- [x] Tests: Vérifier le repli, le filtre géographique et l’exclusion des relevés expirés.

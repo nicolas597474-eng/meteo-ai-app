@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapNetatmoPublicStation } from "./netatmoService";
+import { mapNetatmoPublicStation, mapPersistedNetatmoObservation } from "./netatmoService";
 import { getStationSourceKind } from "./stationService";
 
 describe("stations Netatmo publiques", () => {
@@ -78,5 +78,46 @@ describe("stations Netatmo publiques", () => {
       precipitation: 0.6,
     });
     expect(station?.updatedAt).toBe(new Date(1_786_524_000 * 1000).toISOString());
+  });
+
+  it("réutilise uniquement une observation Netatmo persistée, validée, fraîche et dans le rayon", () => {
+    const now = Date.parse("2026-08-13T08:00:00.000Z");
+    const station = mapPersistedNetatmoObservation({
+      station: {
+        stationId: "netatmo-cache-1", source: "netatmo", name: "Station cache", lat: 50.76, lon: 2.52,
+        altitude: 40, reliabilityScore: 72, updateFrequencyMin: 10, dataAvailability: 0.75,
+        isActive: 1, qualificationStatus: "validated", sourceTier: 1,
+      },
+      observation: {
+        observedAt: now - 10 * 60_000, temperature: 19.2, humidity: 63, pressure: 1018,
+        windSpeed: 8, windGust: 13, windDirection: 140, precipitation: 0,
+      },
+    }, 50.7567, 2.5204, 20, now);
+
+    expect(station).toMatchObject({
+      stationId: "netatmo-cache-1", source: "netatmo", temperature: 19.2,
+      isActive: true, qualificationStatus: "validated", sourceTier: 1,
+    });
+  });
+
+  it("refuse une observation persistée expirée ou non qualifiée", () => {
+    const now = Date.parse("2026-08-13T08:00:00.000Z");
+    const base = {
+      station: {
+        stationId: "netatmo-cache-2", source: "netatmo", name: "Station cache", lat: 50.76, lon: 2.52,
+        altitude: null, reliabilityScore: 72, updateFrequencyMin: 10, dataAvailability: 0.75,
+        isActive: 1, qualificationStatus: "validated", sourceTier: 1,
+      },
+      observation: {
+        observedAt: now - 31 * 60_000, temperature: 19.2, humidity: null, pressure: null,
+        windSpeed: null, windGust: null, windDirection: null, precipitation: null,
+      },
+    };
+    expect(mapPersistedNetatmoObservation(base, 50.7567, 2.5204, 20, now)).toBeNull();
+    expect(mapPersistedNetatmoObservation({
+      ...base,
+      observation: { ...base.observation, observedAt: now - 5 * 60_000 },
+      station: { ...base.station, qualificationStatus: "candidate" },
+    }, 50.7567, 2.5204, 20, now)).toBeNull();
   });
 });

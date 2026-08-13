@@ -1021,6 +1021,39 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
       const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
       const discovered = await collectNearbyStations(favorite.lat, favorite.lon, radiusKm, favorite.customName ?? favorite.name, { netatmoUserId: favorite.userId });
       const physical = getPhysicalActiveStations(discovered);
+      for (const station of physical) {
+        await upsertWeatherStation({
+          stationId: station.stationId,
+          source: station.source,
+          name: station.name,
+          lat: station.lat,
+          lon: station.lon,
+          altitude: station.altitude,
+          refLat: favorite.lat,
+          refLon: favorite.lon,
+          distanceKm: station.distanceKm,
+          reliabilityScore: station.reliabilityScore,
+          updateFrequencyMin: station.updateFrequencyMin,
+          dataAvailability: station.dataAvailability,
+          isActive: station.isActive ? 1 : 0,
+          exclusionReason: station.exclusionReason ?? null,
+          qualificationStatus: station.qualificationStatus ?? "validated",
+          sourceTier: station.sourceTier ?? null,
+        });
+        const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
+        if (!Number.isFinite(observedAt)) continue;
+        await upsertStationObservation({
+          stationId: station.stationId,
+          observedAt,
+          temperature: station.temperature,
+          humidity: station.humidity,
+          pressure: station.pressure,
+          windSpeed: station.windSpeed,
+          windGust: station.windGust,
+          windDirection: station.windDirection,
+          precipitation: station.precipitation,
+        });
+      }
       const synthesis = calculateGroundTruth(physical);
       if (synthesis.stationCount < 1 || synthesis.temperature == null) {
         results.push({ locationKey, stationCount: synthesis.stationCount, stored: false, reason: "Aucune station physique qualifiée" });
