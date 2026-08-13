@@ -827,7 +827,7 @@
 ## Couverture physique effective
 - [x] Diagnostic: Confirmer la couverture physique collectée et le motif d’une éventuelle absence de snapshot.
 - [x] Recherche: Évaluer des fournisseurs d’observations physiques publics, compatibles et vérifiables autour des favoris.
-- [ ] Décision: Proposer une intégration qui ne réintroduit aucune station ou donnée simulée.
+- [x] Décision: Proposition d’intégration annulée par l’utilisateur ; aucune nouvelle source n’est ajoutée.
 
 ## Décision utilisateur — fusion locale
 - [x] Décision: Ne pas réintroduire la fusion locale à partir de stations physiques, même après qualification et mesure de gain.
