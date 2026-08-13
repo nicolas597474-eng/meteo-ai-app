@@ -298,6 +298,8 @@ export default function Dashboard() {
     : regimeAgeMinutes === 0
       ? "Mis à jour à l’instant"
       : `Mis à jour il y a ${regimeAgeMinutes} min`;
+  const allRegimeIds = regimeCatalogue.map((candidate: any) => candidate.id);
+  const allRegimesExpanded = allRegimeIds.length > 0 && allRegimeIds.every((id) => expandedRegimeIds.includes(id));
   const netatmoStatusLabel: Record<string, string> = {
     live: "Netatmo : relevés directs authentifiés",
     fresh_cache: "Netatmo : cache authentifié récent (service temporairement indisponible)",
@@ -449,7 +451,17 @@ export default function Dashboard() {
                   <div id="regime-catalogue" className="mt-2 rounded-lg border border-slate-600/35 bg-slate-950/30 p-2" aria-label="Tous les régimes météo possibles">
                     <div className="mb-2 flex items-center justify-between gap-2 px-1">
                       <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">Tous les régimes</p>
-                      <span className="rounded-full border border-slate-600/50 bg-slate-900/60 px-1.5 py-0.5 text-[9px] text-slate-400">{regimeCatalogue.length || 20}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedRegimeIds(allRegimesExpanded ? [] : allRegimeIds)}
+                          aria-label={allRegimesExpanded ? "Tout réduire les régimes" : "Tout développer les régimes"}
+                          className="min-h-7 rounded-md border border-primary/30 bg-primary/10 px-2 text-[9px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          {allRegimesExpanded ? "Tout réduire" : "Tout développer"}
+                        </button>
+                        <span className="rounded-full border border-slate-600/50 bg-slate-900/60 px-1.5 py-0.5 text-[9px] text-slate-400">{regimeCatalogue.length || 20}</span>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
                       {regimeCatalogue.map((candidate: any) => {
@@ -457,6 +469,12 @@ export default function Dashboard() {
                         const isExpanded = expandedRegimeIds.includes(candidate.id);
                         const detailsId = `regime-weights-${candidate.id}`;
                         const weights = candidate?.weights && typeof candidate.weights === "object" ? candidate.weights : null;
+                        const weightRows = [
+                          { label: "Temp.", value: weights?.temp, color: "bg-orange-400" },
+                          { label: "Pluie", value: weights?.precip, color: "bg-blue-400" },
+                          { label: "Vent", value: weights?.wind, color: "bg-cyan-400" },
+                          { label: "Cond.", value: weights?.condition, color: "bg-violet-400" },
+                        ];
                         return (
                           <div key={candidate.id} className={`min-w-0 rounded-md text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
                             <button
@@ -472,11 +490,21 @@ export default function Dashboard() {
                               {isExpanded ? <ChevronUp className="mt-px h-3 w-3 shrink-0" aria-hidden="true" /> : <ChevronDown className="mt-px h-3 w-3 shrink-0 text-slate-500" aria-hidden="true" />}
                             </button>
                             {isExpanded && (
-                              <div id={detailsId} className="mx-1.5 mb-1.5 grid grid-cols-2 gap-x-1 gap-y-0.5 border-t border-slate-700/40 pt-1 text-[8px] leading-tight text-slate-400">
-                                <span>Temp. {formatRegimeWeight(weights?.temp)}</span>
-                                <span>Pluie {formatRegimeWeight(weights?.precip)}</span>
-                                <span>Vent {formatRegimeWeight(weights?.wind)}</span>
-                                <span>Cond. {formatRegimeWeight(weights?.condition)}</span>
+                              <div id={detailsId} className="mx-1.5 mb-1.5 grid grid-cols-2 gap-x-2 gap-y-1.5 border-t border-slate-700/40 pt-1.5 text-[8px] leading-tight text-slate-400">
+                                {weightRows.map((weight) => {
+                                  const percent = typeof weight.value === "number" && Number.isFinite(weight.value) ? Math.max(0, Math.min(100, Math.round(weight.value * 100))) : 0;
+                                  return (
+                                    <div key={weight.label} className="min-w-0">
+                                      <div className="mb-0.5 flex items-center justify-between gap-1">
+                                        <span>{weight.label}</span>
+                                        <span className="font-medium text-slate-300">{formatRegimeWeight(weight.value)}</span>
+                                      </div>
+                                      <div className="h-1 overflow-hidden rounded-full bg-slate-700/70" role="progressbar" aria-label={`Poids ${weight.label}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+                                        <div className={`h-full rounded-full ${weight.color}`} style={{ width: `${percent}%` }} />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>

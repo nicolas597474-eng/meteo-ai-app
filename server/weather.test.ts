@@ -23,6 +23,10 @@ describe("weather.getDashboard", () => {
     expect(catalogue).toHaveLength(20);
     expect(catalogue).toContainEqual(expect.objectContaining({ id: "stable", label: "Été stable" }));
     expect(catalogue).toContainEqual(expect.objectContaining({ id: "thunderstorm", label: "Orages" }));
+    expect(catalogue).toContainEqual(expect.objectContaining({
+      id: "stable",
+      weights: expect.objectContaining({ temp: expect.any(Number), precip: expect.any(Number), wind: expect.any(Number), condition: expect.any(Number) }),
+    }));
   });
 
   it("retrouve la prévision de l’heure courante malgré un format horaire sans zéro initial", () => {

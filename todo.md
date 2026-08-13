@@ -973,6 +973,12 @@
 - [x] Correctif: Empêcher une pondération manquante de provoquer une erreur au déploiement d’un régime.
 - [x] Tests: Couvrir explicitement un régime sans objet `weights` complet.
 
+## Pondérations visuelles des régimes
+- [x] Backend: Fournir les pondérations complètes du catalogue de régimes dans le contrat Dashboard.
+- [x] Interface: Afficher des barres de progression pour chaque pondération de régime.
+- [x] Interface: Ajouter un bouton global pour tout développer ou tout réduire.
+- [x] Tests: Vérifier les poids complets, les barres et les deux états globaux du catalogue.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.

@@ -155,6 +155,12 @@ export const weatherRouter = router({
       label: info.label,
       emoji: info.emoji,
       description: info.description,
+      weights: {
+        temp: info.weights.temp,
+        precip: info.weights.precip,
+        wind: info.weights.wind,
+        condition: info.weights.condition,
+      },
     }))
   )),
 

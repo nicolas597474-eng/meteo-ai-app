@@ -12,10 +12,12 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Comment est calculée la fusion officielle ?");
     expect(source).toContain("Voir les 20 régimes");
     expect(source).not.toContain("max-h-72 overflow-y-auto");
-    expect(source).toContain("formatRegimeWeight(weights?.temp)");
-    expect(source).toContain("formatRegimeWeight(weights?.condition)");
+    expect(source).toContain("weightRows");
+    expect(source).toContain('role="progressbar"');
     expect(source).toContain("expandedRegimeIds");
     expect(source).toContain("aria-expanded={isExpanded}");
     expect(source).toContain("candidate?.weights");
+    expect(source).toContain("Tout développer");
+    expect(source).toContain("Tout réduire");
   });
 });
