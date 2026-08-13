@@ -985,6 +985,12 @@
 - [x] Interface: Afficher température et ressenti pour chaque heure dans le graphique horaire.
 - [x] Tests: Vérifier les séries, échelles et libellés sans modifier les données météo.
 
+## Graduations simplifiées des graphiques
+- [x] Interface: Afficher une échelle de température arrondie par pas de 5 °C.
+- [x] Interface: Présenter seulement les unités km/h et mm sur les échelles vent et pluie.
+- [x] Interface: Afficher les degrés en blanc, le vent en vert et la pluie en bleu sur les échelles.
+- [x] Tests: Vérifier les graduations de 5 °C et les unités compactes sur les deux graphiques.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.

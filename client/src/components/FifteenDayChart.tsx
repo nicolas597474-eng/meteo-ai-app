@@ -99,18 +99,18 @@ function ForecastScaleLabels({
   windMax: number;
   precipMax: number;
 }) {
-  const tempMid = Math.round((scaleTop + scaleBot) / 2);
+  const tempTicks = Array.from({ length: Math.max(0, Math.round((scaleTop - scaleBot) / 5) + 1) }, (_, index) => scaleBot + index * 5);
+  const tempToAxisY = (value: number) => tempTop + (1 - (value - scaleBot) / (scaleTop - scaleBot || 1)) * (tempBottom - tempTop);
   return (
     <aside aria-label="Échelles du graphique de prévisions" className="relative z-10 w-10 shrink-0 border-r border-slate-700/70 bg-[#06080d] text-right text-[8px] font-medium text-slate-500" style={{ height: totalHeight }}>
-      <span className="absolute right-1.5 text-orange-300/80" style={{ top: tempTop - 5 }}>{scaleTop}°</span>
-      <span className="absolute right-1.5 text-slate-500" style={{ top: (tempTop + tempBottom) / 2 - 5 }}>{tempMid}°</span>
-      <span className="absolute right-1.5 text-orange-300/80" style={{ top: tempBottom - 10 }}>{scaleBot}°</span>
-      <span className="absolute right-1.5 text-emerald-300/80" style={{ top: windTop + 2 }}>{windMax}</span>
-      <span className="absolute right-1.5 text-slate-500" style={{ top: windBottom - 10 }}>0</span>
-      <span className="absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 text-[7px] uppercase tracking-wide text-emerald-300/70">km/h</span>
-      <span className="absolute right-1.5 text-sky-300/80" style={{ top: precipTop + 2 }}>{precipMax.toFixed(1)}</span>
-      <span className="absolute right-1.5 text-slate-500" style={{ top: precipBottom - 10 }}>0</span>
-      <span className="absolute bottom-1 left-1 text-[7px] uppercase tracking-wide text-sky-300/70">mm</span>
+      <span className="absolute left-1 top-1 text-[7px] font-semibold text-white">°C</span>
+      {tempTicks.map((tick) => <span key={tick} className="absolute right-1.5 -translate-y-1/2 text-white" style={{ top: tempToAxisY(tick) }}>{tick}°</span>)}
+      <span className="absolute left-1 text-[7px] font-semibold text-emerald-400" style={{ top: windTop + 1 }}>km/h</span>
+      <span className="absolute right-1.5 text-emerald-400" style={{ top: windTop + 12 }}>{windMax}</span>
+      <span className="absolute right-1.5 text-emerald-400/80" style={{ top: windBottom - 10 }}>0</span>
+      <span className="absolute left-1 text-[7px] font-semibold text-sky-400" style={{ top: precipTop + 1 }}>mm</span>
+      <span className="absolute right-1.5 text-sky-400" style={{ top: precipTop + 12 }}>{precipMax.toFixed(1)}</span>
+      <span className="absolute right-1.5 text-sky-400/80" style={{ top: precipBottom - 10 }}>0</span>
     </aside>
   );
 }
@@ -220,7 +220,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const allMin = displayDays.map(d => d.tempMin ?? 0);
   const dataHigh = Math.max(...allMax);
   const dataLow = Math.min(...allMin);
-  const gridStep = dataHigh - dataLow > 20 ? 10 : 5;
+  const gridStep = 5;
   const scaleTop = Math.ceil((dataHigh + 3) / gridStep) * gridStep;
   const scaleBot = Math.max(Math.floor((dataLow - 3) / gridStep) * gridStep, -10);
   const scaleRange = scaleTop - scaleBot || 1;
@@ -267,6 +267,17 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.moveTo(x, 0);
       ctx.lineTo(x, CHART_H);
       ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // ── Lignes de température alignées à l’échelle de 5 °C ──────────────────
+    for (let t = scaleBot; t <= scaleTop; t += gridStep) {
+      const y = tempToY(t);
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(scrollableW, y);
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.06)";
       ctx.lineWidth = 1;
       ctx.stroke();
     }

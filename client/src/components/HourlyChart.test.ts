@@ -9,6 +9,11 @@ describe("HourlyChart", () => {
     expect(source).toContain('aria-label="Échelles du graphique horaire"');
     expect(source).toContain("windScaleTop");
     expect(source).toContain("precipScaleTop");
+    expect(source).toContain("const gridStep = 5;");
+    expect(source).toContain("tempTicks");
+    expect(source).toContain("text-white");
+    expect(source).toContain("text-emerald-400");
+    expect(source).toContain("text-sky-400");
     expect(source).toContain("apparentTemp ?? h.temp ?? 0) + 3");
     expect(source).toContain("Ressenti affiché à chaque heure");
     expect(source).toContain("v.toFixed(1)}°");
