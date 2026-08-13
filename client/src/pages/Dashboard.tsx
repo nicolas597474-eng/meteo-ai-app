@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -101,6 +101,8 @@ export default function Dashboard() {
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
   const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
+  const [showRegimeMenu, setShowRegimeMenu] = useState(false);
+  const [showFusionDetails, setShowFusionDetails] = useState(false);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
   const selectedLocation = contextLocation ?? activeLocation;
@@ -183,6 +185,9 @@ export default function Dashboard() {
   );
   const { data: localOfficialHistory } = trpc.weather.getLocalOfficialDeltaHistory.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
+  );
+  const { data: regimeCatalogue = [] } = trpc.weather.getRegimeCatalogue.useQuery(
+    undefined, { staleTime: 60 * 60 * 1000 }
   );
 
   const isLoading = (selectedLocation ? locLoading : dashLoading) || officialLoading;
@@ -296,6 +301,17 @@ export default function Dashboard() {
     not_connected: "Netatmo : aucune autorisation active pour cette session",
   };
   const modelIndicator = dash?.modelIndicator ?? null;
+  const fusionTrace = (officialForecast as any)?.trace?.available === false ? null : (officialForecast as any)?.trace ?? null;
+  const fusionParameters = [
+    { key: "temperature", label: "Température" },
+    { key: "precipitation", label: "Précipitations" },
+    { key: "wind", label: "Vent" },
+  ].map(({ key, label }) => ({
+    key,
+    label,
+    sources: ((fusionTrace?.parameterSources?.[key] ?? []) as any[])
+      .filter((source) => source.type === "model" && Number.isFinite(source.finalWeight) && source.finalWeight > 0),
+  }));
 
   // Multi-regime data for alert badges
   const multiRegime = officialRegime
@@ -394,13 +410,19 @@ export default function Dashboard() {
             {regime && (
               <div className="mb-3 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRegimeMenu((open) => !open)}
+                    aria-expanded={showRegimeMenu}
+                    aria-controls="regime-catalogue"
+                    className="flex min-w-0 items-center gap-2 text-left"
+                  >
                     <span className="text-base">{regime.emoji}</span>
                     <div>
-                      <p className="text-xs font-semibold text-white">{regime.label}</p>
+                      <p className="flex items-center gap-1 text-xs font-semibold text-white">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-slate-300" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
                     </div>
-                  </div>
+                  </button>
                   {/* Weight pills */}
                   <div className="flex flex-wrap gap-1">
                     <span className="text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium">
@@ -417,15 +439,55 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
+                {showRegimeMenu && (
+                  <div id="regime-catalogue" className="mt-2 border-t border-slate-600/40 pt-2" aria-label="Tous les régimes météo possibles">
+                    <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-slate-400">Tous les régimes possibles</p>
+                    <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                      {regimeCatalogue.map((candidate: any) => {
+                        const isActive = candidate.id === primaryRegimeId;
+                        return (
+                          <div key={candidate.id} className={`flex items-start gap-2 rounded-lg px-2 py-1.5 text-[11px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-slate-300"}`}>
+                            <span className="pt-0.5">{candidate.emoji}</span>
+                            <span className="min-w-0"><strong>{candidate.label}{isActive ? " · actif" : ""}</strong><span className="mt-0.5 block leading-snug text-slate-400">{candidate.description}</span></span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}<span className="hidden sm:inline">{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</span></p>
                 {modelIndicator && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-blue-400/25 bg-blue-400/10 px-2 py-1 text-[10px] text-blue-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowFusionDetails((open) => !open)}
+                    aria-expanded={showFusionDetails}
+                    aria-controls="fusion-explication"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-blue-400/25 bg-blue-400/10 px-2 py-1 text-left text-[10px] text-blue-100"
+                  >
                     <Activity className="h-3 w-3 text-blue-300" />
                     <span className="hidden sm:inline">
                       {modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion ${modelIndicator.modelCount} modèles`} : <strong>{modelIndicator.primaryModel}</strong>
                       {modelIndicator.mode === "multi_model" ? ` · poids moyen ${Math.round(modelIndicator.primaryWeight * 100)}%` : ""}
                     </span>
                     <span className="sm:hidden">{modelIndicator.mode === "single_model" ? "Modèle" : "Fusion"} · <strong>{modelIndicator.primaryModel}</strong>{modelIndicator.mode === "multi_model" ? ` ${Math.round(modelIndicator.primaryWeight * 100)}%` : ""}</span>
+                    {showFusionDetails ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </button>
+                )}
+                {showFusionDetails && modelIndicator && (
+                  <div id="fusion-explication" className="mt-2 rounded-lg border border-blue-400/20 bg-slate-950/45 p-2 text-[10px] text-slate-200">
+                    <p className="flex items-start gap-1.5 font-medium text-blue-100"><Info className="mt-0.5 h-3 w-3 shrink-0 text-blue-300" />Comment est calculée la fusion officielle ?</p>
+                    <p className="mt-1 leading-relaxed text-slate-400">{fusionTrace?.method ?? "La trace détaillée du snapshot n’est pas encore disponible."} Le pourcentage d’AROME est son poids appliqué, pas une mesure de station.</p>
+                    {fusionParameters.some((parameter) => parameter.sources.length > 0) && (
+                      <div className="mt-2 space-y-1.5">
+                        {fusionParameters.filter((parameter) => parameter.sources.length > 0).map((parameter) => (
+                          <div key={parameter.key}>
+                            <span className="text-slate-400">{parameter.label} : </span>
+                            {parameter.sources.map((source) => `${source.name} ${Math.round(source.finalWeight * 100)}%`).join(" · ")}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-2 text-slate-500">Les pondérations varient selon les traces archivées du snapshot et ne modifient pas les observations Netatmo.</p>
                   </div>
                 )}
               </div>

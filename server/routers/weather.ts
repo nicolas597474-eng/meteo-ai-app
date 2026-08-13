@@ -148,6 +148,16 @@ function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
 }
 
 export const weatherRouter = router({
+  /** Catalogue descriptif des régimes : il n’altère jamais le régime détecté. */
+  getRegimeCatalogue: publicProcedure.query(() => (
+    Object.entries(EXTENDED_REGIME_INFO).map(([id, info]) => ({
+      id,
+      label: info.label,
+      emoji: info.emoji,
+      description: info.description,
+    }))
+  )),
+
   /**
    * Dashboard: today's MeteoAI forecast + stability index + top services
    */

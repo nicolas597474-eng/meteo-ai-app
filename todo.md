@@ -950,3 +950,8 @@
 ## Date complète du Dashboard
 - [x] Interface: Remplacer la date ISO par une date française complète dans le sélecteur Dashboard.
 - [x] Tests: Vérifier le format de date affiché sans modifier la date métier sous-jacente.
+
+## Transparence du régime et de la fusion
+- [x] Interface: Ajouter un menu déroulant des régimes météo possibles avec régime actif mis en évidence.
+- [x] Interface: Ajouter une vue explicative de « Fusion · AROME 13 % » et des pondérations de modèles disponibles.
+- [x] Tests: Vérifier les deux interactions de transparence sans modifier les calculs de régime ou de fusion.

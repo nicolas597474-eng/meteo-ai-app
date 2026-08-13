@@ -17,6 +17,14 @@ function createPublicContext(): TrpcContext {
 }
 
 describe("weather.getDashboard", () => {
+  it("expose les vingt régimes possibles pour le menu descriptif", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const catalogue = await caller.weather.getRegimeCatalogue();
+    expect(catalogue).toHaveLength(20);
+    expect(catalogue).toContainEqual(expect.objectContaining({ id: "stable", label: "Été stable" }));
+    expect(catalogue).toContainEqual(expect.objectContaining({ id: "thunderstorm", label: "Orages" }));
+  });
+
   it("retrouve la prévision de l’heure courante malgré un format horaire sans zéro initial", () => {
     const current = getCurrentHourlyRegimeInput([
       { hour: "6:00", temp: 15.7, precipitation: 0, windSpeed: 5.8, humidity: 33, cloudCover: 4 },
