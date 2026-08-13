@@ -832,5 +832,16 @@
 ## Décision utilisateur — fusion locale
 - [x] Décision: Ne pas réintroduire la fusion locale à partir de stations physiques, même après qualification et mesure de gain.
 
+## Restauration des modes Local et Ultra-local
+- [x] Frontend: Restaurer les sélecteurs Local et Ultra-local dans le Dashboard.
+- [x] Backend: Vérifier que la température locale utilise uniquement les stations physiques qualifiées, pondérées par distance, fraîcheur, fiabilité, altitude et cohérence.
+- [x] Frontend: Afficher la moyenne, les contributions station et le repli multi-modèles explicite.
+- [x] Tests: Vérifier l’exclusion des capteurs candidats et les pondérations des stations qualifiées.
+
 ## Décision utilisateur — nouvelles observations officielles
 - [x] Décision: Ne pas intégrer Météo‑France ni aucune nouvelle source d’observations officielle pour l’audit ou le scoring.
+
+## Simplification des modes locaux
+- [x] Audit: Recenser les sélecteurs, calculs et libellés Local / Ultra-local encore actifs.
+- [x] Frontend: Réduire les modes à une information de contexte sans divergence avec la prévision officielle.
+- [x] Tests: Vérifier que la température officielle reste identique indépendamment du mode sélectionné.

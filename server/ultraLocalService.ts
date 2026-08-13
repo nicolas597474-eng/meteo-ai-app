@@ -441,17 +441,29 @@ export function calculateUltraLocal(
       v => v.station.distanceKm >= band.minKm && v.station.distanceKm < band.maxKm
     );
 
-    // Within a band, weight by inverse distance and quality
+    // Dans une même bande, les contrôles de cohérence et d'altitude ont déjà
+    // exclu les mesures non admissibles. La pondération relative combine alors
+    // distance, fiabilité historique et fraîcheur réelle du relevé.
     const inBandWeights = bandStations.map(v => {
       const distW = 1 / (v.station.distanceKm + 0.1);
       const qualW = v.station.reliabilityScore / 100;
-      return distW * 0.6 + qualW * 0.4;
+      const ageMin = v.station.updatedAt
+        ? Math.max(0, (Date.now() - new Date(v.station.updatedAt).getTime()) / 60000)
+        : config.maxFreshnessMin;
+      // Une mesure exactement à la limite reste admissible mais pèse moins
+      // qu'une mesure récente ; la fonction est bornée pour rester stable.
+      const freshnessW = Math.max(0.20, 1 - (Math.min(ageMin, config.maxFreshnessMin) / config.maxFreshnessMin) * 0.80);
+      return (distW * 0.60 + qualW * 0.40) * freshnessW;
     });
     const inBandTotal = inBandWeights.reduce((s, w) => s + w, 0);
 
-    bandStations.forEach((v, i) => {
-      const stationWeight = (inBandWeights[i] / inBandTotal) * bandInfo.effectiveWeight;
-      const adjustedTemp = v.station.temperature != null ? v.station.temperature + v.altAdj : null;
+      bandStations.forEach((v, i) => {
+        const stationWeight = (inBandWeights[i] / inBandTotal) * bandInfo.effectiveWeight;
+        const adjustedTemp = v.station.temperature != null ? v.station.temperature + v.altAdj : null;
+        const ageMin = v.station.updatedAt
+          ? Math.max(0, (Date.now() - new Date(v.station.updatedAt).getTime()) / 60000)
+          : config.maxFreshnessMin;
+        const freshnessWeight = Math.max(0.20, 1 - (Math.min(ageMin, config.maxFreshnessMin) / config.maxFreshnessMin) * 0.80);
 
       if (adjustedTemp != null) {
         weightedTemp += adjustedTemp * stationWeight;
@@ -466,7 +478,7 @@ export function calculateUltraLocal(
         weight: Math.round(stationWeight * 1000) / 1000,
         distanceWeight: Math.round((1 / (v.station.distanceKm + 0.1)) * 1000) / 1000,
         qualityWeight: Math.round((v.station.reliabilityScore / 100) * 1000) / 1000,
-        freshnessWeight: 1,
+        freshnessWeight: Math.round(freshnessWeight * 1000) / 1000,
         temperature: v.station.temperature,
         humidity: v.station.humidity,
         pressure: v.station.pressure,

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-describe("Dashboard repli multi-modèles", () => {
-  it("étiquette les contributions comme modèles et affiche leurs poids traçables", () => {
+describe("Dashboard officiel avec contexte local", () => {
+  it("préserve la température officielle tout en expliquant la moyenne station pondérée", () => {
     const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
-    expect(source).toContain("Contributions de la fusion officielle");
-    expect(source).toContain("Poids de température issus de la trace de fusion officielle");
-    expect(source).toContain("ce sont des modèles, pas des stations");
+    expect(source).toContain("Prévision officielle consolidée");
+    expect(source).toContain("Moyenne locale pondérée");
+    expect(source).toContain("Poids : distance, fraîcheur, fiabilité historique, cohérence et correction d’altitude.");
+    expect(source).toContain('localMode: loc.localMode ?? "standard"');
   });
 });

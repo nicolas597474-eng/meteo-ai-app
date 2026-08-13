@@ -86,8 +86,7 @@ function storeLocation(loc: { lat: number; lon: number; name: string; radiusKm?:
 function getStoredLocalMode(): "standard" | "local" | "ultra-local" {
   try {
     const stored = localStorage.getItem("meteoai_local_mode");
-    if (stored === "standard" || stored === "local" || stored === "ultra-local") return stored;
-    return "standard";
+    return stored === "local" || stored === "ultra-local" ? stored : "standard";
   } catch { return "standard"; }
 }
 
@@ -109,8 +108,7 @@ export default function Dashboard() {
     setActiveLocation(loc);
     storeLocation(loc);
     // Sync to LocationContext so all pages (Ranking, History, AI Lab) use this location
-    setContextLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, favoriteId: loc.favoriteId, radiusKm: loc.radiusKm, localMode: loc.localMode });
-    // If the favorite has a per-location mode, apply it
+    setContextLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, favoriteId: loc.favoriteId, radiusKm: loc.radiusKm, localMode: loc.localMode ?? "standard" });
     if (loc.localMode) {
       setLocalMode(loc.localMode);
       storeLocalMode(loc.localMode);
@@ -305,19 +303,13 @@ export default function Dashboard() {
     ?? 0;
   const stabilityIndex: number = officialForecast?.confidence?.stabilityIndex ?? today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0;
 
-  // La température affichée utilise exactement la même fusion locale validée que
-  // la transparence Ultra-locale. Sans observation locale exploitable, elle
-  // conserve le flux officiel horaire.
+  // Le Dashboard présente un unique snapshot officiel multi-modèles : les
+  // observations locales restent auditables dans Fiabilité, sans modifier cette valeur.
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
   const nextConditionChange = findNextConditionChange(hours, currentHour?.hour ?? nowHour);
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
-  const localCurrentObservation = lw?.currentObservation ?? null;
   const officialCurrentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
-  const currentTemp = localCurrentObservation?.temperature ?? officialCurrentTemp;
-  const localObservedAt = localCurrentObservation?.observedAt
-    ? new Date(localCurrentObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
-    : null;
-  const localDelta = localCurrentObservation?.deltaFromOfficialC ?? null;
+  const currentTemp = officialCurrentTemp;
   const apparentTemp = currentHour?.apparentTemp ?? null;
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
   const windDir = currentHour?.windDirection ?? null;
@@ -431,12 +423,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {localObservedRegime && localMode !== "standard" && (
-              <p className="mb-3 text-[11px] text-emerald-200/90">
-                Observation {localMode === "ultra-local" ? "ultra-locale" : "locale"} : {localObservedRegime.emoji} {localObservedRegime.label}. Elle complète le régime officiel sans le remplacer.
-              </p>
-            )}
-
             {nextWeatherAlert && (
               <div className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 ${
                 nextWeatherAlert.kind === "thunderstorm"
@@ -477,16 +463,7 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground mt-1">
                     {(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible") + " actuellement"}
                   </p>
-                  {localCurrentObservation ? (
-                    <p className="mt-1 text-[11px] font-medium text-emerald-300">
-                      {localCurrentObservation.source === "model_fallback" ? <><span className="sm:hidden">Fusion modèles officielle</span><span className="hidden sm:inline">Fusion officielle multi-modèles · sans station locale validée</span></> : <><span className="sm:hidden">Local {localObservedAt ?? "validé"} · {localCurrentObservation.stationCount} station{localCurrentObservation.stationCount > 1 ? "s" : ""}</span><span className="hidden sm:inline">Relevé local {localObservedAt ? `à ${localObservedAt}` : "validé"} · {localCurrentObservation.stationCount} source{localCurrentObservation.stationCount > 1 ? "s" : ""}</span></>}
-                      {localDelta != null
-                        ? <span>{localDelta >= 0 ? " +" : " "}{localDelta.toFixed(1)}°<span className="hidden sm:inline"> vs prévision officielle</span></span>
-                        : officialCurrentTemp != null ? ` · prévision officielle ${officialCurrentTemp.toFixed(1)}°` : ""}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-[11px] text-sky-200/90">Prévision officielle consolidée</p>
-                  )}
+                  <p className="mt-1 text-[11px] text-sky-200/90">Prévision officielle consolidée</p>
                   {(nextRegimeChange ?? nextConditionChange) && (
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
                       <Clock className="h-3 w-3" />
@@ -599,135 +576,57 @@ export default function Dashboard() {
           <span className="text-primary text-xs">→</span>
         </a>
 
-        {localMode !== "standard" && (
-          <section className="space-y-2" aria-labelledby="local-history-title">
-            <div className="flex items-center justify-between gap-2 px-1">
-              <h2 id="local-history-title" className="text-sm font-semibold text-slate-100">Historique local / officiel</h2>
-              <span className="text-[10px] text-muted-foreground">Observations physiques validées</span>
-            </div>
-            <LocalOfficialDeltaChart points={localOfficialHistory} />
-          </section>
-        )}
-
-        {/* ── Ultra-local Mode Selector ── */}
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2">
-          <Radio className="h-4 w-4 text-primary flex-shrink-0" />
-          <span className="text-xs font-semibold text-muted-foreground mr-auto">Mode</span>
+        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
+          <Radio className="h-4 w-4 shrink-0 text-primary" />
+          <span className="mr-auto text-xs font-semibold text-muted-foreground">Contexte</span>
           <div className="flex gap-1">
             {(["standard", "local", "ultra-local"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => handleModeChange(mode)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                  localMode === mode
-                    ? mode === "ultra-local"
-                      ? "bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 border border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/10"
-                      : mode === "local"
-                        ? "bg-blue-500/20 border border-blue-500/40 text-blue-300"
-                        : "bg-primary/20 border border-primary/40 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
-                }`}
+                className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${localMode === mode ? "border-primary/50 bg-primary/15 text-primary" : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"}`}
               >
-                {mode === "ultra-local" ? "Ultra-local" : mode === "local" ? "Local" : "Standard"}
+                {mode === "ultra-local" ? "Ultra-local" : mode === "local" ? "Local" : "Officiel"}
               </button>
             ))}
           </div>
         </div>
 
-        {/* ── Ultra-local transparency (when active) ── */}
         {localMode !== "standard" && locationWeather?.ultraLocal && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Radio className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="text-xs font-semibold text-emerald-300">
-                  {locationWeather.ultraLocal.usesModelFallback
-                    ? "Repli sur la fusion officielle"
-                    : locationWeather.ultraLocal.usesOfficialFallback
-                    ? "Repli sur la prévision officielle"
-                    : localMode === "ultra-local" ? "Observation Ultra-locale" : "Observation Locale"}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {locationWeather.ultraLocal.stationCount} station{locationWeather.ultraLocal.stationCount !== 1 ? "s" : ""}
-              </span>
+          <section className="space-y-2" aria-labelledby="local-context-title">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
+              <span className="text-[10px] text-muted-foreground">n’influence pas la prévision officielle</span>
             </div>
-
-            <p className="text-[11px] text-muted-foreground">
-              {locationWeather.ultraLocal.usesModelFallback
-                ? `Aucune observation physique validée : fusion officielle de ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèles, avec pondérations de température traçables.`
-                : locationWeather.ultraLocal.usesOfficialFallback
-                ? "Aucune observation physique validée : la valeur ci-dessous est strictement celle de la prévision officielle affichée au-dessus."
-                : "Mesure locale issue des stations : elle complète la prévision officielle affichée au-dessus, sans la remplacer."}
-            </p>
-
-            {/* Temperature from ultra-local */}
-            {locationWeather.ultraLocal.temperature != null && (
-              <div className="flex items-center gap-3">
-                <span className="text-2xl font-bold text-emerald-300">
-                  {Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C
-                </span>
-                <div className="text-xs text-muted-foreground">
-                  <p>{locationWeather.ultraLocal.usesModelFallback ? `Source : ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèles pondérés` : locationWeather.ultraLocal.usesOfficialFallback ? "Source : prévision officielle" : <>Confiance : <span className="font-semibold text-foreground">{locationWeather.ultraLocal.confidenceScore}%</span></>}</p>
-                  {!locationWeather.ultraLocal.usesOfficialFallback && !locationWeather.ultraLocal.usesModelFallback && locationWeather.ultraLocal.microclimateAdjustment !== 0 && (
-                    <p>Microclimat : {locationWeather.ultraLocal.microclimateAdjustment > 0 ? "+" : ""}{Number(locationWeather.ultraLocal.microclimateAdjustment).toFixed(1)}°C</p>
-                  )}
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-2xl font-bold text-emerald-300">{locationWeather.ultraLocal.temperature != null ? `${Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C` : "—"}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {locationWeather.ultraLocal.stationCount > 0
+                      ? `${locationWeather.ultraLocal.stationCount} station${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} physique${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} qualifiée${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""}`
+                      : `Repli explicite sur ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèle${locationWeather.ultraLocal.modelFallback?.modelCount === 1 ? "" : "s"}`}
+                  </p>
                 </div>
+                <span className="text-xs text-emerald-200">Confiance {locationWeather.ultraLocal.confidenceScore}%</span>
               </div>
-            )}
-
-            {locationWeather.ultraLocal.usesModelFallback && modelFallbackContributors.length > 0 && (
-              <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-2.5 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Contributions de la fusion officielle</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {modelFallbackContributors.map((model: any) => (
-                    <span key={model.name} className="rounded-md border border-violet-500/20 bg-slate-950/40 px-1.5 py-1 text-[10px] text-slate-200">
-                      {model.name} {Number(model.temperature).toFixed(1)}° · {Math.round(Number(model.weight) * 100)}%
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">Poids de température issus de la trace de fusion officielle ; ce sont des modèles, pas des stations.</p>
-              </div>
-            )}
-
-            {/* Band breakdown */}
-            {locationWeather.ultraLocal.bandBreakdown.filter((b: any) => b.stationCount > 0).length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {locationWeather.ultraLocal.bandBreakdown.filter((b: any) => b.stationCount > 0).map((band: any) => (
-                  <div key={band.band} className="text-center rounded-lg bg-background/50 border border-border/50 p-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">{band.band}</p>
-                    <p className="text-sm font-bold">{band.avgTemperature != null ? `${band.avgTemperature}°` : "—"}</p>
-                    <p className="text-xs text-emerald-400">{Math.round(band.effectiveWeight * 100)}% · {band.stationCount}st.</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Top stations used */}
-            {locationWeather.ultraLocal.stationsUsed.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Stations utilisées :</p>
-                <div className="space-y-0.5">
-                  {locationWeather.ultraLocal.stationsUsed.slice(0, 4).map((s: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="truncate max-w-[50%]">{s.name}</span>
-                      <span className="text-muted-foreground">{s.distanceKm.toFixed(1)} km · {s.temperature != null ? `${s.temperature.toFixed(1)}°C` : "—"} · <span className="text-emerald-400 font-medium">{Math.round(s.weight * 100)}%</span></span>
+              {locationWeather.ultraLocal.stationsUsed.length > 0 ? (
+                <div className="mt-3 space-y-1.5 border-t border-emerald-500/15 pt-2">
+                  {locationWeather.ultraLocal.stationsUsed.slice(0, 4).map((station: any) => (
+                    <div key={station.stationId} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                      <span className="min-w-0 truncate">{station.name} · {station.distanceKm.toFixed(1)} km</span>
+                      <span className="shrink-0 text-emerald-200">{station.adjustedTemperature?.toFixed(1) ?? "—"}° · {Math.round(station.weight * 100)}%</span>
                     </div>
                   ))}
-                  {locationWeather.ultraLocal.stationsUsed.length > 4 && (
-                    <p className="text-xs text-muted-foreground">+ {locationWeather.ultraLocal.stationsUsed.length - 4} autres stations</p>
-                  )}
+                  <p className="pt-1 text-[10px] leading-relaxed text-slate-400">Poids : distance, fraîcheur, fiabilité historique, cohérence et correction d’altitude.</p>
                 </div>
-              </div>
-            )}
-
-            {/* Explanation */}
-            <p className="text-xs text-muted-foreground italic leading-relaxed">
-              {locationWeather.ultraLocal.explanation}
-            </p>
-          </div>
+              ) : modelFallbackContributors.length > 0 ? (
+                <p className="mt-3 border-t border-emerald-500/15 pt-2 text-[10px] leading-relaxed text-slate-400">Contributeurs de repli : {modelFallbackContributors.map((model: any) => `${model.name} ${Math.round(Number(model.weight) * 100)}%`).join(" · ")}. Aucun modèle n’est présenté comme station.</p>
+              ) : null}
+            </div>
+            <LocalOfficialDeltaChart points={localOfficialHistory} />
+          </section>
         )}
-
 
                 {/* Hourly Chart */}
         <div className="bg-card border border-border rounded-2xl p-0 overflow-hidden">
