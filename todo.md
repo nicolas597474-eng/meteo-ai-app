@@ -965,6 +965,10 @@
 - [x] Interface: Afficher les pondérations température, pluie, vent et conditions pour chaque régime.
 - [x] Tests: Vérifier que chaque régime conserve ses pondérations et reste visible sans défilement interne.
 
+## Régimes repliables individuellement
+- [x] Interface: Permettre d’ouvrir et refermer les pondérations de chaque régime séparément.
+- [x] Tests: Vérifier l’état accessible ouvert/replié sans modifier le régime actif ni son catalogue.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.

@@ -102,6 +102,7 @@ export default function Dashboard() {
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
   const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
   const [showRegimeMenu, setShowRegimeMenu] = useState(false);
+  const [expandedRegimeIds, setExpandedRegimeIds] = useState<string[]>([]);
   const [showFusionDetails, setShowFusionDetails] = useState(false);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
@@ -449,18 +450,30 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
                       {regimeCatalogue.map((candidate: any) => {
                         const isActive = candidate.id === primaryRegimeId;
+                        const isExpanded = expandedRegimeIds.includes(candidate.id);
+                        const detailsId = `regime-weights-${candidate.id}`;
                         return (
-                          <div key={candidate.id} className={`min-w-0 rounded-md px-1.5 py-1.5 text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
-                            <div className="flex min-w-0 items-start gap-1.5">
-                            <span className="pt-px">{candidate.emoji}</span>
-                            <span className="min-w-0"><strong className="block truncate">{candidate.label}{isActive ? " · actif" : ""}</strong><span className="mt-0.5 hidden leading-snug text-slate-400 sm:block">{candidate.description}</span></span>
-                            </div>
-                            <div className="mt-1 grid grid-cols-2 gap-x-1 gap-y-0.5 border-t border-slate-700/40 pt-1 text-[8px] leading-tight text-slate-400">
-                              <span>Temp. {Math.round(candidate.weights.temp * 100)}%</span>
-                              <span>Pluie {Math.round(candidate.weights.precip * 100)}%</span>
-                              <span>Vent {Math.round(candidate.weights.wind * 100)}%</span>
-                              <span>Cond. {Math.round(candidate.weights.condition * 100)}%</span>
-                            </div>
+                          <div key={candidate.id} className={`min-w-0 rounded-md text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRegimeIds((current) => current.includes(candidate.id) ? current.filter((id) => id !== candidate.id) : [...current, candidate.id])}
+                              aria-expanded={isExpanded}
+                              aria-controls={detailsId}
+                              aria-label={`${isExpanded ? "Replier" : "Afficher"} les pondérations de ${candidate.label}`}
+                              className="flex w-full min-w-0 items-start gap-1.5 px-1.5 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              <span className="pt-px">{candidate.emoji}</span>
+                              <span className="min-w-0 flex-1"><strong className="block truncate">{candidate.label}{isActive ? " · actif" : ""}</strong><span className="mt-0.5 hidden leading-snug text-slate-400 sm:block">{candidate.description}</span></span>
+                              {isExpanded ? <ChevronUp className="mt-px h-3 w-3 shrink-0" aria-hidden="true" /> : <ChevronDown className="mt-px h-3 w-3 shrink-0 text-slate-500" aria-hidden="true" />}
+                            </button>
+                            {isExpanded && (
+                              <div id={detailsId} className="mx-1.5 mb-1.5 grid grid-cols-2 gap-x-1 gap-y-0.5 border-t border-slate-700/40 pt-1 text-[8px] leading-tight text-slate-400">
+                                <span>Temp. {Math.round(candidate.weights.temp * 100)}%</span>
+                                <span>Pluie {Math.round(candidate.weights.precip * 100)}%</span>
+                                <span>Vent {Math.round(candidate.weights.wind * 100)}%</span>
+                                <span>Cond. {Math.round(candidate.weights.condition * 100)}%</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

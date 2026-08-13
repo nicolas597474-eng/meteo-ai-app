@@ -14,5 +14,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).not.toContain("max-h-72 overflow-y-auto");
     expect(source).toContain("candidate.weights.temp");
     expect(source).toContain("candidate.weights.condition");
+    expect(source).toContain("expandedRegimeIds");
+    expect(source).toContain("aria-expanded={isExpanded}");
   });
 });
