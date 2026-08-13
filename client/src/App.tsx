@@ -33,7 +33,7 @@ const navItems = [
 function TopNav() {
   const [location] = useLocation();
   return (
-    <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border">
+    <nav className="sticky top-0 z-50 hidden border-b border-border bg-background/90 backdrop-blur-xl sm:block">
       <div className="max-w-2xl mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between h-14">
           <Link href="/" className="flex items-center gap-2">

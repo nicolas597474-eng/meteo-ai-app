@@ -959,3 +959,7 @@
 ## Design du menu de régimes
 - [x] Interface: Affiner le menu déroulant des régimes pour une intégration mobile plus fluide à la carte Tendance.
 - [x] Tests: Préserver le catalogue, le régime actif et l’accessibilité du menu après la retouche visuelle.
+
+## Allègement de l’en-tête Dashboard
+- [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
+- [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
