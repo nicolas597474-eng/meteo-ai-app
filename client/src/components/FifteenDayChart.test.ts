@@ -9,8 +9,9 @@ describe("FifteenDayChart", () => {
     expect(source).toContain('aria-label="Échelles du graphique de prévisions"');
     expect(source).toContain("windScaleTop");
     expect(source).toContain("precipScaleTop");
-    expect(source).toContain("const gridStep = 5;");
-    expect(source).toContain("tempTicks");
+    expect(source).toContain("const gridStep = 10;");
+    expect(source).toContain("index * 10");
+    expect(source).toContain("const scaleBot = Math.floor((dataLow - 3) / gridStep) * gridStep;");
     expect(source).toContain("text-white");
     expect(source).toContain("text-emerald-400");
     expect(source).toContain("text-sky-400");

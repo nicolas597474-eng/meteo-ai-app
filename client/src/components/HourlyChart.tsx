@@ -79,7 +79,7 @@ function HourlyScaleLabels({
   windMax: number;
   precipMax: number;
 }) {
-  const tempTicks = Array.from({ length: Math.max(0, Math.round((scaleTop - scaleBot) / 5) + 1) }, (_, index) => scaleBot + index * 5);
+  const tempTicks = Array.from({ length: Math.max(0, Math.round((scaleTop - scaleBot) / 10) + 1) }, (_, index) => scaleBot + index * 10);
   const tempToAxisY = (value: number) => tempTop + (1 - (value - scaleBot) / (scaleTop - scaleBot || 1)) * (tempBottom - tempTop);
   return (
     <aside aria-label="Échelles du graphique horaire" className="relative z-10 w-10 shrink-0 border-r border-slate-700/70 bg-[#06080d] text-right text-[8px] font-medium text-slate-500" style={{ height: totalHeight }}>
@@ -249,7 +249,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const allTemps = hours.map(h => h.temp ?? 0);
   const dataHigh = Math.max(...allTemps);
   const dataLow = Math.min(...allTemps);
-  const gridStep = 5;
+  const gridStep = 10;
   const scaleTop = Math.ceil((dataHigh + 2) / gridStep) * gridStep;
   const scaleBot = Math.floor((dataLow - 2) / gridStep) * gridStep;
   const scaleRange = scaleTop - scaleBot || 1;

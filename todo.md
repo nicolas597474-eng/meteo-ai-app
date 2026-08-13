@@ -991,6 +991,11 @@
 - [x] Interface: Afficher les degrés en blanc, le vent en vert et la pluie en bleu sur les échelles.
 - [x] Tests: Vérifier les graduations de 5 °C et les unités compactes sur les deux graphiques.
 
+## Échelles thermiques dynamiques de 10 °C
+- [x] Interface: Utiliser des graduations de température de 10 °C sur les deux graphiques.
+- [x] Interface: Étendre automatiquement les échelles aux températures négatives.
+- [x] Tests: Vérifier des plages strictement positives et des plages franchissant 0 °C.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
