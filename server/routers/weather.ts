@@ -51,9 +51,12 @@ function getTodayParis(): string {
   return getParisDate();
 }
 
-function getCurrentHourlyRegimeInput(hours: Array<any>) {
-  const nowHour = `${getParisHour()}:00`;
-  const current = hours.find((hour) => hour.hour === nowHour) ?? null;
+export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour()) {
+  const hourNumber = Number(currentHour);
+  const current = hours.find((hour) => {
+    const match = String(hour?.hour ?? "").match(/^(\d{1,2}):/);
+    return match != null && Number(match[1]) === hourNumber;
+  }) ?? null;
   if (!current) return null;
   return {
     temp: current.temp ?? null,

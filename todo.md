@@ -847,6 +847,16 @@
 - [x] Frontend: Charger les pages secondaires à la demande sans modifier la navigation ni les données.
 - [x] Tests: Vérifier la disponibilité des routes différées et le chargement du Dashboard.
 
+## Audit complet post-évolutions — lecture seule
+- [x] Audit: Examiner architecture, routes, dépendances, pages et composants après les dernières évolutions.
+- [x] Audit: Examiner sources, provenance, scores, automatisations, sécurité et performances.
+- [x] Rapport: Qualifier les incohérences, risques, éléments validés et priorités de correction sans modifier l’application.
+
+## Cohérence régime / nébulosité
+- [x] Diagnostic: Comparer les instants et seuils utilisés par le régime, la condition actuelle et la nébulosité détaillée.
+- [x] Backend: Aligner le régime courant sur la même échéance que la condition actuelle affichée.
+- [x] Tests: Vérifier qu’une nébulosité très faible ne produit plus un régime partiellement nuageux au même instant.
+
 ## Décision utilisateur — nouvelles observations officielles
 - [x] Décision: Ne pas intégrer Météo‑France ni aucune nouvelle source d’observations officielle pour l’audit ou le scoring.
 

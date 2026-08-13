@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
+import { getCurrentHourlyRegimeInput } from "./routers/weather";
 import type { TrpcContext } from "./_core/context";
 
 function createPublicContext(): TrpcContext {
@@ -16,6 +17,18 @@ function createPublicContext(): TrpcContext {
 }
 
 describe("weather.getDashboard", () => {
+  it("retrouve la prévision de l’heure courante malgré un format horaire sans zéro initial", () => {
+    const current = getCurrentHourlyRegimeInput([
+      { hour: "6:00", temp: 15.7, precipitation: 0, windSpeed: 5.8, humidity: 33, cloudCover: 4 },
+      { hour: "07:00", temp: 17, precipitation: 0, windSpeed: 6, humidity: 35, cloudCover: 8 },
+    ], 6);
+
+    expect(current).toEqual(expect.objectContaining({
+      temp: 15.7,
+      cloudCover: 4,
+    }));
+  });
+
   it("returns dashboard data with today's date", async () => {
     const ctx = createPublicContext();
     const caller = appRouter.createCaller(ctx);
