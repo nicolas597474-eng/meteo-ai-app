@@ -30,6 +30,12 @@ describe("sécurité OAuth Netatmo", () => {
     expect(hashNetatmoState(state)).toBe(hash);
   });
 
+  it("porte l’identité dans l’état signé plutôt que dans un contexte de session transitoire", () => {
+    const state = createNetatmoState(42, Date.now());
+    expect(verifyNetatmoState(state)?.userId).toBe(42);
+    expect(hashNetatmoState(state)).toHaveLength(64);
+  });
+
   it("chiffre le refresh token sans le conserver en clair", () => {
     const token = "refresh-token-test";
     const encrypted = encryptNetatmoRefreshToken(token);

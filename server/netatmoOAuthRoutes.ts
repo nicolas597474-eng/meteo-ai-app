@@ -44,7 +44,7 @@ export function registerNetatmoOAuthRoutes(app: Express) {
       res.status(400).send("Connexion Netatmo refusée (callback_invalide). Relancez l’autorisation depuis MeteoAI.");
       return;
     }
-    const stateConsumed = await consumeNetatmoOAuthState(hashNetatmoState(state!), verifiedState.userId);
+    const stateConsumed = await consumeNetatmoOAuthState(hashNetatmoState(state!));
     if (!stateConsumed) {
       console.warn("[Netatmo OAuth] Callback rejeté: état absent, expiré ou déjà consommé");
       res.status(400).send("Connexion Netatmo expirée ou déjà utilisée. Relancez l’autorisation depuis MeteoAI.");

@@ -875,3 +875,8 @@
 - [x] Audit: Recenser les sélecteurs, calculs et libellés Local / Ultra-local encore actifs.
 - [x] Frontend: Réduire les modes à une information de contexte sans divergence avec la prévision officielle.
 - [x] Tests: Vérifier que la température officielle reste identique indépendamment du mode sélectionné.
+
+## Correctif state OAuth Netatmo
+- [x] Diagnostic: Identifier pourquoi le state OAuth est perdu entre l’autorisation et le callback.
+- [x] Backend: Persister et valider le state OAuth de manière durable et à usage unique.
+- [x] Tests: Vérifier le callback avec state valide, expiré et déjà utilisé.

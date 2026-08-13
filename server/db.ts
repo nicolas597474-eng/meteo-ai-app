@@ -781,14 +781,19 @@ export async function createNetatmoOAuthState(stateHash: string, userId: number,
   await db.insert(netatmoOAuthStates).values({ stateHash, userId, expiresAt });
 }
 
-export async function consumeNetatmoOAuthState(stateHash: string, userId: number, now = new Date()) {
+/**
+ * Consume an OAuth state by its unguessable signed-state hash.
+ * The callback already verifies the signed user ID before this write; adding a
+ * second user ID predicate here can reject a valid round trip if authentication
+ * context changes between authorization and the provider callback.
+ */
+export async function consumeNetatmoOAuthState(stateHash: string, now = new Date()) {
   const db = await getDb();
   if (!db) return false;
   const result = await db.update(netatmoOAuthStates)
     .set({ consumedAt: now })
     .where(and(
       eq(netatmoOAuthStates.stateHash, stateHash),
-      eq(netatmoOAuthStates.userId, userId),
       gte(netatmoOAuthStates.expiresAt, now),
       isNull(netatmoOAuthStates.consumedAt),
     ));
