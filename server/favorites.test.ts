@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDashboardCurrentTemperature, resolveLocalModeTemperature } from "./routers/favorites";
+import { buildDashboardCurrentTemperature, getDashboardNetatmoCollectionOptions, resolveLocalModeTemperature } from "./routers/favorites";
 
 describe("buildDashboardCurrentTemperature", () => {
   it("utilise l’observation locale validée en modes Local et Ultra-local", () => {
@@ -82,5 +82,16 @@ describe("buildDashboardCurrentTemperature", () => {
       microclimateAdjustment: 0,
       usesModelFallback: true,
     });
+  });
+});
+
+describe("getDashboardNetatmoCollectionOptions", () => {
+  it("transmet uniquement l’identité résolue côté serveur pour la session autorisée", () => {
+    expect(getDashboardNetatmoCollectionOptions({ id: 42 })).toEqual({ netatmoUserId: 42 });
+  });
+
+  it("n’envoie aucune identité Netatmo lorsque la session est absente", () => {
+    expect(getDashboardNetatmoCollectionOptions(null)).toEqual({});
+    expect(getDashboardNetatmoCollectionOptions(undefined)).toEqual({});
   });
 });

@@ -902,3 +902,16 @@
 
 ## Décision utilisateur — sources personnelles
 - [x] Décision: Conserver Netatmo comme seule source personnelle active ; archiver les alternatives sans intégration.
+
+## Diagnostic intégral Netatmo Hondeghem — lecture seule
+- [x] Audit: Vérifier une station Netatmo réelle, sa qualification, son admissibilité et sa contribution potentielle.
+- [x] Audit: Vérifier son archivage d’observations et les prérequis du scoring futur.
+- [x] Rapport: Restituer la chaîne complète sans modifier le code, les données ou les tâches.
+
+## Solutions d’autorisation Netatmo pour le Dashboard — analyse
+- [x] Analyse: Comparer les solutions de propagation sécurisée de l’identité OAuth au Dashboard.
+- [x] Recommandation: Décrire le correctif, les tests et les garde-fous sans l’appliquer.
+
+## Correctif Dashboard Netatmo proposé
+- [x] Backend: Transmettre `ctx.user?.id` au collecteur Netatmo dans le parcours Dashboard, après accord explicite.
+- [x] Tests: Vérifier session autorisée, session absente, absence de jeton et exclusion de tout identifiant client.

@@ -85,6 +85,15 @@ export function buildDashboardCurrentTemperature(input: {
       : Math.round((temperature - input.officialTemperature) * 10) / 10,
   };
 }
+
+/**
+ * Les identifiants Netatmo proviennent exclusivement de la session résolue côté
+ * serveur. Aucun identifiant de compte ne doit être reçu depuis le navigateur.
+ */
+export function getDashboardNetatmoCollectionOptions(user: { id: number } | null | undefined) {
+  return user?.id !== undefined ? { netatmoUserId: user.id } : {};
+}
+
 import { collectNearbyStations, rankStations, calculateGroundTruth, getPhysicalActiveStations, fetchCurrentModelReferences } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
 import { computeFusion, detectMultiRegime, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
@@ -218,7 +227,7 @@ export const favoritesRouter = router({
       localMode: z.enum(["standard", "local", "ultra-local"]).default("standard"),
       name: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const { lat, lon, radiusKm, localMode } = input;
 
       // For ultra-local, always search at least 20km to find all potential stations
@@ -230,7 +239,13 @@ export const favoritesRouter = router({
       const locationKey = makeLocationKey(lat, lon);
       const [officialSnapshot, stations, currentModelReferences, meteoAI] = await Promise.all([
         resolveOfficialWeatherSnapshot(coords),
-        collectNearbyStations(lat, lon, searchRadius, input.name ?? "Local"),
+        collectNearbyStations(
+          lat,
+          lon,
+          searchRadius,
+          input.name ?? "Local",
+          getDashboardNetatmoCollectionOptions(ctx.user),
+        ),
         fetchCurrentModelReferences(lat, lon),
         getMeteoAIForecastByDate(todayDate, locationKey),
       ]);
