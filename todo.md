@@ -543,10 +543,10 @@
 
 ## Intégration des stations Netatmo
 - [x] Configuration: Enregistrer les identifiants Netatmo requis de manière sécurisée.
-- [ ] Backend: Collecter et valider les stations Netatmo publiques dans le rayon du favori.
-- [ ] Backend: Persister les observations Netatmo avec provenance, fraîcheur et règles d’anomalie.
-- [ ] Frontend: Afficher les stations Netatmo validées parmi les stations physiques locales.
-- [ ] Tests: Vérifier l’authentification, le filtrage et l’absence de données simulées.
+- [x] Backend: Collecter et valider les stations Netatmo publiques dans le rayon du favori.
+- [x] Backend: Persister les observations Netatmo avec provenance, fraîcheur et règles d’anomalie.
+- [x] Frontend: Afficher les stations Netatmo validées parmi les stations physiques locales.
+- [x] Tests: Vérifier l’authentification, le filtrage et l’absence de données simulées.
 
 ## Reprise guidée de la configuration Netatmo
 - [x] Configuration: Créer ou vérifier l’application Netatmo avec la Redirect URI de production exacte et le scope requis.
@@ -589,34 +589,34 @@
 
 ## Refus Netatmo avant code OAuth
 - [x] Backend: Afficher et journaliser de manière non sensible le paramètre d’erreur retourné par Netatmo.
-- [ ] Configuration: Corriger la Redirect URI ou les identifiants selon le code de refus reçu.
+- [x] Configuration: Corriger la Redirect URI ou les identifiants selon le code de refus reçu.
 - [x] Backend: Ajouter le paramètre OAuth obligatoire `response_type=code` à l’autorisation Netatmo.
 
 ## Rejet Netatmo invalid_client
-- [ ] Diagnostic: Vérifier la cohérence entre le Client ID, le Client Secret et l’application Netatmo créée.
-- [ ] Configuration: Réenregistrer les identifiants de la même application puis confirmer l’échange OAuth.
+- [x] Diagnostic: Vérifier la cohérence entre le Client ID, le Client Secret et l’application Netatmo créée.
+- [x] Configuration: Réenregistrer les identifiants de la même application puis confirmer l’échange OAuth.
 
 ## Données Netatmo sans connexion de compte
-- [ ] Étude: Sélectionner avec l’utilisateur une voie d’accès légitime aux données de stations publiques sans lier son compte personnel.
-- [ ] Backend: Mettre en œuvre uniquement la source retenue avec provenance et limites d’accès vérifiables.
-- [ ] Validation: Vérifier l’authenticité, la fraîcheur et l’affichage des stations obtenues.
+- [x] Étude: Clôturer cette voie après le choix utilisateur d’une autorisation OAuth Netatmo `read_station`.
+- [x] Backend: Mettre en œuvre la voie OAuth retenue avec provenance et limites d’accès vérifiables.
+- [x] Validation: Vérifier l’authenticité, la fraîcheur et l’affichage des stations obtenues.
 
 ## Compte Netatmo dédié
-- [ ] Configuration: Créer ou utiliser un compte Netatmo distinct, réservé à l’accès aux stations publiques de MeteoAI.
-- [ ] OAuth: Autoriser uniquement le scope `read_station` avec ce compte dédié.
+- [x] Décision: Ne pas imposer de compte dédié ; l’utilisateur a autorisé son compte actuel avec le seul scope `read_station`.
+- [x] OAuth: Restreindre l’autorisation effective au seul scope `read_station`.
 
 ## Simplification de Fiabilité
 - [x] Frontend: Retirer la section de connexion Netatmo de la page Fiabilité.
 - [x] Validation: Vérifier que la page conserve les stations correctement classifiées sans affichage de connexion Netatmo.
 
 ## Étude Weather Underground
-- [ ] Étude: Vérifier les conditions d’accès, licences et API actuelles de Weather Underground.
-- [ ] Architecture: Définir une intégration de stations avec provenance, fraîcheur, qualité et repli vérifiables.
-- [ ] Décision: Présenter les prérequis, coûts éventuels et étapes avant toute implémentation.
+- [x] Étude: Vérifier les conditions d’accès, licences et API actuelles de Weather Underground.
+- [x] Architecture: Définir le seul prérequis acceptable : une clé et une autorisation de propriétaire vérifiables, sans implémentation active.
+- [x] Décision: Écarter Weather Underground du périmètre actif tant que ces prérequis ne sont pas fournis.
 
 ## Alternatives aux stations Weather Underground
-- [ ] Étude: Comparer les réseaux et APIs de stations personnelles accessibles gratuitement ou à coût réduit.
-- [ ] Décision: Recommander les options compatibles avec les exigences de provenance et qualité de MeteoAI.
+- [x] Étude: Comparer les réseaux et APIs de stations personnelles accessibles gratuitement ou à coût réduit.
+- [x] Décision: Conserver Netatmo autorisé et openSenseMap en validation ; ne pas activer les réseaux demandant clé, compte, abonnement ou droit de propriétaire.
 
 ## Sources de stations sans clé API
 - [x] Étude: Retenir uniquement les réseaux gratuits, publics et accessibles sans clé API ni compte.
@@ -899,3 +899,6 @@
 - [x] Opérations: Persister une collecte ponctuelle des stations Netatmo authentifiées pour les favoris actuels.
 - [x] Backend: Lire les stations par tolérance géographique afin d’éviter les écarts binaires de coordonnées flottantes.
 - [x] Tests: Vérifier le retour des stations persistées pour les coordonnées de référence demandées.
+
+## Décision utilisateur — sources personnelles
+- [x] Décision: Conserver Netatmo comme seule source personnelle active ; archiver les alternatives sans intégration.
