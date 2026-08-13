@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { Calendar, BarChart3, MapPin, Wind, CloudRain, Thermometer, Clock, TrendingUp } from "lucide-react";
 import { useLocation } from "@/contexts/LocationContext";
+import { BackToTopButton } from "@/components/BackToTopButton";
 import {
   LineChart,
   Line,
@@ -148,8 +149,8 @@ export default function History() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="container">
+      <div className="min-h-screen bg-background px-3 pb-24 pt-3 sm:p-6">
+        <div className="mx-auto max-w-2xl">
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-48 bg-muted rounded" />
             <div className="h-64 bg-muted rounded-xl" />
@@ -168,7 +169,7 @@ export default function History() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container py-8 space-y-6">
+      <div className="mx-auto max-w-2xl space-y-4 px-3 pb-24 pt-3 sm:space-y-6 sm:px-5 sm:py-8">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -590,6 +591,7 @@ export default function History() {
           </div>
         )}
       </div>
+      <BackToTopButton />
     </div>
   );
 }

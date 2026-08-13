@@ -963,3 +963,9 @@
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
+
+## Ergonomie mobile des pages longues
+- [x] Interface: Réduire l’espace supérieur restant du Dashboard sur mobile.
+- [x] Interface: Ajouter un retour au début accessible sur Fiabilité et Historique.
+- [x] Interface: Harmoniser les marges mobiles de Fiabilité et Historique.
+- [x] Tests: Vérifier les espacements et la disponibilité du retour au début sur les pages longues.

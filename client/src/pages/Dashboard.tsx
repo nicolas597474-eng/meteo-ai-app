@@ -344,7 +344,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-3 py-3 space-y-3 sm:px-6 sm:py-8 sm:space-y-6">
+      <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-2 sm:space-y-6 sm:px-6 sm:py-8">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">

@@ -8,6 +8,7 @@ import { filterAndSortStationSources, type SourceDistanceOrder, type SourceKindF
 import { getStationDisplayStatus } from "@/lib/stationCandidateStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
+import { BackToTopButton } from "@/components/BackToTopButton";
 
 type ComparisonPoint = {
   hour?: number;
@@ -120,7 +121,7 @@ export default function Ranking() {
   };
 
   if (isLoading) {
-    return <div className="min-h-screen bg-[#080a0f] max-w-2xl mx-auto px-4 pt-5 space-y-4"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
+    return <div className="mx-auto min-h-screen max-w-2xl space-y-4 bg-[#080a0f] px-3 pb-24 pt-3 sm:px-5 sm:pt-5"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
   }
 
   const stations = data?.stations ?? [];
@@ -138,7 +139,7 @@ export default function Ranking() {
 
   return (
     <main className="min-h-screen bg-[#080a0f] pb-28">
-      <div className="mx-auto max-w-2xl px-3 pt-4 sm:px-5">
+      <div className="mx-auto max-w-2xl px-3 pt-2 sm:px-5 sm:pt-4">
         <header className="mb-4 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 text-blue-400"><MeteoIcon name="location" size={19} /><span className="text-sm font-semibold">{locationName}</span></div>
@@ -208,6 +209,7 @@ export default function Ranking() {
         </section>
       </div>
       <SourceDetailsDialog selection={selectedSource} groundTruth={liveStationData?.groundTruth} onOpenChange={(open) => { if (!open) setSelectedSource(null); }} />
+      <BackToTopButton />
     </main>
   );
 }
