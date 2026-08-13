@@ -95,6 +95,10 @@ function storeLocalMode(mode: "standard" | "local" | "ultra-local") {
   try { localStorage.setItem("meteoai_local_mode", mode); } catch {}
 }
 
+function formatRegimeWeight(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value * 100)}%` : "—";
+}
+
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
@@ -452,6 +456,7 @@ export default function Dashboard() {
                         const isActive = candidate.id === primaryRegimeId;
                         const isExpanded = expandedRegimeIds.includes(candidate.id);
                         const detailsId = `regime-weights-${candidate.id}`;
+                        const weights = candidate?.weights && typeof candidate.weights === "object" ? candidate.weights : null;
                         return (
                           <div key={candidate.id} className={`min-w-0 rounded-md text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
                             <button
@@ -468,10 +473,10 @@ export default function Dashboard() {
                             </button>
                             {isExpanded && (
                               <div id={detailsId} className="mx-1.5 mb-1.5 grid grid-cols-2 gap-x-1 gap-y-0.5 border-t border-slate-700/40 pt-1 text-[8px] leading-tight text-slate-400">
-                                <span>Temp. {Math.round(candidate.weights.temp * 100)}%</span>
-                                <span>Pluie {Math.round(candidate.weights.precip * 100)}%</span>
-                                <span>Vent {Math.round(candidate.weights.wind * 100)}%</span>
-                                <span>Cond. {Math.round(candidate.weights.condition * 100)}%</span>
+                                <span>Temp. {formatRegimeWeight(weights?.temp)}</span>
+                                <span>Pluie {formatRegimeWeight(weights?.precip)}</span>
+                                <span>Vent {formatRegimeWeight(weights?.wind)}</span>
+                                <span>Cond. {formatRegimeWeight(weights?.condition)}</span>
                               </div>
                             )}
                           </div>

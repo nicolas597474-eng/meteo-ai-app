@@ -969,6 +969,10 @@
 - [x] Interface: Permettre d’ouvrir et refermer les pondérations de chaque régime séparément.
 - [x] Tests: Vérifier l’état accessible ouvert/replié sans modifier le régime actif ni son catalogue.
 
+## Robustesse du menu de régimes
+- [x] Correctif: Empêcher une pondération manquante de provoquer une erreur au déploiement d’un régime.
+- [x] Tests: Couvrir explicitement un régime sans objet `weights` complet.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
