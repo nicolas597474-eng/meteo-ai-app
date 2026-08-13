@@ -245,6 +245,30 @@ export type StationObservation = typeof stationObservations.$inferSelect;
 export type InsertStationObservation = typeof stationObservations.$inferInsert;
 
 /**
+ * Measured historical quality of a physical station. This profile documents
+ * continuity and data quality; it never changes operational fusion weights by
+ * itself. A status of "reliable" is therefore evidence metadata, not a new
+ * source tier.
+ */
+export const stationQualityProfiles = mysqlTable("station_quality_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  stationId: varchar("stationId", { length: 128 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("en_observation"),
+  observationCount: int("observationCount").notNull().default(0),
+  temperatureObservationCount: int("temperatureObservationCount").notNull().default(0),
+  continuityScore: float("continuityScore"),
+  completenessScore: float("completenessScore"),
+  stabilityScore: float("stabilityScore"),
+  windowHours: int("windowHours").notNull().default(0),
+  firstObservedAt: bigint("firstObservedAt", { mode: "number" }),
+  lastObservedAt: bigint("lastObservedAt", { mode: "number" }),
+  evaluatedAt: timestamp("evaluatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("station_quality_profile_station_unique").on(table.stationId)]);
+
+export type StationQualityProfile = typeof stationQualityProfiles.$inferSelect;
+export type InsertStationQualityProfile = typeof stationQualityProfiles.$inferInsert;
+
+/**
  * Physical-station synthesis captured for one location and Paris hour.
  * It is separate from model references and is the sole eligible input for
  * a later daily observation used in model scoring.

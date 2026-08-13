@@ -49,6 +49,7 @@ import {
   getQualifiedLeadTimeScoresForLocation,
   upsertWeatherStation,
   upsertStationObservation,
+  refreshStationQualityProfiles,
   upsertGroundTruthSnapshot,
   upsertQualifiedObservationSnapshot,
   insertStationCollectionSnapshot,
@@ -1054,6 +1055,9 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
           precipitation: station.precipitation,
         });
       }
+      // Evidence-only metadata: profile status does not change the active
+      // station list or its operational weight in this collection cycle.
+      await refreshStationQualityProfiles(physical.map((station) => station.stationId));
       const synthesis = calculateGroundTruth(physical);
       if (synthesis.stationCount < 1 || synthesis.temperature == null) {
         results.push({ locationKey, stationCount: synthesis.stationCount, stored: false, reason: "Aucune station physique qualifiée" });

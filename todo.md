@@ -926,3 +926,15 @@
 - [x] Ultra-local: Exposer la preuve des contrôles altitude et stabilité, sans les présenter comme validés lorsqu’ils ne sont pas mesurés.
 - [x] Autorisation: Exposer un état explicite connexion absente / temporairement indisponible sans divulguer de secret.
 - [x] Scoring: Garantir que le cycle quotidien ne score qu’après la couverture physique minimale de 18 heures.
+
+## Comparaison du document utilisateur — lecture seule
+- [x] Analyse: Extraire les recommandations du document et les comparer aux mécanismes existants.
+- [x] Rapport: Prioriser les évolutions utiles sans modifier le code, les données ni les tâches.
+
+## Renforcement scientifique MeteoAI
+- [x] Local/Ultra-local: Aligner les sources, exclusions et seuils de fraîcheur avec le mode réellement affiché.
+- [x] Qualité stations: Créer un profil historique objectif de continuité, stabilité et données manquantes sans modifier les poids prématurément.
+- [x] Qualité stations: Calculer une première fois les profils depuis les observations réellement archivées.
+- [ ] Confiance: Distinguer et expliquer les confiances observation locale, prévision officielle et régime.
+- [ ] Cohérence: Ajouter des contrôles automatisés entre les pages qui doivent partager un même snapshot.
+- [ ] Scoring: Étendre les métriques seulement lorsque les observations physiques qualifiées rendent la comparaison possible.

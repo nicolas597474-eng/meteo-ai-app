@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDashboardCurrentTemperature, getDashboardNetatmoCollectionOptions, resolveLocalModeTemperature } from "./routers/favorites";
+import { buildDashboardCurrentTemperature, getDashboardNetatmoCollectionOptions, getModeAlignedFusionConstraints, resolveLocalModeTemperature } from "./routers/favorites";
 
 describe("buildDashboardCurrentTemperature", () => {
   it("utilise l’observation locale validée en modes Local et Ultra-local", () => {
@@ -102,5 +102,16 @@ describe("getDashboardNetatmoCollectionOptions", () => {
     expect(statuses).toEqual(["fresh_cache"]);
     expect(options).not.toHaveProperty("accessToken");
     expect(options).not.toHaveProperty("refreshToken");
+  });
+});
+
+describe("getModeAlignedFusionConstraints", () => {
+  it("ne réadmet pas dans la fusion une station trop ancienne pour le mode affiché", () => {
+    expect(getModeAlignedFusionConstraints("local")).toMatchObject({ maxFreshnessMin: 60, maxTempDeviationC: 6, minReliabilityScore: 40 });
+    expect(getModeAlignedFusionConstraints("ultra-local")).toMatchObject({ maxFreshnessMin: 30, maxTempDeviationC: 5, minReliabilityScore: 45 });
+  });
+
+  it("conserve le périmètre plus large réservé au mode Standard", () => {
+    expect(getModeAlignedFusionConstraints("standard")).toMatchObject({ maxFreshnessMin: 180, maxTempDeviationC: 6, minReliabilityScore: 40 });
   });
 });

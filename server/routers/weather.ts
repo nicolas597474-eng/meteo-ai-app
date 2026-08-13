@@ -28,6 +28,7 @@ import {
   getStoredHourlyForecasts,
   getStationCollectionSnapshots,
   getQualifiedEvidenceStatus,
+  getStationQualityProfiles,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
@@ -1313,6 +1314,8 @@ export const weatherRouter = router({
         getStoredHourlyForecasts(locationKey, date),
         getStationCollectionSnapshots(locationKey, 14),
       ]);
+      const qualityProfiles = await getStationQualityProfiles(stationData.stations.map((station) => station.stationId));
+      const qualityByStationId = new Map(qualityProfiles.map((profile) => [profile.stationId, profile]));
 
       const officialRows = hourlyRows.filter((row) => row.modelName === "best_match");
       const byHour = new Map<number, Array<{ temperature: number | null; windSpeed: number | null; precipitation: number | null }>>();
@@ -1404,6 +1407,7 @@ export const weatherRouter = router({
         })),
         stations: stationData.stations.map((station) => {
           const latest = station.readings.at(-1) ?? null;
+          const qualityProfile = qualityByStationId.get(station.stationId) ?? null;
           return {
             stationId: station.stationId,
             name: station.name,
@@ -1416,6 +1420,7 @@ export const weatherRouter = router({
             latest,
             ageMinutes: latest ? Math.max(0, Math.round((now - latest.observedAt) / 60000)) : null,
             readings: station.readings,
+            qualityProfile,
           };
         }),
         comparison24h,

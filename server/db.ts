@@ -25,6 +25,7 @@ import {
   InsertLeadTimeScore,
   weatherStations,
   stationObservations,
+  stationQualityProfiles,
   groundTruth,
   stationCollectionSnapshots,
   qualifiedObservationSnapshots,
@@ -32,6 +33,7 @@ import {
   netatmoOAuthStates,
   InsertWeatherStation,
   InsertStationObservation,
+  InsertStationQualityProfile,
   InsertGroundTruth,
   InsertStationCollectionSnapshot,
   InsertQualifiedObservationSnapshot,
@@ -39,6 +41,7 @@ import {
 import { ENV } from "./_core/env";
 import { selectLatestForecasts } from "./forecastSelection";
 import { buildForecastUpdateSet } from "./forecastWrite";
+import { deriveStationQualityProfile } from "./stationQualityService";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -617,6 +620,38 @@ export async function upsertStationObservation(data: InsertStationObservation): 
     return;
   }
   await db.insert(stationObservations).values(data);
+}
+
+/**
+ * Rebuild quality metadata from archived observations. The profile is evidence
+ * only: it never writes reliabilityScore, qualificationStatus or isActive.
+ */
+export async function refreshStationQualityProfiles(stationIds: string[], nowMs = Date.now()): Promise<void> {
+  const db = await getDb();
+  const uniqueIds = Array.from(new Set(stationIds));
+  if (!db || uniqueIds.length === 0) return;
+  const sinceMs = nowMs - 30 * 24 * 60 * 60 * 1000;
+  const readings = await db.select().from(stationObservations).where(and(
+    inArray(stationObservations.stationId, uniqueIds),
+    gte(stationObservations.observedAt, sinceMs),
+  )).orderBy(stationObservations.observedAt);
+  const byStation = new Map<string, typeof readings>();
+  for (const reading of readings) byStation.set(reading.stationId, [...(byStation.get(reading.stationId) ?? []), reading]);
+
+  for (const stationId of uniqueIds) {
+    const profile = deriveStationQualityProfile({ stationId, nowMs, observations: byStation.get(stationId) ?? [] });
+    const data: InsertStationQualityProfile = { ...profile, firstObservedAt: profile.firstObservedAt ?? null, lastObservedAt: profile.lastObservedAt ?? null };
+    const existing = await db.select({ id: stationQualityProfiles.id }).from(stationQualityProfiles).where(eq(stationQualityProfiles.stationId, stationId)).limit(1);
+    if (existing[0]) await db.update(stationQualityProfiles).set(data).where(eq(stationQualityProfiles.id, existing[0].id));
+    else await db.insert(stationQualityProfiles).values(data);
+  }
+}
+
+export async function getStationQualityProfiles(stationIds: string[]) {
+  const db = await getDb();
+  const uniqueIds = Array.from(new Set(stationIds));
+  if (!db || uniqueIds.length === 0) return [];
+  return db.select().from(stationQualityProfiles).where(inArray(stationQualityProfiles.stationId, uniqueIds));
 }
 
 /**

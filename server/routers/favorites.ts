@@ -99,6 +99,24 @@ export function getDashboardNetatmoCollectionOptions(
     : { onNetatmoStatus };
 }
 
+/**
+ * La trace de fusion doit respecter les mêmes limites que le mode présenté.
+ * Le mode Standard conserve son horizon de comparaison plus large ; Local et
+ * Ultra-local ne peuvent jamais réadmettre une station rejetée par leur mode.
+ */
+export function getModeAlignedFusionConstraints(mode: LocalMode) {
+  const modeConfig = getUltraLocalConfig(mode).config;
+  if (mode === "standard") {
+    return { maxFreshnessMin: 180, maxTempDeviationC: 6, minReliabilityScore: 40, modelWeightFraction: 0.25 };
+  }
+  return {
+    maxFreshnessMin: modeConfig.maxFreshnessMin,
+    maxTempDeviationC: modeConfig.maxTempDeviation,
+    minReliabilityScore: modeConfig.minReliability,
+    modelWeightFraction: modeConfig.modelWeight,
+  };
+}
+
 import { collectNearbyStations, rankStations, calculateGroundTruth, getPhysicalActiveStations, fetchCurrentModelReferences } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
 import { computeFusion, detectMultiRegime, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
@@ -265,6 +283,7 @@ export const favoritesRouter = router({
       const officialCurrentTemperature = hourly.find((hour) => hour.hour === nowHour)?.temp ?? hourly[0]?.temp ?? null;
       const modelFallback = buildOfficialModelFallback(currentModelReferences, meteoAI?.weights);
       const ultraLocalResult = calculateUltraLocal(physicalStations, localMode, lat, lon, null, officialCurrentTemperature);
+      const modeFusionConstraints = getModeAlignedFusionConstraints(localMode);
 
       // ── Fusion avancée en production (IDW + qualité + fraîcheur + MAE + anomalies) ──
       // Les stations locales représentent la réalité observée ; la prévision horaire
@@ -318,15 +337,13 @@ export const favoritesRouter = router({
         {
           idwExponent: 2,
           maxDistanceKm: searchRadius,
-          maxFreshnessMin: 180,
-          maxTempDeviationC: 6,
-          minReliabilityScore: 40,
+          maxFreshnessMin: modeFusionConstraints.maxFreshnessMin,
+          maxTempDeviationC: modeFusionConstraints.maxTempDeviationC,
+          minReliabilityScore: modeFusionConstraints.minReliabilityScore,
           altitudeCorrectionEnabled: true,
           anomalyDetectionEnabled: true,
           adaptiveWeightingEnabled: true,
-          // Le modèle est davantage sollicité en mode Standard, prioritairement
-          // local en mode Ultra-local.
-          modelWeightFraction: localMode === "ultra-local" ? 0.10 : localMode === "local" ? 0.15 : 0.25,
+          modelWeightFraction: modeFusionConstraints.modelWeightFraction,
         },
         previousReadings
       );
@@ -363,25 +380,28 @@ export const favoritesRouter = router({
         weights: multiRegimeResult.blendedWeights,
       };
 
-      // Stabilité = dispersion entre modèles. Confiance = qualité, fraîcheur,
-      // accord et anomalies des sources utilisées par la fusion avancée.
+      // Stabilité = dispersion entre modèles. La confiance locale suit les
+      // stations effectivement admises par le mode affiché ; la fusion avancée
+      // reste une trace de contrôle avec les mêmes seuils d’admission.
       const temps = forecast15d.map((forecast) => forecast.tempMax).filter((value): value is number => value != null);
       const divergence = temps.length > 1 ? Math.max(...temps) - Math.min(...temps) : 0;
-      const confidenceScore = advancedFusion.confidenceScore;
+      const modeUsesLocalStations = localMode !== "standard";
+      const confidenceScore = modeUsesLocalStations ? ultraLocalResult.confidenceScore : advancedFusion.confidenceScore;
       const stabilityIndex = Math.max(0, Math.min(100, 100 - divergence * 4));
-      const localTemperature = advancedFusion.temperature ?? ultraLocalResult.temperature;
+      const localTemperature = modeUsesLocalStations
+        ? ultraLocalResult.temperature
+        : advancedFusion.temperature ?? ultraLocalResult.temperature;
+      const localStationCount = modeUsesLocalStations ? ultraLocalResult.stationCount : advancedFusion.stationCount;
       const localModeTemperature = resolveLocalModeTemperature({
         officialTemperature: officialCurrentTemperature,
         localTemperature,
-        physicalStationCount: advancedFusion.stationCount,
+        physicalStationCount: localStationCount,
         microclimateAdjustment: ultraLocalResult.microclimateAdjustment,
         modelFallbackTemperature: modelFallback?.temperature ?? null,
       });
-      const usedLocalSourceIds = new Set(
-        advancedFusion.usedSources
-          .filter((source) => source.type === "station")
-          .map((source) => source.id)
-      );
+      const usedLocalSourceIds = new Set(modeUsesLocalStations
+        ? ultraLocalResult.stationsUsed.map((station) => station.stationId)
+        : advancedFusion.usedSources.filter((source) => source.type === "station").map((source) => source.id));
       const latestLocalSourceAt = fusionSources
         .filter((source) => source.type === "station" && usedLocalSourceIds.has(source.id) && source.updatedAt)
         .map((source) => new Date(source.updatedAt!))
@@ -390,7 +410,7 @@ export const favoritesRouter = router({
       const currentObservation = buildDashboardCurrentTemperature({
         localMode,
         temperature: localModeTemperature.usesOfficialFallback ? null : localTemperature,
-        stationCount: advancedFusion.stationCount,
+        stationCount: localStationCount,
         confidenceScore,
         observedAt: latestLocalSourceAt,
         officialTemperature: officialCurrentTemperature,
