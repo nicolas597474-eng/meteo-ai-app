@@ -1,17 +1,10 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
+import { lazy, Suspense } from "react";
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Dashboard from "./pages/Dashboard";
-import Ranking from "./pages/Ranking";
-import History from "./pages/History";
-import Report from "./pages/Report";
-import WeatherAILab from "./pages/WeatherAILab";
-import FavoriteSettings from "./pages/FavoriteSettings";
-import WeatherDetails from "./pages/WeatherDetails";
-import WeightComparison from "./pages/WeightComparison";
 import {
   LayoutDashboard,
   Trophy,
@@ -20,6 +13,15 @@ import {
   Activity,
   FlaskConical,
 } from "lucide-react";
+
+const Ranking = lazy(() => import("./pages/Ranking"));
+const History = lazy(() => import("./pages/History"));
+const Report = lazy(() => import("./pages/Report"));
+const WeatherAILab = lazy(() => import("./pages/WeatherAILab"));
+const FavoriteSettings = lazy(() => import("./pages/FavoriteSettings"));
+const WeatherDetails = lazy(() => import("./pages/WeatherDetails"));
+const WeightComparison = lazy(() => import("./pages/WeightComparison"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -121,7 +123,9 @@ function App() {
           <TopNav />
           {/* Add bottom padding on mobile for the bottom nav bar */}
           <div className="pb-16 sm:pb-0">
-            <Router />
+            <Suspense fallback={<div className="mx-auto min-h-[280px] max-w-2xl animate-pulse px-3 py-6"><div className="h-44 rounded-2xl bg-muted" /></div>}>
+              <Router />
+            </Suspense>
           </div>
           <BottomNav />
         </TooltipProvider>

@@ -838,6 +838,15 @@
 - [x] Frontend: Afficher la moyenne, les contributions station et le repli multi-modèles explicite.
 - [x] Tests: Vérifier l’exclusion des capteurs candidats et les pondérations des stations qualifiées.
 
+## Contrôle comparatif des modes météo
+- [x] Validation: Comparer Officiel, Local et Ultra-local pour les mêmes coordonnées et le même instant.
+- [x] Validation: Vérifier les stations, poids, repli et provenance retournés par chaque mode.
+
+## Performance du chargement mobile
+- [x] Audit: Identifier les routes et dépendances responsables du bundle initial trop volumineux.
+- [x] Frontend: Charger les pages secondaires à la demande sans modifier la navigation ni les données.
+- [x] Tests: Vérifier la disponibilité des routes différées et le chargement du Dashboard.
+
 ## Décision utilisateur — nouvelles observations officielles
 - [x] Décision: Ne pas intégrer Météo‑France ni aucune nouvelle source d’observations officielle pour l’audit ou le scoring.
 
