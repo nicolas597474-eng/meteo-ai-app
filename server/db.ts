@@ -781,6 +781,20 @@ export async function createNetatmoOAuthState(stateHash: string, userId: number,
   await db.insert(netatmoOAuthStates).values({ stateHash, userId, expiresAt });
 }
 
+export async function hasActiveNetatmoOAuthState(stateHash: string, now = new Date()) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ stateHash: netatmoOAuthStates.stateHash })
+    .from(netatmoOAuthStates)
+    .where(and(
+      eq(netatmoOAuthStates.stateHash, stateHash),
+      gte(netatmoOAuthStates.expiresAt, now),
+      isNull(netatmoOAuthStates.consumedAt),
+    ))
+    .limit(1);
+  return Boolean(rows[0]);
+}
+
 /**
  * Consume an OAuth state by its unguessable signed-state hash.
  * The callback already verifies the signed user ID before this write; adding a

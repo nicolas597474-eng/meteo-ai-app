@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { consumeNetatmoOAuthState, upsertNetatmoOAuthToken } from "./db";
+import { consumeNetatmoOAuthState, hasActiveNetatmoOAuthState, upsertNetatmoOAuthToken } from "./db";
 import { encryptNetatmoRefreshToken, hashNetatmoState, NETATMO_REDIRECT_URI, NETATMO_SCOPE, verifyNetatmoState } from "./netatmoOAuth";
 
 function queryValue(req: Request, key: string) {
@@ -44,8 +44,9 @@ export function registerNetatmoOAuthRoutes(app: Express) {
       res.status(400).send("Connexion Netatmo refusée (callback_invalide). Relancez l’autorisation depuis MeteoAI.");
       return;
     }
-    const stateConsumed = await consumeNetatmoOAuthState(hashNetatmoState(state!));
-    if (!stateConsumed) {
+    const stateHash = hashNetatmoState(state!);
+    const stateActive = await hasActiveNetatmoOAuthState(stateHash);
+    if (!stateActive) {
       console.warn("[Netatmo OAuth] Callback rejeté: état absent, expiré ou déjà consommé");
       res.status(400).send("Connexion Netatmo expirée ou déjà utilisée. Relancez l’autorisation depuis MeteoAI.");
       return;
@@ -69,6 +70,10 @@ export function registerNetatmoOAuthRoutes(app: Express) {
       const token = await response.json() as { refresh_token?: string };
       if (!response.ok || !token.refresh_token) throw new Error("Netatmo token exchange failed");
       await upsertNetatmoOAuthToken(verifiedState.userId, encryptNetatmoRefreshToken(token.refresh_token), NETATMO_SCOPE);
+      const stateConsumed = await consumeNetatmoOAuthState(stateHash);
+      if (!stateConsumed) {
+        console.warn("[Netatmo OAuth] State déjà consommé après échange de jeton");
+      }
       res.redirect(302, "/reliability?netatmo=connected");
     } catch (error) {
       console.error("[Netatmo OAuth] Callback failed", error);

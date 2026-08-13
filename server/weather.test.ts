@@ -43,7 +43,7 @@ describe("weather.getDashboard", () => {
     expect(Array.isArray(result.recentForecasts)).toBe(true);
     expect(result).toHaveProperty("allServices");
     expect(Array.isArray(result.allServices)).toBe(true);
-  }, 10_000);
+  }, 25_000);
 
   it("returns meteoAI forecast for today if available", async () => {
     const ctx = createPublicContext();

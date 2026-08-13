@@ -58,6 +58,15 @@ describe("sécurité OAuth Netatmo", () => {
     })).toBe("code_absent");
   });
 
+  it("ne considère pas un code fournisseur comme une preuve de callback sans state signé", () => {
+    expect(getNetatmoCallbackDiagnostic({
+      code: "code-netatmo",
+      state: undefined,
+      netatmoError: undefined,
+      verifiedState: null,
+    })).toBe("state_absent");
+  });
+
   it("n’expose pas de texte non sûr provenant du fournisseur", () => {
     expect(getNetatmoCallbackDiagnostic({
       code: undefined,

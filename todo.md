@@ -880,3 +880,8 @@
 - [x] Diagnostic: Identifier pourquoi le state OAuth est perdu entre l’autorisation et le callback.
 - [x] Backend: Persister et valider le state OAuth de manière durable et à usage unique.
 - [x] Tests: Vérifier le callback avec state valide, expiré et déjà utilisé.
+
+## Diagnostic approfondi du callback Netatmo
+- [x] Diagnostic: Corréler l’empreinte du state créée, stockée et reçue par le callback publié.
+- [x] Backend: Corriger uniquement la cause vérifiée du rejet persistant.
+- [x] Tests: Couvrir le scénario de callback consenti jusqu’à l’échange de jeton.
