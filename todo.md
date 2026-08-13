@@ -823,3 +823,14 @@
 - [x] Backend: Exposer la couverture horaire physique et le dernier score qualifié par lieu.
 - [x] Frontend: Afficher l’éligibilité du scoring et l’explication en cas de données insuffisantes.
 - [x] Tests: Vérifier les états sans donnée, incomplet et qualifié de la page Fiabilité.
+
+## Couverture physique effective
+- [x] Diagnostic: Confirmer la couverture physique collectée et le motif d’une éventuelle absence de snapshot.
+- [x] Recherche: Évaluer des fournisseurs d’observations physiques publics, compatibles et vérifiables autour des favoris.
+- [ ] Décision: Proposer une intégration qui ne réintroduit aucune station ou donnée simulée.
+
+## Décision utilisateur — fusion locale
+- [x] Décision: Ne pas réintroduire la fusion locale à partir de stations physiques, même après qualification et mesure de gain.
+
+## Décision utilisateur — nouvelles observations officielles
+- [x] Décision: Ne pas intégrer Météo‑France ni aucune nouvelle source d’observations officielle pour l’audit ou le scoring.
