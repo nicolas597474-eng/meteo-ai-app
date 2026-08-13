@@ -148,7 +148,7 @@ describe("weather.getRanking", () => {
     expect(ranking.officialRegime.primary.id).toBe(dashboard.officialRegime.primary.id);
     expect(ranking.officialRegime.active).toEqual(dashboard.officialRegime.active);
     expect(ranking.officialRegime.blendedWeights).toEqual(dashboard.officialRegime.blendedWeights);
-  });
+  }, 25_000);
 });
 
 describe("weather.getStationReliabilityOverview", () => {

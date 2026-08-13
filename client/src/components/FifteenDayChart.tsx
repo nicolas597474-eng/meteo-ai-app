@@ -74,6 +74,47 @@ function WeatherIconSVG({ condition, size = 22 }: { condition: string; size?: nu
   return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} />;
 }
 
+function ForecastScaleLabels({
+  totalHeight,
+  tempTop,
+  tempBottom,
+  windTop,
+  windBottom,
+  precipTop,
+  precipBottom,
+  scaleTop,
+  scaleBot,
+  windMax,
+  precipMax,
+}: {
+  totalHeight: number;
+  tempTop: number;
+  tempBottom: number;
+  windTop: number;
+  windBottom: number;
+  precipTop: number;
+  precipBottom: number;
+  scaleTop: number;
+  scaleBot: number;
+  windMax: number;
+  precipMax: number;
+}) {
+  const tempMid = Math.round((scaleTop + scaleBot) / 2);
+  return (
+    <aside aria-label="Échelles du graphique de prévisions" className="relative z-10 w-10 shrink-0 border-r border-slate-700/70 bg-[#06080d] text-right text-[8px] font-medium text-slate-500" style={{ height: totalHeight }}>
+      <span className="absolute right-1.5 text-orange-300/80" style={{ top: tempTop - 5 }}>{scaleTop}°</span>
+      <span className="absolute right-1.5 text-slate-500" style={{ top: (tempTop + tempBottom) / 2 - 5 }}>{tempMid}°</span>
+      <span className="absolute right-1.5 text-orange-300/80" style={{ top: tempBottom - 10 }}>{scaleBot}°</span>
+      <span className="absolute right-1.5 text-emerald-300/80" style={{ top: windTop + 2 }}>{windMax}</span>
+      <span className="absolute right-1.5 text-slate-500" style={{ top: windBottom - 10 }}>0</span>
+      <span className="absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 text-[7px] uppercase tracking-wide text-emerald-300/70">km/h</span>
+      <span className="absolute right-1.5 text-sky-300/80" style={{ top: precipTop + 2 }}>{precipMax.toFixed(1)}</span>
+      <span className="absolute right-1.5 text-slate-500" style={{ top: precipBottom - 10 }}>0</span>
+      <span className="absolute bottom-1 left-1 text-[7px] uppercase tracking-wide text-sky-300/70">mm</span>
+    </aside>
+  );
+}
+
 // ─── Detail Card ──────────────────────────────────────────────────────────────
 function DetailCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   return (
@@ -185,6 +226,9 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const scaleRange = scaleTop - scaleBot || 1;
 
   const maxPrecip = Math.max(...displayDays.map(d => d.precipitation ?? 0), 2);
+  const maxWind = Math.max(...displayDays.map(d => d.windSpeed ?? 0), 5);
+  const windScaleTop = Math.ceil(maxWind / 5) * 5;
+  const precipScaleTop = Math.ceil(maxPrecip * 10) / 10;
   // Zone allocation: temp 55%, wind 20%, precip 20%, gaps 5%
   const tempZoneTop = PAD_T;
   const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.55;
@@ -500,7 +544,9 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
       {/* ── Full-width scrollable chart ───────────────────────────────────── */}
       <div className="overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
-        <div ref={scrollRef} className="w-full overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+        <div className="flex h-full">
+          <ForecastScaleLabels totalHeight={TOTAL_H} tempTop={tempZoneTop} tempBottom={tempZoneBot} windTop={windZoneTop} windBottom={windZoneBot} precipTop={precipZoneTop} precipBottom={precipZoneBot} scaleTop={scaleTop} scaleBot={scaleBot} windMax={windScaleTop} precipMax={precipScaleTop} />
+        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           <div className="relative" style={{ width: scrollableW, height: TOTAL_H }}>
             {/* En-tête de chaque journée : jour + grande icône météo */}
             <div className="pointer-events-none absolute left-0 top-0 flex" style={{ height: 78, width: scrollableW }}>
@@ -519,6 +565,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
             </div>
             <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block" }} onClick={onClick} />
           </div>
+        </div>
         </div>
       </div>
 

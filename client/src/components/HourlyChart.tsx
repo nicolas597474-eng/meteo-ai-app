@@ -54,6 +54,47 @@ function WeatherIconSVG({ condition, size = 20 }: { condition: string; size?: nu
   return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} />;
 }
 
+function HourlyScaleLabels({
+  totalHeight,
+  tempTop,
+  tempBottom,
+  windTop,
+  windBottom,
+  precipTop,
+  precipBottom,
+  scaleTop,
+  scaleBot,
+  windMax,
+  precipMax,
+}: {
+  totalHeight: number;
+  tempTop: number;
+  tempBottom: number;
+  windTop: number;
+  windBottom: number;
+  precipTop: number;
+  precipBottom: number;
+  scaleTop: number;
+  scaleBot: number;
+  windMax: number;
+  precipMax: number;
+}) {
+  const tempMid = Math.round((scaleTop + scaleBot) / 2);
+  return (
+    <aside aria-label="Échelles du graphique horaire" className="relative z-10 w-10 shrink-0 border-r border-slate-700/70 bg-[#06080d] text-right text-[8px] font-medium text-slate-500" style={{ height: totalHeight }}>
+      <span className="absolute right-1.5 text-orange-300/80" style={{ top: tempTop - 5 }}>{scaleTop}°</span>
+      <span className="absolute right-1.5 text-slate-500" style={{ top: (tempTop + tempBottom) / 2 - 5 }}>{tempMid}°</span>
+      <span className="absolute right-1.5 text-orange-300/80" style={{ top: tempBottom - 10 }}>{scaleBot}°</span>
+      <span className="absolute right-1.5 text-emerald-300/80" style={{ top: windTop + 2 }}>{windMax}</span>
+      <span className="absolute right-1.5 text-slate-500" style={{ top: windBottom - 10 }}>0</span>
+      <span className="absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 text-[7px] uppercase tracking-wide text-emerald-300/70">km/h</span>
+      <span className="absolute right-1.5 text-sky-300/80" style={{ top: precipTop + 2 }}>{precipMax.toFixed(1)}</span>
+      <span className="absolute right-1.5 text-slate-500" style={{ top: precipBottom - 10 }}>0</span>
+      <span className="absolute bottom-1 left-1 text-[7px] uppercase tracking-wide text-sky-300/70">mm</span>
+    </aside>
+  );
+}
+
 // ─── Detail Overlay ──────────────────────────────────────────────────────────
 function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => void }) {
   const cond = getConditionLabel(hour.cloudCover, hour.precipitation, hour.condition);
@@ -214,6 +255,9 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const scaleRange = scaleTop - scaleBot || 1;
 
   const maxPrecip = Math.max(...hours.map(h => h.precipitation ?? 0), 1);
+  const maxWind = Math.max(...hours.map(h => h.windSpeed ?? 0), 5);
+  const windScaleTop = Math.ceil(maxWind / 5) * 5;
+  const precipScaleTop = Math.ceil(maxPrecip * 10) / 10;
   // Zone allocation: temp 55%, wind 20%, precip 20%
   const tempZoneTop = PAD_T;
   const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.55;
@@ -332,7 +376,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.lineWidth = 2;
       ctx.stroke();
     }
-    // Points + values (every 2 hours to avoid clutter)
+    // Points + température affichée à chaque heure
     tempPts.forEach((pt, i) => {
       const v = hours[i].temp;
       if (v == null) return;
@@ -345,41 +389,42 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      // Show value every 2 hours or on selection
-      if (i % 2 === 0 || sel) {
-        ctx.fillStyle = nowHour === i ? "#a5b4fc" : "#fdba74";
-        ctx.font = `bold ${sel ? 12 : 10}px system-ui`;
-        ctx.textAlign = "center";
-        ctx.fillText(`${v.toFixed(1)}°`, pt.x, pt.y - 10);
-      }
+      ctx.fillStyle = nowHour === i ? "#a5b4fc" : "#fdba74";
+      ctx.font = `bold ${sel ? 11 : 8}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText(`${v.toFixed(1)}°`, pt.x, pt.y - 10);
     });
 
-    // Apparent temperature curve (blue dashed)
-    const apparentPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.apparentTemp ?? h.temp ?? 0) }));
+    // Ressenti : ligne continue avec un décalage visuel de 3 px pour distinguer
+    // deux valeurs proches sans modifier les valeurs textuelles ni l’échelle.
+    const apparentPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.apparentTemp ?? h.temp ?? 0) + 3 }));
     if (apparentPts.length > 1) {
       ctx.beginPath();
-      ctx.setLineDash([4, 4]);
       ctx.moveTo(apparentPts[0].x, apparentPts[0].y);
       for (let i = 1; i < apparentPts.length; i++) {
         const cpx = (apparentPts[i - 1].x + apparentPts[i].x) / 2;
         ctx.bezierCurveTo(cpx, apparentPts[i - 1].y, cpx, apparentPts[i].y, apparentPts[i].x, apparentPts[i].y);
       }
-      ctx.strokeStyle = "#60a5fa";
-      ctx.lineWidth = 1.8;
+      ctx.save();
+      ctx.strokeStyle = "rgba(96, 165, 250, 0.35)";
+      ctx.lineWidth = 4;
+      ctx.shadowColor = "#60a5fa";
+      ctx.shadowBlur = 6;
       ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.restore();
+      ctx.strokeStyle = "#93c5fd";
+      ctx.lineWidth = 1.7;
+      ctx.stroke();
     }
-    // Apparent temp values (every 3 hours or on selection)
+    // Ressenti affiché à chaque heure, sous la température pour éviter le chevauchement.
     apparentPts.forEach((pt, i) => {
       const v = hours[i].apparentTemp;
       if (v == null) return;
       const sel = selectedHour === i;
-      if (i % 3 === 1 || sel) {
-        ctx.fillStyle = "#93c5fd";
-        ctx.font = `${sel ? "bold 10" : "9"}px system-ui`;
-        ctx.textAlign = "center";
-        ctx.fillText(`${v.toFixed(0)}°`, pt.x, pt.y + 14);
-      }
+      ctx.fillStyle = "#bfdbfe";
+      ctx.font = `${sel ? "bold 10" : "8"}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText(`${v.toFixed(1)}°`, pt.x, pt.y + 13);
     });
 
     // Wind readings by column (no wind curve).
@@ -519,7 +564,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
         )}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Temp °C</span>
-          <span className="flex items-center gap-1.5 text-blue-300"><span className="w-4 h-0 border-t-2 border-dashed border-blue-400 inline-block" /> Ressenti</span>
+          <span className="flex items-center gap-1.5 text-blue-200"><span className="w-4 h-0 border-t-2 border-blue-300 inline-block" /> Ressenti</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
           <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
         </div>
@@ -527,7 +572,9 @@ export default function HourlyChart({ hours, locationName }: Props) {
 
       {/* Chart area */}
       <div className="overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
-        <div ref={scrollRef} className="w-full overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+        <div className="flex h-full">
+          <HourlyScaleLabels totalHeight={TOTAL_H} tempTop={tempZoneTop} tempBottom={tempZoneBot} windTop={windZoneTop} windBottom={windZoneBot} precipTop={precipZoneTop} precipBottom={precipZoneBot} scaleTop={scaleTop} scaleBot={scaleBot} windMax={windScaleTop} precipMax={precipScaleTop} />
+        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           <div className="relative" style={{ width: scrollableW, height: TOTAL_H }}>
             {/* En-tête de chaque créneau : heure + grande icône météo */}
             <div className="pointer-events-none absolute left-0 top-0 flex" style={{ height: 78, width: scrollableW }}>
@@ -544,6 +591,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
             </div>
             <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block" }} onClick={onClick} />
           </div>
+        </div>
         </div>
       </div>
 

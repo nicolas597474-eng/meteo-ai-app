@@ -979,6 +979,12 @@
 - [x] Interface: Ajouter un bouton global pour tout développer ou tout réduire.
 - [x] Tests: Vérifier les poids complets, les barres et les deux états globaux du catalogue.
 
+## Graphiques horaires et prévisions
+- [x] Interface: Afficher les échelles température, vent et pluie à gauche des deux graphiques.
+- [x] Interface: Rendre la courbe de ressenti continue et visuellement distincte de la température.
+- [x] Interface: Afficher température et ressenti pour chaque heure dans le graphique horaire.
+- [x] Tests: Vérifier les séries, échelles et libellés sans modifier les données météo.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
