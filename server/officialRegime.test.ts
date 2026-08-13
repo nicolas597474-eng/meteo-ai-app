@@ -47,4 +47,14 @@ describe("buildOperationalRegime", () => {
     ], "09:00", "sunny");
     expect(change).toMatchObject({ hour: "11:00", id: "partly_cloudy", cloudCover: 60 });
   });
+
+  it("normalise les heures sans zéro initial pour détecter le prochain changement", () => {
+    const change = findNextHourlyRegimeChange([
+      { hour: "6:00", temp: 15, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 4 },
+      { hour: "07:00", temp: 16, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 8 },
+      { hour: "08:00", temp: 17, precipitation: 0, windSpeed: 6, humidity: 55, cloudCover: 65 },
+    ], "06:00", "sunny");
+
+    expect(change).toMatchObject({ hour: "08:00", id: "partly_cloudy", cloudCover: 65 });
+  });
 });

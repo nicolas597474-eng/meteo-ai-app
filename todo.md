@@ -857,6 +857,11 @@
 - [x] Backend: Aligner le régime courant sur la même échéance que la condition actuelle affichée.
 - [x] Tests: Vérifier qu’une nébulosité très faible ne produit plus un régime partiellement nuageux au même instant.
 
+## Cohérence des transitions météo
+- [x] Audit: Comparer condition actuelle, régime actif et prochain changement pour le même créneau horaire.
+- [x] Backend: Aligner les transitions futures sur la même normalisation horaire que le régime courant.
+- [x] Tests: Vérifier les changements à venir avec heures au format compact et zéro initial.
+
 ## Décision utilisateur — nouvelles observations officielles
 - [x] Décision: Ne pas intégrer Météo‑France ni aucune nouvelle source d’observations officielle pour l’audit ou le scoring.
 

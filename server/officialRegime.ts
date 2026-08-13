@@ -51,6 +51,16 @@ function averageTemperature(data: { tempMax?: number | null; tempMin?: number | 
     : data.tempMax ?? data.tempMin ?? 15;
 }
 
+function hourToMinutes(value: string) {
+  const match = value.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return Number.isInteger(hour) && Number.isInteger(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59
+    ? hour * 60 + minute
+    : null;
+}
+
 /**
  * Persisted multi-model snapshot. It is the stable fallback for every view.
  */
@@ -189,8 +199,18 @@ export function findNextHourlyRegimeChange(
   currentHour: string,
   currentRegimeId: string,
 ) {
-  const currentIndex = hours.findIndex((point) => point.hour === currentHour);
-  const startIndex = currentIndex >= 0 ? currentIndex : hours.findIndex((point) => point.hour >= currentHour);
+  const currentMinutes = hourToMinutes(currentHour);
+  const currentIndex = currentMinutes == null
+    ? -1
+    : hours.findIndex((point) => hourToMinutes(point.hour) === currentMinutes);
+  const startIndex = currentIndex >= 0
+    ? currentIndex
+    : currentMinutes == null
+      ? -1
+      : hours.findIndex((point) => {
+        const pointMinutes = hourToMinutes(point.hour);
+        return pointMinutes != null && pointMinutes >= currentMinutes;
+      });
   if (startIndex < 0) return null;
 
   for (let index = startIndex + 1; index < hours.length; index += 1) {
