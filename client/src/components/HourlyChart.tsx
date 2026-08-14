@@ -4,6 +4,7 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getHourlyDetailInsights } from "@/lib/hourlyDetailInsights";
+import { getFeltLabelY, getLabelAboveCurveY } from "@/lib/chartLabelLanes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -447,7 +448,8 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.fillStyle = nowHour === i ? "#a5b4fc" : "#fdba74";
       ctx.font = `bold ${sel ? 12 : 10}px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText(`${v.toFixed(1)}°`, pt.x, pt.y - 10);
+      const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop);
+      ctx.fillText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY);
     });
 
     // Ressenti : ligne continue avec un décalage visuel de 3 px pour distinguer
@@ -471,7 +473,8 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.lineWidth = 1.7;
       ctx.stroke();
     }
-    // Ressenti affiché sous la courbe bleue, en gardant une marge avant la zone de vent.
+    // Ressenti dans une bande fixe sous la courbe bleue : aucune valeur ne peut
+    // entrer dans la zone de vent, même lorsque les températures sont très proches.
     apparentPts.forEach((pt, i) => {
       const v = hours[i].apparentTemp;
       if (v == null) return;
@@ -479,7 +482,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.fillStyle = "#bfdbfe";
       ctx.font = `${sel ? "bold 12" : "10"}px system-ui`;
       ctx.textAlign = "center";
-      const apparentLabelY = Math.min(pt.y + 21, windZoneTop - 5);
+      const apparentLabelY = getFeltLabelY(windZoneTop);
       ctx.fillText(`${v.toFixed(1)}°`, pt.x, apparentLabelY);
     });
 

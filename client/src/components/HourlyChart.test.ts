@@ -15,9 +15,10 @@ describe("HourlyChart", () => {
     expect(source).toContain("text-emerald-400");
     expect(source).toContain("text-sky-400");
     expect(source).toContain("apparentTemp ?? h.temp ?? 0) + 3");
-    expect(source).toContain("Ressenti affiché sous la courbe bleue");
+    expect(source).toContain("Ressenti dans une bande fixe sous la courbe bleue");
     expect(source).toContain("v.toFixed(1)}°");
-    expect(source).toContain("const apparentLabelY = Math.min(pt.y + 21, windZoneTop - 5)");
+    expect(source).toContain("getFeltLabelY(windZoneTop)");
+    expect(source).toContain("getLabelAboveCurveY(pt.y, tempZoneTop)");
     expect(source).toContain('ctx.font = `${sel ? "bold 12" : "10"}px system-ui`');
     expect(source).toContain("p-2 sm:p-3");
     expect(source).toContain("weather-chart-3d");

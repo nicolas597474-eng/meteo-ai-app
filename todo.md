@@ -1213,3 +1213,9 @@
 ## Libellé de la carte principale
 - [x] Interface: Retirer « Prévision officielle consolidée » sous la température principale.
 - [x] Validation: Vérifier la carte mobile, TypeScript, tests et build.
+
+## Lisibilité des graphiques horaire et journalier
+- [x] Audit: Vérifier les zones de température ressentie, vent, pluie et alertes des deux graphiques.
+- [x] Interface: Maintenir les ressentis sous leur courbe avec une marge de sécurité.
+- [x] Interface: Réserver des zones distinctes pour températures, vent et précipitations.
+- [x] Validation: Tester les données denses, les températures extrêmes, TypeScript, tests et build.
