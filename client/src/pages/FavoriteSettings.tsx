@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { ArrowLeft, MapPin, Star, Trash2, Edit3, Save, Radio } from "lucide-react";
 import { Link } from "wouter";
+import { MeteoSurface } from "@/components/weather/MeteoSurface";
 
 export default function FavoriteSettings() {
   const { user } = useAuth();
@@ -40,11 +41,11 @@ export default function FavoriteSettings() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="bg-card border border-border rounded-2xl p-6 text-center max-w-sm">
+        <MeteoSurface className="max-w-sm rounded-2xl p-6 text-center">
           <Star className="h-10 w-10 mx-auto text-yellow-400 mb-3" />
           <h2 className="text-lg font-semibold mb-2">Connexion requise</h2>
           <p className="text-sm text-muted-foreground">Connectez-vous pour gérer vos lieux favoris.</p>
-        </div>
+        </MeteoSurface>
       </div>
     );
   }
@@ -76,7 +77,7 @@ export default function FavoriteSettings() {
           )}
 
           {favorites.map((fav: any) => (
-            <div key={fav.id} className="bg-card border border-border rounded-xl p-4">
+            <MeteoSurface key={fav.id} className="rounded-xl p-4">
               {editingId === fav.id ? (
                 /* Edit mode */
                 <div className="space-y-3">
@@ -234,12 +235,12 @@ export default function FavoriteSettings() {
                   )}
                 </div>
               )}
-            </div>
+            </MeteoSurface>
           ))}
         </div>
 
         {/* Info */}
-        <div className="bg-muted/50 border border-border rounded-xl p-4">
+        <MeteoSurface tone="subtle" className="rounded-xl bg-muted/50 p-4">
           <h3 className="text-sm font-semibold mb-2">Paramètres par lieu</h3>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
             <li>• <strong>Nom personnalisé</strong> — Renommez vos favoris librement</li>
@@ -248,7 +249,7 @@ export default function FavoriteSettings() {
             <li>• <strong>Unité de température</strong> — Celsius ou Fahrenheit par lieu</li>
             <li>• <strong>Favori par défaut</strong> — Lieu affiché au démarrage de l'application</li>
           </ul>
-        </div>
+        </MeteoSurface>
       </div>
     </div>
   );

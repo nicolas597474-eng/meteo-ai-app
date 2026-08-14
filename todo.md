@@ -1008,3 +1008,20 @@
 - [x] Interface: Ajouter un retour au début accessible sur Fiabilité et Historique.
 - [x] Interface: Harmoniser les marges mobiles de Fiabilité et Historique.
 - [x] Tests: Vérifier les espacements et la disponibilité du retour au début sur les pages longues.
+
+## Reconstruction complète fidèle de MeteoAI
+- [x] Audit: Inventorier toutes les pages, les routes, les composants réutilisés, les états de chargement et les parcours mobile/desktop.
+- [x] Audit: Cartographier les sources de données, les contrats tRPC, les calculs frontend/backend et les graphiques sans les modifier.
+- [x] Design system: Formaliser les tokens, proportions, typographies, surfaces, gradients, rayons, icônes et états déjà utilisés par MeteoAI.
+- [x] Architecture: Définir la cible par composants et l’ordre de migration conservant exactement le rendu actuel.
+- [x] Plan: Définir les lots de migration, leurs garanties de non-régression et les comparaisons obligatoires.
+- [ ] Reconstruction: Centraliser progressivement les primitives et composants partagés sans modifier les données, les calculs ni les parcours.
+- [ ] Reconstruction: Recomposer les pages avec un rendu visuellement équivalent et des contrats de données inchangés.
+- [ ] Validation: Comparer chaque page sur mobile, tablette et bureau ; vérifier navigation, graphiques, états et données Netatmo.
+- [ ] Publication: Documenter les écarts résolus, les garanties de non-régression et publier la reconstruction validée.
+
+## Collecte quotidienne des prévisions et observations
+- [x] Audit: Vérifier les tâches actives, leurs horaires et les derniers résultats de collecte.
+- [x] Périmètre: Confirmer que la collecte de 05h00 couvre les prévisions horaires de tous les modèles configurés pour chaque lieu favori.
+- [x] Périmètre: Maintenir les relevés de stations comme observations distinctes, avec leur propre fraîcheur et leur cycle adapté.
+- [x] Validation: Contrôler les cycles actifs, les derniers bilans archivés et les sources/stats de couverture.
