@@ -16,8 +16,9 @@ describe("HourlyChart", () => {
     expect(source).toContain("text-sky-400");
     expect(source).toContain("apparentTemp ?? h.temp ?? 0) + 3");
     expect(source).toContain("Ressenti immédiatement sous sa courbe bleue");
-    expect(source).toContain("v.toFixed(1)}°");
-    expect(source).toContain("getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 12, 20)");
+    expect(source).toContain("`T ${v.toFixed(1)}°`");
+    expect(source).toContain("`R ${v.toFixed(1)}°`");
+    expect(source).toContain("getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 17, 20)");
     expect(source).toContain("getLabelAboveCurveY(pt.y, tempZoneTop)");
     expect(source).toContain('ctx.font = `${sel ? "bold 12" : "10"}px system-ui`');
     expect(source).toContain("p-2 sm:p-3");

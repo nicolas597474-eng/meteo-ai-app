@@ -1229,3 +1229,8 @@
 - [x] Audit: Vérifier les positions de la courbe bleue et des libellés de température.
 - [x] Interface: Placer chaque valeur de température juste sous la courbe de ressenti.
 - [x] Validation: Vérifier les courbes proches, TypeScript, tests et build.
+
+## Séparation renforcée température et ressenti
+- [x] Audit: Identifier les configurations où les deux courbes sont trop proches.
+- [x] Interface: Réserver des décalages distincts pour les libellés orange et bleus.
+- [x] Validation: Vérifier les écarts faibles, TypeScript, tests et build.

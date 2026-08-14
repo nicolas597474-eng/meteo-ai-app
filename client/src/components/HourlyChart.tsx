@@ -451,7 +451,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.font = `bold ${sel ? 12 : 10}px system-ui`;
       ctx.textAlign = "center";
       const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop);
-      ctx.fillText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY);
+      ctx.fillText(`T ${v.toFixed(1)}°`, pt.x, temperatureLabelY);
     });
 
     // Ressenti : ligne continue avec un décalage visuel de 3 px pour distinguer
@@ -475,8 +475,9 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.lineWidth = 1.7;
       ctx.stroke();
     }
-    // Ressenti immédiatement sous sa courbe bleue, en gardant une marge avant
-    // la zone de vent lorsque les deux températures sont proches.
+    // Ressenti immédiatement sous sa courbe bleue. Le préfixe R et le décalage
+    // opposé à celui de T séparent explicitement les deux mesures, même quand
+    // les courbes orange et bleue sont presque confondues.
     apparentPts.forEach((pt, i) => {
       const v = hours[i].apparentTemp;
       if (v == null) return;
@@ -484,8 +485,8 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.fillStyle = "#bfdbfe";
       ctx.font = `${sel ? "bold 12" : "10"}px system-ui`;
       ctx.textAlign = "center";
-      const apparentLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 12, 20);
-      ctx.fillText(`${v.toFixed(1)}°`, pt.x, apparentLabelY);
+      const apparentLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 17, 20);
+      ctx.fillText(`R ${v.toFixed(1)}°`, pt.x, apparentLabelY);
     });
 
     // Wind readings by column (no wind curve).
