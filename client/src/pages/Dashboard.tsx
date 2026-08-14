@@ -591,7 +591,6 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground mt-1">
                     {(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible") + " actuellement"}
                   </p>
-                  <p className="mt-1 text-[11px] text-sky-200/90">Prévision officielle consolidée</p>
                   {(nextRegimeChange ?? nextConditionChange) && (
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
                       <Clock className="h-3 w-3" />

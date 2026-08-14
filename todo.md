@@ -1205,3 +1205,11 @@
 - [x] Interface: Réserver une zone spécifique aux alertes météo dans l’en-tête du graphique.
 - [x] Interface: Préserver les libellés de date et « Aujourd’hui » sans chevauchement.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, tests et build.
+
+## Diagnostic des comparaisons historiques en attente
+- [x] Audit: Vérifier les archives de prévisions et d’observations nécessaires à Meteoblue.
+- [x] Rapport: Expliquer les causes précises des comparaisons en attente et leur résolution naturelle.
+
+## Libellé de la carte principale
+- [x] Interface: Retirer « Prévision officielle consolidée » sous la température principale.
+- [x] Validation: Vérifier la carte mobile, TypeScript, tests et build.
