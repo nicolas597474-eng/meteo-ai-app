@@ -1017,3 +1017,9 @@
 - [x] Interface: Ajouter un retour au début accessible sur Fiabilité et Historique.
 - [x] Interface: Harmoniser les marges mobiles de Fiabilité et Historique.
 - [x] Tests: Vérifier les espacements et la disponibilité du retour au début sur les pages longues.
+
+## Reproduction fidèle de la maquette mobile de référence
+- [x] Audit visuel: Décomposer la maquette fournie en en-tête, localisation, panneau Tendance, carte héro, modes et zones de graphique.
+- [x] Interface: Recomposer la structure du Dashboard mobile, ses proportions et ses hiérarchies selon la maquette, sans modifier les données.
+- [x] Interface: Faire correspondre les surfaces, contours électriques, éclairages, espacements, panneaux Local/Ultra-local et le cadre du graphique horaire.
+- [x] Validation: Vérifier le rendu mobile par rapport à la maquette, les états de chargement et l’intégrité des graphiques Canvas.

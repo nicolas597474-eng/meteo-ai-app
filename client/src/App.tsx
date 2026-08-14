@@ -70,6 +70,7 @@ function TopNav() {
 
 function BottomNav() {
   const [location] = useLocation();
+  if (location === "/") return null;
   return (
     <nav className="weather-nav sm:hidden fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-xl safe-area-inset-bottom">
       <div className="flex items-center justify-around h-16 px-2">
