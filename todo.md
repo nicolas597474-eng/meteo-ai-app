@@ -1056,3 +1056,9 @@
 - [x] Audit: Identifier les rayons du cadre 3D et de la zone de tracé à modifier.
 - [x] Interface: Conserver le haut rectiligne et arrondir uniquement les coins inférieurs des deux graphiques.
 - [x] Validation: Vérifier les contours et les interactions aux différentes tailles.
+
+## Diagnostic de la collecte de 05h00
+- [x] Audit: Vérifier les tâches actives, leurs journaux d’exécution et le dernier bilan archivé.
+- [x] Diagnostic: Comparer la collecte attendue aux prévisions, traces de pondération et snapshots AI Lab disponibles.
+- [x] Correction: Remplacer le job dont le cookie cron était refusé par une tâche active avec autorisation fraîche, sans simuler de prévision ni de trace.
+- [x] Validation: Confirmer l’exécution, la persistance et l’affichage du snapshot après correction.
