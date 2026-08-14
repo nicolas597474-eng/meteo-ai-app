@@ -1036,3 +1036,8 @@
 - [x] Audit: Identifier les surfaces et contours des cadres horaire et quinze jours à enrichir.
 - [x] Interface: Appliquer un relief 3D bleu discret aux deux cadres sans modifier les composants Canvas.
 - [x] Validation: Vérifier le contraste, la profondeur et les interactions à toutes les tailles.
+
+## Fond plus neutre des graphiques
+- [x] Audit: Identifier les couches bleues du fond 3D à atténuer.
+- [x] Interface: Assombrir légèrement le fond des deux graphiques sans modifier leurs contours lumineux.
+- [x] Validation: Vérifier le contraste des libellés, courbes et données à toutes les tailles.
