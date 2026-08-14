@@ -47,4 +47,13 @@ describe("page Fiabilité", () => {
     expect(source).toContain("realLocalStations.slice(1).map");
     expect(source).toContain("aria-expanded={showAdditionalLocalStations}");
   });
+
+  it("affiche une seule référence de modèle puis propose de développer les autres", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("showAdditionalModelReferences");
+    expect(source).toContain("reference={modelReferences[0]}");
+    expect(source).toContain("Afficher les ${modelReferences.length - 1} autres références");
+    expect(source).toContain("modelReferences.slice(1).map");
+    expect(source).toContain("aria-expanded={showAdditionalModelReferences}");
+  });
 });

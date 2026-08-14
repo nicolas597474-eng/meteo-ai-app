@@ -1132,3 +1132,8 @@
 - [x] Interface: Afficher uniquement la première station locale réelle par défaut.
 - [x] Interface: Ajouter une flèche vers le bas pour développer ou replier les autres stations.
 - [x] Validation: Vérifier le comportement, l’accessibilité et la lisibilité mobile.
+
+## Panneau des références de modèles
+- [x] Interface: Afficher uniquement la première référence de modèle par défaut.
+- [x] Interface: Ajouter une flèche vers le bas pour développer ou replier les autres références.
+- [x] Validation: Vérifier le comportement, l’accessibilité et la lisibilité mobile.
