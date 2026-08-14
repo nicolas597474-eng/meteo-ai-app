@@ -1110,3 +1110,8 @@
 - [x] Audit: Identifier les positions actuelles des libellés de température et ressenti.
 - [x] Interface: Placer les valeurs de ressenti sous la courbe bleue.
 - [x] Validation: Vérifier la lisibilité et l’absence de chevauchement avec les courbes.
+
+## Taille des libellés de ressenti
+- [x] Audit: Identifier la taille actuelle des valeurs de ressenti.
+- [x] Interface: Agrandir légèrement les valeurs de ressenti sous la courbe bleue.
+- [x] Validation: Vérifier la lisibilité et le non-chevauchement avec le vent.

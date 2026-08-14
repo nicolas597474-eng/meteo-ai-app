@@ -414,7 +414,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       if (v == null) return;
       const sel = selectedHour === i;
       ctx.fillStyle = "#bfdbfe";
-      ctx.font = `${sel ? "bold 11" : "9"}px system-ui`;
+      ctx.font = `${sel ? "bold 12" : "10"}px system-ui`;
       ctx.textAlign = "center";
       const apparentLabelY = Math.min(pt.y + 21, windZoneTop - 5);
       ctx.fillText(`${v.toFixed(1)}°`, pt.x, apparentLabelY);
