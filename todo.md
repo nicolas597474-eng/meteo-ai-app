@@ -1015,10 +1015,11 @@
 - [x] Design system: Formaliser les tokens, proportions, typographies, surfaces, gradients, rayons, icônes et états déjà utilisés par MeteoAI.
 - [x] Architecture: Définir la cible par composants et l’ordre de migration conservant exactement le rendu actuel.
 - [x] Plan: Définir les lots de migration, leurs garanties de non-régression et les comparaisons obligatoires.
-- [ ] Reconstruction: Centraliser progressivement les primitives et composants partagés sans modifier les données, les calculs ni les parcours.
-- [ ] Reconstruction: Recomposer les pages avec un rendu visuellement équivalent et des contrats de données inchangés.
-- [ ] Validation: Comparer chaque page sur mobile, tablette et bureau ; vérifier navigation, graphiques, états et données Netatmo.
-- [ ] Publication: Documenter les écarts résolus, les garanties de non-régression et publier la reconstruction validée.
+- [x] Reconstruction: Centraliser progressivement les primitives et composants partagés sans modifier les données, les calculs ni les parcours.
+- [x] Reconstruction: Recomposer les pages avec un rendu visuellement équivalent et des contrats de données inchangés.
+- [x] Correction responsive: Préserver la lisibilité des tableaux de l’Historique en largeur tablette et mobile sans supprimer de métrique.
+- [x] Validation: Comparer chaque page sur mobile, tablette et bureau ; vérifier navigation, graphiques, états et données Netatmo.
+- [x] Publication: Documenter les écarts résolus, les garanties de non-régression et publier la reconstruction validée.
 
 ## Collecte quotidienne des prévisions et observations
 - [x] Audit: Vérifier les tâches actives, leurs horaires et les derniers résultats de collecte.

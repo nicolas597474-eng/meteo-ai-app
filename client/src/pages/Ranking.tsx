@@ -9,6 +9,7 @@ import { getStationDisplayStatus } from "@/lib/stationCandidateStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
+import { MeteoSurface } from "@/components/weather/MeteoSurface";
 
 type ComparisonPoint = {
   hour?: number;
@@ -37,9 +38,9 @@ function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint
   const usable = points.filter((point) => point.stationTemperature !== null || point.officialTemperature !== null);
   if (usable.length === 0) {
     return (
-      <div className="border border-dashed border-slate-800 rounded-xl px-4 py-8 text-center text-sm text-slate-500">
+      <MeteoSurface className="rounded-xl border-dashed border-slate-800 bg-transparent px-4 py-8 text-center text-sm text-slate-500">
         La comparaison apparaîtra après les premiers relevés physiques collectés à 05h00.
-      </div>
+      </MeteoSurface>
     );
   }
 

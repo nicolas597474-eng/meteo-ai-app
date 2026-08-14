@@ -2,9 +2,10 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
 import { Link } from "wouter";
 import { AlertTriangle, BarChart3, ClipboardCheck, Database, FlaskConical, MapPin, RefreshCw, ShieldCheck, Zap } from "lucide-react";
+import { MeteoSurface } from "@/components/weather/MeteoSurface";
 
 function Stat({ label, value, tone = "text-slate-100" }: { label: string; value: string; tone?: string }) {
-  return <div className="rounded-xl border border-slate-800 bg-black/20 px-2 py-2.5 text-center"><p className={`text-xl font-bold ${tone}`}>{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-500">{label}</p></div>;
+  return <MeteoSurface tone="lab" className="rounded-xl bg-black/20 px-2 py-2.5 text-center"><p className={`text-xl font-bold ${tone}`}>{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-500">{label}</p></MeteoSurface>;
 }
 
 function Divergence({ label, value, max, unit, color }: { label: string; value: number; max: number; unit: string; color: string }) {

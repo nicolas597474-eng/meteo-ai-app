@@ -9,6 +9,7 @@ describe("primitives visuelles MeteoAI", () => {
   });
 
   it("propose des variantes de surface sans logique météo", () => {
-    expect(Object.keys(meteoSurfaceClasses)).toEqual(["default", "subtle", "inset", "accent"]);
+    expect(Object.keys(meteoSurfaceClasses)).toEqual(["default", "subtle", "inset", "accent", "lab"]);
+    expect(meteoSurfaceClasses.lab).toContain("bg-[#0d131d]");
   });
 });

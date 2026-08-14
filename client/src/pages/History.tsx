@@ -3,6 +3,8 @@ import { useState, useMemo } from "react";
 import { Calendar, BarChart3, MapPin, Wind, CloudRain, Thermometer, Clock, TrendingUp } from "lucide-react";
 import { useLocation } from "@/contexts/LocationContext";
 import { BackToTopButton } from "@/components/BackToTopButton";
+import { MeteoSurface } from "@/components/weather/MeteoSurface";
+import { HISTORY_DETAILS_TABLE_CLASS } from "@/lib/historyLayout";
 import {
   LineChart,
   Line,
@@ -522,7 +524,7 @@ export default function History() {
               <h3 className="font-semibold">Données détaillées</h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className={HISTORY_DETAILS_TABLE_CLASS}>
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
                     <th className="text-left p-3 font-medium">Date</th>
@@ -582,13 +584,13 @@ export default function History() {
         )}
 
         {chartData.length === 0 && (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
+          <MeteoSurface className="rounded-xl p-12 text-center">
             <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Aucun historique</h2>
             <p className="text-muted-foreground">
               Les données historiques seront disponibles après les premières collectes.
             </p>
-          </div>
+          </MeteoSurface>
         )}
       </div>
       <BackToTopButton />

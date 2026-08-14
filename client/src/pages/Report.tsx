@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { FileText, Thermometer, Droplets, Wind, Cloud, ChevronDown, ChevronUp } from "lucide-react";
 import { useLocation } from "@/contexts/LocationContext";
+import { MeteoSurface } from "@/components/weather/MeteoSurface";
 
 type DimScore = {
   serviceName: string;
@@ -278,11 +279,11 @@ export default function Report() {
 
         {/* No data state */}
         {(!data?.forecasts || data.forecasts.length === 0) && !data?.meteoAI && (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
+          <MeteoSurface className="rounded-xl p-12 text-center">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Aucune donnée pour cette date</h2>
             <p className="text-muted-foreground">Les données seront disponibles après la collecte matinale (05h00).</p>
-          </div>
+          </MeteoSurface>
         )}
       </div>
     </div>
