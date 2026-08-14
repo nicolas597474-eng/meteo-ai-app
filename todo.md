@@ -1200,3 +1200,8 @@
 - [x] Interface: Positionner l’heure actuelle au début de la zone visible au chargement.
 - [x] Interface: Réappliquer l’ancrage lors d’un changement de prévisions ou de lieu.
 - [x] Validation: Vérifier le défilement, TypeScript, tests et build.
+
+## Zone d’alerte du graphique journalier
+- [x] Interface: Réserver une zone spécifique aux alertes météo dans l’en-tête du graphique.
+- [x] Interface: Préserver les libellés de date et « Aujourd’hui » sans chevauchement.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, tests et build.

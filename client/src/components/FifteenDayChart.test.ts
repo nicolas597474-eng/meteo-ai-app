@@ -32,4 +32,12 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("slide-in-from-top-2");
     expect(source).toContain('role="region"');
   });
+
+  it("réserve une zone d’alerte séparée des libellés de date", () => {
+    expect(source).toContain("chartAlerts");
+    expect(source).toContain('aria-label="Alertes météo des prévisions"');
+    expect(source).toContain("Alertes météo");
+    expect(source).toContain("Canicule · maximum ≥ 33°C");
+    expect(source).not.toContain('ctx.fillText("☀ Canicule"');
+  });
 });

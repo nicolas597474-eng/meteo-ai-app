@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset, Gauge, Navigation, Eye, MapPin } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
@@ -225,6 +225,16 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
   const maxPrecip = Math.max(...displayDays.map(d => d.precipitation ?? 0), 2);
   const maxWind = Math.max(...displayDays.map(d => d.windSpeed ?? 0), 5);
+  const chartAlerts = useMemo(() => {
+    const alerts: Array<{ id: string; label: string; className: string }> = [];
+    if (displayDays.some((day) => (day.tempMax ?? 0) >= 33)) {
+      alerts.push({ id: "heat", label: "Canicule · maximum ≥ 33°C", className: "border-orange-400/35 bg-orange-400/10 text-orange-200" });
+    }
+    if (displayDays.some((day) => (day.condition ?? "").toLowerCase().includes("orage"))) {
+      alerts.push({ id: "storm", label: "Risque d’orage", className: "border-violet-400/35 bg-violet-400/10 text-violet-200" });
+    }
+    return alerts;
+  }, [displayDays]);
   const windScaleTop = Math.ceil(maxWind / 5) * 5;
   const precipScaleTop = Math.ceil(maxPrecip * 10) / 10;
   // Zone allocation: temp 55%, wind 20%, precip 20%, gaps 5%
@@ -305,26 +315,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.lineWidth = 1.5;
       ctx.strokeRect(x + 0.5, 0.5, COL_W - 1, CHART_H - 1);
     }
-
-    // ── Context zone labels ──────────────────────────────────────────────────
-    let caniculeLabeled = false;
-    let orageLabeled = false;
-    displayDays.forEach((d, i) => {
-      if ((d.tempMax ?? 0) >= 33 && !caniculeLabeled) {
-        ctx.fillStyle = "#f87171";
-        ctx.font = "bold 10px system-ui";
-        ctx.textAlign = "left";
-        ctx.fillText("☀ Canicule", i * COL_W + 4, 12);
-        caniculeLabeled = true;
-      }
-      if ((d.condition ?? "").toLowerCase().includes("orage") && !orageLabeled) {
-        ctx.fillStyle = "#a78bfa";
-        ctx.font = "bold 10px system-ui";
-        ctx.textAlign = "left";
-        ctx.fillText("⚡ Orage", i * COL_W + 4, 12);
-        orageLabeled = true;
-      }
-    });
 
     // ── Animation progress ───────────────────────────────────────────────────
     const progress = animated ? 1 : animProgress;
@@ -549,6 +539,13 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         <div ref={detailPanelRef} className="scroll-mt-3">
           <DayDetailOverlay day={displayDays[selectedDay]} onClose={() => setSelectedDay(null)} />
         </div>
+      )}
+
+      {chartAlerts.length > 0 && (
+        <aside aria-label="Alertes météo des prévisions" className="mb-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-700/70 bg-slate-950/50 px-2.5 py-2">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Alertes météo</span>
+          {chartAlerts.map((alert) => <span key={alert.id} className={`rounded-lg border px-2 py-1 text-[10px] font-semibold ${alert.className}`}>{alert.label}</span>)}
+        </aside>
       )}
 
       {/* ── Full-width scrollable chart ───────────────────────────────────── */}
