@@ -9,6 +9,7 @@ describe("validation weather models", () => {
       "ICON-D2",
       "ECMWF AIFS",
       "ECMWF ENS",
+      "AIFS ENS",
     ]);
     const activeNames = WEATHER_SERVICES.expert.map((model) => model.name);
     expect(VALIDATION_WEATHER_MODELS.every((model) => !activeNames.includes(model.name))).toBe(true);

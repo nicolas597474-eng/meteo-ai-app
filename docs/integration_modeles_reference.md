@@ -26,3 +26,7 @@ La collecte active suit les règles suivantes :
 ## Transparence utilisateur
 
 AI Lab doit exposer les candidats dans une source séparée intitulée « Modèles en validation ». Ils ne peuvent pas être listés dans la fusion officielle, dans les pondérations appliquées, ni dans le compteur de modèles experts actifs. Une indisponibilité AIFS reste affichée comme telle, sans valeur de remplacement.
+
+## Contrôle opérationnel planifié
+
+Le job quotidien actif `meteoai-collect-favorites-forecasts-v4` est configuré à `03:00 UTC` (05:00 Paris en heure d’été) avec une autorisation cron fraîche. Le prochain cycle normal est le contrôle opérationnel de référence : il doit archiver les sorties disponibles sous les suffixes `· validation` et conserver les absences AIFS/AIFS ENS sans les remplir. Les tentatives ponctuelles créées trop près de leur horaire n’ont pas été exécutées par le planificateur et ont été supprimées ; aucun résultat n’a été simulé.

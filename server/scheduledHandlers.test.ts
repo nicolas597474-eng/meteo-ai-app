@@ -23,7 +23,7 @@ describe("getModelCoverage", () => {
   it("conserve les candidats hors du compteur de couverture active", () => {
     const coverage = getModelCoverage(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo"]);
     expect(coverage.expected).toHaveLength(8);
-    expect(VALIDATION_WEATHER_MODELS).toHaveLength(4);
+    expect(VALIDATION_WEATHER_MODELS).toHaveLength(5);
     expect(coverage.expected).not.toContain("DMI HARMONIE-DINI");
   });
 });

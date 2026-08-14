@@ -41,6 +41,7 @@ export const VALIDATION_WEATHER_MODELS = [
   { name: "ICON-D2", modelId: "dwd_icon_d2", family: "icon" as const },
   { name: "ECMWF AIFS", modelId: "ecmwf_aifs025", family: "aifs" as const },
   { name: "ECMWF ENS", modelId: "ecmwf_ifs025_ensemble", family: "ensemble" as const },
+  { name: "AIFS ENS", modelId: "ecmwf_aifs025_ensemble", family: "ensemble" as const },
 ] as const;
 
 export type ForecastData = {
