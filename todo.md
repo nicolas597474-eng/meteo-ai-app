@@ -1080,3 +1080,8 @@
 - [x] Audit: Distinguer la surface de colonne Canvas du carré de l’en-tête horaire.
 - [x] Interface: Retirer uniquement le carré bleu de l’en-tête et conserver la colonne actuelle en surbrillance.
 - [x] Validation: Vérifier le repère de l’heure actuelle et les interactions du graphique.
+
+## Lisibilité du graphique horaire
+- [x] Audit: Identifier les tailles de température et les emplacements disponibles pour vitesse, unité et cap de vent.
+- [x] Interface: Agrandir les températures et afficher « km/h » puis le cap cardinal sous chaque vent.
+- [x] Validation: Vérifier la lisibilité mobile, l’absence de chevauchement et les interactions.

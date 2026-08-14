@@ -382,7 +382,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.fillStyle = nowHour === i ? "#a5b4fc" : "#fdba74";
-      ctx.font = `bold ${sel ? 11 : 8}px system-ui`;
+      ctx.font = `bold ${sel ? 12 : 10}px system-ui`;
       ctx.textAlign = "center";
       ctx.fillText(`${v.toFixed(1)}°`, pt.x, pt.y - 10);
     });
@@ -414,7 +414,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       if (v == null) return;
       const sel = selectedHour === i;
       ctx.fillStyle = "#bfdbfe";
-      ctx.font = `${sel ? "bold 10" : "8"}px system-ui`;
+      ctx.font = `${sel ? "bold 11" : "9"}px system-ui`;
       ctx.textAlign = "center";
       ctx.fillText(`${v.toFixed(1)}°`, pt.x, pt.y + 13);
     });
@@ -426,26 +426,14 @@ export default function HourlyChart({ hours, locationName }: Props) {
       const x = colX(i);
       const y = windZoneTop + 17;
       ctx.fillStyle = "#4ade80";
-      ctx.font = "bold 10px system-ui";
+      ctx.font = "bold 12px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(v)}`, x, y);
+      ctx.fillText(`${Math.round(v)} km/h`, x, y);
       const dir = hours[i].windDirection;
       if (dir != null) {
-        const angle = ((dir + 180) % 360) * (Math.PI / 180);
-        ctx.save();
-        ctx.translate(x + 15, y - 4);
-        ctx.rotate(angle);
-        ctx.beginPath();
-        ctx.moveTo(0, -3);
-        ctx.lineTo(-2, 2.5);
-        ctx.lineTo(0, 1);
-        ctx.lineTo(2, 2.5);
-        ctx.closePath();
-        ctx.fillStyle = "#4ade80";
-        ctx.globalAlpha = 0.7;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.restore();
+        ctx.fillStyle = "rgba(74, 222, 128, 0.78)";
+        ctx.font = "10px system-ui";
+        ctx.fillText(degToCompass(dir), x, y + 14);
       }
     });
 
