@@ -70,9 +70,6 @@ function TopNav() {
 
 function BottomNav() {
   const [location] = useLocation();
-  // Le Dashboard mobile possède sa propre barre d’application avec menu ; la
-  // barre basse reste disponible sur les autres pages afin de préserver leurs parcours.
-  if (location === "/") return null;
   return (
     <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border safe-area-inset-bottom">
       <div className="flex items-center justify-around h-16 px-2">
