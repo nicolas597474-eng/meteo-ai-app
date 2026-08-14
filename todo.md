@@ -1080,3 +1080,8 @@
 - [x] Audit: Distinguer la surface de colonne Canvas du carré de l’en-tête horaire.
 - [x] Interface: Retirer uniquement le carré bleu de l’en-tête et conserver la colonne actuelle en surbrillance.
 - [x] Validation: Vérifier le repère de l’heure actuelle et les interactions du graphique.
+
+## Ligne de l’heure actuelle
+- [x] Audit: Identifier le niveau de dessin permettant d’ajouter un repère sans masquer les données.
+- [x] Interface: Ajouter une fine ligne verticale sur la colonne de l’heure actuelle.
+- [x] Validation: Vérifier le contraste, les courbes et les interactions du graphique.
