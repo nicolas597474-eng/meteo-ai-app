@@ -19,5 +19,6 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("candidate?.weights");
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
+    expect(source).toContain("-mx-3 overflow-hidden border-y border-border bg-card");
   });
 });

@@ -16,5 +16,6 @@ describe("HourlyChart", () => {
     expect(source).toContain("apparentTemp ?? h.temp ?? 0) + 3");
     expect(source).toContain("Ressenti affiché à chaque heure");
     expect(source).toContain("v.toFixed(1)}°");
+    expect(source).toContain("p-2 shadow-[0_12px_32px_rgba(0,0,0,0.38)] sm:p-3");
   });
 });

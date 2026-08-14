@@ -539,7 +539,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
   if (hours.length === 0) return null;
 
   return (
-    <section ref={containerRef} className="w-full rounded-[22px] border border-slate-700/70 bg-[#080b10] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.38)]">
+    <section ref={containerRef} className="w-full rounded-[22px] border border-slate-700/70 bg-[#080b10] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.38)] sm:p-3">
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-center justify-between">

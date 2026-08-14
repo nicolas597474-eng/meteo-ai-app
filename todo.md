@@ -1026,3 +1026,8 @@
 - [x] Périmètre: Confirmer que la collecte de 05h00 couvre les prévisions horaires de tous les modèles configurés pour chaque lieu favori.
 - [x] Périmètre: Maintenir les relevés de stations comme observations distinctes, avec leur propre fraîcheur et leur cycle adapté.
 - [x] Validation: Contrôler les cycles actifs, les derniers bilans archivés et les sources/stats de couverture.
+
+## Graphiques pleine largeur sur mobile
+- [x] Audit: Repérer les cadres et marges qui contraignent la largeur disponible des graphiques.
+- [x] Interface: Étendre les graphiques horaire et quinze jours à la largeur mobile utile sans toucher au canvas.
+- [x] Validation: Vérifier le défilement, les clics, les courbes et la lisibilité sur mobile, tablette et bureau.
