@@ -42,4 +42,13 @@ describe("History", () => {
     expect(source).toContain("maxBarSize={20}");
     expect(source).toContain('domain={["dataMin - 2", "dataMax + 2"]}');
   });
+
+  it("donne une clé de lecture explicite et des couleurs distinctes aux histogrammes", () => {
+    expect(source).toContain("HistogramLegend");
+    expect(source).toContain("Clé de lecture des barres");
+    expect(source).toContain("mesure réelle");
+    expect(source).toContain("modèle comparé");
+    expect(source).toContain("history-observation-bar");
+    expect(source).toContain("history-meteoai-bar");
+  });
 });

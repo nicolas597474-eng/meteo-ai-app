@@ -1185,3 +1185,8 @@
 - [x] Interface: Regrouper les informations secondaires sans répéter inutilement les libellés.
 - [x] Interface: Rendre explicite l’absence d’observation ou d’information météo.
 - [x] Validation: Vérifier la lisibilité mobile, TypeScript, tests et build.
+
+## Palette et légende des histogrammes Historique
+- [x] Design: Différencier nettement observation, MeteoAI et modèle sélectionné par la couleur.
+- [x] Interface: Clarifier le rôle de chaque couleur dans la légende des histogrammes.
+- [x] Validation: Vérifier le contraste mobile, TypeScript, tests et build.
