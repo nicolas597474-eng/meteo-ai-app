@@ -429,7 +429,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.font = "bold 11px system-ui";
       ctx.textAlign = "center";
       if (p <= 0) {
-        ctx.fillText(p.toFixed(1), x, precipZoneTop + 12);
+        ctx.fillText(p.toFixed(1), x, precipZoneBot - 5);
         return;
       }
       const barH = Math.max(4, (p / maxPrecip) * precipH);

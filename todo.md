@@ -1100,3 +1100,8 @@
 - [x] Audit: Identifier la position du texte et la hauteur réelle de chaque barre sur les deux graphiques.
 - [x] Interface: Positionner les valeurs de précipitations juste au-dessus de leurs barres bleues.
 - [x] Validation: Vérifier la visibilité des valeurs quelle que soit la hauteur de pluie.
+
+## Valeurs de pluie nulles
+- [x] Audit: Identifier la position dédiée aux valeurs 0,0 mm sur les deux graphiques.
+- [x] Interface: Placer les valeurs nulles en bas de la zone de précipitation.
+- [x] Validation: Vérifier la séparation entre valeurs nulles et valeurs au-dessus des barres.

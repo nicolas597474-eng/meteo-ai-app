@@ -22,5 +22,6 @@ describe("FifteenDayChart", () => {
     expect(source).toContain('ctx.font = "bold 11px system-ui"');
     expect(source).toContain("const precipLabelBand = 18");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, barTop - 5)");
+    expect(source).toContain("ctx.fillText(p.toFixed(1), x, precipZoneBot - 5)");
   });
 });

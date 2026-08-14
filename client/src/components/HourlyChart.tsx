@@ -448,7 +448,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.font = "bold 10px system-ui";
       ctx.textAlign = "center";
       if (p <= 0) {
-        ctx.fillText(p.toFixed(1), x, precipZoneTop + 11);
+        ctx.fillText(p.toFixed(1), x, precipZoneBot - 5);
         return;
       }
       const barH = Math.max(3, (p / maxPrecip) * precipH);
