@@ -140,10 +140,10 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
   const uv = uvLabel(day.uvIndex);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" onClick={onClose} role="presentation">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:p-4" onClick={onClose} role="presentation">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md max-h-[88vh] overflow-y-auto rounded-t-[28px] border border-white/10 bg-[#0a0e14] p-5 shadow-2xl shadow-blue-500/10 animate-in slide-in-from-bottom-4 duration-200 sm:rounded-2xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="day-detail-title">
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-600 sm:hidden" />
+      <div className="relative h-[100dvh] w-full max-w-none overflow-y-auto border border-white/10 bg-[#0a0e14] px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-[max(1.25rem,env(safe-area-inset-top))] shadow-2xl shadow-blue-500/10 animate-in slide-in-from-bottom-4 duration-200 sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:rounded-2xl sm:p-5" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="day-detail-title">
+        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-600 sm:hidden" aria-hidden="true" />
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-400/25 bg-blue-500/10">

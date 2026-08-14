@@ -1137,3 +1137,8 @@
 - [x] Interface: Afficher uniquement la première référence de modèle par défaut.
 - [x] Interface: Ajouter une flèche vers le bas pour développer ou replier les autres références.
 - [x] Validation: Vérifier le comportement, l’accessibilité et la lisibilité mobile.
+
+## Volet de prévision détaillée mobile
+- [x] Interface: Afficher la prévision sélectionnée dans un volet pleinement visible au clic sur un jour.
+- [x] Interface: Préserver une fermeture claire et les détails météo sans exiger de défilement de page.
+- [x] Validation: Vérifier le comportement mobile, TypeScript, tests et build.
