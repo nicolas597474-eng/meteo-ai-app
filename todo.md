@@ -1225,3 +1225,8 @@
 - [x] Interface: Agrandir et clarifier les cartes Matin, Après-midi, Soir et Nuit.
 - [x] Interface: Rendre chaque journée de la liste dépliable avec ses quatre périodes détaillées.
 - [x] Validation: Vérifier les jours disponibles, le rendu mobile, TypeScript, tests et build.
+
+## Correction du fond du graphique horaire
+- [x] Diagnostic: Identifier la règle qui rend le fond du Canvas blanc.
+- [x] Interface: Rétablir le fond sombre du graphique sans modifier ses données ni coordonnées.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, tests et build.

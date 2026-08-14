@@ -345,7 +345,10 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
     canvas.width = scrollableW * dpr;
     canvas.height = TOTAL_H * dpr;
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, scrollableW, TOTAL_H);
+    // Le fond est peint dans le Canvas (et non seulement sur le conteneur) afin
+    // d'éviter un rendu blanc sur certains navigateurs mobiles après un resize.
+    ctx.fillStyle = "#05070a";
+    ctx.fillRect(0, 0, scrollableW, TOTAL_H);
 
     // Per-hour background
     hours.forEach((h, i) => {
@@ -650,7 +653,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
                 );
               })}
             </div>
-            <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block" }} onClick={onClick} />
+            <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block", backgroundColor: "#05070a" }} onClick={onClick} />
           </div>
         </div>
         </div>
