@@ -1190,3 +1190,8 @@
 - [x] Design: Différencier nettement observation, MeteoAI et modèle sélectionné par la couleur.
 - [x] Interface: Clarifier le rôle de chaque couleur dans la légende des histogrammes.
 - [x] Validation: Vérifier le contraste mobile, TypeScript, tests et build.
+
+## Ordre des métriques de la carte principale
+- [x] Interface: Placer Vent max à l’emplacement haut de la grille de métriques.
+- [x] Interface: Placer Confiance prévision à l’emplacement bas de la grille de métriques.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, tests et build.

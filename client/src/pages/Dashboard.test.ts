@@ -20,5 +20,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
     expect(source).toContain("overflow-visible rounded-[22px]");
+    const ventMaxIndex = source.indexOf("Vent max");
+    const confidenceIndex = source.indexOf("Confiance prévision");
+    expect(ventMaxIndex).toBeGreaterThan(-1);
+    expect(confidenceIndex).toBeGreaterThan(ventMaxIndex);
   });
 });

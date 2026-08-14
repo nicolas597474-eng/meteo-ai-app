@@ -668,12 +668,9 @@ export default function Dashboard() {
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Activity className="h-3 w-3" />Confiance prévision
+                  <Wind className="h-3 w-3" />Vent max
                 </p>
-                <p className={`text-base sm:text-lg font-semibold ${stabilityColor(forecastConfidence)}`}>
-                  {Math.round(forecastConfidence)}%
-                </p>
-                <p className="text-[10px] text-muted-foreground">Stabilité {Math.round(stabilityIndex)}%</p>
+                <p className="text-base sm:text-lg font-semibold">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
@@ -689,9 +686,12 @@ export default function Dashboard() {
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Wind className="h-3 w-3" />Vent max
+                  <Activity className="h-3 w-3" />Confiance prévision
                 </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
+                <p className={`text-base sm:text-lg font-semibold ${stabilityColor(forecastConfidence)}`}>
+                  {Math.round(forecastConfidence)}%
+                </p>
+                <p className="text-[10px] text-muted-foreground">Stabilité {Math.round(stabilityIndex)}%</p>
               </div>
             </div>
           </div>
