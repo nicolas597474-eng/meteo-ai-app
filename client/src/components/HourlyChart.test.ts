@@ -39,4 +39,17 @@ describe("HourlyChart", () => {
     expect(source).toContain("slide-in-from-top-2");
     expect(source).toContain('aria-labelledby="hour-detail-title"');
   });
+
+  it("présente tous les paramètres horaires réellement fournis dans le panneau détaillé", () => {
+    expect(source).toContain("dewPoint?: number | null");
+    expect(source).toContain("pressure?: number | null");
+    expect(source).toContain("visibility?: number | null");
+    expect(source).toContain("solarRadiation?: number | null");
+    expect(source).toContain("cloudLow?: number | null");
+    expect(source).toContain("precipIntensity?: string | null");
+    expect(source).toContain("Point de rosée");
+    expect(source).toContain("Pression de surface");
+    expect(source).toContain("Portée horizontale");
+    expect(source).toContain("Régime opérationnel");
+  });
 });

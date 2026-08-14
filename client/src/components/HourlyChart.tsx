@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation } from "lucide-react";
+import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, Gauge, Eye } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
@@ -17,6 +17,15 @@ export interface HourData {
   humidity: number | null;
   uvIndex: number | null;
   condition: string | null;
+  pressure?: number | null;
+  dewPoint?: number | null;
+  visibility?: number | null;
+  solarRadiation?: number | null;
+  cloudLow?: number | null;
+  cloudMid?: number | null;
+  cloudHigh?: number | null;
+  precipType?: string | null;
+  precipIntensity?: string | null;
   // Multi-model spread
   tempSpread?: number | null;
   precipProb?: number | null;
@@ -26,6 +35,7 @@ export interface HourData {
 interface Props {
   hours: HourData[];
   locationName?: string;
+  regime?: { label: string; emoji?: string | null } | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,7 +107,7 @@ function HourlyScaleLabels({
 }
 
 // ─── Detail Overlay ──────────────────────────────────────────────────────────
-function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => void }) {
+function HourDetailOverlay({ hour, onClose, regime }: { hour: HourData; onClose: () => void; regime?: Props["regime"] }) {
   const cond = getConditionLabel(hour.cloudCover, hour.precipitation, hour.condition);
   const hasSpread = hour.tempSpread != null && hour.tempSpread > 0;
   const hasPrecipProb = hour.precipProb != null;
@@ -179,6 +189,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Précipitations</span></div>
             <p className="text-sm font-bold text-blue-400">{hour.precipitation ?? 0} mm</p>
+            {hour.precipType ? <p className="mt-0.5 text-[10px] text-slate-500">{hour.precipType === "snow" ? "Neige" : hour.precipType === "freezing_rain" ? "Pluie verglaçante" : "Pluie"}{hour.precipIntensity ? ` · ${hour.precipIntensity === "heavy" ? "forte" : hour.precipIntensity === "moderate" ? "modérée" : "faible"}` : ""}</p> : null}
             {hasPrecipProb && (
               <div className="mt-1">
                 <div className="flex items-center justify-between mb-0.5">
@@ -196,6 +207,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-cyan-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Humidité</span></div>
             <p className="text-sm font-bold text-cyan-400">{hour.humidity != null ? `${Math.round(hour.humidity)}%` : "—"}</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Point de rosée {hour.dewPoint != null ? `${hour.dewPoint.toFixed(1)}°C` : "—"}</p>
           </div>
 
           {/* UV */}
@@ -207,20 +219,33 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
                 {hour.uvIndex <= 2 ? "Faible" : hour.uvIndex <= 5 ? "Modéré" : hour.uvIndex <= 7 ? "Élevé" : hour.uvIndex <= 10 ? "Très élevé" : "Extrême"}
               </p>
             )}
+            <p className="mt-0.5 text-[10px] text-slate-500">Rayonnement {hour.solarRadiation != null ? `${Math.round(hour.solarRadiation)} W/m²` : "—"}</p>
           </div>
 
           {/* Nébulosité */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Cloud className="h-3.5 w-3.5 text-slate-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Nébulosité</span></div>
             <p className="text-sm font-bold text-white">{hour.cloudCover != null ? `${Math.round(hour.cloudCover)}%` : "—"}</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Bas {hour.cloudLow ?? "—"}% · Moy. {hour.cloudMid ?? "—"}% · Haut {hour.cloudHigh ?? "—"}%</p>
           </div>
+          <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
+            <div className="flex items-center gap-1.5 mb-1"><Gauge className="h-3.5 w-3.5 text-violet-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Pression</span></div>
+            <p className="text-sm font-bold text-violet-300">{hour.pressure != null ? `${Math.round(hour.pressure)} hPa` : "—"}</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Pression de surface</p>
+          </div>
+          <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
+            <div className="flex items-center gap-1.5 mb-1"><Eye className="h-3.5 w-3.5 text-cyan-300" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Visibilité</span></div>
+            <p className="text-sm font-bold text-cyan-200">{hour.visibility != null ? `${hour.visibility.toFixed(1)} km` : "—"}</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Portée horizontale</p>
+          </div>
+          {regime ? <div className="col-span-2 flex items-center gap-2 rounded-lg border border-amber-400/15 bg-amber-400/5 p-2.5"><span className="text-lg" aria-hidden="true">{regime.emoji ?? "•"}</span><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Régime opérationnel</p><p className="text-sm font-semibold text-amber-100">{regime.label}</p></div></div> : null}
         </div>
     </section>
   );
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export default function HourlyChart({ hours, locationName }: Props) {
+export default function HourlyChart({ hours, locationName, regime }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -561,7 +586,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
 
       {selectedHour !== null && selectedHour < hours.length && (
         <div ref={detailPanelRef} className="scroll-mt-3">
-          <HourDetailOverlay hour={hours[selectedHour]} onClose={() => setSelectedHour(null)} />
+          <HourDetailOverlay hour={hours[selectedHour]} regime={regime} onClose={() => setSelectedHour(null)} />
         </div>
       )}
 

@@ -763,7 +763,7 @@ export default function Dashboard() {
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
             <Suspense fallback={<div className="h-56 bg-muted rounded-xl animate-pulse" />}>
-              <HourlyChart hours={hours} locationName={activeLocation?.name} />
+              <HourlyChart hours={hours} locationName={activeLocation?.name} regime={officialRegime?.primary ? { label: officialRegime.primary.label, emoji: officialRegime.primary.emoji } : null} />
             </Suspense>
           ) : (
             <p className="text-sm text-muted-foreground">Données horaires indisponibles.</p>

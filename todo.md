@@ -1148,3 +1148,9 @@
 - [x] Interface: Afficher les détails de l’heure sélectionnée au-dessus du graphique heure par heure.
 - [x] Interface: Préserver les données détaillées et une fermeture claire sans défilement de page.
 - [x] Validation: Vérifier les deux graphiques, TypeScript, tests et build.
+
+## Détails horaires complets du Dashboard
+- [x] Audit: Vérifier les paramètres horaires réellement fournis au graphique et leurs unités.
+- [x] Données: Exposer uniquement les paramètres supplémentaires réellement disponibles pour chaque heure.
+- [x] Interface: Afficher ces paramètres dans le panneau de détail horaire au-dessus du graphique.
+- [x] Validation: Vérifier les données manquantes, TypeScript, tests, rendu mobile et build.
