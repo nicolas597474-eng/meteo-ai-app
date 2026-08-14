@@ -1,599 +1,132 @@
+import { useMemo, useState } from "react";
+import { Calendar, CloudRain, Clock, MapPin, Thermometer, TrendingUp, Wind } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
-import { Calendar, BarChart3, MapPin, Wind, CloudRain, Thermometer, Clock, TrendingUp } from "lucide-react";
 import { useLocation } from "@/contexts/LocationContext";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
-import { HISTORY_DETAILS_TABLE_CLASS } from "@/lib/historyLayout";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Area,
-  AreaChart,
-} from "recharts";
 
-// Color palette for models
 const MODEL_COLORS: Record<string, string> = {
-  AROME: "#f97316",
-  ARPEGE: "#8b5cf6",
-  ECMWF: "#3b82f6",
-  GFS: "#10b981",
-  ICON: "#ef4444",
-  UKMET: "#06b6d4",
-  GEM: "#f59e0b",
-  JMA: "#ec4899",
-  MeteoAI: "#60a5fa",
+  AROME: "#fb923c", ARPEGE: "#a78bfa", ECMWF: "#60a5fa", GFS: "#34d399",
+  ICON: "#fb7185", UKMET: "#22d3ee", GEM: "#fbbf24", MeteoAI: "#38bdf8",
 };
 
 const BUCKET_LABELS: Record<string, string> = {
-  "0-6h": "0-6h",
-  "6-24h": "6-24h",
-  "1-3d": "1-3j",
-  "4-7d": "4-7j",
-  "8-15d": "8-15j",
+  "0-6h": "0–6 h", "6-24h": "6–24 h", "1-3d": "1–3 j", "4-7d": "4–7 j", "8-15d": "8–15 j",
 };
 
-function getModelColor(name: string): string {
-  return MODEL_COLORS[name] || `hsl(${(name.charCodeAt(0) * 37) % 360}, 70%, 55%)`;
+type HistoryTab = "temperature" | "precip" | "wind" | "scores" | "leadtime";
+
+function modelColor(name: string) {
+  return MODEL_COLORS[name] ?? `hsl(${(name.charCodeAt(0) * 37) % 360} 74% 62%)`;
 }
 
-function ChartLegend({ entries }: { entries: Array<{ label: string; color: string }> }) {
-  return (
-    <div className="mt-3 flex max-w-full gap-3 overflow-x-auto pb-1 text-[10px] text-muted-foreground scrollbar-hide" aria-label="Légende du graphique">
-      {entries.map((entry) => (
-        <span key={entry.label} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
-          {entry.label}
-        </span>
-      ))}
-    </div>
-  );
+function shortDate(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" }).format(date);
+}
+
+function number(value: unknown, suffix = "", digits = 1) {
+  return value == null || Number.isNaN(Number(value)) ? "—" : `${Number(value).toFixed(digits)}${suffix}`;
+}
+
+function errorTone(value: number | null) {
+  if (value == null) return "text-slate-400";
+  if (value <= 1) return "text-emerald-300";
+  if (value <= 2) return "text-amber-300";
+  return "text-rose-300";
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return <MeteoSurface tone="inset" className="rounded-2xl p-6 text-center"><Clock className="mx-auto mb-3 h-7 w-7 text-slate-500" /><h2 className="text-base font-semibold text-white">{title}</h2><p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-slate-400">{detail}</p></MeteoSurface>;
+}
+
+function SectionTitle({ icon: Icon, title, detail }: { icon: typeof Thermometer; title: string; detail: string }) {
+  return <div className="mb-3 flex items-start gap-2.5"><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-sky-400/20 bg-sky-400/10"><Icon className="h-4 w-4 text-sky-300" /></span><div><h2 className="text-lg font-semibold tracking-tight text-white">{title}</h2><p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{detail}</p></div></div>;
+}
+
+function Legend({ entries }: { entries: Array<{ label: string; color: string; dashed?: boolean }> }) {
+  return <div className="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">{entries.map((entry) => <span key={entry.label} className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-700/70 bg-slate-950/30 px-2 py-1 text-[10px] text-slate-300"><span className={`h-0.5 w-3 rounded-full ${entry.dashed ? "border-t border-dashed border-current bg-transparent" : ""}`} style={{ backgroundColor: entry.dashed ? undefined : entry.color, color: entry.color }} />{entry.label}</span>)}</div>;
+}
+
+function Metric({ label, value, detail, tone = "text-white" }: { label: string; value: string; detail?: string; tone?: string }) {
+  return <div className="rounded-xl border border-slate-800 bg-[#080c13] px-3 py-2.5"><p className="text-[9px] font-medium uppercase tracking-[0.1em] text-slate-500">{label}</p><p className={`mt-1 text-base font-semibold ${tone}`}>{value}</p>{detail ? <p className="mt-0.5 text-[10px] text-slate-500">{detail}</p> : null}</div>;
+}
+
+function CompactLineChart({ data, observedKey, forecastKey, modelKey, observedLabel, forecastLabel, modelLabel, unit, height = 230 }: { data: any[]; observedKey: string; forecastKey: string; modelKey: string; observedLabel: string; forecastLabel: string; modelLabel: string; unit: string; height?: number }) {
+  return <><Legend entries={[{ label: observedLabel, color: "#34d399", dashed: true }, { label: forecastLabel, color: "#38bdf8" }, { label: modelLabel, color: modelColor(modelLabel) }]} /><div style={{ height }}><ResponsiveContainer width="100%" height="100%"><LineChart data={data} margin={{ top: 8, right: 6, left: -16, bottom: 0 }}><CartesianGrid vertical={false} stroke="#1e293b" strokeDasharray="3 4" /><XAxis dataKey="date" tickFormatter={shortDate} minTickGap={28} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis width={38} tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={(value) => `${value}${unit}`} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: "#080c13", border: "1px solid #334155", borderRadius: 12, fontSize: 12 }} labelFormatter={(value) => shortDate(String(value))} formatter={(value: any, name: string | number | undefined) => [number(value, unit), String(name ?? "—")]} /><Line type="monotone" dataKey={observedKey} name={observedLabel} stroke="#34d399" strokeWidth={2.5} strokeDasharray="5 4" dot={{ r: 3, fill: "#34d399" }} connectNulls /><Line type="monotone" dataKey={forecastKey} name={forecastLabel} stroke="#38bdf8" strokeWidth={3} dot={{ r: 2, fill: "#38bdf8" }} connectNulls /><Line type="monotone" dataKey={modelKey} name={modelLabel} stroke={modelColor(modelLabel)} strokeWidth={1.5} strokeOpacity={0.8} dot={false} connectNulls /></LineChart></ResponsiveContainer></div></>;
+}
+
+function DailyComparison({ rows, selectedModel }: { rows: any[]; selectedModel: string }) {
+  const [showAllDays, setShowAllDays] = useState(false);
+  const orderedRows = [...rows].reverse();
+  const visibleRows = showAllDays ? orderedRows : orderedRows.slice(0, 5);
+  const remainingDays = Math.max(0, orderedRows.length - visibleRows.length);
+  return <div className="space-y-2">{visibleRows.map((row) => {
+    const modelMax = row[`${selectedModel}_max`];
+    const err = row.obsMax != null && row.meteoAIMax != null ? Math.abs(row.obsMax - row.meteoAIMax) : null;
+    return <article key={row.date} className="rounded-xl border border-slate-800 bg-[#080c13] p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-white">{shortDate(row.date)}</p><p className="mt-0.5 text-[10px] text-slate-500">Observation, synthèse MeteoAI et {selectedModel}</p></div><span className={`rounded-full border border-slate-700/70 bg-slate-900/70 px-2 py-1 text-[10px] font-semibold ${errorTone(err)}`}>{err == null ? "Erreur —" : `Écart ${err.toFixed(1)}°C`}</span></div><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="Obs. max" value={number(row.obsMax, "°C")} tone="text-emerald-200" /><Metric label="MeteoAI" value={number(row.meteoAIMax, "°C")} tone="text-sky-200" /><Metric label={selectedModel} value={number(modelMax, "°C")} tone="text-violet-200" /></div><div className="mt-2 grid grid-cols-2 gap-2"><Metric label="Obs. min" value={number(row.obsMin, "°C")} /><Metric label="Pluie observée" value={number(row.obsPrecip, " mm")} tone="text-blue-200" /></div></article>;
+  })}{orderedRows.length > 5 ? <button type="button" onClick={() => setShowAllDays((open) => !open)} aria-expanded={showAllDays} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-sky-400/25 bg-sky-400/8 px-3 text-xs font-semibold text-sky-100"><span>{showAllDays ? "Réduire les dates" : `Afficher les ${remainingDays} date${remainingDays > 1 ? "s" : ""} précédente${remainingDays > 1 ? "s" : ""}`}</span><span aria-hidden="true">{showAllDays ? "⌃" : "⌄"}</span></button> : null}</div>;
 }
 
 export default function History() {
   const [days, setDays] = useState(14);
-  const [activeTab, setActiveTab] = useState<"temperature" | "precip" | "wind" | "scores" | "leadtime">("temperature");
+  const [activeTab, setActiveTab] = useState<HistoryTab>("temperature");
   const { activeLocation } = useLocation();
-  const { data, isLoading } = trpc.weather.getHistory.useQuery(
-    activeLocation ? { days, lat: activeLocation.lat, lon: activeLocation.lon } : { days }
-  );
+  const { data, isLoading } = trpc.weather.getHistory.useQuery(activeLocation ? { days, lat: activeLocation.lat, lon: activeLocation.lon } : { days });
 
-  // Chart data: observations + MeteoAI + per-model forecasts
   const chartData = useMemo(() => {
     if (!data) return [];
     const dateMap = new Map<string, any>();
-
-    // Add observations
-    data.observations.forEach((obs) => {
-      if (!dateMap.has(obs.date)) dateMap.set(obs.date, { date: obs.date });
-      const entry = dateMap.get(obs.date)!;
-      entry.obsMax = obs.tempMax;
-      entry.obsMin = obs.tempMin;
-      entry.obsPrecip = obs.precipitation;
-      entry.obsWind = obs.windSpeed;
-      entry.obsGust = obs.windGust;
-    });
-
-    // Add MeteoAI forecasts
-    data.meteoAIForecasts.forEach((f) => {
-      if (!dateMap.has(f.date)) dateMap.set(f.date, { date: f.date });
-      const entry = dateMap.get(f.date)!;
-      entry.meteoAIMax = f.tempMax;
-      entry.meteoAIMin = f.tempMin;
-      entry.meteoAIPrecip = f.precipitation;
-      entry.stability = f.stabilityIndex;
-    });
-
-    // Add per-model forecasts
-    data.forecasts.forEach((f) => {
-      if (!dateMap.has(f.date)) dateMap.set(f.date, { date: f.date });
-      const entry = dateMap.get(f.date)!;
-      entry[`${f.serviceName}_max`] = f.tempMax;
-      entry[`${f.serviceName}_min`] = f.tempMin;
-      entry[`${f.serviceName}_precip`] = f.precipitation;
-      entry[`${f.serviceName}_wind`] = f.windSpeed;
-    });
-
+    const ensure = (date: string) => { if (!dateMap.has(date)) dateMap.set(date, { date }); return dateMap.get(date)!; };
+    data.observations.forEach((obs: any) => Object.assign(ensure(obs.date), { obsMax: obs.tempMax, obsMin: obs.tempMin, obsPrecip: obs.precipitation, obsWind: obs.windSpeed, obsGust: obs.windGust }));
+    data.meteoAIForecasts.forEach((forecast: any) => Object.assign(ensure(forecast.date), { meteoAIMax: forecast.tempMax, meteoAIMin: forecast.tempMin, meteoAIPrecip: forecast.precipitation, stability: forecast.stabilityIndex }));
+    data.forecasts.forEach((forecast: any) => Object.assign(ensure(forecast.date), { [`${forecast.serviceName}_max`]: forecast.tempMax, [`${forecast.serviceName}_min`]: forecast.tempMin, [`${forecast.serviceName}_precip`]: forecast.precipitation, [`${forecast.serviceName}_wind`]: forecast.windSpeed }));
     return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [data]);
 
-  // Unique model names from forecasts
-  const modelNames = useMemo(() => {
-    if (!data) return [];
-    const names = new Set<string>();
-    data.forecasts.forEach((f) => names.add(f.serviceName));
-    return Array.from(names).sort();
-  }, [data]);
+  const modelNames = useMemo(() => data ? Array.from(new Set(data.forecasts.map((forecast: any) => forecast.serviceName))).sort() : [], [data]);
+  const [selectedModel, setSelectedModel] = useState<string>("MeteoAI");
+  const comparisonModel = modelNames.includes(selectedModel) ? selectedModel : modelNames[0] ?? "MeteoAI";
+  const comparisonModelKey = comparisonModel === "MeteoAI" ? "meteoAIMax" : `${comparisonModel}_max`;
 
-  // Score time series grouped by date
-  const scoreChartData = useMemo(() => {
+  const scoreRows = useMemo(() => {
     if (!data?.scoreTimeSeries) return [];
-    const dateMap = new Map<string, any>();
-    data.scoreTimeSeries.forEach((row: any) => {
-      if (!dateMap.has(row.date)) dateMap.set(row.date, { date: row.date });
-      const entry = dateMap.get(row.date)!;
-      entry[row.serviceName] = row.weightedScore;
-    });
-    return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const dates = new Map<string, any>();
+    data.scoreTimeSeries.forEach((row: any) => Object.assign(dates.get(row.date) ?? dates.set(row.date, { date: row.date }).get(row.date), { [row.serviceName]: row.weightedScore }));
+    return Array.from(dates.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [data]);
+  const latestScores = useMemo(() => modelNames.map((name) => ({ name, score: [...scoreRows].reverse().find((row) => row[name] != null)?.[name] ?? null })).filter((row) => row.score != null).sort((a, b) => Number(b.score) - Number(a.score)), [modelNames, scoreRows]);
+  const leadRows = useMemo(() => (data?.leadTimeScores ?? []).filter((row: any) => row.serviceName === comparisonModel), [data, comparisonModel]);
 
-  // Lead-time data grouped by bucket
-  const leadTimeData = useMemo(() => {
-    if (!data?.leadTimeScores || data.leadTimeScores.length === 0) return [];
-    const bucketOrder = ["0-6h", "6-24h", "1-3d", "4-7d", "8-15d"];
-    const bucketMap = new Map<string, any>();
-    bucketOrder.forEach((b) => bucketMap.set(b, { bucket: BUCKET_LABELS[b] || b }));
+  if (isLoading) return <div className="min-h-screen bg-background px-3 pb-24 pt-3"><div className="mx-auto max-w-2xl animate-pulse space-y-4"><div className="h-9 w-48 rounded-xl bg-muted" /><div className="h-40 rounded-2xl bg-muted" /><div className="h-56 rounded-2xl bg-muted" /></div></div>;
 
-    data.leadTimeScores.forEach((row: any) => {
-      const entry = bucketMap.get(row.bucket);
-      if (entry) {
-        entry[`${row.serviceName}_mae`] = row.avgMaeTemp;
-      }
-    });
-    return Array.from(bucketMap.values());
-  }, [data]);
+  const tabItems: Array<{ id: HistoryTab; label: string; icon: typeof Thermometer }> = [
+    { id: "temperature", label: "Température", icon: Thermometer }, { id: "precip", label: "Pluie", icon: CloudRain }, { id: "wind", label: "Vent", icon: Wind }, { id: "scores", label: "Scores", icon: TrendingUp }, { id: "leadtime", label: "Échéance", icon: Clock },
+  ];
+  const selectedModelMinKey = comparisonModel === "MeteoAI" ? "meteoAIMin" : `${comparisonModel}_min`;
+  const selectedModelPrecipKey = comparisonModel === "MeteoAI" ? "meteoAIPrecip" : `${comparisonModel}_precip`;
+  const selectedModelWindKey = `${comparisonModel}_wind`;
+  const latest = chartData[chartData.length - 1];
+  const latestError = latest?.obsMax != null && latest?.meteoAIMax != null ? Math.abs(latest.obsMax - latest.meteoAIMax) : null;
 
-  // Models present in lead-time data
-  const leadTimeModels = useMemo(() => {
-    if (!data?.leadTimeScores) return [];
-    const names = new Set<string>();
-    data.leadTimeScores.forEach((row: any) => names.add(row.serviceName));
-    return Array.from(names).sort();
-  }, [data]);
+  return <div className="weather-page min-h-screen"><main className="mx-auto max-w-2xl space-y-4 px-3 pb-28 pt-3 sm:space-y-5 sm:px-5 sm:py-8">
+    <header className="weather-surface-hero rounded-2xl p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-sky-400/25 bg-sky-400/10"><Calendar className="h-4 w-4 text-sky-300" /></span><div><h1 className="text-xl font-bold tracking-tight text-white">Historique météo</h1><p className="text-[11px] text-slate-400">Prévisions confrontées aux observations archivées</p></div></div>{activeLocation ? <p className="mt-3 flex items-center gap-1.5 text-[11px] text-sky-300"><MapPin className="h-3.5 w-3.5" />{activeLocation.name}</p> : null}</div><div className="shrink-0 text-right"><p className="text-[10px] uppercase tracking-wider text-slate-500">Période</p><p className="text-lg font-semibold text-white">{days} j</p></div></div><div className="mt-4 flex gap-2">{[7, 14, 30].map((period) => <button key={period} onClick={() => setDays(period)} className={`min-h-9 flex-1 rounded-xl border text-xs font-semibold ${days === period ? "border-sky-400/45 bg-sky-400/15 text-sky-100" : "border-slate-700/70 bg-slate-950/25 text-slate-400"}`}>{period} jours</button>)}</div>{chartData.length > 0 ? <div className="mt-3 grid grid-cols-3 gap-2"><Metric label="Jours archivés" value={String(chartData.length)} /><Metric label="Obs. disponibles" value={String(data?.observations.length ?? 0)} tone="text-emerald-200" /><Metric label="Dernier écart" value={latestError == null ? "—" : `${latestError.toFixed(1)}°C`} tone={errorTone(latestError)} /></div> : null}</header>
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background px-3 pb-24 pt-3 sm:p-6">
-        <div className="mx-auto max-w-2xl">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-48 bg-muted rounded" />
-            <div className="h-64 bg-muted rounded-xl" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+    <nav className="weather-surface-inset -mx-1 flex gap-1 overflow-x-auto rounded-2xl p-1.5 scrollbar-hide" aria-label="Type de comparaison historique">{tabItems.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setActiveTab(id)} className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold ${activeTab === id ? "bg-sky-400/15 text-sky-100 ring-1 ring-sky-400/25" : "text-slate-400"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</nav>
 
-  const tooltipStyle = {
-    backgroundColor: "hsl(var(--card))",
-    border: "1px solid hsl(var(--border))",
-    borderRadius: "8px",
-    color: "hsl(var(--foreground))",
-  };
+    {modelNames.length > 0 && ["temperature", "precip", "wind", "scores", "leadtime"].includes(activeTab) ? <section className="weather-surface-inset rounded-2xl p-3"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Modèle comparé</p><div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"><button onClick={() => setSelectedModel("MeteoAI")} className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${comparisonModel === "MeteoAI" ? "border-sky-400/40 bg-sky-400/15 text-sky-100" : "border-slate-700 text-slate-400"}`}>MeteoAI</button>{modelNames.map((name) => <button key={name} onClick={() => setSelectedModel(name)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${comparisonModel === name ? "border-violet-400/40 bg-violet-400/15 text-violet-100" : "border-slate-700 text-slate-400"}`}>{name}</button>)}</div></section> : null}
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl space-y-4 px-3 pb-24 pt-3 sm:space-y-6 sm:px-5 sm:py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-              <Calendar className="h-8 w-8 text-primary" />
-              Historique
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Comparaison multi-modèles vs observations sur {days} jours
-            </p>
-            {activeLocation && (
-              <div className="flex items-center gap-1 mt-1 text-xs text-primary">
-                <MapPin className="h-3 w-3" />
-                <span>{activeLocation.name}</span>
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {[7, 14, 30].map((d) => (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  days === d
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-accent"
-                }`}
-              >
-                {d}j
-              </button>
-            ))}
-          </div>
-        </div>
+    {chartData.length === 0 ? <EmptyState title="Historique en cours de constitution" detail="Les comparaisons apparaîtront dès que des observations et des prévisions archivées couvriront cette période." /> : <>
+      {activeTab === "temperature" ? <section className="space-y-4"><MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionTitle icon={Thermometer} title="Températures maximales" detail={`Une lecture centrée sur l’observation, MeteoAI et ${comparisonModel}.`} /><CompactLineChart data={chartData} observedKey="obsMax" forecastKey="meteoAIMax" modelKey={comparisonModelKey} observedLabel="Observation" forecastLabel="MeteoAI" modelLabel={comparisonModel} unit="°C" /></MeteoSurface><MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionTitle icon={Thermometer} title="Températures minimales" detail="Les mêmes repères, sans superposer toute la flotte de modèles." /><CompactLineChart data={chartData} observedKey="obsMin" forecastKey="meteoAIMin" modelKey={selectedModelMinKey} observedLabel="Observation" forecastLabel="MeteoAI" modelLabel={comparisonModel} unit="°C" height={205} /></MeteoSurface><MeteoSurface tone="inset" className="rounded-2xl p-4"><SectionTitle icon={Calendar} title="Lecture jour par jour" detail="Chaque date expose les valeurs brutes, sans dépendre d’un survol de graphique." /><DailyComparison rows={chartData} selectedModel={comparisonModel} /></MeteoSurface></section> : null}
 
-        {/* Tab navigation */}
-        <div className="flex gap-1 bg-muted/50 p-1 rounded-lg w-fit flex-wrap">
-          {[
-            { id: "temperature" as const, label: "Température", icon: Thermometer },
-            { id: "precip" as const, label: "Précipitations", icon: CloudRain },
-            { id: "wind" as const, label: "Vent", icon: Wind },
-            { id: "scores" as const, label: "Scores", icon: TrendingUp },
-            { id: "leadtime" as const, label: "Par échéance", icon: Clock },
-          ].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === id
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
+      {activeTab === "precip" ? <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionTitle icon={CloudRain} title="Précipitations quotidiennes" detail={`Barres limitées à l’observation, MeteoAI et ${comparisonModel} pour conserver une comparaison lisible.`} /><Legend entries={[{ label: "Observation", color: "#34d399" }, { label: "MeteoAI", color: "#38bdf8" }, { label: comparisonModel, color: modelColor(comparisonModel) }]} /><div className="h-60"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 4, right: 2, left: -18, bottom: 0 }}><CartesianGrid vertical={false} stroke="#1e293b" strokeDasharray="3 4" /><XAxis dataKey="date" tickFormatter={shortDate} minTickGap={28} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={(value) => `${value} mm`} width={42} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: "#080c13", border: "1px solid #334155", borderRadius: 12, fontSize: 12 }} labelFormatter={(value) => shortDate(String(value))} /><Bar dataKey="obsPrecip" name="Observation" fill="#34d399" radius={[4, 4, 0, 0]} /><Bar dataKey="meteoAIPrecip" name="MeteoAI" fill="#38bdf8" radius={[4, 4, 0, 0]} /><Bar dataKey={selectedModelPrecipKey} name={comparisonModel} fill={modelColor(comparisonModel)} radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div><div className="mt-4 space-y-2">{[...chartData].reverse().map((row) => <div key={row.date} className="grid grid-cols-[1.1fr_1fr_1fr_1fr] items-center gap-2 rounded-xl border border-slate-800 bg-[#080c13] px-3 py-2 text-[11px]"><span className="font-medium text-slate-200">{shortDate(row.date)}</span><span className="text-emerald-200">Obs. {number(row.obsPrecip, " mm")}</span><span className="text-sky-200">IA {number(row.meteoAIPrecip, " mm")}</span><span className="text-violet-200">{number(row[selectedModelPrecipKey], " mm")}</span></div>)}</div></MeteoSurface> : null}
 
-        {/* Temperature Tab */}
-        {activeTab === "temperature" && chartData.length > 0 && (
-          <div className="space-y-6">
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Thermometer className="h-5 w-5 text-primary" />
-                Températures Max — Modèles vs Observations
-              </h3>
-              <ChartLegend entries={[
-                { label: "Obs. Max", color: "#34d399" },
-                { label: "MeteoAI", color: "#60a5fa" },
-                ...modelNames.map((name) => ({ label: name, color: getModelColor(name) })),
-              ]} />
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit="°C" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    {/* Observation line (thick, dashed) */}
-                    <Line type="monotone" dataKey="obsMax" name="Obs. Max" stroke="#34d399" strokeWidth={3} strokeDasharray="6 3" dot={{ r: 4 }} />
-                    {/* MeteoAI line (thick, solid) */}
-                    <Line type="monotone" dataKey="meteoAIMax" name="MeteoAI" stroke="#60a5fa" strokeWidth={3} dot={{ r: 3 }} />
-                    {/* Per-model lines (thin) */}
-                    {modelNames.map((name) => (
-                      <Line
-                        key={name}
-                        type="monotone"
-                        dataKey={`${name}_max`}
-                        name={name}
-                        stroke={getModelColor(name)}
-                        strokeWidth={1.5}
-                        strokeOpacity={0.6}
-                        dot={false}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+      {activeTab === "wind" ? <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionTitle icon={Wind} title="Vent et rafales" detail={`La courbe compare l’observation au modèle ${comparisonModel}, avec les rafales observées distinctes.`} /><Legend entries={[{ label: "Vent observé", color: "#34d399", dashed: true }, { label: "Rafales obs.", color: "#fb923c", dashed: true }, { label: comparisonModel, color: modelColor(comparisonModel) }]} /><div className="h-64"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 8, right: 6, left: -16, bottom: 0 }}><CartesianGrid vertical={false} stroke="#1e293b" strokeDasharray="3 4" /><XAxis dataKey="date" tickFormatter={shortDate} minTickGap={28} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis width={42} tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={(value) => `${value}`} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: "#080c13", border: "1px solid #334155", borderRadius: 12, fontSize: 12 }} labelFormatter={(value) => shortDate(String(value))} /><Line type="monotone" dataKey="obsWind" name="Vent observé" stroke="#34d399" strokeWidth={2.5} strokeDasharray="5 4" dot={{ r: 3 }} connectNulls /><Line type="monotone" dataKey="obsGust" name="Rafales obs." stroke="#fb923c" strokeWidth={2} strokeDasharray="3 3" dot={false} connectNulls /><Line type="monotone" dataKey={selectedModelWindKey} name={comparisonModel} stroke={modelColor(comparisonModel)} strokeWidth={2.5} dot={{ r: 2 }} connectNulls /></LineChart></ResponsiveContainer></div></MeteoSurface> : null}
 
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Thermometer className="h-5 w-5 text-blue-400" />
-                Températures Min — Modèles vs Observations
-              </h3>
-              <ChartLegend entries={[
-                { label: "Obs. Min", color: "#6ee7b7" },
-                { label: "MeteoAI", color: "#93c5fd" },
-                ...modelNames.map((name) => ({ label: name, color: getModelColor(name) })),
-              ]} />
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit="°C" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Line type="monotone" dataKey="obsMin" name="Obs. Min" stroke="#6ee7b7" strokeWidth={3} strokeDasharray="6 3" dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="meteoAIMin" name="MeteoAI" stroke="#93c5fd" strokeWidth={3} dot={{ r: 3 }} />
-                    {modelNames.map((name) => (
-                      <Line
-                        key={name}
-                        type="monotone"
-                        dataKey={`${name}_min`}
-                        name={name}
-                        stroke={getModelColor(name)}
-                        strokeWidth={1.5}
-                        strokeOpacity={0.6}
-                        dot={false}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        )}
+      {activeTab === "scores" ? <section className="space-y-4">{scoreRows.length === 0 ? <EmptyState title="Scores encore insuffisants" detail="Les scores apparaîtront lorsque le nombre de comparaisons qualifiées sera suffisant." /> : <><MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionTitle icon={TrendingUp} title="Classement le plus récent" detail="Le score est affiché uniquement lorsqu’il existe dans l’archive de fiabilité." /><div className="space-y-2">{latestScores.map((row, index) => <div key={row.name} className="grid grid-cols-[32px_1fr_auto] items-center gap-2 rounded-xl border border-slate-800 bg-[#080c13] px-3 py-2.5"><span className="grid h-6 w-6 place-items-center rounded-full bg-slate-800 text-[10px] font-bold text-slate-300">{index + 1}</span><div><p className="text-sm font-semibold text-white">{row.name}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, Number(row.score)))}%`, backgroundColor: modelColor(row.name) }} /></div></div><span className="text-base font-bold text-white">{number(row.score, "/100", 0)}</span></div>)}</div></MeteoSurface><MeteoSurface tone="inset" className="rounded-2xl p-4"><SectionTitle icon={TrendingUp} title={`Évolution de ${comparisonModel}`} detail="Une courbe isolée pour suivre le modèle choisi sans mélange de lignes." /><div className="h-52"><ResponsiveContainer width="100%" height="100%"><LineChart data={scoreRows} margin={{ top: 8, right: 6, left: -16, bottom: 0 }}><CartesianGrid vertical={false} stroke="#1e293b" strokeDasharray="3 4" /><XAxis dataKey="date" tickFormatter={shortDate} minTickGap={28} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis domain={[0, 100]} width={38} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: "#080c13", border: "1px solid #334155", borderRadius: 12, fontSize: 12 }} labelFormatter={(value) => shortDate(String(value))} /><Line type="monotone" dataKey={comparisonModel} name={comparisonModel} stroke={modelColor(comparisonModel)} strokeWidth={3} dot={{ r: 3 }} connectNulls /></LineChart></ResponsiveContainer></div></MeteoSurface></>}</section> : null}
 
-        {/* Precipitation Tab */}
-        {activeTab === "precip" && chartData.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <CloudRain className="h-5 w-5 text-blue-400" />
-              Précipitations — Modèles vs Observations
-            </h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit=" mm" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="obsPrecip" name="Obs." fill="#34d399" opacity={0.9} />
-                  <Bar dataKey="meteoAIPrecip" name="MeteoAI" fill="#60a5fa" opacity={0.8} />
-                  {modelNames.slice(0, 4).map((name) => (
-                    <Bar
-                      key={name}
-                      dataKey={`${name}_precip`}
-                      name={name}
-                      fill={getModelColor(name)}
-                      opacity={0.5}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Wind Tab */}
-        {activeTab === "wind" && chartData.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Wind className="h-5 w-5 text-cyan-400" />
-              Vent moyen — Modèles vs Observations
-            </h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit=" km/h" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Area type="monotone" dataKey="obsWind" name="Obs. Vent" stroke="#34d399" fill="#34d399" fillOpacity={0.15} strokeWidth={3} strokeDasharray="6 3" />
-                  <Area type="monotone" dataKey="obsGust" name="Obs. Rafales" stroke="#f97316" fill="#f97316" fillOpacity={0.1} strokeWidth={2} strokeDasharray="4 2" />
-                  {modelNames.map((name) => (
-                    <Line
-                      key={name}
-                      type="monotone"
-                      dataKey={`${name}_wind`}
-                      name={name}
-                      stroke={getModelColor(name)}
-                      strokeWidth={1.5}
-                      strokeOpacity={0.6}
-                      dot={false}
-                    />
-                  ))}
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Scores Tab */}
-        {activeTab === "scores" && scoreChartData.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Évolution des scores de fiabilité par modèle
-            </h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={scoreChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit="/100" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {modelNames.map((name) => (
-                    <Line
-                      key={name}
-                      type="monotone"
-                      dataKey={name}
-                      name={name}
-                      stroke={getModelColor(name)}
-                      strokeWidth={2}
-                      dot={{ r: 2 }}
-                      connectNulls
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Lead-time Tab */}
-        {activeTab === "leadtime" && (
-          <div className="space-y-6">
-            {leadTimeData.length > 0 ? (
-              <div className="bg-card border border-border rounded-xl p-6">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  MAE Température par échéance de prévision
-                </h3>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Plus la barre est courte, plus le modèle est précis à cette échéance.
-                </p>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={leadTimeData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} unit="°C" />
-                      <YAxis type="category" dataKey="bucket" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} width={60} />
-                      <Tooltip contentStyle={tooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      {leadTimeModels.map((name) => (
-                        <Bar
-                          key={name}
-                          dataKey={`${name}_mae`}
-                          name={name}
-                          fill={getModelColor(name)}
-                          opacity={0.8}
-                        />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-card border border-border rounded-xl p-12 text-center">
-                <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h2 className="text-xl font-semibold mb-2">Scoring par échéance</h2>
-                <p className="text-muted-foreground">
-                  Les données de scoring par échéance seront disponibles après les prochaines collectes d'observations.
-                </p>
-              </div>
-            )}
-
-            {/* Lead-time detail table */}
-            {data?.leadTimeScores && data.leadTimeScores.length > 0 && (
-              <div className="bg-card border border-border rounded-xl overflow-hidden">
-                <div className="p-4 border-b border-border">
-                  <h3 className="font-semibold">Détail par modèle et échéance</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/50">
-                        <th className="text-left p-3 font-medium">Modèle</th>
-                        <th className="text-center p-3 font-medium">Échéance</th>
-                        <th className="text-right p-3 font-medium">MAE T°</th>
-                        <th className="text-right p-3 font-medium">RMSE T°</th>
-                        <th className="text-right p-3 font-medium">Biais T°</th>
-                        <th className="text-right p-3 font-medium">MAE Précip</th>
-                        <th className="text-right p-3 font-medium">MAE Vent</th>
-                        <th className="text-right p-3 font-medium">Échantillons</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.leadTimeScores.map((row: any, i: number) => (
-                        <tr key={i} className="border-b border-border/50 hover:bg-muted/30">
-                          <td className="p-3 font-medium">
-                            <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: getModelColor(row.serviceName) }} />
-                            {row.serviceName}
-                          </td>
-                          <td className="p-3 text-center">
-                            <span className="px-2 py-0.5 rounded bg-muted text-xs font-mono">
-                              {BUCKET_LABELS[row.bucket] || row.bucket}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right font-mono">
-                            {row.avgMaeTemp != null ? `${Number(row.avgMaeTemp).toFixed(2)}°C` : "—"}
-                          </td>
-                          <td className="p-3 text-right font-mono">
-                            {row.avgRmseTemp != null ? `${Number(row.avgRmseTemp).toFixed(2)}°C` : "—"}
-                          </td>
-                          <td className="p-3 text-right font-mono">
-                            {row.avgBiasTemp != null ? (
-                              <span className={Number(row.avgBiasTemp) > 0 ? "text-red-400" : "text-blue-400"}>
-                                {Number(row.avgBiasTemp) > 0 ? "+" : ""}{Number(row.avgBiasTemp).toFixed(2)}°C
-                              </span>
-                            ) : "—"}
-                          </td>
-                          <td className="p-3 text-right font-mono">
-                            {row.avgMaePrecip != null ? `${Number(row.avgMaePrecip).toFixed(1)} mm` : "—"}
-                          </td>
-                          <td className="p-3 text-right font-mono">
-                            {row.avgMaeWind != null ? `${Number(row.avgMaeWind).toFixed(1)} km/h` : "—"}
-                          </td>
-                          <td className="p-3 text-right text-muted-foreground">
-                            {row.totalSamples ?? 0}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Detailed Table (always visible) */}
-        {data && data.observations.length > 0 && activeTab === "temperature" && (
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-border">
-              <h3 className="font-semibold">Données détaillées</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className={HISTORY_DETAILS_TABLE_CLASS}>
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-3 font-medium">Date</th>
-                    <th className="text-right p-3 font-medium">Obs. Max</th>
-                    <th className="text-right p-3 font-medium">Obs. Min</th>
-                    <th className="text-right p-3 font-medium">Obs. Précip</th>
-                    <th className="text-right p-3 font-medium">MeteoAI Max</th>
-                    <th className="text-right p-3 font-medium">MeteoAI Min</th>
-                    <th className="text-right p-3 font-medium">Erreur Max</th>
-                    <th className="text-right p-3 font-medium">Stabilité</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {chartData.map((row) => {
-                    const errMax = (row.obsMax != null && row.meteoAIMax != null)
-                      ? Math.abs(row.meteoAIMax - row.obsMax)
-                      : null;
-                    return (
-                      <tr key={row.date} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="p-3 font-medium">{row.date}</td>
-                        <td className="p-3 text-right font-mono">
-                          {row.obsMax != null ? `${row.obsMax}°C` : "—"}
-                        </td>
-                        <td className="p-3 text-right font-mono">
-                          {row.obsMin != null ? `${row.obsMin}°C` : "—"}
-                        </td>
-                        <td className="p-3 text-right font-mono">
-                          {row.obsPrecip != null ? `${row.obsPrecip} mm` : "—"}
-                        </td>
-                        <td className="p-3 text-right font-mono text-primary">
-                          {row.meteoAIMax != null ? `${row.meteoAIMax}°C` : "—"}
-                        </td>
-                        <td className="p-3 text-right font-mono text-primary">
-                          {row.meteoAIMin != null ? `${row.meteoAIMin}°C` : "—"}
-                        </td>
-                        <td className="p-3 text-right font-mono">
-                          {errMax != null ? (
-                            <span className={errMax <= 1 ? "text-green-400" : errMax <= 2 ? "text-yellow-400" : "text-red-400"}>
-                              {errMax.toFixed(1)}°C
-                            </span>
-                          ) : "—"}
-                        </td>
-                        <td className="p-3 text-right">
-                          {row.stability != null ? (
-                            <span className={row.stability >= 60 ? "text-green-400" : "text-red-400"}>
-                              {row.stability >= 60 ? "🟢" : "🔴"} {row.stability}
-                            </span>
-                          ) : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {chartData.length === 0 && (
-          <MeteoSurface className="rounded-xl p-12 text-center">
-            <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Aucun historique</h2>
-            <p className="text-muted-foreground">
-              Les données historiques seront disponibles après les premières collectes.
-            </p>
-          </MeteoSurface>
-        )}
-      </div>
-      <BackToTopButton />
-    </div>
-  );
+      {activeTab === "leadtime" ? <section>{leadRows.length === 0 ? <EmptyState title="Données par échéance insuffisantes" detail={`Aucune mesure qualifiée n’est encore disponible pour ${comparisonModel} sur cette période.`} /> : <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionTitle icon={Clock} title={`Précision de ${comparisonModel} par échéance`} detail="Plus la MAE est faible, plus la température prévue est proche de l’observation." /><div className="space-y-2">{leadRows.map((row: any) => <article key={row.bucket} className="rounded-xl border border-slate-800 bg-[#080c13] p-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-white">{BUCKET_LABELS[row.bucket] ?? row.bucket}</p><span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-semibold text-sky-200">{number(row.avgMaeTemp, "°C", 2)} MAE</span></div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric label="RMSE" value={number(row.avgRmseTemp, "°C", 2)} /><Metric label="Biais" value={number(row.avgBiasTemp, "°C", 2)} tone={Number(row.avgBiasTemp) > 0 ? "text-rose-200" : "text-sky-200"} /><Metric label="MAE pluie" value={number(row.avgMaePrecip, " mm", 1)} /><Metric label="Échantillons" value={String(row.totalSamples ?? "—")} /></div></article>)}</div></MeteoSurface>}</section> : null}
+    </>}
+  </main><BackToTopButton /></div>;
 }

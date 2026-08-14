@@ -1160,3 +1160,10 @@
 - [x] Calcul: Définir des indicateurs transparents sans donnée artificielle ni nouvelle source.
 - [x] Interface: Ajouter les informations complémentaires au panneau horaire développé.
 - [x] Validation: Couvrir les cas de données absentes, vérifier le rendu mobile, TypeScript, tests et build.
+
+## Refonte de la page Historique
+- [x] Audit: Identifier les données, onglets et graphiques actuels qui réduisent la lisibilité mobile.
+- [x] Interface: Recomposer l’en-tête, les filtres et la hiérarchie de comparaison.
+- [x] Graphiques: Remplacer les comparaisons surchargées par une lecture mobile sans chevauchement.
+- [x] Interface: Ajouter des tableaux ou listes de valeurs détaillées accessibles en complément des graphiques.
+- [x] Validation: Vérifier les données réelles, le rendu mobile, TypeScript, tests et build.
