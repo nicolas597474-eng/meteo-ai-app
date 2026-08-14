@@ -1073,5 +1073,5 @@
 - [x] Audit: Réconcilier les douze modèles de la référence avec les sources et collectes actuelles.
 - [x] Architecture: Définir le stockage séparé des sorties déterministes et probabilistes en mode observation.
 - [ ] Collecte: Ajouter les modèles localement disponibles et vérifier leur archivage horaire sans leur attribuer de poids.
-- [ ] Transparence: Exposer leur statut « en validation » et leur couverture sans les présenter comme une fusion active.
+- [x] Transparence: Exposer leur statut « en validation » et leur couverture sans les présenter comme une fusion active.
 - [ ] Validation: Vérifier les cycles de 05h00, l’affichage et l’absence de modification de la prévision officielle.
