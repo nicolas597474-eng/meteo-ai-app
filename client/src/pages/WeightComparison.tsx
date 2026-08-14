@@ -47,8 +47,8 @@ export default function WeightComparison() {
   ) ?? 0;
 
   return (
-    <main className="min-h-screen bg-[#0d1117] text-foreground">
-      <div className="mx-auto max-w-2xl px-3 pb-24 pt-4 sm:px-6 sm:pt-6">
+    <main className="weather-page min-h-screen text-foreground">
+      <div className="weather-page-frame mx-auto max-w-2xl px-3 pb-24 pt-4 sm:px-6 sm:pt-6">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">Traçabilité MeteoAI</p>
@@ -57,7 +57,7 @@ export default function WeightComparison() {
               {activeLocation?.name ?? "Localisation par défaut"} · évolution réelle entre deux snapshots.
             </p>
           </div>
-          <Link href="/details" className="shrink-0 rounded-lg border border-border px-3 py-2 text-xs font-medium text-sky-300">
+          <Link href="/details" className="weather-chip shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-sky-300">
             Détails météo
           </Link>
         </div>
@@ -65,12 +65,12 @@ export default function WeightComparison() {
         {historyLoading ? (
           <div className="space-y-3"><Skeleton className="h-28 w-full rounded-2xl" /><Skeleton className="h-72 w-full rounded-2xl" /></div>
         ) : history.length < 2 ? (
-          <section className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-5 text-sm text-muted-foreground">
+          <section className="weather-action-surface rounded-2xl p-5 text-sm text-muted-foreground">
             Deux snapshots traçables sont nécessaires pour afficher une comparaison. Les prochaines collectes officielles enrichiront cet historique.
           </section>
         ) : (
           <>
-            <section className="rounded-2xl border border-border bg-card p-4">
+            <section className="weather-surface rounded-2xl p-4">
               <h2 className="text-sm font-semibold text-white">Snapshots à comparer</h2>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="text-xs text-muted-foreground">
@@ -104,7 +104,7 @@ export default function WeightComparison() {
                 {comparison.parameters.map((parameter) => {
                   const meta = PARAMETER_META[parameter.parameter];
                   return (
-                    <section key={parameter.parameter} className="rounded-2xl border border-border bg-card p-4">
+                    <section key={parameter.parameter} className="weather-surface rounded-2xl p-4">
                       <div className="mb-4 flex items-center gap-2">
                         <MeteoIcon name={meta.icon} size={26} />
                         <h2 className={`text-sm font-semibold ${meta.color}`}>{meta.label}</h2>
@@ -139,7 +139,7 @@ export default function WeightComparison() {
                 })}
               </div>
             ) : (
-              <section className="mt-4 rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm text-amber-200">
+              <section className="weather-surface-inset mt-4 rounded-2xl p-4 text-sm text-amber-200">
                 La comparaison n’est pas disponible pour cette paire de snapshots.
               </section>
             )}

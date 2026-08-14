@@ -999,6 +999,15 @@
 ## Vérification isolée de gel
 - [x] Tests: Simuler des plages négatives dans les tests de graphique sans injecter de données météo applicatives.
 
+## Maquette visuelle MeteoAI 3D
+- [x] Design: Créer une image conceptuelle mobile de MeteoAI avec profondeur 3D, sans modifier l’application.
+
+## Reconstruction MeteoAI avec relief 3D
+- [x] Audit: Inventorier les pages, composants, styles, données et parcours de navigation existants.
+- [x] Architecture: Définir les tokens, composants partagés et une migration visuelle sans régression de données.
+- [x] Interface: Reproduire la direction 3D validée sur les composants et pages prioritaires sans changer les calculs météo.
+- [x] Validation: Vérifier la fidélité, les données, les graphiques, les stations Netatmo et le responsive de toutes les pages.
+
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.

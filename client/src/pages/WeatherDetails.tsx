@@ -98,7 +98,7 @@ export default function WeatherDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0d1117]">
+      <div className="weather-page min-h-screen">
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -115,12 +115,12 @@ export default function WeatherDetails() {
   const confidence = data?.confidence;
 
   return (
-    <div className="min-h-screen bg-[#0d1117]">
-      <div className="max-w-2xl mx-auto px-3 pb-28">
+    <div className="weather-page min-h-screen">
+      <div className="weather-page-frame max-w-2xl mx-auto px-3 pb-28">
 
         {/* ═══ HEADER ═══ */}
         <div className="flex items-center gap-3 py-4">
-          <Link href="/" className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 transition-colors">
+          <Link href="/" className="weather-chip rounded-lg p-2 transition-colors hover:bg-slate-700/50">
             <ChevronLeft className="h-5 w-5 text-slate-300" />
           </Link>
           <div>
@@ -128,7 +128,7 @@ export default function WeatherDetails() {
             <p className="text-slate-400 text-xs">{activeLocation?.name ?? "Position actuelle"} • {formatDate(data?.today ?? "")}</p>
           </div>
           {regime && (
-            <div className="ml-auto flex items-center gap-1.5 bg-slate-800/50 rounded-full px-2.5 py-1">
+            <div className="weather-chip ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1">
               <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={16} />
               <span className="text-xs text-slate-300">{regime.primary.label}</span>
             </div>
@@ -151,7 +151,7 @@ export default function WeatherDetails() {
                 return (
                   <div
                     key={h.hour}
-                    className={`flex-shrink-0 w-[132px] rounded-xl border p-2.5 transition-all ${
+                    className={`weather-surface-inset flex-shrink-0 w-[132px] rounded-xl p-2.5 transition-all ${
                       isNow
                         ? "bg-blue-950/60 border-blue-500/50 ring-1 ring-blue-500/30"
                         : "bg-[#152238] border-slate-800"
@@ -280,7 +280,7 @@ export default function WeatherDetails() {
           </div>
           
           {/* Chart area */}
-          <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
+          <div className="weather-surface weather-chart-surface rounded-2xl p-4">
             <HourlyChart hours={hours} type={activeChart} currentIdx={currentHourIdx} />
           </div>
         </section>
@@ -295,7 +295,7 @@ export default function WeatherDetails() {
               // Les données serveur distinguent la confiance (accord, qualité,
               // historique, échéance) de la simple dispersion des modèles.
               return (
-                <div key={day.date} className="rounded-2xl bg-[#152238] border border-slate-800 overflow-hidden">
+                <div key={day.date} className="weather-surface rounded-2xl overflow-hidden">
                   {/* Day summary card */}
                   <button
                     onClick={() => setExpandedDay(isExpanded ? null : day.date)}
@@ -357,14 +357,14 @@ export default function WeatherDetails() {
         {/* ═══ SECTION 5: TENDANCES ═══ */}
         <section className="mb-4">
           <h2 className="text-green-400 font-bold text-sm mb-3">Tendances</h2>
-          <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
+          <div className="weather-surface rounded-2xl p-4">
             <TrendSection days={days} />
           </div>
         </section>
 
         {/* ═══ SECTION 6: CONFIANCE DE PRÉVISION ═══ */}
         <section className="mb-4">
-          <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
+          <div className="weather-surface rounded-2xl p-4">
             <h2 className="text-green-400 font-bold text-sm mb-3 flex items-center gap-2">
               <MeteoIcon name="confidence" size={14} />
               Confiance de prévision officielle
@@ -382,7 +382,7 @@ export default function WeatherDetails() {
 
 function DetailCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-800/30 rounded-lg p-2 text-center">
+    <div className="weather-surface-inset rounded-lg p-2 text-center">
       <p className="text-[8px] text-slate-500">{label}</p>
       <p className="text-xs text-white font-medium">{value}</p>
     </div>
@@ -431,7 +431,7 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
         return (
-          <div key={p} className="bg-slate-800/30 rounded-xl p-2">
+          <div key={p} className="weather-surface-inset rounded-xl p-2">
             <div className="flex items-center gap-1.5 mb-1">
               <span className="text-[10px]">{PERIOD_LABELS[p].emoji}</span>
               <span className="text-[10px] text-white font-semibold">{PERIOD_LABELS[p].label}</span>
@@ -605,7 +605,7 @@ function TrendSection({ days }: { days: any[] }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {trends.map((t) => (
-        <div key={t.label} className="flex items-center gap-2 bg-slate-800/30 rounded-lg p-2.5">
+        <div key={t.label} className="weather-surface-inset flex items-center gap-2 rounded-lg p-2.5">
           <MeteoIcon name={t.icon} size={16} />
           <div className="flex-1">
             <span className="text-[10px] text-slate-400 block">{t.label}</span>

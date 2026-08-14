@@ -33,7 +33,7 @@ const navItems = [
 function TopNav() {
   const [location] = useLocation();
   return (
-    <nav className="sticky top-0 z-50 hidden border-b border-border bg-background/90 backdrop-blur-xl sm:block">
+    <nav className="weather-nav sticky top-0 z-50 hidden border-b backdrop-blur-xl sm:block">
       <div className="max-w-2xl mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between h-14">
           <Link href="/" className="flex items-center gap-2">
@@ -52,7 +52,7 @@ function TopNav() {
                   href={item.path}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-primary/10 text-primary"
+                      ? "weather-nav-active text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                 >
@@ -71,7 +71,7 @@ function TopNav() {
 function BottomNav() {
   const [location] = useLocation();
   return (
-    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border safe-area-inset-bottom">
+    <nav className="weather-nav sm:hidden fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-xl safe-area-inset-bottom">
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const isActive = location === item.path;
@@ -80,7 +80,7 @@ function BottomNav() {
               key={item.path}
               href={item.path}
               className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors min-w-0 flex-1 ${
-                isActive ? "text-primary" : "text-muted-foreground"
+                isActive ? "weather-nav-active text-primary" : "text-muted-foreground"
               }`}
             >
               <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />

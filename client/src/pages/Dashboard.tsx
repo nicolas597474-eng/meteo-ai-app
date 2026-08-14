@@ -350,13 +350,13 @@ export default function Dashboard() {
   const modelFallbackContributors = locationWeather?.ultraLocal?.modelFallback?.contributors ?? [];
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-2 sm:space-y-6 sm:px-6 sm:py-8">
+    <div className="weather-page min-h-screen">
+      <div className="weather-page-frame mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-2 sm:space-y-6 sm:px-6 sm:py-8">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+            <h1 className="hidden text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent sm:block">
               MeteoAI
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground text-xs sm:text-sm">
@@ -364,7 +364,7 @@ export default function Dashboard() {
               <span>{selectedLocation?.name ?? "Hondeghem, Nord"}</span>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-lg px-2.5 py-1.5">
+          <div className="weather-chip flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
             <span>{formatDashboardDate(officialForecast?.today ?? dash?.today)}</span>
           </div>
@@ -384,7 +384,7 @@ export default function Dashboard() {
         />
 
         {/* ── Hero : Température actuelle + max/min ── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
+        <div className="weather-surface weather-surface-hero relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-4 sm:p-6">
           {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
           <img
             src={getDashboardWeatherImage({ condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
@@ -415,7 +415,7 @@ export default function Dashboard() {
 
             {/* ── Regime badge ── */}
             {regime && (
-              <div className="mb-3 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-2">
+              <div className="weather-surface-inset mb-3 rounded-xl px-3 py-2">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <button
                     type="button"
@@ -698,13 +698,13 @@ export default function Dashboard() {
         </div>
 
         {/* ── Link to details page ── */}
-        <a href="/details" className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
+        <a href="/details" className="weather-action-surface flex min-h-10 items-center justify-center gap-2 rounded-xl p-2 transition-colors hover:bg-primary/20">
           <MeteoIcon name="chevron_right" size={16} />
           <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
           <span className="text-primary text-xs">→</span>
         </a>
 
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
+        <div className="weather-surface flex min-h-11 items-center gap-2 rounded-xl p-2" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />
           <span className="mr-auto text-xs font-semibold text-muted-foreground">Contexte</span>
           <div className="flex gap-1">
@@ -726,7 +726,7 @@ export default function Dashboard() {
               <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
               <span className="text-[10px] text-muted-foreground">n’influence pas la prévision officielle</span>
             </div>
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+            <div className="weather-observation-surface rounded-xl p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-2xl font-bold text-emerald-300">{locationWeather.ultraLocal.temperature != null ? `${Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C` : "—"}</p>
@@ -758,7 +758,7 @@ export default function Dashboard() {
         )}
 
                 {/* Hourly Chart */}
-        <div className="bg-card border border-border rounded-2xl p-0 overflow-hidden">
+        <div className="weather-surface weather-chart-surface overflow-hidden rounded-2xl p-0">
           {officialLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
@@ -771,7 +771,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── 15-day chart enriched ── */}
-        <div className="bg-card border border-border rounded-2xl p-0 overflow-hidden">
+        <div className="weather-surface weather-chart-surface overflow-hidden rounded-2xl p-0">
           {officialLoading ? (
             <div className="h-72 bg-muted rounded-xl animate-pulse" />
           ) : days.length > 0 ? (

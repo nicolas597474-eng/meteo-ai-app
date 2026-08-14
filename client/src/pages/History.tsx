@@ -149,7 +149,7 @@ export default function History() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background px-3 pb-24 pt-3 sm:p-6">
+      <div className="weather-page min-h-screen px-3 pb-24 pt-3 sm:p-6">
         <div className="mx-auto max-w-2xl">
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-48 bg-muted rounded" />
@@ -168,8 +168,8 @@ export default function History() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl space-y-4 px-3 pb-24 pt-3 sm:space-y-6 sm:px-5 sm:py-8">
+    <div className="weather-page min-h-screen">
+      <div className="weather-page-frame mx-auto max-w-2xl space-y-4 px-3 pb-24 pt-3 sm:space-y-6 sm:px-5 sm:py-8">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -205,7 +205,7 @@ export default function History() {
         </div>
 
         {/* Tab navigation */}
-        <div className="flex gap-1 bg-muted/50 p-1 rounded-lg w-fit flex-wrap">
+        <div className="weather-surface-inset flex w-fit flex-wrap gap-1 rounded-lg p-1">
           {[
             { id: "temperature" as const, label: "Température", icon: Thermometer },
             { id: "precip" as const, label: "Précipitations", icon: CloudRain },
@@ -231,7 +231,7 @@ export default function History() {
         {/* Temperature Tab */}
         {activeTab === "temperature" && chartData.length > 0 && (
           <div className="space-y-6">
-            <div className="bg-card border border-border rounded-xl p-6">
+            <div className="weather-surface weather-chart-surface rounded-xl p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <Thermometer className="h-5 w-5 text-primary" />
                 Températures Max — Modèles vs Observations
@@ -270,7 +270,7 @@ export default function History() {
               </div>
             </div>
 
-            <div className="bg-card border border-border rounded-xl p-6">
+            <div className="weather-surface weather-chart-surface rounded-xl p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <Thermometer className="h-5 w-5 text-blue-400" />
                 Températures Min — Modèles vs Observations
@@ -310,7 +310,7 @@ export default function History() {
 
         {/* Precipitation Tab */}
         {activeTab === "precip" && chartData.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6">
+          <div className="weather-surface weather-chart-surface rounded-xl p-6">
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <CloudRain className="h-5 w-5 text-blue-400" />
               Précipitations — Modèles vs Observations
@@ -342,7 +342,7 @@ export default function History() {
 
         {/* Wind Tab */}
         {activeTab === "wind" && chartData.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6">
+          <div className="weather-surface weather-chart-surface rounded-xl p-6">
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Wind className="h-5 w-5 text-cyan-400" />
               Vent moyen — Modèles vs Observations
@@ -377,7 +377,7 @@ export default function History() {
 
         {/* Scores Tab */}
         {activeTab === "scores" && scoreChartData.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6">
+          <div className="weather-surface weather-chart-surface rounded-xl p-6">
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
               Évolution des scores de fiabilité par modèle
@@ -412,7 +412,7 @@ export default function History() {
         {activeTab === "leadtime" && (
           <div className="space-y-6">
             {leadTimeData.length > 0 ? (
-              <div className="bg-card border border-border rounded-xl p-6">
+              <div className="weather-surface weather-chart-surface rounded-xl p-6">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary" />
                   MAE Température par échéance de prévision
@@ -442,7 +442,7 @@ export default function History() {
                 </div>
               </div>
             ) : (
-              <div className="bg-card border border-border rounded-xl p-12 text-center">
+              <div className="weather-surface rounded-xl p-12 text-center">
                 <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h2 className="text-xl font-semibold mb-2">Scoring par échéance</h2>
                 <p className="text-muted-foreground">
@@ -453,7 +453,7 @@ export default function History() {
 
             {/* Lead-time detail table */}
             {data?.leadTimeScores && data.leadTimeScores.length > 0 && (
-              <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <div className="weather-surface overflow-hidden rounded-xl">
                 <div className="p-4 border-b border-border">
                   <h3 className="font-semibold">Détail par modèle et échéance</h3>
                 </div>
@@ -517,7 +517,7 @@ export default function History() {
 
         {/* Detailed Table (always visible) */}
         {data && data.observations.length > 0 && activeTab === "temperature" && (
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="weather-surface overflow-hidden rounded-xl">
             <div className="p-4 border-b border-border">
               <h3 className="font-semibold">Données détaillées</h3>
             </div>
@@ -582,7 +582,7 @@ export default function History() {
         )}
 
         {chartData.length === 0 && (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
+          <div className="weather-surface rounded-xl p-12 text-center">
             <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Aucun historique</h2>
             <p className="text-muted-foreground">

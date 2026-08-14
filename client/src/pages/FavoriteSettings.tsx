@@ -39,8 +39,8 @@ export default function FavoriteSettings() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="bg-card border border-border rounded-2xl p-6 text-center max-w-sm">
+      <div className="weather-page min-h-screen flex items-center justify-center p-4">
+        <div className="weather-surface rounded-2xl p-6 text-center max-w-sm">
           <Star className="h-10 w-10 mx-auto text-yellow-400 mb-3" />
           <h2 className="text-lg font-semibold mb-2">Connexion requise</h2>
           <p className="text-sm text-muted-foreground">Connectez-vous pour gérer vos lieux favoris.</p>
@@ -50,12 +50,12 @@ export default function FavoriteSettings() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+    <div className="weather-page min-h-screen">
+      <div className="weather-page-frame max-w-lg mx-auto px-4 py-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link href="/">
-            <button className="p-2 rounded-lg hover:bg-muted transition-colors">
+            <button className="weather-chip rounded-lg p-2 transition-colors hover:bg-muted">
               <ArrowLeft className="h-5 w-5" />
             </button>
           </Link>
@@ -76,7 +76,7 @@ export default function FavoriteSettings() {
           )}
 
           {favorites.map((fav: any) => (
-            <div key={fav.id} className="bg-card border border-border rounded-xl p-4">
+            <div key={fav.id} className="weather-surface rounded-xl p-4">
               {editingId === fav.id ? (
                 /* Edit mode */
                 <div className="space-y-3">
@@ -239,7 +239,7 @@ export default function FavoriteSettings() {
         </div>
 
         {/* Info */}
-        <div className="bg-muted/50 border border-border rounded-xl p-4">
+        <div className="weather-surface-inset rounded-xl p-4">
           <h3 className="text-sm font-semibold mb-2">Paramètres par lieu</h3>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
             <li>• <strong>Nom personnalisé</strong> — Renommez vos favoris librement</li>
