@@ -15,5 +15,6 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("text-sky-400");
     expect(source).toContain("km/h");
     expect(source).toContain("mm");
+    expect(source).toContain("weather-chart-3d");
   });
 });

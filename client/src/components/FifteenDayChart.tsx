@@ -525,7 +525,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   if (displayDays.length === 0) return null;
 
   return (
-    <section ref={containerRef} className="w-full rounded-[22px] border border-slate-700/70 bg-[#080b10] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.38)] sm:p-3">
+    <section ref={containerRef} className="weather-chart-3d w-full rounded-[22px] border p-2 sm:p-3">
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-center">

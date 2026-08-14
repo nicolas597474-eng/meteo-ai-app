@@ -166,3 +166,35 @@
 /* Scrollbar hide utility */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Cadres de graphiques MeteoAI : relief bleu discret sans affecter le canvas. */
+.weather-chart-3d {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(59, 130, 246, 0.18), transparent 38%),
+    linear-gradient(145deg, rgba(15, 28, 49, 0.98), rgba(5, 9, 16, 0.99));
+  border-color: rgba(96, 165, 250, 0.58);
+  box-shadow:
+    0 20px 34px rgba(0, 0, 0, 0.52),
+    0 0 0 1px rgba(2, 6, 23, 0.88),
+    0 0 26px rgba(37, 99, 235, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -14px 28px rgba(0, 0, 0, 0.28);
+}
+
+.weather-chart-3d::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  inset: 1px;
+  border: 1px solid rgba(147, 197, 253, 0.16);
+  border-radius: inherit;
+  box-shadow: inset 0 0 22px rgba(37, 99, 235, 0.1);
+}
+
+.weather-chart-3d > * {
+  position: relative;
+  z-index: 1;
+}

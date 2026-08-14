@@ -1031,3 +1031,8 @@
 - [x] Audit: Repérer les cadres et marges qui contraignent la largeur disponible des graphiques.
 - [x] Interface: Étendre les graphiques horaire et quinze jours à la largeur mobile utile sans toucher au canvas.
 - [x] Validation: Vérifier le défilement, les clics, les courbes et la lisibilité sur mobile, tablette et bureau.
+
+## Relief 3D des graphiques
+- [x] Audit: Identifier les surfaces et contours des cadres horaire et quinze jours à enrichir.
+- [x] Interface: Appliquer un relief 3D bleu discret aux deux cadres sans modifier les composants Canvas.
+- [x] Validation: Vérifier le contraste, la profondeur et les interactions à toutes les tailles.
