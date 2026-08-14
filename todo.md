@@ -1179,3 +1179,9 @@
 - [x] Interface: Remplacer le graphique des températures minimales par un histogramme comparatif.
 - [x] Interaction: Conserver les infobulles de valeurs au survol et au toucher.
 - [x] Validation: Vérifier les séries, le rendu mobile, TypeScript, tests et build.
+
+## Panneaux quotidiens Historique plus compréhensibles
+- [x] Interface: Mettre en avant l’observation, la synthèse MeteoAI et l’écart réellement mesuré.
+- [x] Interface: Regrouper les informations secondaires sans répéter inutilement les libellés.
+- [x] Interface: Rendre explicite l’absence d’observation ou d’information météo.
+- [x] Validation: Vérifier la lisibilité mobile, TypeScript, tests et build.

@@ -17,6 +17,9 @@ describe("History", () => {
     expect(source).toContain("Écart");
     expect(source).toContain("showAllDays");
     expect(source).toContain("Afficher les");
+    expect(source).toContain("Référence réelle");
+    expect(source).toContain("Observation indisponible");
+    expect(source).toContain("Comparaison en attente");
   });
 
   it("conserve les états d’historique et de données insuffisantes", () => {
