@@ -331,9 +331,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
       g.addColorStop(1, "rgba(37, 99, 235, 0)");
       ctx.fillStyle = g;
       ctx.fillRect(x, 0, COL_W, TOTAL_H);
-      ctx.strokeStyle = "rgba(96, 165, 250, 0.7)";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(x + 0.5, 0.5, COL_W - 1, CHART_H - 1);
     }
 
     // Selected hour highlight
@@ -577,7 +574,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
                 const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
                 const isCurrent = i === nowHour;
                 return (
-                  <div key={h.hour} className={`flex flex-col items-center justify-start pt-2 ${isCurrent ? "rounded-b-xl border border-blue-300/70 bg-blue-500/25 shadow-[0_0_18px_rgba(37,99,235,0.4)]" : ""}`} style={{ width: COL_W }}>
+                  <div key={h.hour} className="flex flex-col items-center justify-start pt-2" style={{ width: COL_W }}>
                     <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
                     <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>

@@ -1075,3 +1075,8 @@
 - [x] Collecte: Ajouter les modèles localement disponibles au cycle horaire et quotidien sans leur attribuer de poids.
 - [x] Transparence: Exposer leur statut « en validation » et leur couverture sans les présenter comme une fusion active.
 - [x] Validation opérationnelle: Vérifier l’archivage réel de DMI HARMONIE-DINI et ICON-D2, l’affichage séparé et l’absence de candidats dans la prévision officielle.
+
+## Repère de l’heure actuelle
+- [x] Audit: Distinguer la surface de colonne Canvas du carré de l’en-tête horaire.
+- [x] Interface: Retirer uniquement le carré bleu de l’en-tête et conserver la colonne actuelle en surbrillance.
+- [x] Validation: Vérifier le repère de l’heure actuelle et les interactions du graphique.
