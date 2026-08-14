@@ -31,4 +31,12 @@ describe("HourlyChart", () => {
     expect(source).not.toContain("rounded-b-xl border border-blue-300/70");
     expect(source).not.toContain("ctx.strokeRect(x + 0.5, 0.5, COL_W - 1, CHART_H - 1)");
   });
+
+  it("affiche les détails horaires au-dessus du graphique sélectionné", () => {
+    expect(source).toContain("detailPanelRef");
+    expect(source).toContain('scrollIntoView({ behavior: "smooth", block: "start" })');
+    expect(source).toContain("scroll-mt-3");
+    expect(source).toContain("slide-in-from-top-2");
+    expect(source).toContain('aria-labelledby="hour-detail-title"');
+  });
 });

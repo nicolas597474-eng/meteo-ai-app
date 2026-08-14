@@ -140,10 +140,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
   const uv = uvLabel(day.uvIndex);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:p-4" onClick={onClose} role="presentation">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative h-[100dvh] w-full max-w-none overflow-y-auto border border-white/10 bg-[#0a0e14] px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-[max(1.25rem,env(safe-area-inset-top))] shadow-2xl shadow-blue-500/10 animate-in slide-in-from-bottom-4 duration-200 sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:rounded-2xl sm:p-5" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="day-detail-title">
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-600 sm:hidden" aria-hidden="true" />
+    <section className="mb-3 rounded-2xl border border-blue-400/25 bg-[#0a0e14] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.35)] animate-in slide-in-from-top-2 duration-200 sm:p-5" role="region" aria-labelledby="day-detail-title">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-400/25 bg-blue-500/10">
@@ -163,7 +160,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           <div className="px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Pluie</p><p className="mt-0.5 text-base font-bold text-sky-300">{day.precipitation ?? 0} mm</p></div>
         </div>
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Paramètres météo</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-orange-400" />} label="Température" value={<>{day.tempMax ?? "—"}° <span className="text-blue-400 text-xs">/ {day.tempMin ?? "—"}°</span></>} />
           <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-pink-400" />} label="Ressenti" value={<>{day.feelsLikeMax ?? "—"}° <span className="text-blue-400 text-xs">/ {day.feelsLikeMin ?? "—"}°</span></>} />
           <DetailCard icon={<Wind className="h-3.5 w-3.5 text-emerald-400" />} label="Vent moyen" value={<>{day.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
@@ -175,7 +172,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           <DetailCard icon={<Cloud className="h-3.5 w-3.5 text-slate-400" />} label="Nébulosité" value={<>{day.cloudCover != null ? `${Math.round(day.cloudCover)}%` : "—"}</>} />
           <DetailCard icon={<Sunrise className="h-3.5 w-3.5 text-amber-400" />} label="Lever" value={<span className="text-amber-400">{day.sunrise ?? "—"}</span>} />
           <DetailCard icon={<Sunset className="h-3.5 w-3.5 text-orange-500" />} label="Coucher" value={<span className="text-orange-500">{day.sunset ?? "—"}</span>} />
-          <div className="bg-white/5 rounded-lg p-2.5 border border-white/5 col-span-2 sm:col-span-3">
+          <div className="bg-white/5 rounded-lg p-2.5 border border-white/5 col-span-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Gauge className="h-3.5 w-3.5 text-indigo-400" />
               <span className="text-[10px] uppercase tracking-wider text-slate-500">Confiance de la prévision</span>
@@ -186,8 +183,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -195,6 +191,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
 export default function FifteenDayChart({ days, locationName }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [animated, setAnimated] = useState(false);
@@ -202,6 +199,10 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const [scrollProgress, setScrollProgress] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (selectedDay !== null) detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedDay]);
 
   // The chart deliberately stays on one consistent 15-day horizon.
   const displayDays = days.slice(0, 15);
@@ -544,6 +545,12 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         </div>
       </div>
 
+      {selectedDay !== null && selectedDay < displayDays.length && (
+        <div ref={detailPanelRef} className="scroll-mt-3">
+          <DayDetailOverlay day={displayDays[selectedDay]} onClose={() => setSelectedDay(null)} />
+        </div>
+      )}
+
       {/* ── Full-width scrollable chart ───────────────────────────────────── */}
       <div className="overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
         <div className="flex h-full">
@@ -600,10 +607,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         </div>
       )}
 
-      {/* ── Overlay detail panel ──────────────────────────────────────────── */}
-      {selectedDay !== null && selectedDay < displayDays.length && (
-        <DayDetailOverlay day={displayDays[selectedDay]} onClose={() => setSelectedDay(null)} />
-      )}
     </section>
   );
 }

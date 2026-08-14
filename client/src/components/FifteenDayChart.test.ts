@@ -25,11 +25,11 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, precipZoneBot - 5)");
   });
 
-  it("ouvre la prévision détaillée en plein écran sur mobile", () => {
-    expect(source).toContain("h-[100dvh]");
-    expect(source).toContain("max-w-none");
-    expect(source).toContain("sm:max-h-[88vh]");
-    expect(source).toContain("safe-area-inset-bottom");
-    expect(source).toContain('aria-modal="true"');
+  it("affiche la prévision détaillée au-dessus du graphique sélectionné", () => {
+    expect(source).toContain("detailPanelRef");
+    expect(source).toContain('scrollIntoView({ behavior: "smooth", block: "start" })');
+    expect(source).toContain("scroll-mt-3");
+    expect(source).toContain("slide-in-from-top-2");
+    expect(source).toContain('role="region"');
   });
 });

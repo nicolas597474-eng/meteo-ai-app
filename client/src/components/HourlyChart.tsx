@@ -113,20 +113,18 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
     : "text-orange-400";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-blue-500/10 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+    <section className="mb-3 rounded-2xl border border-blue-400/25 bg-[#0a0e14] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.35)] animate-in slide-in-from-top-2 duration-200" role="region" aria-labelledby="hour-detail-title">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <WeatherIconSVG condition={cond} size={32} />
             <div>
-              <h3 className="font-semibold text-white text-base">{hour.hour}</h3>
+              <h3 id="hour-detail-title" className="font-semibold text-white text-base">{hour.hour}</h3>
               <p className="text-xs text-slate-400">{cond}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 transition-colors active:scale-95"><X className="h-5 w-5 text-slate-400" /></button>
+          <button onClick={onClose} aria-label="Fermer les détails de la prévision horaire" className="p-2 rounded-xl hover:bg-white/10 transition-colors active:scale-95"><X className="h-5 w-5 text-slate-400" /></button>
         </div>
 
         {/* Multi-model confidence banner */}
@@ -217,8 +215,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
             <p className="text-sm font-bold text-white">{hour.cloudCover != null ? `${Math.round(hour.cloudCover)}%` : "—"}</p>
           </div>
         </div>
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -228,11 +225,16 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [animated, setAnimated] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    if (selectedHour !== null) detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedHour]);
 
   const N = hours.length;
   const VISIBLE_HOURS = 8; // hours visible at once
@@ -557,6 +559,12 @@ export default function HourlyChart({ hours, locationName }: Props) {
         </div>
       </div>
 
+      {selectedHour !== null && selectedHour < hours.length && (
+        <div ref={detailPanelRef} className="scroll-mt-3">
+          <HourDetailOverlay hour={hours[selectedHour]} onClose={() => setSelectedHour(null)} />
+        </div>
+      )}
+
       {/* Chart area */}
       <div className="overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
         <div className="flex h-full">
@@ -611,10 +619,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
         </div>
       )}
 
-      {/* Detail overlay */}
-      {selectedHour !== null && selectedHour < hours.length && (
-        <HourDetailOverlay hour={hours[selectedHour]} onClose={() => setSelectedHour(null)} />
-      )}
     </section>
   );
 }

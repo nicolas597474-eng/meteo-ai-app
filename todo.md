@@ -1142,3 +1142,9 @@
 - [x] Interface: Afficher la prévision sélectionnée dans un volet pleinement visible au clic sur un jour.
 - [x] Interface: Préserver une fermeture claire et les détails météo sans exiger de défilement de page.
 - [x] Validation: Vérifier le comportement mobile, TypeScript, tests et build.
+
+## Détails au-dessus des graphiques
+- [x] Interface: Afficher les détails du jour sélectionné au-dessus du graphique de prévisions.
+- [x] Interface: Afficher les détails de l’heure sélectionnée au-dessus du graphique heure par heure.
+- [x] Interface: Préserver les données détaillées et une fermeture claire sans défilement de page.
+- [x] Validation: Vérifier les deux graphiques, TypeScript, tests et build.
