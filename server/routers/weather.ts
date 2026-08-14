@@ -30,7 +30,7 @@ import {
   getQualifiedEvidenceStatus,
   getStationQualityProfiles,
 } from "../db";
-import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES } from "../weatherServices";
+import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
@@ -1004,6 +1004,7 @@ export const weatherRouter = router({
 
     const sources = [
       { name: "Open-Meteo API", type: "API météo", models: ["ECMWF", "AROME", "ARPEGE", "ICON", "GFS", "Open-Meteo Best Match"], updateFrequency: "6h", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Haute" },
+      { name: "Modèles en validation", type: "Collecte d'observation", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "05h00", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
       { name: "Stations Météo-France", type: "Observations", models: [], updateFrequency: "1h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Haute" },
       { name: "Open-Meteo ERA5", type: "Réanalyse", models: ["ERA5"], updateFrequency: "24h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Très haute" },
     ];

@@ -35,6 +35,14 @@ export const WEATHER_SERVICES = {
   ],
 };
 
+/** Modèles observés séparément avant toute éventuelle qualification. */
+export const VALIDATION_WEATHER_MODELS = [
+  { name: "DMI HARMONIE-DINI", modelId: "dmi_seamless", family: "harmonie" as const },
+  { name: "ICON-D2", modelId: "dwd_icon_d2", family: "icon" as const },
+  { name: "ECMWF AIFS", modelId: "ecmwf_aifs025", family: "aifs" as const },
+  { name: "ECMWF ENS", modelId: "ecmwf_ifs025_ensemble", family: "ensemble" as const },
+] as const;
+
 export type ForecastData = {
   serviceName: string;
   serviceCategory: "public" | "expert";
@@ -47,6 +55,11 @@ export type ForecastData = {
   cloudCover: number | null;
   condition: string | null;
   rawData?: unknown;
+};
+
+export type ValidationForecastData = ForecastData & {
+  modelId: string;
+  validationStatus: "candidate";
 };
 
 /**
@@ -106,6 +119,56 @@ export async function collectExpertForecasts(
   );
 
   return responses.filter((forecast): forecast is ForecastData => forecast !== null);
+}
+
+/**
+ * Collect validation models separately from the active expert catalogue.
+ * Empty provider responses remain unavailable; no other model substitutes them.
+ */
+export async function collectValidationForecasts(
+  targetDate: string,
+  coords?: { lat: number; lon: number }
+): Promise<ValidationForecastData[]> {
+  const location = coords ?? HONDEGHEM;
+  const responses = await Promise.all(
+    VALIDATION_WEATHER_MODELS.map(async (model): Promise<ValidationForecastData | null> => {
+      try {
+        const url = new URL("https://api.open-meteo.com/v1/forecast");
+        url.searchParams.set("latitude", location.lat.toString());
+        url.searchParams.set("longitude", location.lon.toString());
+        url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
+        url.searchParams.set("timezone", "Europe/Paris");
+        url.searchParams.set("forecast_days", "16");
+        url.searchParams.set("models", model.modelId);
+
+        const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
+        if (!response.ok) return null;
+        const data = await response.json();
+        const daily = data.daily;
+        const dateIndex = daily?.time?.indexOf(targetDate) ?? -1;
+        if (dateIndex < 0 || daily.temperature_2m_max?.[dateIndex] == null) return null;
+        return {
+          serviceName: model.name,
+          serviceCategory: "expert",
+          modelId: model.modelId,
+          validationStatus: "candidate",
+          tempMax: daily.temperature_2m_max?.[dateIndex] ?? null,
+          tempMin: daily.temperature_2m_min?.[dateIndex] ?? null,
+          precipitation: daily.precipitation_sum?.[dateIndex] ?? null,
+          windSpeed: daily.wind_speed_10m_max?.[dateIndex] ?? null,
+          windGust: daily.wind_gusts_10m_max?.[dateIndex] ?? null,
+          humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
+          cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
+          condition: null,
+          rawData: data,
+        };
+      } catch (err) {
+        console.warn(`[Validation] Error fetching ${model.name}:`, err);
+        return null;
+      }
+    })
+  );
+  return responses.filter((forecast): forecast is ValidationForecastData => forecast !== null);
 }
 
 /**
@@ -546,5 +609,63 @@ export async function collectHourlyForecastAllModels(
     }
   }));
 
+  return results.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null);
+}
+
+/** Collect hourly candidate series without affecting active model coverage. */
+export async function collectValidationHourlyForecasts(
+  targetDate: string,
+  coords?: { lat: number; lon: number }
+): Promise<Array<{
+  modelName: string;
+  modelId: string;
+  hours: Array<{
+    hour: number;
+    temperature: number | null;
+    apparentTemperature: number | null;
+    precipitation: number | null;
+    windSpeed: number | null;
+    windGusts: number | null;
+    windDirection: number | null;
+    humidity: number | null;
+    cloudCover: number | null;
+    weatherCode: number | null;
+  }>;
+}>> {
+  const location = coords ?? HONDEGHEM;
+  const results = await Promise.all(VALIDATION_WEATHER_MODELS.map(async (model) => {
+    try {
+      const url = new URL("https://api.open-meteo.com/v1/forecast");
+      url.searchParams.set("latitude", location.lat.toString());
+      url.searchParams.set("longitude", location.lon.toString());
+      url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,cloud_cover,weather_code");
+      url.searchParams.set("timezone", "Europe/Paris");
+      url.searchParams.set("forecast_days", "2");
+      url.searchParams.set("models", model.modelId);
+      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
+      if (!response.ok) return null;
+      const hourly = (await response.json()).hourly;
+      if (!hourly?.time) return null;
+      const hours = hourly.time.flatMap((dt: string, index: number) => {
+        if (!dt.startsWith(targetDate) || hourly.temperature_2m?.[index] == null) return [];
+        return [{
+          hour: Number.parseInt(dt.slice(11, 13), 10),
+          temperature: hourly.temperature_2m[index] ?? null,
+          apparentTemperature: hourly.apparent_temperature?.[index] ?? null,
+          precipitation: hourly.precipitation?.[index] ?? null,
+          windSpeed: hourly.wind_speed_10m?.[index] ?? null,
+          windGusts: hourly.wind_gusts_10m?.[index] ?? null,
+          windDirection: hourly.wind_direction_10m?.[index] ?? null,
+          humidity: hourly.relative_humidity_2m?.[index] ?? null,
+          cloudCover: hourly.cloud_cover?.[index] ?? null,
+          weatherCode: hourly.weather_code?.[index] ?? null,
+        }];
+      });
+      return hours.length > 0 ? { modelName: model.name, modelId: model.modelId, hours } : null;
+    } catch (err) {
+      console.warn(`[ValidationHourly] Error fetching ${model.name}:`, err);
+      return null;
+    }
+  }));
   return results.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null);
 }

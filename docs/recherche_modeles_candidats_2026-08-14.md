@@ -19,3 +19,16 @@ MeteoAI collecte déjà huit sorties quotidiennes et horaires : AROME France HD,
 Open-Meteo précise que ses données sont répliquées de manière éventuellement cohérente entre serveurs et recommande d’attendre environ dix minutes après une mise à jour pour viser la version la plus récente. [Model updates](https://open-meteo.com/en/docs/model-updates)
 
 Météo-France AROME France HD et ARPEGE Europe sont déjà dans MeteoAI ; ils ne sont donc pas des candidats additionnels. La documentation confirme le rôle d’AROME France HD à 1,5 km sur les deux premiers jours et d’ARPEGE Europe à environ 11 km sur quatre jours. [Open-Meteo Météo-France](https://open-meteo.com/en/docs/meteofrance-api)
+
+## Vérification d’API à Hondeghem — 14 août 2026
+
+Une requête directe à `50.7567, 2.5204` a fourni des séries horaires non nulles pour `dmi_seamless` et `dwd_icon_d2`. La même réponse contenait `ecmwf_aifs025`, mais toutes ses valeurs étaient nulles à cet instant : ce modèle ne peut donc pas être archivé comme prévision exploitable avant un contrôle ultérieur concluant.
+
+L’endpoint d’ensemble a répondu avec une moyenne et 50 membres pour `ecmwf_ifs025_ensemble`, ce qui permet de dériver une dispersion mesurée sans compter les membres comme 50 modèles indépendants. `ecmwf_aifs025_ensemble` restera en attente tant qu’une série utilisable n’est pas confirmée.
+
+La réponse avec `dwd_icon_seamless` a reproduit, sur la fenêtre inspectée, les sorties de `dwd_icon_d2`. L’intégration ne doit donc pas compter « ICON global » et ICON-D2 comme deux voix distinctes avant d’avoir établi une différence opérationnelle vérifiable.
+
+Sources de vérification :
+
+- https://api.open-meteo.com/v1/forecast?latitude=50.7567%26longitude=2.5204%26hourly=temperature_2m,precipitation,wind_speed_10m%26forecast_days=2%26timezone=Europe%2FParis%26models=dmi_seamless,dwd_icon_d2,ecmwf_aifs025,dwd_icon_seamless
+- https://ensemble-api.open-meteo.com/v1/ensemble?latitude=50.7567%26longitude=2.5204%26hourly=temperature_2m,precipitation,wind_speed_10m%26forecast_days=2%26timezone=Europe%2FParis%26models=ecmwf_ifs025_ensemble,ecmwf_aifs025_ensemble

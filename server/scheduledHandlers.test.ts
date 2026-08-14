@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildStationCollectionSnapshot, getModelCoverage } from "./scheduledHandlers";
+import { VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
 describe("getModelCoverage", () => {
   it("identifie les huit modèles experts attendus et les indisponibilités", () => {
@@ -17,6 +18,13 @@ describe("getModelCoverage", () => {
 
     expect(coverage.collected).toHaveLength(8);
     expect(coverage.missing).toEqual([]);
+  });
+
+  it("conserve les candidats hors du compteur de couverture active", () => {
+    const coverage = getModelCoverage(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo"]);
+    expect(coverage.expected).toHaveLength(8);
+    expect(VALIDATION_WEATHER_MODELS).toHaveLength(4);
+    expect(coverage.expected).not.toContain("DMI HARMONIE-DINI");
   });
 });
 

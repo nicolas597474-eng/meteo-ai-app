@@ -7,7 +7,7 @@
 import type { Request, Response } from "express";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
-import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels } from "./weatherServices";
+import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
@@ -816,6 +816,30 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           })),
         ]);
 
+        // Candidate outputs are archived independently and cannot enter the
+        // forecasts table, official fusion or eight-model coverage counters.
+        const validationDaily = await collectValidationForecasts(today, { lat: fav.lat, lon: fav.lon });
+        if (validationDaily.length > 0) {
+          await insertForecastRuns(validationDaily.map((f) => ({
+            locationKey: locKey,
+            validDate: today,
+            serviceName: f.serviceName,
+            provider: "open-meteo",
+            modelId: f.modelId,
+            sourceKind: "model_forecast" as const,
+            issuedAt,
+            tempMax: f.tempMax,
+            tempMin: f.tempMin,
+            precipitation: f.precipitation,
+            windSpeed: f.windSpeed,
+            windGust: f.windGust,
+            humidity: f.humidity,
+            cloudCover: f.cloudCover,
+            condition: f.condition,
+            rawData: { validationStatus: f.validationStatus, forecast: f.rawData } as any,
+          })));
+        }
+
         // ── Correction automatique des biais (favoris) ──────────────────────────────
         const activeRanking = locRanking.length > 0 ? locRanking : ranking;
         const locBiases: ServiceBias[] = activeRanking
@@ -959,6 +983,25 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             }));
             await insertHourlyForecasts(rows);
           }
+          const validationHourly = await collectValidationHourlyForecasts(today, { lat: fav.lat, lon: fav.lon });
+          for (const { modelName, hours } of validationHourly) {
+            await insertHourlyForecasts(hours.map((h) => ({
+              locationKey: locKey,
+              date: today,
+              hour: h.hour,
+              modelName: `${modelName} · validation`,
+              temperature: h.temperature,
+              apparentTemperature: h.apparentTemperature,
+              precipitation: h.precipitation,
+              windSpeed: h.windSpeed,
+              windGusts: h.windGusts,
+              windDirection: h.windDirection,
+              humidity: h.humidity,
+              cloudCover: h.cloudCover,
+              weatherCode: h.weatherCode,
+            })));
+          }
+          console.log(`[Validation] ${fav.name}: ${validationDaily.length} quotidien(s), ${validationHourly.length} horaire(s) candidat(s)`);
           console.log(`[HourlyAll] Stored ${hourlyAllModels.length} models for ${fav.name}`);
         } catch (hourlyErr: any) {
           console.warn(`[HourlyAll] Failed for ${fav.name}:`, hourlyErr.message);
