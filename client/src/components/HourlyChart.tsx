@@ -572,13 +572,15 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Auto-scroll to current hour on mount
+  // Toujours démarrer la zone visible sur l’heure actuelle, y compris après un
+  // rafraîchissement des prévisions ou un changement de lieu.
   useEffect(() => {
-    if (nowHour > 0 && scrollRef.current) {
-      const targetScroll = Math.max(0, (nowHour - 2) * COL_W);
-      scrollRef.current.scrollTo({ left: targetScroll, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (nowHour >= 0 && el) {
+      const targetScroll = Math.max(0, nowHour * COL_W);
+      requestAnimationFrame(() => el.scrollTo({ left: targetScroll, behavior: "auto" }));
     }
-  }, [nowHour, COL_W]);
+  }, [hours, nowHour, COL_W]);
 
   useEffect(() => { draw(); }, [draw]);
 

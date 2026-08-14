@@ -1195,3 +1195,8 @@
 - [x] Interface: Placer Vent max à l’emplacement haut de la grille de métriques.
 - [x] Interface: Placer Confiance prévision à l’emplacement bas de la grille de métriques.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, tests et build.
+
+## Ancrage de l’heure actuelle dans le graphique horaire
+- [x] Interface: Positionner l’heure actuelle au début de la zone visible au chargement.
+- [x] Interface: Réappliquer l’ancrage lors d’un changement de prévisions ou de lieu.
+- [x] Validation: Vérifier le défilement, TypeScript, tests et build.

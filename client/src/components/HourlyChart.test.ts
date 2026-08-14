@@ -41,6 +41,13 @@ describe("HourlyChart", () => {
     expect(source).toContain('aria-labelledby="hour-detail-title"');
   });
 
+  it("ancre toujours le début du graphique sur l’heure actuelle", () => {
+    expect(source).toContain("Toujours démarrer la zone visible sur l’heure actuelle");
+    expect(source).toContain("nowHour * COL_W");
+    expect(source).toContain('behavior: "auto"');
+    expect(source).toContain("[hours, nowHour, COL_W]");
+  });
+
   it("présente tous les paramètres horaires réellement fournis dans le panneau détaillé", () => {
     expect(source).toContain("dewPoint?: number | null");
     expect(source).toContain("pressure?: number | null");
