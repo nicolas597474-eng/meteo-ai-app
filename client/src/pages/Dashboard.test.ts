@@ -20,4 +20,16 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
   });
+
+  it("conserve la hiérarchie mobile de référence sans remplacer les données métier", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Header mobile fidèle à la référence");
+    expect(source).toContain("Ouvrir le menu MeteoAI");
+    expect(source).toContain("Tendance : panneau autonome de la référence mobile");
+    expect(source).toContain("Température locale");
+    expect(source).toContain("Repli de modèle explicitement qualifié");
+    expect(source).toContain("bg-blue-600");
+    expect(source).toContain("HourlyChart hours={hours}");
+    expect(source).toContain("FifteenDayChart days={days}");
+  });
 });

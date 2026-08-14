@@ -1026,3 +1026,11 @@
 - [x] Périmètre: Confirmer que la collecte de 05h00 couvre les prévisions horaires de tous les modèles configurés pour chaque lieu favori.
 - [x] Périmètre: Maintenir les relevés de stations comme observations distinctes, avec leur propre fraîcheur et leur cycle adapté.
 - [x] Validation: Contrôler les cycles actifs, les derniers bilans archivés et les sources/stats de couverture.
+
+## Reproduction stricte de la référence Dashboard mobile
+- [x] Audit: Comparer le Dashboard actuel à la référence pour l’en-tête, la localisation, le panneau Tendance, la carte héro, les modes et le graphique horaire.
+- [x] Design: Définir les composants MeteoAI spécifiques nécessaires sans substituer des composants génériques ni modifier l’identité graphique.
+- [x] Interface: Recomposer le Dashboard mobile à proportions et hiérarchie équivalentes, en gardant les mêmes données et interactions.
+- [x] Cohérence: Raccorder les surfaces et états équivalents aux pages connexes sans modifier leurs graphiques ni leurs contrats tRPC.
+- [x] Validation: Comparer mobile, tablette et bureau ; vérifier navigation, chargement, erreurs, données, stations et graphiques.
+- [x] Publication: Documenter les contrôles de fidélité, puis publier la version validée.

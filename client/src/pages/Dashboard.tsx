@@ -1,9 +1,10 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info, Menu, Settings } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
+import { Link } from "wouter";
 import { getDashboardWeatherImage } from "@/lib/weatherImages";
 import { formatDashboardDate } from "@/lib/dashboardDate";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
@@ -108,6 +109,7 @@ export default function Dashboard() {
   const [showRegimeMenu, setShowRegimeMenu] = useState(false);
   const [expandedRegimeIds, setExpandedRegimeIds] = useState<string[]>([]);
   const [showFusionDetails, setShowFusionDetails] = useState(false);
+  const [showMobileNavigation, setShowMobileNavigation] = useState(false);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
   const selectedLocation = contextLocation ?? activeLocation;
@@ -350,11 +352,50 @@ export default function Dashboard() {
   const modelFallbackContributors = locationWeather?.ultraLocal?.modelFallback?.contributors ?? [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#070b13] text-foreground">
       <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-2 sm:space-y-6 sm:px-6 sm:py-8">
 
+        {/* ── Header mobile fidèle à la référence ── */}
+        <header className="sm:hidden">
+          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowMobileNavigation((open) => !open)}
+              aria-label="Ouvrir le menu MeteoAI"
+              aria-expanded={showMobileNavigation}
+              className="grid h-12 w-12 place-items-center rounded-full border border-slate-700/80 bg-slate-900/65 text-slate-100 shadow-[0_8px_22px_rgba(0,0,0,0.28)]"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+            <h1 className="text-center text-[34px] font-semibold tracking-tight text-white">
+              Meteo<span className="text-blue-500">AI</span>
+            </h1>
+            <Link href="/favorites" aria-label="Ouvrir les réglages de lieux favoris" className="grid h-12 w-12 place-items-center justify-self-end rounded-full border border-slate-700/80 bg-slate-900/65 text-slate-100 shadow-[0_8px_22px_rgba(0,0,0,0.28)]">
+              <Settings className="h-6 w-6" />
+            </Link>
+          </div>
+          <div className="mt-5 flex items-start gap-3 px-1">
+            <MapPin className="mt-1 h-8 w-8 shrink-0 fill-blue-500 text-blue-500" />
+            <div>
+              <p className="text-[29px] font-bold leading-none text-white">{selectedLocation?.name ?? "Hondeghem"}</p>
+              <p className="mt-2 text-lg text-slate-400">{formatDashboardDate(officialForecast?.today ?? dash?.today)}</p>
+            </div>
+          </div>
+          {showMobileNavigation && (
+            <nav className="mt-4 space-y-3 rounded-2xl border border-slate-700/80 bg-slate-950/95 p-3 shadow-[0_18px_42px_rgba(0,0,0,0.38)]" aria-label="Navigation mobile MeteoAI">
+              <div className="grid grid-cols-2 gap-2 text-sm font-semibold">
+                <Link href="/" onClick={() => setShowMobileNavigation(false)} className="rounded-xl bg-blue-500/15 px-3 py-2.5 text-center text-blue-200">Dashboard</Link>
+                <Link href="/ranking" onClick={() => setShowMobileNavigation(false)} className="rounded-xl bg-slate-900 px-3 py-2.5 text-center text-slate-200">Fiabilité</Link>
+                <Link href="/history" onClick={() => setShowMobileNavigation(false)} className="rounded-xl bg-slate-900 px-3 py-2.5 text-center text-slate-200">Historique</Link>
+                <Link href="/ai-lab" onClick={() => setShowMobileNavigation(false)} className="rounded-xl bg-slate-900 px-3 py-2.5 text-center text-slate-200">AI Lab</Link>
+              </div>
+              <FavoritesBar activeLocation={activeLocation} onLocationChange={handleLocationChange} prefetchedWeather={prefetchedWeather} />
+            </nav>
+          )}
+        </header>
+
         {/* ── Header ── */}
-        <div className="flex items-center justify-between">
+        <div className="hidden items-center justify-between sm:flex">
           <div>
             <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
               MeteoAI
@@ -377,14 +418,53 @@ export default function Dashboard() {
         )}
 
         {/* ── Favorites Bar ── */}
-        <FavoritesBar
-          activeLocation={activeLocation}
-          onLocationChange={handleLocationChange}
-          prefetchedWeather={prefetchedWeather}
-        />
+        <div className="hidden sm:block">
+          <FavoritesBar
+            activeLocation={activeLocation}
+            onLocationChange={handleLocationChange}
+            prefetchedWeather={prefetchedWeather}
+          />
+        </div>
+
+        {/* ── Tendance : panneau autonome de la référence mobile ── */}
+        {regime && (
+          <section className="rounded-2xl border border-blue-400/60 bg-[linear-gradient(135deg,rgba(10,24,43,0.96),rgba(5,13,25,0.98))] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(147,197,253,0.12)] sm:hidden">
+            <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-blue-400">
+              <Activity className="h-4 w-4" /> Tendance
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" onClick={() => setShowRegimeMenu((open) => !open)} aria-expanded={showRegimeMenu} aria-controls="regime-catalogue-mobile" className="flex min-w-0 items-center gap-2 text-left">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-slate-950/35 text-3xl">{regime.emoji}</span>
+                <span className="min-w-0"><strong className="block truncate text-xl text-white">{regime.label}</strong><span className="mt-0.5 block text-xs leading-tight text-slate-400">{regime.description}</span></span>
+              </button>
+              <div className="grid shrink-0 grid-cols-2 gap-1.5 text-xs">
+                <span className="rounded-xl border border-orange-400/15 bg-slate-950/45 px-2 py-1.5 text-orange-300">☀ {Math.round(regime.weights.temp * 100)}%</span>
+                <span className="rounded-xl border border-blue-400/15 bg-slate-950/45 px-2 py-1.5 text-blue-300">🌧 {Math.round(regime.weights.precip * 100)}%</span>
+                <span className="rounded-xl border border-emerald-400/15 bg-slate-950/45 px-2 py-1.5 text-emerald-300">💨 {Math.round(regime.weights.wind * 100)}%</span>
+                <span className="rounded-xl border border-violet-400/15 bg-slate-950/45 px-2 py-1.5 text-violet-300">☁ {Math.round(regime.weights.condition * 100)}%</span>
+              </div>
+            </div>
+            {showRegimeMenu && (
+              <div id="regime-catalogue-mobile" className="mt-3 rounded-xl border border-slate-700/70 bg-slate-950/45 p-2 text-[11px] text-slate-300">
+                <p className="px-1 pb-2 text-xs font-semibold text-blue-200">Régime actif et pondérations détaillées</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { label: "Température", value: regime.weights.temp, color: "bg-orange-400" },
+                    { label: "Précipitations", value: regime.weights.precip, color: "bg-blue-400" },
+                    { label: "Vent", value: regime.weights.wind, color: "bg-emerald-400" },
+                    { label: "Conditions", value: regime.weights.condition, color: "bg-violet-400" },
+                  ].map((weight) => (
+                    <div key={weight.label} className="rounded-lg bg-slate-900/80 p-2"><span>{weight.label} {Math.round(weight.value * 100)}%</span><div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-700"><div className={`h-full ${weight.color}`} style={{ width: `${Math.round(weight.value * 100)}%` }} /></div></div>
+                  ))}
+                </div>
+                <p className="mt-2 px-1 text-[10px] text-slate-500">{regimeFreshnessLabel}</p>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ── Hero : Température actuelle + max/min ── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
+        <div className="relative overflow-hidden rounded-3xl border border-blue-500/65 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-4 shadow-[0_16px_38px_rgba(0,0,0,0.4),0_0_0_1px_rgba(59,130,246,0.12)] sm:rounded-2xl sm:border-slate-700 sm:p-6 sm:shadow-none">
           {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
           <img
             src={getDashboardWeatherImage({ condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
@@ -394,7 +474,7 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/52 to-slate-950/88 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className={dashboardTemperatureLayout.mobileHeader}>
+            <div className={`${dashboardTemperatureLayout.mobileHeader} hidden sm:flex`}>
               <div className="flex min-w-0 items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs font-medium text-primary sm:hidden">Tendance</span>
@@ -415,7 +495,7 @@ export default function Dashboard() {
 
             {/* ── Regime badge ── */}
             {regime && (
-              <div className="mb-3 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-2">
+              <div className="mb-3 hidden rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-2 sm:block">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <button
                     type="button"
@@ -577,8 +657,8 @@ export default function Dashboard() {
             {/* Main temperature row */}
             <div className="flex items-start gap-3 sm:gap-6">
               {/* Icon — current hour condition (not day) */}
-              <div className="w-14 shrink-0 pt-1 sm:w-auto sm:pt-0">
-                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={56} className="sm:hidden" />
+              <div className="w-28 shrink-0 pt-1 sm:w-auto sm:pt-0">
+                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={112} className="sm:hidden" />
                 <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={64} className="hidden sm:block" />
               </div>
 
@@ -623,8 +703,15 @@ export default function Dashboard() {
               </div>
             </div>
 
+            <div className="mt-4 grid grid-cols-4 divide-x divide-slate-700/60 rounded-xl bg-slate-950/40 py-2 sm:hidden">
+              <div className="px-2 text-center"><p className="text-[10px] text-slate-400">Ressenti</p><p className="mt-0.5 text-base font-semibold text-white">{apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : currentTemp != null ? `${currentTemp.toFixed(1)}°` : "—"}</p></div>
+              <div className="px-2 text-center"><p className="text-[10px] text-slate-400">Humidité</p><p className="mt-0.5 text-base font-semibold text-white">{currentHour?.humidity ?? today?.humidity ?? "—"}%</p></div>
+              <div className="px-2 text-center"><p className="text-[10px] text-slate-400">Vent</p><p className="mt-0.5 text-base font-semibold text-white">{windSpeed != null ? `${windSpeed.toFixed(0)} km/h` : "—"}</p></div>
+              <div className="px-2 text-center"><p className="text-[10px] text-slate-400">Pression</p><p className="mt-0.5 text-base font-semibold text-white">{currentHour?.pressure != null ? `${Number(currentHour.pressure).toFixed(0)} hPa` : "—"}</p></div>
+            </div>
+
             {/* Apparent temp + UV + Wind rose highlight row */}
-            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700/60`}>
+            <div className={`${dashboardTemperatureLayout.compactMetrics} hidden border-t border-slate-700/60 sm:grid`}>
               {/* Ressenti */}
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
@@ -653,7 +740,7 @@ export default function Dashboard() {
             </div>
 
             {/* Stats row */}
-            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700`}>
+            <div className={`${dashboardTemperatureLayout.compactMetrics} hidden border-t border-slate-700 sm:grid`}>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
                   <Droplets className="h-3 w-3" />Précip.
@@ -698,13 +785,18 @@ export default function Dashboard() {
         </div>
 
         {/* ── Link to details page ── */}
-        <a href="/details" className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
+        <a href="/details" className="hidden min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors sm:flex">
           <MeteoIcon name="chevron_right" size={16} />
           <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
           <span className="text-primary text-xs">→</span>
         </a>
 
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
+        <div className="grid min-h-14 grid-cols-2 gap-1 rounded-xl border border-slate-700 bg-slate-950/60 p-1 sm:hidden" aria-label="Mode de contexte local">
+          <button type="button" onClick={() => handleModeChange("local")} className={`min-h-11 rounded-xl text-sm font-semibold ${localMode !== "ultra-local" ? "bg-blue-600 text-white" : "text-slate-400"}`}>⌖ Local</button>
+          <button type="button" onClick={() => handleModeChange("ultra-local")} className={`min-h-11 rounded-xl text-sm font-semibold ${localMode === "ultra-local" ? "bg-blue-600 text-white" : "text-slate-400"}`}>◎ Ultra-local</button>
+        </div>
+
+        <div className="hidden min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2 sm:flex" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />
           <span className="mr-auto text-xs font-semibold text-muted-foreground">Contexte</span>
           <div className="flex gap-1">
@@ -720,8 +812,19 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {locationWeather?.ultraLocal && (
+          <section className="rounded-2xl border border-emerald-400/35 bg-[linear-gradient(135deg,rgba(4,53,47,0.72),rgba(4,24,31,0.9))] p-3 shadow-[inset_0_1px_0_rgba(110,231,183,0.12)] sm:hidden" aria-label="Observation locale">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-full border border-emerald-400/25 bg-emerald-400/10"><Thermometer className="h-6 w-6 text-emerald-300" /></div>
+              <div className="min-w-0 flex-1"><p className="text-3xl font-bold text-white">{locationWeather.ultraLocal.temperature != null ? `${Number(locationWeather.ultraLocal.temperature).toFixed(1)}°` : "—"}</p><p className="text-sm text-emerald-300">Température locale</p><p className="mt-0.5 truncate text-[11px] text-slate-400">{locationWeather.ultraLocal.stationCount > 0 ? `${locationWeather.ultraLocal.stationCount} station${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""} physique${locationWeather.ultraLocal.stationCount > 1 ? "s" : ""}` : "Repli de modèle explicitement qualifié"}</p></div>
+              <div className="text-right text-xs"><p className="text-slate-400">Confiance</p><p className="mt-0.5 font-semibold text-emerald-200">{locationWeather.ultraLocal.confidenceScore}%</p></div>
+            </div>
+            <p className="mt-2 text-[10px] text-slate-400">{netatmoStatusLabel[locationWeather.netatmo?.status ?? "not_connected"]}</p>
+          </section>
+        )}
+
         {localMode !== "standard" && locationWeather?.ultraLocal && (
-          <section className="space-y-2" aria-labelledby="local-context-title">
+          <section className="hidden space-y-2 sm:block" aria-labelledby="local-context-title">
             <div className="flex items-center justify-between gap-2 px-1">
               <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
               <span className="text-[10px] text-muted-foreground">n’influence pas la prévision officielle</span>
@@ -757,8 +860,8 @@ export default function Dashboard() {
           </section>
         )}
 
-                {/* Hourly Chart */}
-        <div className="bg-card border border-border rounded-2xl p-0 overflow-hidden">
+        {/* Hourly Chart */}
+        <div className="overflow-hidden rounded-2xl border border-blue-500/30 bg-[#07111f] p-0 shadow-[inset_0_1px_0_rgba(96,165,250,0.08)] sm:border-border sm:bg-card sm:shadow-none">
           {officialLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
@@ -771,7 +874,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── 15-day chart enriched ── */}
-        <div className="bg-card border border-border rounded-2xl p-0 overflow-hidden">
+        <div className="hidden overflow-hidden rounded-2xl border border-border bg-card p-0 sm:block">
           {officialLoading ? (
             <div className="h-72 bg-muted rounded-xl animate-pulse" />
           ) : days.length > 0 ? (
