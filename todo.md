@@ -1167,3 +1167,9 @@
 - [x] Graphiques: Remplacer les comparaisons surchargées par une lecture mobile sans chevauchement.
 - [x] Interface: Ajouter des tableaux ou listes de valeurs détaillées accessibles en complément des graphiques.
 - [x] Validation: Vérifier les données réelles, le rendu mobile, TypeScript, tests et build.
+
+## Infobulles interactives de l’Historique
+- [x] Audit: Identifier les séries et unités à présenter au survol de chaque graphique.
+- [x] Interface: Créer une infobulle réutilisable, compacte et accessible sur mobile.
+- [x] Graphiques: Raccorder l’infobulle aux comparaisons de température, pluie, vent et scores.
+- [x] Validation: Vérifier les valeurs, l’interaction tactile, TypeScript, tests et build.

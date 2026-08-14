@@ -24,4 +24,12 @@ describe("History", () => {
     expect(source).toContain("Scores encore insuffisants");
     expect(source).toContain("Données par échéance insuffisantes");
   });
+
+  it("fournit des infobulles interactives contextualisées pour chaque graphique", () => {
+    expect(source).toContain("HistoryChartTooltip");
+    expect(source).toContain('role="tooltip"');
+    expect(source).toContain("Écart MeteoAI / observation");
+    expect(source).toContain("activeDot");
+    expect(source).toContain("cursor={{ stroke");
+  });
 });
