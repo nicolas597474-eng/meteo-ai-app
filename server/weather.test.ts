@@ -93,6 +93,8 @@ describe("contrat de snapshot officiel inter-pages", () => {
     expect(details.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
     expect(hourly.officialSnapshot.source).toBe(daily.officialSnapshot.source);
     expect(details.officialSnapshot.source).toBe(daily.officialSnapshot.source);
+    expect(details.hours.every((hour) => typeof hour.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(hour.date))).toBe(true);
+    expect(new Set(details.hours.map((hour) => hour.date)).size).toBeGreaterThan(1);
   }, 25_000);
 });
 

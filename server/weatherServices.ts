@@ -244,6 +244,7 @@ export type DayForecast = {
 };
 
 export type HourlyPoint = {
+  date?: string;     // "YYYY-MM-DD" in Europe/Paris, present for multi-day details
   hour: string;      // "HH:00"
   temp: number | null;
   apparentTemp: number | null;
@@ -384,7 +385,7 @@ export async function collect15DayForecast(
 }
 
 /**
- * Fetch hourly forecast for today from Open-Meteo best_match model.
+ * Fetch hourly forecast for the same 16-day horizon as the daily cards.
  */
 export async function collectHourlyForecast(
   targetDate: string,
@@ -397,7 +398,7 @@ export async function collectHourlyForecast(
     url.searchParams.set("longitude", location.lon.toString());
     url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index,surface_pressure,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall");
     url.searchParams.set("timezone", "Europe/Paris");
-    url.searchParams.set("forecast_days", "2");
+    url.searchParams.set("forecast_days", "16");
 
     const response = await fetchWeather(url.toString(), {}, { timeoutMs: 10_000, attempts: 2 });
     if (!response.ok) return [];
@@ -407,42 +408,40 @@ export async function collectHourlyForecast(
     if (!hourly?.time) return [];
 
     // Fetch a second model (AROME) for spread estimation
-    let aromeTemps: (number | null)[] = [];
-    let aromePrecips: (number | null)[] = [];
+    const aromeByDateTime = new Map<string, { temp: number | null; precipitation: number | null }>();
     try {
       const aromeUrl = new URL("https://api.open-meteo.com/v1/forecast");
       aromeUrl.searchParams.set("latitude", location.lat.toString());
       aromeUrl.searchParams.set("longitude", location.lon.toString());
       aromeUrl.searchParams.set("hourly", "temperature_2m,precipitation");
       aromeUrl.searchParams.set("timezone", "Europe/Paris");
-      aromeUrl.searchParams.set("forecast_days", "2");
+      aromeUrl.searchParams.set("forecast_days", "16");
       aromeUrl.searchParams.set("models", "meteofrance_arome_france_hd");
       const aromeResp = await fetchWeather(aromeUrl.toString(), {}, { timeoutMs: 8_000, attempts: 2 });
       if (aromeResp.ok) {
         const aromeData = await aromeResp.json();
         if (aromeData.hourly?.time) {
           for (let j = 0; j < aromeData.hourly.time.length; j++) {
-            if (aromeData.hourly.time[j].startsWith(targetDate)) {
-              aromeTemps.push(aromeData.hourly.temperature_2m?.[j] ?? null);
-              aromePrecips.push(aromeData.hourly.precipitation?.[j] ?? null);
-            }
+            aromeByDateTime.set(aromeData.hourly.time[j], {
+              temp: aromeData.hourly.temperature_2m?.[j] ?? null,
+              precipitation: aromeData.hourly.precipitation?.[j] ?? null,
+            });
           }
         }
       }
     } catch { /* AROME optional */ }
 
     const points: HourlyPoint[] = [];
-    let aromeIdx = 0;
     for (let i = 0; i < hourly.time.length; i++) {
       const dt = hourly.time[i]; // "2026-07-05T14:00"
-      if (!dt.startsWith(targetDate)) continue;
+      const date = dt.slice(0, 10);
       const hour = dt.slice(11, 16); // "14:00"
       const precip = hourly.precipitation?.[i] ?? null;
       const cloud = hourly.cloud_cover?.[i] ?? null;
       const bestTemp = hourly.temperature_2m?.[i] ?? null;
-      const aromeTemp = aromeTemps[aromeIdx] ?? null;
-      const aromePrecip = aromePrecips[aromeIdx] ?? null;
-      aromeIdx++;
+      const aromePoint = aromeByDateTime.get(dt);
+      const aromeTemp = aromePoint?.temp ?? null;
+      const aromePrecip = aromePoint?.precipitation ?? null;
 
       // Spread: difference between best_match and AROME
       const tempSpread = (bestTemp != null && aromeTemp != null)
@@ -464,6 +463,7 @@ export async function collectHourlyForecast(
       }
 
       points.push({
+        date,
         hour,
         temp: bestTemp,
         apparentTemp: hourly.apparent_temperature?.[i] ?? null,

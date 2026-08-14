@@ -1219,3 +1219,9 @@
 - [x] Interface: Maintenir les ressentis sous leur courbe avec une marge de sécurité.
 - [x] Interface: Réserver des zones distinctes pour températures, vent et précipitations.
 - [x] Validation: Tester les données denses, les températures extrêmes, TypeScript, tests et build.
+
+## Prévisions détaillées par période pour chaque jour
+- [x] Audit: Vérifier les données horaires disponibles pour les quatre périodes de chaque jour.
+- [x] Interface: Agrandir et clarifier les cartes Matin, Après-midi, Soir et Nuit.
+- [x] Interface: Rendre chaque journée de la liste dépliable avec ses quatre périodes détaillées.
+- [x] Validation: Vérifier les jours disponibles, le rendu mobile, TypeScript, tests et build.
