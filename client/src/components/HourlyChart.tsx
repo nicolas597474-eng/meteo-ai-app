@@ -408,7 +408,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.lineWidth = 1.7;
       ctx.stroke();
     }
-    // Ressenti affiché à chaque heure, sous la température pour éviter le chevauchement.
+    // Ressenti affiché sous la courbe bleue, en gardant une marge avant la zone de vent.
     apparentPts.forEach((pt, i) => {
       const v = hours[i].apparentTemp;
       if (v == null) return;
@@ -416,7 +416,8 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.fillStyle = "#bfdbfe";
       ctx.font = `${sel ? "bold 11" : "9"}px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText(`${v.toFixed(1)}°`, pt.x, pt.y + 13);
+      const apparentLabelY = Math.min(pt.y + 21, windZoneTop - 5);
+      ctx.fillText(`${v.toFixed(1)}°`, pt.x, apparentLabelY);
     });
 
     // Wind readings by column (no wind curve).

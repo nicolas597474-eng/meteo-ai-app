@@ -1105,3 +1105,8 @@
 - [x] Audit: Identifier la position dédiée aux valeurs 0,0 mm sur les deux graphiques.
 - [x] Interface: Placer les valeurs nulles en bas de la zone de précipitation.
 - [x] Validation: Vérifier la séparation entre valeurs nulles et valeurs au-dessus des barres.
+
+## Libellés de température ressentie
+- [x] Audit: Identifier les positions actuelles des libellés de température et ressenti.
+- [x] Interface: Placer les valeurs de ressenti sous la courbe bleue.
+- [x] Validation: Vérifier la lisibilité et l’absence de chevauchement avec les courbes.
