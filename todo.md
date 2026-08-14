@@ -1224,3 +1224,8 @@
 - [x] Diagnostic: Identifier l’interruption du cycle de dessin du Canvas sur mobile.
 - [x] Interface: Rétablir le tracé des températures, ressentis, vent et précipitations sur fond sombre.
 - [x] Validation: Vérifier les données visibles, TypeScript, tests et build.
+
+## Valeurs de température sous le ressenti
+- [x] Audit: Vérifier les positions de la courbe bleue et des libellés de température.
+- [x] Interface: Placer chaque valeur de température juste sous la courbe de ressenti.
+- [x] Validation: Vérifier les courbes proches, TypeScript, tests et build.

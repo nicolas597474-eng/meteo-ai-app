@@ -7,12 +7,12 @@ describe("chartLabelLanes", () => {
     expect(getLabelAboveCurveY(150, 82)).toBe(140);
   });
 
-  it("réserve une marge avant le vent et une bande distincte pour le ressenti", () => {
+  it("place le ressenti sous sa courbe avec une marge avant le vent", () => {
     const minLabelY = getLabelBelowCurveY(219, 82, 230);
-    const feltLabelY = getFeltLabelY(230);
+    const feltLabelY = getLabelBelowCurveY(190, 82, 230, 12, 20);
 
     expect(minLabelY).toBeLessThanOrEqual(206);
-    expect(feltLabelY).toBe(222);
-    expect(feltLabelY - minLabelY).toBeGreaterThanOrEqual(16);
+    expect(feltLabelY).toBe(202);
+    expect(feltLabelY).toBeLessThanOrEqual(210);
   });
 });

@@ -4,7 +4,7 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getHourlyDetailInsights } from "@/lib/hourlyDetailInsights";
-import { getFeltLabelY, getLabelAboveCurveY } from "@/lib/chartLabelLanes";
+import { getLabelAboveCurveY, getLabelBelowCurveY } from "@/lib/chartLabelLanes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -475,8 +475,8 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.lineWidth = 1.7;
       ctx.stroke();
     }
-    // Ressenti dans une bande fixe sous la courbe bleue : aucune valeur ne peut
-    // entrer dans la zone de vent, même lorsque les températures sont très proches.
+    // Ressenti immédiatement sous sa courbe bleue, en gardant une marge avant
+    // la zone de vent lorsque les deux températures sont proches.
     apparentPts.forEach((pt, i) => {
       const v = hours[i].apparentTemp;
       if (v == null) return;
@@ -484,7 +484,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.fillStyle = "#bfdbfe";
       ctx.font = `${sel ? "bold 12" : "10"}px system-ui`;
       ctx.textAlign = "center";
-      const apparentLabelY = getFeltLabelY(windZoneTop);
+      const apparentLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 12, 20);
       ctx.fillText(`${v.toFixed(1)}°`, pt.x, apparentLabelY);
     });
 
