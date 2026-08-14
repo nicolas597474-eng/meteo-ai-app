@@ -24,7 +24,9 @@ describe("HourlyChart", () => {
     expect(source).toContain("weather-chart-3d");
     expect(source).toContain("ctx.fillRect(x, 0, COL_W, TOTAL_H)");
     expect(source).toContain('ctx.fillStyle = "#05070a"');
-    expect(source).toContain('backgroundColor: "#05070a"');
+    expect(source).toContain('ctx.globalCompositeOperation = "copy"');
+    expect(source).toContain('ctx.globalCompositeOperation = "source-over"');
+    expect(source).toContain('className="hourly-weather-canvas"');
     expect(source).toContain("bold ${sel ? 12 : 10}px system-ui");
     expect(source).toContain("`${Math.round(v)} km/h`");
     expect(source).toContain("ctx.fillText(degToCompass(dir), x, y + 14)");

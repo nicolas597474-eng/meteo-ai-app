@@ -1230,3 +1230,8 @@
 - [x] Diagnostic: Identifier la règle qui rend le fond du Canvas blanc.
 - [x] Interface: Rétablir le fond sombre du graphique sans modifier ses données ni coordonnées.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, tests et build.
+
+## Correctif définitif du Canvas horaire
+- [x] Diagnostic: Identifier pourquoi le Canvas conserve un bitmap clair sur mobile.
+- [x] Interface: Peindre un fond sombre opaque sur tout le bitmap avant les données météo.
+- [x] Validation: Vérifier l’absence de fond blanc après redimensionnement, TypeScript, tests et build.
