@@ -186,6 +186,41 @@ describe("weather.getStationReliabilityOverview", () => {
   });
 });
 
+describe("weather.getReliabilityLaboratory", () => {
+  it("expose uniquement des structures mesurées et les règles explicites de données insuffisantes", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.weather.getReliabilityLaboratory({
+      lat: 50.7567,
+      lon: 2.5204,
+      period: "30d",
+      horizon: "6-24h",
+    });
+
+    expect(result.locationKey).toBeTruthy();
+    expect(result.period).toEqual(expect.objectContaining({ id: "30d", days: 30 }));
+    expect(result.scoreDefinition).toEqual(expect.objectContaining({
+      minimumComparisons: 18,
+      weights: expect.objectContaining({ temperature: 0.30, precipitation: 0.25, wind: 0.20 }),
+    }));
+    expect(Array.isArray(result.models)).toBe(true);
+    expect(Array.isArray(result.horizons)).toBe(true);
+    expect(Array.isArray(result.stations)).toBe(true);
+    expect(result.horizons).toHaveLength(7);
+
+    for (const model of result.models) {
+      expect(model).toEqual(expect.objectContaining({
+        name: expect.any(String),
+        status: expect.any(String),
+        evidence: expect.objectContaining({ comparisons: expect.any(Number), evaluatedDays: expect.any(Number) }),
+        confidence: expect.objectContaining({ isRankable: expect.any(Boolean), label: expect.any(String) }),
+      }));
+      if (model.normalizedScore === null) {
+        expect(model.insufficiencyReason).toBeTruthy();
+      }
+    }
+  }, 25_000);
+});
+
 describe("weather.getHistory", () => {
   it("returns history data for 7 days", async () => {
     const ctx = createPublicContext();

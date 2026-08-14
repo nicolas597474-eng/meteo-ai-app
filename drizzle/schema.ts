@@ -141,6 +141,18 @@ export const reliabilityScores = mysqlTable("reliability_scores", {
   condScore: float("condScore"),
   condConcordance: float("condConcordance"),
   condMaeCloud: float("condMaeCloud"),
+  /** Exact count of aligned forecast/physical-observation pairs used by this score. */
+  sampleSize: int("sampleSize"),
+  /** Laboratory score using the centralized six-variable weights, when all inputs exist. */
+  normalizedScore: float("normalizedScore"),
+  humidityScore: float("humidityScore"),
+  humidityMae: float("humidityMae"),
+  humidityRmse: float("humidityRmse"),
+  humidityBias: float("humidityBias"),
+  pressureScore: float("pressureScore"),
+  pressureMae: float("pressureMae"),
+  pressureRmse: float("pressureRmse"),
+  pressureBias: float("pressureBias"),
   evidenceType: mysqlEnum("evidenceType", ["physical_observation", "model_reference", "legacy_unqualified"]).notNull().default("legacy_unqualified"),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
 });
@@ -447,6 +459,7 @@ export const hourlyForecasts = mysqlTable("hourly_forecasts", {
   windGusts: float("windGusts"), // km/h
   windDirection: int("windDirection"), // degrees 0-360
   humidity: float("humidity"), // %
+  pressure: float("pressure"), // hPa
   cloudCover: float("cloudCover"), // %
   weatherCode: int("weatherCode"), // WMO code
   collectedAt: timestamp("collectedAt").defaultNow().notNull(),

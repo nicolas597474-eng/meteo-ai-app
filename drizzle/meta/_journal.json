@@ -162,6 +162,13 @@
       "when": 1786609341379,
       "tag": "0022_yellow_lionheart",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1786697847376,
+      "tag": "0023_flashy_mandarin",
+      "breakpoints": true
     }
   ]
 }

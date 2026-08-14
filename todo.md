@@ -1115,3 +1115,15 @@
 - [x] Audit: Identifier la taille actuelle des valeurs de ressenti.
 - [x] Interface: Agrandir légèrement les valeurs de ressenti sous la courbe bleue.
 - [x] Validation: Vérifier la lisibilité et le non-chevauchement avec le vent.
+
+## Laboratoire de fiabilité météo
+- [x] Spécification: Analyser l’intégralité des exigences fonctionnelles et les limites des données réelles.
+- [x] Audit: Inventorier les données archivées, les scores existants et les calculs de fiabilité réutilisables.
+- [x] Configuration: Centraliser les pondérations du score normalisé et les seuils de confiance statistique.
+- [x] Backend: Exposer les agrégats du laboratoire sans créer de moteur de scoring parallèle.
+- [x] Interface: Créer la page responsive avec filtres de lieu, période et horizon.
+- [x] Interface: Afficher les KPI, tableaux et graphiques à partir de données réellement disponibles.
+- [x] Interface: Prévoir les états « Données insuffisantes » pour chaque analyse non qualifiable.
+- [x] Navigation: Ajouter la route et l’accès au Laboratoire de fiabilité.
+- [x] Tests: Couvrir les calculs, seuils et contrats tRPC du laboratoire.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, les tests et le build avant publication.

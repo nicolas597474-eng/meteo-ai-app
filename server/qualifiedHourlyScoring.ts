@@ -1,7 +1,25 @@
 import { calculateReliabilityScore } from "./statsEngine";
 
-type PhysicalSnapshot = { hour: number; stationCount: number; temperature: number | null; precipitation: number | null; windSpeed: number | null; windGust?: number | null };
-type HourlyForecast = { modelName: string; hour: number; temperature: number | null; precipitation: number | null; windSpeed: number | null; windGusts?: number | null };
+type PhysicalSnapshot = {
+  hour: number;
+  stationCount: number;
+  temperature: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGust?: number | null;
+  humidity?: number | null;
+  pressure?: number | null;
+};
+type HourlyForecast = {
+  modelName: string;
+  hour: number;
+  temperature: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGusts?: number | null;
+  humidity?: number | null;
+  pressure?: number | null;
+};
 
 export type QualifiedHourlyModelScore = {
   serviceName: string;
@@ -22,6 +40,15 @@ export type QualifiedHourlyModelScore = {
   windScore: number | null;
   windMaeGusts: number | null;
   weightedScore: number | null;
+  normalizedScore: number | null;
+  humidityScore: number | null;
+  humidityMae: number | null;
+  humidityRmse: number | null;
+  humidityBias: number | null;
+  pressureScore: number | null;
+  pressureMae: number | null;
+  pressureRmse: number | null;
+  pressureBias: number | null;
 };
 
 const MINIMUM_ALIGNED_HOURS = 18;
@@ -39,8 +66,24 @@ export function scoreQualifiedHourlyModels(snapshots: PhysicalSnapshot[], foreca
     });
     if (pairs.length < MINIMUM_ALIGNED_HOURS) return [];
     const score = calculateReliabilityScore(
-      pairs.map(({ forecast }) => ({ tempMax: forecast.temperature, tempMin: forecast.temperature, precipitation: forecast.precipitation, windSpeed: forecast.windSpeed, windGust: forecast.windGusts ?? null })),
-      pairs.map(({ observation }) => ({ tempMax: observation.temperature, tempMin: observation.temperature, precipitation: observation.precipitation, windSpeed: observation.windSpeed, windGust: observation.windGust ?? null })),
+      pairs.map(({ forecast }) => ({
+        tempMax: forecast.temperature,
+        tempMin: forecast.temperature,
+        precipitation: forecast.precipitation,
+        windSpeed: forecast.windSpeed,
+        windGust: forecast.windGusts ?? null,
+        humidity: forecast.humidity ?? null,
+        pressure: forecast.pressure ?? null,
+      })),
+      pairs.map(({ observation }) => ({
+        tempMax: observation.temperature,
+        tempMin: observation.temperature,
+        precipitation: observation.precipitation,
+        windSpeed: observation.windSpeed,
+        windGust: observation.windGust ?? null,
+        humidity: observation.humidity ?? null,
+        pressure: observation.pressure ?? null,
+      })),
     );
     return [{
       serviceName,
@@ -61,6 +104,15 @@ export function scoreQualifiedHourlyModels(snapshots: PhysicalSnapshot[], foreca
       windScore: score.dimensions.wind.score,
       windMaeGusts: score.dimensions.wind.maeGusts,
       weightedScore: score.weightedScore,
+      normalizedScore: score.normalizedScore,
+      humidityScore: score.laboratory.humidity.score,
+      humidityMae: score.laboratory.humidity.sampleSize > 0 ? score.laboratory.humidity.mae : null,
+      humidityRmse: score.laboratory.humidity.sampleSize > 0 ? score.laboratory.humidity.rmse : null,
+      humidityBias: score.laboratory.humidity.sampleSize > 0 ? score.laboratory.humidity.bias : null,
+      pressureScore: score.laboratory.pressure.score,
+      pressureMae: score.laboratory.pressure.sampleSize > 0 ? score.laboratory.pressure.mae : null,
+      pressureRmse: score.laboratory.pressure.sampleSize > 0 ? score.laboratory.pressure.rmse : null,
+      pressureBias: score.laboratory.pressure.sampleSize > 0 ? score.laboratory.pressure.bias : null,
     }];
   });
 }

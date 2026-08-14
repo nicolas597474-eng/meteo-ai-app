@@ -27,4 +27,18 @@ describe("scoreQualifiedHourlyModels", () => {
     const forecasts = snapshots.slice(0, 17).map((snapshot) => ({ modelName: "ECMWF", hour: snapshot.hour, temperature: snapshot.temperature, precipitation: 0, windSpeed: 8 }));
     expect(scoreQualifiedHourlyModels(snapshots, forecasts)).toEqual([]);
   });
+
+  it("ne publie pas de score normalisé lorsque la pression ou l’humidité ne sont pas alignées", () => {
+    const forecasts = snapshots.map((snapshot) => ({
+      modelName: "ECMWF",
+      hour: snapshot.hour,
+      temperature: snapshot.temperature,
+      precipitation: 0,
+      windSpeed: 8,
+    }));
+    const [score] = scoreQualifiedHourlyModels(snapshots, forecasts);
+    expect(score.normalizedScore).toBeNull();
+    expect(score.pressureScore).toBeNull();
+    expect(score.humidityScore).toBeNull();
+  });
 });

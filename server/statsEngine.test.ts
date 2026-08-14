@@ -192,6 +192,33 @@ describe("calculateReliabilityScore — dimensions", () => {
     expect(result.dimensions.temperature.sampleSize).toBe(0);
     expect(result.dimensions.precipitation.sampleSize).toBe(0);
   });
+
+  it("calcule un score normalisé complet de 100 lorsque les six variables sont exactes", () => {
+    const forecast = {
+      tempMax: 22,
+      tempMin: 12,
+      precipitation: 2,
+      windSpeed: 15,
+      windGust: 23,
+      humidity: 64,
+      pressure: 1013,
+    };
+    const result = calculateReliabilityScore([forecast], [{ ...forecast }]);
+
+    expect(result.normalizedScore).toBe(100);
+    expect(result.laboratory.humidity).toEqual(expect.objectContaining({ mae: 0, sampleSize: 1, score: 100 }));
+    expect(result.laboratory.pressure).toEqual(expect.objectContaining({ mae: 0, sampleSize: 1, score: 100 }));
+  });
+
+  it("laisse le score normalisé indisponible lorsqu’une composante n’est pas archivée", () => {
+    const result = calculateReliabilityScore(
+      [{ tempMax: 22, tempMin: 12, precipitation: 2, windSpeed: 15, windGust: 23, humidity: 64 }],
+      [{ tempMax: 22, tempMin: 12, precipitation: 2, windSpeed: 15, windGust: 23, humidity: 64 }],
+    );
+
+    expect(result.laboratory.pressure.sampleSize).toBe(0);
+    expect(result.normalizedScore).toBeNull();
+  });
 });
 
 // ─── calculateStabilityIndex ─────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import {
   FileText,
   Activity,
   FlaskConical,
+  ChartNoAxesCombined,
 } from "lucide-react";
 
 const Ranking = lazy(() => import("./pages/Ranking"));
@@ -21,11 +22,13 @@ const WeatherAILab = lazy(() => import("./pages/WeatherAILab"));
 const FavoriteSettings = lazy(() => import("./pages/FavoriteSettings"));
 const WeatherDetails = lazy(() => import("./pages/WeatherDetails"));
 const WeightComparison = lazy(() => import("./pages/WeightComparison"));
+const ReliabilityLaboratory = lazy(() => import("./pages/ReliabilityLaboratory"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/ranking", label: "Fiabilité", icon: Trophy },
+  { path: "/laboratoire", label: "Fiabilité", icon: ChartNoAxesCombined },
+  { path: "/ranking", label: "Stations", icon: Trophy },
   { path: "/history", label: "Historique", icon: Calendar },
   { path: "/ai-lab", label: "AI Lab", icon: FlaskConical },
 ];
@@ -101,6 +104,8 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/ranking" component={Ranking} />
       <Route path="/reliability" component={Ranking} />
+      <Route path="/laboratoire" component={ReliabilityLaboratory} />
+      <Route path="/lab" component={ReliabilityLaboratory} />
       <Route path="/history" component={History} />
       <Route path="/report" component={Report} />
       <Route path="/ai-lab" component={WeatherAILab} />

@@ -47,6 +47,7 @@ import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
+import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -1445,4 +1446,22 @@ export const weatherRouter = router({
         instantDeltaC,
       };
     }),
+
+  /**
+   * Laboratory: a strict read-model over qualified physical evidence only.
+   * It never ranks legacy/model-reference scores as if they were observations.
+   */
+  getReliabilityLaboratory: publicProcedure
+    .input(z.object({
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
+      period: z.enum(["24h", "7d", "30d", "90d", "365d"]).default("30d"),
+      horizon: z.enum(["0-6h", "6-24h", "24-48h", "2-3d", "4-7d", "8-10d", "11-15d"]).default("6-24h"),
+    }).optional())
+    .query(async ({ input }) => buildReliabilityLaboratory({
+      lat: input?.lat ?? HONDEGHEM.lat,
+      lon: input?.lon ?? HONDEGHEM.lon,
+      period: input?.period ?? "30d",
+      horizon: input?.horizon ?? "6-24h",
+    })),
 });

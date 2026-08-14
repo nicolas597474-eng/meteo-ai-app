@@ -517,6 +517,7 @@ export async function collectHourlyForecastAllModels(
     windGusts: number | null;
     windDirection: number | null;
     humidity: number | null;
+    pressure: number | null;
     cloudCover: number | null;
     weatherCode: number | null;
   }>;
@@ -544,6 +545,7 @@ export async function collectHourlyForecastAllModels(
       windGusts: number | null;
       windDirection: number | null;
       humidity: number | null;
+      pressure: number | null;
       cloudCover: number | null;
       weatherCode: number | null;
     }>;
@@ -552,7 +554,7 @@ export async function collectHourlyForecastAllModels(
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,cloud_cover,weather_code");
+      url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,surface_pressure,cloud_cover,weather_code");
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", "2");
       if (model.modelId) {
@@ -578,6 +580,7 @@ export async function collectHourlyForecastAllModels(
         windGusts: number | null;
         windDirection: number | null;
         humidity: number | null;
+        pressure: number | null;
         cloudCover: number | null;
         weatherCode: number | null;
       }> = [];
@@ -595,6 +598,7 @@ export async function collectHourlyForecastAllModels(
           windGusts: hourly.wind_gusts_10m?.[i] ?? null,
           windDirection: hourly.wind_direction_10m?.[i] ?? null,
           humidity: hourly.relative_humidity_2m?.[i] ?? null,
+          pressure: hourly.surface_pressure?.[i] ?? null,
           cloudCover: hourly.cloud_cover?.[i] ?? null,
           weatherCode: hourly.weather_code?.[i] ?? null,
         });

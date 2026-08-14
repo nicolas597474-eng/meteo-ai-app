@@ -1091,3 +1091,91 @@ export async function getQualifiedLeadTimeScoresForLocation(locationKey: string,
     .groupBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`)
     .orderBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`);
 }
+
+// ─── Reliability laboratory read models ──────────────────────────────────────
+
+/**
+ * Aggregate only score rows based on explicitly qualified physical observations.
+ * Legacy and model-reference rows are intentionally excluded from the laboratory.
+ */
+export async function getLaboratoryModelAggregates(locationKey: string, startDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      serviceName: reliabilityScores.serviceName,
+      evaluatedDays: sql<number>`COUNT(DISTINCT ${reliabilityScores.date})`.as("evaluatedDays"),
+      scoreRows: sql<number>`COUNT(*)`.as("scoreRows"),
+      comparisons: sql<number>`SUM(COALESCE(${reliabilityScores.sampleSize}, 0))`.as("comparisons"),
+      latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`.as("latestScoreDate"),
+      averageNormalizedScore: sql<number>`AVG(${reliabilityScores.normalizedScore})`.as("averageNormalizedScore"),
+      averageOperationalScore: sql<number>`AVG(${reliabilityScores.weightedScore})`.as("averageOperationalScore"),
+      averageMaeTemp: sql<number>`AVG(${reliabilityScores.maeTemp})`.as("averageMaeTemp"),
+      averageRmseTemp: sql<number>`AVG(${reliabilityScores.rmseTemp})`.as("averageRmseTemp"),
+      averageBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`.as("averageBiasTemp"),
+      averagePrecipScore: sql<number>`AVG(${reliabilityScores.precipScore})`.as("averagePrecipScore"),
+      averagePrecipPod: sql<number>`AVG(${reliabilityScores.precipPod})`.as("averagePrecipPod"),
+      averagePrecipFar: sql<number>`AVG(${reliabilityScores.precipFar})`.as("averagePrecipFar"),
+      falsePositives: sql<number>`SUM(COALESCE(${reliabilityScores.precipFalsePositives}, 0))`.as("falsePositives"),
+      falseNegatives: sql<number>`SUM(COALESCE(${reliabilityScores.precipFalseNegatives}, 0))`.as("falseNegatives"),
+      averageMaeWind: sql<number>`AVG(${reliabilityScores.maeWind})`.as("averageMaeWind"),
+      averageMaeGusts: sql<number>`AVG(${reliabilityScores.windMaeGusts})`.as("averageMaeGusts"),
+      averageHumidityScore: sql<number>`AVG(${reliabilityScores.humidityScore})`.as("averageHumidityScore"),
+      averagePressureScore: sql<number>`AVG(${reliabilityScores.pressureScore})`.as("averagePressureScore"),
+    })
+    .from(reliabilityScores)
+    .where(and(
+      eq(reliabilityScores.locationKey, locationKey),
+      eq(reliabilityScores.evidenceType, "physical_observation"),
+      gte(reliabilityScores.date, startDate),
+    ))
+    .groupBy(reliabilityScores.serviceName)
+    .orderBy(sql`AVG(${reliabilityScores.normalizedScore}) DESC`);
+}
+
+/** Daily qualified score points for the evolution chart, without legacy evidence. */
+export async function getLaboratoryScoreTimeline(locationKey: string, startDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      date: reliabilityScores.date,
+      serviceName: reliabilityScores.serviceName,
+      comparisons: reliabilityScores.sampleSize,
+      normalizedScore: reliabilityScores.normalizedScore,
+      operationalScore: reliabilityScores.weightedScore,
+      maeTemp: reliabilityScores.maeTemp,
+      rmseTemp: reliabilityScores.rmseTemp,
+      maeWind: reliabilityScores.maeWind,
+    })
+    .from(reliabilityScores)
+    .where(and(
+      eq(reliabilityScores.locationKey, locationKey),
+      eq(reliabilityScores.evidenceType, "physical_observation"),
+      gte(reliabilityScores.date, startDate),
+    ))
+    .orderBy(reliabilityScores.date, reliabilityScores.serviceName);
+}
+
+/** Immutable emissions are the factual archive used to disclose model coverage. */
+export async function getLaboratoryModelArchive(locationKey: string, startDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      serviceName: forecastRuns.serviceName,
+      provider: forecastRuns.provider,
+      modelId: forecastRuns.modelId,
+      archivedRuns: sql<number>`COUNT(*)`.as("archivedRuns"),
+      firstValidDate: sql<string>`MIN(${forecastRuns.validDate})`.as("firstValidDate"),
+      latestValidDate: sql<string>`MAX(${forecastRuns.validDate})`.as("latestValidDate"),
+    })
+    .from(forecastRuns)
+    .where(and(
+      eq(forecastRuns.locationKey, locationKey),
+      eq(forecastRuns.sourceKind, "model_forecast"),
+      gte(forecastRuns.validDate, startDate),
+    ))
+    .groupBy(forecastRuns.serviceName, forecastRuns.provider, forecastRuns.modelId)
+    .orderBy(forecastRuns.serviceName);
+}

@@ -41,6 +41,7 @@ import {
   EXTENDED_REGIME_INFO,
   type ExtendedRegime,
 } from "./fusionEngine";
+import { LABORATORY_SCORE_WEIGHTS } from "./weatherReliabilityConfig";
 
 // Alias for backward compatibility throughout this file
 export type WeatherRegime = ExtendedRegime;
@@ -119,6 +120,8 @@ export type ForecastRow = {
   precipitation: number | null;
   windSpeed: number | null;
   windGust?: number | null;
+  humidity?: number | null;
+  pressure?: number | null;
   cloudCover?: number | null;
   condition?: string | null;
 };
@@ -129,6 +132,8 @@ export type ObservationRow = {
   precipitation: number | null;
   windSpeed: number | null;
   windGust?: number | null;
+  humidity?: number | null;
+  pressure?: number | null;
   cloudCover?: number | null;
   condition?: string | null;
 };
@@ -170,6 +175,15 @@ export type WindDimension = {
   sampleSize: number;
 };
 
+/** A scalar error dimension used by the laboratory's transparent normalized score. */
+export type ScalarDimension = {
+  mae: number;
+  rmse: number;
+  bias: number;
+  score: number | null;
+  sampleSize: number;
+};
+
 /** ☁️ Cloud cover / Conditions dimension */
 export type ConditionDimension = {
   concordance: number;  // % of days where category matches (0-100)
@@ -201,12 +215,20 @@ export type ScoreResult = {
   biasWind: number;
   conditionAccuracy: number;
   weightedScore: number;
+  /** Null until all six laboratory dimensions have real aligned values. */
+  normalizedScore: number | null;
   // New dimension-level detail
   dimensions: DimensionScores;
   regime: WeatherRegime;
   regimeLabel: string;
   regimeEmoji: string;
   weights: RegimeWeights;
+  laboratory: {
+    wind: ScalarDimension;
+    gusts: ScalarDimension;
+    humidity: ScalarDimension;
+    pressure: ScalarDimension;
+  };
 };
 
 // ─── Math primitives ──────────────────────────────────────────────────────────
@@ -370,6 +392,44 @@ function calcWindDimension(forecasts: ForecastRow[], observations: ObservationRo
 }
 
 /**
+ * Measure one directly comparable scalar variable. Missing archived values stay
+ * unavailable instead of being converted into a neutral or favourable score.
+ */
+function calcScalarDimension(
+  forecasts: ForecastRow[],
+  observations: ObservationRow[],
+  forecastValue: (row: ForecastRow) => number | null | undefined,
+  observationValue: (row: ObservationRow) => number | null | undefined,
+  expectedError: number,
+): ScalarDimension {
+  const predicted: number[] = [];
+  const actual: number[] = [];
+  for (let index = 0; index < forecasts.length; index++) {
+    const forecast = forecasts[index];
+    const observation = observations[index];
+    if (!forecast || !observation) continue;
+    const predictedValue = forecastValue(forecast);
+    const actualValue = observationValue(observation);
+    if (predictedValue == null || actualValue == null) continue;
+    predicted.push(predictedValue);
+    actual.push(actualValue);
+  }
+
+  if (predicted.length === 0) {
+    return { mae: 0, rmse: 0, bias: 0, score: null, sampleSize: 0 };
+  }
+
+  const maeValue = mae(predicted, actual);
+  return {
+    mae: round2(maeValue),
+    rmse: round2(rmse(predicted, actual)),
+    bias: round2(bias(predicted, actual)),
+    score: round2(maeToScore(maeValue, expectedError)),
+    sampleSize: predicted.length,
+  };
+}
+
+/**
  * ☁️ Cloud cover / Conditions dimension
  * Categorical concordance: maps conditions to 3 categories (clear/partly/overcast).
  */
@@ -468,6 +528,34 @@ export function calculateReliabilityScore(
   const precipDim = calcPrecipDimension(forecasts, observations);
   const windDim = calcWindDimension(forecasts, observations);
   const condDim = calcConditionDimension(forecasts, observations);
+  const laboratoryWind = calcScalarDimension(forecasts, observations, row => row.windSpeed, row => row.windSpeed, 25);
+  const laboratoryGusts = calcScalarDimension(forecasts, observations, row => row.windGust, row => row.windGust, 35);
+  const laboratoryHumidity = calcScalarDimension(forecasts, observations, row => row.humidity, row => row.humidity, 30);
+  const laboratoryPressure = calcScalarDimension(forecasts, observations, row => row.pressure, row => row.pressure, 20);
+
+  const laboratoryComponents = {
+    temperature: tempDim.sampleSize > 0 ? tempDim.score : null,
+    precipitation: precipDim.sampleSize > 0 ? precipDim.score : null,
+    wind: laboratoryWind.score,
+    gusts: laboratoryGusts.score,
+    humidity: laboratoryHumidity.score,
+    pressure: laboratoryPressure.score,
+  };
+  const normalizedScore = laboratoryComponents.temperature !== null
+    && laboratoryComponents.precipitation !== null
+    && laboratoryComponents.wind !== null
+    && laboratoryComponents.gusts !== null
+    && laboratoryComponents.humidity !== null
+    && laboratoryComponents.pressure !== null
+    ? round2(
+      laboratoryComponents.temperature * LABORATORY_SCORE_WEIGHTS.temperature
+      + laboratoryComponents.precipitation * LABORATORY_SCORE_WEIGHTS.precipitation
+      + laboratoryComponents.wind * LABORATORY_SCORE_WEIGHTS.wind
+      + laboratoryComponents.gusts * LABORATORY_SCORE_WEIGHTS.gusts
+      + laboratoryComponents.humidity * LABORATORY_SCORE_WEIGHTS.humidity
+      + laboratoryComponents.pressure * LABORATORY_SCORE_WEIGHTS.pressure
+    )
+    : null;
 
   // Detect regime from observations
   let regimeInfo: RegimeInfo;
@@ -517,6 +605,7 @@ export function calculateReliabilityScore(
     biasWind: windDim.biasMean,
     conditionAccuracy: condDim.concordance / 100,
     weightedScore: round2(weightedScore),
+    normalizedScore,
     // Dimension detail
     dimensions: {
       temperature: tempDim,
@@ -528,6 +617,12 @@ export function calculateReliabilityScore(
     regimeLabel: regimeInfo.label,
     regimeEmoji: regimeInfo.emoji,
     weights,
+    laboratory: {
+      wind: laboratoryWind,
+      gusts: laboratoryGusts,
+      humidity: laboratoryHumidity,
+      pressure: laboratoryPressure,
+    },
   };
 }
 
