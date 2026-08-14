@@ -1173,3 +1173,9 @@
 - [x] Interface: Créer une infobulle réutilisable, compacte et accessible sur mobile.
 - [x] Graphiques: Raccorder l’infobulle aux comparaisons de température, pluie, vent et scores.
 - [x] Validation: Vérifier les valeurs, l’interaction tactile, TypeScript, tests et build.
+
+## Histogrammes de température Historique
+- [x] Interface: Remplacer le graphique des températures maximales par un histogramme comparatif.
+- [x] Interface: Remplacer le graphique des températures minimales par un histogramme comparatif.
+- [x] Interaction: Conserver les infobulles de valeurs au survol et au toucher.
+- [x] Validation: Vérifier les séries, le rendu mobile, TypeScript, tests et build.

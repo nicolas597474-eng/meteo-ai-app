@@ -7,8 +7,8 @@ describe("History", () => {
   it("isole la comparaison sur un modèle sélectionné afin d’éviter les graphiques surchargés", () => {
     expect(source).toContain("Modèle comparé");
     expect(source).toContain("comparisonModel");
-    expect(source).toContain("CompactLineChart");
-    expect(source).toContain("Une lecture centrée sur l’observation, MeteoAI");
+    expect(source).toContain("CompactTemperatureHistogram");
+    expect(source).toContain("Histogramme comparatif : observation, MeteoAI");
   });
 
   it("propose une lecture jour par jour sans dépendre du survol du graphique", () => {
@@ -31,5 +31,12 @@ describe("History", () => {
     expect(source).toContain("Écart MeteoAI / observation");
     expect(source).toContain("activeDot");
     expect(source).toContain("cursor={{ stroke");
+  });
+
+  it("rend les températures maximales et minimales sous forme d’histogrammes groupés", () => {
+    expect(source).toContain("Histogramme comparatif");
+    expect(source).toContain("barCategoryGap");
+    expect(source).toContain("maxBarSize={20}");
+    expect(source).toContain('domain={["dataMin - 2", "dataMax + 2"]}');
   });
 });
