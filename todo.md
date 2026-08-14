@@ -1095,3 +1095,8 @@
 - [x] Audit: Identifier les tailles et emplacements des valeurs en millimètres sur les deux graphiques.
 - [x] Interface: Agrandir les valeurs de précipitations sans modifier les barres ni les échelles.
 - [x] Validation: Vérifier la lisibilité et le non-chevauchement à toutes les tailles.
+
+## Valeurs de pluie au-dessus des barres
+- [x] Audit: Identifier la position du texte et la hauteur réelle de chaque barre sur les deux graphiques.
+- [x] Interface: Positionner les valeurs de précipitations juste au-dessus de leurs barres bleues.
+- [x] Validation: Vérifier la visibilité des valeurs quelle que soit la hauteur de pluie.

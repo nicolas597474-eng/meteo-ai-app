@@ -438,22 +438,28 @@ export default function HourlyChart({ hours, locationName }: Props) {
     });
 
     // Precipitation bars
-    const precipH = precipZoneBot - precipZoneTop;
+    const precipLabelBand = 16;
+    const precipBarTop = precipZoneTop + precipLabelBand;
+    const precipH = precipZoneBot - precipBarTop;
     hours.slice(0, visibleN).forEach((h, i) => {
       const p = h.precipitation ?? 0;
       const x = colX(i);
       ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
       ctx.font = "bold 10px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(p.toFixed(1), x, precipZoneTop + 10);
-      if (p <= 0) return;
+      if (p <= 0) {
+        ctx.fillText(p.toFixed(1), x, precipZoneTop + 11);
+        return;
+      }
       const barH = Math.max(3, (p / maxPrecip) * precipH);
+      const barTop = precipZoneBot - barH;
+      ctx.fillText(p.toFixed(1), x, barTop - 5);
       const barW = Math.min(COL_W * 0.5, 20);
       const g = ctx.createLinearGradient(0, precipZoneBot - barH, 0, precipZoneBot);
       g.addColorStop(0, "rgba(96, 165, 250, 0.9)");
       g.addColorStop(1, "rgba(37, 99, 235, 0.5)");
       ctx.fillStyle = g;
-      ctx.fillRect(x - barW / 2, precipZoneBot - barH, barW, barH);
+      ctx.fillRect(x - barW / 2, barTop, barW, barH);
     });
 
   }, [hours, N, selectedHour, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);

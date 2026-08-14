@@ -20,5 +20,7 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("`${Math.round(v)} km/h`");
     expect(source).toContain("ctx.fillText(degToCompass(dir), x, y + 14)");
     expect(source).toContain('ctx.font = "bold 11px system-ui"');
+    expect(source).toContain("const precipLabelBand = 18");
+    expect(source).toContain("ctx.fillText(p.toFixed(1), x, barTop - 5)");
   });
 });

@@ -23,6 +23,8 @@ describe("HourlyChart", () => {
     expect(source).toContain("`${Math.round(v)} km/h`");
     expect(source).toContain("ctx.fillText(degToCompass(dir), x, y + 14)");
     expect(source).toContain('ctx.font = "bold 10px system-ui"');
+    expect(source).toContain("const precipLabelBand = 16");
+    expect(source).toContain("ctx.fillText(p.toFixed(1), x, barTop - 5)");
     expect(source).not.toContain("rounded-b-xl border border-blue-300/70");
     expect(source).not.toContain("ctx.strokeRect(x + 0.5, 0.5, COL_W - 1, CHART_H - 1)");
   });

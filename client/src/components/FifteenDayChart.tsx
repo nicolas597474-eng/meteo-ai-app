@@ -419,22 +419,28 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     });
 
     // ── Precipitation bars ───────────────────────────────────────────────────
-    const precipH = precipZoneBot - precipZoneTop;
+    const precipLabelBand = 18;
+    const precipBarTop = precipZoneTop + precipLabelBand;
+    const precipH = precipZoneBot - precipBarTop;
     displayDays.slice(0, visibleN).forEach((d, i) => {
       const p = d.precipitation ?? 0;
       const x = colX(i);
       ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
       ctx.font = "bold 11px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(p.toFixed(1), x, precipZoneTop + 11);
-      if (p <= 0) return;
+      if (p <= 0) {
+        ctx.fillText(p.toFixed(1), x, precipZoneTop + 12);
+        return;
+      }
       const barH = Math.max(4, (p / maxPrecip) * precipH);
+      const barTop = precipZoneBot - barH;
+      ctx.fillText(p.toFixed(1), x, barTop - 5);
       const barW = Math.min(COL_W * 0.45, 24);
       const g = ctx.createLinearGradient(0, precipZoneBot - barH, 0, precipZoneBot);
       g.addColorStop(0, "rgba(96, 165, 250, 0.9)");
       g.addColorStop(1, "rgba(37, 99, 235, 0.5)");
       ctx.fillStyle = g;
-      ctx.fillRect(x - barW / 2, precipZoneBot - barH, barW, barH);
+      ctx.fillRect(x - barW / 2, barTop, barW, barH);
     });
 
     // ── Date labels + icons ──────────────────────────────────────────────────
