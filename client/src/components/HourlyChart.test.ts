@@ -23,6 +23,10 @@ describe("HourlyChart", () => {
     expect(source).toContain("p-2 sm:p-3");
     expect(source).toContain("weather-chart-3d");
     expect(source).toContain("ctx.fillRect(x, 0, COL_W, TOTAL_H)");
+    expect(source).toContain('ctx.fillStyle = "#05070a"');
+    expect(source).toContain("const visibleN = N");
+    expect(source).toContain("Toutes les données sont dessinées immédiatement");
+    expect(source).not.toContain("const [animProgress, setAnimProgress]");
     expect(source).toContain("bold ${sel ? 12 : 10}px system-ui");
     expect(source).toContain("`${Math.round(v)} km/h`");
     expect(source).toContain("ctx.fillText(degToCompass(dir), x, y + 14)");

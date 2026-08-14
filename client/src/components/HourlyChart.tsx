@@ -290,8 +290,6 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [animated, setAnimated] = useState(false);
-  const [animProgress, setAnimProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
@@ -344,8 +342,11 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = scrollableW * dpr;
     canvas.height = TOTAL_H * dpr;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, scrollableW, TOTAL_H);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Fond opaque garanti avant tout tracé, y compris après un redimensionnement
+    // mobile qui réinitialise le bitmap du Canvas.
+    ctx.fillStyle = "#05070a";
+    ctx.fillRect(0, 0, scrollableW, TOTAL_H);
 
     // Per-hour background
     hours.forEach((h, i) => {
@@ -408,9 +409,10 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.fillRect(x, 0, COL_W, TOTAL_H);
     }
 
-    // Animation progress
-    const progress = animated ? 1 : animProgress;
-    const visibleN = Math.max(1, Math.ceil(N * progress));
+    // Toutes les données sont dessinées immédiatement. Une animation de tracé
+    // peut rester bloquée sur certains navigateurs mobiles et laisser le canvas
+    // sans courbe ni valeur visible.
+    const visibleN = N;
 
     // Temperature curve (orange gradient)
     const tempPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.temp ?? 0) }));
@@ -529,7 +531,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
       ctx.fillRect(x - barW / 2, barTop, barW, barH);
     });
 
-  }, [hours, N, selectedHour, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
+  }, [hours, N, selectedHour, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
 
   // Resize observer
   useEffect(() => {
@@ -540,28 +542,6 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
     setContainerWidth(el.clientWidth);
     return () => ro.disconnect();
   }, []);
-
-  // Animation trigger
-  useEffect(() => {
-    if (N > 0 && !animated) {
-      let start: number | null = null;
-      const duration = 1000;
-      const step = (ts: number) => {
-        if (!start) start = ts;
-        const elapsed = ts - start;
-        const p = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - p, 3);
-        setAnimProgress(eased);
-        if (p < 1) {
-          requestAnimationFrame(step);
-        } else {
-          setAnimated(true);
-        }
-      };
-      const t = setTimeout(() => requestAnimationFrame(step), 100);
-      return () => clearTimeout(t);
-    }
-  }, [N, animated]);
 
   // Scroll progress tracker
   useEffect(() => {
@@ -650,7 +630,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
                 );
               })}
             </div>
-            <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block" }} onClick={onClick} />
+            <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block", backgroundColor: "#05070a" }} onClick={onClick} />
           </div>
         </div>
         </div>

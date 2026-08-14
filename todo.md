@@ -1219,3 +1219,8 @@
 - [x] Interface: Maintenir les ressentis sous leur courbe avec une marge de sécurité.
 - [x] Interface: Réserver des zones distinctes pour températures, vent et précipitations.
 - [x] Validation: Tester les données denses, les températures extrêmes, TypeScript, tests et build.
+
+## Rétablissement du dessin du graphique horaire
+- [x] Diagnostic: Identifier l’interruption du cycle de dessin du Canvas sur mobile.
+- [x] Interface: Rétablir le tracé des températures, ressentis, vent et précipitations sur fond sombre.
+- [x] Validation: Vérifier les données visibles, TypeScript, tests et build.
