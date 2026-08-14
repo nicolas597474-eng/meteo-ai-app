@@ -364,7 +364,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.stroke();
       // Value
       ctx.fillStyle = "#fdba74";
-      ctx.font = `bold ${sel ? 13 : 12}px system-ui`;
+      ctx.font = `bold ${sel ? 14 : 13}px system-ui`;
       ctx.textAlign = "center";
       ctx.fillText(`${v.toFixed(1)}`, pt.x, pt.y - 14);
     });
@@ -395,7 +395,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.fillStyle = "#93c5fd";
-      ctx.font = `bold ${sel ? 12 : 11}px system-ui`;
+      ctx.font = `bold ${sel ? 13 : 12}px system-ui`;
       ctx.textAlign = "center";
       ctx.fillText(`${v.toFixed(1)}`, pt.x, pt.y - 10);
     });
@@ -408,25 +408,13 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       const x = colX(i);
       const y = windZoneTop + 17;
       ctx.fillStyle = "#4ade80";
-      ctx.font = "bold 10px system-ui";
+      ctx.font = "bold 12px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(v)}`, x, y);
+      ctx.fillText(`${Math.round(v)} km/h`, x, y);
       if (dir != null) {
-        const angle = ((dir + 180) % 360) * (Math.PI / 180);
-        ctx.save();
-        ctx.translate(x + 15, y - 4);
-        ctx.rotate(angle);
-        ctx.beginPath();
-        ctx.moveTo(0, -4);
-        ctx.lineTo(-2.5, 3);
-        ctx.lineTo(0, 1.5);
-        ctx.lineTo(2.5, 3);
-        ctx.closePath();
-        ctx.fillStyle = "#4ade80";
-        ctx.globalAlpha = 0.8;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.restore();
+        ctx.fillStyle = "rgba(74, 222, 128, 0.78)";
+        ctx.font = "10px system-ui";
+        ctx.fillText(degToCompass(dir), x, y + 14);
       }
     });
 
@@ -436,7 +424,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       const p = d.precipitation ?? 0;
       const x = colX(i);
       ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
-      ctx.font = "bold 9px system-ui";
+      ctx.font = "bold 11px system-ui";
       ctx.textAlign = "center";
       ctx.fillText(p.toFixed(1), x, precipZoneTop + 11);
       if (p <= 0) return;

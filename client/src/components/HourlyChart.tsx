@@ -443,7 +443,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       const p = h.precipitation ?? 0;
       const x = colX(i);
       ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
-      ctx.font = "bold 8px system-ui";
+      ctx.font = "bold 10px system-ui";
       ctx.textAlign = "center";
       ctx.fillText(p.toFixed(1), x, precipZoneTop + 10);
       if (p <= 0) return;

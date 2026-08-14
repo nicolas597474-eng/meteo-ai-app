@@ -1085,3 +1085,13 @@
 - [x] Audit: Identifier les tailles de température et les emplacements disponibles pour vitesse, unité et cap de vent.
 - [x] Interface: Agrandir les températures et afficher « km/h » puis le cap cardinal sous chaque vent.
 - [x] Validation: Vérifier la lisibilité mobile, l’absence de chevauchement et les interactions.
+
+## Lisibilité du graphique quinze jours
+- [x] Audit: Identifier les tailles de température et l’emplacement des données de vent.
+- [x] Interface: Agrandir les températures et afficher « km/h » puis le cap cardinal par jour.
+- [x] Validation: Vérifier la lisibilité, le non-chevauchement et les interactions.
+
+## Lisibilité des précipitations
+- [x] Audit: Identifier les tailles et emplacements des valeurs en millimètres sur les deux graphiques.
+- [x] Interface: Agrandir les valeurs de précipitations sans modifier les barres ni les échelles.
+- [x] Validation: Vérifier la lisibilité et le non-chevauchement à toutes les tailles.
