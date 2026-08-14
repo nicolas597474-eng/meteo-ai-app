@@ -1046,3 +1046,8 @@
 - [x] Audit: Identifier la marge des cartes locales à répliquer et les sources du halo à réduire.
 - [x] Interface: Aligner la largeur mobile des graphiques sur les cartes locales et atténuer leur halo.
 - [x] Validation: Vérifier l’alignement, la lisibilité et les interactions à toutes les tailles.
+
+## Finition des coins de graphiques
+- [x] Audit: Identifier les rayons et bordures imbriqués à l’origine du défaut visible.
+- [x] Interface: Uniformiser les coins arrondis et le raccord des deux cadres de graphiques.
+- [x] Validation: Vérifier les contours aux différentes tailles sans modifier les graphiques Canvas.
