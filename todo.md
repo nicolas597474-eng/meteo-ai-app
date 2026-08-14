@@ -1234,3 +1234,7 @@
 - [x] Audit: Identifier les configurations où les deux courbes sont trop proches.
 - [x] Interface: Réserver des décalages distincts pour les libellés orange et bleus.
 - [x] Validation: Vérifier les écarts faibles, TypeScript, tests et build.
+
+## Libellés de température simplifiés
+- [x] Interface: Retirer les préfixes T et R des valeurs des deux courbes.
+- [x] Validation: Vérifier la séparation par couleur et position, TypeScript, tests et build.
