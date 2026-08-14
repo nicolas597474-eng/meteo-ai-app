@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { getHourlyDetailInsights } from "@/lib/hourlyDetailInsights";
 
 const source = readFileSync(new URL("./HourlyChart.tsx", import.meta.url), "utf8");
 
@@ -49,7 +50,61 @@ describe("HourlyChart", () => {
     expect(source).toContain("precipIntensity?: string | null");
     expect(source).toContain("Point de rosée");
     expect(source).toContain("Pression de surface");
-    expect(source).toContain("Portée horizontale");
+    expect(source).toContain("Portée {visibilityLabel");
     expect(source).toContain("Régime opérationnel");
+  });
+
+  it("ajoute des indicateurs dérivés transparents sur un horizon de trois heures", () => {
+    expect(source).toContain("getHourlyDetailInsights");
+    expect(source).toContain("Évolution à court terme");
+    expect(source).toContain("Température à +3 h");
+    expect(source).toContain("Cumul de pluie à +3 h");
+    expect(source).toContain("Rafale maximale à +3 h");
+    expect(source).toContain("Tendance de pression");
+    expect(source).toContain("Écart temp. / rosée");
+    expect(source).toContain("même prévision officielle");
+  });
+
+  it("calcule les tendances à court terme depuis les points horaires mesurés", () => {
+    const makeHour = (hour: string, values: Record<string, number | null>) => ({
+      hour,
+      temp: 18,
+      apparentTemp: 18,
+      precipitation: 0,
+      windSpeed: 8,
+      windGust: 10,
+      windDirection: 180,
+      cloudCover: 20,
+      humidity: 55,
+      uvIndex: 3,
+      condition: "Peu nuageux",
+      pressure: 1012,
+      dewPoint: 14,
+      visibility: 15,
+      solarRadiation: 250,
+      cloudLow: 10,
+      cloudMid: 10,
+      cloudHigh: 10,
+      precipProb: 0,
+      ...values,
+    });
+    const hours = [
+      makeHour("10:00", { pressure: 1010 }),
+      makeHour("11:00", { pressure: 1011 }),
+      makeHour("12:00", { temp: 20, dewPoint: 17, pressure: 1012, cloudCover: 20, windGust: 12 }),
+      makeHour("13:00", { temp: 21, precipitation: 0.2, precipProb: 50, windGust: 15, cloudCover: 30 }),
+      makeHour("14:00", { temp: 22, precipitation: 0.3, precipProb: 80, windGust: 22, cloudCover: 45 }),
+      makeHour("15:00", { temp: 23, precipitation: 0.1, precipProb: 20, windGust: 18, cloudCover: 60 }),
+    ];
+    const insights = getHourlyDetailInsights(hours, 2);
+
+    expect(insights.temperatureDelta).toBe(3);
+    expect(insights.temperatureAtEnd).toBe(23);
+    expect(insights.precipitationTotal).toBeCloseTo(0.6);
+    expect(insights.precipitationProbabilityMax).toBe(80);
+    expect(insights.gustMax).toBe(22);
+    expect(insights.cloudDelta).toBe(40);
+    expect(insights.pressureDelta).toBe(2);
+    expect(insights.dewPointGap).toBe(3);
   });
 });

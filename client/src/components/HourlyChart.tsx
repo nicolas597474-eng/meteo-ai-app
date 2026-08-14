@@ -3,6 +3,7 @@ import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, 
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
+import { getHourlyDetailInsights } from "@/lib/hourlyDetailInsights";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -65,6 +66,18 @@ function WeatherIconSVG({ condition, size = 20 }: { condition: string; size?: nu
   return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} />;
 }
 
+function signed(value: number, digits = 1): string {
+  return `${value > 0 ? "+" : ""}${value.toFixed(digits)}`;
+}
+
+function visibilityLabel(value: number | null | undefined): string {
+  if (value == null) return "indisponible";
+  if (value < 1) return "très réduite";
+  if (value < 5) return "réduite";
+  if (value < 10) return "moyenne";
+  return "bonne";
+}
+
 function HourlyScaleLabels({
   totalHeight,
   tempTop,
@@ -107,11 +120,12 @@ function HourlyScaleLabels({
 }
 
 // ─── Detail Overlay ──────────────────────────────────────────────────────────
-function HourDetailOverlay({ hour, onClose, regime }: { hour: HourData; onClose: () => void; regime?: Props["regime"] }) {
+function HourDetailOverlay({ hour, hours, selectedIndex, onClose, regime }: { hour: HourData; hours: HourData[]; selectedIndex: number; onClose: () => void; regime?: Props["regime"] }) {
   const cond = getConditionLabel(hour.cloudCover, hour.precipitation, hour.condition);
   const hasSpread = hour.tempSpread != null && hour.tempSpread > 0;
   const hasPrecipProb = hour.precipProb != null;
   const hasGust = hour.windGust != null && hour.windGust > 0;
+  const insights = getHourlyDetailInsights(hours, selectedIndex);
 
   // Confidence from spread: low spread = high confidence
   const spreadConfidence = hasSpread
@@ -236,12 +250,34 @@ function HourDetailOverlay({ hour, onClose, regime }: { hour: HourData; onClose:
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Eye className="h-3.5 w-3.5 text-cyan-300" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Visibilité</span></div>
             <p className="text-sm font-bold text-cyan-200">{hour.visibility != null ? `${hour.visibility.toFixed(1)} km` : "—"}</p>
-            <p className="mt-0.5 text-[10px] text-slate-500">Portée horizontale</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Portée {visibilityLabel(hour.visibility)}</p>
           </div>
           {regime ? <div className="col-span-2 flex items-center gap-2 rounded-lg border border-amber-400/15 bg-amber-400/5 p-2.5"><span className="text-lg" aria-hidden="true">{regime.emoji ?? "•"}</span><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Régime opérationnel</p><p className="text-sm font-semibold text-amber-100">{regime.label}</p></div></div> : null}
         </div>
+
+        <section className="mt-3 rounded-xl border border-sky-400/15 bg-sky-400/[0.04] p-3" aria-label="Évolution prévue dans les trois prochaines heures">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200">Évolution à court terme</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">Calculée à partir des {insights.nextHoursCount} heure(s) suivante(s) de la même prévision officielle.</p>
+            </div>
+            <span className="rounded-full border border-slate-600/40 bg-slate-950/30 px-2 py-1 text-[9px] text-slate-400">{insights.dataCoverage}/14 mesures</span>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+            <Insight label="Température à +3 h" value={insights.temperatureAtEnd != null ? `${insights.temperatureAtEnd.toFixed(1)}°C` : "—"} detail={insights.temperatureDelta != null ? `${signed(insights.temperatureDelta)}°C vs ${hour.hour}` : "Tendance indisponible"} tone="text-orange-200" />
+            <Insight label="Cumul de pluie à +3 h" value={insights.precipitationTotal != null ? `${insights.precipitationTotal.toFixed(1)} mm` : "—"} detail={insights.precipitationProbabilityMax != null ? `Probabilité max. ${Math.round(insights.precipitationProbabilityMax)} %` : "Probabilité indisponible"} tone="text-blue-200" />
+            <Insight label="Rafale maximale à +3 h" value={insights.gustMax != null ? `${Math.round(insights.gustMax)} km/h` : "—"} detail={insights.gustMax != null && hour.windGust != null ? `${signed(insights.gustMax - hour.windGust, 0)} km/h vs maintenant` : "Tendance indisponible"} tone="text-emerald-200" />
+            <Insight label="Nébulosité à +3 h" value={insights.cloudEnd != null ? `${Math.round(insights.cloudEnd)} %` : "—"} detail={insights.cloudDelta != null ? `${insights.cloudDelta > 5 ? "Se couvre" : insights.cloudDelta < -5 ? "Se dégage" : "Stable"} · ${signed(insights.cloudDelta, 0)} pts` : "Tendance indisponible"} tone="text-slate-200" />
+            <Insight label="Tendance de pression" value={insights.pressureDelta == null ? "—" : Math.abs(insights.pressureDelta) < 0.5 ? "Stable" : insights.pressureDelta > 0 ? "En hausse" : "En baisse"} detail={insights.pressureDelta != null ? `${signed(insights.pressureDelta)} hPa sur 2 h` : "Deux relevés requis"} tone="text-violet-200" />
+            <Insight label="Écart temp. / rosée" value={insights.dewPointGap != null ? `${insights.dewPointGap.toFixed(1)}°C` : "—"} detail={insights.dewPointGap == null ? "Mesure indisponible" : insights.dewPointGap <= 2 ? "Air proche de la saturation" : insights.dewPointGap <= 5 ? "Humidité sensible" : "Air relativement sec"} tone="text-cyan-200" />
+          </div>
+        </section>
     </section>
   );
+}
+
+function Insight({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: string }) {
+  return <div className="rounded-lg border border-white/5 bg-black/15 px-2.5 py-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-0.5 text-sm font-semibold ${tone}`}>{value}</p><p className="mt-0.5 leading-snug text-[9px] text-slate-500">{detail}</p></div>;
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
@@ -586,7 +622,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
 
       {selectedHour !== null && selectedHour < hours.length && (
         <div ref={detailPanelRef} className="scroll-mt-3">
-          <HourDetailOverlay hour={hours[selectedHour]} regime={regime} onClose={() => setSelectedHour(null)} />
+          <HourDetailOverlay hour={hours[selectedHour]} hours={hours} selectedIndex={selectedHour} regime={regime} onClose={() => setSelectedHour(null)} />
         </div>
       )}
 

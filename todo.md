@@ -1154,3 +1154,9 @@
 - [x] Données: Exposer uniquement les paramètres supplémentaires réellement disponibles pour chaque heure.
 - [x] Interface: Afficher ces paramètres dans le panneau de détail horaire au-dessus du graphique.
 - [x] Validation: Vérifier les données manquantes, TypeScript, tests, rendu mobile et build.
+
+## Indicateurs horaires complémentaires du Dashboard
+- [x] Audit: Identifier les tendances et indicateurs calculables à partir des mesures horaires officielles.
+- [x] Calcul: Définir des indicateurs transparents sans donnée artificielle ni nouvelle source.
+- [x] Interface: Ajouter les informations complémentaires au panneau horaire développé.
+- [x] Validation: Couvrir les cas de données absentes, vérifier le rendu mobile, TypeScript, tests et build.
