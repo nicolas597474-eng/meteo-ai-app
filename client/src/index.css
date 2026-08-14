@@ -167,12 +167,6 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Le Canvas météo doit rester opaque sur les navigateurs mobiles, même lors
-   d'un redimensionnement qui réinitialise son bitmap. */
-.hourly-weather-canvas {
-  background: #05070a !important;
-}
-
 /* Cadres de graphiques MeteoAI : relief bleu discret sans affecter le canvas. */
 .weather-chart-3d {
   position: relative;

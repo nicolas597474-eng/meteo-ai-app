@@ -344,13 +344,8 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = scrollableW * dpr;
     canvas.height = TOTAL_H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Le premier passage remplace totalement le bitmap. Certains navigateurs
-    // mobiles gardent sinon une surface claire temporaire après un resize.
-    ctx.globalCompositeOperation = "copy";
-    ctx.fillStyle = "#05070a";
-    ctx.fillRect(0, 0, scrollableW, TOTAL_H);
-    ctx.globalCompositeOperation = "source-over";
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, scrollableW, TOTAL_H);
 
     // Per-hour background
     hours.forEach((h, i) => {
@@ -655,7 +650,7 @@ export default function HourlyChart({ hours, locationName, regime }: Props) {
                 );
               })}
             </div>
-            <canvas ref={canvasRef} className="hourly-weather-canvas" style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block" }} onClick={onClick} />
+            <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block" }} onClick={onClick} />
           </div>
         </div>
         </div>

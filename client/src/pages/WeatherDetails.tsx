@@ -9,7 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft } from "lucide-react";
 import { Link } from "wouter";
 import { useLocation } from "@/contexts/LocationContext";
-import { FORECAST_PERIOD_LABELS, FORECAST_PERIODS, getDayPeriodHours, type ForecastPeriod } from "@/lib/detailedForecastPeriods";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -39,6 +38,23 @@ function formatDate(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 }
+
+// Period splitting for a day
+type Period = "matin" | "apres_midi" | "soir" | "nuit";
+function getPeriod(hour: string): Period {
+  const h = parseInt(hour.split(":")[0]);
+  if (h >= 6 && h < 12) return "matin";
+  if (h >= 12 && h < 18) return "apres_midi";
+  if (h >= 18 && h < 22) return "soir";
+  return "nuit";
+}
+
+const PERIOD_LABELS: Record<Period, { label: string; emoji: string }> = {
+  matin: { label: "Matin", emoji: "🌅" },
+  apres_midi: { label: "Après-midi", emoji: "☀️" },
+  soir: { label: "Soir", emoji: "🌇" },
+  nuit: { label: "Nuit", emoji: "🌙" },
+};
 
 // ─── Chart types ────────────────────────────────────────────────────────────
 
@@ -74,15 +90,11 @@ export default function WeatherDetails() {
     return now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   }, []);
 
-  const visibleHourlyCards = useMemo(() => {
-    const allHours = data?.hours ?? [];
-    return allHours.filter((hour: any) => hour.date === data?.today);
-  }, [data?.hours, data?.today]);
-
   const currentHourIdx = useMemo(() => {
-    const idx = visibleHourlyCards.findIndex((h: any) => h.hour === currentHourStr);
+    if (!data?.hours) return 0;
+    const idx = data.hours.findIndex((h: any) => h.hour === currentHourStr);
     return idx >= 0 ? idx : 0;
-  }, [visibleHourlyCards, currentHourStr]);
+  }, [data?.hours, currentHourStr]);
 
   if (isLoading) {
     return (
@@ -132,10 +144,10 @@ export default function WeatherDetails() {
           
           {/* Horizontal scrollable hourly cards */}
           <div ref={hourlyRef} className="overflow-x-auto pb-2 -mx-3 px-3 scrollbar-hide">
-            <div className="flex gap-2" style={{ width: `${visibleHourlyCards.length * 140}px` }}>
-              {visibleHourlyCards.map((h: any, i: number) => {
+            <div className="flex gap-2" style={{ width: `${hours.length * 140}px` }}>
+              {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
-                const pTrend = pressureTrend(visibleHourlyCards, i);
+                const pTrend = pressureTrend(hours, i);
                 return (
                   <div
                     key={h.hour}
@@ -269,7 +281,7 @@ export default function WeatherDetails() {
           
           {/* Chart area */}
           <div className="rounded-2xl bg-[#152238] border border-slate-800 p-4">
-            <HourlyChart hours={visibleHourlyCards} type={activeChart} currentIdx={currentHourIdx} />
+            <HourlyChart hours={hours} type={activeChart} currentIdx={currentHourIdx} />
           </div>
         </section>
 
@@ -287,31 +299,31 @@ export default function WeatherDetails() {
                   {/* Day summary card */}
                   <button
                     onClick={() => setExpandedDay(isExpanded ? null : day.date)}
-                    className="w-full min-h-[96px] p-4 flex items-center gap-3 hover:bg-slate-800/30 transition-colors text-left"
+                    className="w-full p-3 flex items-center gap-3 hover:bg-slate-800/30 transition-colors text-left"
                   >
                     <div className="flex-shrink-0">
-                      <MeteoIcon name={getIconNameFromCondition(day.condition)} size={40} />
+                      <MeteoIcon name={getIconNameFromCondition(day.condition)} size={32} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-white font-semibold text-base capitalize">{getDayOfWeek(day.date)}</span>
-                        <span className="text-slate-500 text-sm">{formatDate(day.date)}</span>
+                        <span className="text-white font-semibold text-sm capitalize">{getDayOfWeek(day.date)}</span>
+                        <span className="text-slate-500 text-xs">{formatDate(day.date)}</span>
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-white font-bold text-lg">{day.tempMax?.toFixed(0)}°</span>
-                        <span className="text-slate-400 text-base">{day.tempMin?.toFixed(0)}°</span>
+                        <span className="text-white font-bold text-sm">{day.tempMax?.toFixed(0)}°</span>
+                        <span className="text-slate-400 text-sm">{day.tempMin?.toFixed(0)}°</span>
                         {(day.precipitation ?? 0) > 0 && (
                           <span className="text-blue-400 text-xs">{day.precipitation?.toFixed(1)} mm</span>
                         )}
                         <span className="text-slate-500 text-xs">{day.windSpeed?.toFixed(0)} km/h</span>
                       </div>
                     </div>
-                    <span className="text-xs text-slate-400 font-medium">{isExpanded ? "Réduire ▲" : "4 périodes ▼"}</span>
+                    <span className="text-[10px] text-slate-600">{isExpanded ? "▲" : "▼"}</span>
                   </button>
                   
                   {/* Expanded day details */}
                   {isExpanded && (
-                    <div className="border-t border-slate-800 p-4 space-y-4">
+                    <div className="border-t border-slate-800 p-3 space-y-3">
                       {/* Day details grid */}
                       <div className="grid grid-cols-3 gap-2">
                         <DetailCell label="Ressenti" value={`${day.feelsLikeMin?.toFixed(0) ?? "?"}° / ${day.feelsLikeMax?.toFixed(0) ?? "?"}°`} />
@@ -387,29 +399,30 @@ function calculateSunshineDuration(sunrise: string, sunset: string): string {
 }
 
 function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours: any[]; regime: any }) {
-  const periods = getDayPeriodHours(dayDate, hours);
-  const hasHourlyData = FORECAST_PERIODS.some((period) => periods[period].length > 0);
-
-  if (!hasHourlyData) {
+  // For today, use actual hourly data; for future days, show estimated from daily data
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+  const isToday = dayDate === todayStr;
+  
+  if (!isToday) {
+    // For future days, we don't have hourly data — show placeholder
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-3 py-2 text-xs text-slate-500">
-        Données horaires non disponibles pour cette date.
+      <div className="text-[9px] text-slate-500 italic">
+        Découpage horaire disponible uniquement pour aujourd'hui et demain.
       </div>
     );
   }
 
+  const periods: Record<Period, any[]> = { matin: [], apres_midi: [], soir: [], nuit: [] };
+  hours.forEach((h: any) => {
+    const p = getPeriod(h.hour);
+    periods[p].push(h);
+  });
+
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {FORECAST_PERIODS.map((p: ForecastPeriod) => {
+    <div className="grid grid-cols-2 gap-2">
+      {(["matin", "apres_midi", "soir", "nuit"] as Period[]).map((p) => {
         const periodHours = periods[p];
-        if (periodHours.length === 0) {
-          return (
-            <div key={p} className="min-h-[170px] rounded-2xl border border-slate-800 bg-slate-900/30 p-3 text-xs text-slate-500">
-              <div className="flex items-center gap-2 text-slate-400"><span>{FORECAST_PERIOD_LABELS[p].emoji}</span><span>{FORECAST_PERIOD_LABELS[p].label}</span></div>
-              <p className="mt-4">Données non disponibles</p>
-            </div>
-          );
-        }
+        if (periodHours.length === 0) return null;
         const avgTemp = Math.round(periodHours.reduce((s: number, h: any) => s + (h.temp ?? 0), 0) / periodHours.length);
         const avgWind = Math.round(periodHours.reduce((s: number, h: any) => s + (h.windSpeed ?? 0), 0) / periodHours.length);
         const maxGust = Math.round(Math.max(...periodHours.map((h: any) => h.windGust ?? 0)));
@@ -418,24 +431,24 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
         return (
-          <div key={p} className="min-h-[210px] rounded-2xl border border-slate-700/60 bg-slate-800/35 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm">{FORECAST_PERIOD_LABELS[p].emoji}</span>
-              <span className="text-sm text-white font-semibold">{FORECAST_PERIOD_LABELS[p].label}</span>
-              <MeteoIcon name={getIconNameFromCondition(dominantCondition)} size={20} className="ml-auto" />
+          <div key={p} className="bg-slate-800/30 rounded-xl p-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px]">{PERIOD_LABELS[p].emoji}</span>
+              <span className="text-[10px] text-white font-semibold">{PERIOD_LABELS[p].label}</span>
+              <MeteoIcon name={getIconNameFromCondition(dominantCondition)} size={14} className="ml-auto" />
             </div>
-            <div className="space-y-1.5 text-xs text-slate-300">
-              <div className="flex justify-between"><span>Température</span><span className="text-white font-semibold">{avgTemp}°C</span></div>
+            <div className="space-y-0.5 text-[9px] text-slate-300">
+              <div className="flex justify-between"><span>Temp.</span><span className="text-white font-medium">{avgTemp}°C</span></div>
               <div className="flex justify-between"><span>Vent</span><span>{avgWind} km/h</span></div>
               <div className="flex justify-between"><span>Rafales</span><span>{maxGust} km/h</span></div>
-              <div className="flex justify-between"><span>Précipitations</span><span>{totalPrecip.toFixed(1)} mm</span></div>
+              <div className="flex justify-between"><span>Précip.</span><span>{totalPrecip.toFixed(1)} mm</span></div>
               <div className="flex justify-between"><span>Humidité</span><span>{avgHumidity}%</span></div>
               <div className="flex justify-between"><span>Nuages</span><span>{avgCloud}%</span></div>
             </div>
             {regime && (
-              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-slate-700/40">
+              <div className="flex items-center gap-1 mt-1 pt-1 border-t border-slate-700/30">
                 <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={10} />
-                <span className="text-[10px] text-slate-400">{regime.primary.label}</span>
+                <span className="text-[8px] text-slate-500">{regime.primary.label}</span>
               </div>
             )}
           </div>
