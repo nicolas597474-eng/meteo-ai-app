@@ -38,4 +38,13 @@ describe("page Fiabilité", () => {
     expect(dialog).toContain("poids de fusion locale 0 %");
     expect(dialog).toContain("Décomposition du poids appliqué");
   });
+
+  it("affiche une seule station locale puis propose de développer les autres", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("showAdditionalLocalStations");
+    expect(source).toContain("station={realLocalStations[0]}");
+    expect(source).toContain("Afficher les ${realLocalStations.length - 1} autres stations");
+    expect(source).toContain("realLocalStations.slice(1).map");
+    expect(source).toContain("aria-expanded={showAdditionalLocalStations}");
+  });
 });

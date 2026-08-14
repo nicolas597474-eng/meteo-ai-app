@@ -1127,3 +1127,8 @@
 - [x] Navigation: Ajouter la route et l’accès au Laboratoire de fiabilité.
 - [x] Tests: Couvrir les calculs, seuils et contrats tRPC du laboratoire.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, les tests et le build avant publication.
+
+## Panneau des stations locales réelles
+- [x] Interface: Afficher uniquement la première station locale réelle par défaut.
+- [x] Interface: Ajouter une flèche vers le bas pour développer ou replier les autres stations.
+- [x] Validation: Vérifier le comportement, l’accessibilité et la lisibilité mobile.
