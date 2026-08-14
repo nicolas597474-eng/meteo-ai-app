@@ -577,7 +577,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
                 const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
                 const isCurrent = i === nowHour;
                 return (
-                  <div key={h.hour} className={`flex flex-col items-center justify-start pt-2 ${isCurrent ? "rounded-xl border border-blue-300/70 bg-blue-500/25 shadow-[0_0_18px_rgba(37,99,235,0.4)]" : ""}`} style={{ width: COL_W }}>
+                  <div key={h.hour} className={`flex flex-col items-center justify-start pt-2 ${isCurrent ? "rounded-b-xl border border-blue-300/70 bg-blue-500/25 shadow-[0_0_18px_rgba(37,99,235,0.4)]" : ""}`} style={{ width: COL_W }}>
                     <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
                     <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>

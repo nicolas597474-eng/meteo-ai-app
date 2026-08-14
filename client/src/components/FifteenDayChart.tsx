@@ -563,7 +563,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
                 const date = formatDate(d.date);
                 const isSelected = i === selectedDay;
                 return (
-                  <div key={d.date} className={`flex flex-col items-center justify-start pt-2 ${isSelected ? "rounded-xl border border-blue-300/50 bg-blue-500/20 shadow-[0_0_18px_rgba(59,130,246,0.38)]" : ""}`} style={{ width: COL_W }}>
+                  <div key={d.date} className={`flex flex-col items-center justify-start pt-2 ${isSelected ? "rounded-b-xl border border-blue-300/50 bg-blue-500/20 shadow-[0_0_18px_rgba(59,130,246,0.38)]" : ""}`} style={{ width: COL_W }}>
                     <span className={`text-[10px] font-semibold ${isSelected ? "text-blue-100" : "text-slate-200"}`}>{date.line1}</span>
                     <span className="text-[9px] text-slate-500">{date.line2}</span>
                     <span className="mt-1"><WeatherIconSVG condition={cond} size={31} /></span>

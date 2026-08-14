@@ -1051,3 +1051,8 @@
 - [x] Audit: Identifier les rayons et bordures imbriqués à l’origine du défaut visible.
 - [x] Interface: Uniformiser les coins arrondis et le raccord des deux cadres de graphiques.
 - [x] Validation: Vérifier les contours aux différentes tailles sans modifier les graphiques Canvas.
+
+## Coins inférieurs des graphiques
+- [x] Audit: Identifier les rayons du cadre 3D et de la zone de tracé à modifier.
+- [x] Interface: Conserver le haut rectiligne et arrondir uniquement les coins inférieurs des deux graphiques.
+- [x] Validation: Vérifier les contours et les interactions aux différentes tailles.

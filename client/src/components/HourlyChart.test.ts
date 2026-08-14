@@ -18,5 +18,6 @@ describe("HourlyChart", () => {
     expect(source).toContain("v.toFixed(1)}°");
     expect(source).toContain("p-2 sm:p-3");
     expect(source).toContain("weather-chart-3d");
+    expect(source).toContain("rounded-b-xl border border-blue-300/70");
   });
 });
