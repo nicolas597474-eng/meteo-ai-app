@@ -1041,3 +1041,8 @@
 - [x] Audit: Identifier les couches bleues du fond 3D à atténuer.
 - [x] Interface: Assombrir légèrement le fond des deux graphiques sans modifier leurs contours lumineux.
 - [x] Validation: Vérifier le contraste des libellés, courbes et données à toutes les tailles.
+
+## Alignement des graphiques et halo
+- [x] Audit: Identifier la marge des cartes locales à répliquer et les sources du halo à réduire.
+- [x] Interface: Aligner la largeur mobile des graphiques sur les cartes locales et atténuer leur halo.
+- [x] Validation: Vérifier l’alignement, la lisibilité et les interactions à toutes les tailles.

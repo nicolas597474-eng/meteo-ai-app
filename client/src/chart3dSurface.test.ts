@@ -8,5 +8,6 @@ describe("surface 3D des graphiques", () => {
     expect(styles).toContain("rgba(59, 130, 246, 0.10)");
     expect(styles).toContain("rgba(11, 19, 32, 0.98)");
     expect(styles).toContain("rgba(96, 165, 250, 0.58)");
+    expect(styles).toContain("0 0 26px rgba(37, 99, 235, 0.09)");
   });
 });
