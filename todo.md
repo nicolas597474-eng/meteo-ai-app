@@ -1075,8 +1075,3 @@
 - [x] Collecte: Ajouter les modèles localement disponibles au cycle horaire et quotidien sans leur attribuer de poids.
 - [x] Transparence: Exposer leur statut « en validation » et leur couverture sans les présenter comme une fusion active.
 - [x] Validation opérationnelle: Vérifier l’archivage réel de DMI HARMONIE-DINI et ICON-D2, l’affichage séparé et l’absence de candidats dans la prévision officielle.
-
-## Suppression de la surbrillance bleue des graphiques
-- [x] Audit: Identifier la classe de surbrillance du créneau actif sur les deux graphiques.
-- [x] Interface: Retirer la surface bleue carrée sans supprimer le contenu ni le comportement de sélection.
-- [x] Validation: Vérifier les graphiques, les clics et les données à toutes les tailles.
