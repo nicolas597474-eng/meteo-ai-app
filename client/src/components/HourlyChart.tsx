@@ -331,14 +331,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
       g.addColorStop(1, "rgba(37, 99, 235, 0)");
       ctx.fillStyle = g;
       ctx.fillRect(x, 0, COL_W, TOTAL_H);
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(x + COL_W / 2, 0);
-      ctx.lineTo(x + COL_W / 2, TOTAL_H);
-      ctx.strokeStyle = "rgba(147, 197, 253, 0.55)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.restore();
     }
 
     // Selected hour highlight
