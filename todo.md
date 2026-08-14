@@ -1062,3 +1062,9 @@
 - [x] Diagnostic: Comparer la collecte attendue aux prévisions, traces de pondération et snapshots AI Lab disponibles.
 - [x] Correction: Remplacer le job dont le cookie cron était refusé par une tâche active avec autorisation fraîche, sans simuler de prévision ni de trace.
 - [x] Validation: Confirmer l’exécution, la persistance et l’affichage du snapshot après correction.
+
+## Évaluation de modèles supplémentaires
+- [x] Audit: Recenser les modèles réellement exploités et les horizons où la couverture peut gagner en indépendance.
+- [x] Recherche: Vérifier les modèles additionnels accessibles, leurs sources officielles et leur disponibilité pour le nord de la France.
+- [x] Comparaison: Évaluer la valeur ajoutée, la redondance et la compatibilité avec le scoring existant.
+- [x] Recommandation: Présenter des options graduées sans intégrer de nouveau modèle avant validation.
