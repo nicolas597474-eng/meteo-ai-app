@@ -66,7 +66,7 @@ function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint
         <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Stations physiques</span>
         <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-blue-400" /> Prévision officielle</span>
       </div>
-      <div className="weather-surface-inset h-[168px] rounded-xl px-2 py-1">
+      <div className="h-[168px] rounded-xl border border-slate-800 bg-[#090b10] px-2 py-1">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label="Comparaison température station et prévision officielle sur 24 heures">
           {[0.25, 0.5, 0.75].map((ratio) => <line key={ratio} x1="0" x2={width} y1={height * ratio} y2={height * ratio} stroke="#1e293b" strokeWidth="1" />)}
           <polyline points={toPoint("officialTemperature")} fill="none" stroke="#60a5fa" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -121,7 +121,7 @@ export default function Ranking() {
   };
 
   if (isLoading) {
-    return <div className="weather-page mx-auto min-h-screen max-w-2xl space-y-4 px-3 pb-24 pt-3 sm:px-5 sm:pt-5"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
+    return <div className="mx-auto min-h-screen max-w-2xl space-y-4 bg-[#080a0f] px-3 pb-24 pt-3 sm:px-5 sm:pt-5"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
   }
 
   const stations = data?.stations ?? [];
@@ -138,27 +138,27 @@ export default function Ranking() {
   const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate");
 
   return (
-    <main className="weather-page min-h-screen pb-28">
-      <div className="weather-page-frame mx-auto max-w-2xl px-3 pt-2 sm:px-5 sm:pt-4">
+    <main className="min-h-screen bg-[#080a0f] pb-28">
+      <div className="mx-auto max-w-2xl px-3 pt-2 sm:px-5 sm:pt-4">
         <header className="mb-4 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 text-blue-400"><MeteoIcon name="location" size={19} /><span className="text-sm font-semibold">{locationName}</span></div>
             <h1 className="mt-2 text-xl font-bold text-white">Stations & fiabilité locale</h1>
             <p className="mt-1 text-xs text-slate-500">Relevés physiques et comparaison avec la prévision officielle.</p>
           </div>
-          <div className="weather-chip rounded-full px-3 py-2 text-right">
+          <div className="rounded-full border border-slate-800 bg-[#10131a] px-3 py-2 text-right">
             <p className="text-[10px] uppercase tracking-wide text-slate-500">Collecte</p>
             <p className="text-xs font-medium text-blue-300">05h00 Paris</p>
           </div>
         </header>
 
-        <section className="weather-surface mb-4 grid grid-cols-3 gap-2 rounded-2xl p-3">
+        <section className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
           <Metric label="Stations actives" value={String(stations.length)} icon="stations" color="text-emerald-400" />
           <Metric label="Confiance synthèse locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
           <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
         </section>
 
-        <section className="weather-surface mb-4 rounded-2xl p-4">
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Rayon de recherche</h2><p className="text-xs text-slate-500">Utilisé à la prochaine collecte de stations physiques.</p></div><MeteoIcon name="location" size={20} className="text-blue-400" /></div>
           <div className="flex flex-wrap gap-2">{[5, 10, 20, 30, 50].map((radius) => <button key={radius} type="button" disabled={updateFavorite.isPending} onClick={() => changeRadius(radius)} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${radiusKm === radius ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-[#090b10] text-slate-300"}`}>{radius} km</button>)}</div>
           <p className="mt-3 text-[11px] text-slate-600">{activeLocation?.favoriteId ? "Le rayon est enregistré pour ce lieu favori." : "Le rayon est utilisé pour cette consultation ; enregistrez ce lieu pour le conserver."}</p>
@@ -180,19 +180,19 @@ export default function Ranking() {
 
         <FilteredStationDirectory sources={currentSources as any[]} isLoading={liveStationsLoading} onOpenDetails={(source) => setSelectedSource({ source, kind: "station" })} />
 
-        <section className="weather-surface mb-4 rounded-2xl p-4">
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Bleu : lieu de référence · vert : relevé récent · ambre : relevé ancien.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
           <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
         </section>
 
-        <section className="weather-surface mb-4 rounded-2xl p-4">
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-white">Relevés des stations</h2><p className="text-xs text-slate-500">Stations physiques validées autour du lieu.</p></div><MeteoIcon name="stations" size={22} /></div>
           {stations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-500">Aucune station physique n’est encore archivée pour ce lieu. La première collecte est prévue à 05h00.</div>
           ) : (
             <div className="space-y-2">
               {stations.map((station: any) => (
-                <article key={station.stationId} className="weather-surface-inset rounded-xl p-3">
+                <article key={station.stationId} className="rounded-xl border border-slate-800 bg-[#090b10] p-3">
                   <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-sm text-white">{station.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{station.source} · {station.distanceKm.toFixed(1)} km · fiabilité {Math.round(station.reliabilityScore)}%</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${station.ageMinutes !== null && station.ageMinutes <= 90 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"}`}>{formatAge(station.ageMinutes)}</span></div>
                   <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-800 pt-3 text-center"><Reading label="Temp." value={value(station.latest?.temperature, "°")} /><Reading label="Vent" value={value(station.latest?.windSpeed, " km/h")} /><Reading label="Rafales" value={value(station.latest?.windGust, " km/h")} /><Reading label="Pluie" value={value(station.latest?.precipitation, " mm")} /></div>
                   <p className="mt-3 text-[11px] text-slate-600">{station.readings.length} relevé(s) conservé(s) sur les dernières 24 h.</p>
@@ -202,9 +202,9 @@ export default function Ranking() {
           )}
         </section>
 
-        <section className="weather-surface rounded-2xl p-4">
+        <section className="rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Stations vs prévision officielle</h2><p className="text-xs text-slate-500">Température — heures de Paris.</p></div><div className="flex rounded-lg border border-slate-700 bg-[#090b10] p-0.5"><button type="button" onClick={() => setPeriodDays(1)} className={`rounded-md px-2.5 py-1 text-xs ${periodDays === 1 ? "bg-blue-600 text-white" : "text-slate-400"}`}>24 h</button><button type="button" onClick={() => setPeriodDays(7)} className={`rounded-md px-2.5 py-1 text-xs ${periodDays === 7 ? "bg-blue-600 text-white" : "text-slate-400"}`}>7 jours</button></div></div>
-          <div className="weather-surface-inset mb-4 flex items-center justify-between rounded-xl px-3 py-2"><span className="text-xs text-slate-400">Écart instantané station / prévision</span><span className={`text-sm font-bold ${instantDeltaC === null ? "text-slate-400" : instantDeltaC > 0 ? "text-amber-300" : instantDeltaC < 0 ? "text-sky-300" : "text-emerald-400"}`}>{instantDeltaC === null ? "—" : `${instantDeltaC > 0 ? "+" : ""}${instantDeltaC.toFixed(1)} °C`}</span></div>
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-800 bg-[#090b10] px-3 py-2"><span className="text-xs text-slate-400">Écart instantané station / prévision</span><span className={`text-sm font-bold ${instantDeltaC === null ? "text-slate-400" : instantDeltaC > 0 ? "text-amber-300" : instantDeltaC < 0 ? "text-sky-300" : "text-emerald-400"}`}>{instantDeltaC === null ? "—" : `${instantDeltaC > 0 ? "+" : ""}${instantDeltaC.toFixed(1)} °C`}</span></div>
           <TemperatureComparison points={comparison} periodDays={periodDays} />
         </section>
       </div>

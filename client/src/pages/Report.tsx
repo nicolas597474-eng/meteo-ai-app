@@ -42,7 +42,7 @@ export default function Report() {
 
   if (isLoading) {
     return (
-      <div className="weather-page min-h-screen p-4">
+      <div className="min-h-screen bg-background p-4">
         <div className="max-w-3xl mx-auto space-y-4">
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-48 bg-muted rounded" />
@@ -54,8 +54,8 @@ export default function Report() {
   }
 
   return (
-    <div className="weather-page min-h-screen">
-      <div className="weather-page-frame max-w-3xl mx-auto px-3 py-4 space-y-4 sm:px-6 sm:py-8 sm:space-y-6">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-3xl mx-auto px-3 py-4 space-y-4 sm:px-6 sm:py-8 sm:space-y-6">
 
         {/* Header */}
         <div>
@@ -70,7 +70,7 @@ export default function Report() {
 
         {/* MeteoAI Summary */}
         {data?.meteoAI && (
-          <div className="weather-surface weather-surface-hero bg-gradient-to-r from-primary/10 to-card rounded-xl p-4 sm:p-6">
+          <div className="bg-gradient-to-r from-primary/10 to-card border border-border rounded-xl p-4 sm:p-6">
             <h2 className="text-base sm:text-lg font-semibold mb-3">Synthèse MeteoAI</h2>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
               <MetricCard icon={<Thermometer className="h-4 w-4" />} label="Temp. Max" value={`${data.meteoAI.tempMax}°C`} />
@@ -80,7 +80,7 @@ export default function Report() {
               <MetricCard icon={<Cloud className="h-4 w-4" />} label="Stabilité" value={`${data.meteoAI.stabilityIndex}/100`} highlight={data.meteoAI.stabilityLabel === "stable"} />
             </div>
             {data.meteoAI.explanation && (
-              <div className="weather-surface-inset rounded-lg p-3">
+              <div className="bg-background/50 rounded-lg p-3 border border-border">
                 <p className="text-xs sm:text-sm italic text-foreground/80">{data.meteoAI.explanation}</p>
               </div>
             )}
@@ -89,7 +89,7 @@ export default function Report() {
 
         {/* Observations réelles */}
         {data?.observation && (
-          <div className="weather-observation-surface rounded-xl p-4 sm:p-6">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6">
             <h2 className="text-base sm:text-lg font-semibold mb-3">Observations réelles</h2>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <MetricCard icon={<Thermometer className="h-4 w-4" />} label="Temp. Max" value={`${data.observation.tempMax}°C`} />
@@ -133,7 +133,7 @@ export default function Report() {
             {dimScores
               .sort((a, b) => b.weightedScore - a.weightedScore)
               .map((s, i) => (
-                <div key={s.serviceName} className={`weather-surface rounded-xl overflow-hidden ${i < 3 ? "border-primary/30" : "border-border"}`}>
+                <div key={s.serviceName} className={`bg-card border rounded-xl overflow-hidden ${i < 3 ? "border-primary/30" : "border-border"}`}>
                   {/* Service header */}
                   <button
                     className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/20 transition-colors"
@@ -239,7 +239,7 @@ export default function Report() {
 
         {/* Forecasts table (expert models) */}
         {servicesByCategory.expert.length > 0 && (
-          <div className="weather-surface rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="p-3 sm:p-4 border-b border-border">
               <h3 className="font-semibold text-sm sm:text-base">Modèles Experts — Prévisions brutes ({servicesByCategory.expert.length})</h3>
             </div>
@@ -278,7 +278,7 @@ export default function Report() {
 
         {/* No data state */}
         {(!data?.forecasts || data.forecasts.length === 0) && !data?.meteoAI && (
-          <div className="weather-surface rounded-xl p-12 text-center">
+          <div className="bg-card border border-border rounded-xl p-12 text-center">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Aucune donnée pour cette date</h2>
             <p className="text-muted-foreground">Les données seront disponibles après la collecte matinale (05h00).</p>
@@ -315,7 +315,7 @@ function DimensionBlock({
   const barColor = score >= 80 ? "bg-green-400" : score >= 60 ? "bg-yellow-400" : "bg-red-400";
 
   return (
-    <div className="weather-surface-inset rounded-lg p-3 space-y-2">
+    <div className="bg-background/50 border border-border/50 rounded-lg p-3 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {emoji} {title}

@@ -7,8 +7,8 @@ describe("mise en page de température du Dashboard", () => {
     expect(dashboardTemperatureLayout.extremes).toContain("shrink-0");
   });
 
-  it("donne une échelle forte à la température principale sans retour à la ligne", () => {
-    expect(dashboardTemperatureLayout.currentValue).toContain("clamp(4.5rem,23vw,6rem)");
+  it("borne la température principale et interdit le retour à la ligne des valeurs", () => {
+    expect(dashboardTemperatureLayout.currentValue).toContain("clamp(3.25rem,16vw,4.5rem)");
     expect(dashboardTemperatureLayout.currentValue).toContain("whitespace-nowrap");
     expect(dashboardTemperatureLayout.extremeValue).toContain("whitespace-nowrap");
   });

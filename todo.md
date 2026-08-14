@@ -999,15 +999,6 @@
 ## Vérification isolée de gel
 - [x] Tests: Simuler des plages négatives dans les tests de graphique sans injecter de données météo applicatives.
 
-## Maquette visuelle MeteoAI 3D
-- [x] Design: Créer une image conceptuelle mobile de MeteoAI avec profondeur 3D, sans modifier l’application.
-
-## Reconstruction MeteoAI avec relief 3D
-- [x] Audit: Inventorier les pages, composants, styles, données et parcours de navigation existants.
-- [x] Architecture: Définir les tokens, composants partagés et une migration visuelle sans régression de données.
-- [x] Interface: Reproduire la direction 3D validée sur les composants et pages prioritaires sans changer les calculs météo.
-- [x] Validation: Vérifier la fidélité, les données, les graphiques, les stations Netatmo et le responsive de toutes les pages.
-
 ## Allègement de l’en-tête Dashboard
 - [x] Interface: Retirer l’en-tête de marque MeteoAI du Dashboard sans supprimer la navigation.
 - [x] Tests: Vérifier que le contenu et les raccourcis de navigation restent accessibles sans l’en-tête.
@@ -1017,9 +1008,3 @@
 - [x] Interface: Ajouter un retour au début accessible sur Fiabilité et Historique.
 - [x] Interface: Harmoniser les marges mobiles de Fiabilité et Historique.
 - [x] Tests: Vérifier les espacements et la disponibilité du retour au début sur les pages longues.
-
-## Reproduction fidèle de la maquette mobile de référence
-- [x] Audit visuel: Décomposer la maquette fournie en en-tête, localisation, panneau Tendance, carte héro, modes et zones de graphique.
-- [x] Interface: Recomposer la structure du Dashboard mobile, ses proportions et ses hiérarchies selon la maquette, sans modifier les données.
-- [x] Interface: Faire correspondre les surfaces, contours électriques, éclairages, espacements, panneaux Local/Ultra-local et le cadre du graphique horaire.
-- [x] Validation: Vérifier le rendu mobile par rapport à la maquette, les états de chargement et l’intégrité des graphiques Canvas.

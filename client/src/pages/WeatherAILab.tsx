@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { AlertTriangle, BarChart3, ClipboardCheck, Database, FlaskConical, MapPin, RefreshCw, ShieldCheck, Zap } from "lucide-react";
 
 function Stat({ label, value, tone = "text-slate-100" }: { label: string; value: string; tone?: string }) {
-  return <div className="weather-surface-inset rounded-xl px-2 py-2.5 text-center"><p className={`text-xl font-bold ${tone}`}>{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-500">{label}</p></div>;
+  return <div className="rounded-xl border border-slate-800 bg-black/20 px-2 py-2.5 text-center"><p className={`text-xl font-bold ${tone}`}>{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-500">{label}</p></div>;
 }
 
 function Divergence({ label, value, max, unit, color }: { label: string; value: number; max: number; unit: string; color: string }) {
@@ -19,8 +19,8 @@ export default function WeatherAILab() {
   const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: true });
 
-  if (isLoading) return <div className="weather-page mx-auto min-h-screen max-w-2xl space-y-3 px-3 py-4">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-800" />)}</div>;
-  if (error || !data) return <div className="weather-page mx-auto min-h-screen max-w-2xl px-3 py-5"><div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-center"><AlertTriangle className="mx-auto h-6 w-6 text-red-300" /><p className="mt-2 text-sm text-red-100">Impossible de charger la traçabilité de cette prévision.</p><button onClick={() => refetch()} className="mt-3 text-xs font-semibold text-red-200 underline">Réessayer</button></div></div>;
+  if (isLoading) return <div className="mx-auto max-w-2xl space-y-3 px-3 py-4">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-800" />)}</div>;
+  if (error || !data) return <div className="mx-auto max-w-2xl px-3 py-5"><div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-center"><AlertTriangle className="mx-auto h-6 w-6 text-red-300" /><p className="mt-2 text-sm text-red-100">Impossible de charger la traçabilité de cette prévision.</p><button onClick={() => refetch()} className="mt-3 text-xs font-semibold text-red-200 underline">Réessayer</button></div></div>;
 
   const hasTrace = data.appliedModelWeights.length > 0;
   const hasSnapshot = Boolean(data.calculatedAt);
@@ -28,10 +28,10 @@ export default function WeatherAILab() {
   const updatedAt = data.calculatedAt ? new Date(data.calculatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }) : null;
   const collection = data.latestStationCollection;
 
-  return <main className="weather-page ai-lab-page mx-auto min-h-screen max-w-2xl space-y-3 px-3 py-3 pb-24 sm:px-6 sm:py-6">
+  return <main className="mx-auto max-w-2xl space-y-3 px-3 py-3 pb-24 sm:px-6 sm:py-6">
     <header className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2"><div className="weather-chip flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"><FlaskConical className="h-5 w-5 text-blue-300" /></div><div className="min-w-0"><h1 className="text-base font-bold text-slate-100">AI Lab · traçabilité</h1><p className="truncate text-xs text-slate-500">{activeLocation?.name ?? "Lieu actif"}{updatedAt ? ` · calcul à ${updatedAt}` : " · snapshot indisponible"}</p></div></div>
-      <button onClick={() => refetch()} disabled={isFetching} className="weather-action-surface inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-3 text-xs font-semibold text-blue-200 disabled:opacity-60"><RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />Actualiser</button>
+      <div className="flex min-w-0 items-center gap-2"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15"><FlaskConical className="h-5 w-5 text-blue-300" /></div><div className="min-w-0"><h1 className="text-base font-bold text-slate-100">AI Lab · traçabilité</h1><p className="truncate text-xs text-slate-500">{activeLocation?.name ?? "Lieu actif"}{updatedAt ? ` · calcul à ${updatedAt}` : " · snapshot indisponible"}</p></div></div>
+      <button onClick={() => refetch()} disabled={isFetching} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-blue-400/30 bg-blue-400/10 px-3 text-xs font-semibold text-blue-200 disabled:opacity-60"><RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />Actualiser</button>
     </header>
 
     <section className="grid grid-cols-3 gap-2"><Stat label="Confiance prévision" value={hasSnapshot ? `${Math.round(data.confidenceScore)}%` : "—"} tone={hasSnapshot ? confidenceTone : "text-slate-500"} /><Stat label="Stabilité modèles" value={hasSnapshot ? `${Math.round(data.stabilityScore)}%` : "—"} tone={hasSnapshot ? "text-sky-300" : "text-slate-500"} /><Stat label="Modèles appliqués" value={hasTrace ? String(data.modelsUsed) : "—"} tone={hasTrace ? "text-violet-300" : "text-slate-500"} /></section>

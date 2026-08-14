@@ -539,22 +539,25 @@ export default function HourlyChart({ hours, locationName }: Props) {
   if (hours.length === 0) return null;
 
   return (
-    <section ref={containerRef} className="w-full rounded-[22px] border border-blue-400/35 bg-[#06101f] p-3 shadow-[0_0_24px_rgba(37,99,235,0.12),0_18px_34px_rgba(0,0,0,0.42)]">
+    <section ref={containerRef} className="w-full rounded-[22px] border border-slate-700/70 bg-[#080b10] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.38)]">
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-[0.13em] text-blue-400 sm:flex sm:items-center sm:gap-2.5 sm:normal-case sm:tracking-normal sm:text-base sm:text-white">
-            <span className="hidden sm:flex sm:h-8 sm:w-8 sm:items-center sm:justify-center sm:rounded-full sm:border sm:border-blue-300/40 sm:bg-blue-500/25 sm:shadow-[0_0_18px_rgba(59,130,246,0.45)]"><Clock className="h-4 w-4 text-blue-200" /></span>
-            Heure par heure
+          <h2 className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-300/40 bg-blue-500/25 shadow-[0_0_18px_rgba(59,130,246,0.45)]"><Clock className="h-4 w-4 text-blue-200" /></span>
+            <span>
+              <span className="block text-base font-bold text-white">Heure par heure</span>
+              <span className="block text-[11px] font-normal text-slate-400">Prévisions détaillées</span>
+            </span>
           </h2>
-          <span className="hidden rounded-full border border-slate-500/45 bg-slate-900/60 px-3 py-1.5 text-[11px] font-semibold text-slate-200 sm:inline">24h⌄</span>
+          <span className="rounded-full border border-slate-500/45 bg-slate-900/60 px-3 py-1.5 text-[11px] font-semibold text-slate-200">24h⌄</span>
         </div>
         {locationName && (
           <p className="text-[11px] text-primary/70 flex items-center gap-1 mt-0.5">
             <MapPin className="h-3 w-3" /> {locationName}
           </p>
         )}
-        <div className="mt-2 hidden flex-wrap items-center gap-x-3 gap-y-1 text-[10px] sm:flex">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Temp °C</span>
           <span className="flex items-center gap-1.5 text-blue-200"><span className="w-4 h-0 border-t-2 border-blue-300 inline-block" /> Ressenti</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
