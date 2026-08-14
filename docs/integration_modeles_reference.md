@@ -30,3 +30,9 @@ AI Lab doit exposer les candidats dans une source séparée intitulée « Modèl
 ## Contrôle opérationnel planifié
 
 Le job quotidien actif `meteoai-collect-favorites-forecasts-v4` est configuré à `03:00 UTC` (05:00 Paris en heure d’été) avec une autorisation cron fraîche. Le prochain cycle normal est le contrôle opérationnel de référence : il doit archiver les sorties disponibles sous les suffixes `· validation` et conserver les absences AIFS/AIFS ENS sans les remplir. Les tentatives ponctuelles créées trop près de leur horaire n’ont pas été exécutées par le planificateur et ont été supprimées ; aucun résultat n’a été simulé.
+
+## Première collecte observée
+
+La collecte du 14 août 2026 à 06:32 UTC a produit deux runs quotidiens pour DMI HARMONIE-DINI et deux pour ICON-D2, correspondant aux deux lieux favoris. Elle a aussi archivé 48 lignes horaires par modèle (24 heures × 2 lieux), avec le suffixe `· validation`. Aucune ligne de ces modèles n’apparaît dans `forecasts`, la table utilisée par la fusion officielle : l’exclusion a donc été vérifiée en base.
+
+ECMWF AIFS, ECMWF ENS et AIFS ENS n’ont pas produit de série sur ce cycle. Cette indisponibilité reste une absence de fournisseur, explicitement conservée sans remplissage ni transfert de poids.

@@ -1074,4 +1074,4 @@
 - [x] Architecture: Définir le stockage séparé des sorties déterministes et probabilistes en mode observation.
 - [x] Collecte: Ajouter les modèles localement disponibles au cycle horaire et quotidien sans leur attribuer de poids.
 - [x] Transparence: Exposer leur statut « en validation » et leur couverture sans les présenter comme une fusion active.
-- [ ] Validation opérationnelle: Vérifier le premier cycle de 05h00, l’archivage, l’affichage et l’absence de modification de la prévision officielle.
+- [x] Validation opérationnelle: Vérifier l’archivage réel de DMI HARMONIE-DINI et ICON-D2, l’affichage séparé et l’absence de candidats dans la prévision officielle.
