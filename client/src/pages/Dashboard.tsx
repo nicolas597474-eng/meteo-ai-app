@@ -14,6 +14,7 @@ import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
@@ -529,7 +530,7 @@ export default function Dashboard() {
                 )}
                 <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}<span className="hidden sm:inline">{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</span></p>
                 {modelIndicator && (
-                  <button
+                  <Tooltip><TooltipTrigger asChild><button
                     type="button"
                     onClick={() => setShowFusionDetails((open) => !open)}
                     aria-expanded={showFusionDetails}
@@ -538,7 +539,7 @@ export default function Dashboard() {
                   >
                     <WeatherStatusBadge compact tone="info" icon={<Activity className="h-3 w-3" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
                     {showFusionDetails ? <ChevronUp className="ml-1 h-3 w-3 text-sky-200" /> : <ChevronDown className="ml-1 h-3 w-3 text-sky-200" />}
-                  </button>
+                  </button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">Indique le ou les modèles qui contribuent à la prévision officielle du snapshot en cours. Le pourcentage est un poids de fusion, pas une mesure de station.</TooltipContent></Tooltip>
                 )}
                 {showFusionDetails && modelIndicator && (
                   <div id="fusion-explication" className="mt-2 rounded-lg border border-blue-400/20 bg-slate-950/45 p-2 text-[10px] text-slate-200">
@@ -744,7 +745,7 @@ export default function Dashboard() {
                       : `Repli explicite sur ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèle${locationWeather.ultraLocal.modelFallback?.modelCount === 1 ? "" : "s"}`}
                   </p>
                 </div>
-                <WeatherStatusBadge compact tone="success" label="Confiance locale" value={`${locationWeather.ultraLocal.confidenceScore}%`} pulse={locationWeather.ultraLocal.stationCount > 0} />
+                <WeatherStatusBadge compact tone="success" label="Confiance locale" value={`${locationWeather.ultraLocal.confidenceScore}%`} pulse={locationWeather.ultraLocal.stationCount > 0} description="Mesure l’accord et la qualité des observations locales utilisées pour le contexte local. Elle ne remplace pas la confiance de la prévision officielle." />
               </div>
               {locationWeather.ultraLocal.stationsUsed.length > 0 ? (
                 <div className="mt-3 space-y-1.5 border-t border-emerald-500/15 pt-2">

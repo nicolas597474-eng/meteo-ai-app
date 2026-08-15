@@ -8,5 +8,7 @@ describe("WeatherStatusBadge", () => {
     expect(source).toContain("motion-safe:animate-pulse");
     expect(source).toContain("data-weather-status-badge");
     expect(source).toContain("aria-label");
+    expect(source).toContain("TooltipContent");
+    expect(source).toContain("description?: string");
   });
 });

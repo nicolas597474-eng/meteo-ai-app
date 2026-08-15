@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { CircleHelp } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export type WeatherStatusBadgeTone = "info" | "success" | "warning" | "lab" | "neutral" | "danger";
 
@@ -11,6 +13,7 @@ type WeatherStatusBadgeProps = {
   compact?: boolean;
   className?: string;
   ariaLabel?: string;
+  description?: string;
 };
 
 const toneClasses: Record<WeatherStatusBadgeTone, { surface: string; icon: string; label: string; value: string; dot: string }> = {
@@ -67,24 +70,29 @@ export function WeatherStatusBadge({
   compact = false,
   className = "",
   ariaLabel,
+  description,
 }: WeatherStatusBadgeProps) {
   const styles = toneClasses[tone];
   const hasValue = value !== undefined && value !== null && value !== "";
-
-  return (
+  const accessibleLabel = ariaLabel ?? (hasValue ? `${label} ${String(value)}` : label);
+  const badgeContent = (
     <span
-      className={`relative inline-flex max-w-full items-center overflow-hidden border ${compact ? "gap-1.5 rounded-xl px-2 py-1" : "gap-2 rounded-2xl px-2.5 py-2"} ${styles.surface} ${className}`}
-      aria-label={ariaLabel ?? (hasValue ? `${label} ${String(value)}` : label)}
+      className={`relative inline-flex max-w-full items-center overflow-hidden border ${compact ? "gap-1 rounded-xl px-1.5 py-1" : "shrink-0 gap-2 rounded-2xl px-2.5 py-2"} ${styles.surface} ${className}`}
+      aria-label={accessibleLabel}
       data-weather-status-badge={tone}
     >
-      <span className={`relative flex shrink-0 items-center justify-center border ${compact ? "h-5 w-5 rounded-lg" : "h-7 w-7 rounded-xl"} ${styles.icon}`} aria-hidden="true">
-        {icon ?? <span className={`h-2 w-2 rounded-full ${styles.dot} ${pulse ? "motion-safe:animate-pulse" : ""}`} />}
-        {pulse ? <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-[#10131a] ${styles.dot} motion-safe:animate-pulse`} /> : null}
+      <span className={`relative flex shrink-0 items-center justify-center border ${compact ? "h-4 w-4 rounded-md" : "h-7 w-7 rounded-xl"} ${styles.icon}`} aria-hidden="true">
+        {icon ?? <span className={`${compact ? "h-1.5 w-1.5" : "h-2 w-2"} rounded-full ${styles.dot} ${pulse ? "motion-safe:animate-pulse" : ""}`} />}
+        {pulse ? <span className={`absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full border border-[#10131a] ${styles.dot} motion-safe:animate-pulse`} /> : null}
       </span>
       <span className="min-w-0 text-left leading-none">
-        <span className={`block font-semibold uppercase ${compact ? "text-[8px] tracking-[0.1em]" : "text-[9px] tracking-[0.14em]"} ${styles.label}`}>{label}</span>
-        {hasValue ? <span className={`block whitespace-nowrap font-bold tracking-tight ${compact ? "mt-0.5 text-[10px]" : "mt-1 text-sm"} ${styles.value}`}>{value}</span> : null}
+        <span className={`flex items-center gap-0.5 font-semibold uppercase ${compact ? "text-[7px] tracking-[0.08em]" : "text-[9px] tracking-[0.14em]"} ${styles.label}`}><span className="truncate">{label}</span>{description ? <CircleHelp className="h-2.5 w-2.5 shrink-0 opacity-75" aria-hidden="true" /> : null}</span>
+        {hasValue ? <span className={`block truncate font-bold tracking-tight ${compact ? "mt-0.5 text-[9px]" : "mt-1 text-sm"} ${styles.value}`}>{value}</span> : null}
       </span>
     </span>
   );
+
+  if (!description) return badgeContent;
+
+  return <Tooltip><TooltipTrigger asChild><button type="button" className="max-w-full cursor-help rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">{badgeContent}</button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">{description}</TooltipContent></Tooltip>;
 }

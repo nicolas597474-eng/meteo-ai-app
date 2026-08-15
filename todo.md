@@ -1267,3 +1267,9 @@
 - [x] Interface: Créer une primitive de badge réutilisable, avec variantes sémantiques.
 - [x] Interface: Appliquer le nouveau langage visuel aux badges pertinents des différentes pages.
 - [x] Validation: Vérifier les rendus mobiles, TypeScript, 210 tests et build.
+
+## Correctif d’intégration et aide des badges
+- [x] Audit: Identifier les badges coupés ou trop volumineux sur mobile.
+- [x] Interface: Adapter la primitive de badge aux contraintes de largeur mobile.
+- [x] Interface: Ajouter des infobulles explicatives aux badges de statut et de confiance.
+- [x] Validation: Vérifier les rendus mobiles, TypeScript, 210 tests et build.
