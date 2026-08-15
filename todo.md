@@ -1353,3 +1353,7 @@
 - [x] Audit: Identifier les conditions picturales animables et les contraintes d’accessibilité.
 - [x] Interface: Ajouter des animations CSS discrètes, conditionnelles et compatibles avec la réduction de mouvement.
 - [x] Validation: Vérifier les rendus, TypeScript, 219 tests et build.
+
+## Lisibilité des libellés de la carte principale
+- [x] Interface: Agrandir « Ciel couvert actuellement » et le badge « Fusion · 8 modèles ».
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 219 tests et build.

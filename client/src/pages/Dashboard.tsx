@@ -542,7 +542,7 @@ export default function Dashboard() {
                     aria-controls="fusion-explication"
                     className="mt-2 inline-flex max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   >
-                    <WeatherStatusBadge compact tone="info" icon={<Activity className="h-3 w-3" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
+                    <WeatherStatusBadge tone="info" icon={<Activity className="h-3.5 w-3.5" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
                     {showFusionDetails ? <ChevronUp className="ml-1 h-3 w-3 text-sky-200" /> : <ChevronDown className="ml-1 h-3 w-3 text-sky-200" />}
                   </button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">Indique le ou les modèles qui contribuent à la prévision officielle du snapshot en cours. Le pourcentage est un poids de fusion, pas une mesure de station.</TooltipContent></Tooltip>
                 )}
@@ -603,7 +603,7 @@ export default function Dashboard() {
                   <p className={dashboardTemperatureLayout.currentValue}>
                     {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="mt-1 text-base font-medium text-slate-100/90 sm:text-lg">
                     {(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible") + " actuellement"}
                   </p>
                   {(nextRegimeChange ?? nextConditionChange) && (
