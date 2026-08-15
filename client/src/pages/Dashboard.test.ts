@@ -9,7 +9,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée.");
     expect(source).toContain('localMode: loc.localMode ?? "standard"');
     expect(source).toContain("Tous les régimes");
-    expect(source).toContain("Comment est calculée la fusion officielle ?");
+    expect(source).not.toContain("Comment est calculée la fusion officielle ?");
     expect(source).toContain("Voir les 20 régimes");
     expect(source).not.toContain("max-h-72 overflow-y-auto");
     expect(source).toContain("weightRows");
@@ -28,8 +28,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("candidate?.weights");
     expect(source).toContain('text-base font-medium text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
-    expect(source).toContain('<WeatherStatusBadge dense tone="info"');
-    expect(source).toContain('flex min-w-0 flex-1 items-center gap-2');
+    expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');
     expect(source).toContain('CalendarDays className="h-4 w-4 text-sky-300"');
     expect(source).toContain('mb-2 flex justify-center sm:mb-3');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');

@@ -1409,3 +1409,9 @@
 - [x] Interface: Afficher le régime et la fusion des modèles sur une même ligne mobile.
 - [x] Interface: Conserver les pondérations sous cette ligne avec un ordre visuel clair.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 223 tests et build.
+
+## Transparence de fusion dans AI Lab
+- [x] Audit: Identifier les données de fusion disponibles pour AI Lab.
+- [x] Interface: Retirer la fusion de modèles du Dashboard.
+- [x] Interface: Ajouter dans AI Lab un panneau détaillé de modèle principal, poids, méthode et sources.
+- [x] Validation: Vérifier Dashboard et AI Lab, TypeScript, 224 tests et build.

@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -15,7 +15,6 @@ import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
@@ -112,7 +111,6 @@ export default function Dashboard() {
   const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
   const [showRegimeMenu, setShowRegimeMenu] = useState(false);
   const [expandedRegimeIds, setExpandedRegimeIds] = useState<string[]>([]);
-  const [showFusionDetails, setShowFusionDetails] = useState(false);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
   const selectedLocation = contextLocation ?? activeLocation;
@@ -327,18 +325,6 @@ export default function Dashboard() {
     temporarily_unavailable: "Netatmo : service temporairement indisponible",
     not_connected: "Netatmo : aucune autorisation active pour cette session",
   };
-  const modelIndicator = dash?.modelIndicator ?? null;
-  const fusionTrace = (officialForecast as any)?.trace?.available === false ? null : (officialForecast as any)?.trace ?? null;
-  const fusionParameters = [
-    { key: "temperature", label: "Température" },
-    { key: "precipitation", label: "Précipitations" },
-    { key: "wind", label: "Vent" },
-  ].map(({ key, label }) => ({
-    key,
-    label,
-    sources: ((fusionTrace?.parameterSources?.[key] ?? []) as any[])
-      .filter((source) => source.type === "model" && Number.isFinite(source.finalWeight) && source.finalWeight > 0),
-  }));
 
   // Multi-regime data for alert badges
   const multiRegime = officialRegime
@@ -426,18 +412,6 @@ export default function Dashboard() {
                       <span className="sr-only">Voir les 20 régimes</span>
                     </div>
                   </button>
-                  {modelIndicator && (
-                    <Tooltip><TooltipTrigger asChild><button
-                      type="button"
-                      onClick={() => setShowFusionDetails((open) => !open)}
-                      aria-expanded={showFusionDetails}
-                      aria-controls="fusion-explication"
-                      className="inline-flex shrink-0 items-center text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                    >
-                      <WeatherStatusBadge dense tone="info" icon={<Activity className="h-3 w-3" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
-                      {showFusionDetails ? <ChevronUp className="ml-0.5 h-3 w-3 text-sky-200" /> : <ChevronDown className="ml-0.5 h-3 w-3 text-sky-200" />}
-                    </button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">Indique le ou les modèles qui contribuent à la prévision officielle du snapshot en cours. Le pourcentage est un poids de fusion, pas une mesure de station.</TooltipContent></Tooltip>
-                  )}
                 </div>
                 {/* Weight pills */}
                 <div className="mt-1 flex flex-wrap gap-1">
@@ -521,23 +495,6 @@ export default function Dashboard() {
                   </div>
                 )}
                 <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
-                {showFusionDetails && modelIndicator && (
-                  <div id="fusion-explication" className="mt-2 rounded-lg border border-blue-400/20 bg-slate-950/45 p-2 text-[10px] text-slate-200">
-                    <p className="flex items-start gap-1.5 font-medium text-blue-100"><Info className="mt-0.5 h-3 w-3 shrink-0 text-blue-300" />Comment est calculée la fusion officielle ?</p>
-                    <p className="mt-1 leading-relaxed text-slate-400">{fusionTrace?.method ?? "La trace détaillée du snapshot n’est pas encore disponible."} Le pourcentage d’AROME est son poids appliqué, pas une mesure de station.</p>
-                    {fusionParameters.some((parameter) => parameter.sources.length > 0) && (
-                      <div className="mt-2 space-y-1.5">
-                        {fusionParameters.filter((parameter) => parameter.sources.length > 0).map((parameter) => (
-                          <div key={parameter.key}>
-                            <span className="text-slate-400">{parameter.label} : </span>
-                            {parameter.sources.map((source) => `${source.name} ${Math.round(source.finalWeight * 100)}%`).join(" · ")}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <p className="mt-2 text-slate-500">Les pondérations varient selon les traces archivées du snapshot et ne modifient pas les observations Netatmo.</p>
-                  </div>
-                )}
               </div>
             )}
 
