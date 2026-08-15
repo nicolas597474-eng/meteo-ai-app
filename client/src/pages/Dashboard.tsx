@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Droplets, Wind, Activity, MapPin, Clock, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Droplets, Wind, Activity, MapPin, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -415,23 +415,29 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className={dashboardTemperatureLayout.mobileHeader}>
+            <div className={`${dashboardTemperatureLayout.mobileHeader} gap-2`}>
               <div className="flex min-w-0 items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs font-medium text-primary sm:hidden">Tendance</span>
                 <span className="hidden text-xs font-medium text-primary sm:inline">Tendance · {regimeSourceLabel}</span>
                 {selectedLocation && <span className="hidden text-xs text-primary/60 sm:inline">· {selectedLocation.name}</span>}
               </div>
-              <button
-                type="button"
-                onClick={refreshCurrentWeather}
-                disabled={isRefreshing}
-                className={dashboardTemperatureLayout.refreshButton}
-                aria-label="Actualiser la météo maintenant"
-              >
-                <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
-                Actualiser
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-500/35 bg-slate-950/35 px-2 py-1 text-[10px] font-semibold text-slate-100/85">
+                  <CalendarDays className="h-3 w-3 text-sky-300" aria-hidden="true" />
+                  {panelDate}
+                </span>
+                <button
+                  type="button"
+                  onClick={refreshCurrentWeather}
+                  disabled={isRefreshing}
+                  className={dashboardTemperatureLayout.refreshButton}
+                  aria-label="Actualiser la météo maintenant"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                  Actualiser
+                </button>
+              </div>
             </div>
 
             {/* ── Regime badge ── */}
@@ -534,7 +540,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                <p className="mt-0.5 text-[10px] font-medium text-slate-300">{panelDate}<span className="hidden sm:inline text-slate-400"> · {regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</span></p>
+                <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
                 {modelIndicator && (
                   <Tooltip><TooltipTrigger asChild><button
                     type="button"

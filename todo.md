@@ -1362,3 +1362,7 @@
 - [x] Interface: Afficher la date du jour dans la pancarte de la carte principale.
 - [x] Interface: Réduire la hauteur de la zone Ciel couvert et Fusion des modèles.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
+
+## Position explicite de la date dans la pancarte
+- [x] Interface: Déplacer la date vers une position immédiatement visible dans l’en-tête de la pancarte.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
