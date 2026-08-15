@@ -16,7 +16,8 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("km/h");
     expect(source).toContain("mm");
     expect(source).toContain("weather-chart-3d");
-    expect(source).toContain("rounded-b-xl border border-blue-300/50");
+    expect(source).toContain("rounded-b-xl border-2 border-blue-300/65");
+    expect(source).not.toContain("shadow-[0_0_18px");
     expect(source).toContain("`${Math.round(v)} km/h`");
     expect(source).toContain("ctx.fillText(degToCompass(dir), x, y + 14)");
     expect(source).toContain('ctx.font = "bold 11px system-ui"');

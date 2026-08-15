@@ -55,7 +55,7 @@ function HistoryChartTooltip({ active, payload, label, unit = "" }: any) {
   const observation = entries.find((entry: any) => String(entry.name).toLowerCase().includes("observation") || String(entry.name).toLowerCase().includes("observé"));
   const meteoAI = entries.find((entry: any) => String(entry.name).toLowerCase().includes("meteoai"));
   const gap = observation?.value != null && meteoAI?.value != null ? Number(meteoAI.value) - Number(observation.value) : null;
-  return <div role="tooltip" className="min-w-48 rounded-xl border border-slate-600/80 bg-[#070b12]/95 p-3 text-left shadow-[0_12px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+  return <div role="tooltip" className="min-w-48 rounded-xl border border-slate-500/90 bg-[#070b12] p-3 text-left ring-1 ring-black/45">
     <p className="border-b border-slate-700/80 pb-2 text-xs font-semibold text-white">{shortDate(String(label ?? ""))}</p>
     <div className="space-y-1.5 pt-2">{entries.map((entry: any) => <div key={`${entry.dataKey}-${entry.name}`} className="flex items-center justify-between gap-5 text-[11px]"><span className="flex min-w-0 items-center gap-1.5 text-slate-300"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color ?? "#94a3b8" }} /> <span className="truncate">{entry.name}</span></span><strong className="shrink-0 font-mono text-slate-100">{number(entry.value, unit, unit === "/100" ? 0 : 1)}</strong></div>)}</div>
     {gap != null ? <p className={`mt-2 rounded-lg border px-2 py-1.5 text-[10px] ${Math.abs(gap) <= 1 ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-amber-400/20 bg-amber-400/5 text-amber-100"}`}>Écart MeteoAI / observation : {gap > 0 ? "+" : ""}{gap.toFixed(1)}{unit}</p> : null}

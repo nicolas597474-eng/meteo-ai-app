@@ -1422,3 +1422,8 @@
 - [x] Interface: Retirer la courbe et les chiffres de ressenti du graphique horaire.
 - [x] Interface: Harmoniser les espaces et la légende du graphique après le retrait.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 225 tests et build.
+
+## Netteté des surfaces et capsules
+- [x] Audit: Recenser les halos diffus décoratifs dans les composants et pages météo.
+- [x] Interface: Remplacer les halos décoratifs par des bordures, dégradés et ombres nettes.
+- [x] Validation: Vérifier la netteté mobile, TypeScript, tests et build.

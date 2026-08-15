@@ -524,7 +524,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       <div className="mb-3">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-300/40 bg-blue-500/25 shadow-[0_0_18px_rgba(59,130,246,0.45)]"><Clock className="h-4 w-4 text-blue-200" /></span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-300/55 bg-blue-500/25"><Clock className="h-4 w-4 text-blue-200" /></span>
             <span>
               <span className="block text-base font-bold text-white">Heure par heure</span>
               <span className="block text-[11px] font-normal text-slate-400">Prévisions détaillées</span>

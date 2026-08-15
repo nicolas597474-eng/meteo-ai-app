@@ -184,14 +184,11 @@
 .weather-nav {
   background: var(--weather-surface-base);
   border-color: rgba(100, 140, 177, 0.19);
-  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.035), 0 12px 26px rgba(0, 0, 0, 0.14);
+  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.05), 0 1px 0 rgba(0, 0, 0, 0.32);
 }
 
 .weather-surface-hero {
-  background:
-    radial-gradient(circle at 88% 2%, rgba(42, 119, 215, 0.11), transparent 45%),
-    radial-gradient(circle at 12% 0%, rgba(32, 179, 231, 0.045), transparent 34%),
-    var(--weather-surface-base);
+  background: linear-gradient(145deg, rgba(18, 34, 52, 0.98) 0%, rgba(10, 18, 29, 0.98) 64%, rgba(7, 12, 20, 0.99) 100%);
   border-color: rgba(56, 189, 248, 0.22);
 }
 
@@ -199,27 +196,23 @@
 .weather-surface-inset,
 .weather-nav {
   background: var(--weather-surface-inset);
-  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.025), 0 8px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.04), 0 1px 0 rgba(0, 0, 0, 0.26);
 }
 
 .weather-surface-accent {
-  background:
-    radial-gradient(circle at 88% 0%, rgba(14, 165, 233, 0.08), transparent 44%),
-    var(--weather-surface-base);
+  background: linear-gradient(145deg, rgba(13, 35, 49, 0.98) 0%, rgba(10, 18, 29, 0.98) 100%);
   border-color: rgba(56, 189, 248, 0.24);
 }
 
 .weather-surface-lab {
-  background:
-    radial-gradient(circle at 92% 0%, rgba(37, 99, 235, 0.10), transparent 44%),
-    var(--weather-surface-base);
+  background: linear-gradient(145deg, rgba(19, 27, 52, 0.98) 0%, rgba(10, 18, 29, 0.98) 100%);
   border-color: rgba(71, 146, 214, 0.24);
 }
 
 [class~="bg-[#10131a]"] {
   background: var(--weather-surface-base);
   border-color: rgba(100, 140, 177, 0.19);
-  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.03), 0 10px 24px rgba(0, 0, 0, 0.13);
+  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.04), 0 1px 0 rgba(0, 0, 0, 0.26);
 }
 
 [class~="bg-[#090b10]"],
@@ -233,16 +226,9 @@
 .weather-chart-3d {
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(circle at 18% 0%, rgba(59, 130, 246, 0.10), transparent 38%),
-    linear-gradient(145deg, rgba(11, 19, 32, 0.98), rgba(5, 9, 16, 0.99));
+  background: linear-gradient(145deg, rgba(11, 19, 32, 0.99), rgba(5, 9, 16, 0.99));
   border-color: rgba(96, 165, 250, 0.58);
-  box-shadow:
-    0 20px 34px rgba(0, 0, 0, 0.52),
-    0 0 0 1px rgba(2, 6, 23, 0.88),
-    0 0 26px rgba(37, 99, 235, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -14px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.88), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .weather-chart-3d::before {
@@ -253,7 +239,7 @@
   inset: 1px;
   border: 1px solid rgba(147, 197, 253, 0.16);
   border-radius: inherit;
-  box-shadow: inset 0 0 22px rgba(37, 99, 235, 0.04);
+  box-shadow: none;
 }
 
 .weather-chart-3d > * {
@@ -263,7 +249,7 @@
 
 /* Icônes météo vivantes : les mouvements sont désactivés lorsque l’utilisateur le demande. */
 .meteo-icon-3d {
-  filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 6px rgb(125 211 252 / 0.18));
+  filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72));
   transform-origin: center;
 }
 
@@ -296,14 +282,14 @@
 }
 
 @keyframes meteo-icon-rain {
-  0%, 100% { transform: translateY(0); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 6px rgb(56 189 248 / 0.18)); }
-  50% { transform: translateY(1.5px); filter: drop-shadow(0 3px 3px rgb(2 6 23 / 0.72)) drop-shadow(0 0 9px rgb(56 189 248 / 0.32)); }
+  0%, 100% { transform: translateY(0); filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72)); }
+  50% { transform: translateY(1.5px); filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72)); }
 }
 
 @keyframes meteo-icon-storm {
-  0%, 44%, 100% { transform: translateY(0); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 6px rgb(125 211 252 / 0.18)); }
-  48% { transform: translateY(-1px); filter: brightness(1.24) drop-shadow(0 0 11px rgb(250 204 21 / 0.52)); }
-  52% { transform: translateY(0); filter: brightness(0.98) drop-shadow(0 0 6px rgb(125 211 252 / 0.22)); }
+  0%, 44%, 100% { transform: translateY(0); filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72)); }
+  48% { transform: translateY(-1px); filter: brightness(1.16) drop-shadow(0 1px 0 rgb(2 6 23 / 0.72)); }
+  52% { transform: translateY(0); filter: brightness(0.98) drop-shadow(0 1px 0 rgb(2 6 23 / 0.72)); }
 }
 
 @keyframes meteo-icon-snow {
@@ -317,8 +303,8 @@
 }
 
 @keyframes meteo-icon-night {
-  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 5px rgb(167 139 250 / 0.2)); }
-  50% { transform: translateY(-1px) scale(1.025); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 10px rgb(196 181 253 / 0.42)); }
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72)); }
+  50% { transform: translateY(-1px) scale(1.025); filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72)); }
 }
 
 @keyframes meteo-icon-wind {

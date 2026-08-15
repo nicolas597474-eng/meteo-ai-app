@@ -388,7 +388,7 @@ export default function Dashboard() {
           <div className="relative">
             {/* Source label + Regime badge */}
             <div className="mb-2 flex justify-center sm:mb-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/35 bg-slate-950/50 px-3 py-1.5 text-sm font-bold text-slate-50 shadow-[0_0_16px_rgba(56,189,248,0.16)]">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/55 bg-slate-950/70 px-3 py-1.5 text-sm font-bold text-slate-50">
                 <CalendarDays className="h-4 w-4 text-sky-300" aria-hidden="true" />
                 {panelDate}
               </span>

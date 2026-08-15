@@ -19,42 +19,42 @@ type WeatherStatusBadgeProps = {
 
 const toneClasses: Record<WeatherStatusBadgeTone, { surface: string; icon: string; label: string; value: string; dot: string }> = {
   info: {
-    surface: "border-sky-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.18),transparent_48%),linear-gradient(135deg,rgba(14,116,144,0.16),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(8,47,73,0.22),inset_0_1px_0_rgba(186,230,253,0.12)]",
+    surface: "border-sky-400/40 bg-[linear-gradient(135deg,rgba(14,116,144,0.28),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(186,230,253,0.14)]",
     icon: "border-sky-300/20 bg-sky-400/10 text-sky-200",
     label: "text-sky-100/65",
     value: "text-sky-100",
     dot: "bg-sky-300",
   },
   success: {
-    surface: "border-emerald-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(52,211,153,0.16),transparent_48%),linear-gradient(135deg,rgba(6,95,70,0.18),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(6,78,59,0.2),inset_0_1px_0_rgba(167,243,208,0.1)]",
+    surface: "border-emerald-400/40 bg-[linear-gradient(135deg,rgba(6,95,70,0.28),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(167,243,208,0.12)]",
     icon: "border-emerald-300/20 bg-emerald-400/10 text-emerald-200",
     label: "text-emerald-100/65",
     value: "text-emerald-100",
     dot: "bg-emerald-300",
   },
   warning: {
-    surface: "border-amber-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.15),transparent_48%),linear-gradient(135deg,rgba(146,64,14,0.18),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(120,53,15,0.2),inset_0_1px_0_rgba(253,230,138,0.1)]",
+    surface: "border-amber-400/40 bg-[linear-gradient(135deg,rgba(146,64,14,0.28),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(253,230,138,0.12)]",
     icon: "border-amber-300/20 bg-amber-400/10 text-amber-200",
     label: "text-amber-100/65",
     value: "text-amber-100",
     dot: "bg-amber-300",
   },
   lab: {
-    surface: "border-violet-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(167,139,250,0.16),transparent_48%),linear-gradient(135deg,rgba(91,33,182,0.16),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(76,29,149,0.2),inset_0_1px_0_rgba(221,214,254,0.1)]",
+    surface: "border-violet-400/40 bg-[linear-gradient(135deg,rgba(91,33,182,0.26),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(221,214,254,0.12)]",
     icon: "border-violet-300/20 bg-violet-400/10 text-violet-200",
     label: "text-violet-100/65",
     value: "text-violet-100",
     dot: "bg-violet-300",
   },
   neutral: {
-    surface: "border-slate-500/35 bg-[radial-gradient(circle_at_18%_18%,rgba(148,163,184,0.14),transparent_48%),linear-gradient(135deg,rgba(51,65,85,0.28),rgba(15,23,42,0.9))] shadow-[0_12px_28px_rgba(2,6,23,0.26),inset_0_1px_0_rgba(226,232,240,0.08)]",
+    surface: "border-slate-500/45 bg-[linear-gradient(135deg,rgba(51,65,85,0.34),rgba(15,23,42,0.94))] shadow-[inset_0_1px_0_rgba(226,232,240,0.1)]",
     icon: "border-slate-400/20 bg-slate-400/10 text-slate-200",
     label: "text-slate-200/60",
     value: "text-slate-100",
     dot: "bg-slate-300",
   },
   danger: {
-    surface: "border-rose-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(251,113,133,0.15),transparent_48%),linear-gradient(135deg,rgba(159,18,57,0.18),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(136,19,55,0.2),inset_0_1px_0_rgba(254,205,211,0.1)]",
+    surface: "border-rose-400/40 bg-[linear-gradient(135deg,rgba(159,18,57,0.28),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(254,205,211,0.12)]",
     icon: "border-rose-300/20 bg-rose-400/10 text-rose-200",
     label: "text-rose-100/65",
     value: "text-rose-100",

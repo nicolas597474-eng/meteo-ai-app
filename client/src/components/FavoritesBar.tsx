@@ -220,7 +220,7 @@ export function FavoritesBar({
             onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full border whitespace-nowrap text-xs font-medium transition-all flex-shrink-0 ${
                 isActive(loc)
-                  ? "bg-primary/20 border-primary text-primary shadow-sm shadow-primary/20"
+                  ? "bg-primary/20 border-primary text-primary"
                   : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
               }`}
             >
@@ -357,10 +357,10 @@ function AddFavoriteDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+      <div className="w-full max-w-sm bg-card border border-border rounded-2xl ring-1 ring-black/45 overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">

@@ -29,4 +29,19 @@ describe("intensité visuelle des températures extrêmes", () => {
     expect(minTone).toContain("from-blue-500/88");
     expect(minTone).toContain("to-sky-500/14");
   });
+
+  it("préserve des libellés et des capsules nets, sans halo diffus", () => {
+    const tones = [
+      getExtremeTemperatureTone("max", 22),
+      getExtremeTemperatureTone("max", 29),
+      getExtremeTemperatureTone("max", 34),
+      getExtremeTemperatureTone("min", 8),
+      getExtremeTemperatureTone("min", 3),
+      getExtremeTemperatureTone("min", -6),
+    ];
+
+    for (const tone of tones) {
+      expect(`${tone.container} ${tone.label} ${tone.value}`).not.toMatch(/(?:drop-)?shadow-\[/);
+    }
+  });
 });
