@@ -29,6 +29,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('text-base font-medium text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).toContain('<WeatherStatusBadge dense tone="info"');
+    expect(source).toContain('flex min-w-0 flex-1 items-center gap-2');
     expect(source).toContain('CalendarDays className="h-4 w-4 text-sky-300"');
     expect(source).toContain('mb-2 flex justify-center sm:mb-3');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');

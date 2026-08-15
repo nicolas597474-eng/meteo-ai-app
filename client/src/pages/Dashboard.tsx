@@ -411,36 +411,48 @@ export default function Dashboard() {
             {/* ── Regime badge ── */}
             {regime && (
               <div className="mb-2 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-1.5">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setShowRegimeMenu((open) => !open)}
                     aria-expanded={showRegimeMenu}
                     aria-controls="regime-catalogue"
-                    className="-mx-1 flex min-w-0 items-center gap-2 rounded-lg px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                    className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-950/35 text-base">{regime.emoji}</span>
                     <div className="min-w-0">
                       <p className="flex items-center gap-1 text-xs font-semibold text-white">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
-                      <p className="mt-0.5 text-[10px] text-primary/80 sm:hidden">Voir les 20 régimes</p>
+                      <span className="sr-only">Voir les 20 régimes</span>
                     </div>
                   </button>
-                  {/* Weight pills */}
-                  <div className="flex flex-wrap gap-1">
-                    <span className="text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium">
-                      🌡 {Math.round(regime.weights.temp * 100)}%
-                    </span>
-                    <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full px-2 py-0.5 font-medium">
-                      🌧 {Math.round(regime.weights.precip * 100)}%
-                    </span>
-                    <span className="text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full px-2 py-0.5 font-medium">
-                      💨 {Math.round(regime.weights.wind * 100)}%
-                    </span>
-                    <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full px-2 py-0.5 font-medium">
-                      ☁ {Math.round(regime.weights.condition * 100)}%
-                    </span>
-                  </div>
+                  {modelIndicator && (
+                    <Tooltip><TooltipTrigger asChild><button
+                      type="button"
+                      onClick={() => setShowFusionDetails((open) => !open)}
+                      aria-expanded={showFusionDetails}
+                      aria-controls="fusion-explication"
+                      className="inline-flex shrink-0 items-center text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    >
+                      <WeatherStatusBadge dense tone="info" icon={<Activity className="h-3 w-3" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
+                      {showFusionDetails ? <ChevronUp className="ml-0.5 h-3 w-3 text-sky-200" /> : <ChevronDown className="ml-0.5 h-3 w-3 text-sky-200" />}
+                    </button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">Indique le ou les modèles qui contribuent à la prévision officielle du snapshot en cours. Le pourcentage est un poids de fusion, pas une mesure de station.</TooltipContent></Tooltip>
+                  )}
+                </div>
+                {/* Weight pills */}
+                <div className="mt-1 flex flex-wrap gap-1">
+                  <span className="text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium">
+                    🌡 {Math.round(regime.weights.temp * 100)}%
+                  </span>
+                  <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full px-2 py-0.5 font-medium">
+                    🌧 {Math.round(regime.weights.precip * 100)}%
+                  </span>
+                  <span className="text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full px-2 py-0.5 font-medium">
+                    💨 {Math.round(regime.weights.wind * 100)}%
+                  </span>
+                  <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full px-2 py-0.5 font-medium">
+                    ☁ {Math.round(regime.weights.condition * 100)}%
+                  </span>
                 </div>
                 {showRegimeMenu && (
                   <div id="regime-catalogue" className="mt-2 rounded-lg border border-slate-600/35 bg-slate-950/30 p-2" aria-label="Tous les régimes météo possibles">
@@ -509,18 +521,6 @@ export default function Dashboard() {
                   </div>
                 )}
                 <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
-                {modelIndicator && (
-                  <Tooltip><TooltipTrigger asChild><button
-                    type="button"
-                    onClick={() => setShowFusionDetails((open) => !open)}
-                    aria-expanded={showFusionDetails}
-                    aria-controls="fusion-explication"
-                    className="mt-1 inline-flex max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                  >
-                    <WeatherStatusBadge dense tone="info" icon={<Activity className="h-3 w-3" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
-                    {showFusionDetails ? <ChevronUp className="ml-1 h-3 w-3 text-sky-200" /> : <ChevronDown className="ml-1 h-3 w-3 text-sky-200" />}
-                  </button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">Indique le ou les modèles qui contribuent à la prévision officielle du snapshot en cours. Le pourcentage est un poids de fusion, pas une mesure de station.</TooltipContent></Tooltip>
-                )}
                 {showFusionDetails && modelIndicator && (
                   <div id="fusion-explication" className="mt-2 rounded-lg border border-blue-400/20 bg-slate-950/45 p-2 text-[10px] text-slate-200">
                     <p className="flex items-start gap-1.5 font-medium text-blue-100"><Info className="mt-0.5 h-3 w-3 shrink-0 text-blue-300" />Comment est calculée la fusion officielle ?</p>

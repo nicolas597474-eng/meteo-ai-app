@@ -1396,3 +1396,16 @@
 - [x] Règles: Définir les seuils de chaleur et de gel utilisés pour les capsules Max et Min.
 - [x] Interface: Appliquer automatiquement la palette et l’intensité adaptées aux seuils.
 - [x] Validation: Couvrir les seuils par des tests et vérifier le rendu mobile, TypeScript et build.
+
+## Compactage vertical de la pancarte principale
+- [x] Audit: Identifier les espacements verticaux à réduire sans retirer d’information utile.
+- [x] Interface: Ne pas appliquer le compactage vertical demandé, conformément à l’annulation utilisateur.
+- [x] Validation: Vérifier le rétablissement intégral des espacements précédents.
+
+## Annulation du compactage vertical
+- [x] Décision: Conserver les espacements verticaux actuels de la pancarte principale.
+
+## Ligne régime et fusion harmonisée
+- [x] Interface: Afficher le régime et la fusion des modèles sur une même ligne mobile.
+- [x] Interface: Conserver les pondérations sous cette ligne avec un ordre visuel clair.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 223 tests et build.
