@@ -1253,3 +1253,11 @@
 ## Flèche de retour rapide du Dashboard
 - [x] Interface: Ajouter la flèche de retour vers le haut au Dashboard.
 - [x] Validation: Vérifier le comportement mobile, TypeScript, tests et build.
+
+## Diagnostic des heures officielles indisponibles
+- [x] Audit: Vérifier le snapshot horaire officiel, les erreurs récentes et les reprises.
+- [x] Rapport: Expliquer la cause réelle et la disponibilité attendue sans modifier les données.
+
+## Badge de collecte de la page Stations
+- [x] Interface: Moderniser le badge « Collecte 05:00 Paris » en conservant son information.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, test ciblé et build ; la suite complète conserve deux échecs intermittents antérieurs liés aux snapshots météo dynamiques.

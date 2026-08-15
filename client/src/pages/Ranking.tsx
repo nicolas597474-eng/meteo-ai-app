@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
+import { Clock3 } from "lucide-react";
 
 type ComparisonPoint = {
   hour?: number;
@@ -147,9 +148,18 @@ export default function Ranking() {
             <h1 className="mt-2 text-xl font-bold text-white">Stations & fiabilité locale</h1>
             <p className="mt-1 text-xs text-slate-500">Relevés physiques et comparaison avec la prévision officielle.</p>
           </div>
-          <div className="rounded-full border border-slate-800 bg-[#10131a] px-3 py-2 text-right">
-            <p className="text-[10px] uppercase tracking-wide text-slate-500">Collecte</p>
-            <p className="text-xs font-medium text-blue-300">05h00 Paris</p>
+          <div
+            className="relative flex shrink-0 items-center gap-2.5 overflow-hidden rounded-2xl border border-sky-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.18),transparent_48%),linear-gradient(135deg,rgba(14,116,144,0.16),rgba(15,23,42,0.88))] px-2.5 py-2 shadow-[0_12px_28px_rgba(8,47,73,0.22),inset_0_1px_0_rgba(186,230,253,0.12)]"
+            aria-label="Collecte automatique planifiée à 05h00, heure de Paris"
+          >
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-400/10 text-sky-200">
+              <Clock3 className="h-4 w-4" aria-hidden="true" />
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-[#10131a] bg-emerald-400 motion-safe:animate-pulse" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 text-left leading-none">
+              <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-100/65">Collecte</span>
+              <span className="mt-1 block whitespace-nowrap text-sm font-bold tracking-tight text-sky-100">05h00 <span className="font-medium text-sky-300">Paris</span></span>
+            </span>
           </div>
         </header>
 

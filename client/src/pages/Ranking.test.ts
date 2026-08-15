@@ -56,4 +56,12 @@ describe("page Fiabilité", () => {
     expect(source).toContain("modelReferences.slice(1).map");
     expect(source).toContain("aria-expanded={showAdditionalModelReferences}");
   });
+
+  it("présente la collecte planifiée dans un badge visuel accessible", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Clock3");
+    expect(source).toContain("motion-safe:animate-pulse");
+    expect(source).toContain("Collecte automatique planifiée à 05h00, heure de Paris");
+    expect(source).toContain(">05h00 <span");
+  });
 });
