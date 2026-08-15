@@ -1366,3 +1366,9 @@
 ## Position explicite de la date dans la pancarte
 - [x] Interface: Déplacer la date vers une position immédiatement visible dans l’en-tête de la pancarte.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
+
+## Hiérarchie de la date et des températures extrêmes
+- [x] Interface: Retirer la date affichée au-dessus de la carte principale.
+- [x] Interface: Agrandir la date intégrée à la pancarte principale.
+- [x] Interface: Accentuer les températures Max et Min.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.

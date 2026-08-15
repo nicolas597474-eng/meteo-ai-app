@@ -11,6 +11,8 @@ describe("mise en page de température du Dashboard", () => {
     expect(dashboardTemperatureLayout.currentValue).toContain("clamp(3.25rem,16vw,4.5rem)");
     expect(dashboardTemperatureLayout.currentValue).toContain("whitespace-nowrap");
     expect(dashboardTemperatureLayout.extremeValue).toContain("whitespace-nowrap");
+    expect(dashboardTemperatureLayout.extremeValue).toContain("text-2xl");
+    expect(dashboardTemperatureLayout.extremeValue).toContain("font-extrabold");
   });
 
   it("préserve une zone tactile de 44 px tout en compactant les sections mobiles", () => {

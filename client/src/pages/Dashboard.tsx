@@ -5,7 +5,7 @@ import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { getDashboardWeatherImage } from "@/lib/weatherImages";
-import { formatDashboardCompactDate, formatDashboardDate } from "@/lib/dashboardDate";
+import { formatDashboardCompactDate } from "@/lib/dashboardDate";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
@@ -375,7 +375,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-2 sm:space-y-6 sm:px-6 sm:py-8">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <div>
             <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
               MeteoAI
@@ -384,10 +384,6 @@ export default function Dashboard() {
               <MapPin className="h-3 w-3 flex-shrink-0" />
               <span>{selectedLocation?.name ?? "Hondeghem, Nord"}</span>
             </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-lg px-2.5 py-1.5">
-            <Clock className="h-3 w-3" />
-            <span>{formatDashboardDate(officialForecast?.today ?? dash?.today)}</span>
           </div>
         </div>
 
@@ -423,8 +419,8 @@ export default function Dashboard() {
                 {selectedLocation && <span className="hidden text-xs text-primary/60 sm:inline">· {selectedLocation.name}</span>}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-500/35 bg-slate-950/35 px-2 py-1 text-[10px] font-semibold text-slate-100/85">
-                  <CalendarDays className="h-3 w-3 text-sky-300" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-300/30 bg-slate-950/45 px-2.5 py-1.5 text-xs font-bold text-slate-50 shadow-[0_0_14px_rgba(56,189,248,0.12)]">
+                  <CalendarDays className="h-3.5 w-3.5 text-sky-300" aria-hidden="true" />
                   {panelDate}
                 </span>
                 <button
@@ -629,14 +625,14 @@ export default function Dashboard() {
                 {/* Max / Min */}
                 <div className={dashboardTemperatureLayout.extremes}>
                   <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-                    <span className="text-[10px] sm:text-xs font-medium text-orange-400 uppercase tracking-normal sm:tracking-wide">max</span>
-                    <span className={`${dashboardTemperatureLayout.extremeValue} text-orange-300`}>
+                    <span className="text-[10px] sm:text-xs font-bold text-orange-300 uppercase tracking-normal drop-shadow-[0_0_8px_rgba(251,146,60,0.55)] sm:tracking-wide">max</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} text-orange-200 drop-shadow-[0_0_12px_rgba(251,146,60,0.72)]`}>
                       {today?.tempMax != null ? Number(today.tempMax).toFixed(1) : meteoAI?.tempMax != null ? Number(meteoAI.tempMax).toFixed(1) : "—"}°
                     </span>
                   </div>
                   <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-                    <span className="text-[10px] sm:text-xs font-medium text-blue-400 uppercase tracking-normal sm:tracking-wide">min</span>
-                    <span className={`${dashboardTemperatureLayout.extremeValue} text-blue-300`}>
+                    <span className="text-[10px] sm:text-xs font-bold text-blue-300 uppercase tracking-normal drop-shadow-[0_0_8px_rgba(96,165,250,0.55)] sm:tracking-wide">min</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} text-blue-200 drop-shadow-[0_0_12px_rgba(96,165,250,0.72)]`}>
                       {today?.tempMin != null ? Number(today.tempMin).toFixed(1) : meteoAI?.tempMin != null ? Number(meteoAI.tempMin).toFixed(1) : "—"}°
                     </span>
                   </div>
