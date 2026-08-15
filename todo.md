@@ -1238,3 +1238,9 @@
 ## Libellés de température simplifiés
 - [x] Interface: Retirer les préfixes T et R des valeurs des deux courbes.
 - [x] Validation: Vérifier la séparation par couleur et position, TypeScript, tests et build.
+
+## Chargement initial et données horaires
+- [x] Diagnostic: Mesurer les requêtes de démarrage et la cause des données horaires indisponibles.
+- [x] Données: Mettre en place une reprise contrôlée sans inventer de prévision.
+- [x] Interface: Rendre le chargement et les indisponibilités explicites et non bloquants.
+- [x] Validation: Vérifier le démarrage, TypeScript, tests et build.

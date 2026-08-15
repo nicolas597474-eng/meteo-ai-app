@@ -16,6 +16,12 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('role="progressbar"');
     expect(source).toContain("expandedRegimeIds");
     expect(source).toContain("aria-expanded={isExpanded}");
+    expect(source).toContain('const needsLocalStations = localMode !== "standard"');
+    expect(source).toContain("enabled: !!selectedLocation && needsLocalStations");
+    expect(source).toContain("Données horaires temporairement indisponibles.");
+    expect(source).toContain("trpc.weather.getHourlyForecast.useQuery");
+    expect(source).toContain("const isLoading = officialLoading && hourlyLoading");
+    expect(source).toContain("refetchHourlySnapshot()");
     expect(source).toContain("candidate?.weights");
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");

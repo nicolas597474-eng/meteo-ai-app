@@ -177,11 +177,12 @@ export const weatherRouter = router({
     // Snapshot, observation et prévision horaire actualisée sont comparés par
     // le sélecteur partagé.
     const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
-    const [meteoAI, observation, hourly] = await Promise.all([
+    const [meteoAI, observation, officialSnapshot] = await Promise.all([
       getMeteoAIForecastByDate(today, locKey),
       getObservationByDate(today, locKey),
-      collectHourlyForecast(today, coords),
+      resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM),
     ]);
+    const hourly = officialSnapshot.hourly;
 
     // Get all forecasts for today
     const forecasts = await getForecastsByDate(today, locKey);

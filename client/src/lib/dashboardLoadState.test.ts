@@ -3,7 +3,7 @@ import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "./dashboar
 
 describe("états de chargement du Dashboard", () => {
   it("borne l’attente des prévisions", () => {
-    expect(DASHBOARD_LOAD_TIMEOUT_MS).toBe(15_000);
+    expect(DASHBOARD_LOAD_TIMEOUT_MS).toBe(8_000);
   });
 
   it("explique le mode aperçu sans confondre la prévision officielle et les favoris", () => {

@@ -136,9 +136,10 @@ export default function Dashboard() {
     localMode,
   }), [selectedLocation?.lat, selectedLocation?.lon, activeLocation?.radiusKm, localMode]);
 
-  const { data: locationWeather, isLoading: locLoading } = trpc.favorites.getLocationWeather.useQuery(
+  const needsLocalStations = localMode !== "standard";
+  const { data: locationWeather } = trpc.favorites.getLocationWeather.useQuery(
     queryInput,
-    { enabled: !!selectedLocation }
+    { enabled: !!selectedLocation && needsLocalStations, staleTime: 2 * 60 * 1000 }
   );
 
   // Pre-loaded forecasts for all favorites (from 05h00 cron)
@@ -170,12 +171,12 @@ export default function Dashboard() {
   }), [selectedLocation?.lat, selectedLocation?.lon]);
 
   // Dashboard (MeteoAI synthesis) — always location-aware
-  const { data: dash, isLoading: dashLoading, isError: dashError, isFetching: dashFetching, refetch: refetchDashboard } = trpc.weather.getDashboard.useQuery(
+  const { data: dash, isFetching: dashFetching, refetch: refetchDashboard } = trpc.weather.getDashboard.useQuery(
     coordsInput,
     {
       staleTime: 60 * 1000,
       refetchInterval: 5 * 60 * 1000,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
     }
   );
   // Réponse officielle consolidée : la même source alimente désormais Dashboard
@@ -185,7 +186,18 @@ export default function Dashboard() {
     {
       staleTime: 60 * 1000,
       refetchInterval: 5 * 60 * 1000,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    }
+  );
+  const { data: hourlySnapshot, isLoading: hourlyLoading, isError: hourlyError, refetch: refetchHourlySnapshot } = trpc.weather.getHourlyForecast.useQuery(
+    coordsInput,
+    {
+      staleTime: 2 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     }
   );
   const { data: localOfficialHistory } = trpc.weather.getLocalOfficialDeltaHistory.useQuery(
@@ -195,12 +207,12 @@ export default function Dashboard() {
     undefined, { staleTime: 60 * 60 * 1000 }
   );
 
-  const isLoading = (selectedLocation ? locLoading : dashLoading) || officialLoading;
-  const isError = (selectedLocation ? false : dashError) || officialError;
+  const isLoading = officialLoading && hourlyLoading;
+  const isError = officialError && hourlyError;
   const isRefreshing = dashFetching || officialFetching;
   const refreshCurrentWeather = async () => {
     setHasWaitTimedOut(false);
-    await Promise.all([refetchDashboard(), refetchOfficialForecast()]);
+    await Promise.all([refetchDashboard(), refetchOfficialForecast(), refetchHourlySnapshot()]);
   };
 
   useEffect(() => {
@@ -218,8 +230,8 @@ export default function Dashboard() {
         <div className="mx-auto flex min-h-[52vh] max-w-md flex-col items-center justify-center gap-4 text-center">
           <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-6">
             <Clock className="mx-auto mb-3 h-9 w-9 text-blue-300" />
-            <h2 className="text-lg font-semibold">Prévisions toujours en cours de chargement</h2>
-            <p className="mt-2 text-sm text-muted-foreground">La source météo répond plus lentement que prévu. Aucune donnée estimée n’est affichée.</p>
+            <h2 className="text-lg font-semibold">Prévisions officielles en cours de chargement</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Les données horaires restent en attente de la source météo. Aucune donnée estimée n’est affichée.</p>
             <button type="button" onClick={() => void refreshCurrentWeather()} className="mt-5 min-h-11 rounded-md border border-primary/50 px-4 text-sm font-medium text-primary">
               Réessayer maintenant
             </button>
@@ -266,7 +278,7 @@ export default function Dashboard() {
   const officialPrimaryRegime = officialRegime?.primary as any;
   const days: any[] = officialForecast?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
-  const hours: any[] = officialForecast?.hours ?? (lw ? lw.hourly : []);
+  const hours: any[] = hourlySnapshot?.hours ?? officialForecast?.hours ?? (lw ? lw.hourly : []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const localObservedRegime = lw
     ? {
@@ -758,14 +770,18 @@ export default function Dashboard() {
 
         {/* Hourly Chart */}
         <div className="overflow-visible rounded-[22px]">
-          {officialLoading ? (
+          {hourlyLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
             <Suspense fallback={<div className="h-56 bg-muted rounded-xl animate-pulse" />}>
               <HourlyChart hours={hours} locationName={activeLocation?.name} regime={officialRegime?.primary ? { label: officialRegime.primary.label, emoji: officialRegime.primary.emoji } : null} />
             </Suspense>
           ) : (
-            <p className="text-sm text-muted-foreground">Données horaires indisponibles.</p>
+            <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-5 text-center">
+              <p className="text-sm font-medium text-blue-100">Données horaires temporairement indisponibles.</p>
+              <p className="mt-1 text-xs text-muted-foreground">La dernière prévision officielle n’a pas encore répondu. Aucune donnée n’est inventée.</p>
+              <button type="button" onClick={() => void Promise.all([refetchHourlySnapshot(), refetchOfficialForecast()])} className="mt-3 min-h-10 rounded-md border border-primary/50 px-3 text-xs font-semibold text-primary">Réessayer les heures</button>
+            </div>
           )}
         </div>
 
