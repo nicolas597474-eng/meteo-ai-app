@@ -15,6 +15,7 @@ import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dash
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
@@ -202,6 +203,10 @@ export default function Dashboard() {
       retry: 2,
       retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     }
+  );
+  const { data: environmentalData, isFetching: environmentalFetching } = trpc.weather.getEnvironmentalSnapshot.useQuery(
+    coordsInput,
+    { staleTime: 10 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 }
   );
   const { data: localOfficialHistory } = trpc.weather.getLocalOfficialDeltaHistory.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
@@ -793,6 +798,8 @@ export default function Dashboard() {
             </Suspense>
           ) : null}
         </div>
+
+        <EnvironmentalPanels data={environmentalData} isLoading={environmentalFetching} />
 
       </div>
       <BackToTopButton />

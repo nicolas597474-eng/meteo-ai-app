@@ -48,6 +48,7 @@ import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
+import { getEnvironmentalSnapshot } from "../environmentalData";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -577,6 +578,11 @@ export const weatherRouter = router({
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
       return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
+
+  /** Qualité de l’air et éphémérides réelles pour le lieu actif. */
+  getEnvironmentalSnapshot: publicProcedure
+    .input(requiredCoordinatesSchema)
+    .query(({ input }) => getEnvironmentalSnapshot({ lat: input.lat, lon: input.lon })),
 
   /**
    * Detailed forecast page: 48h hourly + 15-day daily + regime + confidence

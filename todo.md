@@ -1293,3 +1293,9 @@
 ## Simplification du panneau détaillé horaire
 - [x] Interface: Retirer les sections « Régime opérationnel » et « Évolution à court terme ».
 - [x] Validation: Vérifier le panneau sur mobile, TypeScript, 210 tests et build.
+
+## Qualité de l’air, soleil et lune
+- [x] Audit: Identifier les sources existantes ou gratuites pour l’air et les éphémérides du lieu actif.
+- [x] Données: Exposer une réponse environnementale réelle via le serveur.
+- [x] Interface: Ajouter les panneaux Qualité de l’air et Soleil & Lune sous les graphiques du Dashboard.
+- [x] Validation: Vérifier les données réelles, le rendu mobile, TypeScript, 214 tests et build.
