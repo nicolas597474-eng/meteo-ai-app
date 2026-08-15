@@ -1377,3 +1377,8 @@
 - [x] Interface: Retirer le bloc MeteoAI et Hondeghem au-dessus des favoris.
 - [x] Interface: Resserer l’espacement supérieur après le retrait du bloc.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
+
+## Date centrée dans la pancarte
+- [x] Interface: Retirer le bouton Actualiser de la pancarte principale.
+- [x] Interface: Centrer et agrandir légèrement la date dans l’en-tête de pancarte.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.

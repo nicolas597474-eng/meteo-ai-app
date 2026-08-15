@@ -29,7 +29,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('text-base font-medium text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).toContain('<WeatherStatusBadge dense tone="info"');
-    expect(source).toContain('CalendarDays className="h-3.5 w-3.5 text-sky-300"');
+    expect(source).toContain('CalendarDays className="h-4 w-4 text-sky-300"');
+    expect(source).toContain('grid-cols-[1fr_auto_1fr]');
+    expect(source).not.toContain('aria-label="Actualiser la météo maintenant"');
     expect(source).not.toContain("formatDashboardDate");
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");

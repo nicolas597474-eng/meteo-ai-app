@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -217,7 +217,6 @@ export default function Dashboard() {
 
   const isLoading = officialLoading && hourlyLoading;
   const isError = officialError && hourlyError;
-  const isRefreshing = dashFetching || officialFetching;
   const refreshCurrentWeather = async () => {
     setHasWaitTimedOut(false);
     await Promise.all([refetchDashboard(), refetchOfficialForecast(), refetchHourlySnapshot()]);
@@ -398,29 +397,18 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className={`${dashboardTemperatureLayout.mobileHeader} gap-2`}>
-              <div className="flex min-w-0 items-center gap-1.5">
+            <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:mb-3">
+              <div className="flex min-w-0 items-center gap-1.5 justify-self-start">
                 <Activity className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs font-medium text-primary sm:hidden">Tendance</span>
                 <span className="hidden text-xs font-medium text-primary sm:inline">Tendance · {regimeSourceLabel}</span>
                 {selectedLocation && <span className="hidden text-xs text-primary/60 sm:inline">· {selectedLocation.name}</span>}
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full border border-sky-300/30 bg-slate-950/45 px-2.5 py-1.5 text-xs font-bold text-slate-50 shadow-[0_0_14px_rgba(56,189,248,0.12)]">
-                  <CalendarDays className="h-3.5 w-3.5 text-sky-300" aria-hidden="true" />
-                  {panelDate}
-                </span>
-                <button
-                  type="button"
-                  onClick={refreshCurrentWeather}
-                  disabled={isRefreshing}
-                  className={dashboardTemperatureLayout.refreshButton}
-                  aria-label="Actualiser la météo maintenant"
-                >
-                  <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
-                  Actualiser
-                </button>
-              </div>
+              <span className="inline-flex items-center justify-self-center gap-1.5 rounded-full border border-sky-300/35 bg-slate-950/50 px-3 py-1.5 text-sm font-bold text-slate-50 shadow-[0_0_16px_rgba(56,189,248,0.16)]">
+                <CalendarDays className="h-4 w-4 text-sky-300" aria-hidden="true" />
+                {panelDate}
+              </span>
+              <span aria-hidden="true" />
             </div>
 
             {/* ── Regime badge ── */}
