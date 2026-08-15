@@ -1357,3 +1357,8 @@
 ## Lisibilité des libellés de la carte principale
 - [x] Interface: Agrandir « Ciel couvert actuellement » et le badge « Fusion · 8 modèles ».
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 219 tests et build.
+
+## Date et compactage de la pancarte principale
+- [x] Interface: Afficher la date du jour dans la pancarte de la carte principale.
+- [x] Interface: Réduire la hauteur de la zone Ciel couvert et Fusion des modèles.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.

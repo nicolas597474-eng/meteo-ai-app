@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDashboardDate } from "./dashboardDate";
+import { formatDashboardCompactDate, formatDashboardDate } from "./dashboardDate";
 
 describe("formatDashboardDate", () => {
   it("affiche une date ISO dans le format français complet demandé", () => {
@@ -9,5 +9,9 @@ describe("formatDashboardDate", () => {
   it("préserve la sécurité d’affichage lorsque la date métier est absente ou invalide", () => {
     expect(formatDashboardDate(null)).toBe("—");
     expect(formatDashboardDate("13/08/2026")).toBe("—");
+  });
+
+  it("fournit une date compacte pour la pancarte principale", () => {
+    expect(formatDashboardCompactDate("2026-08-15")).toBe("Samedi 15 Août");
   });
 });

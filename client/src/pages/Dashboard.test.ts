@@ -25,7 +25,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("BackToTopButton");
     expect(source).toContain("candidate?.weights");
     expect(source).toContain('text-base font-medium text-slate-100/90 sm:text-lg');
-    expect(source).toContain('<WeatherStatusBadge tone="info"');
+    expect(source).toContain('formatDashboardCompactDate');
+    expect(source).toContain('<WeatherStatusBadge dense tone="info"');
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
     expect(source).toContain("overflow-visible rounded-[22px]");

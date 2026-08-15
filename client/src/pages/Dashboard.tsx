@@ -5,7 +5,7 @@ import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { getDashboardWeatherImage } from "@/lib/weatherImages";
-import { formatDashboardDate } from "@/lib/dashboardDate";
+import { formatDashboardCompactDate, formatDashboardDate } from "@/lib/dashboardDate";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
@@ -288,6 +288,7 @@ export default function Dashboard() {
   const today = days[0] ?? null;
   const hours: any[] = hourlySnapshot?.hours ?? officialForecast?.hours ?? (lw ? lw.hourly : []);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
+  const panelDate = formatDashboardCompactDate(officialForecast?.today ?? dash?.today);
   const localObservedRegime = lw
     ? {
         id: lw.scores.regime,
@@ -435,14 +436,14 @@ export default function Dashboard() {
 
             {/* ── Regime badge ── */}
             {regime && (
-              <div className="mb-3 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-2">
+              <div className="mb-2 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-1.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setShowRegimeMenu((open) => !open)}
                     aria-expanded={showRegimeMenu}
                     aria-controls="regime-catalogue"
-                    className="-mx-1 flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                    className="-mx-1 flex min-w-0 items-center gap-2 rounded-lg px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-950/35 text-base">{regime.emoji}</span>
                     <div className="min-w-0">
@@ -533,16 +534,16 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                <p className="mt-1 text-[10px] text-slate-400">{regimeFreshnessLabel}<span className="hidden sm:inline">{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</span></p>
+                <p className="mt-0.5 text-[10px] font-medium text-slate-300">{panelDate}<span className="hidden sm:inline text-slate-400"> · {regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</span></p>
                 {modelIndicator && (
                   <Tooltip><TooltipTrigger asChild><button
                     type="button"
                     onClick={() => setShowFusionDetails((open) => !open)}
                     aria-expanded={showFusionDetails}
                     aria-controls="fusion-explication"
-                    className="mt-2 inline-flex max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    className="mt-1 inline-flex max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   >
-                    <WeatherStatusBadge tone="info" icon={<Activity className="h-3.5 w-3.5" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
+                    <WeatherStatusBadge dense tone="info" icon={<Activity className="h-3 w-3" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
                     {showFusionDetails ? <ChevronUp className="ml-1 h-3 w-3 text-sky-200" /> : <ChevronDown className="ml-1 h-3 w-3 text-sky-200" />}
                   </button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">Indique le ou les modèles qui contribuent à la prévision officielle du snapshot en cours. Le pourcentage est un poids de fusion, pas une mesure de station.</TooltipContent></Tooltip>
                 )}

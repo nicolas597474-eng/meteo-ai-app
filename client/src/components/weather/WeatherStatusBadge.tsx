@@ -11,6 +11,7 @@ type WeatherStatusBadgeProps = {
   icon?: ReactNode;
   pulse?: boolean;
   compact?: boolean;
+  dense?: boolean;
   className?: string;
   ariaLabel?: string;
   description?: string;
@@ -68,6 +69,7 @@ export function WeatherStatusBadge({
   icon,
   pulse = false,
   compact = false,
+  dense = false,
   className = "",
   ariaLabel,
   description,
@@ -77,17 +79,17 @@ export function WeatherStatusBadge({
   const accessibleLabel = ariaLabel ?? (hasValue ? `${label} ${String(value)}` : label);
   const badgeContent = (
     <span
-      className={`relative inline-flex max-w-full items-center overflow-hidden border ${compact ? "gap-1 rounded-xl px-1.5 py-1" : "shrink-0 gap-2 rounded-2xl px-2.5 py-2"} ${styles.surface} ${className}`}
+      className={`relative inline-flex max-w-full items-center overflow-hidden border ${compact ? "gap-1 rounded-xl px-1.5 py-1" : dense ? "shrink-0 gap-1.5 rounded-xl px-2 py-1.5" : "shrink-0 gap-2 rounded-2xl px-2.5 py-2"} ${styles.surface} ${className}`}
       aria-label={accessibleLabel}
       data-weather-status-badge={tone}
     >
-      <span className={`relative flex shrink-0 items-center justify-center border ${compact ? "h-4 w-4 rounded-md" : "h-7 w-7 rounded-xl"} ${styles.icon}`} aria-hidden="true">
+      <span className={`relative flex shrink-0 items-center justify-center border ${compact ? "h-4 w-4 rounded-md" : dense ? "h-5 w-5 rounded-lg" : "h-7 w-7 rounded-xl"} ${styles.icon}`} aria-hidden="true">
         {icon ?? <span className={`${compact ? "h-1.5 w-1.5" : "h-2 w-2"} rounded-full ${styles.dot} ${pulse ? "motion-safe:animate-pulse" : ""}`} />}
         {pulse ? <span className={`absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full border border-[#10131a] ${styles.dot} motion-safe:animate-pulse`} /> : null}
       </span>
       <span className="min-w-0 text-left leading-none">
-        <span className={`flex items-center gap-0.5 font-semibold uppercase ${compact ? "text-[7px] tracking-[0.08em]" : "text-[9px] tracking-[0.14em]"} ${styles.label}`}><span className="truncate">{label}</span>{description ? <CircleHelp className="h-2.5 w-2.5 shrink-0 opacity-75" aria-hidden="true" /> : null}</span>
-        {hasValue ? <span className={`block truncate font-bold tracking-tight ${compact ? "mt-0.5 text-[9px]" : "mt-1 text-sm"} ${styles.value}`}>{value}</span> : null}
+        <span className={`flex items-center gap-0.5 font-semibold uppercase ${compact ? "text-[7px] tracking-[0.08em]" : dense ? "text-[8px] tracking-[0.12em]" : "text-[9px] tracking-[0.14em]"} ${styles.label}`}><span className="truncate">{label}</span>{description ? <CircleHelp className="h-2.5 w-2.5 shrink-0 opacity-75" aria-hidden="true" /> : null}</span>
+        {hasValue ? <span className={`block truncate font-bold tracking-tight ${compact ? "mt-0.5 text-[9px]" : dense ? "mt-0.5 text-xs" : "mt-1 text-sm"} ${styles.value}`}>{value}</span> : null}
       </span>
     </span>
   );
