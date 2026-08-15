@@ -2,7 +2,7 @@ import { useId } from "react";
 
 /**
  * MeteoIcon — Pack d'icônes MeteoAI personnalisé
- * Style holographique futuriste en tuiles hexagonales, conçu pour l'interface MeteoAI.
+ * Style futuriste en verre dépoli lumineux, conçu pour l'interface MeteoAI.
  * Couvre : 30 régimes météo + paramètres + indicateurs + classement
  */
 
@@ -15,14 +15,14 @@ interface MeteoIconProps {
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
   const depthFilterId = `meteo-depth-${uniqueId}`;
-  const tileGradientId = `meteo-tile-${uniqueId}`;
-  const gridGradientId = `meteo-grid-${uniqueId}`;
+  const glassGradientId = `meteo-glass-${uniqueId}`;
+  const glassRimId = `meteo-glass-rim-${uniqueId}`;
   const cloudGradientId = `meteo-cloud-${uniqueId}`;
   const sunGradientId = `meteo-sun-${uniqueId}`;
   const rainGradientId = `meteo-rain-${uniqueId}`;
   const cyanGradientId = `meteo-cyan-${uniqueId}`;
   const violetGradientId = `meteo-violet-${uniqueId}`;
-  const showTile = size >= 18;
+  const showGlass = size >= 18;
   return (
     <svg
       width={size}
@@ -36,25 +36,26 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
     >
       <defs>
         <filter id={depthFilterId} x="-35%" y="-35%" width="170%" height="185%" colorInterpolationFilters="sRGB">
-          <feDropShadow dx="0" dy="2.2" stdDeviation="1.5" floodColor="#020617" floodOpacity="0.92" />
-          <feDropShadow dx="0" dy="0" stdDeviation="1.7" floodColor="#22d3ee" floodOpacity="0.38" />
-          <feDropShadow dx="0.4" dy="0" stdDeviation="0.8" floodColor="#c084fc" floodOpacity="0.28" />
+          <feDropShadow dx="0" dy="2.8" stdDeviation="1.6" floodColor="#020617" floodOpacity="0.84" />
+          <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#7dd3fc" floodOpacity="0.34" />
+          <feDropShadow dx="0" dy="-0.4" stdDeviation="0.7" floodColor="#f8fafc" floodOpacity="0.5" />
         </filter>
-        <linearGradient id={tileGradientId} x1="8" y1="5" x2="56" y2="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0e7490" stopOpacity="0.5" />
-          <stop offset="38%" stopColor="#0f172a" stopOpacity="0.78" />
-          <stop offset="100%" stopColor="#312e81" stopOpacity="0.5" />
-        </linearGradient>
-        <linearGradient id={gridGradientId} x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#a5f3fc" stopOpacity="0.72" />
-          <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#c084fc" stopOpacity="0.64" />
+        <radialGradient id={glassGradientId} cx="33%" cy="22%" r="78%">
+          <stop offset="0%" stopColor="#f8fafc" stopOpacity="0.38" />
+          <stop offset="36%" stopColor="#bae6fd" stopOpacity="0.18" />
+          <stop offset="72%" stopColor="#1e40af" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="#020617" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={glassRimId} x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#f8fafc" stopOpacity="0.78" />
+          <stop offset="44%" stopColor="#7dd3fc" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#818cf8" stopOpacity="0.52" />
         </linearGradient>
         <linearGradient id={cloudGradientId} x1="14" y1="15" x2="48" y2="47" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#dbeafe" />
-          <stop offset="32%" stopColor="#7c8eac" />
-          <stop offset="72%" stopColor="#334155" />
-          <stop offset="100%" stopColor="#111827" />
+          <stop offset="0%" stopColor="#f8fafc" stopOpacity="0.82" />
+          <stop offset="34%" stopColor="#bfdbfe" stopOpacity="0.68" />
+          <stop offset="74%" stopColor="#64748b" stopOpacity="0.65" />
+          <stop offset="100%" stopColor="#1e293b" stopOpacity="0.72" />
         </linearGradient>
         <radialGradient id={sunGradientId} cx="32%" cy="24%" r="74%">
           <stop offset="0%" stopColor="#fff7bf" />
@@ -78,9 +79,9 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
           <stop offset="100%" stopColor="#5b21b6" />
         </linearGradient>
       </defs>
-      {showTile ? <><path d="M32 3 57 17.5v29L32 61 7 46.5v-29L32 3Z" fill={`url(#${tileGradientId})`} stroke={`url(#${gridGradientId})`} strokeWidth="1.05" /><path d="M32 8 52.5 20v24L32 56 11.5 44V20L32 8Z" fill="none" stroke="#67e8f9" strokeOpacity="0.16" strokeWidth="0.8" /><path d="M12 32h40M32 9v46M17 17l30 30M47 17 17 47" stroke={`url(#${gridGradientId})`} strokeOpacity="0.1" strokeWidth="0.7" /></> : null}
+      {showGlass ? <><circle cx="32" cy="32" r="27" fill={`url(#${glassGradientId})`} /><circle cx="32" cy="32" r="25.5" fill="none" stroke={`url(#${glassRimId})`} strokeOpacity="0.62" strokeWidth="1" /><ellipse cx="24" cy="17" rx="11" ry="4" fill="#f8fafc" opacity="0.1" transform="rotate(-24 24 17)" /><circle cx="47" cy="46" r="2.2" fill="#c4b5fd" opacity="0.2" /></> : null}
       <g filter={`url(#${depthFilterId})`}><FuturisticGlyph name={name} ids={{ cloud: cloudGradientId, sun: sunGradientId, rain: rainGradientId, cyan: cyanGradientId, violet: violetGradientId }} /></g>
-      {showTile ? <path d="M24 10h16" stroke="#e0f2fe" strokeOpacity="0.28" strokeWidth="1.2" strokeLinecap="round" /> : null}
+      {showGlass ? <path d="M21 11c6-3 16-3.5 23-.7" stroke="#f8fafc" strokeOpacity="0.24" strokeWidth="1.25" strokeLinecap="round" /> : null}
     </svg>
   );
 }
@@ -144,12 +145,12 @@ export function getIconNameFromRegime(regimeId: string): string {
 type GlyphIds = { cloud: string; sun: string; rain: string; cyan: string; violet: string };
 
 function FuturisticCloud({ ids, storm = false }: { ids: GlyphIds; storm?: boolean }) {
-  return <><path d="M15 40c-4.8 0-8-3.3-8-7.4 0-4.3 3.1-7.5 7.5-7.7C16.1 17.2 22.5 13 30.2 13c8.3 0 14.9 5.2 16.2 12.5 5.5.1 9.6 3.6 9.6 8 0 4.1-3.3 7.5-8.2 7.5H15Z" fill="#071827" fillOpacity="0.86" stroke={storm ? "#c084fc" : `url(#${ids.cyan})`} strokeWidth="1.8" strokeLinejoin="round" /><path d="M15 35h34M19 40h27" stroke="#a5f3fc" strokeOpacity="0.25" strokeWidth="1.15" strokeLinecap="round" /><circle cx="24" cy="25" r="1.5" fill="#e0f2fe" opacity="0.65" /><circle cx="42" cy="29" r="1.1" fill="#c4b5fd" opacity="0.65" /></>;
+  return <><ellipse cx="32" cy="43" rx="20" ry="3" fill="#020617" opacity="0.24" /><path d="M15 40c-4.8 0-8-3.3-8-7.4 0-4.3 3.1-7.5 7.5-7.7C16.1 17.2 22.5 13 30.2 13c8.3 0 14.9 5.2 16.2 12.5 5.5.1 9.6 3.6 9.6 8 0 4.1-3.3 7.5-8.2 7.5H15Z" fill={`url(#${ids.cloud})`} stroke={storm ? "#c4b5fd" : "#e0f2fe"} strokeOpacity="0.72" strokeWidth="1.2" strokeLinejoin="round" /><path d="M18 28c2-5.2 6.5-8.1 12.1-8.1 3.1 0 5.9.9 8.3 2.9" fill="none" stroke="#fff" strokeOpacity="0.43" strokeWidth="2" strokeLinecap="round" /></>;
 }
 
 function FuturisticSun({ ids, hot = false }: { ids: GlyphIds; hot?: boolean }) {
-  const ray = hot ? "#fb7185" : "#a5f3fc";
-  return <><circle cx="32" cy="31" r="17" fill="none" stroke={ray} strokeOpacity="0.38" strokeWidth="1.15" strokeDasharray="3 3" /><g stroke={ray} strokeWidth="2" strokeLinecap="round"><path d="M32 9v6" /><path d="M32 47v6" /><path d="M10 31h6" /><path d="M48 31h6" /><path d="M17 16l4 4" /><path d="M43 42l4 4" /><path d="M17 46l4-4" /><path d="M43 20l4-4" /></g><circle cx="32" cy="31" r="11.2" fill="#06243a" stroke={`url(#${ids.sun})`} strokeWidth="2.2" /><circle cx="32" cy="31" r="5.5" fill={`url(#${ids.sun})`} /><path d="M28 26h8M28 31h8M28 36h8" stroke="#fff7bf" strokeOpacity="0.4" strokeWidth="0.9" /></>;
+  const ray = hot ? "#fb7185" : "#fde68a";
+  return <><circle cx="32" cy="31" r="17" fill={ray} opacity="0.08" /><g stroke={ray} strokeOpacity="0.72" strokeWidth="2.1" strokeLinecap="round"><path d="M32 8v6" /><path d="M32 48v6" /><path d="M9 31h6" /><path d="M49 31h6" /><path d="M16 15l4 4" /><path d="M44 43l4 4" /><path d="M16 47l4-4" /><path d="M44 19l4-4" /></g><circle cx="32" cy="31" r="12.6" fill={`url(#${ids.sun})`} stroke="#fff7bf" strokeOpacity="0.86" strokeWidth="1" /><ellipse cx="27.5" cy="25.5" rx="4.6" ry="3.2" fill="#fff" opacity="0.48" /></>;
 }
 
 function FuturisticRain({ ids, dense = false }: { ids: GlyphIds; dense?: boolean }) {

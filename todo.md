@@ -1326,3 +1326,8 @@
 - [x] Direction: Définir une esthétique futuriste alternative, distincte de la version volumétrique actuelle.
 - [x] Interface: Refondre la bibliothèque MeteoIcon avec ce nouveau langage graphique.
 - [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.
+
+## Alternative verre dépoli des icônes météo
+- [x] Direction: Définir une esthétique lumineuse et organique, distincte des tuiles holographiques.
+- [x] Interface: Refondre la bibliothèque MeteoIcon avec le traitement verre dépoli.
+- [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.
