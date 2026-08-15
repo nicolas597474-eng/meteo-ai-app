@@ -1244,3 +1244,8 @@
 - [x] Données: Mettre en place une reprise contrôlée sans inventer de prévision.
 - [x] Interface: Rendre le chargement et les indisponibilités explicites et non bloquants.
 - [x] Validation: Vérifier le démarrage, TypeScript, tests et build.
+
+## Fermeture rapide des panneaux météo
+- [x] Audit: Vérifier les commandes de fermeture des détails journalier et horaire.
+- [x] Interface: Agrandir et expliciter la zone de fermeture sur mobile.
+- [x] Validation: Vérifier les interactions tactiles, TypeScript, tests et build.

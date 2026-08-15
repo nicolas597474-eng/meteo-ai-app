@@ -149,7 +149,10 @@ function HourDetailOverlay({ hour, hours, selectedIndex, onClose, regime }: { ho
               <p className="text-xs text-slate-400">{cond}</p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fermer les détails de la prévision horaire" className="p-2 rounded-xl hover:bg-white/10 transition-colors active:scale-95"><X className="h-5 w-5 text-slate-400" /></button>
+          <button onClick={onClose} aria-label="Fermer les détails de la prévision horaire" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-600/60 bg-slate-800/70 px-3 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 active:scale-95">
+            <X className="h-5 w-5" />
+            <span>Fermer</span>
+          </button>
         </div>
 
         {/* Multi-model confidence banner */}

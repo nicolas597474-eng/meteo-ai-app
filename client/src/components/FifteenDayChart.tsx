@@ -153,7 +153,10 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
               <p className="text-xs text-slate-400">{cond}</p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fermer les détails de la prévision" className="p-2 rounded-xl hover:bg-white/10 transition-colors active:scale-95"><X className="h-5 w-5 text-slate-400" /></button>
+          <button onClick={onClose} aria-label="Fermer les détails de la prévision" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-600/60 bg-slate-800/70 px-3 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 active:scale-95">
+            <X className="h-5 w-5" />
+            <span>Fermer</span>
+          </button>
         </div>
         <div className="mb-4 grid grid-cols-3 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03]">
           <div className="border-r border-white/8 px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Max.</p><p className="mt-0.5 text-base font-bold text-orange-300">{day.tempMax != null ? `${day.tempMax}°` : "—"}</p></div>

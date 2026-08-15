@@ -45,6 +45,9 @@ describe("HourlyChart", () => {
     expect(source).toContain("scroll-mt-3");
     expect(source).toContain("slide-in-from-top-2");
     expect(source).toContain('aria-labelledby="hour-detail-title"');
+    expect(source).toContain("Fermer les détails de la prévision horaire");
+    expect(source).toContain("<span>Fermer</span>");
+    expect(source).toContain("min-h-11");
   });
 
   it("ancre toujours le début du graphique sur l’heure actuelle", () => {

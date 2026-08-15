@@ -35,6 +35,9 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("scroll-mt-3");
     expect(source).toContain("slide-in-from-top-2");
     expect(source).toContain('role="region"');
+    expect(source).toContain("Fermer les détails de la prévision");
+    expect(source).toContain("<span>Fermer</span>");
+    expect(source).toContain("min-h-11");
   });
 
   it("réserve une zone d’alerte séparée des libellés de date", () => {
