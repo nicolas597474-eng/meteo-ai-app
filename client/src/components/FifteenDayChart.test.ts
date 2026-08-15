@@ -24,10 +24,9 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("const precipLabelBand = 18");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, barTop - 5)");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, precipZoneBot - 5)");
-    expect(source).toContain("Ressenti : bande dédiée sous les courbes");
-    expect(source).toContain("getFeltLabelY(windZoneTop)");
+    expect(source).not.toContain("getFeltLabelY");
     expect(source).toContain("getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop)");
-    expect(source).toContain("Ressenti °C");
+    expect(source).not.toContain("Ressenti °C");
   });
 
   it("affiche la prévision détaillée au-dessus du graphique sélectionné", () => {

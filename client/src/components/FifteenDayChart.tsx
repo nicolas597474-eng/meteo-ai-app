@@ -3,7 +3,7 @@ import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
-import { getFeltLabelY, getLabelAboveCurveY, getLabelBelowCurveY } from "@/lib/chartLabelLanes";
+import { getLabelAboveCurveY, getLabelBelowCurveY } from "@/lib/chartLabelLanes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface DayData {
@@ -397,18 +397,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillText(`${v.toFixed(1)}`, pt.x, minLabelY);
     });
 
-    // Ressenti : bande dédiée sous les courbes, distincte des températures et du vent.
-    displayDays.slice(0, visibleN).forEach((d, i) => {
-      const felt = d.feelsLikeMax;
-      if (felt == null) return;
-      const sel = selectedDay === i;
-      ctx.fillStyle = "#c4b5fd";
-      ctx.font = `${sel ? "bold 11" : "10"}px system-ui`;
-      ctx.textAlign = "center";
-      const feltLabelY = getFeltLabelY(windZoneTop);
-      ctx.fillText(`R ${felt.toFixed(1)}°`, colX(i), feltLabelY);
-    });
-
     // ── Wind readings by column (no wind curve) ─────────────────────────────
     displayDays.slice(0, visibleN).forEach((d, i) => {
       const v = displayDays[i].windSpeed;
@@ -548,7 +536,6 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Max °C</span>
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-blue-400 inline-block" /> Min °C</span>
-          <span className="flex items-center gap-1.5 text-violet-200"><span className="w-4 h-0 border-t-2 border-violet-300 inline-block" /> Ressenti °C</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-2.5 h-2.5 rounded-full bg-green-400 inline-block" /> Vent km/h</span>
           <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
         </div>

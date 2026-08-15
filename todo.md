@@ -1433,3 +1433,14 @@
 - [x] Interface: Stabiliser le routage, les couches fixes et les états de chargement sur mobile.
 - [x] Données: Fiabiliser les requêtes horaires et leur relance sans masquer les données journalières disponibles.
 - [x] Validation: Vérifier les parcours mobile, TypeScript, Vitest et build.
+
+## Simplification du ressenti du graphique journalier
+- [x] Audit: Identifier les chiffres et la légende « Ressenti » du graphique Températures & Météo.
+- [x] Interface: Retirer le ressenti visuel en conservant Max/Min, vent et pluie.
+- [x] Validation: Vérifier TypeScript, Vitest, build et le rendu mobile.
+
+## Refonte visuelle de la page Prévisions détaillées
+- [x] Audit: Identifier les écarts de style avec le Dashboard, les graphiques et les autres pages MeteoAI.
+- [x] Interface: Recomposer l’en-tête, les cartes horaires, les contrôles et les graphiques dans le style sombre net cohérent.
+- [x] Mobile: Préserver la zone sûre de la barre basse, le défilement horizontal des heures et la lisibilité tactile.
+- [x] Validation: Vérifier les parcours mobiles, TypeScript, Vitest et build.
