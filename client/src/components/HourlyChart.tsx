@@ -3,7 +3,7 @@ import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, 
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
-import { getLabelAboveCurveY, getLabelBelowCurveY } from "@/lib/chartLabelLanes";
+import { getLabelAboveCurveY } from "@/lib/chartLabelLanes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -288,9 +288,10 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const maxWind = Math.max(...hours.map(h => h.windSpeed ?? 0), 5);
   const windScaleTop = Math.ceil(maxWind / 5) * 5;
   const precipScaleTop = Math.ceil(maxPrecip * 10) / 10;
-  // Zone allocation: temp 55%, wind 20%, precip 20%
+  // Zone allocation: température 60 %, vent 20 %, pluie 20 %.
+  // La lecture reste centrée sur la température depuis le retrait du ressenti.
   const tempZoneTop = PAD_T;
-  const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.55;
+  const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.60;
   const windZoneTop = tempZoneBot + 4;
   const windZoneBot = windZoneTop + (CHART_H - PAD_T) * 0.20;
   const precipZoneTop = windZoneBot + 2;
@@ -427,41 +428,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.fillText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY);
     });
 
-    // Ressenti : ligne continue avec un décalage visuel de 3 px pour distinguer
-    // deux valeurs proches sans modifier les valeurs textuelles ni l’échelle.
-    const apparentPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.apparentTemp ?? h.temp ?? 0) + 3 }));
-    if (apparentPts.length > 1) {
-      ctx.beginPath();
-      ctx.moveTo(apparentPts[0].x, apparentPts[0].y);
-      for (let i = 1; i < apparentPts.length; i++) {
-        const cpx = (apparentPts[i - 1].x + apparentPts[i].x) / 2;
-        ctx.bezierCurveTo(cpx, apparentPts[i - 1].y, cpx, apparentPts[i].y, apparentPts[i].x, apparentPts[i].y);
-      }
-      ctx.save();
-      ctx.strokeStyle = "rgba(96, 165, 250, 0.35)";
-      ctx.lineWidth = 4;
-      ctx.shadowColor = "#60a5fa";
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.restore();
-      ctx.strokeStyle = "#93c5fd";
-      ctx.lineWidth = 1.7;
-      ctx.stroke();
-    }
-    // Ressenti immédiatement sous sa courbe bleue. La couleur bleue et le
-    // décalage opposé séparent explicitement les deux mesures, même quand les
-    // courbes orange et bleue sont presque confondues.
-    apparentPts.forEach((pt, i) => {
-      const v = hours[i].apparentTemp;
-      if (v == null) return;
-      const sel = selectedHour === i;
-      ctx.fillStyle = "#bfdbfe";
-      ctx.font = `${sel ? "bold 12" : "10"}px system-ui`;
-      ctx.textAlign = "center";
-      const apparentLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 17, 20);
-      ctx.fillText(`${v.toFixed(1)}°`, pt.x, apparentLabelY);
-    });
-
     // Wind readings by column (no wind curve).
     hours.slice(0, visibleN).forEach((h, i) => {
       const v = hours[i].windSpeed;
@@ -573,7 +539,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
         )}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Temp °C</span>
-          <span className="flex items-center gap-1.5 text-blue-200"><span className="w-4 h-0 border-t-2 border-blue-300 inline-block" /> Ressenti</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
           <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
         </div>

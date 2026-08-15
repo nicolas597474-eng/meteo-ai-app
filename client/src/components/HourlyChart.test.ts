@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./HourlyChart.tsx", import.meta.url), "utf8");
 
 describe("HourlyChart", () => {
-  it("présente les échelles et un ressenti continu avec les deux valeurs par heure", () => {
+  it("présente les échelles avec une seule courbe de température par heure", () => {
     expect(source).toContain("HourlyScaleLabels");
     expect(source).toContain('aria-label="Échelles du graphique horaire"');
     expect(source).toContain("windScaleTop");
@@ -13,13 +13,12 @@ describe("HourlyChart", () => {
     expect(source).toContain("text-white");
     expect(source).toContain("text-emerald-400");
     expect(source).toContain("text-sky-400");
-    expect(source).toContain("apparentTemp ?? h.temp ?? 0) + 3");
-    expect(source).toContain("Ressenti immédiatement sous sa courbe bleue");
     expect(source).toContain("ctx.fillText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY)");
-    expect(source).toContain("ctx.fillText(`${v.toFixed(1)}°`, pt.x, apparentLabelY)");
-    expect(source).toContain("getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 17, 20)");
     expect(source).toContain("getLabelAboveCurveY(pt.y, tempZoneTop)");
-    expect(source).toContain('ctx.font = `${sel ? "bold 12" : "10"}px system-ui`');
+    expect(source).not.toContain("Ressenti immédiatement sous sa courbe bleue");
+    expect(source).not.toContain("apparentLabelY");
+    expect(source).not.toContain('> Ressenti</span>');
+    expect(source).toContain("ctx.font = `bold ${sel ? 12 : 10}px system-ui`");
     expect(source).toContain("p-2 sm:p-3");
     expect(source).toContain("weather-chart-3d");
     expect(source).toContain("ctx.fillRect(x, 0, COL_W, TOTAL_H)");

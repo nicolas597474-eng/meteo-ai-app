@@ -1415,3 +1415,10 @@
 - [x] Interface: Retirer la fusion de modèles du Dashboard.
 - [x] Interface: Ajouter dans AI Lab un panneau détaillé de modèle principal, poids, méthode et sources.
 - [x] Validation: Vérifier Dashboard et AI Lab, TypeScript, 224 tests et build.
+
+## Capsules dégradées et graphique horaire simplifié
+- [x] Audit: Identifier les dégradés Max-Min et le tracé de ressenti du graphique horaire.
+- [x] Interface: Renforcer le dégradé de gauche à droite des capsules Max et Min.
+- [x] Interface: Retirer la courbe et les chiffres de ressenti du graphique horaire.
+- [x] Interface: Harmoniser les espaces et la légende du graphique après le retrait.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 225 tests et build.

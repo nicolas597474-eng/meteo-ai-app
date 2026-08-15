@@ -20,4 +20,13 @@ describe("intensité visuelle des températures extrêmes", () => {
     expect(getExtremeTemperatureTone("max", null).level).toBe("mild");
     expect(getExtremeTemperatureTone("min", undefined).level).toBe("cool");
   });
+
+  it("dégrade les capsules de gauche, intense, vers la droite, plus légère", () => {
+    const maxTone = getExtremeTemperatureTone("max", 29).container;
+    const minTone = getExtremeTemperatureTone("min", 8).container;
+    expect(maxTone).toContain("from-orange-500/88");
+    expect(maxTone).toContain("to-orange-500/14");
+    expect(minTone).toContain("from-blue-500/88");
+    expect(minTone).toContain("to-sky-500/14");
+  });
 });
