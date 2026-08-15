@@ -1,6 +1,8 @@
+import { useId } from "react";
+
 /**
  * MeteoIcon — Pack d'icônes MeteoAI personnalisé
- * Style moderne, couleurs vives sur fond sombre, conçu pour l'interface MeteoAI.
+ * Style 3D futuriste, couleurs lumineuses sur fond sombre, conçu pour l'interface MeteoAI.
  * Couvre : 30 régimes météo + paramètres + indicateurs + classement
  */
 
@@ -12,6 +14,11 @@ interface MeteoIconProps {
 
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const icon = ICONS[name] ?? ICONS["variable"];
+  const uniqueId = useId().replace(/:/g, "");
+  const depthFilterId = `meteo-depth-${uniqueId}`;
+  const orbGradientId = `meteo-orb-${uniqueId}`;
+  const glossGradientId = `meteo-gloss-${uniqueId}`;
+  const showOrb = size >= 26;
   return (
     <svg
       width={size}
@@ -19,9 +26,30 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
       viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={className}
+      className={`meteo-icon-3d ${className}`}
+      role="img"
+      aria-label={`Icône météo : ${name}`}
     >
-      {icon}
+      <defs>
+        <filter id={depthFilterId} x="-35%" y="-35%" width="170%" height="185%" colorInterpolationFilters="sRGB">
+          <feDropShadow dx="0" dy="2.6" stdDeviation="1.65" floodColor="#020617" floodOpacity="0.82" />
+          <feDropShadow dx="0" dy="0.3" stdDeviation="0.6" floodColor="#e0f2fe" floodOpacity="0.28" />
+          <feDropShadow dx="0" dy="0" stdDeviation="2.2" floodColor="#38bdf8" floodOpacity="0.2" />
+        </filter>
+        <radialGradient id={orbGradientId} cx="32%" cy="20%" r="78%">
+          <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.22" />
+          <stop offset="48%" stopColor="#1d4ed8" stopOpacity="0.1" />
+          <stop offset="100%" stopColor="#020617" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={glossGradientId} x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#e0f2fe" stopOpacity="0.38" />
+          <stop offset="45%" stopColor="#38bdf8" stopOpacity="0.08" />
+          <stop offset="100%" stopColor="#020617" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {showOrb ? <><circle cx="32" cy="32" r="29" fill={`url(#${orbGradientId})`} /><circle cx="32" cy="32" r="26.5" fill="none" stroke={`url(#${glossGradientId})`} strokeWidth="0.8" opacity="0.7" /></> : null}
+      <g filter={`url(#${depthFilterId})`}>{icon}</g>
+      {showOrb ? <path d="M18 12c7-4 20-5 29 1" stroke="#e0f2fe" strokeOpacity="0.16" strokeWidth="1.2" strokeLinecap="round" /> : null}
     </svg>
   );
 }

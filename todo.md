@@ -1311,3 +1311,8 @@
 - [x] Interface: Rendre les panneaux Qualité de l’air et Soleil & Lune cliquables.
 - [x] Interface: Afficher les détails et la provenance dans deux modales accessibles.
 - [x] Validation: Vérifier le comportement mobile, TypeScript et build ; 215 tests passent, avec 2 échecs intermittents préexistants liés aux snapshots météo réels.
+
+## Icônes météo 3D futuristes
+- [x] Audit: Recenser les variantes de MeteoIcon et leurs contextes d’affichage.
+- [x] Interface: Ajouter un traitement 3D lumineux cohérent à la bibliothèque d’icônes météo.
+- [x] Validation: Vérifier les rendus sur les pages principales, TypeScript, 219 tests et build.
