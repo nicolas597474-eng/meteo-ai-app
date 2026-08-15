@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { VALIDATION_WEATHER_MODELS, WEATHER_SERVICES } from "./weatherServices";
 
 describe("validation weather models", () => {
@@ -13,5 +14,10 @@ describe("validation weather models", () => {
     ]);
     const activeNames = WEATHER_SERVICES.expert.map((model) => model.name);
     expect(VALIDATION_WEATHER_MODELS.every((model) => !activeNames.includes(model.name))).toBe(true);
+  });
+
+  it("applique une reprise contrôlée à la collecte horaire des modèles actifs", () => {
+    const source = readFileSync(new URL("./weatherServices.ts", import.meta.url), "utf8");
+    expect(source).toContain("fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 })");
   });
 });

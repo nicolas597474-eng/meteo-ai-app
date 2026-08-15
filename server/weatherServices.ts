@@ -566,7 +566,7 @@ export async function collectHourlyForecastAllModels(
         url.searchParams.set("models", model.modelId);
       }
 
-      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
+      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
       if (!response.ok) {
         console.warn(`[HourlyAll] ${model.name} HTTP ${response.status}`);
         return null;
