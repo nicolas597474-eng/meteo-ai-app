@@ -8,7 +8,7 @@ describe("harmonisation des badges météo", () => {
     expect(readPage("../../pages/Ranking.tsx")).toContain("Confiance synthèse");
     expect(readPage("../../pages/Ranking.tsx")).toContain("WeatherStatusBadge");
     expect(readPage("../../pages/Dashboard.tsx")).toContain("Confiance locale");
-    expect(readPage("../../pages/ReliabilityLaboratory.tsx")).toContain("Scores qualifiés");
+    expect(readPage("../../pages/ReliabilityLaboratory.tsx")).toContain("Fiabilité en bref");
     expect(readPage("../../pages/WeatherAILab.tsx")).toContain("Hors fusion");
   });
 });

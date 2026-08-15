@@ -1299,3 +1299,9 @@
 - [x] Données: Exposer une réponse environnementale réelle via le serveur.
 - [x] Interface: Ajouter les panneaux Qualité de l’air et Soleil & Lune sous les graphiques du Dashboard.
 - [x] Validation: Vérifier les données réelles, le rendu mobile, TypeScript, 214 tests et build.
+
+## Synthèse de la page Fiabilité
+- [x] Audit: Identifier les métriques essentielles et les détails techniques redondants sur mobile.
+- [x] Interface: Mettre en avant un résumé explicite de la disponibilité et de la qualité des comparaisons.
+- [x] Interface: Masquer les détails non exploitables ou les réserver à une consultation volontaire.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et build ; 214 tests passent, avec 2 échecs intermittents préexistants liés aux snapshots météo réels.

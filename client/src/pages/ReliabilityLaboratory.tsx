@@ -28,15 +28,10 @@ const HORIZONS: Array<{ id: HorizonId; label: string }> = [
   { id: "11-15d", label: "11–15 jours" },
 ];
 
-const SECTIONS = ["Vue générale", "Modèles", "Stations", "Comparaison", "Situations météo", "Historique", "Méthodologie"] as const;
+const SECTIONS = ["Vue générale", "Modèles"] as const;
 const SECTION_IDS: Record<(typeof SECTIONS)[number], string> = {
   "Vue générale": "vue-generale",
   "Modèles": "modeles",
-  "Stations": "stations",
-  "Comparaison": "comparaison",
-  "Situations météo": "situations",
-  "Historique": "historique",
-  "Méthodologie": "methodologie",
 };
 
 function metric(value: number | null | undefined, unit = "", digits = 1) {
@@ -135,6 +130,9 @@ export default function ReliabilityLaboratory() {
   const stations = (data?.stations ?? []) as any[];
   const bestModel = data?.bestModel as any;
   const evidence = data?.evidence as any;
+  const qualifiedScoreCount = Number(evidence?.status?.qualifiedScoreCount ?? 0);
+  const classifiableModels = activeModels.filter((model) => model.normalizedScore !== null && model.normalizedScore !== undefined);
+  const hasClassifiableEvidence = qualifiedScoreCount > 0 && classifiableModels.length > 0;
   const selectSection = (section: (typeof SECTIONS)[number]) => {
     setActiveSection(section);
     document.getElementById(SECTION_IDS[section])?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -162,7 +160,7 @@ export default function ReliabilityLaboratory() {
 
         <MeteoSurface tone="lab" className="mb-4 rounded-2xl p-3 sm:p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div><p className="text-xs font-semibold text-slate-200">Paramètres d’analyse</p><p className="mt-0.5 text-[11px] text-slate-500">Le filtre ne recalcule pas les données : il limite la lecture de l’historique archivé.</p></div>
+            <div><p className="text-xs font-semibold text-slate-200">Période analysée</p><p className="mt-0.5 text-[11px] text-slate-500">Choisissez la période et l’échéance à comparer. Aucun résultat n’est estimé.</p></div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-700 bg-[#090d14] p-1 [scrollbar-width:none]">
                 {PERIODS.map((choice) => <button type="button" key={choice.id} onClick={() => setPeriod(choice.id)} className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${period === choice.id ? "bg-sky-600 text-white" : "text-slate-400"}`}>{choice.label}</button>)}
@@ -174,50 +172,25 @@ export default function ReliabilityLaboratory() {
 
         {isLoading ? <div className="space-y-4"><div className="h-32 animate-pulse rounded-2xl bg-slate-900" /><div className="h-64 animate-pulse rounded-2xl bg-slate-900" /><div className="h-64 animate-pulse rounded-2xl bg-slate-900" /></div> : isError || !data ? <MeteoSurface tone="lab" className="rounded-2xl p-5"><Insufficient title="Laboratoire indisponible" detail="La lecture des données de fiabilité a échoué. Aucun résultat n’est affiché tant que les données réelles ne sont pas accessibles." /></MeteoSurface> : <>
           <MeteoSurface tone="lab" className="mb-4 scroll-mt-20 rounded-2xl p-4" id="vue-generale">
-            <SectionHeading title="Vue générale" description="Les classements excluent explicitement les archives historiques non qualifiées et les références de modèle." icon="confidence" />
+            <SectionHeading title="Fiabilité en bref" description="Voici uniquement ce qui est actuellement mesuré et utilisable pour ce lieu, cette période et cette échéance." icon="confidence" />
             <div className="grid grid-cols-2 gap-y-4 sm:grid-cols-4">
-              <KeyMetric label="Meilleur modèle" value={bestModel ? bestModel.name : "—"} hint={bestModel ? `${metric(bestModel.normalizedScore, "/100", 0)} · ${bestModel.confidence.label}` : "Aucun modèle classable"} accent="text-sky-200" />
-              <KeyMetric label="Comparaisons" value={String(evidence?.totalComparisons ?? 0)} hint="Paires modèle / observation physique" accent="text-white" />
-              <KeyMetric label="Modèles classables" value={String(evidence?.evaluatedModelCount ?? 0)} hint="Seuil d’échantillon respecté" accent="text-emerald-300" />
-              <KeyMetric label="Stations locales" value={String(stations.length)} hint="Stations physiques archivées sur la période" accent="text-amber-200" />
+              <KeyMetric label="Classement" value={hasClassifiableEvidence ? "Disponible" : "En préparation"} hint={hasClassifiableEvidence ? "Comparaisons qualifiées suffisantes" : "Historique encore trop court"} accent={hasClassifiableEvidence ? "text-emerald-300" : "text-amber-200"} />
+              <KeyMetric label="Meilleur modèle" value={hasClassifiableEvidence && bestModel ? bestModel.name : "—"} hint={hasClassifiableEvidence && bestModel ? `${metric(bestModel.normalizedScore, "/100", 0)} · ${bestModel.confidence.label}` : "Aucun modèle classable"} accent="text-sky-200" />
+              <KeyMetric label="Comparaisons fiables" value={String(evidence?.totalComparisons ?? 0)} hint="Prévision comparée à une observation physique" accent="text-white" />
+              <KeyMetric label="Stations archivées" value={String(stations.length)} hint="Sources physiques sur la période" accent="text-amber-200" />
             </div>
-          </MeteoSurface>
-
-          <MeteoSurface tone="lab" className={`mb-4 rounded-2xl border p-4 ${evidence?.status?.qualifiedScoreCount > 0 ? "border-emerald-500/25" : "border-amber-500/25"}`}>
-            <div className="flex items-start gap-3"><MeteoIcon name="stations" size={26} /><div><p className="text-sm font-semibold text-white">Preuves admises dans le classement</p><p className="mt-1 text-xs leading-relaxed text-slate-400">{evidence?.policy}</p><div className="mt-3 flex flex-wrap gap-2"><WeatherStatusBadge compact tone={evidence?.status?.coverageHours >= 18 ? "success" : "warning"} label="Heures physiques" value={`${evidence?.status?.coverageHours ?? 0}/18`} description="Nombre d’heures disposant de suffisamment d’observations physiques sur le dernier cycle. Le seuil de qualification est de 18 heures." /><WeatherStatusBadge compact tone={evidence?.status?.qualifiedScoreCount > 0 ? "success" : "neutral"} label="Scores qualifiés" value={String(evidence?.status?.qualifiedScoreCount ?? 0)} description="Nombre de comparaisons assez complètes pour être utilisées dans le laboratoire de fiabilité." /><WeatherStatusBadge compact tone="neutral" label="Dernière journée" value={evidence?.status?.date ?? "—"} description="Journée Europe/Paris sur laquelle les dernières preuves de comparaison ont été archivées." /></div></div></div>
+            <div className={`mt-4 rounded-xl border px-3 py-3 ${hasClassifiableEvidence ? "border-emerald-500/25 bg-emerald-500/[0.05]" : "border-amber-500/25 bg-amber-500/[0.05]"}`}><p className="text-sm font-semibold text-slate-100">{hasClassifiableEvidence ? "Le classement est utilisable" : "Classement en préparation"}</p><p className="mt-1 text-xs leading-relaxed text-slate-400">{hasClassifiableEvidence ? "Les scores affichés reposent sur des comparaisons complètes. Les détails secondaires restent volontairement masqués pour faciliter la lecture." : "Les relevés commencent à être archivés, mais les comparaisons ne sont pas encore assez nombreuses ou complètes pour classer les modèles sans risque d’interprétation."}</p></div>
           </MeteoSurface>
 
           <section className="mb-4" id="modeles">
             <MeteoSurface tone="lab" className="rounded-2xl p-4">
-              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><SectionHeading title="Classement des modèles" description="Les huit modèles actifs sont distincts des modèles en validation. Un score manque tant que toutes les métriques nécessaires ne sont pas alignées." icon="confidence" /><div className="flex flex-wrap gap-1.5">{(["score", "temperature", "precipitation", "wind"] as SortId[]).map((item) => <button type="button" key={item} onClick={() => setSortBy(item)} className={`rounded-lg border px-2 py-1 text-[10px] ${sortBy === item ? "border-sky-500 bg-sky-500/15 text-sky-100" : "border-slate-700 text-slate-400"}`}>{item === "score" ? "Score" : item === "temperature" ? "Température" : item === "precipitation" ? "Pluie" : "Vent"}</button>)}</div></div>
+              <SectionHeading title="Modèles classables" description="Seuls les modèles qui disposent de suffisamment de comparaisons complètes sont listés ici." icon="confidence" />
               <div className="space-y-2">
-                {activeModels.map((model) => <ModelCard key={model.name} model={model} />)}
+                {hasClassifiableEvidence ? classifiableModels.slice(0, 3).map((model) => <ModelCard key={model.name} model={model} />) : <Insufficient title="Aucun modèle classable pour le moment" detail="La collecte archive déjà les prévisions et les observations. Le classement apparaîtra automatiquement lorsque le seuil de comparaisons complètes sera atteint." />}
               </div>
-              {candidateModels.length > 0 ? <div className="mt-4 border-t border-slate-800 pt-4"><p className="text-xs font-semibold text-amber-100">Modèles en validation · hors fusion</p><p className="mt-1 text-[11px] text-slate-500">Ces sorties sont archivées mais ne sont ni classées comme actives, ni intégrées à la prévision officielle.</p><div className="mt-2 space-y-2">{candidateModels.map((model) => <ModelCard key={model.name} model={model} candidate />)}</div></div> : null}
+              {hasClassifiableEvidence && classifiableModels.length > 3 ? <p className="mt-3 text-center text-[11px] text-slate-500">{classifiableModels.length - 3} autre(s) modèle(s) classable(s) sont disponibles lorsque davantage de comparaison est nécessaire.</p> : null}
+              {candidateModels.length > 0 ? <p className="mt-3 border-t border-slate-800 pt-3 text-[11px] leading-relaxed text-slate-500">{candidateModels.length} modèle(s) candidat(s) sont suivis séparément. Ils restent hors fusion et ne sont pas listés tant que leur gain de fiabilité n’est pas démontré.</p> : null}
             </MeteoSurface>
-          </section>
-
-          <section className="mb-4 grid gap-4 scroll-mt-20 lg:grid-cols-2" id="comparaison">
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Évolution des scores" description="Chaque point provient d’un score déjà calculé ; aucune courbe n’est interpolée." icon="refresh" />{scoreTimeline.length === 0 ? <EmptyFigure title="Historique de score" reason="Les comparaisons physiques qualifiées ne sont pas encore disponibles sur la période sélectionnée." /> : <TimelineFigure points={scoreTimeline} />}</MeteoSurface>
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Prévision contre réalité" description="La comparaison détaillée apparaîtra une fois les séries horaires qualifiées conservées sur plusieurs cycles." icon="variable" />{scoreTimeline.length === 0 ? <EmptyFigure title="Écarts mesurés" reason={data.availability?.modelObservationReplay ?? "Données insuffisantes."} /> : <MetricEvidenceFigure points={scoreTimeline} />}</MeteoSurface>
-          </section>
-
-          <section className="mb-4 scroll-mt-20" id="historique">
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Précision selon l’horizon" description="Les horizons sont affichés séparément. Une période non archivée n’est jamais déduite d’un autre horizon." icon="refresh" /><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{(data.horizons as any[]).map((bucket) => <HorizonCard key={bucket.id} bucket={bucket} selected={bucket.id === horizon} />)}</div></MeteoSurface>
-          </section>
-
-          <section className="mb-4 grid gap-4 scroll-mt-20 lg:grid-cols-[1.35fr_.65fr]" id="stations">
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Fiabilité des stations" description="La qualité décrit la continuité et la complétude archivées ; elle ne modifie pas la fusion officielle à elle seule." icon="stations" />{stations.length === 0 ? <Insufficient detail="Aucune station physique n’est encore archivée pour cette localisation et cette période." /> : <div className="space-y-2">{stations.slice(0, 6).map((station) => <StationCard key={station.stationId} station={station} />)}{stations.length > 6 ? <p className="pt-1 text-center text-[11px] text-slate-500">{stations.length - 6} station(s) supplémentaire(s) disponible(s) dans l’historique.</p> : null}</div>}</MeteoSurface>
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Qualité locale" description="Statut des observations locales utilisées pour contrôler les modèles." icon="location" />{data.stationEvidence ? <div className="space-y-3 rounded-xl border border-slate-800 bg-[#090d14] p-3"><KeyValue label="Stations de la synthèse" value={String((data.stationEvidence as any).stationCount ?? "—")} /><KeyValue label="Confiance de la synthèse" value={metric((data.stationEvidence as any).confidenceScore, "/100", 0)} /><KeyValue label="Température" value={metric((data.stationEvidence as any).temperature, " °C")} /><KeyValue label="Pression" value={metric((data.stationEvidence as any).pressure, " hPa", 0)} /><KeyValue label="Calculée le" value={(data.stationEvidence as any).computedAt ? new Date((data.stationEvidence as any).computedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }) : "—"} /></div> : <Insufficient title="Synthèse locale indisponible" detail="Une synthèse apparaît après la collecte de stations physiques qualifiées." />}</MeteoSurface>
-          </section>
-
-          <section className="mb-4 grid gap-4 scroll-mt-20 lg:grid-cols-2" id="situations">
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Fiabilité selon les situations météo" description="Stable, pluie, vent, orage, brouillard et autres situations sont séparés seulement lorsque leur échantillon est disponible." icon="variable" /><EmptyFigure title="Analyse des situations" reason={data.availability?.situations ?? "Données insuffisantes."} /></MeteoSurface>
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Analyse saisonnière" description="Les comparaisons par saison, mois et période ne sont publiées qu’avec un historique mesuré suffisant." icon="partly_cloudy" /><EmptyFigure title="Saisons et périodes" reason={data.availability?.seasons ?? "Données insuffisantes."} /></MeteoSurface>
-          </section>
-
-          <section className="mb-4 scroll-mt-20" id="methodologie">
-            <MeteoSurface tone="lab" className="rounded-2xl p-4"><SectionHeading title="Méthodologie et traçabilité" description="Une seule chaîne de données relie l’archive de prévisions, les observations physiques et les scores du laboratoire." icon="confidence" /><div className="grid gap-3 md:grid-cols-3"><MethodCard number="01" title="Prévisions archivées" detail="Les modèles actifs sont archivés avec leur date de validité et leur émission. Les modèles candidats restent hors fusion." /><MethodCard number="02" title="Réalité mesurée" detail="Seules les observations physiques qualifiées servent aux comparaisons. Les références de modèle et archives non qualifiées sont exclues." /><MethodCard number="03" title="Score explicable" detail={`Température ${data.scoreDefinition.weights.temperature * 100} %, pluie ${data.scoreDefinition.weights.precipitation * 100} %, vent ${data.scoreDefinition.weights.wind * 100} %, rafales ${data.scoreDefinition.weights.gusts * 100} %, humidité ${data.scoreDefinition.weights.humidity * 100} %, pression ${data.scoreDefinition.weights.pressure * 100} %.`} /></div><p className="mt-3 rounded-xl border border-slate-800 bg-[#090d14] px-3 py-2 text-[11px] leading-relaxed text-slate-500">Règle de publication : {data.scoreDefinition.missingMetricRule}</p></MeteoSurface>
           </section>
         </>}
       </div>
@@ -226,10 +199,9 @@ export default function ReliabilityLaboratory() {
   );
 }
 
-function ModelCard({ model, candidate = false }: { model: any; candidate?: boolean }) {
+function ModelCard({ model }: { model: any }) {
   const confidence = model.confidence ?? {};
-  const hasMetrics = [model.metrics?.temperature?.mae, model.metrics?.temperature?.rmse, model.metrics?.wind?.mae, model.metrics?.precipitation?.score, model.metrics?.humidityScore, model.metrics?.pressureScore].some((value) => value !== null && value !== undefined);
-  return <article className={`rounded-xl border bg-[#090d14] p-3 ${candidate ? "border-amber-500/20" : "border-slate-800"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[10px] font-bold ${model.rank ? "bg-sky-500/15 text-sky-200" : "bg-slate-800 text-slate-400"}`}>{model.rank ? `#${model.rank}` : "—"}</span><p className="truncate text-sm font-semibold text-white">{model.name}</p><WeatherStatusBadge compact className="w-[104px]" tone={candidate ? "warning" : "info"} label={candidate ? "Validation" : "Modèle"} value={candidate ? "Hors fusion" : "Actif"} description={candidate ? "Ce modèle est en validation : il est archivé, mais ne contribue pas encore à la prévision officielle." : "Ce modèle est actif dans le laboratoire de fiabilité. Son score est calculé uniquement à partir de comparaisons archivées."} /></div><p className="mt-1 text-[10px] text-slate-500">{model.provider} · {model.archive?.runs ?? 0} émission(s) archivée(s) · dernières données : {model.archive?.latestValidDate ?? "—"}</p></div><div className="text-right"><p className="text-xl font-bold text-white">{metric(model.normalizedScore, "/100", 0)}</p><p className="text-[10px] text-slate-500">score normalisé</p></div></div>{hasMetrics ? <><div className="mt-3 grid gap-2 border-t border-slate-800 pt-3 sm:grid-cols-4"><KeyValue label="MAE température" value={metric(model.metrics?.temperature?.mae, " °C", 2)} /><KeyValue label="RMSE" value={metric(model.metrics?.temperature?.rmse, " °C", 2)} /><KeyValue label="Biais" value={metric(model.metrics?.temperature?.bias, " °C", 2)} /><KeyValue label="MAE vent" value={metric(model.metrics?.wind?.mae, " km/h", 2)} /></div><div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1.2fr]"><p className={`rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${confidenceClass(confidence.tone)}`}>{confidence.label ?? "Données insuffisantes"} · {model.evidence?.comparisons ?? 0} comparaison(s) sur {model.evidence?.evaluatedDays ?? 0} jour(s).</p><div className="space-y-1.5"><MiniBar label="Précipitations" value={model.metrics?.precipitation?.score} suffix="/100" className="bg-blue-400" /><MiniBar label="Humidité" value={model.metrics?.humidityScore} suffix="/100" className="bg-cyan-400" /><MiniBar label="Pression" value={model.metrics?.pressureScore} suffix="/100" className="bg-violet-400" /></div></div></> : null}{model.insufficiencyReason ? <p className={`mt-3 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${confidenceClass(confidence.tone)}`}>{model.insufficiencyReason}</p> : null}</article>;
+  return <article className="rounded-xl border border-slate-800 bg-[#090d14] p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[10px] font-bold ${model.rank ? "bg-sky-500/15 text-sky-200" : "bg-slate-800 text-slate-400"}`}>{model.rank ? `#${model.rank}` : "—"}</span><p className="truncate text-sm font-semibold text-white">{model.name}</p></div><p className="mt-1 text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) qualifiée(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p></div><div className="text-right"><p className="text-xl font-bold text-white">{metric(model.normalizedScore, "/100", 0)}</p><p className="text-[10px] text-slate-500">score mesuré</p></div></div><p className={`mt-3 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${confidenceClass(confidence.tone)}`}>{confidence.label ?? "Données insuffisantes"}</p></article>;
 }
 
 function HorizonCard({ bucket, selected }: { bucket: any; selected: boolean }) {
