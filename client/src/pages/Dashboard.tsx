@@ -591,13 +591,13 @@ export default function Dashboard() {
 
                 {/* Max / Min */}
                 <div className={dashboardTemperatureLayout.extremes}>
-                  <div className="flex items-center justify-end gap-1 rounded-lg border border-orange-300/35 bg-gradient-to-r from-orange-500/25 via-amber-300/15 to-transparent px-1.5 py-0.5 shadow-[0_0_16px_rgba(251,146,60,0.2)] sm:gap-1.5">
+                  <div className="flex items-center justify-end gap-1 rounded-lg border border-orange-200/60 bg-gradient-to-r from-orange-500/70 via-amber-400/52 to-orange-950/45 px-1.5 py-0.5 shadow-[0_0_18px_rgba(251,146,60,0.38)] sm:gap-1.5">
                     <span className="text-[10px] sm:text-xs font-bold text-orange-100 uppercase tracking-normal drop-shadow-[0_0_10px_rgba(251,146,60,0.85)] sm:tracking-wide">max</span>
                     <span className={`${dashboardTemperatureLayout.extremeValue} font-black text-orange-100 drop-shadow-[0_0_16px_rgba(251,146,60,0.95)]`}>
                       {today?.tempMax != null ? Number(today.tempMax).toFixed(1) : meteoAI?.tempMax != null ? Number(meteoAI.tempMax).toFixed(1) : "—"}°
                     </span>
                   </div>
-                  <div className="flex items-center justify-end gap-1 rounded-lg border border-cyan-300/35 bg-gradient-to-r from-sky-500/25 via-cyan-300/15 to-transparent px-1.5 py-0.5 shadow-[0_0_16px_rgba(56,189,248,0.2)] sm:gap-1.5">
+                  <div className="flex items-center justify-end gap-1 rounded-lg border border-cyan-200/60 bg-gradient-to-r from-blue-500/70 via-cyan-400/52 to-blue-950/45 px-1.5 py-0.5 shadow-[0_0_18px_rgba(56,189,248,0.38)] sm:gap-1.5">
                     <span className="text-[10px] sm:text-xs font-bold text-cyan-100 uppercase tracking-normal drop-shadow-[0_0_10px_rgba(96,165,250,0.85)] sm:tracking-wide">min</span>
                     <span className={`${dashboardTemperatureLayout.extremeValue} font-black text-cyan-100 drop-shadow-[0_0_16px_rgba(96,165,250,0.95)]`}>
                       {today?.tempMin != null ? Number(today.tempMin).toFixed(1) : meteoAI?.tempMin != null ? Number(meteoAI.tempMin).toFixed(1) : "—"}°

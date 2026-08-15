@@ -1387,3 +1387,7 @@
 - [x] Interface: Retirer la mention Tendance de la pancarte principale.
 - [x] Interface: Renforcer les couleurs des températures Max et Min à droite.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
+
+## Opacité des températures Max et Min
+- [x] Interface: Rendre les fonds orange et bleu des capsules Max et Min plus opaques.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
