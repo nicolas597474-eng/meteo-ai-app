@@ -10,6 +10,8 @@ describe("MeteoIcon", () => {
     expect(source).toContain("meteo3d-thunderstorm_20bf50ef.png");
     expect(source).toContain("meteo3d-clear-night_9a98fab7.png");
     expect(source).toContain("meteo3d-temperature_d834ebfe.png");
+    expect(source).toContain("getPictorialAnimationClass");
+    expect(source).toContain("meteo-icon-motion-storm");
     expect(source).toContain('key === "location"');
     expect(source).toContain('key === "stations"');
   });

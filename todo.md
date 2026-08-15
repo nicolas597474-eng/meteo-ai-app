@@ -1348,3 +1348,8 @@
 - [x] Actifs: Produire des fonds de ciel météo originaux adaptés aux catégories principales.
 - [x] Interface: Intégrer le fond de ciel dynamique à la carte principale sans réduire la lisibilité.
 - [x] Validation: Vérifier les états météo, TypeScript, 219 tests et build.
+
+## Animations des icônes météo
+- [x] Audit: Identifier les conditions picturales animables et les contraintes d’accessibilité.
+- [x] Interface: Ajouter des animations CSS discrètes, conditionnelles et compatibles avec la réduction de mouvement.
+- [x] Validation: Vérifier les rendus, TypeScript, 219 tests et build.

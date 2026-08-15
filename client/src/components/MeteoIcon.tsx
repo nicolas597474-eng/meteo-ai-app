@@ -44,16 +44,30 @@ const PICTORIAL_WEATHER_ICONS: Record<string, string> = {
   temperature: "/manus-storage/meteo3d-temperature_d834ebfe.png",
 };
 
+function getPictorialAnimationClass(name: string) {
+  const key = name.toLowerCase();
+  if (["sunny", "stable", "summer_heat"].includes(key)) return "meteo-icon-motion-sun";
+  if (["few_clouds", "partly_cloudy", "overcast", "cloud_cover", "variable", "maritime", "urban_heat", "mountain"].includes(key)) return "meteo-icon-motion-cloud";
+  if (["showers", "rainy", "heavy_rain", "autumn_disturbed"].includes(key)) return "meteo-icon-motion-rain";
+  if (["thunderstorm", "storm"].includes(key)) return "meteo-icon-motion-storm";
+  if (["snow", "freezing_rain", "sleet", "frost", "deep_frost", "winter_anticyclonic"].includes(key)) return "meteo-icon-motion-snow";
+  if (key === "fog") return "meteo-icon-motion-fog";
+  if (key === "clear_night") return "meteo-icon-motion-night";
+  if (["wind_moderate", "windy", "wind_param"].includes(key)) return "meteo-icon-motion-wind";
+  return "meteo-icon-motion-ambient";
+}
+
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
   const pictorialIcon = PICTORIAL_WEATHER_ICONS[name.toLowerCase()];
+  const animationClass = getPictorialAnimationClass(name);
   if (pictorialIcon) {
     return (
       <img
         src={pictorialIcon}
         width={size}
         height={size}
-        className={`meteo-icon-3d object-contain ${className}`}
+        className={`meteo-icon-3d ${animationClass} object-contain transition-transform duration-200 hover:scale-[1.04] ${className}`}
         alt={`Icône météo : ${name}`}
         draggable={false}
       />

@@ -260,3 +260,68 @@
   position: relative;
   z-index: 1;
 }
+
+/* Icônes météo vivantes : les mouvements sont désactivés lorsque l’utilisateur le demande. */
+.meteo-icon-3d {
+  filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 6px rgb(125 211 252 / 0.18));
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .meteo-icon-motion-ambient { animation: meteo-icon-float 4.8s cubic-bezier(0.23, 1, 0.32, 1) infinite; }
+  .meteo-icon-motion-cloud { animation: meteo-icon-cloud 5.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .meteo-icon-motion-sun { animation: meteo-icon-sun 14s linear infinite; }
+  .meteo-icon-motion-rain { animation: meteo-icon-rain 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .meteo-icon-motion-storm { animation: meteo-icon-storm 4.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .meteo-icon-motion-snow { animation: meteo-icon-snow 5.2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .meteo-icon-motion-fog { animation: meteo-icon-fog 6.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .meteo-icon-motion-night { animation: meteo-icon-night 4.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .meteo-icon-motion-wind { animation: meteo-icon-wind 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+}
+
+@keyframes meteo-icon-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes meteo-icon-cloud {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -1.5px, 0) scale(1.018); }
+}
+
+@keyframes meteo-icon-sun {
+  from { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.025); }
+  to { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes meteo-icon-rain {
+  0%, 100% { transform: translateY(0); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 6px rgb(56 189 248 / 0.18)); }
+  50% { transform: translateY(1.5px); filter: drop-shadow(0 3px 3px rgb(2 6 23 / 0.72)) drop-shadow(0 0 9px rgb(56 189 248 / 0.32)); }
+}
+
+@keyframes meteo-icon-storm {
+  0%, 44%, 100% { transform: translateY(0); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 6px rgb(125 211 252 / 0.18)); }
+  48% { transform: translateY(-1px); filter: brightness(1.24) drop-shadow(0 0 11px rgb(250 204 21 / 0.52)); }
+  52% { transform: translateY(0); filter: brightness(0.98) drop-shadow(0 0 6px rgb(125 211 252 / 0.22)); }
+}
+
+@keyframes meteo-icon-snow {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-1deg); }
+  50% { transform: translate3d(1.5px, 1px, 0) rotate(1deg); }
+}
+
+@keyframes meteo-icon-fog {
+  0%, 100% { transform: translateX(-1px); opacity: 0.94; }
+  50% { transform: translateX(2px); opacity: 1; }
+}
+
+@keyframes meteo-icon-night {
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 5px rgb(167 139 250 / 0.2)); }
+  50% { transform: translateY(-1px) scale(1.025); filter: drop-shadow(0 2px 2px rgb(2 6 23 / 0.7)) drop-shadow(0 0 10px rgb(196 181 253 / 0.42)); }
+}
+
+@keyframes meteo-icon-wind {
+  0%, 100% { transform: translateX(-1.5px); }
+  50% { transform: translateX(2px); }
+}
