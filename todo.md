@@ -1279,3 +1279,7 @@
 - [x] Interface: Définir des dégradés réutilisables, sombres et compatibles avec les états sémantiques.
 - [x] Interface: Appliquer ce traitement aux cartes principales des pages météo.
 - [x] Validation: Vérifier la lisibilité mobile, TypeScript, 210 tests et build.
+
+## Ajustement des dégradés de cartes
+- [x] Interface: Atténuer l’opacité et les lueurs des dégradés de surface.
+- [x] Validation: Vérifier la lisibilité mobile, TypeScript, 210 tests et build.

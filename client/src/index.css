@@ -169,9 +169,9 @@
 
 /* Surfaces MeteoAI : dégradés minéraux sombres, lisibles sur mobile et cohérents entre les pages. */
 :root {
-  --weather-surface-base: linear-gradient(145deg, rgba(18, 31, 47, 0.98) 0%, rgba(11, 19, 30, 0.98) 55%, rgba(7, 12, 20, 0.99) 100%);
-  --weather-surface-soft: linear-gradient(145deg, rgba(16, 28, 43, 0.92) 0%, rgba(9, 16, 27, 0.96) 100%);
-  --weather-surface-inset: linear-gradient(145deg, rgba(9, 17, 28, 0.96) 0%, rgba(5, 10, 17, 0.98) 100%);
+  --weather-surface-base: linear-gradient(145deg, rgba(16, 27, 40, 0.96) 0%, rgba(10, 18, 29, 0.97) 55%, rgba(7, 12, 20, 0.985) 100%);
+  --weather-surface-soft: linear-gradient(145deg, rgba(14, 24, 37, 0.90) 0%, rgba(9, 16, 26, 0.94) 100%);
+  --weather-surface-inset: linear-gradient(145deg, rgba(8, 15, 25, 0.94) 0%, rgba(5, 10, 17, 0.97) 100%);
 }
 
 .weather-surface,
@@ -183,50 +183,50 @@
 .weather-action-surface,
 .weather-nav {
   background: var(--weather-surface-base);
-  border-color: rgba(100, 140, 177, 0.24);
-  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.055), 0 14px 30px rgba(0, 0, 0, 0.18);
+  border-color: rgba(100, 140, 177, 0.19);
+  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.035), 0 12px 26px rgba(0, 0, 0, 0.14);
 }
 
 .weather-surface-hero {
   background:
-    radial-gradient(circle at 88% 2%, rgba(42, 119, 215, 0.20), transparent 45%),
-    radial-gradient(circle at 12% 0%, rgba(32, 179, 231, 0.09), transparent 34%),
+    radial-gradient(circle at 88% 2%, rgba(42, 119, 215, 0.11), transparent 45%),
+    radial-gradient(circle at 12% 0%, rgba(32, 179, 231, 0.045), transparent 34%),
     var(--weather-surface-base);
-  border-color: rgba(56, 189, 248, 0.30);
+  border-color: rgba(56, 189, 248, 0.22);
 }
 
 .weather-surface-subtle,
 .weather-surface-inset,
 .weather-nav {
   background: var(--weather-surface-inset);
-  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.035), 0 9px 22px rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.025), 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
 .weather-surface-accent {
   background:
-    radial-gradient(circle at 88% 0%, rgba(14, 165, 233, 0.16), transparent 44%),
+    radial-gradient(circle at 88% 0%, rgba(14, 165, 233, 0.08), transparent 44%),
     var(--weather-surface-base);
-  border-color: rgba(56, 189, 248, 0.34);
+  border-color: rgba(56, 189, 248, 0.24);
 }
 
 .weather-surface-lab {
   background:
-    radial-gradient(circle at 92% 0%, rgba(37, 99, 235, 0.20), transparent 44%),
+    radial-gradient(circle at 92% 0%, rgba(37, 99, 235, 0.10), transparent 44%),
     var(--weather-surface-base);
-  border-color: rgba(71, 146, 214, 0.34);
+  border-color: rgba(71, 146, 214, 0.24);
 }
 
 [class~="bg-[#10131a]"] {
   background: var(--weather-surface-base);
-  border-color: rgba(100, 140, 177, 0.24);
-  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.045), 0 12px 26px rgba(0, 0, 0, 0.16);
+  border-color: rgba(100, 140, 177, 0.19);
+  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.03), 0 10px 24px rgba(0, 0, 0, 0.13);
 }
 
 [class~="bg-[#090b10]"],
 [class~="bg-[#080c13]"],
 [class~="bg-[#090d14]"] {
   background: var(--weather-surface-inset);
-  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(205, 233, 255, 0.02);
 }
 
 /* Cadres de graphiques MeteoAI : relief bleu discret sans affecter le canvas. */
