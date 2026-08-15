@@ -1372,3 +1372,8 @@
 - [x] Interface: Agrandir la date intégrée à la pancarte principale.
 - [x] Interface: Accentuer les températures Max et Min.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
+
+## Allégement de l’en-tête du Dashboard
+- [x] Interface: Retirer le bloc MeteoAI et Hondeghem au-dessus des favoris.
+- [x] Interface: Resserer l’espacement supérieur après le retrait du bloc.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.

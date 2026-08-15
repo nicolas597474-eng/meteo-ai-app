@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Droplets, Wind, Activity, MapPin, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, RefreshCw, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -372,20 +372,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-2 sm:space-y-6 sm:px-6 sm:py-8">
-
-        {/* ── Header ── */}
-        <div className="flex items-center">
-          <div>
-            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-              MeteoAI
-            </h1>
-            <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground text-xs sm:text-sm">
-              <MapPin className="h-3 w-3 flex-shrink-0" />
-              <span>{selectedLocation?.name ?? "Hondeghem, Nord"}</span>
-            </div>
-          </div>
-        </div>
+      <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-1 sm:space-y-6 sm:px-6 sm:py-8">
 
         {!authLoading && !user && (
           <div role="status" className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-xs text-blue-100">
