@@ -1261,3 +1261,9 @@
 ## Badge de collecte de la page Stations
 - [x] Interface: Moderniser le badge « Collecte 05:00 Paris » en conservant son information.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, test ciblé et build ; la suite complète conserve deux échecs intermittents antérieurs liés aux snapshots météo dynamiques.
+
+## Harmonisation des badges de synthèse et statut
+- [x] Audit: Recenser les badges de synthèse, confiance et statut dans les pages météo.
+- [x] Interface: Créer une primitive de badge réutilisable, avec variantes sémantiques.
+- [x] Interface: Appliquer le nouveau langage visuel aux badges pertinents des différentes pages.
+- [x] Validation: Vérifier les rendus mobiles, TypeScript, 210 tests et build.

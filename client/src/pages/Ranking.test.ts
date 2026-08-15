@@ -18,7 +18,7 @@ describe("page Fiabilité", () => {
   it("distingue explicitement les références de modèles des stations locales", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Références de modèles — non stations");
-    expect(source).toContain("MODÈLE · NON STATION");
+    expect(source).toContain('label="Modèle" value="Non station"');
     expect(source).toContain("il ne modifie pas la température locale avant une validation historique mesurée");
   });
 
@@ -60,8 +60,8 @@ describe("page Fiabilité", () => {
   it("présente la collecte planifiée dans un badge visuel accessible", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Clock3");
-    expect(source).toContain("motion-safe:animate-pulse");
+    expect(source).toContain("WeatherStatusBadge");
     expect(source).toContain("Collecte automatique planifiée à 05h00, heure de Paris");
-    expect(source).toContain(">05h00 <span");
+    expect(source).toContain('label="Collecte" value="05h00 Paris"');
   });
 });

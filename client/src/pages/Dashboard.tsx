@@ -13,6 +13,7 @@ import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
 import { BackToTopButton } from "@/components/BackToTopButton";
+import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
@@ -533,15 +534,10 @@ export default function Dashboard() {
                     onClick={() => setShowFusionDetails((open) => !open)}
                     aria-expanded={showFusionDetails}
                     aria-controls="fusion-explication"
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-blue-400/25 bg-blue-400/10 px-2 py-1 text-left text-[10px] text-blue-100"
+                    className="mt-2 inline-flex max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   >
-                    <Activity className="h-3 w-3 text-blue-300" />
-                    <span className="hidden sm:inline">
-                      {modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion ${modelIndicator.modelCount} modèles`} : <strong>{modelIndicator.primaryModel}</strong>
-                      {modelIndicator.mode === "multi_model" ? ` · poids moyen ${Math.round(modelIndicator.primaryWeight * 100)}%` : ""}
-                    </span>
-                    <span className="sm:hidden">{modelIndicator.mode === "single_model" ? "Modèle" : "Fusion"} · <strong>{modelIndicator.primaryModel}</strong>{modelIndicator.mode === "multi_model" ? ` ${Math.round(modelIndicator.primaryWeight * 100)}%` : ""}</span>
-                    {showFusionDetails ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    <WeatherStatusBadge compact tone="info" icon={<Activity className="h-3 w-3" />} label={modelIndicator.mode === "single_model" ? "Modèle utilisé" : `Fusion · ${modelIndicator.modelCount} modèles`} value={modelIndicator.mode === "multi_model" ? `${modelIndicator.primaryModel} · ${Math.round(modelIndicator.primaryWeight * 100)}%` : modelIndicator.primaryModel} />
+                    {showFusionDetails ? <ChevronUp className="ml-1 h-3 w-3 text-sky-200" /> : <ChevronDown className="ml-1 h-3 w-3 text-sky-200" />}
                   </button>
                 )}
                 {showFusionDetails && modelIndicator && (
@@ -748,7 +744,7 @@ export default function Dashboard() {
                       : `Repli explicite sur ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèle${locationWeather.ultraLocal.modelFallback?.modelCount === 1 ? "" : "s"}`}
                   </p>
                 </div>
-                <span className="text-xs text-emerald-200">Confiance observation locale {locationWeather.ultraLocal.confidenceScore}%</span>
+                <WeatherStatusBadge compact tone="success" label="Confiance locale" value={`${locationWeather.ultraLocal.confidenceScore}%`} pulse={locationWeather.ultraLocal.stationCount > 0} />
               </div>
               {locationWeather.ultraLocal.stationsUsed.length > 0 ? (
                 <div className="mt-3 space-y-1.5 border-t border-emerald-500/15 pt-2">

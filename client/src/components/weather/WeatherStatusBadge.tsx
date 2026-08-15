@@ -1,0 +1,90 @@
+import type { ReactNode } from "react";
+
+export type WeatherStatusBadgeTone = "info" | "success" | "warning" | "lab" | "neutral" | "danger";
+
+type WeatherStatusBadgeProps = {
+  label: string;
+  value?: ReactNode;
+  tone?: WeatherStatusBadgeTone;
+  icon?: ReactNode;
+  pulse?: boolean;
+  compact?: boolean;
+  className?: string;
+  ariaLabel?: string;
+};
+
+const toneClasses: Record<WeatherStatusBadgeTone, { surface: string; icon: string; label: string; value: string; dot: string }> = {
+  info: {
+    surface: "border-sky-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.18),transparent_48%),linear-gradient(135deg,rgba(14,116,144,0.16),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(8,47,73,0.22),inset_0_1px_0_rgba(186,230,253,0.12)]",
+    icon: "border-sky-300/20 bg-sky-400/10 text-sky-200",
+    label: "text-sky-100/65",
+    value: "text-sky-100",
+    dot: "bg-sky-300",
+  },
+  success: {
+    surface: "border-emerald-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(52,211,153,0.16),transparent_48%),linear-gradient(135deg,rgba(6,95,70,0.18),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(6,78,59,0.2),inset_0_1px_0_rgba(167,243,208,0.1)]",
+    icon: "border-emerald-300/20 bg-emerald-400/10 text-emerald-200",
+    label: "text-emerald-100/65",
+    value: "text-emerald-100",
+    dot: "bg-emerald-300",
+  },
+  warning: {
+    surface: "border-amber-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.15),transparent_48%),linear-gradient(135deg,rgba(146,64,14,0.18),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(120,53,15,0.2),inset_0_1px_0_rgba(253,230,138,0.1)]",
+    icon: "border-amber-300/20 bg-amber-400/10 text-amber-200",
+    label: "text-amber-100/65",
+    value: "text-amber-100",
+    dot: "bg-amber-300",
+  },
+  lab: {
+    surface: "border-violet-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(167,139,250,0.16),transparent_48%),linear-gradient(135deg,rgba(91,33,182,0.16),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(76,29,149,0.2),inset_0_1px_0_rgba(221,214,254,0.1)]",
+    icon: "border-violet-300/20 bg-violet-400/10 text-violet-200",
+    label: "text-violet-100/65",
+    value: "text-violet-100",
+    dot: "bg-violet-300",
+  },
+  neutral: {
+    surface: "border-slate-500/35 bg-[radial-gradient(circle_at_18%_18%,rgba(148,163,184,0.14),transparent_48%),linear-gradient(135deg,rgba(51,65,85,0.28),rgba(15,23,42,0.9))] shadow-[0_12px_28px_rgba(2,6,23,0.26),inset_0_1px_0_rgba(226,232,240,0.08)]",
+    icon: "border-slate-400/20 bg-slate-400/10 text-slate-200",
+    label: "text-slate-200/60",
+    value: "text-slate-100",
+    dot: "bg-slate-300",
+  },
+  danger: {
+    surface: "border-rose-400/30 bg-[radial-gradient(circle_at_18%_18%,rgba(251,113,133,0.15),transparent_48%),linear-gradient(135deg,rgba(159,18,57,0.18),rgba(15,23,42,0.88))] shadow-[0_12px_28px_rgba(136,19,55,0.2),inset_0_1px_0_rgba(254,205,211,0.1)]",
+    icon: "border-rose-300/20 bg-rose-400/10 text-rose-200",
+    label: "text-rose-100/65",
+    value: "text-rose-100",
+    dot: "bg-rose-300",
+  },
+};
+
+export function WeatherStatusBadge({
+  label,
+  value,
+  tone = "info",
+  icon,
+  pulse = false,
+  compact = false,
+  className = "",
+  ariaLabel,
+}: WeatherStatusBadgeProps) {
+  const styles = toneClasses[tone];
+  const hasValue = value !== undefined && value !== null && value !== "";
+
+  return (
+    <span
+      className={`relative inline-flex max-w-full items-center overflow-hidden border ${compact ? "gap-1.5 rounded-xl px-2 py-1" : "gap-2 rounded-2xl px-2.5 py-2"} ${styles.surface} ${className}`}
+      aria-label={ariaLabel ?? (hasValue ? `${label} ${String(value)}` : label)}
+      data-weather-status-badge={tone}
+    >
+      <span className={`relative flex shrink-0 items-center justify-center border ${compact ? "h-5 w-5 rounded-lg" : "h-7 w-7 rounded-xl"} ${styles.icon}`} aria-hidden="true">
+        {icon ?? <span className={`h-2 w-2 rounded-full ${styles.dot} ${pulse ? "motion-safe:animate-pulse" : ""}`} />}
+        {pulse ? <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-[#10131a] ${styles.dot} motion-safe:animate-pulse`} /> : null}
+      </span>
+      <span className="min-w-0 text-left leading-none">
+        <span className={`block font-semibold uppercase ${compact ? "text-[8px] tracking-[0.1em]" : "text-[9px] tracking-[0.14em]"} ${styles.label}`}>{label}</span>
+        {hasValue ? <span className={`block whitespace-nowrap font-bold tracking-tight ${compact ? "mt-0.5 text-[10px]" : "mt-1 text-sm"} ${styles.value}`}>{value}</span> : null}
+      </span>
+    </span>
+  );
+}
