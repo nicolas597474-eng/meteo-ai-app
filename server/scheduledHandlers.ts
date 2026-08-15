@@ -572,6 +572,13 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       return res.status(403).json({ error: "cron-only" });
     }
 
+    // Le déclencheur teste 03h00 et 04h00 UTC afin de couvrir les changements
+    // d'heure. Une seule exécution est admise : exactement 05h00 Europe/Paris.
+    const parisHour = getParisHour();
+    if (parisHour !== 5) {
+      return res.json({ ok: true, skipped: "outside-05h00-paris", parisHour });
+    }
+
     const today = getTodayParis();
     console.log(`[MeteoAI] Starting favorites forecast collection for ${today}`);
 

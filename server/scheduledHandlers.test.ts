@@ -3,6 +3,15 @@ import { buildStationCollectionSnapshot, getModelCoverage } from "./scheduledHan
 import { VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
 describe("getModelCoverage", () => {
+  it("définit une couverture quotidienne et horaire sur les huit modèles actifs", () => {
+    const coverage = getModelCoverage([
+      "AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo",
+    ]);
+
+    expect(coverage).toMatchObject({ expected: expect.any(Array), collected: expect.any(Array), missing: [] });
+    expect(coverage.expected).toHaveLength(8);
+  });
+
   it("identifie les huit modèles experts attendus et les indisponibilités", () => {
     const coverage = getModelCoverage(["AROME", "ECMWF", "GEM"]);
 

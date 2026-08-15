@@ -13,4 +13,9 @@ describe("weatherTime — conventions Europe/Paris", () => {
     expect(getParisDate(instant)).toBe("2026-07-02");
     expect(getParisHour(instant)).toBe(0);
   });
+
+  it("identifie 05h00 Paris en été comme en hiver pour la collecte quotidienne", () => {
+    expect(getParisHour(new Date("2026-08-15T03:00:00.000Z"))).toBe(5);
+    expect(getParisHour(new Date("2026-01-15T04:00:00.000Z"))).toBe(5);
+  });
 });

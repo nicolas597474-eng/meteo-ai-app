@@ -1283,3 +1283,9 @@
 ## Ajustement des dégradés de cartes
 - [x] Interface: Atténuer l’opacité et les lueurs des dégradés de surface.
 - [x] Validation: Vérifier la lisibilité mobile, TypeScript, 210 tests et build.
+
+## Collecte quotidienne des prévisions et stations
+- [x] Audit: Vérifier le cycle actif de 05h00 Paris et sa couverture réelle des modèles et stations.
+- [ ] Automatisation: Garantir l’exécution à 05h00 Paris en heure d’été comme en heure d’hiver.
+- [ ] Automatisation: Compléter le périmètre de collecte si un modèle actif ou une station admissible manque.
+- [ ] Validation: Vérifier le prochain passage planifié et le statut des collectes.
