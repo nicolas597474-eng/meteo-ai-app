@@ -1382,3 +1382,8 @@
 - [x] Interface: Retirer le bouton Actualiser de la pancarte principale.
 - [x] Interface: Centrer et agrandir légèrement la date dans l’en-tête de pancarte.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
+
+## Couleurs des températures extrêmes
+- [x] Interface: Retirer la mention Tendance de la pancarte principale.
+- [x] Interface: Renforcer les couleurs des températures Max et Min à droite.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.

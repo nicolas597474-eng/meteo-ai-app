@@ -304,7 +304,6 @@ export default function Dashboard() {
           weights: officialPrimaryRegime.weights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
         }
       : dash?.regime;
-  const regimeSourceLabel = officialRegime?.sourceLabel ?? "Fusion officielle multi-modèles";
   const regimeSourceUpdatedAt = officialRegime?.sourceUpdatedAt
     ? new Date(officialRegime.sourceUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
     : null;
@@ -397,18 +396,11 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:mb-3">
-              <div className="flex min-w-0 items-center gap-1.5 justify-self-start">
-                <Activity className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-primary sm:hidden">Tendance</span>
-                <span className="hidden text-xs font-medium text-primary sm:inline">Tendance · {regimeSourceLabel}</span>
-                {selectedLocation && <span className="hidden text-xs text-primary/60 sm:inline">· {selectedLocation.name}</span>}
-              </div>
-              <span className="inline-flex items-center justify-self-center gap-1.5 rounded-full border border-sky-300/35 bg-slate-950/50 px-3 py-1.5 text-sm font-bold text-slate-50 shadow-[0_0_16px_rgba(56,189,248,0.16)]">
+            <div className="mb-2 flex justify-center sm:mb-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/35 bg-slate-950/50 px-3 py-1.5 text-sm font-bold text-slate-50 shadow-[0_0_16px_rgba(56,189,248,0.16)]">
                 <CalendarDays className="h-4 w-4 text-sky-300" aria-hidden="true" />
                 {panelDate}
               </span>
-              <span aria-hidden="true" />
             </div>
 
             {/* ── Regime badge ── */}
@@ -599,15 +591,15 @@ export default function Dashboard() {
 
                 {/* Max / Min */}
                 <div className={dashboardTemperatureLayout.extremes}>
-                  <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-                    <span className="text-[10px] sm:text-xs font-bold text-orange-300 uppercase tracking-normal drop-shadow-[0_0_8px_rgba(251,146,60,0.55)] sm:tracking-wide">max</span>
-                    <span className={`${dashboardTemperatureLayout.extremeValue} text-orange-200 drop-shadow-[0_0_12px_rgba(251,146,60,0.72)]`}>
+                  <div className="flex items-center justify-end gap-1 rounded-lg border border-orange-300/35 bg-gradient-to-r from-orange-500/25 via-amber-300/15 to-transparent px-1.5 py-0.5 shadow-[0_0_16px_rgba(251,146,60,0.2)] sm:gap-1.5">
+                    <span className="text-[10px] sm:text-xs font-bold text-orange-100 uppercase tracking-normal drop-shadow-[0_0_10px_rgba(251,146,60,0.85)] sm:tracking-wide">max</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} font-black text-orange-100 drop-shadow-[0_0_16px_rgba(251,146,60,0.95)]`}>
                       {today?.tempMax != null ? Number(today.tempMax).toFixed(1) : meteoAI?.tempMax != null ? Number(meteoAI.tempMax).toFixed(1) : "—"}°
                     </span>
                   </div>
-                  <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-                    <span className="text-[10px] sm:text-xs font-bold text-blue-300 uppercase tracking-normal drop-shadow-[0_0_8px_rgba(96,165,250,0.55)] sm:tracking-wide">min</span>
-                    <span className={`${dashboardTemperatureLayout.extremeValue} text-blue-200 drop-shadow-[0_0_12px_rgba(96,165,250,0.72)]`}>
+                  <div className="flex items-center justify-end gap-1 rounded-lg border border-cyan-300/35 bg-gradient-to-r from-sky-500/25 via-cyan-300/15 to-transparent px-1.5 py-0.5 shadow-[0_0_16px_rgba(56,189,248,0.2)] sm:gap-1.5">
+                    <span className="text-[10px] sm:text-xs font-bold text-cyan-100 uppercase tracking-normal drop-shadow-[0_0_10px_rgba(96,165,250,0.85)] sm:tracking-wide">min</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} font-black text-cyan-100 drop-shadow-[0_0_16px_rgba(96,165,250,0.95)]`}>
                       {today?.tempMin != null ? Number(today.tempMin).toFixed(1) : meteoAI?.tempMin != null ? Number(meteoAI.tempMin).toFixed(1) : "—"}°
                     </span>
                   </div>
