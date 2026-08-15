@@ -1336,3 +1336,9 @@
 - [x] Direction: Définir les volumes doux, matériaux et silhouettes des phénomènes météo.
 - [x] Interface: Refondre les conditions météo, paramètres et indicateurs dans le style 3D illustré.
 - [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.
+
+## Pack d’icônes 3D pictural
+- [x] Direction: Définir les conditions prioritaires et les règles de rendu du pack 3D de référence.
+- [x] Actifs: Produire des icônes originales 3D picturales pour les conditions météo principales.
+- [x] Interface: Intégrer les actifs au composant MeteoIcon et conserver les correspondances existantes.
+- [x] Validation: Vérifier les pages, TypeScript, 219 tests et build.

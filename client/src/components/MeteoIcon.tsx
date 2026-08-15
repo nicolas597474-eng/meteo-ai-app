@@ -12,8 +12,53 @@ interface MeteoIconProps {
   className?: string;
 }
 
+const PICTORIAL_WEATHER_ICONS: Record<string, string> = {
+  sunny: "/manus-storage/meteo3d-sunny_9181afc4.png",
+  stable: "/manus-storage/meteo3d-sunny_9181afc4.png",
+  summer_heat: "/manus-storage/meteo3d-sunny_9181afc4.png",
+  few_clouds: "/manus-storage/meteo3d-partly-cloudy_629434e4.png",
+  partly_cloudy: "/manus-storage/meteo3d-partly-cloudy_629434e4.png",
+  overcast: "/manus-storage/meteo3d-overcast_01db4212.png",
+  cloud_cover: "/manus-storage/meteo3d-overcast_01db4212.png",
+  variable: "/manus-storage/meteo3d-overcast_01db4212.png",
+  maritime: "/manus-storage/meteo3d-overcast_01db4212.png",
+  urban_heat: "/manus-storage/meteo3d-overcast_01db4212.png",
+  mountain: "/manus-storage/meteo3d-overcast_01db4212.png",
+  showers: "/manus-storage/meteo3d-rain_8854f8b7.png",
+  rainy: "/manus-storage/meteo3d-rain_8854f8b7.png",
+  heavy_rain: "/manus-storage/meteo3d-rain_8854f8b7.png",
+  autumn_disturbed: "/manus-storage/meteo3d-rain_8854f8b7.png",
+  thunderstorm: "/manus-storage/meteo3d-thunderstorm_20bf50ef.png",
+  storm: "/manus-storage/meteo3d-thunderstorm_20bf50ef.png",
+  snow: "/manus-storage/meteo3d-snow_c8da39d2.png",
+  freezing_rain: "/manus-storage/meteo3d-snow_c8da39d2.png",
+  sleet: "/manus-storage/meteo3d-snow_c8da39d2.png",
+  frost: "/manus-storage/meteo3d-snow_c8da39d2.png",
+  deep_frost: "/manus-storage/meteo3d-snow_c8da39d2.png",
+  winter_anticyclonic: "/manus-storage/meteo3d-snow_c8da39d2.png",
+  fog: "/manus-storage/meteo3d-fog_ffd3923a.png",
+  clear_night: "/manus-storage/meteo3d-clear-night_9a98fab7.png",
+  wind_moderate: "/manus-storage/meteo3d-wind_be1bd4dc.png",
+  windy: "/manus-storage/meteo3d-wind_be1bd4dc.png",
+  wind_param: "/manus-storage/meteo3d-wind_be1bd4dc.png",
+  temperature: "/manus-storage/meteo3d-temperature_d834ebfe.png",
+};
+
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
+  const pictorialIcon = PICTORIAL_WEATHER_ICONS[name.toLowerCase()];
+  if (pictorialIcon) {
+    return (
+      <img
+        src={pictorialIcon}
+        width={size}
+        height={size}
+        className={`meteo-icon-3d object-contain ${className}`}
+        alt={`Icône météo : ${name}`}
+        draggable={false}
+      />
+    );
+  }
   const depthFilterId = `meteo-depth-${uniqueId}`;
   const glassGradientId = `meteo-glass-${uniqueId}`;
   const glassRimId = `meteo-glass-rim-${uniqueId}`;
