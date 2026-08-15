@@ -409,9 +409,9 @@ export default function Dashboard() {
           <img
             src={getDashboardWeatherImage({ condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
             alt="Paysage météo"
-            className="absolute inset-0 h-full w-full object-cover opacity-45 pointer-events-none"
+            className="absolute inset-0 h-full w-full object-cover opacity-70 pointer-events-none"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/52 to-slate-950/88 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
             <div className={dashboardTemperatureLayout.mobileHeader}>

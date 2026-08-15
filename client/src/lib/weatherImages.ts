@@ -1,24 +1,25 @@
 /** Fonds photographiques de la grande carte de conditions actuelles du Dashboard. */
 const WEATHER_IMAGES: Record<string, string> = {
-  sunny: "/manus-storage/meteoai-weather-sunny-master_e597fa3a.jpg",
-  few_clouds: "/manus-storage/meteoai-weather-few-clouds_ff8a0419.jpg",
-  cloudy: "/manus-storage/meteoai-weather-cloudy_0c7e1be9.jpg",
-  overcast: "/manus-storage/meteoai-weather-overcast_d7af5581.jpg",
-  fog: "/manus-storage/meteoai-weather-fog_413e0cc3.jpg",
-  showers: "/manus-storage/meteoai-weather-showers_4efd169c.jpg",
-  drizzle: "/manus-storage/meteoai-weather-drizzle_23214653.jpg",
-  rainy: "/manus-storage/meteoai-weather-rain_6ed21a21.jpg",
-  heavy_rain: "/manus-storage/meteoai-weather-heavy-rain_08d62cb0.jpg",
-  thunderstorm: "/manus-storage/meteoai-weather-thunderstorm_851b62da.jpg",
-  violent_storm: "/manus-storage/meteoai-weather-violent-storm_f79f94a5.jpg",
-  snow: "/manus-storage/meteoai-weather-snow_7b345883.jpg",
-  heavy_snow: "/manus-storage/meteoai-weather-heavy-snow_c321957c.jpg",
-  freezing_rain: "/manus-storage/meteoai-weather-freezing-rain_b20385ef.jpg",
-  frost: "/manus-storage/meteoai-weather-frost_910ff338.jpg",
-  cold_sun: "/manus-storage/meteoai-weather-cold-sun_7cb7d792.jpg",
-  windy: "/manus-storage/meteoai-weather-windy_e1c61512.jpg",
-  heat: "/manus-storage/meteoai-weather-heat_c9ae1fc3.jpg",
-  dust_haze: "/manus-storage/meteoai-weather-dust-haze_9044262d.jpg",
+  sunny: "/manus-storage/sky-pack-sunny_1500b9a0.jpg",
+  few_clouds: "/manus-storage/sky-pack-partly-cloudy_a05dead0.jpg",
+  cloudy: "/manus-storage/sky-pack-cloudy_73c1f4de.jpg",
+  overcast: "/manus-storage/sky-pack-cloudy_73c1f4de.jpg",
+  fog: "/manus-storage/sky-pack-fog_b9e4feed.jpg",
+  showers: "/manus-storage/sky-pack-rain_1cfc77ab.jpg",
+  drizzle: "/manus-storage/sky-pack-drizzle_7f8dc074.jpg",
+  rainy: "/manus-storage/sky-pack-rain_1cfc77ab.jpg",
+  heavy_rain: "/manus-storage/sky-pack-heavy-rain_1767119c.jpg",
+  thunderstorm: "/manus-storage/sky-pack-thunderstorm_e401a8de.jpg",
+  violent_storm: "/manus-storage/sky-pack-violent-storm_6d8ac43d.jpg",
+  snow: "/manus-storage/sky-pack-snow_84cfd297.jpg",
+  heavy_snow: "/manus-storage/sky-pack-snow_84cfd297.jpg",
+  freezing_rain: "/manus-storage/sky-pack-freezing_e4e745b1.jpg",
+  frost: "/manus-storage/sky-pack-freezing_e4e745b1.jpg",
+  cold_sun: "/manus-storage/sky-pack-partly-cloudy_a05dead0.jpg",
+  windy: "/manus-storage/sky-pack-wind_5156d1d8.jpg",
+  heat: "/manus-storage/sky-pack-heat_7eae0649.jpg",
+  dust_haze: "/manus-storage/sky-pack-dust-haze_5efb030f.jpg",
+  clear_night: "/manus-storage/sky-pack-clear-night_2ef41d31.jpg",
 };
 
 const DEFAULT_IMAGE = WEATHER_IMAGES.few_clouds;
@@ -28,6 +29,7 @@ function normalize(value: string | null | undefined) {
 }
 
 const CONDITION_RULES: Array<[string[], keyof typeof WEATHER_IMAGES]> = [
+  [["nuit", "night", "ciel_degagé_nuit", "clear_night"], "clear_night"],
   [["pluie_verglacante", "verglas", "freezing"], "freezing_rain"],
   [["neige_forte", "forte_neige", "heavy_snow"], "heavy_snow"],
   [["neige", "snow"], "snow"],

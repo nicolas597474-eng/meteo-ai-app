@@ -1342,3 +1342,9 @@
 - [x] Actifs: Produire des icônes originales 3D picturales pour les conditions météo principales.
 - [x] Interface: Intégrer les actifs au composant MeteoIcon et conserver les correspondances existantes.
 - [x] Validation: Vérifier les pages, TypeScript, 219 tests et build.
+
+## Pack de ciels météo pour la carte principale
+- [x] Direction: Définir les catégories de ciel et la correspondance avec les conditions météo courantes.
+- [x] Actifs: Produire des fonds de ciel météo originaux adaptés aux catégories principales.
+- [x] Interface: Intégrer le fond de ciel dynamique à la carte principale sans réduire la lisibilité.
+- [x] Validation: Vérifier les états météo, TypeScript, 219 tests et build.
