@@ -20,6 +20,10 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("enabled: !!selectedLocation && needsLocalStations");
     expect(source).toContain("Données horaires temporairement indisponibles.");
     expect(source).toContain("trpc.weather.getHourlyForecast.useQuery");
+    expect(source).toContain('refetchOnReconnect: "always"');
+    expect(source).toContain("refetchInterval: (query) => (query.state.data?.hours?.length ? 5 * 60 * 1000 : 30 * 1000)");
+    expect(source).toContain('disabled={hourlyFetching}');
+    expect(source).toContain('"Relance en cours…"');
     expect(source).toContain("const isLoading = officialLoading && hourlyLoading");
     expect(source).toContain("refetchHourlySnapshot()");
     expect(source).toContain("BackToTopButton");

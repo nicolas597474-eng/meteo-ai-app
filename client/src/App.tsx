@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -36,7 +36,7 @@ const navItems = [
 function TopNav() {
   const [location] = useLocation();
   return (
-    <nav className="sticky top-0 z-50 hidden border-b border-border bg-background/90 backdrop-blur-xl sm:block">
+    <nav className="sticky top-0 z-50 hidden border-b border-border bg-background sm:block">
       <div className="max-w-2xl mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between h-14">
           <Link href="/" className="flex items-center gap-2">
@@ -74,8 +74,8 @@ function TopNav() {
 function BottomNav() {
   const [location] = useLocation();
   return (
-    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border safe-area-inset-bottom">
-      <div className="flex items-center justify-around h-16 px-2">
+    <nav aria-label="Navigation principale" className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-700 bg-[#0d1117] sm:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="flex h-16 items-center justify-around px-2">
         {navItems.map((item) => {
           const isActive = location === item.path;
           return (
@@ -95,6 +95,29 @@ function BottomNav() {
         })}
       </div>
     </nav>
+  );
+}
+
+function ScrollToTopOnRouteChange() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+
+  return null;
+}
+
+function RouteLoadingFallback() {
+  return (
+    <div className="mx-auto min-h-[60vh] max-w-2xl space-y-4 px-3 py-5" role="status" aria-live="polite" aria-label="Chargement de la page">
+      <span className="sr-only">Chargement de la page…</span>
+      <div className="h-12 w-44 animate-pulse rounded-xl bg-slate-800/80" />
+      <div className="h-48 animate-pulse rounded-[22px] border border-slate-800 bg-slate-900/65" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl border border-slate-800 bg-slate-900/65" />)}
+      </div>
+    </div>
   );
 }
 
@@ -126,9 +149,9 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <TopNav />
-          {/* Add bottom padding on mobile for the bottom nav bar */}
-          <div className="pb-16 sm:pb-0">
-            <Suspense fallback={<div className="mx-auto min-h-[280px] max-w-2xl animate-pulse px-3 py-6"><div className="h-44 rounded-2xl bg-muted" /></div>}>
+          <ScrollToTopOnRouteChange />
+          <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
+            <Suspense fallback={<RouteLoadingFallback />}>
               <Router />
             </Suspense>
           </div>

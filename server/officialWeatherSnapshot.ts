@@ -18,6 +18,11 @@ export type OfficialWeatherSnapshot = {
 type CacheEntry = { expiresAt: number; value: Promise<OfficialWeatherSnapshot> };
 const snapshotCache = new Map<string, CacheEntry>();
 const SNAPSHOT_TTL_MS = 2 * 60_000;
+const EMPTY_HOURLY_SNAPSHOT_TTL_MS = 12_000;
+
+export function getOfficialSnapshotTtlMs(hourly: HourlyPoint[]): number {
+  return hourly.length > 0 ? SNAPSHOT_TTL_MS : EMPTY_HOURLY_SNAPSHOT_TTL_MS;
+}
 
 export function buildOfficialWeatherSnapshot(input: {
   lat: number;
@@ -72,6 +77,12 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
     });
   })();
   snapshotCache.set(cacheKey, { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value });
+  void value.then((snapshot) => {
+    const current = snapshotCache.get(cacheKey);
+    if (current?.value === value) {
+      current.expiresAt = Date.now() + getOfficialSnapshotTtlMs(snapshot.hourly);
+    }
+  });
   void value.catch(() => {
     const current = snapshotCache.get(cacheKey);
     if (current?.value === value) snapshotCache.delete(cacheKey);

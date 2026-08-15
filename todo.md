@@ -1427,3 +1427,9 @@
 - [x] Audit: Recenser les halos diffus décoratifs dans les composants et pages météo.
 - [x] Interface: Remplacer les halos décoratifs par des bordures, dégradés et ombres nettes.
 - [x] Validation: Vérifier la netteté mobile, TypeScript, tests et build.
+
+## Stabilisation navigation mobile et chargements
+- [x] Audit: Reproduire les transitions de pages, l’empilement de la barre mobile et les indisponibilités de données horaires.
+- [x] Interface: Stabiliser le routage, les couches fixes et les états de chargement sur mobile.
+- [x] Données: Fiabiliser les requêtes horaires et leur relance sans masquer les données journalières disponibles.
+- [x] Validation: Vérifier les parcours mobile, TypeScript, Vitest et build.

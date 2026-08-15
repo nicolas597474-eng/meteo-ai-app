@@ -43,6 +43,9 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
+      // Une requête météo lente ne doit pas faire échouer le lot contenant
+      // la navigation, l’authentification et les autres données de la page.
+      maxItems: 1,
       headers() {
         // Preview auto-login fallback: when the browser blocks iframe cookies
         // (Safari ITP / private browsing / WebView), the runtime mirrors the

@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -194,12 +195,15 @@ export default function Dashboard() {
       retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     }
   );
-  const { data: hourlySnapshot, isLoading: hourlyLoading, isError: hourlyError, refetch: refetchHourlySnapshot } = trpc.weather.getHourlyForecast.useQuery(
+  const { data: hourlySnapshot, isLoading: hourlyLoading, isError: hourlyError, isFetching: hourlyFetching, refetch: refetchHourlySnapshot } = trpc.weather.getHourlyForecast.useQuery(
     coordsInput,
     {
       staleTime: 2 * 60 * 1000,
       refetchOnWindowFocus: false,
-      retry: 2,
+      refetchOnReconnect: "always",
+      refetchOnMount: "always",
+      refetchInterval: (query) => (query.state.data?.hours?.length ? 5 * 60 * 1000 : 30 * 1000),
+      retry: 3,
       retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     }
   );
@@ -644,11 +648,11 @@ export default function Dashboard() {
         </div>
 
         {/* ── Link to details page ── */}
-        <a href="/details" className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
+        <Link href="/details" className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
           <MeteoIcon name="chevron_right" size={16} />
           <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
           <span className="text-primary text-xs">→</span>
-        </a>
+        </Link>
 
         <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />
@@ -715,7 +719,7 @@ export default function Dashboard() {
             <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-5 text-center">
               <p className="text-sm font-medium text-blue-100">Données horaires temporairement indisponibles.</p>
               <p className="mt-1 text-xs text-muted-foreground">La dernière prévision officielle n’a pas encore répondu. Aucune donnée n’est inventée.</p>
-              <button type="button" onClick={() => void Promise.all([refetchHourlySnapshot(), refetchOfficialForecast()])} className="mt-3 min-h-10 rounded-md border border-primary/50 px-3 text-xs font-semibold text-primary">Réessayer les heures</button>
+              <button type="button" disabled={hourlyFetching} onClick={() => void refetchHourlySnapshot()} className="mt-3 min-h-10 rounded-md border border-primary/50 px-3 text-xs font-semibold text-primary disabled:cursor-wait disabled:opacity-60">{hourlyFetching ? "Relance en cours…" : "Réessayer les heures"}</button>
             </div>
           )}
         </div>
