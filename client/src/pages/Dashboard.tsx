@@ -11,6 +11,7 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
+import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
@@ -360,6 +361,10 @@ export default function Dashboard() {
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
   const officialCurrentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
   const currentTemp = officialCurrentTemp;
+  const maxTemperature = today?.tempMax ?? meteoAI?.tempMax ?? null;
+  const minTemperature = today?.tempMin ?? meteoAI?.tempMin ?? null;
+  const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
+  const minTemperatureTone = getExtremeTemperatureTone("min", minTemperature);
   const apparentTemp = currentHour?.apparentTemp ?? null;
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
   const windDir = currentHour?.windDirection ?? null;
@@ -591,16 +596,16 @@ export default function Dashboard() {
 
                 {/* Max / Min */}
                 <div className={dashboardTemperatureLayout.extremes}>
-                  <div className="flex items-center justify-end gap-1 rounded-lg border border-orange-200/60 bg-gradient-to-r from-orange-500/70 via-amber-400/52 to-orange-950/45 px-1.5 py-0.5 shadow-[0_0_18px_rgba(251,146,60,0.38)] sm:gap-1.5">
-                    <span className="text-[10px] sm:text-xs font-bold text-orange-100 uppercase tracking-normal drop-shadow-[0_0_10px_rgba(251,146,60,0.85)] sm:tracking-wide">max</span>
-                    <span className={`${dashboardTemperatureLayout.extremeValue} font-black text-orange-100 drop-shadow-[0_0_16px_rgba(251,146,60,0.95)]`}>
-                      {today?.tempMax != null ? Number(today.tempMax).toFixed(1) : meteoAI?.tempMax != null ? Number(meteoAI.tempMax).toFixed(1) : "—"}°
+                  <div className={`flex items-center justify-end gap-1 rounded-lg border px-1.5 py-0.5 sm:gap-1.5 ${maxTemperatureTone.container}`}>
+                    <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wide ${maxTemperatureTone.label}`}>max</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} font-black ${maxTemperatureTone.value}`}>
+                      {maxTemperature != null ? Number(maxTemperature).toFixed(1) : "—"}°
                     </span>
                   </div>
-                  <div className="flex items-center justify-end gap-1 rounded-lg border border-cyan-200/60 bg-gradient-to-r from-blue-500/70 via-cyan-400/52 to-blue-950/45 px-1.5 py-0.5 shadow-[0_0_18px_rgba(56,189,248,0.38)] sm:gap-1.5">
-                    <span className="text-[10px] sm:text-xs font-bold text-cyan-100 uppercase tracking-normal drop-shadow-[0_0_10px_rgba(96,165,250,0.85)] sm:tracking-wide">min</span>
-                    <span className={`${dashboardTemperatureLayout.extremeValue} font-black text-cyan-100 drop-shadow-[0_0_16px_rgba(96,165,250,0.95)]`}>
-                      {today?.tempMin != null ? Number(today.tempMin).toFixed(1) : meteoAI?.tempMin != null ? Number(meteoAI.tempMin).toFixed(1) : "—"}°
+                  <div className={`flex items-center justify-end gap-1 rounded-lg border px-1.5 py-0.5 sm:gap-1.5 ${minTemperatureTone.container}`}>
+                    <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wide ${minTemperatureTone.label}`}>min</span>
+                    <span className={`${dashboardTemperatureLayout.extremeValue} font-black ${minTemperatureTone.value}`}>
+                      {minTemperature != null ? Number(minTemperature).toFixed(1) : "—"}°
                     </span>
                   </div>
                 </div>

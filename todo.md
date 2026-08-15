@@ -1391,3 +1391,8 @@
 ## Opacité des températures Max et Min
 - [x] Interface: Rendre les fonds orange et bleu des capsules Max et Min plus opaques.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, 220 tests et build.
+
+## Intensité adaptative des températures extrêmes
+- [x] Règles: Définir les seuils de chaleur et de gel utilisés pour les capsules Max et Min.
+- [x] Interface: Appliquer automatiquement la palette et l’intensité adaptées aux seuils.
+- [x] Validation: Couvrir les seuils par des tests et vérifier le rendu mobile, TypeScript et build.

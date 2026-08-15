@@ -33,8 +33,10 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('mb-2 flex justify-center sm:mb-3');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');
     expect(source).not.toContain('aria-label="Actualiser la météo maintenant"');
-    expect(source).toContain('bg-gradient-to-r from-orange-500/70 via-amber-400/52');
-    expect(source).toContain('bg-gradient-to-r from-blue-500/70 via-cyan-400/52');
+    expect(source).toContain('getExtremeTemperatureTone("max", maxTemperature)');
+    expect(source).toContain('getExtremeTemperatureTone("min", minTemperature)');
+    expect(source).toContain('maxTemperatureTone.container');
+    expect(source).toContain('minTemperatureTone.container');
     expect(source).not.toContain("formatDashboardDate");
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
