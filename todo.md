@@ -1305,3 +1305,9 @@
 - [x] Interface: Mettre en avant un résumé explicite de la disponibilité et de la qualité des comparaisons.
 - [x] Interface: Masquer les détails non exploitables ou les réserver à une consultation volontaire.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et build ; 214 tests passent, avec 2 échecs intermittents préexistants liés aux snapshots météo réels.
+
+## Détails des panneaux environnementaux
+- [x] Audit: Vérifier le composant modal réutilisable et les données disponibles.
+- [x] Interface: Rendre les panneaux Qualité de l’air et Soleil & Lune cliquables.
+- [x] Interface: Afficher les détails et la provenance dans deux modales accessibles.
+- [x] Validation: Vérifier le comportement mobile, TypeScript et build ; 215 tests passent, avec 2 échecs intermittents préexistants liés aux snapshots météo réels.

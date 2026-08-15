@@ -17,4 +17,11 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Éclairage");
     expect(source).toContain("Éphémérides réelles temporairement indisponibles");
   });
+
+  it("ouvre des modales de détail accessibles depuis les deux panneaux", () => {
+    expect(source).toContain("DialogTrigger");
+    expect(source).toContain("Voir les détails");
+    expect(source).toContain("Détails de l’indice et des polluants");
+    expect(source).toContain("Éphémérides locales et état actuel du cycle jour-nuit");
+  });
 });
