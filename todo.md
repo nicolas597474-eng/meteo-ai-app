@@ -1331,3 +1331,8 @@
 - [x] Direction: Définir une esthétique lumineuse et organique, distincte des tuiles holographiques.
 - [x] Interface: Refondre la bibliothèque MeteoIcon avec le traitement verre dépoli.
 - [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.
+
+## Icônes 3D illustrées inspirées de la référence
+- [x] Direction: Définir les volumes doux, matériaux et silhouettes des phénomènes météo.
+- [x] Interface: Refondre les conditions météo, paramètres et indicateurs dans le style 3D illustré.
+- [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.
