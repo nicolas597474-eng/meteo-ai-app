@@ -1321,3 +1321,8 @@
 - [x] Direction: Définir le nouveau langage de formes 3D futuristes et les correspondances sémantiques.
 - [x] Interface: Reconstruire les icônes de conditions météo, paramètres et indicateurs.
 - [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.
+
+## Alternative de design pour les icônes météo
+- [x] Direction: Définir une esthétique futuriste alternative, distincte de la version volumétrique actuelle.
+- [x] Interface: Refondre la bibliothèque MeteoIcon avec ce nouveau langage graphique.
+- [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.

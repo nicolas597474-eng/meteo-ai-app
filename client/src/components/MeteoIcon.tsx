@@ -2,7 +2,7 @@ import { useId } from "react";
 
 /**
  * MeteoIcon — Pack d'icônes MeteoAI personnalisé
- * Style 3D futuriste, couleurs lumineuses sur fond sombre, conçu pour l'interface MeteoAI.
+ * Style holographique futuriste en tuiles hexagonales, conçu pour l'interface MeteoAI.
  * Couvre : 30 régimes météo + paramètres + indicateurs + classement
  */
 
@@ -15,14 +15,14 @@ interface MeteoIconProps {
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
   const depthFilterId = `meteo-depth-${uniqueId}`;
-  const orbGradientId = `meteo-orb-${uniqueId}`;
-  const glossGradientId = `meteo-gloss-${uniqueId}`;
+  const tileGradientId = `meteo-tile-${uniqueId}`;
+  const gridGradientId = `meteo-grid-${uniqueId}`;
   const cloudGradientId = `meteo-cloud-${uniqueId}`;
   const sunGradientId = `meteo-sun-${uniqueId}`;
   const rainGradientId = `meteo-rain-${uniqueId}`;
   const cyanGradientId = `meteo-cyan-${uniqueId}`;
   const violetGradientId = `meteo-violet-${uniqueId}`;
-  const showOrb = size >= 26;
+  const showTile = size >= 18;
   return (
     <svg
       width={size}
@@ -36,19 +36,19 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
     >
       <defs>
         <filter id={depthFilterId} x="-35%" y="-35%" width="170%" height="185%" colorInterpolationFilters="sRGB">
-          <feDropShadow dx="0" dy="2.6" stdDeviation="1.65" floodColor="#020617" floodOpacity="0.82" />
-          <feDropShadow dx="0" dy="0.3" stdDeviation="0.6" floodColor="#e0f2fe" floodOpacity="0.28" />
-          <feDropShadow dx="0" dy="0" stdDeviation="2.2" floodColor="#38bdf8" floodOpacity="0.2" />
+          <feDropShadow dx="0" dy="2.2" stdDeviation="1.5" floodColor="#020617" floodOpacity="0.92" />
+          <feDropShadow dx="0" dy="0" stdDeviation="1.7" floodColor="#22d3ee" floodOpacity="0.38" />
+          <feDropShadow dx="0.4" dy="0" stdDeviation="0.8" floodColor="#c084fc" floodOpacity="0.28" />
         </filter>
-        <radialGradient id={orbGradientId} cx="32%" cy="20%" r="78%">
-          <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.22" />
-          <stop offset="48%" stopColor="#1d4ed8" stopOpacity="0.1" />
-          <stop offset="100%" stopColor="#020617" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={glossGradientId} x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#e0f2fe" stopOpacity="0.38" />
-          <stop offset="45%" stopColor="#38bdf8" stopOpacity="0.08" />
-          <stop offset="100%" stopColor="#020617" stopOpacity="0" />
+        <linearGradient id={tileGradientId} x1="8" y1="5" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0e7490" stopOpacity="0.5" />
+          <stop offset="38%" stopColor="#0f172a" stopOpacity="0.78" />
+          <stop offset="100%" stopColor="#312e81" stopOpacity="0.5" />
+        </linearGradient>
+        <linearGradient id={gridGradientId} x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#a5f3fc" stopOpacity="0.72" />
+          <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="#c084fc" stopOpacity="0.64" />
         </linearGradient>
         <linearGradient id={cloudGradientId} x1="14" y1="15" x2="48" y2="47" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#dbeafe" />
@@ -78,9 +78,9 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
           <stop offset="100%" stopColor="#5b21b6" />
         </linearGradient>
       </defs>
-      {showOrb ? <><circle cx="32" cy="32" r="29" fill={`url(#${orbGradientId})`} /><circle cx="32" cy="32" r="26.5" fill="none" stroke={`url(#${glossGradientId})`} strokeWidth="0.8" opacity="0.7" /></> : null}
+      {showTile ? <><path d="M32 3 57 17.5v29L32 61 7 46.5v-29L32 3Z" fill={`url(#${tileGradientId})`} stroke={`url(#${gridGradientId})`} strokeWidth="1.05" /><path d="M32 8 52.5 20v24L32 56 11.5 44V20L32 8Z" fill="none" stroke="#67e8f9" strokeOpacity="0.16" strokeWidth="0.8" /><path d="M12 32h40M32 9v46M17 17l30 30M47 17 17 47" stroke={`url(#${gridGradientId})`} strokeOpacity="0.1" strokeWidth="0.7" /></> : null}
       <g filter={`url(#${depthFilterId})`}><FuturisticGlyph name={name} ids={{ cloud: cloudGradientId, sun: sunGradientId, rain: rainGradientId, cyan: cyanGradientId, violet: violetGradientId }} /></g>
-      {showOrb ? <path d="M18 12c7-4 20-5 29 1" stroke="#e0f2fe" strokeOpacity="0.16" strokeWidth="1.2" strokeLinecap="round" /> : null}
+      {showTile ? <path d="M24 10h16" stroke="#e0f2fe" strokeOpacity="0.28" strokeWidth="1.2" strokeLinecap="round" /> : null}
     </svg>
   );
 }
@@ -144,12 +144,12 @@ export function getIconNameFromRegime(regimeId: string): string {
 type GlyphIds = { cloud: string; sun: string; rain: string; cyan: string; violet: string };
 
 function FuturisticCloud({ ids, storm = false }: { ids: GlyphIds; storm?: boolean }) {
-  return <><ellipse cx="32" cy="43" rx="22" ry="4" fill="#020617" opacity="0.42" /><path d="M15 39c-4.8 0-8-3.3-8-7.4 0-4.3 3.1-7.5 7.5-7.7C16.1 16.2 22.5 12 30.2 12c8.3 0 14.9 5.2 16.2 12.5 5.5.1 9.6 3.6 9.6 8 0 4.1-3.3 7.5-8.2 7.5H15Z" fill={`url(#${ids.cloud})`} stroke={storm ? "#64748b" : "#bfdbfe"} strokeWidth="1.1" /><path d="M18 26c2.1-5.5 6.6-8.7 12.2-8.7 3.2 0 6.1 1.1 8.4 3" fill="none" stroke="#f8fafc" strokeOpacity="0.48" strokeWidth="2" strokeLinecap="round" /></>;
+  return <><path d="M15 40c-4.8 0-8-3.3-8-7.4 0-4.3 3.1-7.5 7.5-7.7C16.1 17.2 22.5 13 30.2 13c8.3 0 14.9 5.2 16.2 12.5 5.5.1 9.6 3.6 9.6 8 0 4.1-3.3 7.5-8.2 7.5H15Z" fill="#071827" fillOpacity="0.86" stroke={storm ? "#c084fc" : `url(#${ids.cyan})`} strokeWidth="1.8" strokeLinejoin="round" /><path d="M15 35h34M19 40h27" stroke="#a5f3fc" strokeOpacity="0.25" strokeWidth="1.15" strokeLinecap="round" /><circle cx="24" cy="25" r="1.5" fill="#e0f2fe" opacity="0.65" /><circle cx="42" cy="29" r="1.1" fill="#c4b5fd" opacity="0.65" /></>;
 }
 
 function FuturisticSun({ ids, hot = false }: { ids: GlyphIds; hot?: boolean }) {
-  const ray = hot ? "#fb7185" : "#fef08a";
-  return <><circle cx="32" cy="30" r="16" fill="none" stroke={ray} strokeOpacity="0.25" strokeWidth="1.4" /><g stroke={ray} strokeWidth="2.4" strokeLinecap="round"><path d="M32 6v6" /><path d="M32 48v6" /><path d="M8 30h6" /><path d="M50 30h6" /><path d="M15 13l4 4" /><path d="M45 43l4 4" /><path d="M15 47l4-4" /><path d="M45 17l4-4" /></g><circle cx="32" cy="30" r="12.5" fill={`url(#${ids.sun})`} stroke="#fff7bf" strokeOpacity="0.65" strokeWidth="1" /><ellipse cx="28" cy="25" rx="4.5" ry="3" fill="#fff" opacity="0.45" /></>;
+  const ray = hot ? "#fb7185" : "#a5f3fc";
+  return <><circle cx="32" cy="31" r="17" fill="none" stroke={ray} strokeOpacity="0.38" strokeWidth="1.15" strokeDasharray="3 3" /><g stroke={ray} strokeWidth="2" strokeLinecap="round"><path d="M32 9v6" /><path d="M32 47v6" /><path d="M10 31h6" /><path d="M48 31h6" /><path d="M17 16l4 4" /><path d="M43 42l4 4" /><path d="M17 46l4-4" /><path d="M43 20l4-4" /></g><circle cx="32" cy="31" r="11.2" fill="#06243a" stroke={`url(#${ids.sun})`} strokeWidth="2.2" /><circle cx="32" cy="31" r="5.5" fill={`url(#${ids.sun})`} /><path d="M28 26h8M28 31h8M28 36h8" stroke="#fff7bf" strokeOpacity="0.4" strokeWidth="0.9" /></>;
 }
 
 function FuturisticRain({ ids, dense = false }: { ids: GlyphIds; dense?: boolean }) {
