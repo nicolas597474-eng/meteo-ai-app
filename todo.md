@@ -1249,3 +1249,7 @@
 - [x] Audit: Vérifier les commandes de fermeture des détails journalier et horaire.
 - [x] Interface: Agrandir et expliciter la zone de fermeture sur mobile.
 - [x] Validation: Vérifier les interactions tactiles, TypeScript, tests et build.
+
+## Flèche de retour rapide du Dashboard
+- [x] Interface: Ajouter la flèche de retour vers le haut au Dashboard.
+- [x] Validation: Vérifier le comportement mobile, TypeScript, tests et build.

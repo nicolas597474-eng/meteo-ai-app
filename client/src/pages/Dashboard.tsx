@@ -12,6 +12,7 @@ import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondi
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
+import { BackToTopButton } from "@/components/BackToTopButton";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
@@ -797,6 +798,7 @@ export default function Dashboard() {
         </div>
 
       </div>
+      <BackToTopButton />
     </div>
   );
 }

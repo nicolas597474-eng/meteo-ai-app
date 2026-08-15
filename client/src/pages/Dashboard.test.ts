@@ -22,6 +22,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("trpc.weather.getHourlyForecast.useQuery");
     expect(source).toContain("const isLoading = officialLoading && hourlyLoading");
     expect(source).toContain("refetchHourlySnapshot()");
+    expect(source).toContain("BackToTopButton");
     expect(source).toContain("candidate?.weights");
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
