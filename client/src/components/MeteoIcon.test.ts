@@ -4,11 +4,13 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./MeteoIcon.tsx", import.meta.url), "utf8");
 
 describe("MeteoIcon", () => {
-  it("applique une profondeur 3D et un halo futuriste à la bibliothèque partagée", () => {
-    expect(source).toContain("meteo-icon-3d");
-    expect(source).toContain("feDropShadow");
-    expect(source).toContain("radialGradient");
-    expect(source).toContain("showOrb");
+  it("remplace le rendu par des glyphes météo 3D futuristes partagés", () => {
+    expect(source).toContain("FuturisticGlyph");
+    expect(source).toContain("FuturisticCloud");
+    expect(source).toContain("FuturisticSun");
+    expect(source).toContain("FuturisticRain");
+    expect(source).toContain('key === "location"');
+    expect(source).toContain('key === "stations"');
   });
 
   it("conserve une description accessible à chaque icône météo", () => {

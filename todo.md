@@ -1316,3 +1316,8 @@
 - [x] Audit: Recenser les variantes de MeteoIcon et leurs contextes d’affichage.
 - [x] Interface: Ajouter un traitement 3D lumineux cohérent à la bibliothèque d’icônes météo.
 - [x] Validation: Vérifier les rendus sur les pages principales, TypeScript, 219 tests et build.
+
+## Remplacement complet des icônes météo
+- [x] Direction: Définir le nouveau langage de formes 3D futuristes et les correspondances sémantiques.
+- [x] Interface: Reconstruire les icônes de conditions météo, paramètres et indicateurs.
+- [x] Validation: Vérifier les rendus multi-pages, TypeScript, 219 tests et build.

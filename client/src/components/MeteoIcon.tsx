@@ -13,11 +13,15 @@ interface MeteoIconProps {
 }
 
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
-  const icon = ICONS[name] ?? ICONS["variable"];
   const uniqueId = useId().replace(/:/g, "");
   const depthFilterId = `meteo-depth-${uniqueId}`;
   const orbGradientId = `meteo-orb-${uniqueId}`;
   const glossGradientId = `meteo-gloss-${uniqueId}`;
+  const cloudGradientId = `meteo-cloud-${uniqueId}`;
+  const sunGradientId = `meteo-sun-${uniqueId}`;
+  const rainGradientId = `meteo-rain-${uniqueId}`;
+  const cyanGradientId = `meteo-cyan-${uniqueId}`;
+  const violetGradientId = `meteo-violet-${uniqueId}`;
   const showOrb = size >= 26;
   return (
     <svg
@@ -46,9 +50,36 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
           <stop offset="45%" stopColor="#38bdf8" stopOpacity="0.08" />
           <stop offset="100%" stopColor="#020617" stopOpacity="0" />
         </linearGradient>
+        <linearGradient id={cloudGradientId} x1="14" y1="15" x2="48" y2="47" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#dbeafe" />
+          <stop offset="32%" stopColor="#7c8eac" />
+          <stop offset="72%" stopColor="#334155" />
+          <stop offset="100%" stopColor="#111827" />
+        </linearGradient>
+        <radialGradient id={sunGradientId} cx="32%" cy="24%" r="74%">
+          <stop offset="0%" stopColor="#fff7bf" />
+          <stop offset="32%" stopColor="#facc15" />
+          <stop offset="72%" stopColor="#f97316" />
+          <stop offset="100%" stopColor="#be123c" />
+        </radialGradient>
+        <linearGradient id={rainGradientId} x1="18" y1="32" x2="43" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#bae6fd" />
+          <stop offset="45%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#2563eb" />
+        </linearGradient>
+        <linearGradient id={cyanGradientId} x1="12" y1="12" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#a5f3fc" />
+          <stop offset="46%" stopColor="#22d3ee" />
+          <stop offset="100%" stopColor="#0e7490" />
+        </linearGradient>
+        <linearGradient id={violetGradientId} x1="14" y1="10" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ddd6fe" />
+          <stop offset="45%" stopColor="#a78bfa" />
+          <stop offset="100%" stopColor="#5b21b6" />
+        </linearGradient>
       </defs>
       {showOrb ? <><circle cx="32" cy="32" r="29" fill={`url(#${orbGradientId})`} /><circle cx="32" cy="32" r="26.5" fill="none" stroke={`url(#${glossGradientId})`} strokeWidth="0.8" opacity="0.7" /></> : null}
-      <g filter={`url(#${depthFilterId})`}>{icon}</g>
+      <g filter={`url(#${depthFilterId})`}><FuturisticGlyph name={name} ids={{ cloud: cloudGradientId, sun: sunGradientId, rain: rainGradientId, cyan: cyanGradientId, violet: violetGradientId }} /></g>
       {showOrb ? <path d="M18 12c7-4 20-5 29 1" stroke="#e0f2fe" strokeOpacity="0.16" strokeWidth="1.2" strokeLinecap="round" /> : null}
     </svg>
   );
@@ -109,6 +140,45 @@ export function getIconNameFromRegime(regimeId: string): string {
 }
 
 // ─── SVG Icon definitions ───────────────────────────────────────────────────
+
+type GlyphIds = { cloud: string; sun: string; rain: string; cyan: string; violet: string };
+
+function FuturisticCloud({ ids, storm = false }: { ids: GlyphIds; storm?: boolean }) {
+  return <><ellipse cx="32" cy="43" rx="22" ry="4" fill="#020617" opacity="0.42" /><path d="M15 39c-4.8 0-8-3.3-8-7.4 0-4.3 3.1-7.5 7.5-7.7C16.1 16.2 22.5 12 30.2 12c8.3 0 14.9 5.2 16.2 12.5 5.5.1 9.6 3.6 9.6 8 0 4.1-3.3 7.5-8.2 7.5H15Z" fill={`url(#${ids.cloud})`} stroke={storm ? "#64748b" : "#bfdbfe"} strokeWidth="1.1" /><path d="M18 26c2.1-5.5 6.6-8.7 12.2-8.7 3.2 0 6.1 1.1 8.4 3" fill="none" stroke="#f8fafc" strokeOpacity="0.48" strokeWidth="2" strokeLinecap="round" /></>;
+}
+
+function FuturisticSun({ ids, hot = false }: { ids: GlyphIds; hot?: boolean }) {
+  const ray = hot ? "#fb7185" : "#fef08a";
+  return <><circle cx="32" cy="30" r="16" fill="none" stroke={ray} strokeOpacity="0.25" strokeWidth="1.4" /><g stroke={ray} strokeWidth="2.4" strokeLinecap="round"><path d="M32 6v6" /><path d="M32 48v6" /><path d="M8 30h6" /><path d="M50 30h6" /><path d="M15 13l4 4" /><path d="M45 43l4 4" /><path d="M15 47l4-4" /><path d="M45 17l4-4" /></g><circle cx="32" cy="30" r="12.5" fill={`url(#${ids.sun})`} stroke="#fff7bf" strokeOpacity="0.65" strokeWidth="1" /><ellipse cx="28" cy="25" rx="4.5" ry="3" fill="#fff" opacity="0.45" /></>;
+}
+
+function FuturisticRain({ ids, dense = false }: { ids: GlyphIds; dense?: boolean }) {
+  const drops = dense ? [[17, 43, 12, 57], [27, 43, 22, 57], [37, 43, 32, 57], [47, 43, 42, 57]] : [[22, 43, 18, 54], [33, 43, 29, 54], [44, 43, 40, 54]];
+  return <>{drops.map(([x1, y1, x2, y2]) => <path key={`${x1}-${x2}`} d={`M${x1} ${y1} L${x2} ${y2}`} stroke={`url(#${ids.rain})`} strokeWidth={dense ? 3.6 : 3.1} strokeLinecap="round" />)}</>;
+}
+
+function FuturisticGlyph({ name, ids }: { name: string; ids: GlyphIds }) {
+  const key = name.toLowerCase();
+  if (["sunny", "stable", "summer_heat"].includes(key)) return <FuturisticSun ids={ids} hot={key === "summer_heat"} />;
+  if (["few_clouds", "partly_cloudy"].includes(key)) return <><g transform="translate(7 0) scale(.76)"><FuturisticSun ids={ids} /></g><g transform="translate(4 10) scale(.9)"><FuturisticCloud ids={ids} /></g></>;
+  if (["overcast", "fog"].includes(key)) return <><FuturisticCloud ids={ids} />{key === "fog" ? <g stroke={`url(#${ids.cyan})`} strokeWidth="2.2" strokeLinecap="round" opacity="0.8"><path d="M12 47h38" /><path d="M18 53h26" /></g> : null}</>;
+  if (["showers", "rainy", "heavy_rain", "autumn_disturbed"].includes(key)) return <><FuturisticCloud ids={ids} storm={key !== "showers"} /><FuturisticRain ids={ids} dense={["rainy", "heavy_rain"].includes(key)} /></>;
+  if (["thunderstorm", "storm"].includes(key)) return <><FuturisticCloud ids={ids} storm /><path d="M34 39 25 52h7l-2 9 13-17h-8l3-5Z" fill={`url(#${ids.sun})`} stroke="#fef3c7" strokeWidth="0.7" /><FuturisticRain ids={ids} /></>;
+  if (["snow", "freezing_rain", "sleet", "frost", "deep_frost", "winter_anticyclonic"].includes(key)) return <><FuturisticCloud ids={ids} />{[[21, 47], [33, 52], [44, 47]].map(([x, y]) => <g key={`${x}-${y}`} stroke={`url(#${ids.cyan})`} strokeWidth="2" strokeLinecap="round"><path d={`M${x - 5} ${y}h10`} /><path d={`M${x} ${y - 5}v10`} /><path d={`m${x - 3.5} ${y - 3.5} 7 7m0-7-7 7`} /></g>)}</>;
+  if (["wind_moderate", "windy", "wind_param"].includes(key)) return <g fill="none" stroke={`url(#${ids.cyan})`} strokeLinecap="round"><path d="M9 22c9-5 17 2 26-2 7-3 11-5 19-2" strokeWidth="3" /><path d="M7 32c13-5 20 3 30-1 7-3 12-5 19-1" strokeWidth="3.8" /><path d="M12 43c8-3 15 2 22-1 5-2 9-4 15-2" strokeWidth="2.7" /></g>;
+  if (["temperature", "summer_heat", "deep_frost"].includes(key)) return <><rect x="25" y="10" width="14" height="35" rx="7" fill={`url(#${ids.violet})`} stroke="#e0f2fe" strokeOpacity="0.55" /><circle cx="32" cy="48" r="10" fill={`url(#${ids.sun})`} /><path d="M32 20v27" stroke="#fff7bf" strokeWidth="3" strokeLinecap="round" opacity="0.75" /></>;
+  if (["precipitation", "humidity"].includes(key)) return <><path d="M32 7C24 18 16 27 16 37c0 9.2 7.1 16 16 16s16-6.8 16-16C48 27 40 18 32 7Z" fill={`url(#${ids.rain})`} stroke="#bae6fd" strokeWidth="1.2" /><ellipse cx="27" cy="32" rx="3.5" ry="6" fill="#fff" opacity="0.32" /></>;
+  if (key === "pressure") return <><circle cx="32" cy="33" r="20" fill="#111827" stroke={`url(#${ids.violet})`} strokeWidth="2.8" /><circle cx="32" cy="33" r="14" fill="none" stroke="#e0e7ff" strokeOpacity="0.25" /><path d="M32 33 43 24" stroke="#f5f3ff" strokeWidth="3" strokeLinecap="round" /><circle cx="32" cy="33" r="3.5" fill={`url(#${ids.violet})`} /></>;
+  if (["confidence", "trophy", "medal"].includes(key)) return <><path d="M32 6 13 15v15c0 13 7.7 21.4 19 28 11.3-6.6 19-15 19-28V15L32 6Z" fill={`url(#${ids.cyan})`} stroke="#cffafe" strokeWidth="1.2" /><path d="m23 32 6 6 13-14" fill="none" stroke="#ecfeff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></>;
+  if (key === "location") return <><circle cx="32" cy="31" r="19" fill="none" stroke={`url(#${ids.cyan})`} strokeWidth="2" strokeOpacity="0.42" /><path d="M32 9c-7.7 0-14 6.1-14 13.8C18 34.6 32 55 32 55s14-20.4 14-32.2C46 15.1 39.7 9 32 9Z" fill={`url(#${ids.violet})`} stroke="#e0f2fe" strokeWidth="1.1" /><circle cx="32" cy="23" r="5.4" fill="#ecfeff" /><circle cx="32" cy="23" r="2.5" fill="#0e7490" /></>;
+  if (key === "stations") return <><path d="M10 43 25 26l9 8 12-17 8 26H10Z" fill={`url(#${ids.cyan})`} opacity="0.32" /><g fill={`url(#${ids.cyan})`} stroke="#cffafe" strokeWidth="0.8"><circle cx="16" cy="42" r="5" /><circle cx="32" cy="31" r="5.5" /><circle cx="49" cy="20" r="5" /></g><g stroke="#e0f2fe" strokeOpacity="0.65" strokeWidth="1.5" strokeLinecap="round"><path d="m19 39 9-6" /><path d="m36 28 9-6" /></g></>;
+  if (key === "refresh") return <><circle cx="32" cy="32" r="20" fill="none" stroke={`url(#${ids.cyan})`} strokeWidth="3.2" strokeDasharray="40 15" /><path d="m43 12 7 3-4 6" fill="none" stroke="#cffafe" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></>;
+  if (key === "chevron_right") return <><circle cx="32" cy="32" r="21" fill="#0f172a" stroke={`url(#${ids.cyan})`} strokeWidth="1.8" /><path d="m27 20 12 12-12 12" fill="none" stroke="#ecfeff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></>;
+  if (["trend_up", "trend_down"].includes(key)) return <g fill="none" stroke={`url(#${ids.cyan})`} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d={key === "trend_down" ? "M10 17 25 32l8-8 19 22" : "M10 47 25 32l8 8 19-22"} /><path d={key === "trend_down" ? "M43 46h9v-9" : "M43 18h9v9"} /></g>;
+  if (key === "clear_night") return <><circle cx="34" cy="30" r="17" fill={`url(#${ids.violet})`} /><circle cx="41" cy="23" r="17" fill="#07101d" /><circle cx="18" cy="16" r="1.7" fill="#e0f2fe" /><circle cx="48" cy="15" r="1.3" fill="#e0f2fe" /></>;
+  if (["cloud_cover", "variable", "spring_unstable", "maritime", "urban_heat", "mountain"].includes(key)) return <><FuturisticCloud ids={ids} />{key === "variable" ? <FuturisticRain ids={ids} /> : null}</>;
+  return <><FuturisticCloud ids={ids} /><FuturisticRain ids={ids} /></>;
+}
 
 const ICONS: Record<string, React.ReactNode> = {
   // ═══ RÉGIMES MÉTÉO ═══
