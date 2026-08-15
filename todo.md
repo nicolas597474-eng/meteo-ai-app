@@ -1289,3 +1289,7 @@
 - [x] Automatisation: Garantir l’exécution à 05h00 Paris en heure d’été comme en heure d’hiver.
 - [x] Automatisation: Compléter le périmètre de collecte si un modèle actif ou une station admissible manque.
 - [x] Validation: Vérifier le prochain passage planifié et le statut des collectes.
+
+## Simplification du panneau détaillé horaire
+- [x] Interface: Retirer les sections « Régime opérationnel » et « Évolution à court terme ».
+- [x] Validation: Vérifier le panneau sur mobile, TypeScript, 210 tests et build.

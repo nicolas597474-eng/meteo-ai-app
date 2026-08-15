@@ -772,7 +772,7 @@ export default function Dashboard() {
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
             <Suspense fallback={<div className="h-56 bg-muted rounded-xl animate-pulse" />}>
-              <HourlyChart hours={hours} locationName={activeLocation?.name} regime={officialRegime?.primary ? { label: officialRegime.primary.label, emoji: officialRegime.primary.emoji } : null} />
+              <HourlyChart hours={hours} locationName={activeLocation?.name} />
             </Suspense>
           ) : (
             <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-5 text-center">
