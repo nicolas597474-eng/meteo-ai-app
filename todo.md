@@ -1273,3 +1273,9 @@
 - [x] Interface: Adapter la primitive de badge aux contraintes de largeur mobile.
 - [x] Interface: Ajouter des infobulles explicatives aux badges de statut et de confiance.
 - [x] Validation: Vérifier les rendus mobiles, TypeScript, 210 tests et build.
+
+## Fonds de cartes en dégradé
+- [x] Audit: Identifier les primitives et cartes partagées entre les pages météo.
+- [x] Interface: Définir des dégradés réutilisables, sombres et compatibles avec les états sémantiques.
+- [x] Interface: Appliquer ce traitement aux cartes principales des pages météo.
+- [x] Validation: Vérifier la lisibilité mobile, TypeScript, 210 tests et build.
