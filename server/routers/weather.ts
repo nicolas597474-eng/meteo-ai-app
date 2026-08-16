@@ -886,15 +886,21 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
     const today = getTodayParis();
     const locationKey = input?.lat && input?.lon ? makeLocationKey(input.lat, input.lon) : undefined;
-    const forecasts = locationKey
-      ? await getForecastsByDate(today, locationKey)
-      : await getForecastsByDate(today);
     const observation = locationKey
       ? await getObservationByDate(today, locationKey)
       : await getObservationByDate(today);
-    const meteoAI = locationKey
+    const currentMeteoAI = locationKey
       ? await getMeteoAIForecastByDate(today, locationKey)
       : await getMeteoAIForecastByDate(today);
+    const archivedMeteoAI = !currentMeteoAI && locationKey
+      ? (await getLatestMeteoAIForecasts(1, locationKey))[0] ?? null
+      : null;
+    const meteoAI = currentMeteoAI ?? archivedMeteoAI;
+    const snapshotStatus = currentMeteoAI ? "current" : archivedMeteoAI ? "archived" : "unavailable";
+    const snapshotDate = meteoAI?.date ?? null;
+    const forecasts = snapshotDate
+      ? (locationKey ? await getForecastsByDate(snapshotDate, locationKey) : await getForecastsByDate(snapshotDate))
+      : (locationKey ? await getForecastsByDate(today, locationKey) : await getForecastsByDate(today));
     const ranking = locationKey
       ? await getCumulativeRankingForLocation(locationKey)
       : await getCumulativeRanking();
@@ -904,7 +910,7 @@ export const weatherRouter = router({
     // remplacer la fusion officielle que si elle est plus récente, fraîche et
     // couvre notamment la nébulosité.
     const liveHours = await collectHourlyForecast(today, input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined);
-    const operationalRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(liveHours));
+    const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours));
     const regime = operationalRegime.primary.id;
     const regimeDef = operationalRegime.primary;
     const weights = operationalRegime.blendedWeights;
@@ -1057,6 +1063,8 @@ export const weatherRouter = router({
       sources,
       engineVersion: "MeteoAI v2.0 — Multi-Dimension",
       calculatedAt: meteoAI?.computedAt ?? null,
+      snapshotStatus,
+      snapshotDate,
       regimeSource: operationalRegime.source,
       regimeSourceLabel: operationalRegime.sourceLabel,
       regimeSourceUpdatedAt: operationalRegime.sourceUpdatedAt,

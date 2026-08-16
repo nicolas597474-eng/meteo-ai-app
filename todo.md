@@ -1605,7 +1605,7 @@
 ## Snapshot de fusion indisponible dans AI Lab
 - [x] Audit: Vérifier la dernière fusion, les prévisions archivées et les exécutions de collecte pour Hondeghem.
 - [x] Correction: Restaurer la récupération ou la production de snapshot sans inventer de données.
-- [ ] Validation: Vérifier AI Lab, TypeScript, Vitest et build avant publication.
+- [x] Validation: Vérifier AI Lab, TypeScript, Vitest et build avant publication.
 
 ## Position Soleil & Lune
 - [x] Audit: Vérifier les horaires et les coordonnées disponibles pour les deux astres.
