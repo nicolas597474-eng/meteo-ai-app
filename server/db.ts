@@ -42,6 +42,7 @@ import { ENV } from "./_core/env";
 import { selectLatestForecasts } from "./forecastSelection";
 import { buildForecastUpdateSet } from "./forecastWrite";
 import { deriveStationQualityProfile } from "./stationQualityService";
+import { getGroundTruthReferenceBounds } from "./groundTruthReference";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -789,6 +790,8 @@ export async function getPhysicalStationHistory(
   if (!db) return { stations: [], latestGroundTruth: null };
   const latBounds = referenceCoordinateBounds(refLat);
   const lonBounds = referenceCoordinateBounds(refLon);
+  const groundTruthLatBounds = getGroundTruthReferenceBounds(refLat);
+  const groundTruthLonBounds = getGroundTruthReferenceBounds(refLon);
 
   const stations = await db
     .select()
@@ -817,7 +820,12 @@ export async function getPhysicalStationHistory(
   const latestGroundTruth = await db
     .select()
     .from(groundTruth)
-    .where(and(eq(groundTruth.refLat, refLat), eq(groundTruth.refLon, refLon)))
+    .where(and(
+      gte(groundTruth.refLat, groundTruthLatBounds.min),
+      lte(groundTruth.refLat, groundTruthLatBounds.max),
+      gte(groundTruth.refLon, groundTruthLonBounds.min),
+      lte(groundTruth.refLon, groundTruthLonBounds.max),
+    ))
     .orderBy(desc(groundTruth.computedAt))
     .limit(1);
 

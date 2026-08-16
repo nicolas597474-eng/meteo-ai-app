@@ -1562,3 +1562,13 @@
 - [x] Audit: Identifier pourquoi la note individuelle n’est pas suffisamment visible dans les lignes de tendance.
 - [x] Interface: Afficher un badge de note explicite pour chaque modèle Température, Pluie et Vent.
 - [x] Validation: Vérifier les notes par modèle, TypeScript, Vitest et build.
+
+## Diagnostic des indicateurs de synthèse des stations
+- [x] Interface: Identifier les conditions qui affichent un tiret pour Dernière synthèse et Confiance synthèse.
+- [x] Données: Contrôler les synthèses locales, observations et scores réellement archivés pour Hondeghem.
+- [x] Rapport: Expliquer les prérequis qui empêchent ou permettent l’affichage de ces deux indicateurs.
+
+## Correction de correspondance géographique des synthèses
+- [x] Données: Utiliser une tolérance cohérente pour retrouver une synthèse locale proche du lieu actif.
+- [x] Tests: Couvrir la récupération de la dernière synthèse malgré un léger écart de coordonnées.
+- [x] Validation: Vérifier la dernière synthèse et la confiance affichées dans Stations, TypeScript, Vitest et build.
