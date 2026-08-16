@@ -37,5 +37,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("meteoai-first-quarter-moon-3d-realistic_64387ecc.png");
     expect(source).toContain("Lune 3D représentant le premier croissant");
     expect(source).toContain('astronomy.moon.label === "Premier croissant"');
+    expect(source).toContain("moon-3d-first-crescent");
+    expect(styles).toContain("Premier croissant : seul l’astre est visible");
+    expect(styles).toContain("background: transparent !important");
   });
 });

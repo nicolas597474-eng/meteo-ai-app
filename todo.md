@@ -1502,3 +1502,8 @@
 - [x] Asset: Générer un premier croissant 3D réaliste et cratérisé, sans texte ni fond.
 - [x] Interface: Remplacer explicitement le pictogramme du premier croissant par cet asset visible.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Lune 3D agrandie sans cercle
+- [x] Audit: Identifier le conteneur et le fond décoratif de la lune 3D.
+- [x] Interface: Agrandir l’astre et retirer cercle, bordure et arrière-plan autour de la lune.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.

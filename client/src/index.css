@@ -178,6 +178,21 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   bottom: 1rem !important;
 }
 
+/* Premier croissant : seul l’astre est visible, sans pastille, cercle ni fond décoratif. */
+section[aria-label="Qualité de l’air, soleil et lune"] div:has(> img.moon-3d-first-crescent) {
+  width: 6rem !important;
+  height: 6rem !important;
+  margin-left: -0.5rem;
+  overflow: visible !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+img.moon-3d-first-crescent {
+  transform: scale(1.18);
+}
+
 /* Surfaces MeteoAI : dégradés minéraux sombres, lisibles sur mobile et cohérents entre les pages. */
 :root {
   --weather-surface-base: linear-gradient(145deg, rgba(16, 27, 40, 0.96) 0%, rgba(10, 18, 29, 0.97) 55%, rgba(7, 12, 20, 0.985) 100%);
