@@ -167,6 +167,17 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* L’arche Soleil & Lune conserve sa forme complète, y compris sur les écrans mobiles étroits. */
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 {
+  height: 10rem !important;
+  overflow: visible !important;
+}
+
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > div:first-child {
+  height: 8.75rem !important;
+  bottom: 1rem !important;
+}
+
 /* Surfaces MeteoAI : dégradés minéraux sombres, lisibles sur mobile et cohérents entre les pages. */
 :root {
   --weather-surface-base: linear-gradient(145deg, rgba(16, 27, 40, 0.96) 0%, rgba(10, 18, 29, 0.97) 55%, rgba(7, 12, 20, 0.985) 100%);

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
+const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -23,5 +24,12 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
     expect(source).toContain("Éphémérides locales et état actuel du cycle jour-nuit");
+  });
+
+  it("préserve l’arche complète du cycle solaire sur mobile", () => {
+    expect(source).toContain("rounded-t-full");
+    expect(styles).toContain("Qualité de l’air, soleil et lune");
+    expect(styles).toContain("height: 10rem !important");
+    expect(styles).toContain("height: 8.75rem !important");
   });
 });

@@ -1487,3 +1487,8 @@
 - [x] Audit: Identifier le recouvrement des valeurs et du repère de l’heure actuelle.
 - [x] Interface: Réserver des positions de libellés lisibles au-dessus des points du graphique.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Tracé complet du lever et coucher du soleil
+- [x] Audit: Identifier le découpage du tracé et des libellés du panneau Soleil & Lune.
+- [x] Interface: Ajuster les dimensions du tracé pour l’afficher entièrement sur mobile.
+- [x] Validation: Vérifier le panneau Soleil & Lune, TypeScript, Vitest et build.
