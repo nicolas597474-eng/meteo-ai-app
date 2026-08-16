@@ -3,7 +3,7 @@ import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
-import { getLabelAboveCurveY, getLabelBelowCurveY } from "@/lib/chartLabelLanes";
+import { getLabelAboveCurveY, getLabelBelowCurveY, TEMPERATURE_LABEL_ABOVE_GAP, TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE } from "@/lib/chartLabelLanes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface DayData {
@@ -357,7 +357,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillStyle = "#fdba74";
       ctx.font = `bold ${sel ? 14 : 13}px system-ui`;
       ctx.textAlign = "center";
-      const maxLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, 14);
+      const maxLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP);
       ctx.strokeStyle = "rgba(5, 7, 10, 0.9)";
       ctx.lineWidth = 3;
       ctx.strokeText(`${v.toFixed(1)}`, pt.x, maxLabelY);
@@ -392,7 +392,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillStyle = "#93c5fd";
       ctx.font = `bold ${sel ? 13 : 12}px system-ui`;
       ctx.textAlign = "center";
-      const minLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 24, 34);
+      const minLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE);
       ctx.strokeStyle = "rgba(5, 7, 10, 0.9)";
       ctx.lineWidth = 3;
       ctx.strokeText(`${v.toFixed(1)}`, pt.x, minLabelY);

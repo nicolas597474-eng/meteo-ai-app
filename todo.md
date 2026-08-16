@@ -1545,3 +1545,9 @@
 - [x] Audit: Identifier les halos du tracé maximal et la proximité des chiffres minimaux bleus.
 - [x] Interface: Rendre la courbe orange nette et écarter les libellés minimaux de leur courbe.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Harmonisation anti-chevauchement des graphiques
+- [x] Audit: Identifier les collisions restantes de libellés dans les graphiques horaire et de prévisions.
+- [x] Infrastructure: Définir des couloirs communs qui éloignent les chiffres des courbes.
+- [x] Interface: Appliquer le placement harmonisé aux deux graphiques.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.

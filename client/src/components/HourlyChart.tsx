@@ -3,7 +3,7 @@ import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, 
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
-import { getLabelAboveCurveY } from "@/lib/chartLabelLanes";
+import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLabelLanes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -397,15 +397,11 @@ export default function HourlyChart({ hours, locationName }: Props) {
         const cpx = (tempPts[i - 1].x + tempPts[i].x) / 2;
         ctx.bezierCurveTo(cpx, tempPts[i - 1].y, cpx, tempPts[i].y, tempPts[i].x, tempPts[i].y);
       }
-      ctx.save();
-      ctx.strokeStyle = "rgba(249, 115, 22, 0.45)";
-      ctx.lineWidth = 5;
-      ctx.shadowColor = "#f97316";
-      ctx.shadowBlur = 10;
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.38)";
+      ctx.lineWidth = 3.2;
       ctx.stroke();
-      ctx.restore();
       ctx.strokeStyle = "#fb923c";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.1;
       ctx.stroke();
     }
     // Points + température affichée à chaque heure
@@ -424,7 +420,10 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.fillStyle = nowHour === i ? "#a5b4fc" : "#fdba74";
       ctx.font = `bold ${sel ? 12 : 10}px system-ui`;
       ctx.textAlign = "center";
-      const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop);
+      const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP);
+      ctx.strokeStyle = "rgba(5, 7, 10, 0.9)";
+      ctx.lineWidth = 3;
+      ctx.strokeText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY);
       ctx.fillText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY);
     });
 

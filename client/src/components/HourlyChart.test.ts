@@ -14,7 +14,9 @@ describe("HourlyChart", () => {
     expect(source).toContain("text-emerald-400");
     expect(source).toContain("text-sky-400");
     expect(source).toContain("ctx.fillText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY)");
-    expect(source).toContain("getLabelAboveCurveY(pt.y, tempZoneTop)");
+    expect(source).toContain("getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP)");
+    expect(source).toContain('ctx.strokeText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY)');
+    expect(source).not.toContain("ctx.shadowBlur = 10");
     expect(source).not.toContain("Ressenti immédiatement sous sa courbe bleue");
     expect(source).not.toContain("apparentLabelY");
     expect(source).not.toContain('> Ressenti</span>');
