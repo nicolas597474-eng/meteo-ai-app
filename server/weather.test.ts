@@ -83,10 +83,10 @@ describe("contrat de snapshot officiel inter-pages", () => {
     ]);
 
     expect(daily.officialSnapshot).toEqual(expect.objectContaining({
+      validAt: expect.any(String),
       sourceKind: expect.any(String),
       source: expect.any(String),
     }));
-    expect(daily.officialSnapshot.validAt === null || typeof daily.officialSnapshot.validAt === "string").toBe(true);
     expect(hourly.officialSnapshot.validAt).toBe(daily.officialSnapshot.validAt);
     expect(details.officialSnapshot.validAt).toBe(daily.officialSnapshot.validAt);
     expect(hourly.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
