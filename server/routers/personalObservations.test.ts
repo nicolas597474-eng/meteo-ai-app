@@ -11,5 +11,8 @@ describe("routeur des observations personnelles", () => {
     expect(source).toContain("personalizedHourly");
     expect(source).toContain('item.evidenceState === "qualified"');
     expect(source).toContain("weightMultiplier");
+    expect(source).toContain("history: protectedProcedure");
+    expect(source).toContain("rebuildPersonalCalibration");
+    expect(source).toContain("delete: protectedProcedure");
   });
 });

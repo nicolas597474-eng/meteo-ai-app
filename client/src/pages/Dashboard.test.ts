@@ -10,6 +10,10 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Enregistrer et comparer aux modèles");
     expect(source).toContain("personalObservations.submit.useMutation");
     expect(source).toContain("Données insuffisantes");
+    expect(source).toContain("aria-expanded={isPersonalObservationOpen}");
+    expect(source).toContain("Consulter l’historique complet");
+    expect(source).toContain("Modifier mon observation");
+    expect(source).toContain("Supprimer cette observation et recalculer la calibration");
     expect(source).toContain("Écart observé avec la prévision officielle");
     expect(source).toContain("hasMaterialLocalDelta");
     expect(source).toContain("La température principale reste la prévision au point du lieu.");

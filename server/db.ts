@@ -1080,6 +1080,66 @@ export async function getRecentPersonalWeatherObservations(userId: number, locat
     .limit(limit);
 }
 
+export async function getAllPersonalWeatherObservations(userId: number, locationKey: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(personalWeatherObservations)
+    .where(and(eq(personalWeatherObservations.userId, userId), eq(personalWeatherObservations.locationKey, locationKey)))
+    .orderBy(personalWeatherObservations.observedAt);
+}
+
+export async function getPersonalWeatherObservationById(userId: number, id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(personalWeatherObservations)
+    .where(and(eq(personalWeatherObservations.userId, userId), eq(personalWeatherObservations.id, id)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updatePersonalWeatherObservation(userId: number, id: number, data: Pick<InsertPersonalWeatherObservation, "temperature" | "condition" | "windSpeed">) {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db
+    .update(personalWeatherObservations)
+    .set(data)
+    .where(and(eq(personalWeatherObservations.userId, userId), eq(personalWeatherObservations.id, id)));
+  return Number((result as any)[0]?.affectedRows ?? 0) > 0;
+}
+
+export async function deletePersonalWeatherObservation(userId: number, id: number) {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(personalModelObservationScores).where(eq(personalModelObservationScores.observationId, id));
+  const result = await db
+    .delete(personalWeatherObservations)
+    .where(and(eq(personalWeatherObservations.userId, userId), eq(personalWeatherObservations.id, id)));
+  return Number((result as any)[0]?.affectedRows ?? 0) > 0;
+}
+
+export async function getPersonalModelObservationScores(observationIds: number[]) {
+  const db = await getDb();
+  if (!db || observationIds.length === 0) return [];
+  return db.select().from(personalModelObservationScores).where(inArray(personalModelObservationScores.observationId, observationIds));
+}
+
+export async function replacePersonalModelObservationScores(observationIds: number[], rows: InsertPersonalModelObservationScore[]) {
+  const db = await getDb();
+  if (!db || observationIds.length === 0) return;
+  await db.delete(personalModelObservationScores).where(inArray(personalModelObservationScores.observationId, observationIds));
+  if (rows.length > 0) await db.insert(personalModelObservationScores).values(rows);
+}
+
+export async function clearPersonalModelCalibrations(userId: number, locationKey: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(personalModelCalibrations).where(and(eq(personalModelCalibrations.userId, userId), eq(personalModelCalibrations.locationKey, locationKey)));
+}
+
 // ─── LEAD TIME SCORES HELPERS ────────────────────────────────────────────────
 
 /**

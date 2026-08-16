@@ -2,11 +2,15 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import {
   getPersonalModelCalibrations,
+  getAllPersonalWeatherObservations,
+  getPersonalWeatherObservationById,
   getRecentPersonalWeatherObservations,
   getStoredHourlyForecasts,
   insertPersonalModelObservationScores,
   insertPersonalWeatherObservation,
   makeLocationKey,
+  updatePersonalWeatherObservation,
+  deletePersonalWeatherObservation,
   upsertPersonalModelCalibration,
 } from "../db";
 import {
@@ -17,6 +21,7 @@ import {
 } from "../personalCalibration";
 import { getParisDate, getParisHour } from "../weatherTime";
 import { conditionFromWmoWeatherCode } from "../weatherConditionLabels";
+import { rebuildPersonalCalibration } from "../personalObservationHistory";
 
 const observationInput = z.object({
   lat: z.number().min(-90).max(90),
@@ -25,6 +30,7 @@ const observationInput = z.object({
   condition: z.enum(PERSONAL_CONDITIONS),
   windSpeed: z.number().min(0).max(250).nullable(),
 });
+const observationEditInput = observationInput.pick({ temperature: true, condition: true, windSpeed: true });
 
 function weightedAverage(values: Array<{ value: number | null; weight: number }>) {
   const available = values.filter((entry): entry is { value: number; weight: number } => entry.value != null);
@@ -93,6 +99,32 @@ export const personalObservationsRouter = router({
         }];
       });
       return { applied: hours.length > 0, hours, comparedModels: Array.from(qualified.keys()) };
+    }),
+
+  history: protectedProcedure
+    .input(z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }))
+    .query(async ({ ctx, input }) => getAllPersonalWeatherObservations(ctx.user.id, makeLocationKey(input.lat, input.lon))),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), observation: observationEditInput }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await getPersonalWeatherObservationById(ctx.user.id, input.id);
+      if (!existing) throw new Error("Observation introuvable.");
+      const updated = await updatePersonalWeatherObservation(ctx.user.id, input.id, input.observation);
+      if (!updated) throw new Error("L’observation n’a pas pu être modifiée.");
+      const rebuild = await rebuildPersonalCalibration(ctx.user.id, existing.locationKey);
+      return { success: true, rebuild };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await getPersonalWeatherObservationById(ctx.user.id, input.id);
+      if (!existing) throw new Error("Observation introuvable.");
+      const deleted = await deletePersonalWeatherObservation(ctx.user.id, input.id);
+      if (!deleted) throw new Error("L’observation n’a pas pu être supprimée.");
+      const rebuild = await rebuildPersonalCalibration(ctx.user.id, existing.locationKey);
+      return { success: true, rebuild };
     }),
 
   submit: protectedProcedure.input(observationInput).mutation(async ({ ctx, input }) => {

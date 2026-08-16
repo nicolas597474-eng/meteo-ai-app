@@ -1594,3 +1594,10 @@
 - [x] Calcul: Évaluer température, condition, pluie et vent, puis mettre à jour des poids plafonnés selon la preuve accumulée.
 - [x] Interface: Ajouter au Dashboard une saisie guidée des observations, des propositions de conditions et l’état de preuve.
 - [x] Validation: Couvrir les calculs, la saisie mobile, TypeScript, Vitest et build avant publication.
+
+## Historique modifiable des observations personnelles
+- [x] Audit: Définir un recalcul complet et cohérent des scores après une correction ou suppression.
+- [x] Données: Ajouter les opérations sécurisées de liste complète, modification, suppression et reconstruction de calibration.
+- [x] Interface: Créer un panneau mobile pour consulter, modifier et supprimer les observations archivées.
+- [x] Validation: Vérifier les recalculs, les actions utilisateur, TypeScript, Vitest et build.
+- [x] Interface: Replier la section Mes observations par défaut avec une flèche d’ouverture et de fermeture rapide.

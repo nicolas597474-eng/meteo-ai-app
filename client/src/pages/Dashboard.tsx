@@ -17,6 +17,7 @@ import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dash
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
@@ -128,6 +129,9 @@ export default function Dashboard() {
   const [personalWind, setPersonalWind] = useState("");
   const [personalCondition, setPersonalCondition] = useState<(typeof PERSONAL_CONDITION_OPTIONS)[number]["id"]>("partly_cloudy");
   const [personalSubmitResult, setPersonalSubmitResult] = useState<{ notice: string; topModel?: { modelName: string; overallScore: number } } | null>(null);
+  const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
+  const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
+  const [editingPersonalObservation, setEditingPersonalObservation] = useState<{ id: number; temperature: string; windSpeed: string; condition: (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] } | null>(null);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
   const selectedLocation = contextLocation ?? activeLocation;
@@ -242,14 +246,30 @@ export default function Dashboard() {
     coordsInput,
     { enabled: !!user && personalObservationState?.evidence.state === "qualified", staleTime: 2 * 60 * 1000 }
   );
+  const { data: personalHistory = [], refetch: refetchPersonalHistory } = trpc.personalObservations.history.useQuery(
+    coordsInput,
+    { enabled: !!user && isPersonalHistoryOpen, staleTime: 60 * 1000 }
+  );
+  const refreshPersonalObservationData = async () => {
+    await Promise.all([
+      refetchPersonalObservationState(),
+      refetchPersonalHistory(),
+      utils.personalObservations.dashboardState.invalidate(coordsInput),
+      utils.personalObservations.personalizedHourly.invalidate(coordsInput),
+      utils.personalObservations.history.invalidate(coordsInput),
+    ]);
+  };
   const submitPersonalObservation = trpc.personalObservations.submit.useMutation({
     onSuccess: async (result) => {
       setPersonalSubmitResult({ notice: result.notice, topModel: result.modelResults[0] });
-      await Promise.all([
-        refetchPersonalObservationState(),
-        utils.personalObservations.dashboardState.invalidate(coordsInput),
-      ]);
+      await refreshPersonalObservationData();
     },
+  });
+  const updatePersonalObservation = trpc.personalObservations.update.useMutation({
+    onSuccess: async () => { setEditingPersonalObservation(null); await refreshPersonalObservationData(); },
+  });
+  const deletePersonalObservation = trpc.personalObservations.delete.useMutation({
+    onSuccess: async () => { await refreshPersonalObservationData(); },
   });
 
   const handlePersonalObservationSubmit = () => {
@@ -258,6 +278,13 @@ export default function Dashboard() {
     if ((temperature != null && !Number.isFinite(temperature)) || (windSpeed != null && !Number.isFinite(windSpeed))) return;
     setPersonalSubmitResult(null);
     submitPersonalObservation.mutate({ ...coordsInput, temperature, condition: personalCondition, windSpeed });
+  };
+  const savePersonalObservationEdit = () => {
+    if (!editingPersonalObservation) return;
+    const temperature = editingPersonalObservation.temperature.trim() === "" ? null : Number(editingPersonalObservation.temperature.replace(",", "."));
+    const windSpeed = editingPersonalObservation.windSpeed.trim() === "" ? null : Number(editingPersonalObservation.windSpeed.replace(",", "."));
+    if ((temperature != null && !Number.isFinite(temperature)) || (windSpeed != null && !Number.isFinite(windSpeed))) return;
+    updatePersonalObservation.mutate({ id: editingPersonalObservation.id, observation: { temperature, condition: editingPersonalObservation.condition, windSpeed } });
   };
 
   const isLoading = officialLoading && hourlyLoading;
@@ -723,12 +750,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <section className="dashboard-sky-card rounded-xl border border-sky-400/25 bg-sky-400/5 p-3" aria-labelledby="personal-observation-title">
-          <div className="flex items-start gap-2">
-            <Eye className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
-            <div className="min-w-0"><h2 id="personal-observation-title" className="text-sm font-semibold text-slate-100">Mes observations</h2><p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Indiquez ce que vous voyez. L’application compare cette observation aux modèles archivés du même lieu et du même créneau.</p></div>
-          </div>
-          {!user ? <p className="mt-3 rounded-lg border border-slate-700 bg-black/20 px-3 py-2 text-xs text-slate-300">Connectez-vous pour enregistrer vos observations et construire votre calibration locale.</p> : <>
+        <section className="dashboard-sky-card rounded-xl border border-sky-400/25 bg-sky-400/5" aria-labelledby="personal-observation-title">
+          <button type="button" aria-expanded={isPersonalObservationOpen} onClick={() => setIsPersonalObservationOpen((open) => !open)} className="flex min-h-12 w-full items-center gap-2 px-3 text-left">
+            <Eye className="h-5 w-5 shrink-0 text-sky-300" />
+            <div className="min-w-0 flex-1"><h2 id="personal-observation-title" className="text-sm font-semibold text-slate-100">Mes observations</h2><p className="mt-0.5 text-[10px] text-slate-400">Signaler ce que vous observez et améliorer les modèles.</p></div>
+            {isPersonalObservationOpen ? <ChevronUp className="h-5 w-5 shrink-0 text-sky-300" /> : <ChevronDown className="h-5 w-5 shrink-0 text-sky-300" />}
+          </button>
+          {isPersonalObservationOpen ? <div className="border-t border-sky-300/15 px-3 pb-3 pt-2">
+          {!user ? <p className="rounded-lg border border-slate-700 bg-black/20 px-3 py-2 text-xs text-slate-300">Connectez-vous pour enregistrer vos observations et construire votre calibration locale.</p> : <>
+            <p className="text-[11px] leading-relaxed text-slate-400">Indiquez ce que vous voyez. L’application compare cette observation aux modèles archivés du même lieu et du même créneau.</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <label className="text-[11px] font-medium text-slate-300">Température observée (°C)<input aria-label="Température observée" inputMode="decimal" value={personalTemperature} onChange={(event) => setPersonalTemperature(event.target.value)} placeholder="Ex. 24" className="mt-1 min-h-10 w-full rounded-lg border border-slate-600 bg-[#0b1019]/80 px-3 text-sm text-white outline-none focus:border-sky-400" /></label>
               <label className="text-[11px] font-medium text-slate-300">Vent observé (km/h)<input aria-label="Vent observé" inputMode="decimal" value={personalWind} onChange={(event) => setPersonalWind(event.target.value)} placeholder="Facultatif" className="mt-1 min-h-10 w-full rounded-lg border border-slate-600 bg-[#0b1019]/80 px-3 text-sm text-white outline-none focus:border-sky-400" /></label>
@@ -741,8 +771,21 @@ export default function Dashboard() {
             {submitPersonalObservation.isError ? <p className="mt-2 text-[11px] text-red-300">L’observation n’a pas pu être enregistrée. Vérifiez les valeurs puis réessayez.</p> : null}
             {personalSubmitResult ? <div className="mt-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-100"><p>{personalSubmitResult.notice}</p>{personalSubmitResult.topModel ? <p className="mt-1 font-semibold">Meilleur accord sur cette observation : {personalSubmitResult.topModel.modelName} — {Math.round(personalSubmitResult.topModel.overallScore)}/100.</p> : null}</div> : null}
             <div className="mt-3 border-t border-sky-300/15 pt-2 text-[11px] text-slate-400">{personalizedHourly?.applied ? `Calibration qualifiée active : les heures à venir sont pondérées selon ${personalizedHourly.comparedModels.join(", ")}. La condition actuelle reste la source à 15 minutes.` : personalObservationState?.evidence.state === "qualified" ? "Calibration qualifiée : mise à jour de la fusion en cours." : personalObservationState?.evidence.state === "provisional" ? `Tendance provisoire : ${personalObservationState.evidence.comparisonCount}/50 comparaisons avant une influence sur les poids.` : `Données insuffisantes : ${personalObservationState?.evidence.comparisonCount ?? 0}/20 comparaisons pour une première tendance, 50 pour influencer les poids.`}</div>
+            <button type="button" onClick={() => setIsPersonalHistoryOpen(true)} className="mt-3 min-h-10 w-full rounded-lg border border-slate-600 bg-black/15 px-3 text-xs font-semibold text-slate-200">Consulter l’historique complet</button>
           </>}
+          </div> : null}
         </section>
+
+        <Dialog open={isPersonalHistoryOpen} onOpenChange={setIsPersonalHistoryOpen}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:max-w-xl">
+            <DialogHeader><DialogTitle className="pr-7 text-white">Historique de mes observations</DialogTitle></DialogHeader>
+            {personalHistory.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">Aucune observation personnelle n’est encore enregistrée pour ce lieu.</p> : <div className="space-y-2">{personalHistory.slice().reverse().map((observation) => <div key={observation.id} className="rounded-xl border border-slate-700 bg-black/20 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-100">{observation.temperature == null ? "Température non renseignée" : `${Number(observation.temperature).toFixed(1)} °C`} · {PERSONAL_CONDITION_OPTIONS.find((option) => option.id === observation.condition)?.label ?? observation.condition}</p><p className="mt-1 text-[11px] text-slate-400">{new Date(observation.observedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" })}{observation.windSpeed == null ? "" : ` · vent ${Number(observation.windSpeed).toFixed(0)} km/h`}</p></div><div className="flex shrink-0 gap-2"><button type="button" onClick={() => setEditingPersonalObservation({ id: observation.id, temperature: observation.temperature?.toString() ?? "", windSpeed: observation.windSpeed?.toString() ?? "", condition: observation.condition as (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] })} className="min-h-9 rounded-lg border border-sky-400/35 px-2.5 text-[11px] font-semibold text-sky-200">Modifier</button><button type="button" disabled={deletePersonalObservation.isPending} onClick={() => { if (window.confirm("Supprimer cette observation et recalculer la calibration ?")) deletePersonalObservation.mutate({ id: observation.id }); }} className="min-h-9 rounded-lg border border-red-400/35 px-2.5 text-[11px] font-semibold text-red-200 disabled:opacity-60">Supprimer</button></div></div></div>)}</div>}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editingPersonalObservation !== null} onOpenChange={(open) => { if (!open) setEditingPersonalObservation(null); }}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:max-w-md"><DialogHeader><DialogTitle className="pr-7 text-white">Modifier mon observation</DialogTitle></DialogHeader>{editingPersonalObservation ? <div className="space-y-3"><div className="grid grid-cols-2 gap-2"><label className="text-xs text-slate-300">Température (°C)<input inputMode="decimal" value={editingPersonalObservation.temperature} onChange={(event) => setEditingPersonalObservation({ ...editingPersonalObservation, temperature: event.target.value })} className="mt-1 min-h-10 w-full rounded-lg border border-slate-600 bg-black/20 px-3 text-sm text-white" /></label><label className="text-xs text-slate-300">Vent (km/h)<input inputMode="decimal" value={editingPersonalObservation.windSpeed} onChange={(event) => setEditingPersonalObservation({ ...editingPersonalObservation, windSpeed: event.target.value })} className="mt-1 min-h-10 w-full rounded-lg border border-slate-600 bg-black/20 px-3 text-sm text-white" /></label></div><div className="flex flex-wrap gap-1.5">{PERSONAL_CONDITION_OPTIONS.map((option) => <button key={option.id} type="button" onClick={() => setEditingPersonalObservation({ ...editingPersonalObservation, condition: option.id })} className={`min-h-9 rounded-lg border px-2 text-[11px] ${editingPersonalObservation.condition === option.id ? "border-sky-300/60 bg-sky-400/15 text-sky-100" : "border-slate-700 text-slate-300"}`}>{option.label}</button>)}</div><button type="button" disabled={updatePersonalObservation.isPending} onClick={savePersonalObservationEdit} className="min-h-10 w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 text-xs font-semibold text-emerald-100 disabled:opacity-60">{updatePersonalObservation.isPending ? "Recalcul en cours…" : "Enregistrer la correction"}</button><p className="text-[11px] leading-relaxed text-slate-400">La correction reconstruit les scores et les poids à partir de tout l’historique.</p></div> : null}</DialogContent>
+        </Dialog>
 
         {localMode !== "standard" && locationWeather?.ultraLocal && (
           <section className="space-y-2" aria-labelledby="local-context-title">
