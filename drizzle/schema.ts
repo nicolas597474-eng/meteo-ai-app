@@ -494,3 +494,63 @@ export const leadTimeScores = mysqlTable("lead_time_scores", {
 });
 export type LeadTimeScore = typeof leadTimeScores.$inferSelect;
 export type InsertLeadTimeScore = typeof leadTimeScores.$inferInsert;
+
+/**
+ * Observations renseignées par un utilisateur pour son lieu actif.
+ * Elles sont une preuve complémentaire, distincte des stations physiques.
+ */
+export const personalWeatherObservations = mysqlTable("personal_weather_observations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  lat: float("lat").notNull(),
+  lon: float("lon").notNull(),
+  observedAt: bigint("observedAt", { mode: "number" }).notNull(),
+  temperature: float("temperature"),
+  condition: varchar("condition", { length: 32 }).notNull(),
+  windSpeed: float("windSpeed"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("personal_weather_observation_user_time_unique").on(table.userId, table.locationKey, table.observedAt),
+]);
+export type PersonalWeatherObservation = typeof personalWeatherObservations.$inferSelect;
+export type InsertPersonalWeatherObservation = typeof personalWeatherObservations.$inferInsert;
+
+/** Une trace par modèle permet d’expliquer chaque évolution de calibration. */
+export const personalModelObservationScores = mysqlTable("personal_model_observation_scores", {
+  id: int("id").autoincrement().primaryKey(),
+  observationId: int("observationId").notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  temperatureError: float("temperatureError"),
+  temperatureScore: float("temperatureScore"),
+  conditionScore: float("conditionScore"),
+  windScore: float("windScore"),
+  overallScore: float("overallScore").notNull(),
+  forecastSnapshot: json("forecastSnapshot").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [uniqueIndex("personal_model_score_observation_model_unique").on(table.observationId, table.modelName)]);
+export type PersonalModelObservationScore = typeof personalModelObservationScores.$inferSelect;
+export type InsertPersonalModelObservationScore = typeof personalModelObservationScores.$inferInsert;
+
+/** État lissé par modèle, lieu et utilisateur ; jamais promu sans preuve suffisante. */
+export const personalModelCalibrations = mysqlTable("personal_model_calibrations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  comparisonCount: int("comparisonCount").notNull().default(0),
+  scoreEma: float("scoreEma"),
+  temperatureMaeEma: float("temperatureMaeEma"),
+  conditionScoreEma: float("conditionScoreEma"),
+  windScoreEma: float("windScoreEma"),
+  weightMultiplier: float("weightMultiplier").notNull().default(1),
+  evidenceState: varchar("evidenceState", { length: 24 }).notNull().default("insufficient"),
+  lastObservationAt: bigint("lastObservationAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("personal_model_calibration_user_location_model_unique").on(table.userId, table.locationKey, table.modelName),
+]);
+export type PersonalModelCalibration = typeof personalModelCalibrations.$inferSelect;
+export type InsertPersonalModelCalibration = typeof personalModelCalibrations.$inferInsert;

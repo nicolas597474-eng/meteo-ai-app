@@ -1587,3 +1587,10 @@
 - [x] Audit: Comparer l’heure, la température, les nuages, la pluie et la condition affichée avec les sources disponibles.
 - [x] Correction: Corriger uniquement la sélection de données ou l’affichage objectivement incohérent.
 - [x] Validation: Vérifier la cohérence des conditions et températures, TypeScript, Vitest et build.
+
+## Observations personnelles et calibration progressive
+- [x] Audit: Vérifier les prévisions archivées par modèle et définir les garde-fous de comparaison lieu-créneau.
+- [x] Données: Ajouter le stockage sécurisé des observations personnelles et des scores de calibration par modèle.
+- [x] Calcul: Évaluer température, condition, pluie et vent, puis mettre à jour des poids plafonnés selon la preuve accumulée.
+- [x] Interface: Ajouter au Dashboard une saisie guidée des observations, des propositions de conditions et l’état de preuve.
+- [x] Validation: Couvrir les calculs, la saisie mobile, TypeScript, Vitest et build avant publication.

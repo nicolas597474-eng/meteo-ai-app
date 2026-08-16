@@ -6,6 +6,10 @@ describe("Dashboard officiel avec contexte local", () => {
     const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
     expect(source).not.toContain("Prévision officielle consolidée");
     expect(source).toContain("Moyenne locale pondérée");
+    expect(source).toContain("Mes observations");
+    expect(source).toContain("Enregistrer et comparer aux modèles");
+    expect(source).toContain("personalObservations.submit.useMutation");
+    expect(source).toContain("Données insuffisantes");
     expect(source).toContain("Écart observé avec la prévision officielle");
     expect(source).toContain("hasMaterialLocalDelta");
     expect(source).toContain("La température principale reste la prévision au point du lieu.");

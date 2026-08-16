@@ -31,12 +31,18 @@ import {
   qualifiedObservationSnapshots,
   netatmoOAuthTokens,
   netatmoOAuthStates,
+  personalWeatherObservations,
+  personalModelObservationScores,
+  personalModelCalibrations,
   InsertWeatherStation,
   InsertStationObservation,
   InsertStationQualityProfile,
   InsertGroundTruth,
   InsertStationCollectionSnapshot,
   InsertQualifiedObservationSnapshot,
+  InsertPersonalWeatherObservation,
+  InsertPersonalModelObservationScore,
+  InsertPersonalModelCalibration,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { selectLatestForecasts } from "./forecastSelection";
@@ -1019,6 +1025,59 @@ export async function getStoredHourlyForecasts(locationKey: string, date: string
       )
     )
     .orderBy(hourlyForecasts.modelName, hourlyForecasts.hour);
+}
+
+// ─── OBSERVATIONS PERSONNELLES ET CALIBRATION ──────────────────────────────
+
+export async function insertPersonalWeatherObservation(data: InsertPersonalWeatherObservation): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(personalWeatherObservations).values(data);
+  return Number((result as any)[0]?.insertId ?? 0) || null;
+}
+
+export async function insertPersonalModelObservationScores(rows: InsertPersonalModelObservationScore[]): Promise<void> {
+  const db = await getDb();
+  if (!db || rows.length === 0) return;
+  await db.insert(personalModelObservationScores).values(rows);
+}
+
+export async function upsertPersonalModelCalibration(data: InsertPersonalModelCalibration): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(personalModelCalibrations).values(data).onDuplicateKeyUpdate({
+    set: {
+      comparisonCount: data.comparisonCount,
+      scoreEma: data.scoreEma,
+      temperatureMaeEma: data.temperatureMaeEma,
+      conditionScoreEma: data.conditionScoreEma,
+      windScoreEma: data.windScoreEma,
+      weightMultiplier: data.weightMultiplier,
+      evidenceState: data.evidenceState,
+      lastObservationAt: data.lastObservationAt,
+    },
+  });
+}
+
+export async function getPersonalModelCalibrations(userId: number, locationKey: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(personalModelCalibrations)
+    .where(and(eq(personalModelCalibrations.userId, userId), eq(personalModelCalibrations.locationKey, locationKey)))
+    .orderBy(desc(personalModelCalibrations.scoreEma), personalModelCalibrations.modelName);
+}
+
+export async function getRecentPersonalWeatherObservations(userId: number, locationKey: string, limit = 5) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(personalWeatherObservations)
+    .where(and(eq(personalWeatherObservations.userId, userId), eq(personalWeatherObservations.locationKey, locationKey)))
+    .orderBy(desc(personalWeatherObservations.observedAt))
+    .limit(limit);
 }
 
 // ─── LEAD TIME SCORES HELPERS ────────────────────────────────────────────────

@@ -104,6 +104,18 @@ function formatRegimeWeight(value: unknown): string {
   return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value * 100)}%` : "—";
 }
 
+const PERSONAL_CONDITION_OPTIONS = [
+  { id: "sunny", label: "Ensoleillé" },
+  { id: "few_clouds", label: "Quelques nuages" },
+  { id: "partly_cloudy", label: "Partiellement nuageux" },
+  { id: "overcast", label: "Ciel couvert" },
+  { id: "fog", label: "Brouillard" },
+  { id: "drizzle", label: "Bruine" },
+  { id: "rain", label: "Pluie" },
+  { id: "showers", label: "Averses" },
+  { id: "storm", label: "Orage" },
+] as const;
+
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
@@ -112,6 +124,10 @@ export default function Dashboard() {
   const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
   const [showRegimeMenu, setShowRegimeMenu] = useState(false);
   const [expandedRegimeIds, setExpandedRegimeIds] = useState<string[]>([]);
+  const [personalTemperature, setPersonalTemperature] = useState("");
+  const [personalWind, setPersonalWind] = useState("");
+  const [personalCondition, setPersonalCondition] = useState<(typeof PERSONAL_CONDITION_OPTIONS)[number]["id"]>("partly_cloudy");
+  const [personalSubmitResult, setPersonalSubmitResult] = useState<{ notice: string; topModel?: { modelName: string; overallScore: number } } | null>(null);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
   const selectedLocation = contextLocation ?? activeLocation;
@@ -217,6 +233,32 @@ export default function Dashboard() {
   const { data: regimeCatalogue = [] } = trpc.weather.getRegimeCatalogue.useQuery(
     undefined, { staleTime: 60 * 60 * 1000 }
   );
+  const utils = trpc.useUtils();
+  const { data: personalObservationState, refetch: refetchPersonalObservationState } = trpc.personalObservations.dashboardState.useQuery(
+    coordsInput,
+    { enabled: !!user, staleTime: 60 * 1000 }
+  );
+  const { data: personalizedHourly } = trpc.personalObservations.personalizedHourly.useQuery(
+    coordsInput,
+    { enabled: !!user && personalObservationState?.evidence.state === "qualified", staleTime: 2 * 60 * 1000 }
+  );
+  const submitPersonalObservation = trpc.personalObservations.submit.useMutation({
+    onSuccess: async (result) => {
+      setPersonalSubmitResult({ notice: result.notice, topModel: result.modelResults[0] });
+      await Promise.all([
+        refetchPersonalObservationState(),
+        utils.personalObservations.dashboardState.invalidate(coordsInput),
+      ]);
+    },
+  });
+
+  const handlePersonalObservationSubmit = () => {
+    const temperature = personalTemperature.trim() === "" ? null : Number(personalTemperature.replace(",", "."));
+    const windSpeed = personalWind.trim() === "" ? null : Number(personalWind.replace(",", "."));
+    if ((temperature != null && !Number.isFinite(temperature)) || (windSpeed != null && !Number.isFinite(windSpeed))) return;
+    setPersonalSubmitResult(null);
+    submitPersonalObservation.mutate({ ...coordsInput, temperature, condition: personalCondition, windSpeed });
+  };
 
   const isLoading = officialLoading && hourlyLoading;
   const isError = officialError && hourlyError;
@@ -288,7 +330,11 @@ export default function Dashboard() {
   const officialPrimaryRegime = officialRegime?.primary as any;
   const days: any[] = officialForecast?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
-  const hours: any[] = hourlySnapshot?.hours ?? officialForecast?.hours ?? (lw ? lw.hourly : []);
+  const officialHours: any[] = hourlySnapshot?.hours ?? officialForecast?.hours ?? (lw ? lw.hourly : []);
+  const personalizedByHour = new Map((personalizedHourly?.hours ?? []).map((hour) => [hour.hour, hour]));
+  const hours: any[] = personalizedHourly?.applied
+    ? officialHours.map((hour) => hour.isCurrent ? hour : (personalizedByHour.get(hour.hour) ?? hour))
+    : officialHours;
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const panelDate = formatDashboardCompactDate(officialForecast?.today ?? dash?.today);
   const localObservedRegime = lw
@@ -676,6 +722,27 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+
+        <section className="dashboard-sky-card rounded-xl border border-sky-400/25 bg-sky-400/5 p-3" aria-labelledby="personal-observation-title">
+          <div className="flex items-start gap-2">
+            <Eye className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
+            <div className="min-w-0"><h2 id="personal-observation-title" className="text-sm font-semibold text-slate-100">Mes observations</h2><p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Indiquez ce que vous voyez. L’application compare cette observation aux modèles archivés du même lieu et du même créneau.</p></div>
+          </div>
+          {!user ? <p className="mt-3 rounded-lg border border-slate-700 bg-black/20 px-3 py-2 text-xs text-slate-300">Connectez-vous pour enregistrer vos observations et construire votre calibration locale.</p> : <>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="text-[11px] font-medium text-slate-300">Température observée (°C)<input aria-label="Température observée" inputMode="decimal" value={personalTemperature} onChange={(event) => setPersonalTemperature(event.target.value)} placeholder="Ex. 24" className="mt-1 min-h-10 w-full rounded-lg border border-slate-600 bg-[#0b1019]/80 px-3 text-sm text-white outline-none focus:border-sky-400" /></label>
+              <label className="text-[11px] font-medium text-slate-300">Vent observé (km/h)<input aria-label="Vent observé" inputMode="decimal" value={personalWind} onChange={(event) => setPersonalWind(event.target.value)} placeholder="Facultatif" className="mt-1 min-h-10 w-full rounded-lg border border-slate-600 bg-[#0b1019]/80 px-3 text-sm text-white outline-none focus:border-sky-400" /></label>
+            </div>
+            <p className="mt-3 text-[11px] font-medium text-slate-300">Quel temps observez-vous ?</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5" aria-label="Propositions de conditions météo">
+              {PERSONAL_CONDITION_OPTIONS.map((option) => <button key={option.id} type="button" onClick={() => setPersonalCondition(option.id)} className={`min-h-9 rounded-lg border px-2.5 text-[11px] font-medium ${personalCondition === option.id ? "border-sky-300/60 bg-sky-400/15 text-sky-100" : "border-slate-700 bg-black/15 text-slate-300"}`}>{option.label}</button>)}
+            </div>
+            <button type="button" onClick={handlePersonalObservationSubmit} disabled={submitPersonalObservation.isPending} className="mt-3 min-h-10 w-full rounded-lg border border-sky-300/45 bg-sky-400/15 px-3 text-xs font-semibold text-sky-100 disabled:cursor-wait disabled:opacity-60">{submitPersonalObservation.isPending ? "Comparaison des modèles…" : "Enregistrer et comparer aux modèles"}</button>
+            {submitPersonalObservation.isError ? <p className="mt-2 text-[11px] text-red-300">L’observation n’a pas pu être enregistrée. Vérifiez les valeurs puis réessayez.</p> : null}
+            {personalSubmitResult ? <div className="mt-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-100"><p>{personalSubmitResult.notice}</p>{personalSubmitResult.topModel ? <p className="mt-1 font-semibold">Meilleur accord sur cette observation : {personalSubmitResult.topModel.modelName} — {Math.round(personalSubmitResult.topModel.overallScore)}/100.</p> : null}</div> : null}
+            <div className="mt-3 border-t border-sky-300/15 pt-2 text-[11px] text-slate-400">{personalizedHourly?.applied ? `Calibration qualifiée active : les heures à venir sont pondérées selon ${personalizedHourly.comparedModels.join(", ")}. La condition actuelle reste la source à 15 minutes.` : personalObservationState?.evidence.state === "qualified" ? "Calibration qualifiée : mise à jour de la fusion en cours." : personalObservationState?.evidence.state === "provisional" ? `Tendance provisoire : ${personalObservationState.evidence.comparisonCount}/50 comparaisons avant une influence sur les poids.` : `Données insuffisantes : ${personalObservationState?.evidence.comparisonCount ?? 0}/20 comparaisons pour une première tendance, 50 pour influencer les poids.`}</div>
+          </>}
+        </section>
 
         {localMode !== "standard" && locationWeather?.ultraLocal && (
           <section className="space-y-2" aria-labelledby="local-context-title">
