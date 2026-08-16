@@ -247,6 +247,38 @@
   z-index: 1;
 }
 
+/* Page Prévisions détaillées : fond bleu profond et cartes volontairement plus
+   claires. Ces règles sont placées après les primitives globales afin que la
+   hiérarchie locale de la page ne soit pas écrasée par les surfaces sombres. */
+.details-blue-page {
+  background: linear-gradient(165deg, #0a4f94 0%, #126bb8 48%, #2f8bd0 100%);
+}
+
+.details-blue-page .weather-surface {
+  background: linear-gradient(135deg, #5db5eb 0%, #429edb 100%) !important;
+  border-color: rgb(240 249 255 / 0.65) !important;
+}
+
+.details-blue-page .weather-surface-accent {
+  background: linear-gradient(135deg, #67bdf2 0%, #4ca8e7 55%, #368ed0 100%) !important;
+  border-color: rgb(240 249 255 / 0.8) !important;
+}
+
+.details-blue-page .weather-surface-subtle {
+  background: #419fda !important;
+  border-color: rgb(240 249 255 / 0.55) !important;
+}
+
+.details-blue-page .weather-surface-inset {
+  background: #3b98d5 !important;
+  border-color: rgb(240 249 255 / 0.55) !important;
+}
+
+.details-blue-page .weather-chart-3d {
+  background: #358fcd !important;
+  border-color: rgb(240 249 255 / 0.6) !important;
+}
+
 /* Icônes météo vivantes : les mouvements sont désactivés lorsque l’utilisateur le demande. */
 .meteo-icon-3d {
   filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72));

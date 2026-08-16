@@ -1476,3 +1476,8 @@
 ## Confirmation fond bleu profond et cartes claires
 - [x] Vérification: Confirmer le contraste entre le fond général bleu profond et les cartes bleues plus claires.
 - [x] Validation: Vérifier le rendu mobile et publier uniquement si une correction est nécessaire.
+
+## Correctif vérifiable du thème bleu des prévisions détaillées
+- [x] Audit: Identifier l’écrasement des couleurs dans l’aperçu publié.
+- [x] Interface: Forcer le fond bleu profond et les cartes bleu clair avec des styles prioritaires contrôlés.
+- [x] Validation: Vérifier la page détaillée chargée, TypeScript, Vitest et build avant publication.
