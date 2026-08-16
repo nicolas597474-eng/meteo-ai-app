@@ -101,7 +101,7 @@ export default function WeatherDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(160deg,#143b79_0%,#0a2450_42%,#07182e_100%)]">
+      <div className="min-h-screen bg-[linear-gradient(160deg,#0b1527_0%,#080f1d_45%,#070b13_100%)]">
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -118,7 +118,7 @@ export default function WeatherDetails() {
   const confidence = data?.confidence;
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(160deg,#143b79_0%,#0a2450_42%,#07182e_100%)]">
+    <div className="min-h-screen bg-[linear-gradient(160deg,#0b1527_0%,#080f1d_45%,#070b13_100%)]">
       <div className="mx-auto max-w-2xl space-y-3 px-3 py-3 pb-28">
 
         {/* ═══ HEADER ═══ */}

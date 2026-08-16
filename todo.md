@@ -1456,3 +1456,7 @@
 - [x] Audit: Identifier les surfaces de la page détaillée qui doivent être éclaircies.
 - [x] Interface: Appliquer un fond bleu profond et des dégradés nets cohérents avec les cartes météo.
 - [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
+
+## Fond noir dégradé de la page Prévisions détaillées
+- [x] Interface: Rétablir le fond noir avec un dégradé bleu très discret, en préservant les cartes bleues.
+- [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
