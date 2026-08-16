@@ -20,4 +20,13 @@ describe("validation weather models", () => {
     const source = readFileSync(new URL("./weatherServices.ts", import.meta.url), "utf8");
     expect(source).toContain("fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 })");
   });
+
+  it("privilégie les conditions actuelles à 15 minutes et le code météo WMO", () => {
+    const source = readFileSync(new URL("./weatherServices.ts", import.meta.url), "utf8");
+    expect(source).toContain('url.searchParams.set("current"');
+    expect(source).toContain("weather_code");
+    expect(source).toContain("conditionFromWmoWeatherCode");
+    expect(source).toContain('`${current.time.slice(11, 13)}:00`');
+    expect(source).toContain("points[currentIndex]");
+  });
 });

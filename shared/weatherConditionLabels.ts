@@ -17,3 +17,25 @@ export function conditionFromWeatherValues(precipitation: number | null | undefi
   if (precipitationValue > 0.2) return "Pluie légère";
   return cloudCoverLabel(cloudCover);
 }
+
+/** Traduit le code météo WMO de la source en condition française affichable. */
+export function conditionFromWmoWeatherCode(
+  weatherCode: number | null | undefined,
+  precipitation: number | null | undefined,
+  cloudCover: number | null | undefined,
+): string {
+  if (weatherCode === null || weatherCode === undefined || !Number.isFinite(weatherCode)) {
+    return conditionFromWeatherValues(precipitation, cloudCover);
+  }
+  if (weatherCode === 0) return "Ensoleillé";
+  if (weatherCode === 1) return "Peu nuageux";
+  if (weatherCode === 2) return "Partiellement nuageux";
+  if (weatherCode === 3) return "Ciel couvert";
+  if (weatherCode <= 49) return "Brouillard";
+  if (weatherCode <= 59) return "Bruine";
+  if (weatherCode <= 69) return "Pluie";
+  if (weatherCode <= 79) return "Neige";
+  if (weatherCode <= 84) return "Averses";
+  if (weatherCode <= 94) return "Orages";
+  return "Orage violent";
+}

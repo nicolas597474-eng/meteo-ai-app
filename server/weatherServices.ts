@@ -3,7 +3,7 @@
  * Location: Hondeghem (lat: 50.7567, lon: 2.5204)
  */
 
-import { conditionFromWeatherValues } from "./weatherConditionLabels";
+import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weatherConditionLabels";
 import { fetchWeather } from "./weatherFetch";
 
 // Hondeghem coordinates
@@ -255,6 +255,9 @@ export type HourlyPoint = {
   humidity: number | null;
   uvIndex: number | null;
   condition: string | null;
+  weatherCode?: number | null;     // code WMO de la source, lorsqu’il est disponible
+  observedAt?: string | null;      // heure de la condition courante à 15 minutes
+  isCurrent?: boolean;
   // Extended fields for details page
   pressure?: number | null;        // hPa
   dewPoint?: number | null;        // °C
@@ -398,7 +401,8 @@ export async function collectHourlyForecast(
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", location.lat.toString());
     url.searchParams.set("longitude", location.lon.toString());
-    url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index,surface_pressure,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall");
+    url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index,surface_pressure,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall,weather_code");
+    url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,weather_code");
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", "2");
 
@@ -444,6 +448,7 @@ export async function collectHourlyForecast(
       const hour = dt.slice(11, 16); // "14:00"
       const precip = hourly.precipitation?.[i] ?? null;
       const cloud = hourly.cloud_cover?.[i] ?? null;
+      const weatherCode = hourly.weather_code?.[i] ?? null;
       const bestTemp = hourly.temperature_2m?.[i] ?? null;
       const aromeTemp = aromeTemps[aromeIdx] ?? null;
       const aromePrecip = aromePrecips[aromeIdx] ?? null;
@@ -479,7 +484,8 @@ export async function collectHourlyForecast(
         cloudCover: cloud,
         humidity: hourly.relative_humidity_2m?.[i] ?? null,
         uvIndex: hourly.uv_index?.[i] ?? null,
-        condition: deriveCondition(precip, cloud),
+        condition: conditionFromWmoWeatherCode(weatherCode, precip, cloud),
+        weatherCode,
         // Extended fields
         pressure: hourly.surface_pressure?.[i] ?? null,
         dewPoint: hourly.dew_point_2m?.[i] ?? null,
@@ -495,6 +501,33 @@ export async function collectHourlyForecast(
         precipProb,
         modelCount: aromeTemp != null ? 2 : 1,
       });
+    }
+
+    // La condition actuelle est produite à un pas de 15 minutes par la source.
+    // Elle remplace l’instant horaire équivalent pour éviter de présenter à 11h30
+    // une valeur ou un ciel calculé pour 11h00.
+    const current = data.current;
+    const currentHour = typeof current?.time === "string" ? `${current.time.slice(11, 13)}:00` : null;
+    const currentIndex = currentHour ? points.findIndex((point) => point.hour === currentHour) : -1;
+    if (currentIndex >= 0) {
+      const currentPrecipitation = current.precipitation ?? points[currentIndex].precipitation;
+      const currentCloudCover = current.cloud_cover ?? points[currentIndex].cloudCover;
+      const currentWeatherCode = current.weather_code ?? points[currentIndex].weatherCode ?? null;
+      points[currentIndex] = {
+        ...points[currentIndex],
+        temp: current.temperature_2m ?? points[currentIndex].temp,
+        apparentTemp: current.apparent_temperature ?? points[currentIndex].apparentTemp,
+        precipitation: currentPrecipitation,
+        windSpeed: current.wind_speed_10m ?? points[currentIndex].windSpeed,
+        windGust: current.wind_gusts_10m ?? points[currentIndex].windGust,
+        windDirection: current.wind_direction_10m ?? points[currentIndex].windDirection,
+        cloudCover: currentCloudCover,
+        humidity: current.relative_humidity_2m ?? points[currentIndex].humidity,
+        weatherCode: currentWeatherCode,
+        condition: conditionFromWmoWeatherCode(currentWeatherCode, currentPrecipitation, currentCloudCover),
+        observedAt: current.time ?? null,
+        isCurrent: true,
+      };
     }
     return points;
   } catch (err) {

@@ -1,1 +1,1 @@
-export { cloudCoverLabel, conditionFromWeatherValues } from "@shared/weatherConditionLabels";
+export { cloudCoverLabel, conditionFromWeatherValues, conditionFromWmoWeatherCode } from "@shared/weatherConditionLabels";

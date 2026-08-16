@@ -1582,3 +1582,8 @@
 - [x] Audit: Comparer les sources, horodatages et calculs affichés dans les trois contextes.
 - [x] Correction: Corriger uniquement l’origine mesurée de l’écart ou expliciter un écart réel de source.
 - [x] Validation: Vérifier la cohérence mobile, TypeScript, Vitest et build.
+
+## Cohérence entre météo observée et affichage
+- [x] Audit: Comparer l’heure, la température, les nuages, la pluie et la condition affichée avec les sources disponibles.
+- [x] Correction: Corriger uniquement la sélection de données ou l’affichage objectivement incohérent.
+- [x] Validation: Vérifier la cohérence des conditions et températures, TypeScript, Vitest et build.
