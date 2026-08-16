@@ -525,8 +525,9 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const color = getColor();
 
   return (
-    <div className="overflow-x-auto scrollbar-hide">
-      <svg width={chartW} height={chartH + 34} className="min-w-full">
+    <div className="space-y-3">
+      <div className="overflow-x-auto scrollbar-hide">
+        <svg width={chartW} height={chartH + 34} className="min-w-full">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
           <line key={pct} x1={0} x2={chartW} y1={chartH - pct * (chartH - 20) - 10} y2={chartH - pct * (chartH - 20) - 10} stroke="#1e293b" strokeWidth="1" />
@@ -572,7 +573,8 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
             </text>
           );
         })}
-      </svg>
+        </svg>
+      </div>
       <div className="flex justify-between mt-1">
         <span className="text-[9px] text-slate-500">Min: {min.toFixed(1)} {getUnit()}</span>
         <span className="text-[9px] text-slate-500">Max: {max.toFixed(1)} {getUnit()}</span>
@@ -583,12 +585,12 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
           <p className="text-xs font-semibold text-slate-200">Détails par heure</p>
           <p className="text-[10px] text-slate-400">Temp. · ressenti · vent · pluie · humidité · pression</p>
         </div>
-        <div className="overflow-x-auto scrollbar-hide">
-          <div className="flex gap-2 pb-1" style={{ width: `${hours.length * 176}px` }}>
+        <div className="-mx-3 overflow-x-auto px-3 pb-2 scrollbar-hide" aria-label="Détails horaires défilables">
+          <div className="flex gap-3" style={{ width: `${hours.length * 180}px` }}>
             {hours.map((h: any, i: number) => {
               const selectedValue = getValue(h);
               return (
-                <div key={`detail-${h.hour}-${i}`} className={`w-[170px] flex-shrink-0 rounded-xl border p-2.5 ${i === currentIdx ? "border-sky-300/70 bg-sky-950/50" : "border-slate-700/70 bg-slate-950/40"}`}>
+                <div key={`detail-${h.hour}-${i}`} className={`w-[174px] flex-shrink-0 rounded-xl border p-2.5 ${i === currentIdx ? "border-sky-300/70 bg-sky-950/50" : "border-slate-700/70 bg-slate-950/40"}`}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-bold text-white">{h.hour}</span>
                     <span className="text-xs font-semibold" style={{ color }}>{selectedValue == null ? "—" : `${type === "pressure" ? selectedValue.toFixed(0) : selectedValue.toFixed(1)} ${getUnit()}`}</span>

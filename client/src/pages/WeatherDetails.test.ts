@@ -18,7 +18,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("hours.length * 214");
     expect(source).toContain("text-3xl font-bold text-white");
     expect(source).toContain("Détails par heure");
-    expect(source).toContain("hours.length * 176");
+    expect(source).toContain('aria-label="Détails horaires défilables"');
+    expect(source).toContain("hours.length * 180");
+    expect(source).toContain("w-[174px]");
     expect(source).toContain("Temp. · ressenti · vent · pluie · humidité · pression");
   });
 });
