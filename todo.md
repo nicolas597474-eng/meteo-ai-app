@@ -1557,3 +1557,8 @@
 - [x] Méthode: Définir une note provisoire explicable fondée sur le volume de preuves, sans classement validé.
 - [x] Interface: Afficher la note et son statut provisoire dans les tendances Température, Pluie et Vent.
 - [x] Validation: Vérifier les libellés, TypeScript, Vitest et build.
+
+## Note visible pour chaque modèle
+- [x] Audit: Identifier pourquoi la note individuelle n’est pas suffisamment visible dans les lignes de tendance.
+- [x] Interface: Afficher un badge de note explicite pour chaque modèle Température, Pluie et Vent.
+- [x] Validation: Vérifier les notes par modèle, TypeScript, Vitest et build.

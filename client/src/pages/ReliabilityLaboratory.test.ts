@@ -20,8 +20,9 @@ describe("ReliabilityLaboratory", () => {
   it("affiche les tendances mesurées sans les présenter comme un classement validé", () => {
     expect(source).toContain("Tendances provisoires");
     expect(source).toContain("Note de preuve provisoire");
+    expect(source).toContain("Notes par modèle");
     expect(source).toContain("Note {evidenceScore}/100");
-    expect(source).toContain("preuve {Number(model.confidence?.evidenceScore ?? 0)}/100");
+    expect(source).toContain("Note de preuve de ${model.name}: ${evidenceScore}/100");
     expect(source).toContain("Température");
     expect(source).toContain("Pluie");
     expect(source).toContain("Vent");
