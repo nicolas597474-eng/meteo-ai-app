@@ -1492,3 +1492,8 @@
 - [x] Audit: Identifier le découpage du tracé et des libellés du panneau Soleil & Lune.
 - [x] Interface: Ajuster les dimensions du tracé pour l’afficher entièrement sur mobile.
 - [x] Validation: Vérifier le panneau Soleil & Lune, TypeScript, Vitest et build.
+
+## Image 3D de lune en croissant
+- [x] Asset: Générer une lune 3D en croissant, sans texte et avec fond transparent.
+- [x] Interface: Intégrer l’illustration à la phase lunaire affichée dans Soleil & Lune.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.

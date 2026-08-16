@@ -32,4 +32,9 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("height: 10rem !important");
     expect(styles).toContain("height: 8.75rem !important");
   });
+
+  it("utilise une illustration 3D dédiée pour la phase lunaire", () => {
+    expect(styles).toContain("meteoai-crescent-moon-3d_34eeab42.png");
+    expect(styles).toContain("Illustration lunaire 3D");
+  });
 });
