@@ -44,6 +44,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("formatAltitude(astronomy.sunAltitudeDeg)");
     expect(source).toContain("formatAltitude(astronomy.moonAltitudeDeg)");
     expect(source).toContain('MeteoIcon name="clear_night" size={40}');
+    expect(source).toContain("isNightAtLocalMinutes");
+    expect(source).toContain("celestial-night-marker");
   });
 
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {

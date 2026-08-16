@@ -1626,3 +1626,8 @@
 - [x] Calcul: Déterminer l’altitude affichable du Soleil et de la Lune à partir de leurs éphémérides.
 - [x] Interface: Afficher les deux altitudes, un marqueur lunaire 3D sans fond et une animation solaire discrète respectant la réduction des mouvements.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Thème nocturne du panneau céleste
+- [x] Calcul: Déterminer de façon fiable l’état nuit à partir des horaires de coucher et de lever locaux.
+- [x] Interface: Appliquer un habillage nocturne dédié et automatique après le coucher du soleil.
+- [x] Validation: Vérifier les états jour et nuit, TypeScript, Vitest et build avant publication.
