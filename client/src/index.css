@@ -288,6 +288,36 @@ img.moon-3d-first-crescent {
   background-size: cover;
 }
 
+/* Habillage cohérent des pages météo : le ciel bleu de la pancarte est repris
+   avec un voile suffisamment dense pour les tableaux, chiffres et graphiques. */
+.weather-page-sky {
+  --page-weather-sky-image: url("/manus-storage/sky-pack-sunny_1500b9a0.jpg");
+  background-color: #061426 !important;
+  background-image: linear-gradient(145deg, rgba(4, 18, 36, 0.68), rgba(3, 11, 23, 0.88)), var(--page-weather-sky-image) !important;
+  background-position: center;
+  background-size: cover;
+}
+
+.weather-page-sky .weather-surface,
+.weather-page-sky .weather-surface-hero,
+.weather-page-sky .weather-surface-lab,
+.weather-page-sky .weather-observation-surface,
+.weather-page-sky .weather-action-surface,
+.weather-page-sky .weather-chart-3d {
+  background-image: linear-gradient(145deg, rgba(6, 22, 42, 0.80), rgba(4, 13, 26, 0.94)), var(--page-weather-sky-image) !important;
+  background-position: center;
+  background-size: cover;
+}
+
+.weather-page-sky [class~="bg-[#10131a]"],
+.weather-page-sky [class~="bg-[#0d131d]"],
+.weather-page-sky [class~="bg-[#090b10]"],
+.weather-page-sky [class~="bg-[#080d16]"] {
+  background-image: linear-gradient(145deg, rgba(6, 22, 42, 0.80), rgba(4, 13, 26, 0.94)), var(--page-weather-sky-image) !important;
+  background-position: center;
+  background-size: cover;
+}
+
 /* Icônes météo vivantes : les mouvements sont désactivés lorsque l’utilisateur le demande. */
 .meteo-icon-3d {
   filter: drop-shadow(0 1px 0 rgb(2 6 23 / 0.72));

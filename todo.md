@@ -1512,3 +1512,9 @@
 - [x] Audit: Identifier la source de ciel dynamique et les cartes éligibles du Dashboard.
 - [x] Interface: Étendre l’image de ciel aux cartes avec une superposition sombre adaptée à chaque contenu.
 - [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
+
+## Fonds de ciel dynamiques de toutes les pages
+- [x] Audit: Identifier les surfaces principales et les contraintes des pages Prévisions, Historique, Fiabilité, Stations et AI Lab.
+- [x] Infrastructure: Créer une couche de fond de ciel réutilisable, liée aux conditions du lieu actif.
+- [x] Interface: Appliquer les fonds de ciel avec des voiles adaptés aux données, tableaux et graphiques.
+- [x] Validation: Vérifier chaque page sur mobile, TypeScript, Vitest et build.
