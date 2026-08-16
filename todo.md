@@ -1524,3 +1524,14 @@
 - [x] Infrastructure: Créer un hook commun reliant condition météo, image de ciel et variable CSS de page.
 - [x] Interface: Remplacer le ciel bleu fixe par l’image correspondant à la condition actuelle sur chaque page.
 - [x] Validation: Vérifier les changements de condition, TypeScript, Vitest et build.
+
+## Diagnostic du classement de fiabilité par condition
+- [x] Interface: Identifier les seuils et états empêchant l’affichage des modèles les plus fiables.
+- [x] Données: Contrôler les archives de prévisions, observations et échantillons disponibles par condition météo.
+- [x] Rapport: Expliquer le blocage réel et les conditions nécessaires avant affichage d’un classement mesuré.
+
+## Tendances provisoires de fiabilité
+- [x] Données: Définir les métriques réellement disponibles pour température, pluie et vent par modèle.
+- [x] API: Exposer uniquement ces tendances mesurées avec leur volume de comparaisons et un statut provisoire.
+- [x] Interface: Afficher les trois tendances sans les présenter comme un classement validé.
+- [x] Validation: Vérifier les libellés, TypeScript, Vitest et build.

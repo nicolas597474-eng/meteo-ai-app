@@ -16,4 +16,13 @@ describe("ReliabilityLaboratory", () => {
     expect(source).not.toContain("MiniBar label=\"Précipitations\"");
     expect(source).not.toContain("SectionHeading title=\"Évolution des scores\"");
   });
+
+  it("affiche les tendances mesurées sans les présenter comme un classement validé", () => {
+    expect(source).toContain("Tendances provisoires");
+    expect(source).toContain("Statut provisoire");
+    expect(source).toContain("Température");
+    expect(source).toContain("Pluie");
+    expect(source).toContain("Vent");
+    expect(source).toContain("ProvisionalTrendCard");
+  });
 });

@@ -29,9 +29,10 @@ const HORIZONS: Array<{ id: HorizonId; label: string }> = [
   { id: "11-15d", label: "11–15 jours" },
 ];
 
-const SECTIONS = ["Vue générale", "Modèles"] as const;
+const SECTIONS = ["Vue générale", "Tendances provisoires", "Modèles"] as const;
 const SECTION_IDS: Record<(typeof SECTIONS)[number], string> = {
   "Vue générale": "vue-generale",
+  "Tendances provisoires": "tendances-provisoires",
   "Modèles": "modeles",
 };
 
@@ -135,6 +136,11 @@ export default function ReliabilityLaboratory() {
   const qualifiedScoreCount = Number(evidence?.status?.qualifiedScoreCount ?? 0);
   const classifiableModels = activeModels.filter((model) => model.normalizedScore !== null && model.normalizedScore !== undefined);
   const hasClassifiableEvidence = qualifiedScoreCount > 0 && classifiableModels.length > 0;
+  const provisionalTrends = useMemo(() => ({
+    temperature: activeModels.filter((model) => model.metrics?.temperature?.mae !== null && model.metrics?.temperature?.mae !== undefined).sort((left, right) => Number(left.metrics.temperature.mae) - Number(right.metrics.temperature.mae)),
+    precipitation: activeModels.filter((model) => model.metrics?.precipitation?.score !== null && model.metrics?.precipitation?.score !== undefined).sort((left, right) => Number(right.metrics.precipitation.score) - Number(left.metrics.precipitation.score)),
+    wind: activeModels.filter((model) => model.metrics?.wind?.mae !== null && model.metrics?.wind?.mae !== undefined).sort((left, right) => Number(left.metrics.wind.mae) - Number(right.metrics.wind.mae)),
+  }), [activeModels]);
   const selectSection = (section: (typeof SECTIONS)[number]) => {
     setActiveSection(section);
     document.getElementById(SECTION_IDS[section])?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -184,6 +190,18 @@ export default function ReliabilityLaboratory() {
             <div className={`mt-4 rounded-xl border px-3 py-3 ${hasClassifiableEvidence ? "border-emerald-500/25 bg-emerald-500/[0.05]" : "border-amber-500/25 bg-amber-500/[0.05]"}`}><p className="text-sm font-semibold text-slate-100">{hasClassifiableEvidence ? "Le classement est utilisable" : "Classement en préparation"}</p><p className="mt-1 text-xs leading-relaxed text-slate-400">{hasClassifiableEvidence ? "Les scores affichés reposent sur des comparaisons complètes. Les détails secondaires restent volontairement masqués pour faciliter la lecture." : "Les relevés commencent à être archivés, mais les comparaisons ne sont pas encore assez nombreuses ou complètes pour classer les modèles sans risque d’interprétation."}</p></div>
           </MeteoSurface>
 
+          <section className="mb-4 scroll-mt-20" id="tendances-provisoires">
+            <MeteoSurface tone="lab" className="rounded-2xl p-4">
+              <SectionHeading title="Tendances provisoires" description="Ces indicateurs montrent les mesures déjà disponibles par paramètre. Ils ne constituent ni un classement validé ni une fiabilité par condition météo." icon="trending" />
+              <div className="grid gap-3 md:grid-cols-3">
+                <ProvisionalTrendCard title="Température" detail="MAE la plus faible observée" models={provisionalTrends.temperature} value={(model) => metric(model.metrics.temperature.mae, " °C", 2)} accent="text-orange-200" />
+                <ProvisionalTrendCard title="Pluie" detail="Score de précipitation le plus élevé observé" models={provisionalTrends.precipitation} value={(model) => metric(model.metrics.precipitation.score, "/100", 0)} accent="text-sky-200" />
+                <ProvisionalTrendCard title="Vent" detail="MAE la plus faible observée" models={provisionalTrends.wind} value={(model) => metric(model.metrics.wind.mae, " km/h", 2)} accent="text-cyan-200" />
+              </div>
+              <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.05] px-3 py-2 text-[11px] leading-relaxed text-amber-100">Statut provisoire : chaque ligne s’appuie sur les comparaisons physiques disponibles. Le classement officiel reste masqué tant que le score normalisé complet et les régimes météorologiques ne sont pas archivés.</p>
+            </MeteoSurface>
+          </section>
+
           <section className="mb-4" id="modeles">
             <MeteoSurface tone="lab" className="rounded-2xl p-4">
               <SectionHeading title="Modèles classables" description="Seuls les modèles qui disposent de suffisamment de comparaisons complètes sont listés ici." icon="confidence" />
@@ -204,6 +222,10 @@ export default function ReliabilityLaboratory() {
 function ModelCard({ model }: { model: any }) {
   const confidence = model.confidence ?? {};
   return <article className="rounded-xl border border-slate-800 bg-[#090d14] p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[10px] font-bold ${model.rank ? "bg-sky-500/15 text-sky-200" : "bg-slate-800 text-slate-400"}`}>{model.rank ? `#${model.rank}` : "—"}</span><p className="truncate text-sm font-semibold text-white">{model.name}</p></div><p className="mt-1 text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) qualifiée(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p></div><div className="text-right"><p className="text-xl font-bold text-white">{metric(model.normalizedScore, "/100", 0)}</p><p className="text-[10px] text-slate-500">score mesuré</p></div></div><p className={`mt-3 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${confidenceClass(confidence.tone)}`}>{confidence.label ?? "Données insuffisantes"}</p></article>;
+}
+
+function ProvisionalTrendCard({ title, detail, models, value, accent }: { title: string; detail: string; models: any[]; value: (model: any) => string; accent: string }) {
+  return <article className="rounded-xl border border-slate-700/80 bg-[#09111d]/85 p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-100">{title}</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">{detail}</p></div><span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-amber-100">Provisoire</span></div>{models.length ? <div className="mt-3 space-y-2">{models.slice(0, 3).map((model) => <div key={model.name} className="flex items-center justify-between gap-3 border-t border-slate-800 pt-2 first:border-0 first:pt-0"><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-200">{model.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p></div><p className={`shrink-0 text-sm font-bold ${accent}`}>{value(model)}</p></div>)}</div> : <p className="mt-3 text-[11px] leading-relaxed text-slate-500">Aucune mesure qualifiée disponible pour ce paramètre sur la période sélectionnée.</p>}</article>;
 }
 
 function HorizonCard({ bucket, selected }: { bucket: any; selected: boolean }) {
