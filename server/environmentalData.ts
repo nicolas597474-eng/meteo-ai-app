@@ -1,4 +1,5 @@
 import { fetchWeather } from "./weatherFetch";
+import { getMoonPosition, getPosition } from "suncalc";
 
 export type AqiDescriptor = {
   label: string;
@@ -31,6 +32,10 @@ export function getMoonPhaseDescriptor(value: number | null) {
 export function getMoonIllumination(value: number | null) {
   if (value == null || !Number.isFinite(value)) return null;
   return Math.round(50 * (1 - Math.cos(Math.PI * 2 * value)));
+}
+
+export function roundAltitudeDegrees(value: number | null | undefined) {
+  return value == null || !Number.isFinite(value) ? null : Math.round(value * 10) / 10;
 }
 
 function asNumber(value: unknown): number | null {
@@ -88,6 +93,9 @@ export type EnvironmentalSnapshot = {
     moon: ReturnType<typeof getMoonPhaseDescriptor>;
     moonIllumination: number | null;
     dayProgress: number | null;
+    sunAltitudeDeg: number | null;
+    moonAltitudeDeg: number | null;
+    altitudeCalculatedAt: string;
   } | null;
   source: "Open-Meteo / CAMS";
 };
@@ -134,6 +142,9 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
     .filter((point: { time: string; value: number | null }): point is { time: string; value: number } => point.time.length > 0 && point.value != null)
     .slice(0, 24);
   const aqi = asNumber(currentAir?.european_aqi);
+  const altitudeCalculatedAt = new Date();
+  const sunAltitudeDeg = roundAltitudeDegrees(getPosition(altitudeCalculatedAt, coords.lat, coords.lon).altitude);
+  const moonAltitudeDeg = roundAltitudeDegrees(getMoonPosition(altitudeCalculatedAt, coords.lat, coords.lon).altitude);
 
   const value: EnvironmentalSnapshot = {
     air: airResponse ? {
@@ -156,6 +167,9 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
       moon: getMoonPhaseDescriptor(moonPhase),
       moonIllumination: getMoonIllumination(moonPhase),
       dayProgress: calculateDayProgress(sunrise, sunset),
+      sunAltitudeDeg,
+      moonAltitudeDeg,
+      altitudeCalculatedAt: altitudeCalculatedAt.toISOString(),
     } : null,
     source: "Open-Meteo / CAMS",
   };

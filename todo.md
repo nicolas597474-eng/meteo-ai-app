@@ -1621,3 +1621,8 @@
 ## Marqueur solaire 3D
 - [x] Interface: Retirer le contour blanc et créer un soleil 3D net sur l’arche.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Altitude et animation célestes
+- [x] Calcul: Déterminer l’altitude affichable du Soleil et de la Lune à partir de leurs éphémérides.
+- [x] Interface: Afficher les deux altitudes, un marqueur lunaire 3D sans fond et une animation solaire discrète respectant la réduction des mouvements.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.

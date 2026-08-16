@@ -23,7 +23,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
-    expect(source).toContain("Éphémérides locales et état actuel du cycle jour-nuit");
+    expect(source).toContain("Éphémérides locales, altitudes réelles et état actuel du cycle jour-nuit");
   });
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
@@ -41,6 +41,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain('MeteoIcon name="sunny" size={48}');
     expect(source).toContain("Soleil 3D");
     expect(source).not.toContain("border-2 border-amber-100 bg-amber-300");
+    expect(source).toContain("formatAltitude(astronomy.sunAltitudeDeg)");
+    expect(source).toContain("formatAltitude(astronomy.moonAltitudeDeg)");
+    expect(source).toContain('MeteoIcon name="clear_night" size={40}');
   });
 
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {
