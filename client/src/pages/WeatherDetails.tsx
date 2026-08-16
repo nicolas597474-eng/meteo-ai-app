@@ -2,7 +2,7 @@
  * WeatherDetails — Page de prévisions météo ultra-détaillées
  * Sections: Prévisions horaires, Graphiques, Résumé IA, Prévisions jours, Tendances, Confiance
  */
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, type UIEvent } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -490,6 +490,19 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
     }
   }, [chartW, currentIdx, hours.length]);
 
+  const syncDetailScroll = (event: UIEvent<HTMLDivElement>) => {
+    const chartScrollContainer = event.currentTarget;
+    const detailScrollContainer = detailScrollRef.current;
+    if (!detailScrollContainer) return;
+
+    const chartScrollableWidth = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
+    const detailScrollableWidth = detailScrollContainer.scrollWidth - detailScrollContainer.clientWidth;
+    if (chartScrollableWidth <= 0 || detailScrollableWidth <= 0) return;
+
+    const progress = chartScrollContainer.scrollLeft / chartScrollableWidth;
+    detailScrollContainer.scrollLeft = progress * detailScrollableWidth;
+  };
+
   if (hours.length === 0) return <p className="text-slate-500 text-xs">Aucune donnée disponible</p>;
 
   const getValue = (h: any): number | null => {
@@ -549,7 +562,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
 
   return (
     <div className="space-y-3">
-      <div ref={chartScrollRef} className="overflow-x-auto scrollbar-hide">
+      <div ref={chartScrollRef} onScroll={syncDetailScroll} className="overflow-x-auto scrollbar-hide">
         <svg width={chartW} height={chartH + 34} className="min-w-full">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (

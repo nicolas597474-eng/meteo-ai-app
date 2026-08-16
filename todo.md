@@ -1472,3 +1472,8 @@
 - [x] Audit: Identifier le défilement indépendant du ruban de cartes sous le graphique.
 - [x] Interface: Cadrer automatiquement la carte de l’heure actuelle avec son repère visible.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Synchronisation dynamique graphique et cartes horaires
+- [x] Audit: Identifier les plages de défilement du graphique et du ruban de cartes.
+- [x] Interface: Synchroniser en continu le geste horizontal du graphique avec le ruban sans boucle d’événements.
+- [x] Validation: Vérifier le geste mobile, TypeScript, Vitest et build.
