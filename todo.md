@@ -1460,3 +1460,7 @@
 ## Fond noir dégradé de la page Prévisions détaillées
 - [x] Interface: Rétablir le fond noir avec un dégradé bleu très discret, en préservant les cartes bleues.
 - [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
+
+## Cartes azur de la page Prévisions détaillées
+- [x] Interface: Éclaircir les cartes et contrôles bleus dans un ton azur lumineux, en gardant le fond noir.
+- [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
