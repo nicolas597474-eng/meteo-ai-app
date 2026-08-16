@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft } from "lucide-react";
 import { Link } from "wouter";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { BackToTopButton } from "@/components/BackToTopButton";
@@ -78,6 +79,7 @@ const CHART_OPTIONS: { key: ChartType; label: string }[] = [
 
 export default function WeatherDetails() {
   const { activeLocation } = useLocation();
+  const { style: pageSkyStyle } = usePageWeatherSky();
   const coordsInput = useMemo(() => activeLocation
     ? { lat: activeLocation.lat, lon: activeLocation.lon }
     : undefined, [activeLocation?.lat, activeLocation?.lon]);
@@ -101,7 +103,7 @@ export default function WeatherDetails() {
 
   if (isLoading) {
     return (
-      <div className="weather-page-sky min-h-screen bg-[#0d1117]">
+      <div className="weather-page-sky min-h-screen bg-[#0d1117]" style={pageSkyStyle}>
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -118,7 +120,7 @@ export default function WeatherDetails() {
   const confidence = data?.confidence;
 
   return (
-    <div className="weather-page-sky min-h-screen bg-[#0d1117]">
+    <div className="weather-page-sky min-h-screen bg-[#0d1117]" style={pageSkyStyle}>
       <div className="mx-auto max-w-2xl space-y-3 px-3 py-3 pb-28">
 
         {/* ═══ HEADER ═══ */}

@@ -1518,3 +1518,9 @@
 - [x] Infrastructure: Créer une couche de fond de ciel réutilisable, liée aux conditions du lieu actif.
 - [x] Interface: Appliquer les fonds de ciel avec des voiles adaptés aux données, tableaux et graphiques.
 - [x] Validation: Vérifier chaque page sur mobile, TypeScript, Vitest et build.
+
+## Ciel dynamique conditionnel sur toutes les pages
+- [x] Audit: Identifier la condition météo réelle disponible à chaque page pour le lieu actif.
+- [x] Infrastructure: Créer un hook commun reliant condition météo, image de ciel et variable CSS de page.
+- [x] Interface: Remplacer le ciel bleu fixe par l’image correspondant à la condition actuelle sur chaque page.
+- [x] Validation: Vérifier les changements de condition, TypeScript, Vitest et build.

@@ -4,6 +4,7 @@ import { MeteoIcon } from "@/components/MeteoIcon";
 import { StationMap } from "@/components/StationMap";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { filterAndSortStationSources, type SourceDistanceOrder, type SourceKindFilter, type SourceStatusFilter } from "@/lib/stationSourceFilters";
 import { getStationDisplayStatus } from "@/lib/stationCandidateStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -88,6 +89,7 @@ function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint
 
 export default function Ranking() {
   const { activeLocation, setActiveLocation } = useLocation();
+  const { style: pageSkyStyle } = usePageWeatherSky();
   const [periodDays, setPeriodDays] = useState<1 | 7>(1);
   const [radiusKm, setRadiusKm] = useState(activeLocation?.radiusKm ?? 20);
   const [selectedSource, setSelectedSource] = useState<SourceSelection | null>(null);
@@ -124,7 +126,7 @@ export default function Ranking() {
   };
 
   if (isLoading) {
-    return <div className="weather-page-sky mx-auto min-h-screen max-w-2xl space-y-4 bg-[#080a0f] px-3 pb-24 pt-3 sm:px-5 sm:pt-5"><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
+    return <div className="weather-page-sky mx-auto min-h-screen max-w-2xl space-y-4 bg-[#080a0f] px-3 pb-24 pt-3 sm:px-5 sm:pt-5" style={pageSkyStyle}><Skeleton className="h-7 w-48 bg-slate-800" /><Skeleton className="h-32 w-full bg-slate-800" /><Skeleton className="h-56 w-full bg-slate-800" /></div>;
   }
 
   const stations = data?.stations ?? [];
@@ -141,7 +143,7 @@ export default function Ranking() {
   const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate");
 
   return (
-    <main className="weather-page-sky min-h-screen bg-[#080a0f] pb-28">
+    <main className="weather-page-sky min-h-screen bg-[#080a0f] pb-28" style={pageSkyStyle}>
       <div className="mx-auto max-w-2xl px-3 pt-2 sm:px-5 sm:pt-4">
         <header className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

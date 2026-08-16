@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { Link } from "wouter";
 import { AlertTriangle, BarChart3, ClipboardCheck, Database, FlaskConical, MapPin, RefreshCw, ShieldCheck, Zap } from "lucide-react";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
@@ -19,6 +20,7 @@ function Divergence({ label, value, max, unit, color }: { label: string; value: 
 
 export default function WeatherAILab() {
   const { activeLocation } = useLocation();
+  const { style: pageSkyStyle } = usePageWeatherSky();
   const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: true });
 
@@ -44,7 +46,7 @@ export default function WeatherAILab() {
       .filter((source) => source.type === "model" && Number.isFinite(source.finalWeight) && source.finalWeight > 0),
   }));
 
-  return <main className="weather-page-sky min-h-screen mx-auto max-w-2xl space-y-3 px-3 py-3 pb-24 sm:px-6 sm:py-6">
+  return <main className="weather-page-sky min-h-screen mx-auto max-w-2xl space-y-3 px-3 py-3 pb-24 sm:px-6 sm:py-6" style={pageSkyStyle}>
     <header className="flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15"><FlaskConical className="h-5 w-5 text-blue-300" /></div><div className="min-w-0"><h1 className="text-base font-bold text-slate-100">AI Lab · traçabilité</h1><p className="truncate text-xs text-slate-500">{activeLocation?.name ?? "Lieu actif"}{updatedAt ? ` · calcul à ${updatedAt}` : " · snapshot indisponible"}</p></div></div>
       <button onClick={() => refetch()} disabled={isFetching} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-blue-400/30 bg-blue-400/10 px-3 text-xs font-semibold text-blue-200 disabled:opacity-60"><RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />Actualiser</button>

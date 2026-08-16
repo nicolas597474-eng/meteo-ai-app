@@ -4,6 +4,7 @@ import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { trpc } from "@/lib/trpc";
 
 type PeriodId = "24h" | "7d" | "30d" | "90d" | "365d";
@@ -96,6 +97,7 @@ function EmptyFigure({ title, reason }: { title: string; reason: string }) {
 
 export default function ReliabilityLaboratory() {
   const { activeLocation } = useLocation();
+  const { style: pageSkyStyle } = usePageWeatherSky();
   const [period, setPeriod] = useState<PeriodId>("30d");
   const [horizon, setHorizon] = useState<HorizonId>("6-24h");
   const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]>("Vue générale");
@@ -139,7 +141,7 @@ export default function ReliabilityLaboratory() {
   };
 
   return (
-    <main className="weather-page-sky min-h-screen bg-[#080a0f] pb-28">
+    <main className="weather-page-sky min-h-screen bg-[#080a0f] pb-28" style={pageSkyStyle}>
       <div className="mx-auto max-w-6xl px-3 pt-3 sm:px-5 sm:pt-5">
         <header className="mb-4 overflow-hidden rounded-2xl border border-sky-500/15 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,.18),transparent_40%),linear-gradient(135deg,#101827,#090d15)] p-4 sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

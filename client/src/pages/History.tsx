@@ -3,6 +3,7 @@ import { Calendar, CloudRain, Clock, MapPin, Thermometer, TrendingUp, Wind } fro
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 
@@ -99,6 +100,7 @@ export default function History() {
   const [days, setDays] = useState(14);
   const [activeTab, setActiveTab] = useState<HistoryTab>("temperature");
   const { activeLocation } = useLocation();
+  const { style: pageSkyStyle } = usePageWeatherSky();
   const { data, isLoading } = trpc.weather.getHistory.useQuery(activeLocation ? { days, lat: activeLocation.lat, lon: activeLocation.lon } : { days });
 
   const chartData = useMemo(() => {
@@ -125,7 +127,7 @@ export default function History() {
   const latestScores = useMemo(() => modelNames.map((name) => ({ name, score: [...scoreRows].reverse().find((row) => row[name] != null)?.[name] ?? null })).filter((row) => row.score != null).sort((a, b) => Number(b.score) - Number(a.score)), [modelNames, scoreRows]);
   const leadRows = useMemo(() => (data?.leadTimeScores ?? []).filter((row: any) => row.serviceName === comparisonModel), [data, comparisonModel]);
 
-  if (isLoading) return <div className="weather-page-sky min-h-screen bg-background px-3 pb-24 pt-3"><div className="mx-auto max-w-2xl animate-pulse space-y-4"><div className="h-9 w-48 rounded-xl bg-muted" /><div className="h-40 rounded-2xl bg-muted" /><div className="h-56 rounded-2xl bg-muted" /></div></div>;
+  if (isLoading) return <div className="weather-page-sky min-h-screen bg-background px-3 pb-24 pt-3" style={pageSkyStyle}><div className="mx-auto max-w-2xl animate-pulse space-y-4"><div className="h-9 w-48 rounded-xl bg-muted" /><div className="h-40 rounded-2xl bg-muted" /><div className="h-56 rounded-2xl bg-muted" /></div></div>;
 
   const tabItems: Array<{ id: HistoryTab; label: string; icon: typeof Thermometer }> = [
     { id: "temperature", label: "Température", icon: Thermometer }, { id: "precip", label: "Pluie", icon: CloudRain }, { id: "wind", label: "Vent", icon: Wind }, { id: "scores", label: "Scores", icon: TrendingUp }, { id: "leadtime", label: "Échéance", icon: Clock },
@@ -136,7 +138,7 @@ export default function History() {
   const latest = chartData[chartData.length - 1];
   const latestError = latest?.obsMax != null && latest?.meteoAIMax != null ? Math.abs(latest.obsMax - latest.meteoAIMax) : null;
 
-  return <div className="weather-page weather-page-sky min-h-screen"><main className="mx-auto max-w-2xl space-y-4 px-3 pb-28 pt-3 sm:space-y-5 sm:px-5 sm:py-8">
+  return <div className="weather-page weather-page-sky min-h-screen" style={pageSkyStyle}><main className="mx-auto max-w-2xl space-y-4 px-3 pb-28 pt-3 sm:space-y-5 sm:px-5 sm:py-8">
     <header className="weather-surface-hero rounded-2xl p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-sky-400/25 bg-sky-400/10"><Calendar className="h-4 w-4 text-sky-300" /></span><div><h1 className="text-xl font-bold tracking-tight text-white">Historique météo</h1><p className="text-[11px] text-slate-400">Prévisions confrontées aux observations archivées</p></div></div>{activeLocation ? <p className="mt-3 flex items-center gap-1.5 text-[11px] text-sky-300"><MapPin className="h-3.5 w-3.5" />{activeLocation.name}</p> : null}</div><div className="shrink-0 text-right"><p className="text-[10px] uppercase tracking-wider text-slate-500">Période</p><p className="text-lg font-semibold text-white">{days} j</p></div></div><div className="mt-4 flex gap-2">{[7, 14, 30].map((period) => <button key={period} onClick={() => setDays(period)} className={`min-h-9 flex-1 rounded-xl border text-xs font-semibold ${days === period ? "border-sky-400/45 bg-sky-400/15 text-sky-100" : "border-slate-700/70 bg-slate-950/25 text-slate-400"}`}>{period} jours</button>)}</div>{chartData.length > 0 ? <div className="mt-3 grid grid-cols-3 gap-2"><Metric label="Jours archivés" value={String(chartData.length)} /><Metric label="Obs. disponibles" value={String(data?.observations.length ?? 0)} tone="text-emerald-200" /><Metric label="Dernier écart" value={latestError == null ? "—" : `${latestError.toFixed(1)}°C`} tone={errorTone(latestError)} /></div> : null}</header>
 
     <nav className="weather-surface-inset -mx-1 flex gap-1 overflow-x-auto rounded-2xl p-1.5 scrollbar-hide" aria-label="Type de comparaison historique">{tabItems.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setActiveTab(id)} className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold ${activeTab === id ? "bg-sky-400/15 text-sky-100 ring-1 ring-sky-400/25" : "text-slate-400"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</nav>
