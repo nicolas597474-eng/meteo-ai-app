@@ -45,6 +45,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
     expect(source).toContain("overflow-visible rounded-[22px]");
+    expect(source).toContain("dashboard-weather-page");
+    expect(source).toContain("dashboard-sky-card");
+    expect(source).toContain("dashboardSkyImage");
     const ventMaxIndex = source.indexOf("Vent max");
     const confidenceIndex = source.indexOf("Confiance prévision");
     expect(ventMaxIndex).toBeGreaterThan(-1);

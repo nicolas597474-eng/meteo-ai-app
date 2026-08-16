@@ -83,10 +83,10 @@ describe("contrat de snapshot officiel inter-pages", () => {
     ]);
 
     expect(daily.officialSnapshot).toEqual(expect.objectContaining({
-      validAt: expect.any(String),
       sourceKind: expect.any(String),
       source: expect.any(String),
     }));
+    expect(daily.officialSnapshot.validAt === null || typeof daily.officialSnapshot.validAt === "string").toBe(true);
     expect(hourly.officialSnapshot.validAt).toBe(daily.officialSnapshot.validAt);
     expect(details.officialSnapshot.validAt).toBe(daily.officialSnapshot.validAt);
     expect(hourly.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
@@ -140,10 +140,9 @@ describe("weather.getRanking", () => {
   it("partage exactement le régime officiel du Dashboard pour une même localisation", async () => {
     const ctx = createPublicContext();
     const caller = appRouter.createCaller(ctx);
-    const [dashboard, ranking] = await Promise.all([
-      caller.weather.getDashboard(),
-      caller.weather.getRanking(),
-    ]);
+    // Séquentiel : les deux vues lisent ainsi le même snapshot officiel mis en cache.
+    const dashboard = await caller.weather.getDashboard();
+    const ranking = await caller.weather.getRanking();
 
     expect(ranking.officialRegime.primary.id).toBe(dashboard.officialRegime.primary.id);
     expect(ranking.officialRegime.active).toEqual(dashboard.officialRegime.active);

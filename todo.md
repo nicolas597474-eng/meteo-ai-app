@@ -1507,3 +1507,8 @@
 - [x] Audit: Identifier le conteneur et le fond décoratif de la lune 3D.
 - [x] Interface: Agrandir l’astre et retirer cercle, bordure et arrière-plan autour de la lune.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Fonds de ciel dynamiques des cartes Dashboard
+- [x] Audit: Identifier la source de ciel dynamique et les cartes éligibles du Dashboard.
+- [x] Interface: Étendre l’image de ciel aux cartes avec une superposition sombre adaptée à chaque contenu.
+- [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.

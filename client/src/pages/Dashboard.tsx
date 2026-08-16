@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
@@ -360,11 +360,13 @@ export default function Dashboard() {
   const windDir = currentHour?.windDirection ?? null;
   const windSpeed = currentHour?.windSpeed ?? today?.windSpeed ?? meteoAI?.windSpeed ?? null;
   const currentCloudCover = currentHour?.cloudCover ?? today?.cloudCover ?? null;
+  const dashboardSkyImage = getDashboardWeatherImage({ condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined });
+  const dashboardSkyStyle = { "--dashboard-sky-image": `url("${dashboardSkyImage}")` } as CSSProperties;
   const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
   const modelFallbackContributors = locationWeather?.ultraLocal?.modelFallback?.contributors ?? [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>
       <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-1 sm:space-y-6 sm:px-6 sm:py-8">
 
         {!authLoading && !user && (
@@ -384,7 +386,7 @@ export default function Dashboard() {
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
           {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
           <img
-            src={getDashboardWeatherImage({ condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined })}
+            src={dashboardSkyImage}
             alt="Paysage météo"
             className="absolute inset-0 h-full w-full object-cover opacity-70 pointer-events-none"
           />
@@ -648,13 +650,13 @@ export default function Dashboard() {
         </div>
 
         {/* ── Link to details page ── */}
-        <Link href="/details" className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
+        <Link href="/details" className="dashboard-sky-card flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
           <MeteoIcon name="chevron_right" size={16} />
           <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
           <span className="text-primary text-xs">→</span>
         </Link>
 
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
+        <div className="dashboard-sky-card flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />
           <span className="mr-auto text-xs font-semibold text-muted-foreground">Contexte</span>
           <div className="flex gap-1">
@@ -676,7 +678,7 @@ export default function Dashboard() {
               <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
               <span className="text-[10px] text-muted-foreground">n’influence pas la prévision officielle</span>
             </div>
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+            <div className="dashboard-sky-card rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-2xl font-bold text-emerald-300">{locationWeather.ultraLocal.temperature != null ? `${Number(locationWeather.ultraLocal.temperature).toFixed(1)}°C` : "—"}</p>
