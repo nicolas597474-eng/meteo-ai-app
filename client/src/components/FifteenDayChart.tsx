@@ -333,15 +333,11 @@ export default function FifteenDayChart({ days, locationName }: Props) {
         const cpx = (maxPts[i - 1].x + maxPts[i].x) / 2;
         ctx.bezierCurveTo(cpx, maxPts[i - 1].y, cpx, maxPts[i].y, maxPts[i].x, maxPts[i].y);
       }
-      ctx.save();
-      ctx.strokeStyle = "rgba(249, 115, 22, 0.45)";
-      ctx.lineWidth = 5;
-      ctx.shadowColor = "#f97316";
-      ctx.shadowBlur = 10;
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.38)";
+      ctx.lineWidth = 3.2;
       ctx.stroke();
-      ctx.restore();
       ctx.strokeStyle = "#fb923c";
-      ctx.lineWidth = 1.8;
+      ctx.lineWidth = 2.1;
       ctx.stroke();
     }
     // Points + values
@@ -362,6 +358,9 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.font = `bold ${sel ? 14 : 13}px system-ui`;
       ctx.textAlign = "center";
       const maxLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, 14);
+      ctx.strokeStyle = "rgba(5, 7, 10, 0.9)";
+      ctx.lineWidth = 3;
+      ctx.strokeText(`${v.toFixed(1)}`, pt.x, maxLabelY);
       ctx.fillText(`${v.toFixed(1)}`, pt.x, maxLabelY);
     });
 
@@ -393,7 +392,10 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillStyle = "#93c5fd";
       ctx.font = `bold ${sel ? 13 : 12}px system-ui`;
       ctx.textAlign = "center";
-      const minLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop);
+      const minLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 24, 34);
+      ctx.strokeStyle = "rgba(5, 7, 10, 0.9)";
+      ctx.lineWidth = 3;
+      ctx.strokeText(`${v.toFixed(1)}`, pt.x, minLabelY);
       ctx.fillText(`${v.toFixed(1)}`, pt.x, minLabelY);
     });
 

@@ -25,7 +25,9 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, barTop - 5)");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, precipZoneBot - 5)");
     expect(source).not.toContain("getFeltLabelY");
-    expect(source).toContain("getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop)");
+    expect(source).toContain("getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, 24, 34)");
+    expect(source).toContain('ctx.strokeText(`${v.toFixed(1)}`, pt.x, minLabelY)');
+    expect(source).not.toContain("ctx.shadowBlur = 10");
     expect(source).not.toContain("Ressenti °C");
   });
 

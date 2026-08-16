@@ -1540,3 +1540,8 @@
 - [x] Audit: Identifier les contours et badges ambrés à remplacer dans Fiabilité.
 - [x] Interface: Appliquer des accents bleu et vert cohérents aux états de préparation et de tendance provisoire.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Lisibilité des courbes de prévision
+- [x] Audit: Identifier les halos du tracé maximal et la proximité des chiffres minimaux bleus.
+- [x] Interface: Rendre la courbe orange nette et écarter les libellés minimaux de leur courbe.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
