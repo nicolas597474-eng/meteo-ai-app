@@ -39,6 +39,15 @@ describe("page Fiabilité", () => {
     expect(dialog).toContain("Décomposition du poids appliqué");
   });
 
+  it("permet d’ouvrir les détails du calcul de la synthèse locale", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Détails de calcul de la synthèse");
+    expect(source).toContain("GroundTruthDetailDialog");
+    expect(source).toContain("Méthode de pondération");
+    expect(source).toContain("Stations écartées");
+    expect(source).toContain("50 % de proximité");
+  });
+
   it("affiche une seule station locale puis propose de développer les autres", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("showAdditionalLocalStations");

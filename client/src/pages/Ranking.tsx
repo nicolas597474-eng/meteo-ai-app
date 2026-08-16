@@ -8,6 +8,7 @@ import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { filterAndSortStationSources, type SourceDistanceOrder, type SourceKindFilter, type SourceStatusFilter } from "@/lib/stationSourceFilters";
 import { getStationDisplayStatus } from "@/lib/stationCandidateStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
@@ -24,6 +25,30 @@ type ComparisonPoint = {
 
 type SourceSelection = { kind: "station" | "model"; source: any };
 
+type GroundTruthContribution = {
+  stationId: string;
+  name: string;
+  source: string;
+  distanceKm: number;
+  weight: number;
+  distanceWeight: number;
+  qualityWeight: number;
+  freshnessWeight: number;
+  temperature: number | null;
+  humidity: number | null;
+  pressure: number | null;
+  windSpeed: number | null;
+  precipitation: number | null;
+};
+
+type GroundTruthExclusion = {
+  stationId: string;
+  name: string;
+  source: string;
+  distanceKm: number;
+  reason: string;
+};
+
 function formatAge(minutes: number | null) {
   if (minutes === null) return "Aucun relevé";
   if (minutes < 2) return "À l’instant";
@@ -35,6 +60,17 @@ function formatAge(minutes: number | null) {
 
 function value(value: number | null | undefined, unit = "") {
   return value === null || value === undefined ? "—" : `${value.toFixed(1)}${unit}`;
+}
+
+function asStoredArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as T[] : [];
+  } catch {
+    return [];
+  }
 }
 
 function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint[]; periodDays: 1 | 7 }) {
@@ -93,6 +129,7 @@ export default function Ranking() {
   const [periodDays, setPeriodDays] = useState<1 | 7>(1);
   const [radiusKm, setRadiusKm] = useState(activeLocation?.radiusKm ?? 20);
   const [selectedSource, setSelectedSource] = useState<SourceSelection | null>(null);
+  const [isGroundTruthDialogOpen, setIsGroundTruthDialogOpen] = useState(false);
   const coords = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const utils = trpc.useUtils();
   const overviewInput = useMemo(() => ({ ...(coords ?? {}), periodDays, radiusKm }), [coords?.lat, coords?.lon, periodDays, radiusKm]);
@@ -154,10 +191,16 @@ export default function Ranking() {
           <WeatherStatusBadge className="w-[142px]" label="Collecte" value="05h00 Paris" tone="info" icon={<Clock3 className="h-4 w-4" />} pulse ariaLabel="Collecte automatique planifiée à 05h00, heure de Paris" description="Les prévisions et les stations disponibles sont archivées chaque jour à 05h00, heure de Paris. Cette heure ne garantit pas qu’une source externe réponde instantanément." />
         </header>
 
-        <section className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
-          <Metric label="Stations actives" value={String(stations.length)} icon="stations" color="text-emerald-400" />
-          <Metric label="Confiance synthèse locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
-          <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
+          <div className="grid grid-cols-3 gap-2">
+            <Metric label="Stations actives" value={String(stations.length)} icon="stations" color="text-emerald-400" />
+            <Metric label="Confiance synthèse locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
+            <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
+          </div>
+          <button type="button" disabled={!latest} onClick={() => setIsGroundTruthDialogOpen(true)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 text-left text-xs font-semibold text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-[#090b10] disabled:text-slate-500">
+            <span>Détails de calcul de la synthèse</span>
+            <span className="text-[11px] font-medium text-sky-300">{latest ? `${latest.stationCount ?? 0} station${latest.stationCount === 1 ? "" : "s"} · ouvrir` : "Aucune synthèse"}</span>
+          </button>
         </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
@@ -210,10 +253,65 @@ export default function Ranking() {
           <TemperatureComparison points={comparison} periodDays={periodDays} />
         </section>
       </div>
+      <GroundTruthDetailDialog groundTruth={latest} open={isGroundTruthDialogOpen} onOpenChange={setIsGroundTruthDialogOpen} />
       <SourceDetailsDialog selection={selectedSource} groundTruth={liveStationData?.groundTruth} onOpenChange={(open) => { if (!open) setSelectedSource(null); }} />
       <BackToTopButton />
     </main>
   );
+}
+
+function GroundTruthDetailDialog({ groundTruth, open, onOpenChange }: { groundTruth: any; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const stationsUsed = asStoredArray<GroundTruthContribution>(groundTruth?.stationsUsed);
+  const stationsIgnored = asStoredArray<GroundTruthExclusion>(groundTruth?.stationsIgnored);
+  const computedAt = groundTruth?.computedAt ? new Date(groundTruth.computedAt) : null;
+  const measurements = [
+    ["Température", value(groundTruth?.temperature, " °C")],
+    ["Humidité", value(groundTruth?.humidity, " %")],
+    ["Pression", value(groundTruth?.pressure, " hPa")],
+    ["Vent", value(groundTruth?.windSpeed, " km/h")],
+    ["Rafales", value(groundTruth?.windGust, " km/h")],
+    ["Précipitations", value(groundTruth?.precipitation, " mm")],
+  ];
+
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:p-6">
+      <DialogHeader className="pr-7">
+        <DialogTitle className="text-white">Détails du calcul de la synthèse</DialogTitle>
+        <DialogDescription className="leading-relaxed text-slate-400">
+          {computedAt ? `Calculée le ${computedAt.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} à ${computedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.` : "Aucune heure de calcul archivée."}
+        </DialogDescription>
+      </DialogHeader>
+
+      <section className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Résumé de la synthèse locale">
+        <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 px-3 py-2.5"><p className="text-lg font-bold text-sky-200">{groundTruth?.confidenceScore === null || groundTruth?.confidenceScore === undefined ? "—" : `${Math.round(groundTruth.confidenceScore)}%`}</p><p className="mt-0.5 text-[10px] text-slate-400">Confiance de synthèse</p></div>
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3 py-2.5"><p className="text-lg font-bold text-emerald-200">{groundTruth?.stationCount ?? stationsUsed.length}</p><p className="mt-0.5 text-[10px] text-slate-400">Stations contributrices</p></div>
+        <div className="col-span-2 rounded-xl border border-slate-700 bg-[#090b10] px-3 py-2.5 sm:col-span-1"><p className="text-sm font-semibold text-slate-100">{stationsIgnored.length}</p><p className="mt-0.5 text-[10px] text-slate-400">Stations écartées</p></div>
+      </section>
+
+      <section>
+        <h3 className="text-sm font-semibold text-white">Mesures agrégées</h3>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {measurements.map(([label, measurement]) => <div key={label} className="rounded-xl border border-slate-800 bg-[#090b10] px-3 py-2.5"><p className="text-sm font-semibold text-white">{measurement}</p><p className="mt-0.5 text-[10px] text-slate-500">{label}</p></div>)}
+        </div>
+      </section>
+
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-sm font-semibold text-white">Stations retenues</h3><p className="mt-1 text-[11px] text-slate-500">Chaque poids final est la part réelle de la station dans la synthèse enregistrée.</p></div><span className="text-[10px] text-slate-500">Facteurs normalisés : 0 à 1</span></div>
+        {stationsUsed.length > 0 ? <div className="mt-2 overflow-x-auto rounded-xl border border-slate-800"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-[#090b10] text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2 font-semibold">Station</th><th className="px-3 py-2 font-semibold">Distance</th><th className="px-3 py-2 font-semibold">Poids final</th><th className="px-3 py-2 font-semibold">Distance</th><th className="px-3 py-2 font-semibold">Qualité</th><th className="px-3 py-2 font-semibold">Fraîcheur</th><th className="px-3 py-2 font-semibold">Temp.</th></tr></thead><tbody>{stationsUsed.map((station) => <tr key={station.stationId} className="border-t border-slate-800 text-slate-300"><td className="px-3 py-2.5"><p className="font-medium text-white">{station.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{SOURCE_LABELS[station.source] ?? station.source}</p></td><td className="px-3 py-2.5">{Number(station.distanceKm).toFixed(1)} km</td><td className="px-3 py-2.5 font-semibold text-sky-200">{(Number(station.weight) * 100).toFixed(1)} %</td><td className="px-3 py-2.5">{Number(station.distanceWeight).toFixed(3)}</td><td className="px-3 py-2.5">{Number(station.qualityWeight).toFixed(3)}</td><td className="px-3 py-2.5">{Number(station.freshnessWeight).toFixed(3)}</td><td className="px-3 py-2.5">{value(station.temperature, " °C")}</td></tr>)}</tbody></table></div> : <div className="mt-2 rounded-xl border border-dashed border-slate-700 px-3 py-4 text-center text-xs text-slate-500">Aucune contribution détaillée n’a été archivée pour cette synthèse.</div>}
+      </section>
+
+      <section className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-3">
+        <h3 className="text-sm font-semibold text-sky-100">Méthode de pondération</h3>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-300">Le score brut de chaque station combine <strong className="text-sky-100">50 % de proximité</strong> (inverse de la distance), <strong className="text-sky-100">30 % de qualité historique</strong> et <strong className="text-sky-100">20 % de fraîcheur</strong> (décroissance selon l’âge du relevé). Les scores sont ensuite normalisés pour totaliser 100 %.</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">La confiance tient compte de l’accord des températures et du nombre de stations actives : l’écart-type thermique réduit la note, comme une couverture inférieure à cinq stations.</p>
+      </section>
+
+      <section>
+        <h3 className="text-sm font-semibold text-white">Stations écartées</h3>
+        {stationsIgnored.length > 0 ? <div className="mt-2 space-y-2">{stationsIgnored.map((station) => <div key={station.stationId} className="rounded-xl border border-slate-800 bg-[#090b10] px-3 py-2.5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-slate-200">{station.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{SOURCE_LABELS[station.source] ?? station.source} · {Number(station.distanceKm).toFixed(1)} km</p></div><p className="max-w-[55%] text-right text-[11px] leading-relaxed text-slate-400">{station.reason}</p></div></div>)}</div> : <p className="mt-2 text-xs text-slate-500">Aucune station écartée n’a été archivée pour ce calcul.</p>}
+      </section>
+    </DialogContent>
+  </Dialog>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {

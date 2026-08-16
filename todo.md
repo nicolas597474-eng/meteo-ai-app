@@ -1572,3 +1572,8 @@
 - [x] Données: Utiliser une tolérance cohérente pour retrouver une synthèse locale proche du lieu actif.
 - [x] Tests: Couvrir la récupération de la dernière synthèse malgré un léger écart de coordonnées.
 - [x] Validation: Vérifier la dernière synthèse et la confiance affichées dans Stations, TypeScript, Vitest et build.
+
+## Détail de calcul de la synthèse locale
+- [x] Données: Identifier les stations contributrices, pondérations, mesures et confiance déjà disponibles.
+- [x] Interface: Ajouter un bouton et une fenêtre de détail de la synthèse locale.
+- [x] Validation: Vérifier la fenêtre mobile, TypeScript, Vitest et build.
