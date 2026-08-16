@@ -1601,3 +1601,13 @@
 - [x] Interface: Créer un panneau mobile pour consulter, modifier et supprimer les observations archivées.
 - [x] Validation: Vérifier les recalculs, les actions utilisateur, TypeScript, Vitest et build.
 - [x] Interface: Replier la section Mes observations par défaut avec une flèche d’ouverture et de fermeture rapide.
+
+## Snapshot de fusion indisponible dans AI Lab
+- [x] Audit: Vérifier la dernière fusion, les prévisions archivées et les exécutions de collecte pour Hondeghem.
+- [x] Correction: Restaurer la récupération ou la production de snapshot sans inventer de données.
+- [ ] Validation: Vérifier AI Lab, TypeScript, Vitest et build avant publication.
+
+## Position Soleil & Lune
+- [x] Audit: Vérifier les horaires et les coordonnées disponibles pour les deux astres.
+- [x] Interface: Agrandir le soleil et tracer une position lunaire distincte sur l’arche.
+- [x] Validation: Vérifier le panneau mobile, TypeScript, Vitest et build avant publication.

@@ -33,6 +33,14 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("height: 8.75rem !important");
   });
 
+  it("distingue les positions du Soleil et de la Lune à partir des heures réelles", () => {
+    expect(source).toContain("celestialArcPosition");
+    expect(source).toContain("moonPosition");
+    expect(source).toContain("Position actuelle de la Lune");
+    expect(source).toContain("Lune sous l’horizon");
+    expect(source).toContain("h-9 w-9");
+  });
+
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {
     expect(source).toContain("meteoai-first-quarter-moon-3d-realistic_64387ecc.png");
     expect(source).toContain("Lune 3D représentant le premier croissant");
