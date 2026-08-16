@@ -14,8 +14,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Prévisions détaillées");
     expect(source).toContain('aria-label="Retour au Dashboard"');
     expect(source).toContain("<BackToTopButton />");
-    expect(source).toContain("linear-gradient(160deg,#0b1527_0%,#080f1d_45%,#070b13_100%)");
-    expect(source).toContain("linear-gradient(135deg,#176fc4_0%,#1763ad_100%)");
-    expect(source).toContain("bg-[#105a9f]/95");
+    expect(source).toContain("linear-gradient(165deg,#1679d4_0%,#2a95df_48%,#69b9ea_100%)");
+    expect(source).toContain("linear-gradient(135deg,#3a9cdf_0%,#2d8bd1_100%)");
+    expect(source).toContain("bg-[#2b83c9]/95");
   });
 });

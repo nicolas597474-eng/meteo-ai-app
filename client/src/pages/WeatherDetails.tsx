@@ -101,7 +101,7 @@ export default function WeatherDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(160deg,#0b1527_0%,#080f1d_45%,#070b13_100%)]">
+      <div className="min-h-screen bg-[linear-gradient(165deg,#1679d4_0%,#2a95df_48%,#69b9ea_100%)]">
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -118,11 +118,11 @@ export default function WeatherDetails() {
   const confidence = data?.confidence;
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(160deg,#0b1527_0%,#080f1d_45%,#070b13_100%)]">
+    <div className="min-h-screen bg-[linear-gradient(165deg,#1679d4_0%,#2a95df_48%,#69b9ea_100%)]">
       <div className="mx-auto max-w-2xl space-y-3 px-3 py-3 pb-28">
 
         {/* ═══ HEADER ═══ */}
-        <MeteoSurface as="section" tone="accent" className="rounded-[22px] border-sky-100/55 bg-[linear-gradient(135deg,#1976d2_0%,#1671c2_55%,#125eaa_100%)] p-4">
+        <MeteoSurface as="section" tone="accent" className="rounded-[22px] border-sky-50/70 bg-[linear-gradient(135deg,#3aa3ea_0%,#2a91da_55%,#207bc4_100%)] p-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-300/25 bg-slate-950/45 text-sky-200 transition-colors hover:border-sky-300/55 hover:bg-sky-400/10" aria-label="Retour au Dashboard">
               <ChevronLeft className="h-5 w-5" />
@@ -137,7 +137,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-100/40 bg-[linear-gradient(135deg,#176fc4_0%,#1763ad_100%)] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-50/55 bg-[linear-gradient(135deg,#3a9cdf_0%,#2d8bd1_100%)] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="refresh" size={16} /></span>
@@ -157,8 +157,8 @@ export default function WeatherDetails() {
                     key={h.hour}
                     className={`weather-surface-inset flex-shrink-0 w-[138px] rounded-2xl border p-3 transition-colors ${
                       isNow
-                        ? "border-white/70 bg-[linear-gradient(135deg,#2b8ee5_0%,#1d72c2_100%)]"
-                        : "border-sky-100/35 bg-[#105a9f]/95"
+                        ? "border-white/80 bg-[linear-gradient(135deg,#52b4f4_0%,#318fd7_100%)]"
+                        : "border-sky-50/45 bg-[#2b83c9]/95"
                     }`}
                   >
                     {/* Hour + Now badge */}
@@ -263,7 +263,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 2: GRAPHIQUES INTERACTIFS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-100/40 bg-[linear-gradient(135deg,#176fc4_0%,#1763ad_100%)] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-50/55 bg-[linear-gradient(135deg,#3a9cdf_0%,#2d8bd1_100%)] p-4">
           <div className="mb-3 flex items-center gap-2.5"><span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="chart" size={16} /></span><div><h2 className="text-base font-semibold text-white">Graphiques</h2><p className="text-[11px] text-slate-400">Évolution par paramètre</p></div></div>
           
           {/* Chart selector */}
@@ -284,13 +284,13 @@ export default function WeatherDetails() {
           </div>
           
           {/* Chart area */}
-          <div className="weather-chart-3d rounded-2xl border border-sky-100/35 bg-[#105a9f]/80 p-3">
+          <div className="weather-chart-3d rounded-2xl border border-sky-50/45 bg-[#287ec2]/85 p-3">
             <HourlyChart hours={hours} type={activeChart} currentIdx={currentHourIdx} />
           </div>
         </MeteoSurface>
 
         {/* ═══ SECTION 3: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-100/40 bg-[linear-gradient(135deg,#176fc4_0%,#1763ad_100%)] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-50/55 bg-[linear-gradient(135deg,#3a9cdf_0%,#2d8bd1_100%)] p-4">
           <div className="mb-3 flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="calendar" size={16} /></span>
             <div><h2 className="text-base font-semibold text-white">Prochains jours</h2><p className="text-[11px] text-slate-400">Ouvrez un jour pour consulter ses détails</p></div>
@@ -302,7 +302,7 @@ export default function WeatherDetails() {
               // Les données serveur distinguent la confiance (accord, qualité,
               // historique, échéance) de la simple dispersion des modèles.
               return (
-                <div key={day.date} className="weather-surface-inset overflow-hidden rounded-2xl border border-sky-100/35 bg-[#105a9f]/95">
+                <div key={day.date} className="weather-surface-inset overflow-hidden rounded-2xl border border-sky-50/45 bg-[#2b83c9]/95">
                   {/* Day summary card */}
                   <button
                     onClick={() => setExpandedDay(isExpanded ? null : day.date)}
@@ -362,16 +362,16 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 5: TENDANCES ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] border-sky-100/35 bg-[#135faa]/95 p-4">
+        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] border-sky-50/45 bg-[#297fc4]/95 p-4">
           <h2 className="mb-3 text-base font-semibold text-white">Tendances</h2>
-          <div className="weather-surface-inset rounded-2xl border border-sky-100/35 bg-[#105a9f]/95 p-3">
+          <div className="weather-surface-inset rounded-2xl border border-sky-50/45 bg-[#2b83c9]/95 p-3">
             <TrendSection days={days} />
           </div>
         </MeteoSurface>
 
         {/* ═══ SECTION 6: CONFIANCE DE PRÉVISION ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] border-sky-100/35 bg-[#135faa]/95 p-4">
-          <div className="weather-surface-inset rounded-2xl border border-sky-100/35 bg-[#105a9f]/95 p-3">
+        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] border-sky-50/45 bg-[#297fc4]/95 p-4">
+          <div className="weather-surface-inset rounded-2xl border border-sky-50/45 bg-[#2b83c9]/95 p-3">
             <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-white">
               <MeteoIcon name="confidence" size={14} />
               Confiance de prévision officielle

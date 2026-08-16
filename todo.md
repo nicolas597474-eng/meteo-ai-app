@@ -1464,3 +1464,7 @@
 ## Cartes azur de la page Prévisions détaillées
 - [x] Interface: Éclaircir les cartes et contrôles bleus dans un ton azur lumineux, en gardant le fond noir.
 - [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
+
+## Thème bleu clair complet des prévisions détaillées
+- [x] Interface: Étendre le bleu clair à l’ensemble du fond de page et harmoniser les surfaces internes.
+- [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
