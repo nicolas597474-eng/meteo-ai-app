@@ -1472,3 +1472,7 @@
 ## Inversion de contraste bleu des prévisions détaillées
 - [x] Interface: Assombrir légèrement le fond bleu et éclaircir les cartes pour renforcer la hiérarchie.
 - [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.
+
+## Confirmation fond bleu profond et cartes claires
+- [x] Vérification: Confirmer le contraste entre le fond général bleu profond et les cartes bleues plus claires.
+- [x] Validation: Vérifier le rendu mobile et publier uniquement si une correction est nécessaire.
