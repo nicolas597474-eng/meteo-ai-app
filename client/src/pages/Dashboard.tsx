@@ -364,6 +364,11 @@ export default function Dashboard() {
   const dashboardSkyStyle = { "--dashboard-sky-image": `url("${dashboardSkyImage}")` } as CSSProperties;
   const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
   const modelFallbackContributors = locationWeather?.ultraLocal?.modelFallback?.contributors ?? [];
+  const localObservation = locationWeather?.currentObservation?.source === "local_validated"
+    ? locationWeather.currentObservation
+    : null;
+  const localOfficialDelta = localObservation?.deltaFromOfficialC ?? null;
+  const hasMaterialLocalDelta = localOfficialDelta !== null && Math.abs(localOfficialDelta) >= 2;
 
   return (
     <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>
@@ -690,6 +695,10 @@ export default function Dashboard() {
                 </div>
                 <WeatherStatusBadge compact tone="success" label="Confiance locale" value={`${locationWeather.ultraLocal.confidenceScore}%`} pulse={locationWeather.ultraLocal.stationCount > 0} description="Mesure l’accord et la qualité des observations locales utilisées pour le contexte local. Elle ne remplace pas la confiance de la prévision officielle." />
               </div>
+              {hasMaterialLocalDelta ? <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5" role="status">
+                <div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-amber-100">Écart observé avec la prévision officielle</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">Les stations locales et le modèle officiel ne décrivent pas la même source. La température principale reste la prévision au point du lieu.</p></div><span className="shrink-0 text-sm font-bold text-amber-200">{localOfficialDelta > 0 ? "+" : ""}{localOfficialDelta.toFixed(1)}°</span></div>
+                <p className="mt-1.5 text-[10px] text-slate-400">Modèle officiel : {officialCurrentTemp == null ? "—" : `${officialCurrentTemp.toFixed(1)}°C`} · synthèse station : {localObservation?.temperature.toFixed(1)}°C{localObservation?.observedAt ? ` · relevé le ${new Date(localObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}` : ""}.</p>
+              </div> : null}
               {locationWeather.ultraLocal.stationsUsed.length > 0 ? (
                 <div className="mt-3 space-y-1.5 border-t border-emerald-500/15 pt-2">
                   {locationWeather.ultraLocal.stationsUsed.slice(0, 4).map((station: any) => (

@@ -1577,3 +1577,8 @@
 - [x] Données: Identifier les stations contributrices, pondérations, mesures et confiance déjà disponibles.
 - [x] Interface: Ajouter un bouton et une fenêtre de détail de la synthèse locale.
 - [x] Validation: Vérifier la fenêtre mobile, TypeScript, Vitest et build.
+
+## Cohérence des températures officielle, locale et ultra-locale
+- [x] Audit: Comparer les sources, horodatages et calculs affichés dans les trois contextes.
+- [x] Correction: Corriger uniquement l’origine mesurée de l’écart ou expliciter un écart réel de source.
+- [x] Validation: Vérifier la cohérence mobile, TypeScript, Vitest et build.

@@ -20,6 +20,21 @@ describe("buildDashboardCurrentTemperature", () => {
     });
   });
 
+  it("conserve l’écart signé entre une observation locale et la prévision officielle", () => {
+    expect(buildDashboardCurrentTemperature({
+      localMode: "ultra-local",
+      temperature: 26.1,
+      stationCount: 9,
+      confidenceScore: 81,
+      observedAt: "2026-08-16T09:15:00.000Z",
+      officialTemperature: 21.8,
+    })).toMatchObject({
+      source: "local_validated",
+      temperature: 26.1,
+      deltaFromOfficialC: 4.3,
+    });
+  });
+
   it("conserve la prévision officielle en mode Standard ou sans source locale", () => {
     expect(buildDashboardCurrentTemperature({
       localMode: "standard",

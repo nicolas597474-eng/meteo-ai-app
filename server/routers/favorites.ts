@@ -487,13 +487,16 @@ export const favoritesRouter = router({
           modelWeight: localModeTemperature.usesOfficialFallback || localModeTemperature.usesModelFallback ? 0 : ultraLocalResult.modelWeight,
           microclimateAdjustment: localModeTemperature.microclimateAdjustment,
           microclimateFactors: localModeTemperature.usesOfficialFallback || localModeTemperature.usesModelFallback ? [] : ultraLocalResult.microclimateFactors,
-          confidenceScore: advancedFusion.confidenceScore,
+          // Cette confiance et ce compteur décrivent la même sélection de
+          // stations que la température locale affichée, et non la seule
+          // trace de contrôle de fusion avancée.
+          confidenceScore,
           explanation: localModeTemperature.usesModelFallback
             ? `Aucune station physique validée dans le rayon. Repli sur la fusion officielle de ${modelFallback?.modelCount ?? 0} modèles, pondérée par la trace de température appliquée ; aucun micro-ajustement local n’est appliqué.`
             : localModeTemperature.usesOfficialFallback
             ? "Aucune station physique validée dans le rayon de recherche. Les modes Local et Ultra-local reprennent exactement la prévision officielle ; aucun micro-ajustement ni poids local n’est appliqué."
             : `${ultraLocalResult.explanation} ${advancedFusion.validationNote}`,
-          stationCount: advancedFusion.stationCount,
+          stationCount: localStationCount,
           advancedFusion: {
             methodUsed: advancedFusion.methodUsed,
             modelCount: advancedFusion.modelCount,
