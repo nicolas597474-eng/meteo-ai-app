@@ -178,23 +178,6 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   bottom: 1rem !important;
 }
 
-/* Illustration lunaire 3D : le libellé conserve la phase réelle, l’emoji est remplacé par l’asset. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) > div:nth-child(3) > div:first-child {
-  position: relative;
-  overflow: hidden;
-  background: radial-gradient(circle at 40% 35%, rgba(72, 94, 132, 0.76), rgba(15, 24, 42, 0.98) 68%) !important;
-  color: transparent;
-  font-size: 0;
-}
-
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) > div:nth-child(3) > div:first-child::before {
-  content: "";
-  display: block;
-  width: 58px;
-  height: 58px;
-  background: url("/manus-storage/meteoai-crescent-moon-3d_34eeab42.png") center / contain no-repeat;
-}
-
 /* Surfaces MeteoAI : dégradés minéraux sombres, lisibles sur mobile et cohérents entre les pages. */
 :root {
   --weather-surface-base: linear-gradient(145deg, rgba(16, 27, 40, 0.96) 0%, rgba(10, 18, 29, 0.97) 55%, rgba(7, 12, 20, 0.985) 100%);

@@ -33,8 +33,9 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("height: 8.75rem !important");
   });
 
-  it("utilise une illustration 3D dédiée pour la phase lunaire", () => {
-    expect(styles).toContain("meteoai-crescent-moon-3d_34eeab42.png");
-    expect(styles).toContain("Illustration lunaire 3D");
+  it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {
+    expect(source).toContain("meteoai-first-quarter-moon-3d-realistic_64387ecc.png");
+    expect(source).toContain("Lune 3D représentant le premier croissant");
+    expect(source).toContain('astronomy.moon.label === "Premier croissant"');
   });
 });

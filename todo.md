@@ -1497,3 +1497,8 @@
 - [x] Asset: Générer une lune 3D en croissant, sans texte et avec fond transparent.
 - [x] Interface: Intégrer l’illustration à la phase lunaire affichée dans Soleil & Lune.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Premier croissant en lune 3D réaliste
+- [x] Asset: Générer un premier croissant 3D réaliste et cratérisé, sans texte ni fond.
+- [x] Interface: Remplacer explicitement le pictogramme du premier croissant par cet asset visible.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
