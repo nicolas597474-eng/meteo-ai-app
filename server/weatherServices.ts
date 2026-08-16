@@ -539,7 +539,7 @@ export async function collectHourlyForecastAllModels(
     { name: "best_match", modelId: null }, // Open-Meteo best match
   ];
 
-  const results = await Promise.all(modelsToCollect.map(async (model): Promise<{
+  const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<{
     modelName: string;
     hours: Array<{
       hour: number;
@@ -566,7 +566,7 @@ export async function collectHourlyForecastAllModels(
         url.searchParams.set("models", model.modelId);
       }
 
-      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
+      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts });
       if (!response.ok) {
         console.warn(`[HourlyAll] ${model.name} HTTP ${response.status}`);
         return null;
@@ -617,9 +617,21 @@ export async function collectHourlyForecastAllModels(
       console.warn(`[HourlyAll] Error fetching ${model.name}:`, err);
       return null;
     }
-  }));
+  };
 
-  return results.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null);
+  const firstPass = await Promise.all(modelsToCollect.map((model) => collectModel(model, 2)));
+  const collected = firstPass.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null);
+  const collectedNames = new Set(collected.map((forecast) => forecast.modelName));
+  const missingModels = modelsToCollect.filter((model) => !collectedNames.has(model.name));
+
+  if (missingModels.length === 0) return collected;
+
+  // Le second passage cible seulement les sources réellement absentes. Les
+  // données déjà collectées sont conservées et aucune substitution n’est faite.
+  console.warn(`[HourlyAll] Retry targeted for missing models: ${missingModels.map((model) => model.name).join(", ")}`);
+  await new Promise((resolve) => setTimeout(resolve, 1_200));
+  const retryPass = await Promise.all(missingModels.map((model) => collectModel(model, 1)));
+  return [...collected, ...retryPass.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null)];
 }
 
 /** Collect hourly candidate series without affecting active model coverage. */

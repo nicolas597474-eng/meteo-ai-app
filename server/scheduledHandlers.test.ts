@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildStationCollectionSnapshot, getModelCoverage } from "./scheduledHandlers";
 import { VALIDATION_WEATHER_MODELS } from "./weatherServices";
@@ -34,6 +35,17 @@ describe("getModelCoverage", () => {
     expect(coverage.expected).toHaveLength(8);
     expect(VALIDATION_WEATHER_MODELS).toHaveLength(5);
     expect(coverage.expected).not.toContain("DMI HARMONIE-DINI");
+  });
+});
+
+describe("collecte horaire de 05h00", () => {
+  it("relance uniquement les modèles absents sans remplacer les données déjà archivées", () => {
+    const source = readFileSync(new URL("./weatherServices.ts", import.meta.url), "utf8");
+    expect(source).toContain("Retry targeted for missing models");
+    expect(source).toContain("const missingModels = modelsToCollect.filter");
+    expect(source).toContain("collectModel(model, 2)");
+    expect(source).toContain("collectModel(model, 1)");
+    expect(source).toContain("return [...collected");
   });
 });
 

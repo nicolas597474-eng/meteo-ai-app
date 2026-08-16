@@ -1444,3 +1444,10 @@
 - [x] Interface: Recomposer l’en-tête, les cartes horaires, les contrôles et les graphiques dans le style sombre net cohérent.
 - [x] Mobile: Préserver la zone sûre de la barre basse, le défilement horizontal des heures et la lisibilité tactile.
 - [x] Validation: Vérifier les parcours mobiles, TypeScript, Vitest et build.
+
+## Collecte quotidienne des prévisions et stations
+- [x] Audit: Vérifier le déclencheur 05h00, la liste des modèles, les stations actives et les archives créées.
+- [x] Collecte: Enregistrer les prévisions horaires et journalières de tous les modèles actifs pour chaque lieu favori.
+- [x] Stations: Archiver les relevés réellement disponibles des stations physiques, avec statut explicite si une source ne répond pas.
+- [x] Fiabilité: Vérifier l’idempotence, les garde-fous de date et la traçabilité de chaque exécution.
+- [x] Validation: Tester, contrôler les journaux du planificateur et publier la collecte renforcée.

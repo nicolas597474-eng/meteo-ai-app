@@ -828,7 +828,9 @@ export async function getPhysicalStationHistory(
 export async function insertStationCollectionSnapshot(data: InsertStationCollectionSnapshot): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.insert(stationCollectionSnapshots).values(data);
+  await db.insert(stationCollectionSnapshots).values(data).onDuplicateKeyUpdate({
+    set: { ...data, collectedAt: new Date() },
+  });
 }
 
 /** Read latest availability/coverage attempts for a reference location. */

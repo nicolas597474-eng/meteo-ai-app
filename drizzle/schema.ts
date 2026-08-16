@@ -350,7 +350,9 @@ export const stationCollectionSnapshots = mysqlTable("station_collection_snapsho
   hourlyMissingModels: json("hourlyMissingModels"),
   status: mysqlEnum("status", ["completed", "partial", "failed"]).notNull(),
   collectedAt: timestamp("collectedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("station_collection_snapshots_location_date_unique").on(table.locationKey, table.date),
+]);
 
 export type StationCollectionSnapshot = typeof stationCollectionSnapshots.$inferSelect;
 export type InsertStationCollectionSnapshot = typeof stationCollectionSnapshots.$inferInsert;

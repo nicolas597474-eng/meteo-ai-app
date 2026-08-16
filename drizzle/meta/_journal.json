@@ -169,6 +169,13 @@
       "when": 1786697847376,
       "tag": "0023_flashy_mandarin",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786849612852,
+      "tag": "0024_clear_george_stacy",
+      "breakpoints": true
     }
   ]
 }
