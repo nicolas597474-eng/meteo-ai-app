@@ -14,5 +14,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Prévisions détaillées");
     expect(source).toContain('aria-label="Retour au Dashboard"');
     expect(source).toContain("<BackToTopButton />");
+    expect(source).toContain("linear-gradient(160deg,#143b79_0%,#0a2450_42%,#07182e_100%)");
+    expect(source).toContain("bg-[#0b2854]/90");
+    expect(source).toContain("bg-[#081f42]/84");
   });
 });

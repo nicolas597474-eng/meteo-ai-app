@@ -1451,3 +1451,8 @@
 - [x] Stations: Archiver les relevés réellement disponibles des stations physiques, avec statut explicite si une source ne répond pas.
 - [x] Fiabilité: Vérifier l’idempotence, les garde-fous de date et la traçabilité de chaque exécution.
 - [x] Validation: Tester, contrôler les journaux du planificateur et publier la collecte renforcée.
+
+## Fond bleu de la page Prévisions détaillées
+- [x] Audit: Identifier les surfaces de la page détaillée qui doivent être éclaircies.
+- [x] Interface: Appliquer un fond bleu profond et des dégradés nets cohérents avec les cartes météo.
+- [x] Validation: Vérifier le contraste mobile, TypeScript, Vitest et build.

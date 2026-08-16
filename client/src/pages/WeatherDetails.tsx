@@ -101,7 +101,7 @@ export default function WeatherDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0d1117]">
+      <div className="min-h-screen bg-[linear-gradient(160deg,#143b79_0%,#0a2450_42%,#07182e_100%)]">
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -118,11 +118,11 @@ export default function WeatherDetails() {
   const confidence = data?.confidence;
 
   return (
-    <div className="min-h-screen bg-[#0d1117]">
+    <div className="min-h-screen bg-[linear-gradient(160deg,#143b79_0%,#0a2450_42%,#07182e_100%)]">
       <div className="mx-auto max-w-2xl space-y-3 px-3 py-3 pb-28">
 
         {/* ═══ HEADER ═══ */}
-        <MeteoSurface as="section" tone="accent" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="accent" className="rounded-[22px] border-sky-200/40 bg-[#0c3268]/90 p-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-300/25 bg-slate-950/45 text-sky-200 transition-colors hover:border-sky-300/55 hover:bg-sky-400/10" aria-label="Retour au Dashboard">
               <ChevronLeft className="h-5 w-5" />
@@ -137,7 +137,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-200/25 bg-[#0b2854]/90 p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="refresh" size={16} /></span>
@@ -157,8 +157,8 @@ export default function WeatherDetails() {
                     key={h.hour}
                     className={`weather-surface-inset flex-shrink-0 w-[138px] rounded-2xl border p-3 transition-colors ${
                       isNow
-                        ? "border-sky-300/60 bg-sky-950/55"
-                        : "border-slate-700/70 bg-slate-950/50"
+                        ? "border-sky-200/75 bg-[#123d7d]/90"
+                        : "border-sky-200/20 bg-[#081f42]/84"
                     }`}
                   >
                     {/* Hour + Now badge */}
@@ -263,7 +263,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 2: GRAPHIQUES INTERACTIFS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-200/25 bg-[#0b2854]/90 p-4">
           <div className="mb-3 flex items-center gap-2.5"><span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="chart" size={16} /></span><div><h2 className="text-base font-semibold text-white">Graphiques</h2><p className="text-[11px] text-slate-400">Évolution par paramètre</p></div></div>
           
           {/* Chart selector */}
@@ -290,7 +290,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 3: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[22px] border-sky-200/25 bg-[#0b2854]/90 p-4">
           <div className="mb-3 flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="calendar" size={16} /></span>
             <div><h2 className="text-base font-semibold text-white">Prochains jours</h2><p className="text-[11px] text-slate-400">Ouvrez un jour pour consulter ses détails</p></div>
@@ -302,7 +302,7 @@ export default function WeatherDetails() {
               // Les données serveur distinguent la confiance (accord, qualité,
               // historique, échéance) de la simple dispersion des modèles.
               return (
-                <div key={day.date} className="weather-surface-inset overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/45">
+                <div key={day.date} className="weather-surface-inset overflow-hidden rounded-2xl border border-sky-200/20 bg-[#081f42]/84">
                   {/* Day summary card */}
                   <button
                     onClick={() => setExpandedDay(isExpanded ? null : day.date)}
@@ -362,16 +362,16 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 5: TENDANCES ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] border-sky-200/20 bg-[#092448]/90 p-4">
           <h2 className="mb-3 text-base font-semibold text-white">Tendances</h2>
-          <div className="weather-surface-inset rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3">
+          <div className="weather-surface-inset rounded-2xl border border-sky-200/20 bg-[#081f42]/84 p-3">
             <TrendSection days={days} />
           </div>
         </MeteoSurface>
 
         {/* ═══ SECTION 6: CONFIANCE DE PRÉVISION ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] p-4">
-          <div className="weather-surface-inset rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3">
+        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] border-sky-200/20 bg-[#092448]/90 p-4">
+          <div className="weather-surface-inset rounded-2xl border border-sky-200/20 bg-[#081f42]/84 p-3">
             <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-white">
               <MeteoIcon name="confidence" size={14} />
               Confiance de prévision officielle
