@@ -468,16 +468,26 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
 
 function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartType; currentIdx: number }) {
   const chartScrollRef = useRef<HTMLDivElement>(null);
+  const detailScrollRef = useRef<HTMLDivElement>(null);
   const chartH = 148;
   const chartW = Math.max(720, hours.length * 68);
 
   useEffect(() => {
-    const scrollContainer = chartScrollRef.current;
-    if (!scrollContainer || hours.length < 2 || currentIdx < 0 || currentIdx >= hours.length) return;
+    if (hours.length < 2 || currentIdx < 0 || currentIdx >= hours.length) return;
 
     const currentX = (currentIdx / (hours.length - 1)) * chartW;
-    const targetLeft = Math.max(0, currentX - scrollContainer.clientWidth * 0.34);
-    scrollContainer.scrollTo({ left: targetLeft, behavior: "auto" });
+    const chartScrollContainer = chartScrollRef.current;
+    if (chartScrollContainer) {
+      const targetLeft = Math.max(0, currentX - chartScrollContainer.clientWidth * 0.34);
+      chartScrollContainer.scrollTo({ left: targetLeft, behavior: "auto" });
+    }
+
+    const detailScrollContainer = detailScrollRef.current;
+    if (detailScrollContainer) {
+      const detailCardStride = 186;
+      const detailTargetLeft = Math.max(0, currentIdx * detailCardStride - detailScrollContainer.clientWidth * 0.18);
+      detailScrollContainer.scrollTo({ left: detailTargetLeft, behavior: "auto" });
+    }
   }, [chartW, currentIdx, hours.length]);
 
   if (hours.length === 0) return <p className="text-slate-500 text-xs">Aucune donnée disponible</p>;
@@ -607,14 +617,17 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
           <p className="text-xs font-semibold text-slate-200">Détails par heure</p>
           <p className="text-[10px] text-slate-400">Temp. · ressenti · vent · pluie · humidité · pression</p>
         </div>
-        <div className="-mx-3 overflow-x-auto px-3 pb-2 scrollbar-hide" aria-label="Détails horaires défilables">
-          <div className="flex gap-3" style={{ width: `${hours.length * 180}px` }}>
+        <div ref={detailScrollRef} className="-mx-3 overflow-x-auto px-3 pb-2 scrollbar-hide" aria-label="Détails horaires défilables">
+          <div className="flex gap-3" style={{ width: `${hours.length * 186}px` }}>
             {hours.map((h: any, i: number) => {
               const selectedValue = getValue(h);
               return (
                 <div key={`detail-${h.hour}-${i}`} className={`w-[174px] flex-shrink-0 rounded-xl border p-2.5 ${i === currentIdx ? "border-sky-300/70 bg-sky-950/50" : "border-slate-700/70 bg-slate-950/40"}`}>
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">{h.hour}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-white">{h.hour}</span>
+                      {i === currentIdx && <span className="rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[8px] font-bold text-sky-200">MAINTENANT</span>}
+                    </div>
                     <span className="text-xs font-semibold" style={{ color }}>{selectedValue == null ? "—" : `${type === "pressure" ? selectedValue.toFixed(0) : selectedValue.toFixed(1)} ${getUnit()}`}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-slate-300">

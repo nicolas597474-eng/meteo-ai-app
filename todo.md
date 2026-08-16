@@ -1467,3 +1467,8 @@
 - [x] Audit: Identifier le cadrage et le repère actuel dans le graphique horaire détaillé.
 - [x] Interface: Afficher l’heure actuelle avec un libellé visible dès l’ouverture du graphique.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Synchronisation du ruban horaire avec l’heure actuelle
+- [x] Audit: Identifier le défilement indépendant du ruban de cartes sous le graphique.
+- [x] Interface: Cadrer automatiquement la carte de l’heure actuelle avec son repère visible.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
