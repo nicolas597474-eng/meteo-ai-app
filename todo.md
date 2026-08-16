@@ -1482,3 +1482,8 @@
 - [x] Audit: Vérifier la synchronisation existante et les protections contre les boucles d’événements.
 - [x] Interface: Synchroniser le geste horizontal des cartes vers le graphique.
 - [x] Validation: Vérifier le geste mobile dans les deux sens, TypeScript, Vitest et build.
+
+## Lisibilité des libellés supérieurs du graphique
+- [x] Audit: Identifier le recouvrement des valeurs et du repère de l’heure actuelle.
+- [x] Interface: Réserver des positions de libellés lisibles au-dessus des points du graphique.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.

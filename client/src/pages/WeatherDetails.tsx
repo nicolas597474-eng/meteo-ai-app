@@ -566,13 +566,16 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const min = Math.min(...validValues);
   const max = Math.max(...validValues);
   const range = max - min || 1;
+  const chartTop = 36;
+  const chartBottom = chartH - 8;
+  const chartPlotHeight = chartBottom - chartTop;
   const currentX = (currentIdx / Math.max(hours.length - 1, 1)) * chartW;
   const currentLabelX = Math.min(Math.max(currentX + 8, 6), chartW - 118);
 
   const points = values.map((v, hourIndex) => {
     if (v == null) return null;
     const x = (hourIndex / (hours.length - 1)) * chartW;
-    const y = chartH - ((v - min) / range) * (chartH - 20) - 10;
+    const y = chartBottom - ((v - min) / range) * chartPlotHeight;
     return { x, y, v, hourIndex };
   }).filter(Boolean) as { x: number; y: number; v: number; hourIndex: number }[];
 
@@ -582,16 +585,16 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   return (
     <div className="space-y-3">
       <div ref={chartScrollRef} onScroll={syncDetailScroll} className="overflow-x-auto scrollbar-hide">
-        <svg width={chartW} height={chartH + 34} className="min-w-full">
+        <svg width={chartW} height={chartH + 58} className="min-w-full">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
-          <line key={pct} x1={0} x2={chartW} y1={chartH - pct * (chartH - 20) - 10} y2={chartH - pct * (chartH - 20) - 10} stroke="#1e293b" strokeWidth="1" />
+          <line key={pct} x1={0} x2={chartW} y1={chartBottom - pct * chartPlotHeight} y2={chartBottom - pct * chartPlotHeight} stroke="#1e293b" strokeWidth="1" />
         ))}
 
         {/* Repères pour chaque heure afin de relier précisément valeurs et courbe. */}
         {hours.map((_, i) => {
           const x = (i / (hours.length - 1)) * chartW;
-          return <line key={`hour-grid-${i}`} x1={x} x2={x} y1={0} y2={chartH} stroke="#334155" strokeWidth="0.5" opacity="0.45" />;
+          return <line key={`hour-grid-${i}`} x1={x} x2={x} y1={chartTop} y2={chartBottom} stroke="#334155" strokeWidth="0.5" opacity="0.45" />;
         })}
         
         {/* Current hour indicator */}
@@ -600,10 +603,10 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
             <line
             x1={currentX}
             x2={currentX}
-            y1={0} y2={chartH}
+            y1={chartTop} y2={chartBottom}
               stroke="#60a5fa" strokeWidth="2" strokeDasharray="5 3" opacity="0.9"
             />
-            <g transform={`translate(${currentLabelX} 8)`}>
+            <g transform={`translate(${currentLabelX} ${chartH + 3})`}>
               <rect width="110" height="20" rx="10" fill="#0f4c81" stroke="#93c5fd" strokeWidth="1" />
               <text x="55" y="13.5" textAnchor="middle" fill="#eff6ff" fontSize="10" fontWeight="700">Maintenant · {hours[currentIdx]?.hour ?? "—"}</text>
             </g>
@@ -625,14 +628,14 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         {hours.map((h: any, i: number) => {
           const x = (i / (hours.length - 1)) * chartW;
           return (
-            <text key={i} x={x} y={chartH + 18} textAnchor="middle" fill={i === currentIdx ? "#93c5fd" : "#94a3b8"} fontSize="10" fontWeight={i === currentIdx ? "700" : "500"}>{h.hour}</text>
+            <text key={i} x={x} y={chartH + 42} textAnchor="middle" fill={i === currentIdx ? "#93c5fd" : "#94a3b8"} fontSize="10" fontWeight={i === currentIdx ? "700" : "500"}>{h.hour}</text>
           );
         })}
         
         {/* Valeur sélectionnée au-dessus de chaque heure. */}
         {points.map((p) => {
           return (
-            <text key={`value-${p.hourIndex}`} x={p.x} y={p.y - 9} textAnchor="middle" fill={color} fontSize="10" fontWeight="bold">
+            <text key={`value-${p.hourIndex}`} x={p.x} y={Math.max(p.y - 10, 18)} textAnchor="middle" fill={color} fontSize="11" fontWeight="bold" stroke="#070b13" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">
               {type === "pressure" ? p.v.toFixed(0) : p.v.toFixed(1)}
             </text>
           );

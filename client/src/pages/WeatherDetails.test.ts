@@ -32,6 +32,10 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("chartTargetLeft = progress * chartScrollableWidth");
     expect(source).toContain("onScroll={syncDetailScroll}");
     expect(source).toContain("onScroll={syncChartScroll}");
+    expect(source).toContain("const chartTop = 36");
+    expect(source).toContain("chartBottom = chartH - 8");
+    expect(source).toContain('paintOrder="stroke"');
+    expect(source).toContain("chartH + 42");
     expect(source).toContain("MAINTENANT");
     expect(source).toContain("Maintenant ·");
   });
