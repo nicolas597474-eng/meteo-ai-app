@@ -38,7 +38,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("moonPosition");
     expect(source).toContain("Position actuelle de la Lune");
     expect(source).toContain("Lune sous l’horizon");
-    expect(source).toContain("h-9 w-9");
+    expect(source).toContain('MeteoIcon name="sunny" size={48}');
+    expect(source).toContain("Soleil 3D");
+    expect(source).not.toContain("border-2 border-amber-100 bg-amber-300");
   });
 
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {

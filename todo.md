@@ -1617,3 +1617,7 @@
 - [x] Données: Ajouter une procédure protégée qui recalcule et persiste un snapshot pour le lieu actif.
 - [x] Interface: Ajouter le bouton de relance avec chargement, succès et erreur explicites dans AI Lab.
 - [x] Validation: Vérifier la relance, TypeScript, Vitest et build avant publication.
+
+## Marqueur solaire 3D
+- [x] Interface: Retirer le contour blanc et créer un soleil 3D net sur l’arche.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
