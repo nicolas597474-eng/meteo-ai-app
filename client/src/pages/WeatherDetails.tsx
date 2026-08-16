@@ -500,7 +500,26 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
     if (chartScrollableWidth <= 0 || detailScrollableWidth <= 0) return;
 
     const progress = chartScrollContainer.scrollLeft / chartScrollableWidth;
-    detailScrollContainer.scrollLeft = progress * detailScrollableWidth;
+    const detailTargetLeft = progress * detailScrollableWidth;
+    if (Math.abs(detailScrollContainer.scrollLeft - detailTargetLeft) > 0.5) {
+      detailScrollContainer.scrollLeft = detailTargetLeft;
+    }
+  };
+
+  const syncChartScroll = (event: UIEvent<HTMLDivElement>) => {
+    const detailScrollContainer = event.currentTarget;
+    const chartScrollContainer = chartScrollRef.current;
+    if (!chartScrollContainer) return;
+
+    const detailScrollableWidth = detailScrollContainer.scrollWidth - detailScrollContainer.clientWidth;
+    const chartScrollableWidth = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
+    if (detailScrollableWidth <= 0 || chartScrollableWidth <= 0) return;
+
+    const progress = detailScrollContainer.scrollLeft / detailScrollableWidth;
+    const chartTargetLeft = progress * chartScrollableWidth;
+    if (Math.abs(chartScrollContainer.scrollLeft - chartTargetLeft) > 0.5) {
+      chartScrollContainer.scrollLeft = chartTargetLeft;
+    }
   };
 
   if (hours.length === 0) return <p className="text-slate-500 text-xs">Aucune donnée disponible</p>;
@@ -630,7 +649,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
           <p className="text-xs font-semibold text-slate-200">Détails par heure</p>
           <p className="text-[10px] text-slate-400">Temp. · ressenti · vent · pluie · humidité · pression</p>
         </div>
-        <div ref={detailScrollRef} className="-mx-3 overflow-x-auto px-3 pb-2 scrollbar-hide" aria-label="Détails horaires défilables">
+        <div ref={detailScrollRef} onScroll={syncChartScroll} className="-mx-3 overflow-x-auto px-3 pb-2 scrollbar-hide" aria-label="Détails horaires défilables">
           <div className="flex gap-3" style={{ width: `${hours.length * 186}px` }}>
             {hours.map((h: any, i: number) => {
               const selectedValue = getValue(h);

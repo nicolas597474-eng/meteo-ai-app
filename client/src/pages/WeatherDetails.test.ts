@@ -27,8 +27,11 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("detailCardStride = 186");
     expect(source).toContain('scrollTo({ left: detailTargetLeft, behavior: "auto" })');
     expect(source).toContain("syncDetailScroll");
-    expect(source).toContain("detailScrollContainer.scrollLeft = progress * detailScrollableWidth");
+    expect(source).toContain("syncChartScroll");
+    expect(source).toContain("detailTargetLeft = progress * detailScrollableWidth");
+    expect(source).toContain("chartTargetLeft = progress * chartScrollableWidth");
     expect(source).toContain("onScroll={syncDetailScroll}");
+    expect(source).toContain("onScroll={syncChartScroll}");
     expect(source).toContain("MAINTENANT");
     expect(source).toContain("Maintenant ·");
   });

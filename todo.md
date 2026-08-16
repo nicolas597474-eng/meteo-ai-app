@@ -1477,3 +1477,8 @@
 - [x] Audit: Identifier les plages de défilement du graphique et du ruban de cartes.
 - [x] Interface: Synchroniser en continu le geste horizontal du graphique avec le ruban sans boucle d’événements.
 - [x] Validation: Vérifier le geste mobile, TypeScript, Vitest et build.
+
+## Synchronisation bidirectionnelle graphique et cartes
+- [x] Audit: Vérifier la synchronisation existante et les protections contre les boucles d’événements.
+- [x] Interface: Synchroniser le geste horizontal des cartes vers le graphique.
+- [x] Validation: Vérifier le geste mobile dans les deux sens, TypeScript, Vitest et build.
