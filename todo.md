@@ -1535,3 +1535,8 @@
 - [x] API: Exposer uniquement ces tendances mesurées avec leur volume de comparaisons et un statut provisoire.
 - [x] Interface: Afficher les trois tendances sans les présenter comme un classement validé.
 - [x] Validation: Vérifier les libellés, TypeScript, Vitest et build.
+
+## Accents bleu-vert de la page Fiabilité
+- [x] Audit: Identifier les contours et badges ambrés à remplacer dans Fiabilité.
+- [x] Interface: Appliquer des accents bleu et vert cohérents aux états de préparation et de tendance provisoire.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.

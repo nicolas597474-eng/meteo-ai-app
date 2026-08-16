@@ -25,4 +25,10 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("Vent");
     expect(source).toContain("ProvisionalTrendCard");
   });
+
+  it("utilise des accents bleu-vert pour les états de préparation et provisoires", () => {
+    expect(source).toContain("border-sky-500/30");
+    expect(source).toContain("border-sky-400/35");
+    expect(source).not.toContain("amber-500");
+  });
 });
