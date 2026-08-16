@@ -2,7 +2,7 @@
  * WeatherDetails — Page de prévisions météo ultra-détaillées
  * Sections: Prévisions horaires, Graphiques, Résumé IA, Prévisions jours, Tendances, Confiance
  */
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -467,6 +467,19 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
 }
 
 function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartType; currentIdx: number }) {
+  const chartScrollRef = useRef<HTMLDivElement>(null);
+  const chartH = 148;
+  const chartW = Math.max(720, hours.length * 68);
+
+  useEffect(() => {
+    const scrollContainer = chartScrollRef.current;
+    if (!scrollContainer || hours.length < 2 || currentIdx < 0 || currentIdx >= hours.length) return;
+
+    const currentX = (currentIdx / (hours.length - 1)) * chartW;
+    const targetLeft = Math.max(0, currentX - scrollContainer.clientWidth * 0.34);
+    scrollContainer.scrollTo({ left: targetLeft, behavior: "auto" });
+  }, [chartW, currentIdx, hours.length]);
+
   if (hours.length === 0) return <p className="text-slate-500 text-xs">Aucune donnée disponible</p>;
 
   const getValue = (h: any): number | null => {
@@ -511,8 +524,8 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const min = Math.min(...validValues);
   const max = Math.max(...validValues);
   const range = max - min || 1;
-  const chartH = 148;
-  const chartW = Math.max(720, hours.length * 68);
+  const currentX = (currentIdx / Math.max(hours.length - 1, 1)) * chartW;
+  const currentLabelX = Math.min(Math.max(currentX + 8, 6), chartW - 118);
 
   const points = values.map((v, hourIndex) => {
     if (v == null) return null;
@@ -526,7 +539,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto scrollbar-hide">
+      <div ref={chartScrollRef} className="overflow-x-auto scrollbar-hide">
         <svg width={chartW} height={chartH + 34} className="min-w-full">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
@@ -541,12 +554,18 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         
         {/* Current hour indicator */}
         {currentIdx < hours.length && (
-          <line
-            x1={(currentIdx / (hours.length - 1)) * chartW}
-            x2={(currentIdx / (hours.length - 1)) * chartW}
+          <>
+            <line
+            x1={currentX}
+            x2={currentX}
             y1={0} y2={chartH}
-            stroke="#3b82f6" strokeWidth="1" strokeDasharray="4 2" opacity="0.5"
-          />
+              stroke="#60a5fa" strokeWidth="2" strokeDasharray="5 3" opacity="0.9"
+            />
+            <g transform={`translate(${currentLabelX} 8)`}>
+              <rect width="110" height="20" rx="10" fill="#0f4c81" stroke="#93c5fd" strokeWidth="1" />
+              <text x="55" y="13.5" textAnchor="middle" fill="#eff6ff" fontSize="10" fontWeight="700">Maintenant · {hours[currentIdx]?.hour ?? "—"}</text>
+            </g>
+          </>
         )}
         
         {/* Line */}
@@ -554,7 +573,10 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         
         {/* Points */}
         {points.map((p) => (
-          <circle key={p.hourIndex} cx={p.x} cy={p.y} r={p.hourIndex === currentIdx ? 4 : 2.5} fill={color} stroke={p.hourIndex === currentIdx ? "#fff" : "none"} strokeWidth={p.hourIndex === currentIdx ? 1.5 : 0} />
+          <g key={p.hourIndex}>
+            {p.hourIndex === currentIdx && <circle cx={p.x} cy={p.y} r="8" fill="#60a5fa" opacity="0.28" />}
+            <circle cx={p.x} cy={p.y} r={p.hourIndex === currentIdx ? 5 : 2.5} fill={color} stroke={p.hourIndex === currentIdx ? "#fff" : "none"} strokeWidth={p.hourIndex === currentIdx ? 2 : 0} />
+          </g>
         ))}
         
         {/* Chaque heure est libellée : le défilement horizontal conserve la lisibilité. */}

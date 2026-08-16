@@ -1462,3 +1462,8 @@
 - [x] Audit: Identifier le débordement mobile des cartes sous le graphique.
 - [x] Interface: Recomposer le ruban dans un défilement horizontal propre et non tronqué.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Repère immédiat de l’heure actuelle dans le graphique
+- [x] Audit: Identifier le cadrage et le repère actuel dans le graphique horaire détaillé.
+- [x] Interface: Afficher l’heure actuelle avec un libellé visible dès l’ouverture du graphique.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.

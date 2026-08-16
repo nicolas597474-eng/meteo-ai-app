@@ -22,5 +22,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("hours.length * 180");
     expect(source).toContain("w-[174px]");
     expect(source).toContain("Temp. · ressenti · vent · pluie · humidité · pression");
+    expect(source).toContain("chartScrollRef");
+    expect(source).toContain('scrollTo({ left: targetLeft, behavior: "auto" })');
+    expect(source).toContain("Maintenant ·");
   });
 });
