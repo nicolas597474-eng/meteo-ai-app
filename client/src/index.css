@@ -376,6 +376,12 @@ img.moon-3d-first-crescent {
   transform: translateX(-50%) scale(1.12);
 }
 
+/* La source réaliste est isolée dans un disque, sans carré clair ni contour ajouté. */
+.celestial-realistic-sun {
+  clip-path: circle(46% at 50% 50%);
+  transform: scale(1.06);
+}
+
 @keyframes meteo-icon-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }

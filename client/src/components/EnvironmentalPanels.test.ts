@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
+const modernSunMoonSource = source.slice(source.indexOf("function SunMoonPanelModern"));
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -23,7 +24,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
-    expect(source).toContain("Éphémérides locales, altitudes réelles et état actuel du cycle jour-nuit");
+    expect(modernSunMoonSource).toContain("Éphémérides locales et état actuel du cycle jour-nuit");
   });
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
@@ -38,14 +39,13 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("moonPosition");
     expect(source).toContain("Position actuelle de la Lune");
     expect(source).toContain("Lune sous l’horizon");
-    expect(source).toContain('MeteoIcon name="sunny" size={48}');
-    expect(source).toContain("Soleil 3D");
-    expect(source).not.toContain("border-2 border-amber-100 bg-amber-300");
-    expect(source).toContain("formatAltitude(astronomy.sunAltitudeDeg)");
-    expect(source).toContain("formatAltitude(astronomy.moonAltitudeDeg)");
-    expect(source).toContain('MeteoIcon name="clear_night" size={40}');
-    expect(source).toContain("isNightAtLocalMinutes");
-    expect(source).toContain("celestial-night-marker");
+    expect(modernSunMoonSource).toContain("meteoai-realistic-sun-3d-clean_e4a6a1ea.png");
+    expect(modernSunMoonSource).toContain("celestial-realistic-sun");
+    expect(modernSunMoonSource).not.toContain("formatAltitude(astronomy.sunAltitudeDeg)");
+    expect(modernSunMoonSource).not.toContain("formatAltitude(astronomy.moonAltitudeDeg)");
+    expect(modernSunMoonSource).toContain('MeteoIcon name="clear_night" size={40}');
+    expect(modernSunMoonSource).toContain("isNightAtLocalMinutes");
+    expect(modernSunMoonSource).toContain("celestial-night-marker");
   });
 
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {

@@ -1631,3 +1631,8 @@
 - [x] Calcul: Déterminer de façon fiable l’état nuit à partir des horaires de coucher et de lever locaux.
 - [x] Interface: Appliquer un habillage nocturne dédié et automatique après le coucher du soleil.
 - [x] Validation: Vérifier les états jour et nuit, TypeScript, Vitest et build avant publication.
+
+## Soleil réaliste sans altitudes
+- [x] Interface: Retirer les altitudes du Soleil et de la Lune du panneau et de son détail.
+- [x] Médias: Créer un soleil réaliste 3D sans fond compatible avec la Lune 3D existante.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
