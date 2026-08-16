@@ -16,4 +16,12 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Dernière fusion archivée");
     expect(source).toContain("Elle ne pilote pas la prévision actuelle");
   });
+
+  it("propose une relance manuelle pour le lieu favori avec ses états explicites", () => {
+    const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
+    expect(source).toContain("refreshManualFusion");
+    expect(source).toContain("Relancer");
+    expect(source).toContain("Fusion relancée avec");
+    expect(source).toContain("Une fusion vient déjà d’être calculée");
+  });
 });

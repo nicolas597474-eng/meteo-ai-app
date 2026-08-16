@@ -1611,3 +1611,9 @@
 - [x] Audit: Vérifier les horaires et les coordonnées disponibles pour les deux astres.
 - [x] Interface: Agrandir le soleil et tracer une position lunaire distincte sur l’arche.
 - [x] Validation: Vérifier le panneau mobile, TypeScript, Vitest et build avant publication.
+
+## Relance manuelle de fusion météo
+- [x] Audit: Identifier le flux réutilisable de collecte et les garde-fous de fréquence.
+- [x] Données: Ajouter une procédure protégée qui recalcule et persiste un snapshot pour le lieu actif.
+- [x] Interface: Ajouter le bouton de relance avec chargement, succès et erreur explicites dans AI Lab.
+- [x] Validation: Vérifier la relance, TypeScript, Vitest et build avant publication.

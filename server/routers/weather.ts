@@ -3,7 +3,7 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, adminProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import {
   getForecastsByDate,
   getForecastsByDateRange,
@@ -29,6 +29,7 @@ import {
   getStationCollectionSnapshots,
   getQualifiedEvidenceStatus,
   getStationQualityProfiles,
+  getFavoriteLocations,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
@@ -49,6 +50,7 @@ import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
 import { getEnvironmentalSnapshot } from "../environmentalData";
+import { refreshManualFusionForFavorite } from "../manualFusion";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -877,6 +879,15 @@ export const weatherRouter = router({
   getJobs: adminProcedure.query(async () => {
     return getRecentCollectionJobs(20);
   }),
+
+  /** Relance ponctuelle réservée à l’utilisateur propriétaire du lieu favori. */
+  refreshManualFusion: protectedProcedure
+    .input(z.object({ favoriteId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const favorite = (await getFavoriteLocations(ctx.user.id)).find((entry) => entry.id === input.favoriteId);
+      if (!favorite) throw new Error("Ce lieu favori est introuvable ou ne vous appartient pas.");
+      return refreshManualFusionForFavorite(favorite);
+    }),
 
   /**
    * Weather AI Lab — full transparency data for the AI Lab page
