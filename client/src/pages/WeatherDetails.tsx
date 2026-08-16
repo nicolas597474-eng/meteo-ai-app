@@ -148,14 +148,14 @@ export default function WeatherDetails() {
           
           {/* Horizontal scrollable hourly cards */}
           <div ref={hourlyRef} className="overflow-x-auto pb-2 -mx-3 px-3 scrollbar-hide">
-            <div className="flex gap-2" style={{ width: `${hours.length * 140}px` }}>
+            <div className="flex gap-3" style={{ width: `${hours.length * 214}px` }}>
               {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
                 const pTrend = pressureTrend(hours, i);
                 return (
                   <div
                     key={h.hour}
-                    className={`weather-surface-inset flex-shrink-0 w-[138px] rounded-2xl border p-3 transition-colors ${
+                    className={`weather-surface-inset flex-shrink-0 w-[212px] rounded-2xl border p-4 transition-colors ${
                       isNow
                         ? "border-sky-300/60 bg-sky-950/55"
                         : "border-slate-700/70 bg-slate-950/50"
@@ -163,67 +163,67 @@ export default function WeatherDetails() {
                   >
                     {/* Hour + Now badge */}
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className={`text-xs font-bold ${isNow ? "text-blue-400" : "text-white"}`}>{h.hour}</span>
-                      {isNow && <span className="text-[8px] bg-blue-500/30 text-blue-300 px-1.5 py-0.5 rounded-full font-semibold">MAINTENANT</span>}
+                      <span className={`text-base font-bold ${isNow ? "text-blue-400" : "text-white"}`}>{h.hour}</span>
+                      {isNow && <span className="rounded-full bg-blue-500/30 px-2 py-0.5 text-[9px] font-semibold text-blue-300">MAINTENANT</span>}
                     </div>
                     
                     {/* Icon + condition */}
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <MeteoIcon name={getIconNameFromCondition(h.condition)} size={24} />
-                      <span className="text-[9px] text-slate-400 leading-tight">{h.condition ?? "—"}</span>
+                    <div className="mb-2 flex items-center gap-2">
+                      <MeteoIcon name={getIconNameFromCondition(h.condition)} size={32} />
+                      <span className="text-[11px] leading-tight text-slate-300">{h.condition ?? "—"}</span>
                     </div>
                     
                     {/* Temperature */}
-                    <div className="flex items-baseline gap-1 mb-1">
-                      <span className="text-white font-bold text-base">{h.temp?.toFixed(1) ?? "—"}°</span>
-                      <span className="text-slate-500 text-[9px]">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
+                    <div className="mb-2 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-white">{h.temp?.toFixed(1) ?? "—"}°</span>
+                      <span className="text-[11px] text-slate-400">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
                     </div>
                     
                     {/* Precipitation */}
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <MeteoIcon name="precipitation" size={10} />
-                      <span className="text-[9px] text-blue-300">{h.precipProb ?? 0}%</span>
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <MeteoIcon name="precipitation" size={12} />
+                      <span className="text-xs text-blue-300">{h.precipProb ?? 0}%</span>
                       {(h.precipitation ?? 0) > 0 && (
-                        <span className="text-[9px] text-blue-400 font-medium">{h.precipitation?.toFixed(1)} mm</span>
+                        <span className="text-xs font-medium text-blue-400">{h.precipitation?.toFixed(1)} mm</span>
                       )}
-                      {h.precipType && <span className="text-[8px] text-slate-500">({h.precipType === "snow" ? "neige" : h.precipType === "freezing_rain" ? "verglas" : "pluie"})</span>}
+                      {h.precipType && <span className="text-[10px] text-slate-500">({h.precipType === "snow" ? "neige" : h.precipType === "freezing_rain" ? "verglas" : "pluie"})</span>}
                     </div>
                     {h.precipIntensity && (
-                      <span className="text-[8px] text-slate-500 block mb-0.5">Intensité: {h.precipIntensity === "heavy" ? "forte" : h.precipIntensity === "moderate" ? "modérée" : "faible"}</span>
+                      <span className="mb-1 block text-[10px] text-slate-500">Intensité: {h.precipIntensity === "heavy" ? "forte" : h.precipIntensity === "moderate" ? "modérée" : "faible"}</span>
                     )}
                     
                     {/* Humidity + Dew point */}
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <MeteoIcon name="humidity" size={10} />
-                      <span className="text-[9px] text-slate-300">{h.humidity ?? "—"}%</span>
-                      {h.dewPoint != null && <span className="text-[8px] text-slate-500">rosée {h.dewPoint.toFixed(0)}°</span>}
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <MeteoIcon name="humidity" size={12} />
+                      <span className="text-xs text-slate-300">{h.humidity ?? "—"}%</span>
+                      {h.dewPoint != null && <span className="text-[10px] text-slate-500">rosée {h.dewPoint.toFixed(0)}°</span>}
                     </div>
                     
                     {/* Wind */}
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <MeteoIcon name="wind_param" size={10} />
-                      <span className="text-[9px] text-slate-300">{h.windSpeed?.toFixed(0) ?? "—"} km/h</span>
-                      <span className="text-[8px] text-slate-500" style={{ transform: `rotate(${(h.windDirection ?? 0) + 180}deg)`, display: "inline-block" }}>↑</span>
-                      <span className="text-[8px] text-slate-500">{windDirectionLabel(h.windDirection)}</span>
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <MeteoIcon name="wind_param" size={12} />
+                      <span className="text-xs text-slate-300">{h.windSpeed?.toFixed(0) ?? "—"} km/h</span>
+                      <span className="text-[10px] text-slate-500" style={{ transform: `rotate(${(h.windDirection ?? 0) + 180}deg)`, display: "inline-block" }}>↑</span>
+                      <span className="text-[10px] text-slate-500">{windDirectionLabel(h.windDirection)}</span>
                     </div>
                     {h.windGust != null && (
-                      <span className="text-[8px] text-slate-500 block mb-0.5">Rafales: {h.windGust.toFixed(0)} km/h</span>
+                      <span className="mb-1 block text-[10px] text-slate-500">Rafales: {h.windGust.toFixed(0)} km/h</span>
                     )}
                     
                     {/* Pressure */}
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <MeteoIcon name="pressure" size={10} />
-                      <span className="text-[9px] text-slate-300">{h.pressure?.toFixed(0) ?? "—"} hPa</span>
-                      <span className="text-[8px]">{pTrend === "rising" ? "⬆️" : pTrend === "falling" ? "⬇️" : "➡️"}</span>
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <MeteoIcon name="pressure" size={12} />
+                      <span className="text-xs text-slate-300">{h.pressure?.toFixed(0) ?? "—"} hPa</span>
+                      <span className="text-[10px]">{pTrend === "rising" ? "⬆️" : pTrend === "falling" ? "⬇️" : "➡️"}</span>
                     </div>
                     
                     {/* Cloud layers */}
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <MeteoIcon name="cloud_cover" size={10} />
-                      <span className="text-[9px] text-slate-300">{h.cloudCover ?? "—"}%</span>
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <MeteoIcon name="cloud_cover" size={12} />
+                      <span className="text-xs text-slate-300">{h.cloudCover ?? "—"}%</span>
                     </div>
                     {(h.cloudLow != null || h.cloudMid != null || h.cloudHigh != null) && (
-                      <div className="text-[8px] text-slate-500 flex gap-1.5 mb-0.5">
+                      <div className="mb-1 flex gap-1.5 text-[10px] text-slate-500">
                         {h.cloudLow != null && <span>Bas {h.cloudLow}%</span>}
                         {h.cloudMid != null && <span>Moy {h.cloudMid}%</span>}
                         {h.cloudHigh != null && <span>Haut {h.cloudHigh}%</span>}
@@ -232,25 +232,25 @@ export default function WeatherDetails() {
                     
                     {/* Visibility */}
                     {h.visibility != null && (
-                      <div className="text-[8px] text-slate-500 mb-0.5">Visibilité: {h.visibility} km</div>
+                      <div className="mb-1 text-[10px] text-slate-500">Visibilité: {h.visibility} km</div>
                     )}
                     
                     {/* UV */}
                     {h.uvIndex != null && h.uvIndex > 0 && (
-                      <div className="text-[8px] text-slate-500 mb-0.5">UV: {h.uvIndex.toFixed(0)}</div>
+                      <div className="mb-1 text-[10px] text-slate-500">UV: {h.uvIndex.toFixed(0)}</div>
                     )}
                     
                     {/* Solar radiation */}
                     {h.solarRadiation != null && h.solarRadiation > 0 && (
-                      <div className="text-[8px] text-slate-500 mb-0.5">Rayonnement: {h.solarRadiation.toFixed(0)} W/m²</div>
+                      <div className="mb-1 text-[10px] text-slate-500">Rayonnement: {h.solarRadiation.toFixed(0)} W/m²</div>
                     )}
                     
                     {/* Régime opérationnel partagé */}
                     {regime && (
                       <div className="mt-1 pt-1 border-t border-slate-700/50">
                         <div className="flex items-center gap-1">
-                          <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={10} />
-                          <span className="text-[8px] text-slate-400">{regime.primary.label}</span>
+                          <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={12} />
+                          <span className="text-[10px] text-slate-400">{regime.primary.label}</span>
                         </div>
                       </div>
                     )}
@@ -511,26 +511,32 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const min = Math.min(...validValues);
   const max = Math.max(...validValues);
   const range = max - min || 1;
-  const chartH = 120;
-  const chartW = Math.max(600, hours.length * 28);
+  const chartH = 148;
+  const chartW = Math.max(720, hours.length * 68);
 
-  const points = values.map((v, i) => {
+  const points = values.map((v, hourIndex) => {
     if (v == null) return null;
-    const x = (i / (hours.length - 1)) * chartW;
+    const x = (hourIndex / (hours.length - 1)) * chartW;
     const y = chartH - ((v - min) / range) * (chartH - 20) - 10;
-    return { x, y, v };
-  }).filter(Boolean) as { x: number; y: number; v: number }[];
+    return { x, y, v, hourIndex };
+  }).filter(Boolean) as { x: number; y: number; v: number; hourIndex: number }[];
 
   const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
   const color = getColor();
 
   return (
     <div className="overflow-x-auto scrollbar-hide">
-      <svg width={chartW} height={chartH + 30} className="min-w-full">
+      <svg width={chartW} height={chartH + 34} className="min-w-full">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
           <line key={pct} x1={0} x2={chartW} y1={chartH - pct * (chartH - 20) - 10} y2={chartH - pct * (chartH - 20) - 10} stroke="#1e293b" strokeWidth="1" />
         ))}
+
+        {/* Repères pour chaque heure afin de relier précisément valeurs et courbe. */}
+        {hours.map((_, i) => {
+          const x = (i / (hours.length - 1)) * chartW;
+          return <line key={`hour-grid-${i}`} x1={x} x2={x} y1={0} y2={chartH} stroke="#334155" strokeWidth="0.5" opacity="0.45" />;
+        })}
         
         {/* Current hour indicator */}
         {currentIdx < hours.length && (
@@ -546,24 +552,22 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         
         {/* Points */}
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={i === currentIdx ? 4 : 2.5} fill={color} stroke={i === currentIdx ? "#fff" : "none"} strokeWidth={i === currentIdx ? 1.5 : 0} />
+        {points.map((p) => (
+          <circle key={p.hourIndex} cx={p.x} cy={p.y} r={p.hourIndex === currentIdx ? 4 : 2.5} fill={color} stroke={p.hourIndex === currentIdx ? "#fff" : "none"} strokeWidth={p.hourIndex === currentIdx ? 1.5 : 0} />
         ))}
         
-        {/* Labels every 3h */}
+        {/* Chaque heure est libellée : le défilement horizontal conserve la lisibilité. */}
         {hours.map((h: any, i: number) => {
-          if (i % 3 !== 0) return null;
           const x = (i / (hours.length - 1)) * chartW;
           return (
-            <text key={i} x={x} y={chartH + 16} textAnchor="middle" fill="#64748b" fontSize="9">{h.hour}</text>
+            <text key={i} x={x} y={chartH + 18} textAnchor="middle" fill={i === currentIdx ? "#93c5fd" : "#94a3b8"} fontSize="10" fontWeight={i === currentIdx ? "700" : "500"}>{h.hour}</text>
           );
         })}
         
-        {/* Value labels every 4h */}
-        {points.map((p, i) => {
-          if (i % 4 !== 0) return null;
+        {/* Valeur sélectionnée au-dessus de chaque heure. */}
+        {points.map((p) => {
           return (
-            <text key={i} x={p.x} y={p.y - 8} textAnchor="middle" fill={color} fontSize="8" fontWeight="bold">
+            <text key={`value-${p.hourIndex}`} x={p.x} y={p.y - 9} textAnchor="middle" fill={color} fontSize="10" fontWeight="bold">
               {type === "pressure" ? p.v.toFixed(0) : p.v.toFixed(1)}
             </text>
           );
@@ -572,6 +576,38 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
       <div className="flex justify-between mt-1">
         <span className="text-[9px] text-slate-500">Min: {min.toFixed(1)} {getUnit()}</span>
         <span className="text-[9px] text-slate-500">Max: {max.toFixed(1)} {getUnit()}</span>
+      </div>
+
+      <div className="mt-3 border-t border-slate-700/70 pt-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold text-slate-200">Détails par heure</p>
+          <p className="text-[10px] text-slate-400">Temp. · ressenti · vent · pluie · humidité · pression</p>
+        </div>
+        <div className="overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 pb-1" style={{ width: `${hours.length * 176}px` }}>
+            {hours.map((h: any, i: number) => {
+              const selectedValue = getValue(h);
+              return (
+                <div key={`detail-${h.hour}-${i}`} className={`w-[170px] flex-shrink-0 rounded-xl border p-2.5 ${i === currentIdx ? "border-sky-300/70 bg-sky-950/50" : "border-slate-700/70 bg-slate-950/40"}`}>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-bold text-white">{h.hour}</span>
+                    <span className="text-xs font-semibold" style={{ color }}>{selectedValue == null ? "—" : `${type === "pressure" ? selectedValue.toFixed(0) : selectedValue.toFixed(1)} ${getUnit()}`}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-slate-300">
+                    <span>Temp. <b className="text-white">{h.temp?.toFixed(1) ?? "—"}°</b></span>
+                    <span>Ress. <b className="text-white">{h.apparentTemp?.toFixed(1) ?? "—"}°</b></span>
+                    <span>Vent <b className="text-white">{h.windSpeed?.toFixed(0) ?? "—"}</b> km/h</span>
+                    <span>Raf. <b className="text-white">{h.windGust?.toFixed(0) ?? "—"}</b> km/h</span>
+                    <span>Pluie <b className="text-blue-300">{h.precipitation?.toFixed(1) ?? "—"}</b> mm</span>
+                    <span>Prob. <b className="text-blue-300">{h.precipProb ?? "—"}%</b></span>
+                    <span>Hum. <b className="text-white">{h.humidity ?? "—"}%</b></span>
+                    <span>Press. <b className="text-white">{h.pressure?.toFixed(0) ?? "—"}</b></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

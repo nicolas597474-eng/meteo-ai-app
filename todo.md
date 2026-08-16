@@ -1451,3 +1451,9 @@
 - [x] Stations: Archiver les relevés réellement disponibles des stations physiques, avec statut explicite si une source ne répond pas.
 - [x] Fiabilité: Vérifier l’idempotence, les garde-fous de date et la traçabilité de chaque exécution.
 - [x] Validation: Tester, contrôler les journaux du planificateur et publier la collecte renforcée.
+
+## Lisibilité horaire des prévisions détaillées
+- [x] Audit: Identifier les données horaires fiables déjà présentes dans les cartes et le graphique.
+- [x] Interface: Agrandir les cartes horaires, leurs libellés et leurs mesures principales pour le mobile.
+- [x] Graphique: Afficher les détails disponibles par heure sans inventer ni surcharger les données.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
