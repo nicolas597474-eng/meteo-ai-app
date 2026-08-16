@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getLaboratoryHorizon,
+  getProvisionalEvidenceScore,
   getStatisticalConfidence,
   LABORATORY_SCORE_WEIGHT_TOTAL,
   LABORATORY_SCORE_WEIGHTS,
@@ -34,6 +35,12 @@ describe("weatherReliabilityConfig", () => {
     expect(getStatisticalConfidence({ comparisons: 18, evaluatedDays: 2 }).level).toBe("low");
     expect(getStatisticalConfidence({ comparisons: 72, evaluatedDays: 7 }).level).toBe("medium");
     expect(getStatisticalConfidence({ comparisons: 180, evaluatedDays: 30 }).level).toBe("high");
+  });
+
+  it("mesure la couverture provisoire sans la confondre avec une performance de modèle", () => {
+    expect(getProvisionalEvidenceScore({ comparisons: 43, evaluatedDays: 2 })).toBe(29);
+    expect(getProvisionalEvidenceScore({ comparisons: 72, evaluatedDays: 7 })).toBe(100);
+    expect(getStatisticalConfidence({ comparisons: 43, evaluatedDays: 2 }).evidenceScore).toBe(29);
   });
 
   it("n’assimile pas les horizons non archivés séparément à un horizon voisin", () => {

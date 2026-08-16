@@ -33,6 +33,21 @@ export const STATISTICAL_CONFIDENCE_THRESHOLDS = {
   highComparableDays: 30,
 } as const;
 
+/**
+ * Note de couverture des preuves : elle mesure uniquement la maturité de
+ * l’échantillon avant le classement validé, jamais la performance prédictive.
+ */
+export function getProvisionalEvidenceScore(input: {
+  comparisons: number | null | undefined;
+  evaluatedDays: number | null | undefined;
+}): number {
+  const comparisons = Math.max(0, Number(input.comparisons ?? 0));
+  const evaluatedDays = Math.max(0, Number(input.evaluatedDays ?? 0));
+  const comparisonCoverage = comparisons / STATISTICAL_CONFIDENCE_THRESHOLDS.mediumComparisons;
+  const durationCoverage = evaluatedDays / STATISTICAL_CONFIDENCE_THRESHOLDS.mediumComparableDays;
+  return Math.round(Math.max(0, Math.min(1, comparisonCoverage, durationCoverage)) * 100);
+}
+
 export type StatisticalConfidenceLevel = "insufficient" | "low" | "medium" | "high";
 
 export type StatisticalConfidence = {
@@ -41,6 +56,7 @@ export type StatisticalConfidence = {
   tone: "red" | "yellow" | "green";
   isRankable: boolean;
   minimumMissing: number;
+  evidenceScore: number;
 };
 
 export function getStatisticalConfidence(input: {
@@ -50,6 +66,7 @@ export function getStatisticalConfidence(input: {
   const comparisons = Math.max(0, Number(input.comparisons ?? 0));
   const evaluatedDays = Math.max(0, Number(input.evaluatedDays ?? 0));
   const minimumMissing = Math.max(0, MINIMUM_RELIABILITY_COMPARISONS - comparisons);
+  const evidenceScore = getProvisionalEvidenceScore({ comparisons, evaluatedDays });
 
   if (
     comparisons < MINIMUM_RELIABILITY_COMPARISONS
@@ -61,6 +78,7 @@ export function getStatisticalConfidence(input: {
       tone: "red",
       isRankable: false,
       minimumMissing,
+      evidenceScore,
     };
   }
 
@@ -74,6 +92,7 @@ export function getStatisticalConfidence(input: {
       tone: "red",
       isRankable: true,
       minimumMissing: 0,
+      evidenceScore,
     };
   }
 
@@ -87,6 +106,7 @@ export function getStatisticalConfidence(input: {
       tone: "yellow",
       isRankable: true,
       minimumMissing: 0,
+      evidenceScore,
     };
   }
 
@@ -96,6 +116,7 @@ export function getStatisticalConfidence(input: {
     tone: "green",
     isRankable: true,
     minimumMissing: 0,
+    evidenceScore,
   };
 }
 

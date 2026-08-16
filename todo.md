@@ -1551,3 +1551,9 @@
 - [x] Infrastructure: Définir des couloirs communs qui éloignent les chiffres des courbes.
 - [x] Interface: Appliquer le placement harmonisé aux deux graphiques.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build.
+
+## Notes provisoires de fiabilité
+- [x] Audit: Identifier les comparaisons et jours archivés disponibles par modèle.
+- [x] Méthode: Définir une note provisoire explicable fondée sur le volume de preuves, sans classement validé.
+- [x] Interface: Afficher la note et son statut provisoire dans les tendances Température, Pluie et Vent.
+- [x] Validation: Vérifier les libellés, TypeScript, Vitest et build.
