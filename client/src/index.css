@@ -113,6 +113,29 @@
   --sidebar-ring: oklch(0.55 0.18 250);
 }
 
+/* Référence globale : bleu lumineux du contrôle « 30 jours ». */
+:root,
+.dark {
+  --weather-blue-30d: oklch(0.68 0.16 235);
+  --weather-blue-30d-strong: oklch(0.61 0.17 235);
+  --weather-blue-30d-soft: oklch(0.30 0.09 235);
+  --primary: var(--weather-blue-30d);
+  --sidebar-primary: var(--weather-blue-30d);
+  --background: oklch(0.18 0.055 240);
+  --card: oklch(0.27 0.085 238);
+  --popover: oklch(0.27 0.085 238);
+  --secondary: oklch(0.31 0.075 238);
+  --muted: oklch(0.28 0.06 238);
+  --accent: oklch(0.34 0.095 235);
+  --border: oklch(0.44 0.095 238);
+  --input: oklch(0.32 0.075 238);
+  --ring: var(--weather-blue-30d);
+  --sidebar: oklch(0.22 0.07 238);
+  --sidebar-accent: oklch(0.34 0.095 235);
+  --sidebar-border: oklch(0.44 0.095 238);
+  --sidebar-ring: var(--weather-blue-30d);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -235,6 +258,21 @@ img.moon-3d-first-crescent {
   border-color: rgba(71, 146, 214, 0.24);
 }
 
+.weather-surface-hero {
+  background: linear-gradient(145deg, rgba(29, 158, 232, 0.58) 0%, rgba(8, 99, 176, 0.80) 64%, rgba(4, 61, 125, 0.94) 100%);
+  border-color: rgba(105, 216, 255, 0.55);
+}
+
+.weather-surface-accent {
+  background: linear-gradient(145deg, rgba(21, 153, 232, 0.56) 0%, rgba(5, 81, 153, 0.92) 100%);
+  border-color: rgba(105, 216, 255, 0.55);
+}
+
+.weather-surface-lab {
+  background: linear-gradient(145deg, rgba(23, 147, 225, 0.52) 0%, rgba(5, 73, 145, 0.94) 100%);
+  border-color: rgba(79, 198, 255, 0.48);
+}
+
 [class~="bg-[#10131a]"] {
   background: var(--weather-surface-base);
   border-color: rgba(100, 140, 177, 0.19);
@@ -316,6 +354,65 @@ img.moon-3d-first-crescent {
   background-image: linear-gradient(145deg, rgba(6, 22, 42, 0.80), rgba(4, 13, 26, 0.94)), var(--page-weather-sky-image) !important;
   background-position: center;
   background-size: cover;
+}
+
+/* Les pages météo partagent désormais le même bleu clair que le filtre actif. */
+.weather-page-sky {
+  background-color: #075d9e !important;
+  background-image: linear-gradient(145deg, rgba(10, 142, 222, 0.82), rgba(4, 80, 156, 0.94)), var(--page-weather-sky-image) !important;
+}
+
+.weather-page-sky .weather-surface,
+.weather-page-sky .weather-surface-hero,
+.weather-page-sky .weather-surface-lab,
+.weather-page-sky .weather-observation-surface,
+.weather-page-sky .weather-action-surface {
+  background-image: linear-gradient(145deg, rgba(21, 150, 226, 0.96), rgba(4, 79, 153, 0.99)) !important;
+  border-color: rgba(101, 218, 255, 0.46) !important;
+}
+
+.weather-page-sky button[class*="bg-sky-400/15"],
+.weather-page-sky button[class*="bg-violet-400/15"],
+.weather-page-sky button[class*="bg-blue-600"],
+.weather-page-sky button[class*="ring-sky-400"] {
+  border-color: var(--primary) !important;
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  box-shadow: none !important;
+}
+
+.weather-page-sky [class~="bg-[#10131a]"],
+.weather-page-sky [class~="bg-[#090b10]"],
+.weather-page-sky [class~="bg-[#080c13]"],
+.weather-page-sky [class~="bg-[#0d131d]"] {
+  background-image: linear-gradient(145deg, rgba(8, 85, 156, 0.98), rgba(3, 48, 108, 0.99)) !important;
+  border-color: rgba(101, 218, 255, 0.52) !important;
+}
+
+.weather-page-sky .text-slate-500 {
+  color: rgba(214, 241, 255, 0.74) !important;
+}
+
+.weather-page-sky .text-slate-400 {
+  color: rgba(225, 246, 255, 0.84) !important;
+}
+
+.weather-page-sky .text-slate-300 {
+  color: rgba(239, 250, 255, 0.92) !important;
+}
+
+/* Le Dashboard conserve volontairement son habillage antérieur. */
+.dashboard-weather-page {
+  --primary: oklch(0.55 0.18 250);
+  --background: oklch(0.13 0.015 250);
+  --card: oklch(0.17 0.02 250);
+  --popover: oklch(0.17 0.02 250);
+  --secondary: oklch(0.22 0.02 250);
+  --muted: oklch(0.22 0.015 250);
+  --accent: oklch(0.22 0.02 250);
+  --border: oklch(0.28 0.02 250);
+  --input: oklch(0.25 0.02 250);
+  --ring: oklch(0.55 0.18 250);
 }
 
 /* Icônes météo vivantes : les mouvements sont désactivés lorsque l’utilisateur le demande. */

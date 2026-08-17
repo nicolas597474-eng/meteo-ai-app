@@ -1743,3 +1743,10 @@
 - [x] Interface: Conserver « Phénomène actuel · Bruine » sur une ligne mobile et placer l’évolution horaire sur la ligne suivante.
 - [x] Interface: Donner à la ligne d’évolution la même taille de lecture que le phénomène actuel.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Harmonisation globale bleu lumineux « 30 jours »
+- [x] Audit: Relever les accents, surfaces et bordures de toutes les pages à harmoniser.
+- [x] Design system: Définir des jetons partagés inspirés du bleu lumineux du bouton « 30 jours ».
+- [x] Interface: Appliquer les nouvelles surfaces et accents aux pages hors Dashboard : Fiabilité, Stations, Historique, AI Lab, Prévisions détaillées et réglages.
+- [x] Contrainte: Préserver le Dashboard dans son apparence antérieure, sans le soumettre au nouvel habillage bleu lumineux.
+- [x] Validation: Vérifier contrastes, rendus mobile/desktop, TypeScript, Vitest et build avant publication.
