@@ -1693,3 +1693,8 @@
 - [x] Direction: Définir un style éditorial plus épuré, limité à cette page.
 - [x] Interface: Recomposer l’en-tête, les contrôles et les cartes sans modifier les autres pages.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Direction immersive des prévisions détaillées
+- [x] Direction: Définir une composition météo plus immersive, limitée à cette page.
+- [x] Interface: Recomposer les repères de temps, les cartes horaires et les modules de prévisions.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
