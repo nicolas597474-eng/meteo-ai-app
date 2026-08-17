@@ -123,7 +123,9 @@ interface MapViewProps {
   initialCenter?: google.maps.LatLngLiteral;
   initialZoom?: number;
   mapTypeId?: google.maps.MapTypeId | string;
+  streetViewControl?: boolean;
   onMapReady?: (map: google.maps.Map) => void;
+  onFullscreenChange?: (isFullscreen: boolean, map: google.maps.Map | null) => void;
 }
 
 export function MapView({
@@ -131,7 +133,9 @@ export function MapView({
   initialCenter = { lat: 37.7749, lng: -122.4194 },
   initialZoom = 12,
   mapTypeId = "roadmap",
+  streetViewControl = true,
   onMapReady,
+  onFullscreenChange,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
@@ -153,7 +157,7 @@ export function MapView({
         mapTypeControl: true,
         fullscreenControl: true,
         zoomControl: true,
-        streetViewControl: true,
+        streetViewControl,
         mapId: "DEMO_MAP_ID",
       });
       onMapReady?.(map.current);
@@ -168,6 +172,13 @@ export function MapView({
   useEffect(() => {
     init();
   }, [init]);
+
+  useEffect(() => {
+    if (!onFullscreenChange) return;
+    const reportFullscreen = () => onFullscreenChange(Boolean(document.fullscreenElement), map.current);
+    document.addEventListener("fullscreenchange", reportFullscreen);
+    return () => document.removeEventListener("fullscreenchange", reportFullscreen);
+  }, [onFullscreenChange]);
 
   if (loadError) {
     return (

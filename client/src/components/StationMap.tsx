@@ -113,11 +113,15 @@ export function StationMap({
           initialCenter={{ lat: center.lat, lng: center.lon }}
           initialZoom={stations.length > 0 ? 11 : 10}
           mapTypeId="satellite"
+          streetViewControl={false}
           onMapReady={(map) => {
             mapRef.current = map;
             streetViewRef.current = map.getStreetView();
             renderMarkers(map);
             setMapReady(true);
+          }}
+          onFullscreenChange={(isFullscreen, map) => {
+            map?.setOptions({ streetViewControl: isFullscreen });
           }}
         />
         {!mapReady && (

@@ -1854,3 +1854,8 @@
 - [x] Interface: Afficher une infobulle détaillée au clic sur un marqueur de station.
 - [x] Contrainte: Ne présenter que les valeurs et motifs réellement retournés par les données de station.
 - [x] Validation: Vérifier les interactions, TypeScript, Vitest et build avant publication.
+
+## Street View uniquement en carte agrandie
+- [x] Audit: Vérifier le contrôle Street View et l’événement d’agrandissement de la carte.
+- [x] Interface: Masquer Street View dans la carte compacte et l’activer en plein écran.
+- [x] Validation: Vérifier les contrôles, TypeScript, Vitest et build avant publication.
