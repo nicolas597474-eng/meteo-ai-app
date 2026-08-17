@@ -9,6 +9,9 @@ describe("fonds de ciel partagés", () => {
     expect(styles).toContain(".weather-page-sky");
     expect(styles).toContain("--page-weather-sky-image");
     expect(styles).toContain("sky-pack-sunny_1500b9a0.jpg");
+    expect(styles).toContain(".weather-page-sky h1");
+    expect(styles).toContain("button[class*=\"bg-sky-400/15\"]");
+    expect(styles).toContain("border-violet");
   });
 
   it("active cette couche sur les cinq pages météo principales", () => {

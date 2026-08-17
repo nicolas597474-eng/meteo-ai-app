@@ -1743,3 +1743,10 @@
 - [x] Interface: Conserver « Phénomène actuel · Bruine » sur une ligne mobile et placer l’évolution horaire sur la ligne suivante.
 - [x] Interface: Donner à la ligne d’évolution la même taille de lecture que le phénomène actuel.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Typographie et boutons calqués sur le Dashboard
+- [x] Audit: Identifier les échelles typographiques, boutons, bordures et états bleu-cyan/vert du Dashboard.
+- [x] Design system: Créer des styles partagés pour titres, libellés, boutons actifs et données locales fiables.
+- [x] Interface: Appliquer ces styles aux pages Fiabilité, Stations, Historique, AI Lab, Prévisions détaillées et réglages.
+- [x] Contrainte: Utiliser uniquement le bleu-cyan et le vert local pour les éléments non sémantiques, sans modifier le Dashboard.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
