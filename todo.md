@@ -1750,3 +1750,9 @@
 - [x] Interface: Appliquer ces styles aux pages Fiabilité, Stations, Historique, AI Lab, Prévisions détaillées et réglages.
 - [x] Contrainte: Utiliser uniquement le bleu-cyan et le vert local pour les éléments non sémantiques, sans modifier le Dashboard.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Villes favorites : typographie et température actuelle
+- [x] Audit: Identifier la barre des favoris et la source fiable de température pour chaque lieu.
+- [x] Interface: Harmoniser les libellés des villes avec le Dashboard et afficher la température actuelle dans chaque favori.
+- [x] Contrainte: Ne jamais afficher une température inventée ; afficher un état explicite lorsqu’elle est indisponible.
+- [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.

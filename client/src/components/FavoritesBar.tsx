@@ -214,33 +214,44 @@ export function FavoritesBar({
           className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
           style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
         >
-          {locations.map((loc) => (
-            <button
-              key={loc.id}
-            onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full border whitespace-nowrap text-xs font-medium transition-all flex-shrink-0 ${
-                isActive(loc)
-                  ? "bg-primary/20 border-primary text-primary"
-                  : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-              }`}
-            >
-              {loc.type === "current" ? (
-                <Navigation className="h-3 w-3" />
-              ) : (
-                <Star className={`h-3 w-3 ${isActive(loc) ? "fill-primary" : ""}`} />
-              )}
-              <span className="max-w-[100px] truncate">{loc.name}</span>
-              {prefetchedWeather?.get(loc.id)?.temp != null && (
-                <span className="text-xs font-bold ml-0.5">{Math.round(prefetchedWeather.get(loc.id)!.temp!)}°</span>
-              )}
-            </button>
-          ))}
+          {locations.map((loc) => {
+            const weather = prefetchedWeather?.get(loc.id);
+            const hasCurrentTemperature = weather?.temp != null;
+            const showsTemperature = loc.type === "favorite";
+
+            return (
+              <button
+                key={loc.id}
+                onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })}
+                className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 whitespace-nowrap transition-all ${
+                  isActive(loc)
+                    ? "border-primary/70 bg-primary/15 text-primary"
+                    : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                }`}
+              >
+                {loc.type === "current" ? (
+                  <Navigation className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Star className={`h-4 w-4 shrink-0 ${isActive(loc) ? "fill-primary" : ""}`} />
+                )}
+                <span className="max-w-[118px] truncate text-[13px] font-semibold tracking-tight">{loc.name}</span>
+                {showsTemperature && (
+                  <span
+                    className={`ml-0.5 text-sm font-bold tabular-nums ${hasCurrentTemperature ? "text-sky-200" : "text-slate-500"}`}
+                    aria-label={hasCurrentTemperature ? `Température actuelle : ${Math.round(weather!.temp!)} degrés` : "Température actuelle indisponible"}
+                  >
+                    {hasCurrentTemperature ? `${Math.round(weather!.temp!)}°` : "—"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
 
           {/* Add button — always visible if under 5 favorites */}
           {totalFavCount < 5 && (
             <button
               onClick={() => setShowAddDialog(true)}
-              className="flex items-center gap-1 px-3 py-2 rounded-full border-2 border-dashed border-primary/40 text-primary hover:border-primary hover:bg-primary/10 text-xs font-semibold transition-all flex-shrink-0"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-primary/40 px-3.5 py-2 text-[13px] font-semibold tracking-tight text-primary transition-all hover:border-primary hover:bg-primary/10"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Ajouter un lieu</span>
@@ -251,7 +262,7 @@ export function FavoritesBar({
           {totalFavCount > 0 && user && (
             <Link
               href="/favorites"
-              className="flex items-center gap-1 px-2.5 py-2 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 text-xs transition-all flex-shrink-0"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-2 text-[13px] font-semibold text-muted-foreground transition-all hover:border-primary/50 hover:text-foreground"
             >
               <Settings className="h-3 w-3" />
             </Link>
@@ -264,8 +275,8 @@ export function FavoritesBar({
             {locations.map((loc) => (
               <div
                 key={loc.id}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${
-                  isActive(loc) ? "bg-primary w-4" : "bg-muted-foreground/30"
+                  className={`h-1.5 w-1.5 rounded-full transition-all ${
+                  isActive(loc) ? "w-4 bg-primary" : "bg-muted-foreground/30"
                 }`}
               />
             ))}

@@ -183,7 +183,7 @@ export default function Dashboard() {
     for (const pf of preloadedForecasts) {
       if (pf.forecast) {
         map.set(`fav-${pf.favoriteId}`, {
-          temp: pf.forecast.tempCurrent ?? pf.forecast.tempMax,
+          temp: pf.forecast.tempCurrent ?? null,
           condition: pf.forecast.condition,
           confidenceScore: pf.forecast.confidenceScore,
         });
