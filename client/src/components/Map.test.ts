@@ -10,6 +10,9 @@ describe("repli de cartographie", () => {
     const source = await import("node:fs").then(({ readFileSync }) => readFileSync(new URL("./Map.tsx", import.meta.url), "utf8"));
     expect(source).toContain("streetViewControl?: boolean");
     expect(source).toContain("rotateControl?: boolean");
+    expect(source).toContain("mapTypeControl?: boolean");
+    expect(source).toContain("fullscreenControl?: boolean");
+    expect(source).toContain("zoomControl?: boolean");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
   });

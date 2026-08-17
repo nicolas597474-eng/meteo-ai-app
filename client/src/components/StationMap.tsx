@@ -114,6 +114,9 @@ export function StationMap({
           initialCenter={{ lat: center.lat, lng: center.lon }}
           initialZoom={stations.length > 0 ? 11 : 10}
           mapTypeId="satellite"
+          mapTypeControl={false}
+          fullscreenControl={true}
+          zoomControl={false}
           streetViewControl={false}
           rotateControl={false}
           onMapReady={(map) => {
@@ -133,7 +136,13 @@ export function StationMap({
             setMapReady(true);
           }}
           onFullscreenChange={(isFullscreen, map) => {
-            map?.setOptions({ streetViewControl: isFullscreen, rotateControl: isFullscreen });
+            map?.setOptions({
+              mapTypeControl: isFullscreen,
+              fullscreenControl: !isFullscreen,
+              zoomControl: false,
+              streetViewControl: false,
+              rotateControl: false,
+            });
             if (fullscreenCloseControlRef.current) {
               fullscreenCloseControlRef.current.style.display = isFullscreen ? "flex" : "none";
             }

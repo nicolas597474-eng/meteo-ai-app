@@ -1865,3 +1865,9 @@
 - [x] Interface: Réserver les contrôles directionnels à la carte agrandie.
 - [x] Interface: Ajouter un bouton pour fermer facilement la carte en plein écran.
 - [x] Validation: Vérifier les contrôles, TypeScript, Vitest et build avant publication.
+
+## Contrôles Plan et Satellite uniquement
+- [x] Audit: Identifier les contrôles de carte visibles dans les vues compacte et plein écran.
+- [x] Interface: Masquer les contrôles supplémentaires en vue compacte.
+- [x] Interface: Afficher uniquement Plan et Satellite dans la vue agrandie.
+- [x] Validation: Vérifier les contrôles, TypeScript, Vitest et build avant publication.

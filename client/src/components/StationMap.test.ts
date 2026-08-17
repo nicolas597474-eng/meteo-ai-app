@@ -12,8 +12,11 @@ describe("carte des stations", () => {
     expect(source).not.toContain('absolute right-2 top-2 min-h-10');
     expect(source).toContain("streetViewControl={false}");
     expect(source).toContain("rotateControl={false}");
-    expect(source).toContain("streetViewControl: isFullscreen");
-    expect(source).toContain("rotateControl: isFullscreen");
+    expect(source).toContain("mapTypeControl: isFullscreen");
+    expect(source).toContain("fullscreenControl: !isFullscreen");
+    expect(source).toContain("zoomControl: false");
+    expect(source).toContain("streetViewControl: false");
+    expect(source).toContain("rotateControl: false");
     expect(source).toContain("Fermer la carte");
     expect(source).toContain("function stationInfoHtml");
     expect(source).toContain("new google.maps.InfoWindow()");

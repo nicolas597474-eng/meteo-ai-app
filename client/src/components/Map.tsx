@@ -123,6 +123,9 @@ interface MapViewProps {
   initialCenter?: google.maps.LatLngLiteral;
   initialZoom?: number;
   mapTypeId?: google.maps.MapTypeId | string;
+  mapTypeControl?: boolean;
+  fullscreenControl?: boolean;
+  zoomControl?: boolean;
   streetViewControl?: boolean;
   rotateControl?: boolean;
   onMapReady?: (map: google.maps.Map) => void;
@@ -134,6 +137,9 @@ export function MapView({
   initialCenter = { lat: 37.7749, lng: -122.4194 },
   initialZoom = 12,
   mapTypeId = "roadmap",
+  mapTypeControl = true,
+  fullscreenControl = true,
+  zoomControl = true,
   streetViewControl = true,
   rotateControl = true,
   onMapReady,
@@ -156,9 +162,9 @@ export function MapView({
         zoom: initialZoom,
         center: initialCenter,
         mapTypeId,
-        mapTypeControl: true,
-        fullscreenControl: true,
-        zoomControl: true,
+        mapTypeControl,
+        fullscreenControl,
+        zoomControl,
         streetViewControl,
         rotateControl,
         mapId: "DEMO_MAP_ID",
