@@ -61,8 +61,8 @@ export function StationMap({
   const markersRef = useRef<google.maps.Marker[]>([]);
   const streetViewRef = useRef<google.maps.StreetViewPanorama | null>(null);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-  const fullscreenCloseControlRef = useRef<HTMLButtonElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
     if (!mapRef.current) return;
@@ -114,52 +114,78 @@ export function StationMap({
     if (mapRef.current) renderMarkers(mapRef.current);
   }, [renderMarkers]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setOptions({
+      mapTypeControl: isExpanded,
+      mapTypeControlOptions: isExpanded ? {
+        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE],
+      } : undefined,
+      fullscreenControl: false,
+      zoomControl: false,
+      streetViewControl: isExpanded,
+      rotateControl: false,
+    });
+    window.setTimeout(() => google.maps.event.trigger(map, "resize"), 0);
+  }, [isExpanded]);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        streetViewRef.current?.setVisible(false);
+        setIsExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isExpanded]);
+
   return (
-    <div className="space-y-2">
-      <div className="relative h-52 overflow-hidden rounded-xl border border-slate-800 bg-[#090b10]">
+    <div className={isExpanded ? "fixed inset-0 z-[200] bg-[#070b13]" : "space-y-2"}>
+      <div className={`relative overflow-hidden bg-[#090b10] ${isExpanded ? "h-[100dvh] border-0" : "h-52 rounded-xl border border-slate-800"}`}>
         <MapView
           className="h-full w-full"
           initialCenter={{ lat: center.lat, lng: center.lon }}
           initialZoom={stations.length > 0 ? 11 : 10}
           mapTypeId="satellite"
           mapTypeControl={false}
-          fullscreenControl={true}
+          fullscreenControl={false}
           zoomControl={false}
           streetViewControl={false}
           rotateControl={false}
           onMapReady={(map) => {
             mapRef.current = map;
             streetViewRef.current = map.getStreetView();
-            const closeControl = document.createElement("button");
-            closeControl.type = "button";
-            closeControl.textContent = "✕ Fermer la carte";
-            closeControl.setAttribute("aria-label", "Fermer la carte agrandie");
-            closeControl.style.cssText = "display:none;margin:10px;padding:9px 12px;border:1px solid #7dd3fc;border-radius:8px;background:#071018;color:#e0f2fe;font:600 12px system-ui,sans-serif;cursor:pointer;";
-            closeControl.onclick = () => {
-              if (document.fullscreenElement) void document.exitFullscreen();
-            };
-            map.controls[google.maps.ControlPosition.TOP_LEFT].push(closeControl);
-            fullscreenCloseControlRef.current = closeControl;
             renderMarkers(map);
             setMapReady(true);
           }}
-          onFullscreenChange={(isFullscreen, map) => {
-            map?.setOptions({
-              mapTypeControl: isFullscreen,
-              mapTypeControlOptions: isFullscreen ? {
-                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE],
-              } : undefined,
-              fullscreenControl: !isFullscreen,
-              zoomControl: false,
-              streetViewControl: isFullscreen,
-              rotateControl: false,
-            });
-            if (fullscreenCloseControlRef.current) {
-              fullscreenCloseControlRef.current.style.display = isFullscreen ? "flex" : "none";
-            }
-          }}
         />
+        {mapReady && !isExpanded && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            aria-label="Agrandir la carte"
+            className="absolute right-2 top-2 min-h-9 rounded-md border border-sky-300/80 bg-[#071018]/95 px-2.5 text-[11px] font-semibold text-sky-100 shadow-none"
+          >
+            Agrandir la carte
+          </button>
+        )}
+        {isExpanded && (
+          <button
+            type="button"
+            onClick={() => {
+              streetViewRef.current?.setVisible(false);
+              setIsExpanded(false);
+            }}
+            aria-label="Fermer la carte agrandie"
+            className="absolute right-3 top-3 z-10 min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-sm font-semibold text-sky-100 shadow-none"
+          >
+            ✕ Fermer la carte
+          </button>
+        )}
         {!mapReady && (
           <div className="absolute inset-0 grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.16),transparent_34%),linear-gradient(rgba(30,41,59,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(30,41,59,0.32)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px]">
             <div className="absolute h-36 w-36 rounded-full border border-blue-500/20" />
@@ -169,7 +195,7 @@ export function StationMap({
           </div>
         )}
       </div>
-      {mapReady && (
+      {mapReady && !isExpanded && (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090b10] px-2.5 py-1.5">
           <p className="text-[10px] text-slate-400">Satellite · touchez un point pour la vue réelle</p>
           <button

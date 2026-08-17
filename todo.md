@@ -1893,3 +1893,9 @@
 - [x] Audit: Vérifier la largeur maximale et le comportement des noms dans les pastilles.
 - [x] Interface: Tronquer les noms longs avec des points de suspension sans masquer la température.
 - [x] Validation: Vérifier les pastilles, TypeScript, Vitest et build avant publication.
+
+## Carte Stations agrandie sans infobulle système
+- [x] Audit: Identifier le plein écran natif qui affiche l’information système de sortie.
+- [x] Interface: Utiliser une vue agrandie contrôlée dans l’application avec fermeture explicite.
+- [x] Interface: Afficher Plan, Satellite et Street View dans cette vue agrandie.
+- [x] Validation: Vérifier la carte agrandie, TypeScript, Vitest et build avant publication.
