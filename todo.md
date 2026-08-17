@@ -1830,3 +1830,10 @@
 - [x] Interface: Réduire uniquement les zones non essentielles afin d’afficher la carte entière à l’ouverture.
 - [x] Contrainte: Conserver toutes les informations météo de la carte principale.
 - [x] Validation: Vérifier le premier écran mobile, TypeScript, Vitest et build avant publication.
+
+## Carte Stations sous le rayon de recherche
+- [x] Audit: Identifier l’ordre du sélecteur de rayon et de la carte, ainsi que le fond de carte par défaut.
+- [x] Interface: Afficher la carte directement sous le rayon de recherche.
+- [x] Interface: Ouvrir la carte en vue satellite par défaut.
+- [x] Interface: Ouvrir la vue réelle exactement au point choisi par le contrôle d’exploration.
+- [x] Validation: Vérifier Stations sur mobile, TypeScript, Vitest et build avant publication.

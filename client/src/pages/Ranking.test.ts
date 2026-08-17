@@ -74,6 +74,13 @@ describe("page Fiabilité", () => {
     expect(source).toContain('label="Collecte" value="05h00 Paris"');
   });
 
+  it("place la carte des stations juste après le rayon de recherche", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source.indexOf("Rayon de recherche")).toBeLessThan(source.indexOf("Carte des stations"));
+    expect(source.indexOf("Carte des stations")).toBeLessThan(source.indexOf("Dernier bilan de collecte"));
+    expect(source).toContain("Vue satellite");
+  });
+
   it("explique lorsque les modèles existent mais que les stations physiques sont insuffisantes", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Modèles disponibles, relevés physiques insuffisants");

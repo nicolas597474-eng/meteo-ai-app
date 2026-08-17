@@ -249,6 +249,11 @@ export default function Ranking() {
           <p className="mt-3 text-[11px] text-slate-600">{activeLocation?.favoriteId ? "Le rayon est enregistré pour ce lieu favori." : "Le rayon est utilisé pour cette consultation ; enregistrez ce lieu pour le conserver."}</p>
         </section>
 
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Vue satellite · bleu : lieu de référence · vert : relevé récent · ambre : relevé ancien.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
+          <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
+        </section>
+
         <CollectionReport latest={latestCollection as any} history={availabilityHistory} physicalStationExplanation={physicalStationExplanation} />
 
         <LiveSourceSummary
@@ -265,11 +270,6 @@ export default function Ranking() {
         />
 
         <FilteredStationDirectory sources={currentSources as any[]} isLoading={liveStationsLoading} onOpenDetails={(source) => setSelectedSource({ source, kind: "station" })} />
-
-        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
-          <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Bleu : lieu de référence · vert : relevé récent · ambre : relevé ancien.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
-          <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
-        </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-white">Relevés des stations</h2><p className="text-xs text-slate-500">Stations physiques validées autour du lieu.</p></div><MeteoIcon name="stations" size={22} /></div>

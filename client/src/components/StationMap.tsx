@@ -19,7 +19,22 @@ export function StationMap({
 }) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const streetViewRef = useRef<google.maps.StreetViewPanorama | null>(null);
   const [mapReady, setMapReady] = useState(false);
+
+  const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
+    if (!mapRef.current) return;
+    const panorama = streetViewRef.current ?? mapRef.current.getStreetView();
+    streetViewRef.current = panorama;
+    panorama.setPosition(position);
+    panorama.setPov({ heading: 0, pitch: 0 });
+    panorama.setVisible(true);
+    window.setTimeout(() => panorama.setOptions({ addressControl: true, motionTracking: false }), 0);
+    mapRef.current.setCenter(position);
+    mapRef.current.setZoom(17);
+    document.querySelector<HTMLElement>("[aria-label='Vue réelle du lieu']")?.focus();
+    console.info(`[Stations] Vue réelle demandée pour ${title} (${position.lat.toFixed(5)}, ${position.lng.toFixed(5)})`);
+  }, []);
 
   const renderMarkers = useCallback((map: google.maps.Map) => {
     markersRef.current.forEach((marker) => marker.setMap(null));
@@ -33,6 +48,7 @@ export function StationMap({
       icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#2563eb", fillOpacity: 1, strokeColor: "#dbeafe", strokeWeight: 2 },
     });
     markersRef.current.push(reference);
+    reference.addListener("click", () => showStreetViewAt({ lat: center.lat, lng: center.lon }, "Lieu de référence"));
 
     stations.forEach((station) => {
       const freshness = station.ageMinutes !== null && station.ageMinutes <= 90 ? "#34d399" : "#fbbf24";
@@ -42,9 +58,10 @@ export function StationMap({
         title: `${station.name} · ${station.distanceKm.toFixed(1)} km`,
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: freshness, fillOpacity: 1, strokeColor: "#071018", strokeWeight: 2 },
       });
+      marker.addListener("click", () => showStreetViewAt({ lat: station.lat, lng: station.lon }, station.name));
       markersRef.current.push(marker);
     });
-  }, [center, stations]);
+  }, [center, showStreetViewAt, stations]);
 
   useEffect(() => {
     if (mapRef.current) renderMarkers(mapRef.current);
@@ -56,12 +73,25 @@ export function StationMap({
         className="h-full w-full"
         initialCenter={{ lat: center.lat, lng: center.lon }}
         initialZoom={stations.length > 0 ? 11 : 10}
+        mapTypeId="satellite"
         onMapReady={(map) => {
           mapRef.current = map;
+          streetViewRef.current = map.getStreetView();
           renderMarkers(map);
           setMapReady(true);
         }}
       />
+      {mapReady && (
+        <button
+          type="button"
+          aria-label="Vue réelle du lieu"
+          onClick={() => showStreetViewAt({ lat: center.lat, lng: center.lon }, "Lieu de référence")}
+          className="absolute right-2 top-2 min-h-10 rounded-lg border border-sky-300/70 bg-slate-950/85 px-2.5 text-[11px] font-semibold text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+        >
+          Vue réelle ici
+        </button>
+      )}
+      {mapReady && <p className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-slate-950/80 px-2 py-1 text-[10px] text-slate-100">Satellite · touchez un point pour la vue réelle</p>}
       {!mapReady && (
         <div className="absolute inset-0 grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.16),transparent_34%),linear-gradient(rgba(30,41,59,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(30,41,59,0.32)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px]">
           <div className="absolute h-36 w-36 rounded-full border border-blue-500/20" />
