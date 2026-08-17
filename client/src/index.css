@@ -409,11 +409,17 @@ img.moon-3d-first-crescent {
   .meteo-icon-motion-wind { animation: meteo-icon-wind 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
   .meteo-icon-motion-humidity { animation: meteo-icon-humidity 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
   .sun-altitude-marker .meteo-icon-motion-sun { animation: celestial-sun-breathe 8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .sun-altitude-marker .celestial-realistic-sun { animation: celestial-solar-disc-breathe 8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
 }
 
 @keyframes celestial-sun-breathe {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-1px) scale(1.018); }
+}
+
+@keyframes celestial-solar-disc-breathe {
+  0%, 100% { transform: translateY(0) scale(1.06); opacity: 0.98; }
+  50% { transform: translateY(-1px) scale(1.075); opacity: 1; }
 }
 
 /* Le marqueur est rendu seulement après le coucher selon les éphémérides locales. */

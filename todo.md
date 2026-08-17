@@ -1904,3 +1904,9 @@
 - [x] Audit: Identifier les dimensions du Soleil et de la Lune dans l’arche astronomique.
 - [x] Interface: Réduire légèrement le Soleil sans modifier son point de position ni la Lune.
 - [x] Validation: Vérifier le panneau mobile, TypeScript, Vitest et build avant publication.
+
+## Animation solaire discrète
+- [x] Audit: Identifier les styles du Soleil et la gestion de réduction des mouvements.
+- [x] Interface: Ajouter une animation solaire discrète, fondée uniquement sur transform et opacity.
+- [x] Accessibilité: Désactiver l’animation lorsque la réduction des mouvements est demandée.
+- [x] Validation: Vérifier le panneau, TypeScript, Vitest et build avant publication.

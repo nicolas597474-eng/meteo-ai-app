@@ -32,6 +32,8 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("Qualité de l’air, soleil et lune");
     expect(styles).toContain("height: 10rem !important");
     expect(styles).toContain("height: 8.75rem !important");
+    expect(styles).toContain("celestial-solar-disc-breathe");
+    expect(styles).toContain("prefers-reduced-motion: no-preference");
   });
 
   it("distingue les positions du Soleil et de la Lune à partir des heures réelles", () => {
