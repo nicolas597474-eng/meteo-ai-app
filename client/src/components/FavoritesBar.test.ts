@@ -21,11 +21,11 @@ describe("FavoritesBar", () => {
     expect(source).toContain('totalFavCount < MAX_FAVORITES');
   });
 
-  it("place l’action Ajouter après les villes et les paramètres dans la rangée", () => {
+  it("place l’action Ajouter avant les paramètres dans la rangée", () => {
     const addIndex = source.indexOf('aria-label="Ajouter un lieu favori"');
     const settingsIndex = source.indexOf('Gérer, modifier ou supprimer mes villes favorites');
     const sortableIndex = source.indexOf('<SortableContext items={orderedFavorites.map');
-    expect(addIndex).toBeGreaterThan(settingsIndex);
+    expect(addIndex).toBeLessThan(settingsIndex);
     expect(addIndex).toBeGreaterThan(sortableIndex);
   });
 

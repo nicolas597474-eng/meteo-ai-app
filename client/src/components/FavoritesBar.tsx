@@ -300,16 +300,6 @@ export function FavoritesBar({
               {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
             </SortableContext>
 
-            {user && (
-              <Link
-                href="/favorites"
-                aria-label="Gérer, modifier ou supprimer mes villes favorites"
-                title="Gérer mes villes"
-                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-primary/45 bg-primary/[0.06] text-primary transition-colors hover:border-primary hover:bg-primary/10"
-              >
-                <Settings className="h-4 w-4" />
-              </Link>
-            )}
             {totalFavCount < MAX_FAVORITES && (
               <button
                 onClick={() => setShowAddDialog(true)}
@@ -319,6 +309,16 @@ export function FavoritesBar({
                 <Plus className="h-3.5 w-3.5" />
                 <span>Ajouter</span>
               </button>
+            )}
+            {user && (
+              <Link
+                href="/favorites"
+                aria-label="Gérer, modifier ou supprimer mes villes favorites"
+                title="Gérer mes villes"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-primary/45 bg-primary/[0.06] text-primary transition-colors hover:border-primary hover:bg-primary/10"
+              >
+                <Settings className="h-4 w-4" />
+              </Link>
             )}
           </div>
           <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.23, 1, 0.32, 1)" }}>

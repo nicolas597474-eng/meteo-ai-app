@@ -1802,3 +1802,8 @@
 - [x] Interface: Conserver le défilement tactile libre de gauche à droite et de droite à gauche.
 - [x] Interface: Garder le réordonnancement accessible sans bloquer le défilement normal.
 - [x] Validation: Vérifier tactile/mobile, TypeScript, Vitest et build avant publication.
+
+## Inversion des commandes de favoris
+- [x] Audit: Vérifier l’ordre actuel de l’ajout et des paramètres dans la rangée.
+- [x] Interface: Placer Ajouter avant Paramètres dans le défilement horizontal.
+- [x] Validation: Vérifier TypeScript, Vitest et build avant publication.
