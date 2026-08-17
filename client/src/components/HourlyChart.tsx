@@ -417,14 +417,19 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = nowHour === i ? "#a5b4fc" : "#fdba74";
-      ctx.font = `bold ${sel ? 12 : 10}px system-ui`;
+      ctx.fillStyle = nowHour === i ? "#dbeafe" : "#ffedd5";
+      ctx.font = `700 ${sel ? 14 : 12}px system-ui`;
       ctx.textAlign = "center";
       const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP);
-      ctx.strokeStyle = "rgba(5, 7, 10, 0.9)";
-      ctx.lineWidth = 3;
-      ctx.strokeText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY);
-      ctx.fillText(`${v.toFixed(1)}°`, pt.x, temperatureLabelY);
+      const temperatureLabel = `${v.toFixed(1)}°`;
+      const labelWidth = ctx.measureText(temperatureLabel).width;
+      ctx.fillStyle = "rgba(5, 10, 18, 0.9)";
+      ctx.fillRect(pt.x - labelWidth / 2 - 4, temperatureLabelY - 14, labelWidth + 8, 18);
+      ctx.strokeStyle = nowHour === i ? "rgba(147, 197, 253, 0.9)" : "rgba(254, 215, 170, 0.82)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(pt.x - labelWidth / 2 - 4, temperatureLabelY - 14, labelWidth + 8, 18);
+      ctx.fillStyle = nowHour === i ? "#dbeafe" : "#ffedd5";
+      ctx.fillText(temperatureLabel, pt.x, temperatureLabelY);
     });
 
     // Wind readings by column (no wind curve).
@@ -433,14 +438,19 @@ export default function HourlyChart({ hours, locationName }: Props) {
       if (v == null) return;
       const x = colX(i);
       const y = windZoneTop + 17;
-      ctx.fillStyle = "#4ade80";
-      ctx.font = "bold 12px system-ui";
+      ctx.fillStyle = "#bbf7d0";
+      ctx.font = "700 13px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(v)} km/h`, x, y);
+      const windLabel = `${Math.round(v)} km/h`;
+      const windLabelWidth = ctx.measureText(windLabel).width;
+      ctx.fillStyle = "rgba(4, 18, 14, 0.88)";
+      ctx.fillRect(x - windLabelWidth / 2 - 3, y - 12, windLabelWidth + 6, 16);
+      ctx.fillStyle = "#bbf7d0";
+      ctx.fillText(windLabel, x, y);
       const dir = hours[i].windDirection;
       if (dir != null) {
-        ctx.fillStyle = "rgba(74, 222, 128, 0.78)";
-        ctx.font = "10px system-ui";
+        ctx.fillStyle = "rgba(187, 247, 208, 0.92)";
+        ctx.font = "600 11px system-ui";
         ctx.fillText(degToCompass(dir), x, y + 14);
       }
     });
@@ -452,16 +462,24 @@ export default function HourlyChart({ hours, locationName }: Props) {
     hours.slice(0, visibleN).forEach((h, i) => {
       const p = h.precipitation ?? 0;
       const x = colX(i);
-      ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
-      ctx.font = "bold 10px system-ui";
+      ctx.fillStyle = p > 0 ? "#dbeafe" : "rgba(191,219,254,0.92)";
+      ctx.font = "700 12px system-ui";
       ctx.textAlign = "center";
+      const precipLabel = p.toFixed(1);
+      const drawPrecipLabel = (labelY: number) => {
+        const precipLabelWidth = ctx.measureText(precipLabel).width;
+        ctx.fillStyle = "rgba(5, 12, 24, 0.9)";
+        ctx.fillRect(x - precipLabelWidth / 2 - 3, labelY - 12, precipLabelWidth + 6, 15);
+        ctx.fillStyle = p > 0 ? "#dbeafe" : "rgba(191,219,254,0.92)";
+        ctx.fillText(precipLabel, x, labelY);
+      };
       if (p <= 0) {
-        ctx.fillText(p.toFixed(1), x, precipZoneBot - 5);
+        drawPrecipLabel(precipZoneBot - 5);
         return;
       }
       const barH = Math.max(3, (p / maxPrecip) * precipH);
       const barTop = precipZoneBot - barH;
-      ctx.fillText(p.toFixed(1), x, barTop - 5);
+      drawPrecipLabel(barTop - 5);
       const barW = Math.min(COL_W * 0.5, 20);
       const g = ctx.createLinearGradient(0, precipZoneBot - barH, 0, precipZoneBot);
       g.addColorStop(0, "rgba(96, 165, 250, 0.9)");

@@ -1698,3 +1698,8 @@
 - [x] Direction: Définir une composition météo plus immersive, limitée à cette page.
 - [x] Interface: Recomposer les repères de temps, les cartes horaires et les modules de prévisions.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Netteté des chiffres du graphique détaillé
+- [x] Audit: Identifier les conflits de contraste et de position entre valeurs et courbe SVG.
+- [x] Interface: Renforcer le contour, la lisibilité et l’espacement des valeurs.
+- [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
