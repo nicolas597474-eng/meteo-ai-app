@@ -1661,4 +1661,4 @@
 ## Collecte quotidienne de prévisions à 05:00
 - [x] Audit: Vérifier la tâche de 05:00, les huit modèles et les relevés de stations effectivement archivés.
 - [x] Correction: Aucune correction requise : la collecte active couvre déjà les modèles experts et les stations, avec contrôle de couverture.
-- [ ] Validation: Contrôler les données produites et la prochaine exécution planifiée.
+- [x] Validation: Contrôler les données produites et la prochaine exécution planifiée.
