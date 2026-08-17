@@ -530,15 +530,17 @@ export async function getFavoriteLocations(userId: number) {
     .orderBy(favoriteLocations.position);
 }
 
+const MAX_FAVORITE_LOCATIONS = 8;
+
 export async function addFavoriteLocation(data: InsertFavoriteLocation) {
   const db = await getDb();
   if (!db) return null;
-  // Check max 5
+  // Check max 8
   const existing = await db
     .select({ count: sql<number>`count(*)` })
     .from(favoriteLocations)
     .where(eq(favoriteLocations.userId, data.userId));
-  if (existing[0]?.count >= 5) return null;
+  if (existing[0]?.count >= MAX_FAVORITE_LOCATIONS) return null;
   const result = await db.insert(favoriteLocations).values(data);
   return result[0].insertId;
 }

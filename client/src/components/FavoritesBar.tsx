@@ -39,6 +39,7 @@ type LocationItem = {
 
 // ─── LocalStorage favorites (for non-logged-in users) ───────────────────────
 type LocalFavorite = { id: string; name: string; lat: number; lon: number; radiusKm: number };
+const MAX_FAVORITES = 8;
 
 function getLocalFavorites(): LocalFavorite[] {
   try {
@@ -53,7 +54,7 @@ function saveLocalFavorites(favs: LocalFavorite[]) {
 
 function addLocalFavorite(fav: Omit<LocalFavorite, "id">): LocalFavorite[] {
   const current = getLocalFavorites();
-  if (current.length >= 5) return current;
+  if (current.length >= MAX_FAVORITES) return current;
   const newFav = { ...fav, id: `local-${Date.now()}` };
   const updated = [...current, newFav];
   saveLocalFavorites(updated);
@@ -279,21 +280,19 @@ export function FavoritesBar({
             style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
           >
             {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
-            <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
-              {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
-            </SortableContext>
-
-            {totalFavCount < 5 && (
+            {totalFavCount < MAX_FAVORITES && (
               <button
                 onClick={() => setShowAddDialog(true)}
                 className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/55 bg-primary/[0.06] px-3 py-2 text-[13px] font-semibold tracking-tight text-primary transition-colors hover:border-primary hover:bg-primary/10"
                 aria-label="Ajouter un lieu favori"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span className="sm:hidden">Lieu</span>
-                <span className="hidden sm:inline">Ajouter un lieu</span>
+                <span>Ajouter</span>
               </button>
             )}
+            <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
+              {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
+            </SortableContext>
 
             {user && (
               <Link

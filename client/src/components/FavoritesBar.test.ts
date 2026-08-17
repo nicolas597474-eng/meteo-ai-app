@@ -15,8 +15,10 @@ describe("FavoritesBar", () => {
   it("place l’ajout et les paramètres dans le défilement horizontal des favoris", () => {
     expect(source).toContain('flex gap-2 overflow-x-auto pb-1 scrollbar-hide');
     expect(source).toContain('aria-label="Ajouter un lieu favori"');
+    expect(source).toContain('<span>Ajouter</span>');
     expect(source).toContain('Gérer, modifier ou supprimer mes villes favorites');
-    expect(source).toContain('totalFavCount < 5');
+    expect(source).toContain('const MAX_FAVORITES = 8');
+    expect(source).toContain('totalFavCount < MAX_FAVORITES');
   });
 
   it("affiche une température actuelle explicite avec la typographie des pastilles du Dashboard", () => {

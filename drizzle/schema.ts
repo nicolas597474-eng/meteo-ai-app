@@ -383,7 +383,7 @@ export const netatmoOAuthStates = mysqlTable("netatmo_oauth_states", {
 });
 
 /**
- * User favorite locations (max 5 per user).
+ * User favorite locations (max 8 per user).
  * Each location stores coordinates, custom settings, and display preferences.
  */
 export const favoriteLocations = mysqlTable("favorite_locations", {
@@ -394,7 +394,7 @@ export const favoriteLocations = mysqlTable("favorite_locations", {
   lat: float("lat").notNull(),
   lon: float("lon").notNull(),
   isDefault: int("isDefault").default(0), // 1 = default location on app start
-  position: int("position").notNull().default(0), // ordering 0-4
+  position: int("position").notNull().default(0), // ordering 0-7
   // Per-location settings
   localMode: mysqlEnum("localMode", ["standard", "local", "ultra-local"]).default("standard"),
   radiusKm: int("radiusKm").default(20), // station search radius

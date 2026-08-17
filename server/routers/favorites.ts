@@ -128,7 +128,7 @@ import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 
 export const favoritesRouter = router({
   /**
-   * Get all favorites for the current user (max 5).
+   * Get all favorites for the current user (max 8).
    */
   list: protectedProcedure.query(async ({ ctx }) => {
     return getFavoriteLocations(ctx.user.id);
@@ -143,7 +143,7 @@ export const favoritesRouter = router({
       customName: z.string().max(256).optional(),
       lat: z.number().min(-90).max(90),
       lon: z.number().min(-180).max(180),
-      position: z.number().min(0).max(4).optional(),
+      position: z.number().min(0).max(7).optional(),
       radiusKm: z.number().min(5).max(50).optional(),
       tempUnit: z.enum(["celsius", "fahrenheit"]).optional(),
       localMode: z.enum(["standard", "local", "ultra-local"]).optional(),
@@ -161,7 +161,7 @@ export const favoritesRouter = router({
         localMode: input.localMode ?? "standard",
       });
       if (id === null) {
-        throw new Error("Maximum 5 favoris atteint");
+        throw new Error("Maximum 8 favoris atteint");
       }
       return { id };
     }),
@@ -184,7 +184,7 @@ export const favoritesRouter = router({
         tempMin: z.number().optional(),
         tempMax: z.number().optional(),
       }).optional(),
-      position: z.number().min(0).max(4).optional(),
+      position: z.number().min(0).max(7).optional(),
       isDefault: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

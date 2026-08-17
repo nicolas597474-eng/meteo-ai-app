@@ -1784,3 +1784,9 @@
 - [x] Audit: Identifier les conteneurs qui maintiennent l’ajout et les paramètres fixes.
 - [x] Interface: Mettre l’ajout et les paramètres dans le même défilement horizontal que les villes.
 - [x] Validation: Vérifier le défilement mobile, TypeScript, Vitest et build avant publication.
+
+## Accessibilité de l’ajout de ville dans les favoris
+- [x] Audit: Identifier pourquoi la commande d’ajout reste hors de portée après défilement.
+- [x] Interface: Ajouter un repère de défilement et un accès évident à l’ajout sans fixer la commande.
+- [x] Données: Augmenter de manière cohérente la capacité de cinq à huit villes favorites côté interface et serveur.
+- [x] Validation: Vérifier le parcours mobile, TypeScript, Vitest et build avant publication.
