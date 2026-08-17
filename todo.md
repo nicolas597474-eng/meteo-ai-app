@@ -1682,3 +1682,9 @@
 - [x] Audit: Identifier les cartes météo et les icônes réutilisables pour le vent et l’humidité.
 - [x] Interface: Ajouter des animations discrètes respectant la réduction des mouvements.
 - [x] Validation: Vérifier les cartes mobiles, TypeScript, Vitest et build avant publication.
+
+## Modernisation des prévisions détaillées
+- [x] Audit: Définir une hiérarchie visuelle plus moderne pour l’en-tête, les filtres et les cartes horaires.
+- [x] Interface: Moderniser l’en-tête et les surfaces de lecture de la page.
+- [x] Interface: Améliorer les cartes horaires et l’état de l’heure actuelle sur mobile.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.

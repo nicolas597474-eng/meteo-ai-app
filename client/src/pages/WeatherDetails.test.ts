@@ -14,9 +14,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Prévisions détaillées");
     expect(source).toContain('aria-label="Retour au Dashboard"');
     expect(source).toContain("<BackToTopButton />");
-    expect(source).toContain("w-[212px]");
+    expect(source).toContain("w-[228px]");
     expect(source).toContain("hours.length * 214");
-    expect(source).toContain("text-3xl font-bold text-white");
+    expect(source).toContain("text-[40px] font-bold leading-none");
     expect(source).toContain("Détails par heure");
     expect(source).toContain('aria-label="Détails horaires défilables"');
     expect(source).toContain("hours.length * 186");
@@ -40,8 +40,10 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain(">Maintenant</text>");
     expect(source).toContain("hourlyCardStride = 224");
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
-    expect(source).toContain("bg-slate-800/60");
-    expect(source).toContain("bg-sky-800/50");
+    expect(source).toContain("rgba(34,52,75,0.78)");
+    expect(source).toContain("rgba(24,93,137,0.76)");
+    expect(source).toContain("HourlyMetric");
+    expect(source).toContain("Faites défiler les prévisions officielles");
     expect(source).toContain('y={chartH + 58} textAnchor="middle"');
     expect(source).toContain('fontSize="14"');
     expect(source).toContain('fontSize={i === currentIdx ? "13" : "12"}');

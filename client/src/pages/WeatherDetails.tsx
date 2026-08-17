@@ -135,28 +135,28 @@ export default function WeatherDetails() {
       <div className="mx-auto max-w-2xl space-y-3 px-3 py-3 pb-28">
 
         {/* ═══ HEADER ═══ */}
-        <MeteoSurface as="section" tone="accent" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="accent" className="rounded-[28px] border border-sky-300/35 bg-[linear-gradient(135deg,rgba(11,39,59,0.92),rgba(9,18,31,0.94))] p-4">
           <div className="flex items-center gap-3">
-            <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-300/25 bg-slate-950/45 text-sky-200 transition-colors hover:border-sky-300/55 hover:bg-sky-400/10" aria-label="Retour au Dashboard">
+            <Link href="/" className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-sky-200/35 bg-slate-950/35 text-sky-100 transition-colors hover:border-sky-200/65 hover:bg-sky-400/15 active:scale-[0.97]" aria-label="Retour au Dashboard">
               <ChevronLeft className="h-5 w-5" />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-200/75">Prévision officielle</p>
-              <h1 className="mt-0.5 text-xl font-bold tracking-tight text-white">Prévisions détaillées</h1>
-              <p className="mt-1 truncate text-xs text-slate-400">{activeLocation?.name ?? "Position actuelle"} · {formatDate(data?.today ?? "")}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-200/80">Prévision officielle</p>
+              <h1 className="mt-1 text-[22px] font-bold tracking-[-0.03em] text-white">Prévisions détaillées</h1>
+              <p className="mt-1 truncate text-xs font-medium text-slate-300">{activeLocation?.name ?? "Position actuelle"} <span className="px-1 text-sky-300/70">·</span> {formatDate(data?.today ?? "")}</p>
             </div>
             {regime && <WeatherStatusBadge compact tone="info" label="Régime" value={regime.primary.label} icon={<MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={15} />} />}
           </div>
         </MeteoSurface>
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[28px] border border-slate-500/35 bg-[linear-gradient(145deg,rgba(30,50,75,0.84),rgba(12,22,36,0.92))] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="refresh" size={16} /></span>
-              <div><h2 className="text-base font-semibold text-white">Heure par heure</h2><p className="text-[11px] text-slate-400">Données officielles défilables</p></div>
+              <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-300/30 bg-sky-400/10"><MeteoIcon name="refresh" size={18} /></span>
+              <div><h2 className="text-lg font-semibold tracking-tight text-white">Heure par heure</h2><p className="text-[11px] text-slate-300">Faites défiler les prévisions officielles</p></div>
             </div>
-            <span className="rounded-full border border-slate-700/70 bg-slate-950/45 px-2 py-1 text-[10px] font-semibold text-slate-300">48 h</span>
+            <span className="rounded-full border border-sky-300/25 bg-slate-950/30 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-sky-100">48 h</span>
           </div>
           
           {/* Horizontal scrollable hourly cards */}
@@ -168,75 +168,51 @@ export default function WeatherDetails() {
                 return (
                   <div
                     key={h.hour}
-                    className={`weather-surface-inset flex-shrink-0 w-[212px] rounded-2xl border p-4 transition-colors ${
+                    className={`weather-surface-inset flex-shrink-0 w-[228px] rounded-[24px] border p-4 transition-colors ${
                       isNow
-                        ? "border-sky-300/70 bg-sky-800/50"
-                        : "border-slate-500/65 bg-slate-800/60"
+                        ? "border-sky-200/75 bg-[linear-gradient(155deg,rgba(24,93,137,0.76),rgba(10,32,55,0.92))]"
+                        : "border-slate-400/40 bg-[linear-gradient(155deg,rgba(34,52,75,0.78),rgba(11,21,35,0.94))]"
                     }`}
                   >
                     {/* Hour + Now badge */}
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className={`text-base font-bold ${isNow ? "text-blue-400" : "text-white"}`}>{h.hour}</span>
-                      {isNow && <span className="rounded-full bg-blue-500/30 px-2 py-0.5 text-[9px] font-semibold text-blue-300">MAINTENANT</span>}
+                    <div className="flex items-center justify-between">
+                      <span className={`text-lg font-bold tracking-tight ${isNow ? "text-sky-200" : "text-white"}`}>{h.hour}</span>
+                      {isNow && <span className="rounded-full border border-sky-200/30 bg-sky-300/15 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-sky-100">MAINTENANT</span>}
                     </div>
                     
                     {/* Icon + condition */}
-                    <div className="mb-2 flex items-center gap-2">
-                      <MeteoIcon name={getIconNameFromCondition(h.condition)} size={32} />
-                      <span className="text-[11px] leading-tight text-slate-300">{h.condition ?? "—"}</span>
+                    <div className="mb-3 mt-2 flex items-center gap-2.5">
+                      <MeteoIcon name={getIconNameFromCondition(h.condition)} size={38} />
+                      <span className="text-xs font-medium leading-tight text-slate-100">{h.condition ?? "—"}</span>
                     </div>
                     
                     {/* Temperature */}
-                    <div className="mb-2 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-white">{h.temp?.toFixed(1) ?? "—"}°</span>
-                      <span className="text-[11px] text-slate-400">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
+                    <div className="mb-3 flex items-baseline gap-2">
+                      <span className="text-[40px] font-bold leading-none tracking-[-0.06em] text-white">{h.temp?.toFixed(1) ?? "—"}°</span>
+                      <span className="text-[11px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
                     </div>
                     
                     {/* Precipitation */}
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <MeteoIcon name="precipitation" size={12} />
-                      <span className="text-xs text-blue-300">{h.precipProb ?? 0}%</span>
+                    <div className="mb-3 flex items-center gap-1.5 rounded-xl border border-sky-300/15 bg-sky-400/[0.07] px-2.5 py-2">
+                      <MeteoIcon name="precipitation" size={16} />
+                      <span className="text-xs font-semibold text-sky-100">{h.precipProb ?? 0}%</span>
                       {(h.precipitation ?? 0) > 0 && (
-                        <span className="text-xs font-medium text-blue-400">{h.precipitation?.toFixed(1)} mm</span>
+                        <span className="text-xs font-semibold text-sky-300">{h.precipitation?.toFixed(1)} mm</span>
                       )}
-                      {h.precipType && <span className="text-[10px] text-slate-500">({h.precipType === "snow" ? "neige" : h.precipType === "freezing_rain" ? "verglas" : "pluie"})</span>}
+                      {h.precipType && <span className="text-[10px] text-sky-100/65">{h.precipType === "snow" ? "neige" : h.precipType === "freezing_rain" ? "verglas" : "pluie"}</span>}
                     </div>
                     {h.precipIntensity && (
-                      <span className="mb-1 block text-[10px] text-slate-500">Intensité: {h.precipIntensity === "heavy" ? "forte" : h.precipIntensity === "moderate" ? "modérée" : "faible"}</span>
+                      <span className="-mt-2 mb-3 block text-[10px] text-slate-300">Intensité {h.precipIntensity === "heavy" ? "forte" : h.precipIntensity === "moderate" ? "modérée" : "faible"}</span>
                     )}
-                    
-                    {/* Humidity + Dew point */}
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <MeteoIcon name="humidity" size={12} />
-                      <span className="text-xs text-slate-300">{h.humidity ?? "—"}%</span>
-                      {h.dewPoint != null && <span className="text-[10px] text-slate-500">rosée {h.dewPoint.toFixed(0)}°</span>}
-                    </div>
-                    
-                    {/* Wind */}
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <MeteoIcon name="wind_param" size={12} />
-                      <span className="text-xs text-slate-300">{h.windSpeed?.toFixed(0) ?? "—"} km/h</span>
-                      <span className="text-[10px] text-slate-500" style={{ transform: `rotate(${(h.windDirection ?? 0) + 180}deg)`, display: "inline-block" }}>↑</span>
-                      <span className="text-[10px] text-slate-500">{windDirectionLabel(h.windDirection)}</span>
-                    </div>
-                    {h.windGust != null && (
-                      <span className="mb-1 block text-[10px] text-slate-500">Rafales: {h.windGust.toFixed(0)} km/h</span>
-                    )}
-                    
-                    {/* Pressure */}
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <MeteoIcon name="pressure" size={12} />
-                      <span className="text-xs text-slate-300">{h.pressure?.toFixed(0) ?? "—"} hPa</span>
-                      <span className="text-[10px]">{pTrend === "rising" ? "⬆️" : pTrend === "falling" ? "⬇️" : "➡️"}</span>
-                    </div>
-                    
-                    {/* Cloud layers */}
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <MeteoIcon name="cloud_cover" size={12} />
-                      <span className="text-xs text-slate-300">{h.cloudCover ?? "—"}%</span>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <HourlyMetric icon="humidity" label="Humidité" value={`${h.humidity ?? "—"}%`} detail={h.dewPoint != null ? `Rosée ${h.dewPoint.toFixed(0)}°` : undefined} />
+                      <HourlyMetric icon="wind_param" label="Vent" value={`${h.windSpeed?.toFixed(0) ?? "—"} km/h`} detail={`${windDirectionLabel(h.windDirection)}${h.windGust != null ? ` · raf. ${h.windGust.toFixed(0)}` : ""}`} />
+                      <HourlyMetric icon="pressure" label="Pression" value={`${h.pressure?.toFixed(0) ?? "—"} hPa`} detail={pTrend === "rising" ? "En hausse" : pTrend === "falling" ? "En baisse" : "Stable"} />
+                      <HourlyMetric icon="cloud_cover" label="Nuages" value={`${h.cloudCover ?? "—"}%`} />
                     </div>
                     {(h.cloudLow != null || h.cloudMid != null || h.cloudHigh != null) && (
-                      <div className="mb-1 flex gap-1.5 text-[10px] text-slate-500">
+                      <div className="mt-2 flex gap-1.5 text-[10px] text-slate-400">
                         {h.cloudLow != null && <span>Bas {h.cloudLow}%</span>}
                         {h.cloudMid != null && <span>Moy {h.cloudMid}%</span>}
                         {h.cloudHigh != null && <span>Haut {h.cloudHigh}%</span>}
@@ -245,25 +221,25 @@ export default function WeatherDetails() {
                     
                     {/* Visibility */}
                     {h.visibility != null && (
-                      <div className="mb-1 text-[10px] text-slate-500">Visibilité: {h.visibility} km</div>
+                      <div className="mt-2 text-[10px] text-slate-400">Visibilité {h.visibility} km</div>
                     )}
                     
                     {/* UV */}
                     {h.uvIndex != null && h.uvIndex > 0 && (
-                      <div className="mb-1 text-[10px] text-slate-500">UV: {h.uvIndex.toFixed(0)}</div>
+                      <div className="mt-1 text-[10px] text-slate-400">UV {h.uvIndex.toFixed(0)}</div>
                     )}
                     
                     {/* Solar radiation */}
                     {h.solarRadiation != null && h.solarRadiation > 0 && (
-                      <div className="mb-1 text-[10px] text-slate-500">Rayonnement: {h.solarRadiation.toFixed(0)} W/m²</div>
+                      <div className="mt-1 text-[10px] text-slate-400">Rayonnement {h.solarRadiation.toFixed(0)} W/m²</div>
                     )}
                     
                     {/* Régime opérationnel partagé */}
                     {regime && (
-                      <div className="mt-1 pt-1 border-t border-slate-700/50">
+                      <div className="mt-3 border-t border-slate-400/15 pt-2">
                         <div className="flex items-center gap-1">
-                          <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={12} />
-                          <span className="text-[10px] text-slate-400">{regime.primary.label}</span>
+                          <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={14} />
+                          <span className="text-[10px] font-medium text-slate-300">{regime.primary.label}</span>
                         </div>
                       </div>
                     )}
@@ -276,8 +252,8 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 2: GRAPHIQUES INTERACTIFS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] p-4">
-          <div className="mb-3 flex items-center gap-2.5"><span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="chart" size={16} /></span><div><h2 className="text-base font-semibold text-white">Graphiques</h2><p className="text-[11px] text-slate-400">Évolution par paramètre</p></div></div>
+        <MeteoSurface as="section" tone="default" className="rounded-[28px] border border-slate-500/35 bg-[linear-gradient(145deg,rgba(27,45,67,0.84),rgba(11,21,35,0.92))] p-4">
+          <div className="mb-3 flex items-center gap-2.5"><span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="chart" size={18} /></span><div><h2 className="text-lg font-semibold tracking-tight text-white">Graphiques</h2><p className="text-[11px] text-slate-300">Évolution par paramètre</p></div></div>
           
           {/* Chart selector */}
           <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide mb-3">
@@ -287,8 +263,8 @@ export default function WeatherDetails() {
                 onClick={() => setActiveChart(opt.key)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   activeChart === opt.key
-                    ? "border border-sky-300/55 bg-sky-400/15 text-sky-100"
-                    : "border border-slate-700/70 bg-slate-950/45 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                    ? "border border-sky-200/55 bg-sky-400/20 text-sky-50"
+                    : "border border-slate-400/30 bg-slate-950/25 text-slate-300 hover:border-slate-300/50 hover:text-white"
                 }`}
               >
                 {opt.label}
@@ -297,16 +273,16 @@ export default function WeatherDetails() {
           </div>
           
           {/* Chart area */}
-          <div className="weather-chart-3d rounded-2xl border p-3">
+          <div className="weather-chart-3d rounded-[24px] border border-sky-300/20 bg-slate-950/20 p-3">
             <HourlyChart hours={hours} type={activeChart} currentIdx={currentHourIdx} />
           </div>
         </MeteoSurface>
 
         {/* ═══ SECTION 3: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[22px] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[28px] border border-slate-500/35 bg-[linear-gradient(145deg,rgba(27,45,67,0.84),rgba(11,21,35,0.92))] p-4">
           <div className="mb-3 flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="calendar" size={16} /></span>
-            <div><h2 className="text-base font-semibold text-white">Prochains jours</h2><p className="text-[11px] text-slate-400">Ouvrez un jour pour consulter ses détails</p></div>
+            <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-300/25 bg-sky-400/10"><MeteoIcon name="calendar" size={18} /></span>
+            <div><h2 className="text-lg font-semibold tracking-tight text-white">Prochains jours</h2><p className="text-[11px] text-slate-300">Touchez un jour pour consulter ses détails</p></div>
           </div>
           
           <div className="space-y-2">
@@ -315,11 +291,11 @@ export default function WeatherDetails() {
               // Les données serveur distinguent la confiance (accord, qualité,
               // historique, échéance) de la simple dispersion des modèles.
               return (
-                <div key={day.date} className="weather-surface-inset overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/45">
+                <div key={day.date} className="weather-surface-inset overflow-hidden rounded-[22px] border border-slate-400/25 bg-[linear-gradient(135deg,rgba(36,52,75,0.62),rgba(11,20,34,0.86))]">
                   {/* Day summary card */}
                   <button
                     onClick={() => setExpandedDay(isExpanded ? null : day.date)}
-                    className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-sky-400/[0.05]"
+                    className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-sky-400/[0.08] active:scale-[0.99]"
                   >
                     <div className="flex-shrink-0">
                       <MeteoIcon name={getIconNameFromCondition(day.condition)} size={32} />
@@ -327,7 +303,7 @@ export default function WeatherDetails() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-white font-semibold text-sm capitalize">{getDayOfWeek(day.date)}</span>
-                        <span className="text-slate-500 text-xs">{formatDate(day.date)}</span>
+                        <span className="text-slate-400 text-xs">{formatDate(day.date)}</span>
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
                         <span className="text-white font-bold text-sm">{day.tempMax?.toFixed(0)}°</span>
@@ -338,12 +314,12 @@ export default function WeatherDetails() {
                         <span className="text-slate-500 text-xs">{day.windSpeed?.toFixed(0)} km/h</span>
                       </div>
                     </div>
-                    <span className="text-[10px] text-slate-600">{isExpanded ? "▲" : "▼"}</span>
+                    <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-400/20 bg-slate-950/20 text-[10px] text-slate-300">{isExpanded ? "▲" : "▼"}</span>
                   </button>
                   
                   {/* Expanded day details */}
                   {isExpanded && (
-                    <div className="space-y-3 border-t border-slate-700/70 p-3">
+                    <div className="space-y-3 border-t border-slate-400/15 p-3">
                       {/* Day details grid */}
                       <div className="grid grid-cols-3 gap-2">
                         <DetailCell label="Ressenti" value={`${day.feelsLikeMin?.toFixed(0) ?? "?"}° / ${day.feelsLikeMax?.toFixed(0) ?? "?"}°`} />
@@ -375,18 +351,18 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 5: TENDANCES ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] p-4">
-          <h2 className="mb-3 text-base font-semibold text-white">Tendances</h2>
-          <div className="weather-surface-inset rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3">
+        <MeteoSurface as="section" tone="subtle" className="rounded-[28px] border border-slate-500/30 bg-slate-950/30 p-4">
+          <h2 className="mb-3 text-lg font-semibold tracking-tight text-white">Tendances</h2>
+          <div className="weather-surface-inset rounded-[22px] border border-slate-400/20 bg-slate-950/25 p-3">
             <TrendSection days={days} />
           </div>
         </MeteoSurface>
 
         {/* ═══ SECTION 6: CONFIANCE DE PRÉVISION ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-[22px] p-4">
-          <div className="weather-surface-inset rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3">
-            <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-white">
-              <MeteoIcon name="confidence" size={14} />
+        <MeteoSurface as="section" tone="subtle" className="rounded-[28px] border border-slate-500/30 bg-slate-950/30 p-4">
+          <div className="weather-surface-inset rounded-[22px] border border-slate-400/20 bg-slate-950/25 p-3">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
+              <MeteoIcon name="confidence" size={18} />
               Confiance de prévision officielle
             </h2>
             <ConfidenceSection confidence={confidence} regime={regime} />
@@ -406,6 +382,19 @@ function DetailCell({ label, value }: { label: string; value: string }) {
     <div className="bg-slate-800/30 rounded-lg p-2 text-center">
       <p className="text-[8px] text-slate-500">{label}</p>
       <p className="text-xs text-white font-medium">{value}</p>
+    </div>
+  );
+}
+
+function HourlyMetric({ icon, label, value, detail }: { icon: string; label: string; value: string; detail?: string }) {
+  return (
+    <div className="rounded-xl border border-slate-300/10 bg-slate-950/20 px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-wide text-slate-400">
+        <MeteoIcon name={icon} size={14} />
+        <span>{label}</span>
+      </div>
+      <p className="mt-1 text-xs font-semibold text-slate-100">{value}</p>
+      {detail && <p className="mt-0.5 truncate text-[9px] text-slate-400">{detail}</p>}
     </div>
   );
 }
