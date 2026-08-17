@@ -1733,3 +1733,8 @@
 - [x] Audit: Identifier le tracé de la ligne verticale du repère actuel dans le graphique.
 - [x] Interface: Retirer la ligne et conserver uniquement « Maintenant » sous l’heure.
 - [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
+
+## Cohérence phénomène immédiat et régime opérationnel
+- [x] Audit: Comparer les sources, horodatages et règles des libellés Averses, Bruine et Ciel couvert.
+- [x] Interface: Clarifier les niveaux d’information ou corriger une incohérence objectivement mesurée.
+- [x] Validation: Vérifier Dashboard, AI Lab, TypeScript, Vitest et build avant publication.

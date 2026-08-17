@@ -499,8 +499,10 @@ export default function Dashboard() {
                   >
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-950/35 text-base">{regime.emoji}</span>
                     <div className="min-w-0">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Régime de prévision dominant</p>
                       <p className="flex items-center gap-1 text-xs font-semibold text-white">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
+                      <p className="mt-0.5 text-[10px] text-sky-200/80">Synthèse horaire · {regimeFreshnessLabel}</p>
                       <span className="sr-only">Voir les 20 régimes</span>
                     </div>
                   </button>
@@ -628,15 +630,16 @@ export default function Dashboard() {
                     {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
                   <p className="mt-1 text-base font-medium text-slate-100/90 sm:text-lg">
-                    {(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible") + " actuellement"}
+                    <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-sky-200/80">Phénomène actuel</span>
+                    {currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible"}
                   </p>
                   {(nextRegimeChange ?? nextConditionChange) && (
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
                       <Clock className="h-3 w-3" />
-                      <span className="sm:hidden">Prochain : {nextRegimeChange
+                      <span className="sm:hidden">Évolution : {nextRegimeChange
                         ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} · ${nextRegimeChange.hour}`
                         : `${nextConditionChange!.condition} · ${nextConditionChange!.hour}`}</span>
-                      <span className="hidden sm:inline">Prochain changement de régime : {nextRegimeChange
+                      <span className="hidden sm:inline">Évolution horaire : {nextRegimeChange
                         ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} à ${nextRegimeChange.hour}`
                         : `${nextConditionChange!.condition} à ${nextConditionChange!.hour}`}</span>
                     </p>

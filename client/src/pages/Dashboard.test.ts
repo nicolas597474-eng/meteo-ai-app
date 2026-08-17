@@ -45,6 +45,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).not.toContain("Hondeghem, Nord");
     expect(source).not.toContain("MapPin");
     expect(source).toContain("candidate?.weights");
+    expect(source).toContain("Régime de prévision dominant");
+    expect(source).toContain("Phénomène actuel");
+    expect(source).toContain("Synthèse horaire · {regimeFreshnessLabel}");
     expect(source).toContain('text-base font-medium text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');

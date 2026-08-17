@@ -8,6 +8,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Méthode de fusion");
     expect(source).toContain("Sources appliquées par paramètre");
     expect(source).toContain("Modèle principal");
+    expect(source).toContain("Régime de prévision dominant");
+    expect(source).toContain("Le Dashboard indique séparément le phénomène immédiat");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {
