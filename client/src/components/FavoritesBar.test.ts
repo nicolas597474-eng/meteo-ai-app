@@ -39,6 +39,9 @@ describe("FavoritesBar", () => {
     expect(source).toContain('@dnd-kit/core');
     expect(source).toContain('TouchSensor');
     expect(source).toContain('sortableKeyboardCoordinates');
+    expect(source).toContain('setActivatorNodeRef');
+    expect(source).toContain('touch-pan-x');
+    expect(source).toContain('aria-label={`Réorganiser ${loc.name}`}');
     expect(source).toContain('persistFavoriteOrder');
     expect(source).toContain('updateFavoriteMutation.mutateAsync');
     expect(source).toContain('saveLocalFavorites(reordered)');

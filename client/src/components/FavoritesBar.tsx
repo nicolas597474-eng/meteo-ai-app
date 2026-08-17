@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MapPin, Star, Plus, X, Search, Navigation, Settings, LogIn } from "lucide-react";
+import { MapPin, Star, Plus, X, Search, Navigation, Settings, LogIn, GripVertical } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -83,23 +83,39 @@ function FavoritePillContent({ loc, weather, active }: { loc: LocationItem; weat
 }
 
 function SortableFavoritePill({ loc, weather, active, onSelect }: { loc: LocationItem; weather?: FavoriteWeather; active: boolean; onSelect: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: loc.id });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: loc.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const hasCurrentTemperature = weather?.temp != null;
 
-  return <button
+  return <div
     ref={setNodeRef}
     style={style}
     onClick={onSelect}
+    onKeyDown={(event) => {
+      if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        onSelect();
+      }
+    }}
     {...attributes}
-    {...listeners}
-    aria-label={`${loc.name}, ${hasCurrentTemperature ? `température actuelle ${Math.round(weather!.temp!)} degrés` : "température actuelle indisponible"}. Maintenez puis faites glisser pour réorganiser.`}
-    className={`group flex min-h-11 shrink-0 touch-pan-y items-center gap-2 rounded-full border px-3.5 py-2 transition-all ${
+    aria-label={`${loc.name}, ${hasCurrentTemperature ? `température actuelle ${Math.round(weather!.temp!)} degrés` : "température actuelle indisponible"}. Balayez pour faire défiler, ou utilisez la poignée pour réorganiser.`}
+    className={`group flex min-h-11 shrink-0 touch-pan-x items-center gap-2 rounded-full border px-3.5 py-2 transition-all ${
       active ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"
     } ${isDragging ? "cursor-grabbing opacity-35" : "cursor-grab active:cursor-grabbing"}`}
   >
+    <span
+      ref={setActivatorNodeRef}
+      {...listeners}
+      role="button"
+      tabIndex={0}
+      onClick={(event) => event.stopPropagation()}
+      aria-label={`Réorganiser ${loc.name}`}
+      className="flex h-7 w-3 shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground/60 active:cursor-grabbing active:text-primary"
+    >
+      <GripVertical className="h-4 w-4" />
+    </span>
     <FavoritePillContent loc={loc} weather={weather} active={active} />
-  </button>;
+  </div>;
 }
 
 // ─── Hook: useCurrentLocation ───────────────────────────────────────────────

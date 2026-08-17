@@ -1796,3 +1796,9 @@
 - [x] Interface: Placer l’action Ajouter tout à droite de la rangée défilante.
 - [x] Interface: Préserver le défilement horizontal dans les deux sens sur mobile et desktop.
 - [x] Validation: Vérifier le parcours mobile, TypeScript, Vitest et build avant publication.
+
+## Correction : défilement tactile des favoris
+- [x] Audit: Identifier le conflit entre les capteurs de glisser-déposer et le défilement horizontal.
+- [x] Interface: Conserver le défilement tactile libre de gauche à droite et de droite à gauche.
+- [x] Interface: Garder le réordonnancement accessible sans bloquer le défilement normal.
+- [x] Validation: Vérifier tactile/mobile, TypeScript, Vitest et build avant publication.
