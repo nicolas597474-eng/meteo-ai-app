@@ -1773,3 +1773,9 @@
 - [x] Audit: Identifier la condition ou le débordement qui masque l’action « Ajouter un lieu ».
 - [x] Interface: Garder « Ajouter un lieu » visible et accessible avec les favoris réorganisables.
 - [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.
+
+## Ligne des favoris : ajout et paramètres
+- [x] Audit: Vérifier le positionnement de l’ajout et le rendu conditionnel de l’icône Paramètres.
+- [x] Interface: Replacer « Ajouter un lieu » dans la ligne défilante des favoris.
+- [x] Interface: Toujours afficher l’icône Paramètres pour gérer les villes connectées.
+- [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.

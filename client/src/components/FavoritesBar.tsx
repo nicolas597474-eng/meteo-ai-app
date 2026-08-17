@@ -273,23 +273,38 @@ export function FavoritesBar({
       {/* Favorites strip */}
       <div className="relative">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveDragId(null)} onDragEnd={handleDragEnd}>
-          <div
-            ref={scrollRef}
-            className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
-            style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
-          >
-            {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
-            <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
-              {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
-            </SortableContext>
+          <div className="flex min-w-0 items-center gap-2">
+            <div
+              ref={scrollRef}
+              className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 scrollbar-hide"
+              style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
+            >
+              {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
+              <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
+                {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
+              </SortableContext>
+            </div>
 
-            {/* Settings link — only if there are favorites */}
-            {totalFavCount > 0 && user && (
+            {totalFavCount < 5 && (
+              <button
+                onClick={() => setShowAddDialog(true)}
+                className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/55 bg-primary/[0.06] px-3 py-2 text-[13px] font-semibold tracking-tight text-primary transition-colors hover:border-primary hover:bg-primary/10"
+                aria-label="Ajouter un lieu favori"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="sm:hidden">Lieu</span>
+                <span className="hidden sm:inline">Ajouter un lieu</span>
+              </button>
+            )}
+
+            {user && (
               <Link
                 href="/favorites"
-                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-2 text-[13px] font-semibold text-muted-foreground transition-all hover:border-primary/50 hover:text-foreground"
+                aria-label="Gérer, modifier ou supprimer mes villes favorites"
+                title="Gérer mes villes"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-primary/45 bg-primary/[0.06] text-primary transition-colors hover:border-primary hover:bg-primary/10"
               >
-                <Settings className="h-3 w-3" />
+                <Settings className="h-4 w-4" />
               </Link>
             )}
           </div>
@@ -297,16 +312,6 @@ export function FavoritesBar({
             {activeDragLocation ? <div className="flex min-h-11 items-center gap-2 rounded-full border border-primary/80 bg-slate-950 px-3.5 py-2 text-primary ring-1 ring-sky-300/60"><FavoritePillContent loc={activeDragLocation} weather={prefetchedWeather?.get(activeDragLocation.id)} active /></div> : null}
           </DragOverlay>
         </DndContext>
-
-        {totalFavCount < 5 && (
-          <button
-            onClick={() => setShowAddDialog(true)}
-            className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/55 bg-primary/[0.06] px-3.5 py-2 text-[13px] font-semibold tracking-tight text-primary transition-colors hover:border-primary hover:bg-primary/10 sm:w-auto"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Ajouter un lieu</span>
-          </button>
-        )}
 
         {/* Dot indicators */}
         {locations.length > 1 && (
