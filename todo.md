@@ -1738,3 +1738,8 @@
 - [x] Audit: Comparer les sources, horodatages et règles des libellés Averses, Bruine et Ciel couvert.
 - [x] Interface: Clarifier les niveaux d’information ou corriger une incohérence objectivement mesurée.
 - [x] Validation: Vérifier Dashboard, AI Lab, TypeScript, Vitest et build avant publication.
+
+## Carte principale : phénomène et évolution sur deux lignes
+- [x] Interface: Conserver « Phénomène actuel · Bruine » sur une ligne mobile et placer l’évolution horaire sur la ligne suivante.
+- [x] Interface: Donner à la ligne d’évolution la même taille de lecture que le phénomène actuel.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.

@@ -629,21 +629,6 @@ export default function Dashboard() {
                   <p className={dashboardTemperatureLayout.currentValue}>
                     {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
-                  <p className="mt-1 text-base font-medium text-slate-100/90 sm:text-lg">
-                    <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-sky-200/80">Phénomène actuel</span>
-                    {currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible"}
-                  </p>
-                  {(nextRegimeChange ?? nextConditionChange) && (
-                    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-sky-300">
-                      <Clock className="h-3 w-3" />
-                      <span className="sm:hidden">Évolution : {nextRegimeChange
-                        ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} · ${nextRegimeChange.hour}`
-                        : `${nextConditionChange!.condition} · ${nextConditionChange!.hour}`}</span>
-                      <span className="hidden sm:inline">Évolution horaire : {nextRegimeChange
-                        ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} à ${nextRegimeChange.hour}`
-                        : `${nextConditionChange!.condition} à ${nextConditionChange!.hour}`}</span>
-                    </p>
-                  )}
                 </div>
 
                 {/* Max / Min */}
@@ -662,6 +647,26 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-1.5 min-w-0 space-y-1">
+              <p className="whitespace-nowrap text-base font-medium leading-tight text-slate-100/90 sm:text-lg">
+                <span className="font-semibold text-sky-200/90">Phénomène actuel · </span>
+                {currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible"}
+              </p>
+              {(nextRegimeChange ?? nextConditionChange) && (
+                <>
+                  <p className="whitespace-nowrap text-base font-medium leading-tight text-sky-300 sm:hidden">Évolution · {nextRegimeChange
+                    ? `${nextRegimeChange.hour.replace(":00", "h")} · ${nextRegimeChange.emoji} ${nextRegimeChange.label}`
+                    : `${nextConditionChange!.hour.replace(":00", "h")} · ${nextConditionChange!.condition}`}</p>
+                  <p className="hidden items-center gap-1 text-[11px] font-medium text-sky-300 sm:flex">
+                    <Clock className="h-3 w-3" />
+                    <span>Évolution horaire : {nextRegimeChange
+                    ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} à ${nextRegimeChange.hour}`
+                    : `${nextConditionChange!.condition} à ${nextConditionChange!.hour}`}</span>
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Apparent temp + UV + Wind rose highlight row */}

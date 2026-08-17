@@ -48,7 +48,10 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Régime de prévision dominant");
     expect(source).toContain("Phénomène actuel");
     expect(source).toContain("Synthèse horaire · {regimeFreshnessLabel}");
-    expect(source).toContain('text-base font-medium text-slate-100/90 sm:text-lg');
+    expect(source).toContain("whitespace-nowrap text-base font-medium leading-tight");
+    expect(source).toContain('nextRegimeChange.hour.replace(":00", "h")');
+    expect(source).toContain("Évolution · {nextRegimeChange");
+    expect(source).toContain('text-base font-medium leading-tight text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');
     expect(source).toContain('CalendarDays className="h-4 w-4 text-sky-300"');
