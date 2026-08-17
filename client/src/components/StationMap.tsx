@@ -8,7 +8,39 @@ type StationMarker = {
   lon: number;
   distanceKm: number;
   ageMinutes: number | null;
+  source?: string | null;
+  reliabilityScore?: number | null;
+  readings?: unknown[];
+  latest?: {
+    temperature?: number | null;
+    humidity?: number | null;
+    windSpeed?: number | null;
+    windGust?: number | null;
+    precipitation?: number | null;
+  } | null;
 };
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character] ?? character));
+}
+
+function stationMetric(value: number | null | undefined, unit: string, decimals = 1) {
+  return value === null || value === undefined ? "—" : `${value.toFixed(decimals)}${unit}`;
+}
+
+function stationInfoHtml(station: StationMarker) {
+  const latest = station.latest;
+  const freshness = station.ageMinutes === null ? "Aucun relevé horodaté" : station.ageMinutes < 2 ? "À l’instant" : station.ageMinutes < 60 ? `Il y a ${station.ageMinutes} min` : `Il y a ${Math.floor(station.ageMinutes / 60)} h`;
+  const reliability = station.reliabilityScore === null || station.reliabilityScore === undefined ? "—" : `${Math.round(station.reliabilityScore)} %`;
+  const rows = [
+    ["Température", stationMetric(latest?.temperature, " °C")],
+    ["Humidité", stationMetric(latest?.humidity, " %", 0)],
+    ["Vent", stationMetric(latest?.windSpeed, " km/h")],
+    ["Rafales", stationMetric(latest?.windGust, " km/h")],
+    ["Pluie", stationMetric(latest?.precipitation, " mm")],
+  ];
+  return `<div style="min-width:210px;color:#e2e8f0;font-family:system-ui,sans-serif"><strong style="font-size:14px">${escapeHtml(station.name)}</strong><p style="margin:3px 0 8px;color:#94a3b8;font-size:11px">${escapeHtml(station.source ?? "Station physique")} · ${station.distanceKm.toFixed(1)} km · ${freshness}</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">${rows.map(([label, value]) => `<div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:5px"><span style="display:block;color:#94a3b8;font-size:10px">${label}</span><span style="font-size:12px;font-weight:600">${value}</span></div>`).join("")}</div><p style="margin:8px 0 0;color:#94a3b8;font-size:11px">Fiabilité mesurée : <strong style="color:#a7f3d0">${reliability}</strong> · ${station.readings?.length ?? 0} relevé(s) conservé(s)</p></div>`;
+}
 
 export function StationMap({
   center,
@@ -20,6 +52,7 @@ export function StationMap({
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const streetViewRef = useRef<google.maps.StreetViewPanorama | null>(null);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
@@ -58,7 +91,12 @@ export function StationMap({
         title: `${station.name} · ${station.distanceKm.toFixed(1)} km`,
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: freshness, fillOpacity: 1, strokeColor: "#071018", strokeWeight: 2 },
       });
-      marker.addListener("click", () => showStreetViewAt({ lat: station.lat, lng: station.lon }, station.name));
+      marker.addListener("click", () => {
+        const infoWindow = infoWindowRef.current ?? new google.maps.InfoWindow();
+        infoWindowRef.current = infoWindow;
+        infoWindow.setContent(stationInfoHtml(station));
+        infoWindow.open({ map, anchor: marker, shouldFocus: false });
+      });
       markersRef.current.push(marker);
     });
   }, [center, showStreetViewAt, stations]);

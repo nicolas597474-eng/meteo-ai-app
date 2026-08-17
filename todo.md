@@ -1848,3 +1848,9 @@
 - [x] Audit: Vérifier les positions des commandes natives de carte et de la commande Vue réelle.
 - [x] Interface: Positionner Vue réelle sans recouvrir les boutons d’agrandissement ou de zoom.
 - [x] Validation: Vérifier sur mobile, TypeScript, Vitest et build avant publication.
+
+## Infobulles détaillées des stations
+- [x] Audit: Identifier les mesures, scores et motifs réellement disponibles pour chaque station.
+- [x] Interface: Afficher une infobulle détaillée au clic sur un marqueur de station.
+- [x] Contrainte: Ne présenter que les valeurs et motifs réellement retournés par les données de station.
+- [x] Validation: Vérifier les interactions, TypeScript, Vitest et build avant publication.
