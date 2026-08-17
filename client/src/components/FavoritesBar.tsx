@@ -283,17 +283,6 @@ export function FavoritesBar({
               {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
             </SortableContext>
 
-            {/* Add button — always visible if under 5 favorites */}
-            {totalFavCount < 5 && (
-              <button
-                onClick={() => setShowAddDialog(true)}
-                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-primary/40 px-3.5 py-2 text-[13px] font-semibold tracking-tight text-primary transition-all hover:border-primary hover:bg-primary/10"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Ajouter un lieu</span>
-              </button>
-            )}
-
             {/* Settings link — only if there are favorites */}
             {totalFavCount > 0 && user && (
               <Link
@@ -308,6 +297,16 @@ export function FavoritesBar({
             {activeDragLocation ? <div className="flex min-h-11 items-center gap-2 rounded-full border border-primary/80 bg-slate-950 px-3.5 py-2 text-primary ring-1 ring-sky-300/60"><FavoritePillContent loc={activeDragLocation} weather={prefetchedWeather?.get(activeDragLocation.id)} active /></div> : null}
           </DragOverlay>
         </DndContext>
+
+        {totalFavCount < 5 && (
+          <button
+            onClick={() => setShowAddDialog(true)}
+            className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/55 bg-primary/[0.06] px-3.5 py-2 text-[13px] font-semibold tracking-tight text-primary transition-colors hover:border-primary hover:bg-primary/10 sm:w-auto"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Ajouter un lieu</span>
+          </button>
+        )}
 
         {/* Dot indicators */}
         {locations.length > 1 && (

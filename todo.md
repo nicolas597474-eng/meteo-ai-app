@@ -1768,3 +1768,8 @@
 - [x] Média: Créer un disque solaire réaliste, texturé, sans bord blanc et compatible avec la carte sombre.
 - [x] Interface: Intégrer la nouvelle image du Soleil sans modifier la position de la Lune ni les éphémérides.
 - [x] Validation: Vérifier le panneau mobile, TypeScript, Vitest et build avant publication.
+
+## Correction : ajout d’une ville favorite
+- [x] Audit: Identifier la condition ou le débordement qui masque l’action « Ajouter un lieu ».
+- [x] Interface: Garder « Ajouter un lieu » visible et accessible avec les favoris réorganisables.
+- [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.

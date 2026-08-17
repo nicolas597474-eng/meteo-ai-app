@@ -12,6 +12,12 @@ describe("FavoritesBar", () => {
     expect(source).toContain('aria-label="Fermer l’ajout de lieu"');
   });
 
+  it("garde l’action Ajouter un lieu visible hors du défilement des favoris", () => {
+    expect(source).toContain('mt-2 flex min-h-11 w-full items-center justify-center');
+    expect(source).toContain('<span>Ajouter un lieu</span>');
+    expect(source).toContain('totalFavCount < 5');
+  });
+
   it("affiche une température actuelle explicite avec la typographie des pastilles du Dashboard", () => {
     expect(source).toContain('température actuelle indisponible');
     expect(source).toContain('text-[13px] font-semibold tracking-tight');
