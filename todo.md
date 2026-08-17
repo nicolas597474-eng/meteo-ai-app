@@ -1667,3 +1667,8 @@
 - [x] Audit: Identifier le défilement initial et les surfaces appliquées aux cartes horaires.
 - [x] Interface: Cadrer l’heure actuelle et éclaircir les fonds de cartes sans réduire le contraste.
 - [x] Validation: Vérifier le comportement mobile, TypeScript, Vitest et build avant publication.
+
+## Graphique détaillé : chiffres et heure actuelle
+- [x] Audit: Identifier les tailles de libellés et la géométrie du repère actuel dans le SVG.
+- [x] Interface: Agrandir les valeurs et placer l’heure actuelle centrée sous sa verticale.
+- [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.

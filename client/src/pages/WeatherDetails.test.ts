@@ -37,10 +37,13 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('paintOrder="stroke"');
     expect(source).toContain("chartH + 42");
     expect(source).toContain("MAINTENANT");
-    expect(source).toContain("Maintenant ·");
+    expect(source).toContain(">Maintenant</text>");
     expect(source).toContain("hourlyCardStride = 224");
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
     expect(source).toContain("bg-slate-800/60");
     expect(source).toContain("bg-sky-800/50");
+    expect(source).toContain('y={chartH + 58} textAnchor="middle"');
+    expect(source).toContain('fontSize="14"');
+    expect(source).toContain('fontSize={i === currentIdx ? "13" : "12"}');
   });
 });

@@ -583,7 +583,6 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const chartBottom = chartH - 8;
   const chartPlotHeight = chartBottom - chartTop;
   const currentX = (currentIdx / Math.max(hours.length - 1, 1)) * chartW;
-  const currentLabelX = Math.min(Math.max(currentX + 8, 6), chartW - 118);
 
   const points = values.map((v, hourIndex) => {
     if (v == null) return null;
@@ -598,7 +597,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   return (
     <div className="space-y-3">
       <div ref={chartScrollRef} onScroll={syncDetailScroll} className="overflow-x-auto scrollbar-hide">
-        <svg width={chartW} height={chartH + 58} className="min-w-full">
+        <svg width={chartW} height={chartH + 70} className="min-w-full">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
           <line key={pct} x1={0} x2={chartW} y1={chartBottom - pct * chartPlotHeight} y2={chartBottom - pct * chartPlotHeight} stroke="#1e293b" strokeWidth="1" />
@@ -619,10 +618,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
             y1={chartTop} y2={chartBottom}
               stroke="#60a5fa" strokeWidth="2" strokeDasharray="5 3" opacity="0.9"
             />
-            <g transform={`translate(${currentLabelX} ${chartH + 3})`}>
-              <rect width="110" height="20" rx="10" fill="#0f4c81" stroke="#93c5fd" strokeWidth="1" />
-              <text x="55" y="13.5" textAnchor="middle" fill="#eff6ff" fontSize="10" fontWeight="700">Maintenant · {hours[currentIdx]?.hour ?? "—"}</text>
-            </g>
+            <text x={currentX} y={chartH + 58} textAnchor="middle" fill="#bfdbfe" fontSize="11" fontWeight="700">Maintenant</text>
           </>
         )}
         
@@ -641,14 +637,14 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         {hours.map((h: any, i: number) => {
           const x = (i / (hours.length - 1)) * chartW;
           return (
-            <text key={i} x={x} y={chartH + 42} textAnchor="middle" fill={i === currentIdx ? "#93c5fd" : "#94a3b8"} fontSize="10" fontWeight={i === currentIdx ? "700" : "500"}>{h.hour}</text>
+            <text key={i} x={x} y={chartH + 42} textAnchor="middle" fill={i === currentIdx ? "#bfdbfe" : "#94a3b8"} fontSize={i === currentIdx ? "13" : "12"} fontWeight={i === currentIdx ? "700" : "500"}>{h.hour}</text>
           );
         })}
         
         {/* Valeur sélectionnée au-dessus de chaque heure. */}
         {points.map((p) => {
           return (
-            <text key={`value-${p.hourIndex}`} x={p.x} y={Math.max(p.y - 10, 18)} textAnchor="middle" fill={color} fontSize="11" fontWeight="bold" stroke="#070b13" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">
+            <text key={`value-${p.hourIndex}`} x={p.x} y={Math.max(p.y - 12, 20)} textAnchor="middle" fill={color} fontSize="14" fontWeight="bold" stroke="#070b13" strokeWidth="4" paintOrder="stroke" strokeLinejoin="round">
               {type === "pressure" ? p.v.toFixed(0) : p.v.toFixed(1)}
             </text>
           );
