@@ -14,7 +14,7 @@ export function formatDashboardDate(isoDate: string | null | undefined): string 
   return words.map((word) => word ? word[0].toUpperCase() + word.slice(1) : word).join(" ");
 }
 
-/** Format court pour la pancarte principale : « Mardi 15 Août ». */
+/** Format lisible de la pancarte principale : « Mardi 15 Août 2026 ». */
 export function formatDashboardCompactDate(isoDate: string | null | undefined): string {
   if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return "—";
 
@@ -23,6 +23,7 @@ export function formatDashboardCompactDate(isoDate: string | null | undefined): 
     weekday: "long",
     day: "numeric",
     month: "long",
+    year: "numeric",
     timeZone: "UTC",
   }).format(displayDate).split(" ");
 

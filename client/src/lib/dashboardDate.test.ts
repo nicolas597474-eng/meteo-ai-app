@@ -11,7 +11,7 @@ describe("formatDashboardDate", () => {
     expect(formatDashboardDate("13/08/2026")).toBe("—");
   });
 
-  it("fournit une date compacte pour la pancarte principale", () => {
-    expect(formatDashboardCompactDate("2026-08-15")).toBe("Samedi 15 Août");
+  it("fournit une date complète et lisible pour la pancarte principale", () => {
+    expect(formatDashboardCompactDate("2026-08-15")).toBe("Samedi 15 Août 2026");
   });
 });

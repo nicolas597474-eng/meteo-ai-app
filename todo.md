@@ -1812,3 +1812,9 @@
 - [x] Audit: Identifier les marges entre les favoris, les indicateurs et la date.
 - [x] Interface: Réduire légèrement ces espaces sans modifier la taille de la carte principale.
 - [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.
+
+## Année dans la date du Dashboard
+- [x] Audit: Vérifier le formatage compact de la date et ses tests.
+- [x] Interface: Afficher le jour, le mois et l’année dans la pastille de date.
+- [x] Interface: Réduire l’espace entre le haut de la carte, la date et le régime de prévision dominant.
+- [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.

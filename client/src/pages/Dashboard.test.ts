@@ -56,8 +56,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');
     expect(source).toContain('CalendarDays className="h-4 w-4 text-sky-300"');
     expect(source).toContain('space-y-2 px-3 pb-3 pt-1');
-    expect(source).toContain('px-4 pb-4 pt-3 sm:p-6');
-    expect(source).toContain('mb-1.5 flex justify-center sm:mb-3');
+    expect(source).toContain('px-4 pb-4 pt-2 sm:p-6');
+    expect(source).toContain('mb-1 flex justify-center sm:mb-3');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');
     expect(source).not.toContain('aria-label="Actualiser la météo maintenant"');
     expect(source).toContain('getExtremeTemperatureTone("max", maxTemperature)');
