@@ -1723,3 +1723,8 @@
 - [x] Audit: Identifier les dimensions, débordements et surfaces actuelles des cartes sur mobile.
 - [x] Interface: Compacter les cartes et éclaircir leurs fonds transparents.
 - [x] Validation: Vérifier l’ouverture mobile, TypeScript, Vitest et build avant publication.
+
+## Couleurs thermiques des prévisions détaillées
+- [x] Audit: Identifier la fonction et les seuils thermiques employés par le Dashboard.
+- [x] Interface: Appliquer ces teintes aux températures des cartes horaires détaillées.
+- [x] Validation: Vérifier les seuils sur mobile, TypeScript, Vitest et build avant publication.

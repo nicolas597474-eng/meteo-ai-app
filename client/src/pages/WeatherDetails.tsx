@@ -40,6 +40,17 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 }
 
+function hourlyTemperatureTone(temperature: number | null | undefined): string {
+  if (temperature == null || !Number.isFinite(temperature)) return "text-white";
+  if (temperature <= 0) return "text-cyan-200";
+  if (temperature <= 7) return "text-sky-200";
+  if (temperature <= 14) return "text-blue-200";
+  if (temperature < 20) return "text-amber-200";
+  if (temperature < 26) return "text-orange-300";
+  if (temperature < 33) return "text-orange-400";
+  return "text-red-300";
+}
+
 // Period splitting for a day
 type Period = "matin" | "apres_midi" | "soir" | "nuit";
 function getPeriod(hour: string): Period {
@@ -171,7 +182,7 @@ export default function WeatherDetails() {
                     
                     {/* Temperature */}
                     <div className="mb-3 border-b border-white/12 pb-3">
-                      <span className="text-[36px] font-semibold leading-none tracking-[-0.075em] text-white">{h.temp?.toFixed(1) ?? "—"}°</span>
+                      <span className={`text-[36px] font-semibold leading-none tracking-[-0.075em] ${hourlyTemperatureTone(h.temp)}`}>{h.temp?.toFixed(1) ?? "—"}°</span>
                       <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
                     </div>
                     

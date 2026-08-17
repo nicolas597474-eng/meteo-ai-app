@@ -39,6 +39,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("rgba(77,105,132,0.38)");
     expect(source).toContain("rgba(44,128,181,0.48)");
     expect(source).toContain("HourlyMetric");
+    expect(source).toContain("hourlyTemperatureTone(h.temp)");
+    expect(source).toContain('return "text-amber-200"');
+    expect(source).toContain('return "text-orange-300"');
     expect(source).toContain("Déroulé temporel");
     expect(source).not.toContain("Prévision officielle");
     expect(source).toContain('y={chartH + 58} textAnchor="middle"');
