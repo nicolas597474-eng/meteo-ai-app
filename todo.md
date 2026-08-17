@@ -1636,3 +1636,8 @@
 - [x] Interface: Retirer les altitudes du Soleil et de la Lune du panneau et de son détail.
 - [x] Médias: Créer un soleil réaliste 3D sans fond compatible avec la Lune 3D existante.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Ajout de lieu plein écran mobile
+- [x] Audit: Identifier le composant et les contraintes de taille actuelles du panneau d’ajout de lieu.
+- [x] Interface: Afficher la recherche de lieu en plein écran mobile avec fermeture accessible.
+- [x] Validation: Vérifier l’intégralité du panneau sur mobile, TypeScript, Vitest et build avant publication.

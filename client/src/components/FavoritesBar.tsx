@@ -357,28 +357,28 @@ function AddFavoriteDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 p-4"
+    <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-stretch justify-center bg-black/80 p-0 sm:items-center sm:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-sm bg-card border border-border rounded-2xl ring-1 ring-black/45 overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+      <div role="dialog" aria-modal="true" aria-labelledby="add-location-title" className="flex h-[100dvh] w-full min-h-0 flex-col overflow-hidden bg-card ring-1 ring-black/45 animate-in slide-in-from-bottom-4 duration-200 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-md sm:rounded-2xl sm:border sm:border-border">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:p-4">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <MapPin className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <h3 className="text-base font-semibold">Ajouter un lieu</h3>
+              <h3 id="add-location-title" className="text-lg font-semibold">Ajouter un lieu</h3>
               <p className="text-xs text-muted-foreground">Recherchez une ville ou utilisez votre GPS</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+          <button onClick={onClose} aria-label="Fermer l’ajout de lieu" className="p-2 rounded-lg hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Search */}
-        <div className="p-4 space-y-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:p-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
