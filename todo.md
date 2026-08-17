@@ -1938,3 +1938,13 @@
 - [x] Analyse: Vérifier les dimensions communes de l’arche et de la ligne d’horizon dans le panneau mobile.
 - [x] Interface: Aligner l’arche, la ligne d’horizon et les heures de lever/coucher sur une même largeur visible.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Dashboard — provenance après les prévisions détaillées
+- [x] Analyse: Identifier les deux sections à réordonner sans modifier la carte météo principale.
+- [x] Interface: Déplacer la provenance sous l’accès aux prévisions détaillées.
+- [ ] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Dashboard — suppression de la provenance
+- [x] Interface: Retirer entièrement le panneau « Provenance · Valeur actuelle ».
+- [x] Nettoyage: Supprimer les données et imports devenus inutilisés.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

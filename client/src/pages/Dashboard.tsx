@@ -455,12 +455,6 @@ export default function Dashboard() {
     : null;
   const localOfficialDelta = localObservation?.deltaFromOfficialC ?? null;
   const hasMaterialLocalDelta = localOfficialDelta !== null && Math.abs(localOfficialDelta) >= 2;
-  const hasPublishedModelRanking = Boolean((dash as any)?.ranking?.length);
-  const currentDataProvenance = localObservation
-    ? `Prévision horaire de modèle ; relevé local qualifié disponible${localObservation.observedAt ? ` à ${new Date(localObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : ""}.`
-    : currentHour?.isCurrent
-      ? "Valeur actuelle issue d’un modèle au pas de 15 minutes ; ce n’est pas une mesure de station."
-      : "Valeur horaire de prévision de modèle ; aucune observation physique qualifiée n’est disponible pour cet instant.";
 
   return (
     <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>
@@ -479,11 +473,6 @@ export default function Dashboard() {
           prefetchedWeather={prefetchedWeather}
           activeWeather={activeFavoriteWeather}
         />
-
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-sky-300/15 bg-sky-300/[0.04] px-3 py-2 text-[11px] leading-relaxed text-slate-300">
-          <div className="flex min-w-0 gap-2"><Radio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-300" /><p><span className="font-semibold text-sky-100">Provenance.</span> {currentDataProvenance}</p></div>
-          <Link href="/ranking" className="shrink-0 font-semibold text-sky-200">{hasPublishedModelRanking ? "Fiabilité" : "Données insuffisantes"}</Link>
-        </div>
 
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">
