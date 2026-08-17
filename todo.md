@@ -1899,3 +1899,8 @@
 - [x] Interface: Utiliser une vue agrandie contrôlée dans l’application avec fermeture explicite.
 - [x] Interface: Afficher Plan, Satellite et Street View dans cette vue agrandie.
 - [x] Validation: Vérifier la carte agrandie, TypeScript, Vitest et build avant publication.
+
+## Soleil légèrement réduit dans le panneau astronomique
+- [x] Audit: Identifier les dimensions du Soleil et de la Lune dans l’arche astronomique.
+- [x] Interface: Réduire légèrement le Soleil sans modifier son point de position ni la Lune.
+- [x] Validation: Vérifier le panneau mobile, TypeScript, Vitest et build avant publication.

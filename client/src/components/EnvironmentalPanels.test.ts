@@ -49,6 +49,7 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("moonDisplayPosition");
     expect(modernSunMoonSource).toContain("Position du Soleil sur l’arche");
     expect(modernSunMoonSource).toContain("Position de la Lune sur l’arche");
+    expect(modernSunMoonSource).toContain("h-12 w-12");
     expect(styles).not.toContain('content: "Nuit locale"');
   });
 
