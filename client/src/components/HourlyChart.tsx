@@ -422,9 +422,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.textAlign = "center";
       const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP);
       const temperatureLabel = `${v.toFixed(1)}°`;
-      const labelWidth = ctx.measureText(temperatureLabel).width;
-      ctx.fillStyle = "rgba(12, 30, 50, 0.82)";
-      ctx.fillRect(pt.x - labelWidth / 2 - 4, temperatureLabelY - 14, labelWidth + 8, 18);
       ctx.fillStyle = nowHour === i ? "#dbeafe" : "#ffedd5";
       ctx.fillText(temperatureLabel, pt.x, temperatureLabelY);
     });
@@ -439,9 +436,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.font = "700 13px system-ui";
       ctx.textAlign = "center";
       const windLabel = `${Math.round(v)} km/h`;
-      const windLabelWidth = ctx.measureText(windLabel).width;
-      ctx.fillStyle = "rgba(4, 18, 14, 0.88)";
-      ctx.fillRect(x - windLabelWidth / 2 - 3, y - 12, windLabelWidth + 6, 16);
       ctx.fillStyle = "#bbf7d0";
       ctx.fillText(windLabel, x, y);
       const dir = hours[i].windDirection;
@@ -464,9 +458,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.textAlign = "center";
       const precipLabel = p.toFixed(1);
       const drawPrecipLabel = (labelY: number) => {
-        const precipLabelWidth = ctx.measureText(precipLabel).width;
-        ctx.fillStyle = "rgba(5, 12, 24, 0.9)";
-        ctx.fillRect(x - precipLabelWidth / 2 - 3, labelY - 12, precipLabelWidth + 6, 15);
         ctx.fillStyle = p > 0 ? "#dbeafe" : "rgba(191,219,254,0.92)";
         ctx.fillText(precipLabel, x, labelY);
       };

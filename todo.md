@@ -1708,3 +1708,8 @@
 - [x] Audit: Identifier les contours appliqués aux cartouches de température, vent et pluie.
 - [x] Interface: Retirer les contours noirs en préservant le contraste typographique.
 - [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
+
+## Valeurs du graphique sans ombre sombre
+- [x] Audit: Identifier les remplissages et effets sombres encore appliqués aux valeurs.
+- [x] Interface: Retirer toute ombre ou cartouche sombre autour des chiffres.
+- [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
