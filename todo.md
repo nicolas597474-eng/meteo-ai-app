@@ -1948,3 +1948,12 @@
 - [x] Interface: Retirer entièrement le panneau « Provenance · Valeur actuelle ».
 - [x] Nettoyage: Supprimer les données et imports devenus inutilisés.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Arche Soleil & Lune — sommet complet
+- [x] Analyse: Vérifier le rognage supérieur constaté sur mobile.
+- [x] Interface: Agrandir le canevas utile au-dessus de l’arche afin que son sommet reste visible.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Arche Soleil & Lune — libellés superposés
+- [x] Interface: Retirer les textes « Soleil » et « Lune » dessinés au niveau des astres.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
