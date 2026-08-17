@@ -8,16 +8,16 @@ describe("mise en page de température du Dashboard", () => {
   });
 
   it("borne la température principale et interdit le retour à la ligne des valeurs", () => {
-    expect(dashboardTemperatureLayout.currentValue).toContain("clamp(3.25rem,16vw,4.5rem)");
+    expect(dashboardTemperatureLayout.currentValue).toContain("clamp(2.8rem,14vw,3.65rem)");
     expect(dashboardTemperatureLayout.currentValue).toContain("whitespace-nowrap");
     expect(dashboardTemperatureLayout.extremeValue).toContain("whitespace-nowrap");
-    expect(dashboardTemperatureLayout.extremeValue).toContain("text-2xl");
+    expect(dashboardTemperatureLayout.extremeValue).toContain("text-xl");
     expect(dashboardTemperatureLayout.extremeValue).toContain("font-extrabold");
   });
 
   it("préserve une zone tactile de 44 px tout en compactant les sections mobiles", () => {
     expect(dashboardTemperatureLayout.refreshButton).toContain("min-h-11");
-    expect(dashboardTemperatureLayout.compactMetrics).toContain("mt-2");
+    expect(dashboardTemperatureLayout.compactMetrics).toContain("mt-1");
     expect(dashboardTemperatureLayout.compactMetrics).toContain("sm:mt-3");
   });
 });

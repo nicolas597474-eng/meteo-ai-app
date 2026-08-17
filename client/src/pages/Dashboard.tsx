@@ -30,8 +30,8 @@ function WindRose({ direction, speed }: { direction: number | null; speed: numbe
     return dirs[Math.round(deg / 45) % 8];
   };
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative w-10 h-10">
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="relative h-8 w-8">
         <svg viewBox="0 0 40 40" className="w-full h-full">
           {/* Compass circle */}
           <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
@@ -49,8 +49,8 @@ function WindRose({ direction, speed }: { direction: number | null; speed: numbe
           <circle cx="20" cy="20" r="2" fill="#60a5fa" />
         </svg>
       </div>
-      <p className="text-xs font-bold text-blue-300">{cardinalDir(dir)}</p>
-      {speed != null && <p className="text-xs text-muted-foreground">{speed}km/h</p>}
+      <p className="text-[10px] font-bold text-blue-300">{cardinalDir(dir)}</p>
+      {speed != null && <p className="text-[10px] text-muted-foreground">{speed}km/h</p>}
     </div>
   );
 }
@@ -65,8 +65,8 @@ function UVBadge({ uv }: { uv: number | null }) {
     : { label: "Extrême", color: "text-purple-400" };
   return (
     <div className="flex flex-col items-center">
-      <span className={`text-base sm:text-lg font-bold ${level.color}`}>{Math.round(uv)}</span>
-      <span className={`text-xs ${level.color} opacity-80`}>{level.label}</span>
+      <span className={`text-sm sm:text-lg font-bold ${level.color}`}>{Math.round(uv)}</span>
+      <span className={`text-[10px] sm:text-xs ${level.color} opacity-80`}>{level.label}</span>
     </div>
   );
 }
@@ -469,7 +469,7 @@ export default function Dashboard() {
         />
 
         {/* ── Hero : Température actuelle + max/min ── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-4 pb-4 pt-2 sm:p-6">
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">
           {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
           <img
             src={dashboardSkyImage}
@@ -479,17 +479,17 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className="mb-1 flex justify-center sm:mb-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/55 bg-slate-950/70 px-3 py-1.5 text-sm font-bold text-slate-50">
-                <CalendarDays className="h-4 w-4 text-sky-300" aria-hidden="true" />
+            <div className="mb-0.5 flex justify-center sm:mb-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/55 bg-slate-950/70 px-2.5 py-1 text-[13px] font-bold text-slate-50 sm:px-3 sm:py-1.5 sm:text-sm">
+                <CalendarDays className="h-3.5 w-3.5 text-sky-300 sm:h-4 sm:w-4" aria-hidden="true" />
                 {panelDate}
               </span>
             </div>
 
             {/* ── Regime badge ── */}
             {regime && (
-              <div className="mb-2 rounded-xl border border-slate-600/50 bg-slate-800/60 px-3 py-1.5">
-                <div className="flex items-center gap-2">
+              <div className="mb-1 rounded-xl border border-slate-600/50 bg-slate-800/60 px-2.5 py-1 sm:mb-2 sm:px-3 sm:py-1.5">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => setShowRegimeMenu((open) => !open)}
@@ -497,28 +497,28 @@ export default function Dashboard() {
                     aria-controls="regime-catalogue"
                     className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-950/35 text-base">{regime.emoji}</span>
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-950/35 text-sm sm:h-7 sm:w-7 sm:text-base">{regime.emoji}</span>
                     <div className="min-w-0">
-                      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Régime de prévision dominant</p>
-                      <p className="flex items-center gap-1 text-xs font-semibold text-white">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
+                      <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">Régime de prévision dominant</p>
+                      <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
-                      <p className="mt-0.5 text-[10px] text-sky-200/80">Synthèse horaire · {regimeFreshnessLabel}</p>
+                      <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>
                       <span className="sr-only">Voir les 20 régimes</span>
                     </div>
                   </button>
                 </div>
                 {/* Weight pills */}
-                <div className="mt-1 flex flex-wrap gap-1">
-                  <span className="text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium">
+                <div className="mt-0.5 flex flex-wrap gap-1 sm:mt-1">
+                  <span className="rounded-full border border-orange-500/30 bg-orange-500/20 px-1.5 py-px text-[11px] font-medium text-orange-300 sm:px-2 sm:py-0.5 sm:text-xs">
                     🌡 {Math.round(regime.weights.temp * 100)}%
                   </span>
-                  <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full px-2 py-0.5 font-medium">
+                  <span className="rounded-full border border-blue-500/30 bg-blue-500/20 px-1.5 py-px text-[11px] font-medium text-blue-300 sm:px-2 sm:py-0.5 sm:text-xs">
                     🌧 {Math.round(regime.weights.precip * 100)}%
                   </span>
-                  <span className="text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full px-2 py-0.5 font-medium">
+                  <span className="rounded-full border border-cyan-500/30 bg-cyan-500/20 px-1.5 py-px text-[11px] font-medium text-cyan-300 sm:px-2 sm:py-0.5 sm:text-xs">
                     💨 {Math.round(regime.weights.wind * 100)}%
                   </span>
-                  <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full px-2 py-0.5 font-medium">
+                  <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-1.5 py-px text-[11px] font-medium text-purple-300 sm:px-2 sm:py-0.5 sm:text-xs">
                     ☁ {Math.round(regime.weights.condition * 100)}%
                   </span>
                 </div>
@@ -616,10 +616,10 @@ export default function Dashboard() {
             )}
 
             {/* Main temperature row */}
-            <div className="flex items-start gap-3 sm:gap-6">
+            <div className="flex items-start gap-2 sm:gap-6">
               {/* Icon — current hour condition (not day) */}
-              <div className="w-14 shrink-0 pt-1 sm:w-auto sm:pt-0">
-                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={56} className="sm:hidden" />
+              <div className="w-12 shrink-0 pt-1 sm:w-auto sm:pt-0">
+                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={48} className="sm:hidden" />
                 <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={64} className="hidden sm:block" />
               </div>
 
@@ -649,14 +649,14 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="mt-1.5 min-w-0 space-y-1">
-              <p className="whitespace-nowrap text-base font-medium leading-tight text-slate-100/90 sm:text-lg">
+            <div className="mt-1 min-w-0 space-y-0.5 sm:mt-1.5 sm:space-y-1">
+              <p className="whitespace-nowrap text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg">
                 <span className="font-semibold text-sky-200/90">Phénomène actuel · </span>
                 {currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible"}
               </p>
               {(nextRegimeChange ?? nextConditionChange) && (
                 <>
-                  <p className="whitespace-nowrap text-base font-medium leading-tight text-sky-300 sm:hidden">Évolution · {nextRegimeChange
+                  <p className="whitespace-nowrap text-[15px] font-medium leading-tight text-sky-300 sm:hidden">Évolution · {nextRegimeChange
                     ? `${nextRegimeChange.hour.replace(":00", "h")} · ${nextRegimeChange.emoji} ${nextRegimeChange.label}`
                     : `${nextConditionChange!.hour.replace(":00", "h")} · ${nextConditionChange!.condition}`}</p>
                   <p className="hidden items-center gap-1 text-[11px] font-medium text-sky-300 sm:flex">
@@ -673,23 +673,23 @@ export default function Dashboard() {
             <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700/60`}>
               {/* Ressenti */}
               <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
                   <Thermometer className="h-3 w-3" />Ressenti
                 </p>
-                <p className="text-xl sm:text-2xl font-bold">
+                <p className="text-lg font-bold sm:text-2xl">
                   {apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : currentTemp != null ? `${currentTemp.toFixed(1)}°` : "—"}
                 </p>
               </div>
               {/* UV Index */}
               <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
                   <Sun className="h-3 w-3" />Indice UV
                 </p>
                 <UVBadge uv={currentUV} />
               </div>
               {/* Wind Rose */}
               <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
                   <Wind className="h-3 w-3" />Direction
                 </p>
                 <div className="flex justify-center">
@@ -701,43 +701,43 @@ export default function Dashboard() {
             {/* Stats row */}
             <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700`}>
               <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                   <Droplets className="h-3 w-3" />Précip.
                 </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.precipitation ?? meteoAI?.precipitation ?? 0} mm</p>
+                <p className="text-sm font-semibold sm:text-lg">{today?.precipitation ?? meteoAI?.precipitation ?? 0} mm</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                   <Wind className="h-3 w-3" />Rafales
                 </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.windGust ?? "—"} km/h</p>
+                <p className="text-sm font-semibold sm:text-lg">{today?.windGust ?? "—"} km/h</p>
               </div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                     <MeteoIcon name="wind_param" size={16} className="shrink-0" />Vent max
                   </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
+                <p className="text-sm font-semibold sm:text-lg">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
               </div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                     <MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité
                   </p>
-                <p className="text-base sm:text-lg font-semibold">{today?.humidity ?? "—"}%</p>
+                <p className="text-sm font-semibold sm:text-lg">{today?.humidity ?? "—"}%</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Eye className="h-3 w-3" />Nuages
-                </p>
-                <p className="text-base sm:text-lg font-semibold">{currentCloudCover ?? "—"}%</p>
+                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
+                    <Eye className="h-3 w-3" />Nuages
+                  </p>
+                <p className="text-sm font-semibold sm:text-lg">{currentCloudCover ?? "—"}%</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Activity className="h-3 w-3" />Confiance prévision
-                </p>
-                <p className={`text-base sm:text-lg font-semibold ${stabilityColor(forecastConfidence)}`}>
+                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
+                    <Activity className="h-3 w-3" />Confiance prévision
+                  </p>
+                <p className={`text-sm font-semibold sm:text-lg ${stabilityColor(forecastConfidence)}`}>
                   {Math.round(forecastConfidence)}%
                 </p>
-                <p className="text-[10px] text-muted-foreground">Stabilité {Math.round(stabilityIndex)}%</p>
+                <p className="text-[9px] text-muted-foreground sm:text-[10px]">Stabilité {Math.round(stabilityIndex)}%</p>
               </div>
             </div>
           </div>

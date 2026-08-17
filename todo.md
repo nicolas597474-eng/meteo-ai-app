@@ -1824,3 +1824,9 @@
 - [x] Interface: Expliquer clairement quand seuls les modèles sont disponibles et pourquoi les stations sont insuffisantes.
 - [x] Contrainte: Ne jamais attribuer une cause non mesurée ; afficher les motifs réellement disponibles.
 - [x] Validation: Vérifier Stations, TypeScript, Vitest et build avant publication.
+
+## Carte principale complète au premier écran mobile
+- [x] Audit: Mesurer les espaces et les hauteurs au-dessus et dans la carte principale.
+- [x] Interface: Réduire uniquement les zones non essentielles afin d’afficher la carte entière à l’ouverture.
+- [x] Contrainte: Conserver toutes les informations météo de la carte principale.
+- [x] Validation: Vérifier le premier écran mobile, TypeScript, Vitest et build avant publication.
