@@ -6,12 +6,9 @@ import { useState, useMemo, useRef, useEffect, type UIEvent } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon, getIconNameFromCondition, getIconNameFromRegime } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft } from "lucide-react";
-import { Link } from "wouter";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
-import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { BackToTopButton } from "@/components/BackToTopButton";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -134,37 +131,6 @@ export default function WeatherDetails() {
   return (
     <div className="weather-page-sky min-h-screen bg-[#0d1117]" style={pageSkyStyle}>
       <div className="mx-auto max-w-2xl space-y-5 px-3 py-4 pb-28">
-
-        {/* ═══ HEADER ═══ */}
-        <MeteoSurface as="section" tone="accent" className="rounded-[32px] border border-sky-200/20 bg-[linear-gradient(150deg,rgba(17,61,89,0.88),rgba(10,23,40,0.96)_58%,rgba(7,12,21,0.98))] p-5">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/15 bg-slate-950/25 text-white transition-colors hover:border-sky-200/50 hover:bg-sky-400/10 active:scale-[0.97]" aria-label="Retour au Dashboard">
-              <ChevronLeft className="h-5 w-5" />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-sky-100/70">Prévision officielle</p>
-              <h1 className="mt-1 text-[24px] font-bold tracking-[-0.045em] text-white">Prévisions détaillées</h1>
-              <p className="mt-1 truncate text-xs font-medium text-sky-100/70">{activeLocation?.name ?? "Position actuelle"} <span className="px-1 text-sky-200/45">·</span> {formatDate(data?.today ?? "")}</p>
-            </div>
-            {regime && <WeatherStatusBadge compact tone="info" label="Régime" value={regime.primary.label} icon={<MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={15} />} />}
-          </div>
-          {currentHour && (
-            <div className="mt-5 flex items-center gap-4 border-t border-white/10 pt-4">
-              <MeteoIcon name={getIconNameFromCondition(currentHour.condition)} size={52} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/65">À {currentHour.hour}</p>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-[38px] font-semibold leading-none tracking-[-0.07em] text-white">{currentHour.temp?.toFixed(1) ?? "—"}°</span>
-                  <span className="text-xs text-sky-100/75">{currentHour.condition ?? "—"}</span>
-                </div>
-              </div>
-              <div className="text-right text-[11px] text-sky-100/75">
-                <p>Vent {currentHour.windSpeed?.toFixed(0) ?? "—"} km/h</p>
-                <p className="mt-1">Pluie {currentHour.precipitation?.toFixed(1) ?? "0"} mm</p>
-              </div>
-            </div>
-          )}
-        </MeteoSurface>
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
         <MeteoSurface as="section" tone="default" className="rounded-[28px] border border-white/10 bg-[rgba(9,16,28,0.88)] p-4">
@@ -650,7 +616,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         {/* Valeur sélectionnée au-dessus de chaque heure. */}
         {points.map((p) => {
           return (
-            <text key={`value-${p.hourIndex}`} x={p.x} y={Math.max(p.y - 12, 20)} textAnchor="middle" fill={color} fontSize="14" fontWeight="bold" stroke="#070b13" strokeWidth="4" paintOrder="stroke" strokeLinejoin="round">
+            <text key={`value-${p.hourIndex}`} x={p.x} y={Math.max(p.y - 12, 20)} textAnchor="middle" fill={color} fontSize="14" fontWeight="bold">
               {type === "pressure" ? p.v.toFixed(0) : p.v.toFixed(1)}
             </text>
           );

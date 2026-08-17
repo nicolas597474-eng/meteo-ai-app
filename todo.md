@@ -1713,3 +1713,8 @@
 - [x] Audit: Identifier les remplissages et effets sombres encore appliqués aux valeurs.
 - [x] Interface: Retirer toute ombre ou cartouche sombre autour des chiffres.
 - [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
+
+## Prévisions détaillées : en-tête et chiffres sans ombre
+- [x] Audit: Identifier la carte d’introduction et les styles sombres résiduels autour des valeurs.
+- [x] Interface: Retirer la première carte et supprimer tout effet sombre restant sur les chiffres du graphique.
+- [x] Validation: Vérifier la page mobile, TypeScript, Vitest et build avant publication.

@@ -6,13 +6,9 @@ const source = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url), "u
 describe("page Prévisions détaillées", () => {
   it("réutilise les surfaces et contrôles visuels MeteoAI", () => {
     expect(source).toContain('import { MeteoSurface } from "@/components/weather/MeteoSurface"');
-    expect(source).toContain('import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge"');
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
-    expect(source).toContain('tone="accent"');
     expect(source).toContain('tone="default"');
     expect(source).toContain("weather-chart-3d");
-    expect(source).toContain("Prévisions détaillées");
-    expect(source).toContain('aria-label="Retour au Dashboard"');
     expect(source).toContain("<BackToTopButton />");
     expect(source).toContain("w-[202px]");
     expect(source).toContain("hours.length * 214");
@@ -34,7 +30,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("onScroll={syncChartScroll}");
     expect(source).toContain("const chartTop = 36");
     expect(source).toContain("chartBottom = chartH - 8");
-    expect(source).toContain('paintOrder="stroke"');
+    expect(source).not.toContain('paintOrder="stroke"');
     expect(source).toContain("chartH + 42");
     expect(source).toContain("MAINTENANT");
     expect(source).toContain(">Maintenant</text>");
@@ -44,7 +40,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("rgba(19,85,125,0.78)");
     expect(source).toContain("HourlyMetric");
     expect(source).toContain("Déroulé temporel");
-    expect(source).toContain("Prévision officielle");
+    expect(source).not.toContain("Prévision officielle");
     expect(source).toContain('y={chartH + 58} textAnchor="middle"');
     expect(source).toContain('fontSize="14"');
     expect(source).toContain('fontSize={i === currentIdx ? "13" : "12"}');
