@@ -21,6 +21,11 @@ describe("carte des stations", () => {
     expect(source).toContain("MapTypeControlStyle.HORIZONTAL_BAR");
     expect(source).toContain("background:#071018");
     expect(source).toContain("border:1px solid #38bdf8");
+    expect(source).toContain("function stationFreshness");
+    expect(source).toContain("Dernier relevé");
+    expect(source).toContain("#34d399");
+    expect(source).toContain("#fbbf24");
+    expect(source).toContain("#fb7185");
     expect(source).toContain("function stationInfoHtml");
     expect(source).toContain("new google.maps.InfoWindow()");
     expect(source).toContain("Fiabilité mesurée");

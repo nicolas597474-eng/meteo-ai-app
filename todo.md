@@ -1877,3 +1877,9 @@
 - [x] Interface: Afficher Street View avec Plan et Satellite uniquement dans la carte agrandie.
 - [x] Interface: Renforcer le fond, le contraste et l’espacement des infobulles de stations.
 - [x] Validation: Vérifier les contrôles, la lisibilité, TypeScript, Vitest et build avant publication.
+
+## Couleur de fraîcheur dans l’infobulle de station
+- [x] Audit: Vérifier les âges de relevé réellement disponibles et leurs seuils de fraîcheur.
+- [x] Interface: Colorer l’heure du dernier relevé selon sa fraîcheur.
+- [x] Contrainte: Afficher un état neutre lorsque l’horodatage est indisponible.
+- [x] Validation: Vérifier les infobulles, TypeScript, Vitest et build avant publication.
