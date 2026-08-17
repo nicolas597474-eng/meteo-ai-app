@@ -29,8 +29,9 @@ const observationInput = z.object({
   temperature: z.number().min(-60).max(60).nullable(),
   condition: z.enum(PERSONAL_CONDITIONS),
   windSpeed: z.number().min(0).max(250).nullable(),
+  precipitation: z.number().min(0).max(500).nullable(),
 });
-const observationEditInput = observationInput.pick({ temperature: true, condition: true, windSpeed: true });
+const observationEditInput = observationInput.pick({ temperature: true, condition: true, windSpeed: true, precipitation: true });
 
 function weightedAverage(values: Array<{ value: number | null; weight: number }>) {
   const available = values.filter((entry): entry is { value: number; weight: number } => entry.value != null);
@@ -140,6 +141,7 @@ export const personalObservationsRouter = router({
       temperature: input.temperature,
       condition: input.condition,
       windSpeed: input.windSpeed,
+      precipitation: input.precipitation,
     });
     if (!observationId) throw new Error("L’observation n’a pas pu être enregistrée.");
 
@@ -158,13 +160,16 @@ export const personalObservationsRouter = router({
       observationId,
       modelName: forecast.modelName,
       temperatureError: result.temperatureError,
-      temperatureScore: result.temperatureScore,
-      conditionScore: result.conditionScore,
-      windScore: result.windScore,
+        temperatureScore: result.temperatureScore,
+        conditionScore: result.conditionScore,
+        precipitationError: result.precipitationError,
+        precipitationScore: result.precipitationScore,
+        windScore: result.windScore,
       overallScore: result.overallScore,
       forecastSnapshot: {
         temperature: forecast.temperature,
         windSpeed: forecast.windSpeed,
+        precipitation: forecast.precipitation,
         weatherCode: forecast.weatherCode,
         cloudCover: forecast.cloudCover,
         forecastCondition: result.forecastCondition,

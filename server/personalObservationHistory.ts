@@ -7,7 +7,7 @@ import {
 } from "./db";
 import { scorePersonalModelObservation, updatePersonalCalibration, type PersonalCondition } from "./personalCalibration";
 
-type StoredForecastSnapshot = { temperature: number | null; windSpeed: number | null; weatherCode: number | null; cloudCover: number | null };
+type StoredForecastSnapshot = { temperature: number | null; windSpeed: number | null; precipitation: number | null; weatherCode: number | null; cloudCover: number | null };
 
 function parseSnapshot(value: unknown): StoredForecastSnapshot | null {
   if (!value || typeof value !== "object") return null;
@@ -15,6 +15,7 @@ function parseSnapshot(value: unknown): StoredForecastSnapshot | null {
   return {
     temperature: typeof snapshot.temperature === "number" ? snapshot.temperature : null,
     windSpeed: typeof snapshot.windSpeed === "number" ? snapshot.windSpeed : null,
+    precipitation: typeof snapshot.precipitation === "number" ? snapshot.precipitation : null,
     weatherCode: typeof snapshot.weatherCode === "number" ? snapshot.weatherCode : null,
     cloudCover: typeof snapshot.cloudCover === "number" ? snapshot.cloudCover : null,
   };
@@ -37,6 +38,7 @@ export async function rebuildPersonalCalibration(userId: number, locationKey: st
         temperature: observation.temperature,
         condition: observation.condition as PersonalCondition,
         windSpeed: observation.windSpeed,
+        precipitation: observation.precipitation,
       }, snapshot);
       const updated = updatePersonalCalibration(calibrationByModel.get(storedScore.modelName), result);
       calibrationByModel.set(storedScore.modelName, updated);
@@ -46,6 +48,8 @@ export async function rebuildPersonalCalibration(userId: number, locationKey: st
         temperatureError: result.temperatureError,
         temperatureScore: result.temperatureScore,
         conditionScore: result.conditionScore,
+        precipitationError: result.precipitationError,
+        precipitationScore: result.precipitationScore,
         windScore: result.windScore,
         overallScore: result.overallScore,
         forecastSnapshot: { ...snapshot, forecastCondition: result.forecastCondition },

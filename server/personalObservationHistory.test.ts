@@ -8,5 +8,7 @@ describe("reconstruction de calibration personnelle", () => {
     expect(source).toContain("scorePersonalModelObservation");
     expect(source).toContain("replacePersonalModelObservationScores");
     expect(source).toContain("clearPersonalModelCalibrations");
+    expect(source).toContain("precipitation: observation.precipitation");
+    expect(source).toContain("precipitationScore: result.precipitationScore");
   });
 });

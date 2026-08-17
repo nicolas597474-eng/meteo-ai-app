@@ -1672,3 +1672,8 @@
 - [x] Audit: Identifier les tailles de libellés et la géométrie du repère actuel dans le SVG.
 - [x] Interface: Agrandir les valeurs et placer l’heure actuelle centrée sous sa verticale.
 - [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
+
+## Précipitations observées personnelles
+- [x] Audit: Vérifier la persistance et le score des précipitations pour les observations personnelles.
+- [x] Interface: Afficher un champ de millimètres pour les conditions pluvieuses et envoyer sa valeur.
+- [x] Validation: Vérifier la saisie mobile, le score, TypeScript, Vitest et build avant publication.

@@ -8,6 +8,9 @@ describe("routeur des observations personnelles", () => {
     expect(source).toContain("forecast.hour === getParisHour(now)");
     expect(source).toContain("minimumForWeighting: 50");
     expect(source).toContain("scorePersonalModelObservation(input, forecast)");
+    expect(source).toContain("precipitation: z.number().min(0).max(500).nullable()");
+    expect(source).toContain("precipitationScore: result.precipitationScore");
+    expect(source).toContain("precipitation: forecast.precipitation");
     expect(source).toContain("personalizedHourly");
     expect(source).toContain('item.evidenceState === "qualified"');
     expect(source).toContain("weightMultiplier");

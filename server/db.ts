@@ -1051,6 +1051,7 @@ export async function upsertPersonalModelCalibration(data: InsertPersonalModelCa
       scoreEma: data.scoreEma,
       temperatureMaeEma: data.temperatureMaeEma,
       conditionScoreEma: data.conditionScoreEma,
+      precipitationScoreEma: data.precipitationScoreEma,
       windScoreEma: data.windScoreEma,
       weightMultiplier: data.weightMultiplier,
       evidenceState: data.evidenceState,
@@ -1101,7 +1102,7 @@ export async function getPersonalWeatherObservationById(userId: number, id: numb
   return rows[0] ?? null;
 }
 
-export async function updatePersonalWeatherObservation(userId: number, id: number, data: Pick<InsertPersonalWeatherObservation, "temperature" | "condition" | "windSpeed">) {
+export async function updatePersonalWeatherObservation(userId: number, id: number, data: Pick<InsertPersonalWeatherObservation, "temperature" | "condition" | "windSpeed" | "precipitation">) {
   const db = await getDb();
   if (!db) return false;
   const result = await db

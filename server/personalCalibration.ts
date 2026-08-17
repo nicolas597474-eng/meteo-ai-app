@@ -21,11 +21,13 @@ type PersonalObservationInput = {
   temperature: number | null;
   condition: PersonalCondition;
   windSpeed: number | null;
+  precipitation?: number | null;
 };
 
 type ArchivedModelForecast = {
   temperature: number | null;
   windSpeed: number | null;
+  precipitation?: number | null;
   weatherCode: number | null;
   cloudCover: number | null;
 };
@@ -35,6 +37,7 @@ type PriorCalibration = {
   scoreEma: number | null;
   temperatureMaeEma: number | null;
   conditionScoreEma: number | null;
+  precipitationScoreEma?: number | null;
   windScoreEma: number | null;
 };
 
@@ -78,14 +81,19 @@ export function scorePersonalModelObservation(observation: PersonalObservationIn
   const windScore = observation.windSpeed != null && forecast.windSpeed != null
     ? 100 * Math.exp(-Math.abs(forecast.windSpeed - observation.windSpeed) / 10)
     : null;
+  const precipitationError = observation.precipitation != null && forecast.precipitation != null
+    ? Math.abs(forecast.precipitation - observation.precipitation)
+    : null;
+  const precipitationScore = precipitationError == null ? null : 100 * Math.exp(-precipitationError / 1.5);
   const dimensions = [
     { weight: 0.5, score: temperatureScore },
     { weight: 0.3, score: conditionScore },
-    { weight: 0.2, score: windScore },
+    { weight: 0.12, score: precipitationScore },
+    { weight: 0.08, score: windScore },
   ].filter((entry): entry is { weight: number; score: number } => entry.score != null);
   const totalWeight = dimensions.reduce((sum, entry) => sum + entry.weight, 0);
   const overallScore = dimensions.reduce((sum, entry) => sum + entry.weight * entry.score, 0) / totalWeight;
-  return { temperatureError, temperatureScore, conditionScore, windScore, overallScore, forecastCondition };
+  return { temperatureError, temperatureScore, conditionScore, precipitationError, precipitationScore, windScore, overallScore, forecastCondition };
 }
 
 export function updatePersonalCalibration(prior: PriorCalibration | undefined, result: ReturnType<typeof scorePersonalModelObservation>) {
@@ -93,11 +101,12 @@ export function updatePersonalCalibration(prior: PriorCalibration | undefined, r
   const scoreEma = ema(prior?.scoreEma ?? null, result.overallScore);
   const temperatureMaeEma = ema(prior?.temperatureMaeEma ?? null, result.temperatureError);
   const conditionScoreEma = ema(prior?.conditionScoreEma ?? null, result.conditionScore);
+  const precipitationScoreEma = ema(prior?.precipitationScoreEma ?? null, result.precipitationScore);
   const windScoreEma = ema(prior?.windScoreEma ?? null, result.windScore);
   const evidenceState = comparisonCount < 20 ? "insufficient" : comparisonCount < 50 ? "provisional" : "qualified";
   // Aucun modèle ne reçoit une influence opérationnelle avant 50 comparaisons.
   const weightMultiplier = evidenceState === "qualified" && scoreEma != null
     ? clamp(0.85 + (scoreEma / 100) * 0.3, 0.85, 1.15)
     : 1;
-  return { comparisonCount, scoreEma, temperatureMaeEma, conditionScoreEma, windScoreEma, evidenceState, weightMultiplier };
+  return { comparisonCount, scoreEma, temperatureMaeEma, conditionScoreEma, precipitationScoreEma, windScoreEma, evidenceState, weightMultiplier };
 }

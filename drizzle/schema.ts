@@ -509,6 +509,7 @@ export const personalWeatherObservations = mysqlTable("personal_weather_observat
   temperature: float("temperature"),
   condition: varchar("condition", { length: 32 }).notNull(),
   windSpeed: float("windSpeed"),
+  precipitation: float("precipitation"), // mm observés durant le créneau en cours
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
@@ -525,6 +526,8 @@ export const personalModelObservationScores = mysqlTable("personal_model_observa
   temperatureError: float("temperatureError"),
   temperatureScore: float("temperatureScore"),
   conditionScore: float("conditionScore"),
+  precipitationError: float("precipitationError"),
+  precipitationScore: float("precipitationScore"),
   windScore: float("windScore"),
   overallScore: float("overallScore").notNull(),
   forecastSnapshot: json("forecastSnapshot").notNull(),
@@ -543,6 +546,7 @@ export const personalModelCalibrations = mysqlTable("personal_model_calibrations
   scoreEma: float("scoreEma"),
   temperatureMaeEma: float("temperatureMaeEma"),
   conditionScoreEma: float("conditionScoreEma"),
+  precipitationScoreEma: float("precipitationScoreEma"),
   windScoreEma: float("windScoreEma"),
   weightMultiplier: float("weightMultiplier").notNull().default(1),
   evidenceState: varchar("evidenceState", { length: 24 }).notNull().default("insufficient"),
