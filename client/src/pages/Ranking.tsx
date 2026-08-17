@@ -73,6 +73,41 @@ function asStoredArray<T>(value: unknown): T[] {
   }
 }
 
+type PhysicalStationDiagnostics = {
+  netatmoStatus?: "not_connected" | "temporarily_unavailable" | "fresh_cache" | "live" | "connected_empty";
+  discoveredCount?: number;
+  activeCount?: number;
+  exclusionReasons?: string[];
+};
+
+function explainPhysicalStationAvailability(
+  diagnostics: PhysicalStationDiagnostics | null | undefined,
+  candidateCount: number,
+  radiusKm: number,
+) {
+  const exclusionReasons = diagnostics?.exclusionReasons ?? [];
+  const discoveredCount = diagnostics?.discoveredCount ?? exclusionReasons.length;
+  let detail = "Aucune cause détaillée n’a été renvoyée par la vérification actuelle.";
+
+  if (exclusionReasons.length > 0) {
+    detail = `${discoveredCount} station${discoveredCount > 1 ? "s" : ""} physique${discoveredCount > 1 ? "s" : ""} trouvée${discoveredCount > 1 ? "s" : ""}, mais écartée${discoveredCount > 1 ? "s" : ""} : ${exclusionReasons.join(" · ")}.`;
+  } else if (diagnostics?.netatmoStatus === "not_connected") {
+    detail = "La source Netatmo n’était pas autorisée pour cette session de vérification.";
+  } else if (diagnostics?.netatmoStatus === "connected_empty") {
+    detail = `La source Netatmo a répondu, mais aucune station physique n’a été renvoyée dans le rayon de ${radiusKm} km.`;
+  } else if (diagnostics?.netatmoStatus === "temporarily_unavailable") {
+    detail = "La source Netatmo n’a pas répondu et aucun cache récent exploitable n’a été retrouvé.";
+  } else if (diagnostics?.netatmoStatus === "fresh_cache") {
+    detail = "La vérification utilise un cache Netatmo authentifié récent, sans relevé physique actuellement retenu.";
+  } else if (discoveredCount === 0) {
+    detail = `Aucune station physique n’a été trouvée dans le rayon de ${radiusKm} km lors de la vérification actuelle.`;
+  }
+
+  if (candidateCount === 0) return detail;
+  const candidateLabel = `${candidateCount} capteur${candidateCount > 1 ? "s" : ""} citoyen${candidateCount > 1 ? "s" : ""}`;
+  return `${detail} ${candidateLabel} ${candidateCount > 1 ? "sont" : "est"} en validation ; ${candidateCount > 1 ? "ils ne comptent" : "il ne compte"} pas encore comme station physique validée.`;
+}
+
 function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint[]; periodDays: 1 | 7 }) {
   const usable = points.filter((point) => point.stationTemperature !== null || point.officialTemperature !== null);
   if (usable.length === 0) {
@@ -178,6 +213,11 @@ export default function Ranking() {
   const realLocalStations = currentSources.filter((station) => station.isActive && station.sourceKind === "physical");
   const candidateSources = currentSources.filter((station) => station.qualificationStatus === "candidate");
   const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate");
+  const physicalStationExplanation = explainPhysicalStationAvailability(
+    liveStationData?.physicalStationDiagnostics,
+    candidateSources.length,
+    radiusKm,
+  );
 
   return (
     <main className="weather-page-sky min-h-screen bg-[#080a0f] pb-28" style={pageSkyStyle}>
@@ -209,7 +249,7 @@ export default function Ranking() {
           <p className="mt-3 text-[11px] text-slate-600">{activeLocation?.favoriteId ? "Le rayon est enregistré pour ce lieu favori." : "Le rayon est utilisé pour cette consultation ; enregistrez ce lieu pour le conserver."}</p>
         </section>
 
-        <CollectionReport latest={latestCollection as any} history={availabilityHistory} />
+        <CollectionReport latest={latestCollection as any} history={availabilityHistory} physicalStationExplanation={physicalStationExplanation} />
 
         <LiveSourceSummary
           groundTruth={liveStationData?.groundTruth}
@@ -220,6 +260,7 @@ export default function Ranking() {
           ignoredCount={ignoredSources.length}
           criteria={rankingCriteria}
           isLoading={liveStationsLoading}
+          physicalStationExplanation={physicalStationExplanation}
           onOpenDetails={(source, kind) => setSelectedSource({ source, kind })}
         />
 
@@ -370,7 +411,7 @@ function FilteredStationDirectory({ sources, isLoading, onOpenDetails }: { sourc
   return <section className="mb-4 rounded-2xl border border-slate-700 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Explorer les sources</h2><p className="text-xs text-slate-500">Filtrez chaque source selon son type, son statut et sa distance.</p></div><WeatherStatusBadge compact tone="neutral" label="Sources" value={String(filteredSources.length)} /></div><div className="space-y-3 border-b border-slate-800 pb-3"><div><p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Type</p><div className="flex flex-wrap gap-1.5"><Choice active={kind === "all"} onClick={() => setKind("all")}>Toutes</Choice><Choice active={kind === "physical"} onClick={() => setKind("physical")}>Locales réelles</Choice><Choice active={kind === "reference"} onClick={() => setKind("reference")}>Références</Choice></div></div><div><p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Statut</p><div className="flex flex-wrap gap-1.5"><Choice active={status === "active"} onClick={() => setStatus("active")}>Actives</Choice><Choice active={status === "ignored"} onClick={() => setStatus("ignored")}>Écartées</Choice><Choice active={status === "all"} onClick={() => setStatus("all")}>Toutes</Choice></div></div><div className="flex items-center justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Distance</p><div className="flex gap-1.5"><Choice active={distanceOrder === "nearest"} onClick={() => setDistanceOrder("nearest")}>Plus proches</Choice><Choice active={distanceOrder === "furthest"} onClick={() => setDistanceOrder("furthest")}>Plus éloignées</Choice></div></div></div>{isLoading ? <div className="mt-3 h-24 animate-pulse rounded-xl bg-slate-800" /> : filteredSources.length > 0 ? <div className="mt-3 space-y-2">{filteredSources.map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical={station.sourceKind === "physical"} onOpenDetails={onOpenDetails} />)}</div> : <div className="mt-3 rounded-xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-500">Aucune source ne correspond à ces filtres.</div>}</section>;
 }
 
-function LiveSourceSummary({ groundTruth, evidenceStatus, realLocalStations, modelReferences, candidateSources, ignoredCount, criteria, isLoading, onOpenDetails }: { groundTruth: any; evidenceStatus: any; realLocalStations: any[]; modelReferences: any[]; candidateSources: any[]; ignoredCount: number; criteria: any; isLoading: boolean; onOpenDetails: (source: any, kind: "station" | "model") => void }) {
+function LiveSourceSummary({ groundTruth, evidenceStatus, realLocalStations, modelReferences, candidateSources, ignoredCount, criteria, isLoading, physicalStationExplanation, onOpenDetails }: { groundTruth: any; evidenceStatus: any; realLocalStations: any[]; modelReferences: any[]; candidateSources: any[]; ignoredCount: number; criteria: any; isLoading: boolean; physicalStationExplanation: string; onOpenDetails: (source: any, kind: "station" | "model") => void }) {
   const netatmoCount = realLocalStations.filter((station) => station.source === "netatmo" && String(station.stationId ?? "").startsWith("netatmo-")).length;
   const [showAdditionalLocalStations, setShowAdditionalLocalStations] = useState(false);
   const [showAdditionalModelReferences, setShowAdditionalModelReferences] = useState(false);
@@ -397,7 +438,7 @@ function LiveSourceSummary({ groundTruth, evidenceStatus, realLocalStations, mod
           </button>
           {showAdditionalLocalStations ? <div className="space-y-2 border-t border-emerald-500/15 pt-2">{realLocalStations.slice(1).map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 2} physical onOpenDetails={(source) => onOpenDetails(source, "station")} />)}</div> : null}
         </> : null}
-      </div> : <div className="rounded-xl border border-dashed border-emerald-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucune station physique locale n’est disponible dans le rayon actuel.</div>}
+      </div> : <div className="rounded-xl border border-dashed border-emerald-500/20 px-4 py-5 text-center"><p className="text-sm font-semibold text-emerald-100">Modèles disponibles, relevés physiques insuffisants</p><p className="mt-2 text-xs leading-relaxed text-slate-400">{physicalStationExplanation}</p></div>}
     </div>
     <div className="rounded-2xl border border-violet-500/20 bg-[#10131a] p-4">
       <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Références de modèles — non stations</h2><p className="text-xs text-slate-500">Prévisions au point du lieu, comparées aux observations physiques quand elles existent.</p></div><WeatherStatusBadge compact tone="lab" label="Références" value={String(modelReferences.length)} /></div>
@@ -418,12 +459,12 @@ function LiveSourceSummary({ groundTruth, evidenceStatus, realLocalStations, mod
   </section>;
 }
 
-function CollectionReport({ latest, history }: { latest: any; history: any[] }) {
+function CollectionReport({ latest, history, physicalStationExplanation }: { latest: any; history: any[]; physicalStationExplanation: string }) {
   return (
     <>
       <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
         <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Dernier bilan de collecte</h2><p className="text-xs text-slate-500">Couverture réelle des modèles et des stations lors du dernier passage.</p></div><MeteoIcon name="refresh" size={20} className="text-blue-400" /></div>
-        {latest ? <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-800 bg-[#090b10] p-3 text-center"><Reading label="Modèles jour" value={`${latest.dailyModelCount}/8`} /><Reading label="Modèles heure" value={`${latest.hourlyModelCount}/8`} /><Reading label="Stations" value={String(latest.physicalStationCount)} /><p className="col-span-3 border-t border-slate-800 pt-2 text-[11px] text-slate-500">{new Date(latest.collectedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" })} (Europe/Paris) · rayon {latest.radiusKm} km</p></div> : <div className="rounded-xl border border-dashed border-slate-800 px-4 py-5 text-center text-sm text-slate-500">Le premier bilan apparaîtra après la prochaine collecte.</div>}
+        {latest ? <div className="space-y-2 rounded-xl border border-slate-800 bg-[#090b10] p-3"><div className="grid grid-cols-3 gap-2 text-center"><Reading label="Modèles jour" value={`${latest.dailyModelCount}/8`} /><Reading label="Modèles heure" value={`${latest.hourlyModelCount}/8`} /><Reading label="Stations" value={String(latest.physicalStationCount)} /></div>{latest.physicalStationCount === 0 ? <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-left"><p className="text-[11px] font-semibold text-amber-100">Modèles disponibles, relevés physiques insuffisants</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">Au moment du bilan, aucun relevé physique validé n’a été archivé. Vérification actuelle : {physicalStationExplanation}</p></div> : null}<p className="border-t border-slate-800 pt-2 text-center text-[11px] text-slate-500">{new Date(latest.collectedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" })} (Europe/Paris) · rayon {latest.radiusKm} km</p></div> : <div className="rounded-xl border border-dashed border-slate-800 px-4 py-5 text-center text-sm text-slate-500">Le premier bilan apparaîtra après la prochaine collecte.</div>}
       </section>
       <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
         <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Disponibilité des stations</h2><p className="text-xs text-slate-500">Historique des recherches de stations physiques par collecte.</p></div><MeteoIcon name="stations" size={20} className="text-emerald-400" /></div>

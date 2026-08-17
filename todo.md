@@ -1818,3 +1818,9 @@
 - [x] Interface: Afficher le jour, le mois et l’année dans la pastille de date.
 - [x] Interface: Réduire l’espace entre le haut de la carte, la date et le régime de prévision dominant.
 - [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.
+
+## Clarification des stations physiques insuffisantes
+- [x] Audit: Identifier les motifs réels d’absence ou de rejet des relevés de stations physiques.
+- [x] Interface: Expliquer clairement quand seuls les modèles sont disponibles et pourquoi les stations sont insuffisantes.
+- [x] Contrainte: Ne jamais attribuer une cause non mesurée ; afficher les motifs réellement disponibles.
+- [x] Validation: Vérifier Stations, TypeScript, Vitest et build avant publication.

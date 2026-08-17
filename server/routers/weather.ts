@@ -1118,12 +1118,18 @@ export const weatherRouter = router({
       const lon = input.lon ?? HONDEGHEM.lon;
       const radiusKm = input.radiusKm;
 
+      let netatmoStatus: import("../netatmoService").NetatmoAvailability = "not_connected";
       const [stations, currentModelReferences] = await Promise.all([
-        collectNearbyStations(lat, lon, radiusKm, "Local", { netatmoUserId: ctx.user?.id }),
+        collectNearbyStations(lat, lon, radiusKm, "Local", {
+          netatmoUserId: ctx.user?.id,
+          onNetatmoStatus: (status) => { netatmoStatus = status; },
+        }),
         fetchCurrentModelReferences(lat, lon),
       ]);
       const ranked = rankStations(stations);
       const physicalStations = getPhysicalActiveStations(ranked);
+      const discoveredPhysicalStations = ranked.filter((station) => getStationSourceKind(station.source, station.stationId) === "physical");
+      const excludedPhysicalStations = discoveredPhysicalStations.filter((station) => !station.isActive);
       // La vérité terrain locale ne repose que sur des observations physiques validées.
       const ultraResult = calculateUltraLocal(physicalStations, "local", lat, lon, null, null);
       const modelReferences = buildModelReferenceCoherence(
@@ -1200,6 +1206,12 @@ export const weatherRouter = router({
         activeCount: physicalStations.length,
         ignoredCount: stations.filter(s => !s.isActive).length,
         physicalStationCount: physicalStations.length,
+        physicalStationDiagnostics: {
+          netatmoStatus,
+          discoveredCount: discoveredPhysicalStations.length,
+          activeCount: physicalStations.length,
+          exclusionReasons: Array.from(new Set(excludedPhysicalStations.map((station) => station.exclusionReason).filter((reason): reason is string => Boolean(reason)))).slice(0, 3),
+        },
         referenceSourceCount: modelReferences.length,
         fetchedAt: new Date().toISOString(),
       };

@@ -73,4 +73,12 @@ describe("page Fiabilité", () => {
     expect(source).toContain("Collecte automatique planifiée à 05h00, heure de Paris");
     expect(source).toContain('label="Collecte" value="05h00 Paris"');
   });
+
+  it("explique lorsque les modèles existent mais que les stations physiques sont insuffisantes", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Modèles disponibles, relevés physiques insuffisants");
+    expect(source).toContain("Vérification actuelle : {physicalStationExplanation}");
+    expect(source).toContain("La source Netatmo a répondu, mais aucune station physique n’a été renvoyée");
+    expect(source).toContain("station physique n’a été trouvée dans le rayon");
+  });
 });
