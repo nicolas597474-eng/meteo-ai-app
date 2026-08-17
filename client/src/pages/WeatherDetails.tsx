@@ -101,6 +101,17 @@ export default function WeatherDetails() {
     return idx >= 0 ? idx : 0;
   }, [data?.hours, currentHourStr]);
 
+  // À l’ouverture ou au changement de lieu, placer directement la carte de
+  // l’heure réelle de Paris au début du ruban horizontal.
+  useEffect(() => {
+    const rail = hourlyRef.current;
+    if (!rail || !data?.hours?.length) return;
+    const hourlyCardStride = 224; // largeur 212px + espacement 12px
+    const targetLeft = Math.max(0, currentHourIdx * hourlyCardStride - 8);
+    const frame = requestAnimationFrame(() => rail.scrollTo({ left: targetLeft, behavior: "auto" }));
+    return () => cancelAnimationFrame(frame);
+  }, [data?.hours?.length, currentHourIdx, activeLocation?.lat, activeLocation?.lon]);
+
   if (isLoading) {
     return (
       <div className="weather-page-sky min-h-screen bg-[#0d1117]" style={pageSkyStyle}>
@@ -159,8 +170,8 @@ export default function WeatherDetails() {
                     key={h.hour}
                     className={`weather-surface-inset flex-shrink-0 w-[212px] rounded-2xl border p-4 transition-colors ${
                       isNow
-                        ? "border-sky-300/60 bg-sky-950/55"
-                        : "border-slate-700/70 bg-slate-950/50"
+                        ? "border-sky-300/70 bg-sky-800/50"
+                        : "border-slate-500/65 bg-slate-800/60"
                     }`}
                   >
                     {/* Hour + Now badge */}

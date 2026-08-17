@@ -1662,3 +1662,8 @@
 - [x] Audit: Vérifier la tâche de 05:00, les huit modèles et les relevés de stations effectivement archivés.
 - [x] Correction: Aucune correction requise : la collecte active couvre déjà les modèles experts et les stations, avec contrôle de couverture.
 - [x] Validation: Contrôler les données produites et la prochaine exécution planifiée.
+
+## Cartes horaires : heure actuelle et lisibilité
+- [x] Audit: Identifier le défilement initial et les surfaces appliquées aux cartes horaires.
+- [x] Interface: Cadrer l’heure actuelle et éclaircir les fonds de cartes sans réduire le contraste.
+- [x] Validation: Vérifier le comportement mobile, TypeScript, Vitest et build avant publication.

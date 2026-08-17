@@ -38,5 +38,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("chartH + 42");
     expect(source).toContain("MAINTENANT");
     expect(source).toContain("Maintenant ·");
+    expect(source).toContain("hourlyCardStride = 224");
+    expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
+    expect(source).toContain("bg-slate-800/60");
+    expect(source).toContain("bg-sky-800/50");
   });
 });
