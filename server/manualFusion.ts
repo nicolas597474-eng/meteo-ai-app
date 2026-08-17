@@ -82,12 +82,7 @@ export async function refreshManualFusionForFavorite(favorite: ManualFusionFavor
   const condition = conditionFromWeatherValues(averagePrecipitation, averageCloudCover);
   const bestModelScore = ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60;
   const confidenceScore = computeConfidenceScore({ forecasts: biasCorrectedForecasts, bestModelScore, leadTimeBucket: "6-24h" });
-  const hour = getParisHour();
-  const dayProgress = Math.max(0, Math.min(1, (hour - 6) / 12));
-  const tempCurrent = meteoAI.tempMin != null && meteoAI.tempMax != null
-    ? Math.round((meteoAI.tempMin + (meteoAI.tempMax - meteoAI.tempMin) * Math.sin(dayProgress * Math.PI / 2)) * 10) / 10
-    : null;
-  const explanation = `Fusion relancée manuellement pour ${favorite.customName ?? favorite.name} à partir de ${expertData.length}/${WEATHER_SERVICES.expert.length} modèles experts disponibles.`;
+  const explanation = `Prévision quotidienne relancée manuellement pour ${favorite.customName ?? favorite.name} à partir de ${expertData.length}/${WEATHER_SERVICES.expert.length} modèles experts disponibles. La température actuelle est résolue en direct lors de la consultation et n’est jamais interpolée depuis Tmin/Tmax.`;
 
   await insertForecasts(expertData.map((entry) => ({
     locationKey,
@@ -145,7 +140,7 @@ export async function refreshManualFusionForFavorite(favorite: ManualFusionFavor
     date: today,
     tempMax: meteoAI.tempMax,
     tempMin: meteoAI.tempMin,
-    tempCurrent,
+    tempCurrent: null,
     precipitation: meteoAI.precipitation,
     windSpeed: meteoAI.windSpeed,
     condition,

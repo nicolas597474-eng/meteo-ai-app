@@ -22,17 +22,11 @@ export const WEATHER_SERVICES = {
     { name: "Open-Meteo", modelId: "best_match", category: "expert" as const },
   ],
   public: [
-    { name: "Météo-France", category: "public" as const },
-    { name: "Meteoblue", category: "public" as const },
-    { name: "AccuWeather", category: "public" as const },
-    { name: "Apple Weather", category: "public" as const },
-    { name: "OpenWeatherMap", category: "public" as const },
-    { name: "Weather.com", category: "public" as const },
-    { name: "Ventusky", category: "public" as const },
-    { name: "Weatherbit", category: "public" as const },
-    { name: "World Weather Online", category: "public" as const },
-    { name: "La Chaîne Météo", category: "public" as const },
+    { name: "Météo-France", category: "public" as const, availability: "conditional" as const },
+    { name: "OpenWeatherMap", category: "public" as const, availability: "conditional" as const },
   ],
+  /** Marques documentaires uniquement : aucune donnée ne doit être affichée ou scorée sans intégration réelle. */
+  inactivePublicCatalogue: ["Meteoblue", "AccuWeather", "Apple Weather", "Weather.com", "Ventusky", "Weatherbit", "World Weather Online", "La Chaîne Météo"] as const,
 };
 
 /** Modèles observés séparément avant toute éventuelle qualification. */
@@ -270,9 +264,19 @@ export type HourlyPoint = {
   precipIntensity?: string | null; // light, moderate, heavy
   // Multi-model spread (optional, populated when available)
   tempSpread?: number | null;    // Max - Min across models (°C)
-  precipProb?: number | null;    // % of models predicting rain
+  precipAgreement?: number | null; // % de modèles comparés prévoyant de la pluie
   modelCount?: number;           // Number of models contributing
 };
+
+/** Une direction est circulaire : 350° et 10° sont proches du nord, pas du sud. */
+export function circularMeanDegrees(values: readonly number[]): number | null {
+  const valid = values.filter((value) => Number.isFinite(value));
+  if (valid.length === 0) return null;
+  const radians = valid.map((value) => (value * Math.PI) / 180);
+  const sin = radians.reduce((sum, value) => sum + Math.sin(value), 0) / radians.length;
+  const cos = radians.reduce((sum, value) => sum + Math.cos(value), 0) / radians.length;
+  return Math.round((((Math.atan2(sin, cos) * 180) / Math.PI + 360) % 360) * 10) / 10;
+}
 
 function deriveCondition(precip: number | null, cloud: number | null): string {
   return conditionFromWeatherValues(precip, cloud);
@@ -372,7 +376,7 @@ export async function collect15DayForecast(
       precipitation: avgPrecip,
       windSpeed: avg(d.wind),
       windGust: avg(d.windGust),
-      windDirection: avg(d.windDir),
+      windDirection: circularMeanDegrees(d.windDir),
       humidity: avg(d.humidity),
       cloudCover: avgCloud,
       condition: deriveCondition(avgPrecip, avgCloud),
@@ -458,10 +462,14 @@ export async function collectHourlyForecast(
       const tempSpread = (bestTemp != null && aromeTemp != null)
         ? Math.abs(bestTemp - aromeTemp)
         : null;
-      // Precip probability: 100% if both models predict rain, 50% if only one
+      // Accord de détection de pluie entre les deux modèles réellement comparés.
+      // Ce n'est pas une probabilité calibrée ni une probabilité d'ensemble.
       const bestRain = (precip ?? 0) >= 0.1;
       const aromeRain = (aromePrecip ?? 0) >= 0.1;
-      const precipProb = (bestRain && aromeRain) ? 100 : (bestRain || aromeRain) ? 50 : 0;
+      const modelCount = aromeTemp != null ? 2 : 1;
+      const precipAgreement = modelCount === 2
+        ? (bestRain && aromeRain ? 100 : (bestRain || aromeRain ? 50 : 0))
+        : (bestRain ? 100 : 0);
 
       // Derive precipitation type and intensity
       const snowfall = hourly.snowfall?.[i] ?? 0;
@@ -498,8 +506,8 @@ export async function collectHourlyForecast(
         precipIntensity,
         // Multi-model
         tempSpread,
-        precipProb,
-        modelCount: aromeTemp != null ? 2 : 1,
+        precipAgreement,
+        modelCount,
       });
     }
 

@@ -447,7 +447,7 @@ export const weatherRouter = router({
       const observations = await getObservationsByDateRange(startStr, endDate, locKey);
       const meteoAIForecasts = await getLatestMeteoAIForecasts(input.days, locKey);
       const scoreTimeSeries = await getHistoricalScoreTimeSeries(input.days, locKey);
-      const leadTimeScoresData = await getLeadTimeScoresForLocation(locKey, input.days);
+      const leadTimeScoresData = await getQualifiedLeadTimeScoresForLocation(locKey, input.days);
 
       return {
         forecasts,
@@ -972,17 +972,21 @@ export const weatherRouter = router({
     const stabilityScore = meteoAI?.stabilityIndex ?? 0;
 
     // 6. Transparency score (always high — we expose everything)
-    const transparencyScore = 95;
+    const transparencyScore = trace?.parameterSources
+      ? Math.min(100, 40 + Math.min(4, trace.sourceCount ?? 0) * 10 + (trace.issuedAt ? 20 : 0))
+      : 0;
 
     // 7. AI Analysis text
     const modelCount = forecasts.length;
-    const topModel = ranking.length > 0 ? ranking[0].serviceName : "ECMWF";
+    const topModel = ranking.length > 0 ? ranking[0].serviceName : null;
     const convergenceLevel = divergence.tempRange < 2 ? "excellente" : divergence.tempRange < 4 ? "bonne" : "modérée";
     const aiAnalysis = [
       `MeteoAI synthétise ${modelCount} modèles numériques pour Hondeghem (50.76°N, 2.52°E).`,
       `La convergence entre les modèles est ${convergenceLevel} aujourd'hui (écart max temp : ${divergence.tempRange}°C).`,
       `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`,
-      `Le modèle historiquement le plus fiable sur ce site est ${topModel}.`,
+      topModel
+        ? `Le modèle le mieux classé sur ce site est ${topModel}, sur la seule base des observations physiques qualifiées disponibles.`
+        : "Aucun modèle n’est classé : les observations physiques qualifiées disponibles ne satisfont pas encore les seuils statistiques publiés.",
       `Score de confiance global : ${confidenceScore}/100 — ${confidenceScore >= 80 ? "prévision très fiable" : confidenceScore >= 60 ? "prévision fiable" : "incertitude modérée"}.`,
     ].join(" ");
 
@@ -1013,7 +1017,7 @@ export const weatherRouter = router({
     const lastObsJob = jobs.find(j => j.jobType === "observation");
 
     // 11. Historical time series for chart
-    const rawTimeSeries = await getHistoricalScoreTimeSeries(14);
+    const rawTimeSeries = await getHistoricalScoreTimeSeries(14, locationKey ?? "default");
     const tsByDate: Record<string, Record<string, number>> = {};
     rawTimeSeries.forEach(row => {
       if (!tsByDate[row.date]) tsByDate[row.date] = {};
@@ -1028,10 +1032,10 @@ export const weatherRouter = router({
       }));
 
     const sources = [
-      { name: "Open-Meteo API", type: "API météo", models: ["ECMWF", "AROME", "ARPEGE", "ICON", "GFS", "Open-Meteo Best Match"], updateFrequency: "6h", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Haute" },
-      { name: "Modèles en validation", type: "Collecte d'observation", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "05h00", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
-      { name: "Stations Météo-France", type: "Observations", models: [], updateFrequency: "1h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Haute" },
-      { name: "Open-Meteo ERA5", type: "Réanalyse", models: ["ERA5"], updateFrequency: "24h", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Très haute" },
+      { name: "Open-Meteo API", type: "Prévisions de modèles", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modèle", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Prévisions, pas observations" },
+      { name: "Modèles en validation", type: "Prévisions candidates", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "Collecte quotidienne", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
+      { name: "Stations physiques", type: "Observations locales", models: [], updateFrequency: "Selon la dernière collecte", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Netatmo actif ; autres sources seulement si réellement collectées" },
+      { name: "Scores de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Aucun classement avant seuil statistique" },
     ];
     const latestStationCollection = (await getStationCollectionSnapshots(locationKey ?? "default", 1))[0] ?? null;
 

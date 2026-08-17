@@ -146,7 +146,10 @@ const MODE_CONFIG: Record<LocalMode, {
     maxTempDeviation: 5,
     minReliability: 45,
     altitudeCorrection: true,
-    microclimateEnabled: true,
+    // Les heuristiques géographiques (urbain, forêt, littoral, vallée) ne sont
+    // pas des observations. Elles restent désactivées tant qu’elles ne sont pas
+    // calibrées séparément par un historique physique qualifié au lieu concerné.
+    microclimateEnabled: false,
   },
 };
 

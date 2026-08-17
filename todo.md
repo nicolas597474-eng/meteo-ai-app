@@ -1910,3 +1910,26 @@
 - [x] Interface: Ajouter une animation solaire discrète, fondée uniquement sur transform et opacity.
 - [x] Accessibilité: Désactiver l’animation lorsque la réduction des mouvements est demandée.
 - [x] Validation: Vérifier le panneau, TypeScript, Vitest et build avant publication.
+
+## Audit complet du contenu transmis
+- [x] Périmètre: Examiner le contenu transmis et identifier le type d’audit pertinent.
+- [x] Analyse: Relever les constats, risques, incohérences et éléments vérifiables.
+- [x] Rapport: Produire un rapport structuré avec priorités et actions correctives.
+
+## Corrections intégrales post-audit — fiabilité, provenance et cohérence
+- [x] P0 Provenance: Exclure strictement les scores et observations `legacy_unqualified` de tous les classements, indicateurs, textes IA et pondérations décisionnels.
+- [x] P0 Fiabilité: Afficher un état « données insuffisantes » tant que les seuils de preuves physiques qualifiées ne sont pas atteints par lieu, modèle et horizon.
+- [x] P0 Historique: Distinguer explicitement dans toutes les vues une observation physique, une référence de modèle, une prévision et une estimation de fusion.
+- [x] P1 Température: Ne plus présenter la température interpolée des favoris préchargés comme une température actuelle mesurée.
+- [x] P1 Cohérence: Expliciter et harmoniser les sources des prévisions persistées à huit modèles, des horaires live et du consensus quotidien à quatre modèles.
+- [x] P1 Géographie: Résoudre et appliquer le fuseau IANA par lieu favori au lieu d’imposer Europe/Paris à toutes les coordonnées.
+- [x] P1 Sources: Afficher uniquement les fournisseurs publics réellement connectés et identifier clairement toute source indisponible.
+- [x] P1 Confiance: Retirer les valeurs par défaut de performance et de cohérence qui peuvent surévaluer la confiance sans preuve qualifiée.
+- [x] P2 Calculs: Remplacer la moyenne arithmétique des directions de vent par une moyenne vectorielle circulaire et renommer l’accord pluie à deux modèles.
+- [x] P2 Ultra Local: Restreindre les heuristiques microclimatiques au périmètre validé et documenter leurs limites de preuve.
+- [x] P2 Observabilité: Corriger les compteurs de scores de collecte et exposer une santé de cycle complète par lieu, modèle et station.
+- [x] P2 Interface: Remplacer les scores décoratifs ou non mesurés par des indicateurs calculés ou un état indisponible.
+- [x] P3 Robustesse: Ajouter cache persistant court, budget de requêtes, limitation de débit et suivi des disponibilités de fournisseurs.
+- [x] P3 Traçabilité: Archiver les métadonnées utiles de modèle, de maillage et d’heure de disponibilité avec chaque émission.
+- [x] Tests: Ajouter les invariants de provenance, cohérence inter-pages, unités, fuseaux, direction circulaire, absence de fuite temporelle et données insuffisantes.
+- [x] Validation: Exécuter TypeScript, Vitest, build, captures mobile et contrôle des logs avant publication.

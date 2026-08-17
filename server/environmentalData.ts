@@ -47,23 +47,33 @@ function toMinutes(time: string | null | undefined) {
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
 
-function parisMinutesNow() {
+export function getMinutesInTimeZone(timeZone: string, date = new Date()) {
   const parts = new Intl.DateTimeFormat("fr-FR", {
-    timeZone: "Europe/Paris",
+    timeZone,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  }).formatToParts(new Date());
+  }).formatToParts(date);
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
   return hour * 60 + minute;
 }
 
-function calculateDayProgress(sunrise: string | null, sunset: string | null) {
+function resolveTimeZone(value: unknown) {
+  if (typeof value !== "string") return "UTC";
+  try {
+    new Intl.DateTimeFormat("fr-FR", { timeZone: value });
+    return value;
+  } catch {
+    return "UTC";
+  }
+}
+
+function calculateDayProgress(sunrise: string | null, sunset: string | null, timeZone: string) {
   const start = toMinutes(sunrise);
   const end = toMinutes(sunset);
   if (start == null || end == null || end <= start) return null;
-  return Math.max(0, Math.min(1, (parisMinutesNow() - start) / (end - start)));
+  return Math.max(0, Math.min(1, (getMinutesInTimeZone(timeZone) - start) / (end - start)));
 }
 
 async function fetchJson(url: URL) {
@@ -96,8 +106,10 @@ export type EnvironmentalSnapshot = {
     sunAltitudeDeg: number | null;
     moonAltitudeDeg: number | null;
     altitudeCalculatedAt: string;
+    timezone: string;
   } | null;
   source: "Open-Meteo / CAMS";
+  timezone: string;
 };
 
 const snapshotCache = new Map<string, { expiresAt: number; value: EnvironmentalSnapshot }>();
@@ -113,7 +125,7 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
     longitude: String(coords.lon),
     daily: "sunrise,sunset,daylight_duration,moonrise,moonset,moon_phase",
     forecast_days: "1",
-    timezone: "Europe/Paris",
+    timezone: "auto",
   }).toString();
 
   const airUrl = new URL("https://air-quality-api.open-meteo.com/v1/air-quality");
@@ -123,12 +135,13 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
     current: "european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone",
     hourly: "european_aqi",
     forecast_hours: "24",
-    timezone: "Europe/Paris",
+    timezone: "auto",
   }).toString();
 
   const [weatherResult, airResult] = await Promise.allSettled([fetchJson(weatherUrl), fetchJson(airUrl)]);
   const weather = weatherResult.status === "fulfilled" ? weatherResult.value : null;
   const airResponse = airResult.status === "fulfilled" ? airResult.value : null;
+  const timezone = resolveTimeZone(weather?.timezone ?? airResponse?.timezone);
 
   const daily = weather?.daily ?? null;
   const sunrise = typeof daily?.sunrise?.[0] === "string" ? daily.sunrise[0] : null;
@@ -166,12 +179,14 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
       moonPhase,
       moon: getMoonPhaseDescriptor(moonPhase),
       moonIllumination: getMoonIllumination(moonPhase),
-      dayProgress: calculateDayProgress(sunrise, sunset),
+      dayProgress: calculateDayProgress(sunrise, sunset, timezone),
       sunAltitudeDeg,
       moonAltitudeDeg,
       altitudeCalculatedAt: altitudeCalculatedAt.toISOString(),
+      timezone,
     } : null,
     source: "Open-Meteo / CAMS",
+    timezone,
   };
 
   snapshotCache.set(key, { value, expiresAt: Date.now() + 10 * 60 * 1_000 });

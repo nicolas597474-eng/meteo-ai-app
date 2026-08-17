@@ -22,6 +22,23 @@ export const LABORATORY_SCORE_WEIGHT_TOTAL = Object.values(LABORATORY_SCORE_WEIG
 export const MINIMUM_RELIABILITY_COMPARISONS = 18;
 
 /**
+ * Seuil plus strict pour les classements visibles hors Laboratoire. Il évite
+ * qu'une tendance exploratoire soit interprétée comme un meilleur modèle.
+ */
+export const PUBLIC_RANKING_EVIDENCE_THRESHOLDS = {
+  minimumComparisons: 30,
+  minimumComparableDays: 7,
+} as const;
+
+export function isPublicModelRankingEligible(input: {
+  comparisons: number | null | undefined;
+  evaluatedDays: number | null | undefined;
+}): boolean {
+  return Number(input.comparisons ?? 0) >= PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons
+    && Number(input.evaluatedDays ?? 0) >= PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays;
+}
+
+/**
  * Confidence thresholds only qualify the volume and persistence of archived
  * evidence. A score remains unavailable when a required metric was not stored.
  */

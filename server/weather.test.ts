@@ -251,16 +251,12 @@ describe("weather.getReport", () => {
     expect(result.forecasts.length).toBeGreaterThan(0);
   });
 
-  it("returns observation for a seeded date", async () => {
+  it("n’expose pas une observation historique non qualifiée comme vérité terrain", async () => {
     const ctx = createPublicContext();
     const caller = appRouter.createCaller(ctx);
 
     const result = await caller.weather.getReport({ date: "2026-06-26" });
 
-    expect(result.observation).toBeTruthy();
-    if (result.observation) {
-      expect(result.observation.tempMax).toBeCloseTo(33.2, 0);
-      expect(result.observation.tempMin).toBeCloseTo(21.4, 0);
-    }
+    expect(result.observation).toBeNull();
   });
 });

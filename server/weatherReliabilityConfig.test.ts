@@ -6,6 +6,8 @@ import {
   LABORATORY_SCORE_WEIGHT_TOTAL,
   LABORATORY_SCORE_WEIGHTS,
   MINIMUM_RELIABILITY_COMPARISONS,
+  PUBLIC_RANKING_EVIDENCE_THRESHOLDS,
+  isPublicModelRankingEligible,
 } from "./weatherReliabilityConfig";
 
 describe("weatherReliabilityConfig", () => {
@@ -29,6 +31,18 @@ describe("weatherReliabilityConfig", () => {
     expect(confidence.level).toBe("insufficient");
     expect(confidence.isRankable).toBe(false);
     expect(confidence.minimumMissing).toBe(1);
+  });
+
+  it("réserve les classements publics aux preuves physiques suffisamment longues", () => {
+    expect(isPublicModelRankingEligible({
+      comparisons: PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons - 1,
+      evaluatedDays: 30,
+    })).toBe(false);
+    expect(isPublicModelRankingEligible({
+      comparisons: 300,
+      evaluatedDays: PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays - 1,
+    })).toBe(false);
+    expect(isPublicModelRankingEligible({ comparisons: 30, evaluatedDays: 7 })).toBe(true);
   });
 
   it("qualifie les niveaux faible, moyen et élevé uniquement avec assez de durée et de comparaisons", () => {

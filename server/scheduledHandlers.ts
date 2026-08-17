@@ -914,14 +914,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         const avgCloud = expertData.reduce((s, f) => s + (f.cloudCover ?? 50), 0) / expertData.length;
         const condition = conditionFromWeatherValues(avgPrecip, avgCloud);
 
-        // Estimate current temperature (midpoint of min/max adjusted for time of day)
-        const hour = getParisHour();
-        const dayProgress = Math.max(0, Math.min(1, (hour - 6) / 12)); // 0 at 6h, 1 at 18h
-        const tempCurrent = meteoAI.tempMin !== null && meteoAI.tempMax !== null
-          ? Math.round((meteoAI.tempMin + (meteoAI.tempMax - meteoAI.tempMin) * Math.sin(dayProgress * Math.PI / 2)) * 10) / 10
-          : null;
-
-        const explanation = `Prévision officielle pour ${fav.customName ?? fav.name}, fusionnée à partir de ${dailyCoverage.collected.length}/${dailyCoverage.expected.length} modèles experts disponibles. Indice de stabilité : ${stability.index}/100.`;
+        const explanation = `Prévision officielle pour ${fav.customName ?? fav.name}, fusionnée à partir de ${dailyCoverage.collected.length}/${dailyCoverage.expected.length} modèles experts disponibles. Indice de stabilité : ${stability.index}/100. La température actuelle est résolue en direct lors de la consultation et n’est pas interpolée depuis Tmin/Tmax.`;
 
         // Find all favorites with this location (same lat/lon) and upsert for each
         const matchingFavorites = allFavorites.filter(
@@ -961,7 +954,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             date: today,
             tempMax: meteoAI.tempMax,
             tempMin: meteoAI.tempMin,
-            tempCurrent,
+            tempCurrent: null,
             precipitation: meteoAI.precipitation,
             windSpeed: meteoAI.windSpeed,
             condition,

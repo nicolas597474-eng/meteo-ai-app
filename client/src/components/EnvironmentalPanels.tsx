@@ -26,6 +26,7 @@ type EnvironmentalData = {
     sunAltitudeDeg: number | null;
     moonAltitudeDeg: number | null;
     altitudeCalculatedAt: string;
+    timezone: string;
   } | null;
   source: string;
 };
@@ -44,8 +45,8 @@ function displayDuration(value: number | null) { if (value == null) return "—"
 function DetailHint() { return <p className="mt-3 flex items-center gap-1 text-[10px] font-medium text-sky-200/90"><span>Voir les détails</span><span aria-hidden="true">→</span></p>; }
 function formatAltitude(altitude: number | null) { return altitude == null ? "Altitude —" : `Altitude ${altitude >= 0 ? "+" : ""}${altitude.toFixed(1)}°`; }
 
-function parisMinutesNow() {
-  const parts = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+function minutesNow(timeZone: string) {
+  const parts = new Intl.DateTimeFormat("fr-FR", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
   return hour * 60 + minute;
@@ -57,7 +58,7 @@ function timeToMinutes(value: string | null) {
 }
 
 /** Positionne l’astre selon ses propres heures de lever/coucher, sans estimation hors horizon. */
-function celestialArcPosition(rise: string | null, set: string | null, now = parisMinutesNow()) {
+function celestialArcPosition(rise: string | null, set: string | null, now: number) {
   const riseMinutes = timeToMinutes(rise);
   const setMinutes = timeToMinutes(set);
   if (riseMinutes == null || setMinutes == null) return null;
@@ -91,13 +92,14 @@ function AirQualityPanel({ air, source }: { air: EnvironmentalData["air"]; sourc
 
 function SunMoonPanel({ astronomy, source }: { astronomy: EnvironmentalData["astronomy"]; source: string }) {
   if (!astronomy) return <section className="weather-surface rounded-[22px] border border-slate-700/60 p-4"><div className="flex items-center gap-3"><MeteoIcon name="sunny" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="mt-1 text-xs text-slate-400">Éphémérides réelles temporairement indisponibles.</p></div></div></section>;
-  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset) ?? (astronomy.dayProgress == null ? 50 : Math.round(10 + astronomy.dayProgress * 80));
-  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset);
-  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, parisMinutesNow());
+  const localMinutes = minutesNow(astronomy.timezone);
+  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset, localMinutes) ?? (astronomy.dayProgress == null ? 50 : Math.round(10 + astronomy.dayProgress * 80));
+  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset, localMinutes);
+  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, localMinutes);
   const firstCrescentAsset = astronomy.moon.label === "Premier croissant" ? "/manus-storage/meteoai-first-quarter-moon-3d-realistic_64387ecc.png" : null;
   const moonVisual = firstCrescentAsset ? <img src={firstCrescentAsset} alt="Lune 3D représentant le premier croissant" className="moon-3d-first-crescent h-full w-full object-contain" /> : astronomy.moon.symbol;
   const moonMarker = <>{isNight && <span className="celestial-night-marker sr-only">Thème nocturne actif</span>}{firstCrescentAsset ? <img src={firstCrescentAsset} alt="Position actuelle de la Lune" className="moon-3d-first-crescent h-full w-full object-contain" /> : <MeteoIcon name="clear_night" size={40} className="h-10 w-10" />}</>;
-  const content = <div className="space-y-4"><div className="grid grid-cols-2 gap-2"><AstronomyDetail label="Lever du soleil" value={displayTime(astronomy.sunrise)} /><AstronomyDetail label="Coucher du soleil" value={displayTime(astronomy.sunset)} /><AstronomyDetail label="Durée du jour" value={displayDuration(astronomy.daylightDurationSeconds)} /><AstronomyDetail label="Progression" value={astronomy.dayProgress == null ? "—" : `${Math.round(astronomy.dayProgress * 100)} %`} /></div><div className="rounded-2xl border border-indigo-400/20 bg-indigo-400/[0.05] p-4"><div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-full border border-slate-500/40 bg-slate-900 text-2xl">{moonVisual}</span><div><p className="font-semibold text-slate-100">{astronomy.moon.label}</p><p className="text-xs text-slate-400">Éclairage {astronomy.moonIllumination == null ? "—" : `${astronomy.moonIllumination}%`}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-700/70 pt-3"><AstronomyDetail label="Lever de lune" value={displayTime(astronomy.moonrise)} /><AstronomyDetail label="Coucher de lune" value={displayTime(astronomy.moonset)} /></div></div><p className="rounded-xl border border-slate-700/70 bg-slate-950/45 p-3 text-[11px] leading-relaxed text-slate-400">Les heures sont converties pour le lieu actif dans le fuseau Europe/Paris. Les éphémérides servent à informer l’utilisateur et n’ajustent pas les prévisions officielles.</p><p className="text-[10px] text-slate-500">Source des éphémérides : {source}.</p></div>;
+  const content = <div className="space-y-4"><div className="grid grid-cols-2 gap-2"><AstronomyDetail label="Lever du soleil" value={displayTime(astronomy.sunrise)} /><AstronomyDetail label="Coucher du soleil" value={displayTime(astronomy.sunset)} /><AstronomyDetail label="Durée du jour" value={displayDuration(astronomy.daylightDurationSeconds)} /><AstronomyDetail label="Progression" value={astronomy.dayProgress == null ? "—" : `${Math.round(astronomy.dayProgress * 100)} %`} /></div><div className="rounded-2xl border border-indigo-400/20 bg-indigo-400/[0.05] p-4"><div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-full border border-slate-500/40 bg-slate-900 text-2xl">{moonVisual}</span><div><p className="font-semibold text-slate-100">{astronomy.moon.label}</p><p className="text-xs text-slate-400">Éclairage {astronomy.moonIllumination == null ? "—" : `${astronomy.moonIllumination}%`}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-700/70 pt-3"><AstronomyDetail label="Lever de lune" value={displayTime(astronomy.moonrise)} /><AstronomyDetail label="Coucher de lune" value={displayTime(astronomy.moonset)} /></div></div><p className="rounded-xl border border-slate-700/70 bg-slate-950/45 p-3 text-[11px] leading-relaxed text-slate-400">Les heures sont converties pour le lieu actif dans le fuseau {astronomy.timezone}. Les éphémérides servent à informer l’utilisateur et n’ajustent pas les prévisions officielles.</p><p className="text-[10px] text-slate-500">Source des éphémérides : {source}.</p></div>;
   return <PanelDialog title="Soleil & Lune" description="Éphémérides locales, altitudes réelles et état actuel du cycle jour-nuit." content={content} className="weather-surface border-amber-400/20 bg-gradient-to-br from-amber-400/[0.05] via-slate-950/10 to-indigo-500/[0.06]"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2.5"><MeteoIcon name="sunny" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="text-[11px] text-slate-400">Éphémérides locales du jour</p></div></div><span className="rounded-full border border-amber-300/30 bg-amber-300/[0.06] px-2.5 py-1 text-[10px] font-semibold text-amber-100">Jour {displayDuration(astronomy.daylightDurationSeconds)}</span></div><div className="relative mx-auto mt-5 h-36 max-w-[330px] overflow-hidden"><div className="absolute bottom-2 left-4 right-4 h-[164px] rounded-t-full border-x border-t border-sky-300/35 bg-gradient-to-b from-blue-400/30 via-blue-400/10 to-transparent" /><div className="absolute bottom-2 left-4 right-4 border-t border-slate-300/60" /><span aria-label="Position actuelle du Soleil" className="sun-altitude-marker absolute grid h-12 w-12 -translate-x-1/2 place-items-center" style={{ left: `${sunPosition}%`, bottom: `${arcBottom(sunPosition) - 2}px` }}><MeteoIcon name="sunny" size={48} className="h-12 w-12" /><span className="sr-only">Soleil 3D</span></span><span className="absolute -translate-x-1/2 text-[9px] font-semibold text-amber-100" style={{ left: `${sunPosition}%`, bottom: `${arcBottom(sunPosition) - 16}px` }}>Soleil · {formatAltitude(astronomy.sunAltitudeDeg)}</span>{moonPosition != null ? <><span aria-label="Position actuelle de la Lune" className="moon-altitude-marker absolute grid h-10 w-10 -translate-x-1/2 place-items-center" style={{ left: `${moonPosition}%`, bottom: `${arcBottom(moonPosition) - 1}px` }}>{moonMarker}</span><span className="absolute -translate-x-1/2 text-[9px] font-semibold text-indigo-100" style={{ left: `${moonPosition}%`, bottom: `${arcBottom(moonPosition) - 15}px` }}>Lune · {formatAltitude(astronomy.moonAltitudeDeg)}</span></> : <span className="absolute bottom-5 left-1/2 -translate-x-1/2 text-[9px] text-slate-400">Lune sous l’horizon · {formatAltitude(astronomy.moonAltitudeDeg)}</span>}<span className="absolute bottom-0 left-0 text-[11px] text-slate-300">{displayTime(astronomy.sunrise)}<small className="block text-[9px] text-slate-500">Lever</small></span><span className="absolute bottom-0 right-0 text-right text-[11px] text-slate-300">{displayTime(astronomy.sunset)}<small className="block text-[9px] text-slate-500">Coucher</small></span></div><div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-slate-400"><span><b className="text-amber-100">Soleil</b> · {formatAltitude(astronomy.sunAltitudeDeg)} · {displayTime(astronomy.sunrise)}–{displayTime(astronomy.sunset)}</span><span><b className="text-indigo-100">Lune</b> · {formatAltitude(astronomy.moonAltitudeDeg)} · {displayTime(astronomy.moonrise)}–{displayTime(astronomy.moonset)}</span></div><div className="mt-3 grid grid-cols-[80px_1fr] items-center gap-3 border-t border-slate-600/25 pt-3"><div className="grid h-16 w-16 place-items-center rounded-full border border-slate-500/45 bg-[radial-gradient(circle_at_36%_28%,#64748b_0%,#1e293b_46%,#05070a_100%)] text-2xl text-slate-200">{moonVisual}</div><div><p className="text-sm font-semibold text-slate-100">{astronomy.moon.label}</p><p className="mt-0.5 text-xs text-slate-400">Éclairage {astronomy.moonIllumination == null ? "—" : `${astronomy.moonIllumination}%`}</p><div className="mt-2 flex gap-4 text-[10px] text-slate-500"><span>Lever <b className="font-medium text-slate-300">{displayTime(astronomy.moonrise)}</b></span><span>Coucher <b className="font-medium text-slate-300">{displayTime(astronomy.moonset)}</b></span></div></div></div><p className="mt-3 text-[10px] text-slate-500">Altitudes calculées à {displayTime(astronomy.altitudeCalculatedAt)} · Source des éphémérides : {source}.</p><DetailHint /></PanelDialog>;
 }
 
@@ -106,9 +108,10 @@ function LegacySunMoonPanel({ astronomy, source }: { astronomy: EnvironmentalDat
     return <section className="weather-surface rounded-[22px] border border-slate-700/60 p-4"><div className="flex items-center gap-3"><MeteoIcon name="sunny" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="mt-1 text-xs text-slate-400">Éphémérides réelles temporairement indisponibles.</p></div></div></section>;
   }
 
-  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset) ?? (astronomy.dayProgress == null ? 50 : Math.round(10 + astronomy.dayProgress * 80));
-  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset);
-  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, parisMinutesNow());
+  const localMinutes = minutesNow(astronomy.timezone);
+  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset, localMinutes) ?? (astronomy.dayProgress == null ? 50 : Math.round(10 + astronomy.dayProgress * 80));
+  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset, localMinutes);
+  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, localMinutes);
   const firstCrescentAsset = astronomy.moon.label === "Premier croissant" ? "/manus-storage/meteoai-first-quarter-moon-3d-realistic_64387ecc.png" : null;
   const sunAsset = "/manus-storage/meteoai-realistic-sun-3d-clean_e4a6a1ea.png";
   const sunMarker = <img src={sunAsset} alt="Position actuelle du Soleil" className="celestial-realistic-sun h-full w-full object-contain" />;
@@ -124,9 +127,10 @@ function SunMoonPanelModern({ astronomy, source }: { astronomy: EnvironmentalDat
     return <section className="weather-surface rounded-[22px] border border-slate-700/60 p-4"><div className="flex items-center gap-3"><MeteoIcon name="sunny" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="mt-1 text-xs text-slate-400">Éphémérides réelles temporairement indisponibles.</p></div></div></section>;
   }
 
-  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset);
-  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset);
-  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, parisMinutesNow());
+  const localMinutes = minutesNow(astronomy.timezone);
+  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset, localMinutes);
+  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset, localMinutes);
+  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, localMinutes);
   const firstCrescentAsset = astronomy.moon.label === "Premier croissant" ? "/manus-storage/meteoai-first-quarter-moon-3d-realistic_64387ecc.png" : null;
   const sunAsset = "/manus-storage/meteoai-realistic-sun-3d-clean_e4a6a1ea.png";
   const sunMarker = <img src={sunAsset} alt="Position actuelle du Soleil" className="celestial-realistic-sun h-full w-full object-contain" />;
@@ -145,9 +149,10 @@ function SunMoonPanelHorizonAware({ astronomy, source }: { astronomy: Environmen
     return <section className="weather-surface rounded-[22px] border border-slate-700/60 p-4"><div className="flex items-center gap-3"><MeteoIcon name="sunny" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="mt-1 text-xs text-slate-400">Éphémérides réelles temporairement indisponibles.</p></div></div></section>;
   }
 
-  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset);
-  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset);
-  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, parisMinutesNow());
+  const localMinutes = minutesNow(astronomy.timezone);
+  const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset, localMinutes);
+  const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset, localMinutes);
+  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, localMinutes);
   const firstCrescentAsset = astronomy.moon.label === "Premier croissant" ? "/manus-storage/meteoai-first-quarter-moon-3d-realistic_64387ecc.png" : null;
   const sunAsset = "/manus-storage/meteoai-realistic-sun-3d-clean_e4a6a1ea.png";
   const sunMarker = <img src={sunAsset} alt="Soleil 3D" className="celestial-realistic-sun h-full w-full object-contain" />;
@@ -167,7 +172,7 @@ function SunMoonPanelAlwaysVisible({ astronomy, source }: { astronomy: Environme
     return <section className="weather-surface rounded-[22px] border border-slate-700/60 p-4"><div className="flex items-center gap-3"><MeteoIcon name="sunny" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="mt-1 text-xs text-slate-400">Éphémérides réelles temporairement indisponibles.</p></div></div></section>;
   }
 
-  const now = parisMinutesNow();
+  const now = minutesNow(astronomy.timezone);
   const sunPosition = celestialArcPosition(astronomy.sunrise, astronomy.sunset, now);
   const moonPosition = celestialArcPosition(astronomy.moonrise, astronomy.moonset, now);
   const sunRiseMinutes = timeToMinutes(astronomy.sunrise);

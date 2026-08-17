@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFusion, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
+import { computeConfidenceScore, computeFusion, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
 
 function station(
   id: string,
@@ -88,5 +88,25 @@ describe("isEligibleGlobalReliabilityScore", () => {
     expect(isEligibleGlobalReliabilityScore(10, "2026-08-11", now)).toBe(true);
     expect(isEligibleGlobalReliabilityScore(3, "2026-08-12", now)).toBe(false);
     expect(isEligibleGlobalReliabilityScore(10, "2026-08-01", now)).toBe(false);
+  });
+});
+
+describe("computeConfidenceScore", () => {
+  const agreeingForecasts = [
+    { tempMax: 20, tempMin: 12, precipitation: 0, windSpeed: 10 },
+    { tempMax: 20.1, tempMin: 12.1, precipitation: 0, windSpeed: 10.2 },
+  ];
+
+  it("plafonne la confiance sans performance historique ni cohérence de station", () => {
+    expect(computeConfidenceScore({ forecasts: agreeingForecasts, leadTimeBucket: "0-6h" })).toBeLessThanOrEqual(55);
+  });
+
+  it("ne remplace pas une preuve manquante par une note de performance arbitraire", () => {
+    const partialEvidence = computeConfidenceScore({
+      forecasts: agreeingForecasts,
+      bestModelScore: 95,
+      leadTimeBucket: "0-6h",
+    });
+    expect(partialEvidence).toBeLessThanOrEqual(75);
   });
 });

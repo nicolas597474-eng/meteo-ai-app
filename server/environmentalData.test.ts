@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEuropeanAqiDescriptor, getMoonIllumination, getMoonPhaseDescriptor, roundAltitudeDegrees } from "./environmentalData";
+import { getEuropeanAqiDescriptor, getMinutesInTimeZone, getMoonIllumination, getMoonPhaseDescriptor, roundAltitudeDegrees } from "./environmentalData";
 
 describe("environmentalData", () => {
   it("présente les seuils documentés de l’indice européen de qualité de l’air", () => {
@@ -20,5 +20,11 @@ describe("environmentalData", () => {
     expect(roundAltitudeDegrees(42.34)).toBe(42.3);
     expect(roundAltitudeDegrees(-8.76)).toBe(-8.8);
     expect(roundAltitudeDegrees(null)).toBeNull();
+  });
+
+  it("calcule l’heure locale dans le fuseau fourni par la source géographique", () => {
+    const instant = new Date("2026-08-17T12:30:00.000Z");
+    expect(getMinutesInTimeZone("UTC", instant)).toBe(750);
+    expect(getMinutesInTimeZone("Europe/Paris", instant)).toBe(870);
   });
 });

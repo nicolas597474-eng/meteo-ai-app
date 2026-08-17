@@ -189,7 +189,7 @@ export default function WeatherDetails() {
                     {/* Precipitation */}
                     <div className="mb-2.5 flex items-center gap-1.5 rounded-xl border border-sky-100/20 bg-sky-100/[0.08] px-2 py-1.5">
                       <MeteoIcon name="precipitation" size={14} />
-                      <span className="text-[11px] font-semibold text-slate-50">{h.precipProb ?? 0}%</span>
+                      <span className="text-[11px] font-semibold text-slate-50">Accord pluie {h.precipAgreement ?? 0}%</span>
                       {(h.precipitation ?? 0) > 0 && (
                         <span className="text-[11px] font-semibold text-sky-100">{h.precipitation?.toFixed(1)} mm</span>
                       )}
@@ -655,7 +655,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
                     <span>Vent <b className="text-white">{h.windSpeed?.toFixed(0) ?? "—"}</b> km/h</span>
                     <span>Raf. <b className="text-white">{h.windGust?.toFixed(0) ?? "—"}</b> km/h</span>
                     <span>Pluie <b className="text-blue-300">{h.precipitation?.toFixed(1) ?? "—"}</b> mm</span>
-                    <span>Prob. <b className="text-blue-300">{h.precipProb ?? "—"}%</b></span>
+                    <span>Accord pluie <b className="text-blue-300">{h.precipAgreement ?? "—"}%</b></span>
                     <span>Hum. <b className="text-white">{h.humidity ?? "—"}%</b></span>
                     <span>Press. <b className="text-white">{h.pressure?.toFixed(0) ?? "—"}</b></span>
                   </div>

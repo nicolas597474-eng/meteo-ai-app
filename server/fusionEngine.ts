@@ -1228,16 +1228,6 @@ export function computeConfidenceScore(params: {
     agreementScore = Math.min(agreementScore, Math.max(0, 100 - windRange * 3));
   }
 
-  // 2. Historical performance (30%)
-  const perfScore = bestModelScore != null
-    ? Math.min(100, Math.max(0, bestModelScore))
-    : 60;
-
-  // 3. Station coherence (20%)
-  const stationScore = stationCoherence != null
-    ? Math.min(100, Math.max(0, stationCoherence))
-    : 65;
-
   // 4. Lead-time factor (10%)
   const leadTimeFactors: Record<LeadTimeBucket, number> = {
     "0-6h": 95,
@@ -1248,12 +1238,25 @@ export function computeConfidenceScore(params: {
   };
   const leadFactor = leadTimeBucket ? leadTimeFactors[leadTimeBucket] : 70;
 
-  const confidence = Math.round(
-    agreementScore * 0.40 +
-    perfScore * 0.30 +
-    stationScore * 0.20 +
-    leadFactor * 0.10
-  );
+  const components = [
+    { score: agreementScore, weight: 0.40 },
+    { score: leadFactor, weight: 0.10 },
+    ...(bestModelScore != null ? [{ score: Math.min(100, Math.max(0, bestModelScore)), weight: 0.30 }] : []),
+    ...(stationCoherence != null ? [{ score: Math.min(100, Math.max(0, stationCoherence)), weight: 0.20 }] : []),
+  ];
+  const knownWeight = components.reduce((total, component) => total + component.weight, 0);
+  const measuredConfidence = knownWeight > 0
+    ? Math.round(components.reduce((total, component) => total + component.score * component.weight, 0) / knownWeight)
+    : 0;
+
+  // Sans performance qualifiée ni cohérence physique, l'accord des modèles ne
+  // suffit pas pour suggérer une forte précision. Le plafond matérialise cette
+  // absence de preuve au lieu de la remplacer par une valeur par défaut.
+  const confidence = bestModelScore == null && stationCoherence == null
+    ? Math.min(55, measuredConfidence)
+    : bestModelScore == null || stationCoherence == null
+      ? Math.min(75, measuredConfidence)
+      : measuredConfidence;
 
   return Math.max(0, Math.min(100, confidence));
 }

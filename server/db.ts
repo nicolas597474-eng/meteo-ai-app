@@ -49,10 +49,14 @@ import { selectLatestForecasts } from "./forecastSelection";
 import { buildForecastUpdateSet } from "./forecastWrite";
 import { deriveStationQualityProfile } from "./stationQualityService";
 import { getGroundTruthReferenceBounds } from "./groundTruthReference";
+import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export const REFERENCE_COORDINATE_TOLERANCE = 0.0001;
+/** Seuils minimaux avant d'exposer un classement de performance au public. */
+export const MINIMUM_PUBLIC_RELIABILITY_SAMPLES = 30;
+export const MINIMUM_PUBLIC_RELIABILITY_DAYS = 7;
 
 export function referenceCoordinateBounds(value: number) {
   return {
@@ -242,7 +246,12 @@ export async function getObservationByDate(date: string, locationKey = "default"
   const db = await getDb();
   if (!db) return null;
   const result = await db.select().from(observations).where(
-    and(eq(observations.date, date), eq(observations.locationKey, locationKey))
+    and(
+      eq(observations.date, date),
+      eq(observations.locationKey, locationKey),
+      eq(observations.provenanceType, "physical_observation"),
+      eq(observations.isQualified, 1),
+    )
   ).limit(1);
   return result.length > 0 ? result[0] : null;
 }
@@ -253,7 +262,13 @@ export async function getObservationsByDateRange(startDate: string, endDate: str
   return db
     .select()
     .from(observations)
-    .where(and(gte(observations.date, startDate), lte(observations.date, endDate), eq(observations.locationKey, locationKey)))
+    .where(and(
+      gte(observations.date, startDate),
+      lte(observations.date, endDate),
+      eq(observations.locationKey, locationKey),
+      eq(observations.provenanceType, "physical_observation"),
+      eq(observations.isQualified, 1),
+    ))
     .orderBy(observations.date);
 }
 
@@ -271,7 +286,10 @@ export async function getLatestReliabilityScores(locationKey = "default") {
   return db
     .select()
     .from(reliabilityScores)
-    .where(eq(reliabilityScores.locationKey, locationKey))
+    .where(and(
+      eq(reliabilityScores.locationKey, locationKey),
+      eq(reliabilityScores.evidenceType, "physical_observation"),
+    ))
     .orderBy(desc(reliabilityScores.date), desc(reliabilityScores.weightedScore));
 }
 
@@ -281,7 +299,10 @@ export async function getReliabilityScoresByService(serviceName: string, limit =
   return db
     .select()
     .from(reliabilityScores)
-    .where(eq(reliabilityScores.serviceName, serviceName))
+    .where(and(
+      eq(reliabilityScores.serviceName, serviceName),
+      eq(reliabilityScores.evidenceType, "physical_observation"),
+    ))
     .orderBy(desc(reliabilityScores.date))
     .limit(limit);
 }
@@ -289,7 +310,8 @@ export async function getReliabilityScoresByService(serviceName: string, limit =
 export async function getCumulativeRanking() {
   const db = await getDb();
   if (!db) return [];
-  // Average weighted score per service across all dates
+  // Les références de modèle et les lignes legacy ne constituent jamais une
+  // vérité terrain utilisable pour un classement public.
   const result = await db
     .select({
       serviceName: reliabilityScores.serviceName,
@@ -302,6 +324,8 @@ export async function getCumulativeRanking() {
       avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
       daysTracked: sql<number>`COUNT(*)`,
+      totalSamples: sql<number>`SUM(${reliabilityScores.sampleSize})`,
+      evaluatedDays: sql<number>`COUNT(DISTINCT ${reliabilityScores.date})`,
       latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`,
       // 🌡️ Temperature dimension
       avgTempScore: sql<number>`AVG(${reliabilityScores.tempScore})`,
@@ -324,7 +348,9 @@ export async function getCumulativeRanking() {
       avgCondMaeCloud: sql<number>`AVG(${reliabilityScores.condMaeCloud})`,
     })
     .from(reliabilityScores)
+    .where(eq(reliabilityScores.evidenceType, "physical_observation"))
     .groupBy(reliabilityScores.serviceName)
+    .having(sql`SUM(${reliabilityScores.sampleSize}) >= ${PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons} AND COUNT(DISTINCT ${reliabilityScores.date}) >= ${PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays}`)
     .orderBy(sql`AVG(${reliabilityScores.weightedScore}) DESC`);
   return result;
 }
@@ -343,6 +369,8 @@ export async function getCumulativeRankingForLocation(locationKey = "default") {
       avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
       daysTracked: sql<number>`COUNT(*)`,
+      totalSamples: sql<number>`SUM(${reliabilityScores.sampleSize})`,
+      evaluatedDays: sql<number>`COUNT(DISTINCT ${reliabilityScores.date})`,
       latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`,
       avgTempScore: sql<number>`AVG(${reliabilityScores.tempScore})`,
       avgTempMae: sql<number>`AVG(${reliabilityScores.maeTemp})`,
@@ -361,8 +389,12 @@ export async function getCumulativeRankingForLocation(locationKey = "default") {
       avgCondMaeCloud: sql<number>`AVG(${reliabilityScores.condMaeCloud})`,
     })
     .from(reliabilityScores)
-    .where(eq(reliabilityScores.locationKey, locationKey))
+    .where(and(
+      eq(reliabilityScores.locationKey, locationKey),
+      eq(reliabilityScores.evidenceType, "physical_observation"),
+    ))
     .groupBy(reliabilityScores.serviceName)
+    .having(sql`SUM(${reliabilityScores.sampleSize}) >= ${PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons} AND COUNT(DISTINCT ${reliabilityScores.date}) >= ${PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays}`)
     .orderBy(sql`AVG(${reliabilityScores.weightedScore}) DESC`);
   return result;
 }
@@ -381,6 +413,8 @@ export async function getQualifiedCumulativeRankingForLocation(locationKey = "de
       avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
       daysTracked: sql<number>`COUNT(*)`,
+      totalSamples: sql<number>`SUM(${reliabilityScores.sampleSize})`,
+      evaluatedDays: sql<number>`COUNT(DISTINCT ${reliabilityScores.date})`,
       latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`,
       avgCondMaeCloud: sql<number>`AVG(${reliabilityScores.condMaeCloud})`,
     })
@@ -390,6 +424,7 @@ export async function getQualifiedCumulativeRankingForLocation(locationKey = "de
       eq(reliabilityScores.evidenceType, "physical_observation"),
     ))
     .groupBy(reliabilityScores.serviceName)
+    .having(sql`SUM(${reliabilityScores.sampleSize}) >= ${PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons} AND COUNT(DISTINCT ${reliabilityScores.date}) >= ${PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays}`)
     .orderBy(sql`AVG(${reliabilityScores.weightedScore}) DESC`);
 }
 
@@ -470,6 +505,7 @@ export async function getHistoricalScoreTimeSeries(days = 14, locationKey = "def
     .where(
       and(
         eq(reliabilityScores.locationKey, locationKey),
+        eq(reliabilityScores.evidenceType, "physical_observation"),
         sql`${reliabilityScores.date} >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`
       )
     )

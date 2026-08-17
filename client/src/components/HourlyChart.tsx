@@ -29,7 +29,7 @@ export interface HourData {
   precipIntensity?: string | null;
   // Multi-model spread
   tempSpread?: number | null;
-  precipProb?: number | null;
+  precipAgreement?: number | null;
   modelCount?: number;
 }
 
@@ -118,7 +118,7 @@ function HourlyScaleLabels({
 function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => void }) {
   const cond = getConditionLabel(hour.cloudCover, hour.precipitation, hour.condition);
   const hasSpread = hour.tempSpread != null && hour.tempSpread > 0;
-  const hasPrecipProb = hour.precipProb != null;
+  const hasPrecipAgreement = hour.precipAgreement != null;
   const hasGust = hour.windGust != null && hour.windGust > 0;
 
   // Confidence from spread: low spread = high confidence
@@ -149,7 +149,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
         </div>
 
         {/* Multi-model confidence banner */}
-        {(hasSpread || hasPrecipProb) && (
+        {(hasSpread || hasPrecipAgreement) && (
           <div className="mb-3 bg-slate-700/40 border border-slate-600/30 rounded-xl px-3 py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400">🤖 {hour.modelCount ?? 2} modèles</span>
@@ -201,14 +201,14 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
             <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Précipitations</span></div>
             <p className="text-sm font-bold text-blue-400">{hour.precipitation ?? 0} mm</p>
             {hour.precipType ? <p className="mt-0.5 text-[10px] text-slate-500">{hour.precipType === "snow" ? "Neige" : hour.precipType === "freezing_rain" ? "Pluie verglaçante" : "Pluie"}{hour.precipIntensity ? ` · ${hour.precipIntensity === "heavy" ? "forte" : hour.precipIntensity === "moderate" ? "modérée" : "faible"}` : ""}</p> : null}
-            {hasPrecipProb && (
+            {hasPrecipAgreement && (
               <div className="mt-1">
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[9px] text-slate-500">Probabilité</span>
-                  <span className={`text-[10px] font-bold ${(hour.precipProb! >= 70) ? 'text-blue-400' : (hour.precipProb! >= 30) ? 'text-yellow-400' : 'text-slate-400'}`}>{hour.precipProb}%</span>
+                  <span className="text-[9px] text-slate-500">Accord pluie · {hour.modelCount ?? 1} modèle{(hour.modelCount ?? 1) > 1 ? "s" : ""}</span>
+                  <span className={`text-[10px] font-bold ${(hour.precipAgreement! >= 70) ? 'text-blue-400' : (hour.precipAgreement! >= 30) ? 'text-yellow-400' : 'text-slate-400'}`}>{hour.precipAgreement}%</span>
                 </div>
                 <div className="bg-slate-700 rounded-full h-1 overflow-hidden">
-                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${hour.precipProb}%` }} />
+                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${hour.precipAgreement}%` }} />
                 </div>
               </div>
             )}
