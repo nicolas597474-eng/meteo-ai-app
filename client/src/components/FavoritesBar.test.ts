@@ -41,6 +41,11 @@ describe("FavoritesBar", () => {
     expect(source).toContain('size={18}');
   });
 
+  it("tronque les noms longs tout en exposant leur libellé complet", () => {
+    expect(source).toContain('title={loc.name}');
+    expect(source).toContain('max-w-[88px] truncate');
+  });
+
   it("priorise la même donnée actuelle que la carte Dashboard pour le favori actif", () => {
     expect(source).toContain("activeWeather?: FavoriteWeather");
     expect(source).toContain("active ? activeWeather ?? prefetchedWeather?.get(loc.id)");

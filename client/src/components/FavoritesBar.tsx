@@ -75,7 +75,7 @@ function FavoritePillContent({ loc, weather, active }: { loc: LocationItem; weat
 
   return <>
     {hasCondition ? <MeteoIcon name={getIconNameFromCondition(weather?.condition)} size={18} className="h-[18px] w-[18px] shrink-0" /> : <Star className={`h-4 w-4 shrink-0 ${active ? "fill-primary" : ""}`} />}
-    <span className="max-w-[104px] truncate text-[13px] font-semibold tracking-tight">{loc.name}</span>
+    <span title={loc.name} className="min-w-0 max-w-[88px] truncate text-[13px] font-semibold tracking-tight">{loc.name}</span>
     <span className={`ml-0.5 text-sm font-bold tabular-nums ${hasCurrentTemperature ? "text-sky-200" : "text-slate-500"}`}>
       {hasCurrentTemperature ? `${Math.round(weather!.temp!)}°` : "—"}
     </span>

@@ -1888,3 +1888,8 @@
 - [x] Audit: Identifier la hauteur, le rembourrage et les icônes des pastilles actuelles.
 - [x] Interface: Réduire légèrement leur hauteur sans diminuer la lisibilité.
 - [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.
+
+## Noms de favoris tronqués
+- [x] Audit: Vérifier la largeur maximale et le comportement des noms dans les pastilles.
+- [x] Interface: Tronquer les noms longs avec des points de suspension sans masquer la température.
+- [x] Validation: Vérifier les pastilles, TypeScript, Vitest et build avant publication.
