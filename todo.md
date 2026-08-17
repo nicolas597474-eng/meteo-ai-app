@@ -1933,3 +1933,8 @@
 - [x] P3 Traçabilité: Archiver les métadonnées utiles de modèle, de maillage et d’heure de disponibilité avec chaque émission.
 - [x] Tests: Ajouter les invariants de provenance, cohérence inter-pages, unités, fuseaux, direction circulaire, absence de fuite temporelle et données insuffisantes.
 - [x] Validation: Exécuter TypeScript, Vitest, build, captures mobile et contrôle des logs avant publication.
+
+## Arche Soleil & Lune — continuité mobile
+- [x] Analyse: Vérifier les dimensions communes de l’arche et de la ligne d’horizon dans le panneau mobile.
+- [x] Interface: Aligner l’arche, la ligne d’horizon et les heures de lever/coucher sur une même largeur visible.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
