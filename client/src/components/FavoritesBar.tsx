@@ -150,10 +150,12 @@ export function FavoritesBar({
   activeLocation,
   onLocationChange,
   prefetchedWeather,
+  activeWeather,
 }: {
   activeLocation: { lat: number; lon: number; name: string } | null;
   onLocationChange: (loc: { lat: number; lon: number; name: string; radiusKm: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" }) => void;
   prefetchedWeather?: Map<string, { temp: number | null; condition: string | null; confidenceScore: number | null }>;
+  activeWeather?: FavoriteWeather;
 }) {
   const { user } = useAuth();
   const { position: currentPos } = useCurrentLocation();
@@ -297,7 +299,11 @@ export function FavoritesBar({
           >
             {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
             <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
-              {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
+              {orderedFavorites.map((loc) => {
+                const active = isActive(loc);
+                const weather = active ? activeWeather ?? prefetchedWeather?.get(loc.id) : prefetchedWeather?.get(loc.id);
+                return <SortableFavoritePill key={loc.id} loc={loc} weather={weather} active={active} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />;
+              })}
             </SortableContext>
 
             {totalFavCount < MAX_FAVORITES && (

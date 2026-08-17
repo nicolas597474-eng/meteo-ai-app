@@ -432,6 +432,11 @@ export default function Dashboard() {
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
   const officialCurrentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
   const currentTemp = officialCurrentTemp;
+  const activeFavoriteWeather = {
+    temp: currentTemp,
+    condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null,
+    confidenceScore: forecastConfidence,
+  };
   const maxTemperature = today?.tempMax ?? meteoAI?.tempMax ?? null;
   const minTemperature = today?.tempMin ?? meteoAI?.tempMin ?? null;
   const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
@@ -466,6 +471,7 @@ export default function Dashboard() {
           activeLocation={activeLocation}
           onLocationChange={handleLocationChange}
           prefetchedWeather={prefetchedWeather}
+          activeWeather={activeFavoriteWeather}
         />
 
         {/* ── Hero : Température actuelle + max/min ── */}

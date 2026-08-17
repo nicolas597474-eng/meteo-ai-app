@@ -35,6 +35,11 @@ describe("FavoritesBar", () => {
     expect(source).toContain('text-sm font-bold tabular-nums');
   });
 
+  it("priorise la même donnée actuelle que la carte Dashboard pour le favori actif", () => {
+    expect(source).toContain("activeWeather?: FavoriteWeather");
+    expect(source).toContain("active ? activeWeather ?? prefetchedWeather?.get(loc.id)");
+  });
+
   it("permet de réorganiser les villes au toucher ou au clavier et conserve leur ordre", () => {
     expect(source).toContain('@dnd-kit/core');
     expect(source).toContain('TouchSensor');

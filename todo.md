@@ -1837,3 +1837,9 @@
 - [x] Interface: Ouvrir la carte en vue satellite par défaut.
 - [x] Interface: Ouvrir la vue réelle exactement au point choisi par le contrôle d’exploration.
 - [x] Validation: Vérifier Stations sur mobile, TypeScript, Vitest et build avant publication.
+
+## Concordance de température entre favoris et Dashboard
+- [x] Audit: Comparer les sources, horodatages et priorités de température des favoris et de la carte principale.
+- [x] Interface: Alimenter les favoris avec la même température actuelle que la carte Dashboard pour le lieu actif.
+- [x] Contrainte: Ne jamais remplacer une donnée indisponible par une température estimée non issue de la source partagée.
+- [x] Validation: Vérifier la concordance, TypeScript, Vitest et build avant publication.

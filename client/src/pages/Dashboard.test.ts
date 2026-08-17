@@ -72,6 +72,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("dashboard-sky-card");
     expect(source).toContain("dashboardSkyImage");
     expect(source).toContain('temp: pf.forecast.tempCurrent ?? null');
+    expect(source).toContain("const activeFavoriteWeather = {");
+    expect(source).toContain("activeWeather={activeFavoriteWeather}");
     const ventMaxIndex = source.indexOf("Vent max");
     const confidenceIndex = source.indexOf("Confiance prévision");
     expect(ventMaxIndex).toBeGreaterThan(-1);
