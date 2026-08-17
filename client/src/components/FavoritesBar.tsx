@@ -1,9 +1,13 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { MapPin, Star, Plus, X, Search, Navigation, Settings, LogIn } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Link } from "wouter";
+import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type FavoriteLocation = {
@@ -62,6 +66,41 @@ function removeLocalFavorite(id: string): LocalFavorite[] {
   return updated;
 }
 
+type FavoriteWeather = { temp: number | null; condition: string | null; confidenceScore: number | null };
+
+function FavoritePillContent({ loc, weather, active }: { loc: LocationItem; weather?: FavoriteWeather; active: boolean }) {
+  const hasCurrentTemperature = weather?.temp != null;
+  const hasCondition = Boolean(weather?.condition);
+
+  return <>
+    {hasCondition ? <MeteoIcon name={getIconNameFromCondition(weather?.condition)} size={20} className="h-5 w-5 shrink-0" /> : <Star className={`h-4 w-4 shrink-0 ${active ? "fill-primary" : ""}`} />}
+    <span className="max-w-[104px] truncate text-[13px] font-semibold tracking-tight">{loc.name}</span>
+    <span className={`ml-0.5 text-sm font-bold tabular-nums ${hasCurrentTemperature ? "text-sky-200" : "text-slate-500"}`}>
+      {hasCurrentTemperature ? `${Math.round(weather!.temp!)}°` : "—"}
+    </span>
+  </>;
+}
+
+function SortableFavoritePill({ loc, weather, active, onSelect }: { loc: LocationItem; weather?: FavoriteWeather; active: boolean; onSelect: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: loc.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const hasCurrentTemperature = weather?.temp != null;
+
+  return <button
+    ref={setNodeRef}
+    style={style}
+    onClick={onSelect}
+    {...attributes}
+    {...listeners}
+    aria-label={`${loc.name}, ${hasCurrentTemperature ? `température actuelle ${Math.round(weather!.temp!)} degrés` : "température actuelle indisponible"}. Maintenez puis faites glisser pour réorganiser.`}
+    className={`group flex min-h-11 shrink-0 touch-pan-y items-center gap-2 rounded-full border px-3.5 py-2 transition-all ${
+      active ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+    } ${isDragging ? "cursor-grabbing opacity-35" : "cursor-grab active:cursor-grabbing"}`}
+  >
+    <FavoritePillContent loc={loc} weather={weather} active={active} />
+  </button>;
+}
+
 // ─── Hook: useCurrentLocation ───────────────────────────────────────────────
 function useCurrentLocation() {
   const [position, setPosition] = useState<{ lat: number; lon: number } | null>(null);
@@ -103,6 +142,8 @@ export function FavoritesBar({
   const { position: currentPos } = useCurrentLocation();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [localFavorites, setLocalFavorites] = useState<LocalFavorite[]>(getLocalFavorites);
+  const [favoriteOrder, setFavoriteOrder] = useState<string[]>([]);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Fetch user's server-side favorites (only if logged in)
@@ -111,41 +152,10 @@ export function FavoritesBar({
     { enabled: !!user }
   );
 
-  // Determine which favorites to show: server-side if logged in, localStorage otherwise
-  const favorites: FavoriteLocation[] = user
-    ? serverFavorites
-    : localFavorites.map((lf, i) => ({
-        id: i + 1,
-        name: lf.name,
-        customName: null,
-        lat: lf.lat,
-        lon: lf.lon,
-        isDefault: null,
-        radiusKm: lf.radiusKm,
-        position: i,
-      }));
-
   const totalFavCount = user ? serverFavorites.length : localFavorites.length;
 
-  // Build location items list
-  const locations: LocationItem[] = [];
-
-  // Current position first
-  if (currentPos) {
-    locations.push({
-      type: "current",
-      id: "current",
-      name: "Position actuelle",
-      lat: currentPos.lat,
-      lon: currentPos.lon,
-      radiusKm: 10,
-    });
-  }
-
-  // Then favorites (server or local)
-  if (user) {
-    serverFavorites.forEach((fav: FavoriteLocation) => {
-      locations.push({
+  const favoriteLocations = useMemo<LocationItem[]>(() => user
+    ? serverFavorites.map((fav: FavoriteLocation) => ({
         type: "favorite",
         id: `fav-${fav.id}`,
         favoriteId: fav.id,
@@ -155,20 +165,32 @@ export function FavoritesBar({
         radiusKm: fav.radiusKm ?? 10,
         isDefault: fav.isDefault === 1,
         localMode: (fav.localMode as "standard" | "local" | "ultra-local") ?? "standard",
-      });
-    });
-  } else {
-    localFavorites.forEach((fav) => {
-      locations.push({
+      }))
+    : localFavorites.map((fav) => ({
         type: "local",
         id: fav.id,
         name: fav.name,
         lat: fav.lat,
         lon: fav.lon,
         radiusKm: fav.radiusKm,
-      });
-    });
-  }
+      })), [user, serverFavorites, localFavorites]);
+
+  const favoriteSignature = useMemo(() => favoriteLocations.map((location) => location.id).join("|"), [favoriteLocations]);
+
+  useEffect(() => {
+    setFavoriteOrder(favoriteLocations.map((location) => location.id));
+  }, [favoriteSignature]);
+
+  const orderedFavorites = useMemo(() => {
+    const locationsById = new Map(favoriteLocations.map((location) => [location.id, location]));
+    const ordered = favoriteOrder.map((id) => locationsById.get(id)).filter((location): location is LocationItem => Boolean(location));
+    return [...ordered, ...favoriteLocations.filter((location) => !favoriteOrder.includes(location.id))];
+  }, [favoriteLocations, favoriteOrder]);
+
+  const locations = useMemo<LocationItem[]>(() => {
+    const current = currentPos ? [{ type: "current" as const, id: "current", name: "Position actuelle", lat: currentPos.lat, lon: currentPos.lon, radiusKm: 10 }] : [];
+    return [...current, ...orderedFavorites];
+  }, [currentPos, orderedFavorites]);
 
   // Set default on first load
   useEffect(() => {
@@ -190,6 +212,47 @@ export function FavoritesBar({
     return Math.abs(loc.lat - activeLocation.lat) < 0.001 && Math.abs(loc.lon - activeLocation.lon) < 0.001;
   };
 
+  const updateFavoriteMutation = trpc.favorites.update.useMutation();
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const persistFavoriteOrder = useCallback(async (nextOrder: string[]) => {
+    if (user) {
+      try {
+        await Promise.all(nextOrder.map((id, position) => {
+          const location = favoriteLocations.find((item) => item.id === id);
+          return location?.favoriteId == null ? Promise.resolve() : updateFavoriteMutation.mutateAsync({ id: location.favoriteId, position });
+        }));
+        await refetchFavorites();
+      } catch {
+        await refetchFavorites();
+      }
+      return;
+    }
+
+    const localById = new Map(localFavorites.map((favorite) => [favorite.id, favorite]));
+    const reordered = nextOrder.map((id) => localById.get(id)).filter((favorite): favorite is LocalFavorite => Boolean(favorite));
+    saveLocalFavorites(reordered);
+    setLocalFavorites(reordered);
+  }, [favoriteLocations, localFavorites, refetchFavorites, updateFavoriteMutation, user]);
+
+  const handleDragStart = ({ active }: DragStartEvent) => setActiveDragId(String(active.id));
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveDragId(null);
+    if (!over || active.id === over.id) return;
+    const oldIndex = favoriteOrder.indexOf(String(active.id));
+    const newIndex = favoriteOrder.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const nextOrder = arrayMove(favoriteOrder, oldIndex, newIndex);
+    setFavoriteOrder(nextOrder);
+    void persistFavoriteOrder(nextOrder);
+  };
+
+  const activeDragLocation = activeDragId ? orderedFavorites.find((location) => location.id === activeDragId) : null;
+
   const handleAddFavorite = (fav: { name: string; lat: number; lon: number; radiusKm?: number }) => {
     if (user) {
       // Will be handled by the dialog's mutation
@@ -209,65 +272,42 @@ export function FavoritesBar({
     <>
       {/* Favorites strip */}
       <div className="relative">
-        <div
-          ref={scrollRef}
-          className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
-          style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
-        >
-          {locations.map((loc) => {
-            const weather = prefetchedWeather?.get(loc.id);
-            const hasCurrentTemperature = weather?.temp != null;
-            const showsTemperature = loc.type === "favorite";
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveDragId(null)} onDragEnd={handleDragEnd}>
+          <div
+            ref={scrollRef}
+            className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
+            style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
+          >
+            {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
+            <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
+              {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
+            </SortableContext>
 
-            return (
+            {/* Add button — always visible if under 5 favorites */}
+            {totalFavCount < 5 && (
               <button
-                key={loc.id}
-                onClick={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })}
-                className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 whitespace-nowrap transition-all ${
-                  isActive(loc)
-                    ? "border-primary/70 bg-primary/15 text-primary"
-                    : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                }`}
+                onClick={() => setShowAddDialog(true)}
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-primary/40 px-3.5 py-2 text-[13px] font-semibold tracking-tight text-primary transition-all hover:border-primary hover:bg-primary/10"
               >
-                {loc.type === "current" ? (
-                  <Navigation className="h-4 w-4 shrink-0" />
-                ) : (
-                  <Star className={`h-4 w-4 shrink-0 ${isActive(loc) ? "fill-primary" : ""}`} />
-                )}
-                <span className="max-w-[118px] truncate text-[13px] font-semibold tracking-tight">{loc.name}</span>
-                {showsTemperature && (
-                  <span
-                    className={`ml-0.5 text-sm font-bold tabular-nums ${hasCurrentTemperature ? "text-sky-200" : "text-slate-500"}`}
-                    aria-label={hasCurrentTemperature ? `Température actuelle : ${Math.round(weather!.temp!)} degrés` : "Température actuelle indisponible"}
-                  >
-                    {hasCurrentTemperature ? `${Math.round(weather!.temp!)}°` : "—"}
-                  </span>
-                )}
+                <Plus className="h-3.5 w-3.5" />
+                <span>Ajouter un lieu</span>
               </button>
-            );
-          })}
+            )}
 
-          {/* Add button — always visible if under 5 favorites */}
-          {totalFavCount < 5 && (
-            <button
-              onClick={() => setShowAddDialog(true)}
-              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-primary/40 px-3.5 py-2 text-[13px] font-semibold tracking-tight text-primary transition-all hover:border-primary hover:bg-primary/10"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Ajouter un lieu</span>
-            </button>
-          )}
-
-          {/* Settings link — only if there are favorites */}
-          {totalFavCount > 0 && user && (
-            <Link
-              href="/favorites"
-              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-2 text-[13px] font-semibold text-muted-foreground transition-all hover:border-primary/50 hover:text-foreground"
-            >
-              <Settings className="h-3 w-3" />
-            </Link>
-          )}
-        </div>
+            {/* Settings link — only if there are favorites */}
+            {totalFavCount > 0 && user && (
+              <Link
+                href="/favorites"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-2 text-[13px] font-semibold text-muted-foreground transition-all hover:border-primary/50 hover:text-foreground"
+              >
+                <Settings className="h-3 w-3" />
+              </Link>
+            )}
+          </div>
+          <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.23, 1, 0.32, 1)" }}>
+            {activeDragLocation ? <div className="flex min-h-11 items-center gap-2 rounded-full border border-primary/80 bg-slate-950 px-3.5 py-2 text-primary ring-1 ring-sky-300/60"><FavoritePillContent loc={activeDragLocation} weather={prefetchedWeather?.get(activeDragLocation.id)} active /></div> : null}
+          </DragOverlay>
+        </DndContext>
 
         {/* Dot indicators */}
         {locations.length > 1 && (

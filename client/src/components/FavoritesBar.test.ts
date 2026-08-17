@@ -13,8 +13,23 @@ describe("FavoritesBar", () => {
   });
 
   it("affiche une température actuelle explicite avec la typographie des pastilles du Dashboard", () => {
-    expect(source).toContain('Température actuelle indisponible');
+    expect(source).toContain('température actuelle indisponible');
     expect(source).toContain('text-[13px] font-semibold tracking-tight');
     expect(source).toContain('text-sm font-bold tabular-nums');
+  });
+
+  it("permet de réorganiser les villes au toucher ou au clavier et conserve leur ordre", () => {
+    expect(source).toContain('@dnd-kit/core');
+    expect(source).toContain('TouchSensor');
+    expect(source).toContain('sortableKeyboardCoordinates');
+    expect(source).toContain('persistFavoriteOrder');
+    expect(source).toContain('updateFavoriteMutation.mutateAsync');
+    expect(source).toContain('saveLocalFavorites(reordered)');
+  });
+
+  it("utilise une mini-icône MeteoAI uniquement lorsque la condition réelle est disponible", () => {
+    expect(source).toContain('getIconNameFromCondition');
+    expect(source).toContain('hasCondition ? <MeteoIcon');
+    expect(source).toContain('température actuelle indisponible');
   });
 });

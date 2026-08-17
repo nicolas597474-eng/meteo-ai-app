@@ -37,7 +37,7 @@ describe("EnvironmentalPanels", () => {
   it("distingue les positions du Soleil et de la Lune à partir des heures réelles", () => {
     expect(modernSunMoonSource).toContain("celestialArcPosition");
     expect(modernSunMoonSource).toContain("moonPosition");
-    expect(modernSunMoonSource).toContain("meteoai-realistic-sun-3d-clean_e4a6a1ea.png");
+    expect(modernSunMoonSource).toContain("meteoai-solar-disc-textured_d3eb7ecc.png");
     expect(modernSunMoonSource).toContain("celestial-realistic-sun");
     expect(modernSunMoonSource).not.toContain("formatAltitude(astronomy.sunAltitudeDeg)");
     expect(modernSunMoonSource).not.toContain("formatAltitude(astronomy.moonAltitudeDeg)");

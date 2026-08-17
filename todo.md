@@ -1756,3 +1756,15 @@
 - [x] Interface: Harmoniser les libellés des villes avec le Dashboard et afficher la température actuelle dans chaque favori.
 - [x] Contrainte: Ne jamais afficher une température inventée ; afficher un état explicite lorsqu’elle est indisponible.
 - [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.
+
+## Villes favorites : ordre et mini-icône météo
+- [x] Audit: Vérifier la persistance de l’ordre des favoris connectés et locaux, ainsi que la condition météo disponible.
+- [x] Interface: Ajouter le glisser-déposer mobile et desktop pour réorganiser les villes favorites.
+- [x] Interface: Afficher une mini-icône météo avant le nom, avec la température actuelle fiable.
+- [x] Validation: Vérifier la persistance, le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Soleil réaliste dans le panneau astronomique
+- [x] Audit: Identifier l’image et les styles utilisés par le Soleil du panneau Soleil & Lune.
+- [x] Média: Créer un disque solaire réaliste, texturé, sans bord blanc et compatible avec la carte sombre.
+- [x] Interface: Intégrer la nouvelle image du Soleil sans modifier la position de la Lune ni les éphémérides.
+- [x] Validation: Vérifier le panneau mobile, TypeScript, Vitest et build avant publication.
