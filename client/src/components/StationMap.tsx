@@ -39,7 +39,7 @@ function stationInfoHtml(station: StationMarker) {
     ["Rafales", stationMetric(latest?.windGust, " km/h")],
     ["Pluie", stationMetric(latest?.precipitation, " mm")],
   ];
-  return `<div style="min-width:210px;color:#e2e8f0;font-family:system-ui,sans-serif"><strong style="font-size:14px">${escapeHtml(station.name)}</strong><p style="margin:3px 0 8px;color:#94a3b8;font-size:11px">${escapeHtml(station.source ?? "Station physique")} · ${station.distanceKm.toFixed(1)} km · ${freshness}</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">${rows.map(([label, value]) => `<div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:5px"><span style="display:block;color:#94a3b8;font-size:10px">${label}</span><span style="font-size:12px;font-weight:600">${value}</span></div>`).join("")}</div><p style="margin:8px 0 0;color:#94a3b8;font-size:11px">Fiabilité mesurée : <strong style="color:#a7f3d0">${reliability}</strong> · ${station.readings?.length ?? 0} relevé(s) conservé(s)</p></div>`;
+  return `<div style="box-sizing:border-box;min-width:248px;max-width:280px;padding:12px;border:1px solid #38bdf8;border-radius:12px;background:#071018;color:#f8fafc;font-family:system-ui,sans-serif;line-height:1.35"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><strong style="font-size:15px;line-height:1.2;color:#ffffff">${escapeHtml(station.name)}</strong><span style="flex:none;border:1px solid #34d399;border-radius:999px;padding:3px 6px;color:#a7f3d0;font-size:10px;font-weight:700">${escapeHtml(reliability)}</span></div><p style="margin:6px 0 10px;color:#cbd5e1;font-size:11px;font-weight:500">${escapeHtml(station.source ?? "Station physique")} · ${station.distanceKm.toFixed(1)} km</p><div style="margin:0 0 10px;border-left:2px solid #38bdf8;padding-left:7px;color:#bae6fd;font-size:11px">Relevé : ${escapeHtml(freshness)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">${rows.map(([label, value]) => `<div style="background:#111c2e;border:1px solid #334155;border-radius:8px;padding:7px"><span style="display:block;margin-bottom:2px;color:#bae6fd;font-size:10px;font-weight:600">${label}</span><span style="color:#ffffff;font-size:13px;font-weight:700">${escapeHtml(value)}</span></div>`).join("")}</div><div style="margin-top:10px;border-top:1px solid #334155;padding-top:8px;color:#cbd5e1;font-size:11px">Fiabilité mesurée : <strong style="color:#a7f3d0">${escapeHtml(reliability)}</strong> · ${station.readings?.length ?? 0} relevé(s) conservé(s)</div></div>`;
 }
 
 export function StationMap({
@@ -138,9 +138,13 @@ export function StationMap({
           onFullscreenChange={(isFullscreen, map) => {
             map?.setOptions({
               mapTypeControl: isFullscreen,
+              mapTypeControlOptions: isFullscreen ? {
+                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE],
+              } : undefined,
               fullscreenControl: !isFullscreen,
               zoomControl: false,
-              streetViewControl: false,
+              streetViewControl: isFullscreen,
               rotateControl: false,
             });
             if (fullscreenCloseControlRef.current) {

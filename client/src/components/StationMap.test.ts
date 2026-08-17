@@ -15,9 +15,12 @@ describe("carte des stations", () => {
     expect(source).toContain("mapTypeControl: isFullscreen");
     expect(source).toContain("fullscreenControl: !isFullscreen");
     expect(source).toContain("zoomControl: false");
-    expect(source).toContain("streetViewControl: false");
+    expect(source).toContain("streetViewControl: isFullscreen");
     expect(source).toContain("rotateControl: false");
     expect(source).toContain("Fermer la carte");
+    expect(source).toContain("MapTypeControlStyle.HORIZONTAL_BAR");
+    expect(source).toContain("background:#071018");
+    expect(source).toContain("border:1px solid #38bdf8");
     expect(source).toContain("function stationInfoHtml");
     expect(source).toContain("new google.maps.InfoWindow()");
     expect(source).toContain("Fiabilité mesurée");

@@ -1871,3 +1871,9 @@
 - [x] Interface: Masquer les contrôles supplémentaires en vue compacte.
 - [x] Interface: Afficher uniquement Plan et Satellite dans la vue agrandie.
 - [x] Validation: Vérifier les contrôles, TypeScript, Vitest et build avant publication.
+
+## Street View plein écran et infobulles lisibles
+- [x] Audit: Vérifier le rétablissement de Street View au plein écran et les styles actuels des infobulles.
+- [x] Interface: Afficher Street View avec Plan et Satellite uniquement dans la carte agrandie.
+- [x] Interface: Renforcer le fond, le contraste et l’espacement des infobulles de stations.
+- [x] Validation: Vérifier les contrôles, la lisibilité, TypeScript, Vitest et build avant publication.
