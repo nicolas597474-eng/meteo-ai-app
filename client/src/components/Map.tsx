@@ -124,6 +124,7 @@ interface MapViewProps {
   initialZoom?: number;
   mapTypeId?: google.maps.MapTypeId | string;
   streetViewControl?: boolean;
+  rotateControl?: boolean;
   onMapReady?: (map: google.maps.Map) => void;
   onFullscreenChange?: (isFullscreen: boolean, map: google.maps.Map | null) => void;
 }
@@ -134,6 +135,7 @@ export function MapView({
   initialZoom = 12,
   mapTypeId = "roadmap",
   streetViewControl = true,
+  rotateControl = true,
   onMapReady,
   onFullscreenChange,
 }: MapViewProps) {
@@ -158,6 +160,7 @@ export function MapView({
         fullscreenControl: true,
         zoomControl: true,
         streetViewControl,
+        rotateControl,
         mapId: "DEMO_MAP_ID",
       });
       onMapReady?.(map.current);

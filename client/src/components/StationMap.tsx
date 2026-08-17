@@ -53,6 +53,7 @@ export function StationMap({
   const markersRef = useRef<google.maps.Marker[]>([]);
   const streetViewRef = useRef<google.maps.StreetViewPanorama | null>(null);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const fullscreenCloseControlRef = useRef<HTMLButtonElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
@@ -114,14 +115,28 @@ export function StationMap({
           initialZoom={stations.length > 0 ? 11 : 10}
           mapTypeId="satellite"
           streetViewControl={false}
+          rotateControl={false}
           onMapReady={(map) => {
             mapRef.current = map;
             streetViewRef.current = map.getStreetView();
+            const closeControl = document.createElement("button");
+            closeControl.type = "button";
+            closeControl.textContent = "✕ Fermer la carte";
+            closeControl.setAttribute("aria-label", "Fermer la carte agrandie");
+            closeControl.style.cssText = "display:none;margin:10px;padding:9px 12px;border:1px solid #7dd3fc;border-radius:8px;background:#071018;color:#e0f2fe;font:600 12px system-ui,sans-serif;cursor:pointer;";
+            closeControl.onclick = () => {
+              if (document.fullscreenElement) void document.exitFullscreen();
+            };
+            map.controls[google.maps.ControlPosition.TOP_LEFT].push(closeControl);
+            fullscreenCloseControlRef.current = closeControl;
             renderMarkers(map);
             setMapReady(true);
           }}
           onFullscreenChange={(isFullscreen, map) => {
-            map?.setOptions({ streetViewControl: isFullscreen });
+            map?.setOptions({ streetViewControl: isFullscreen, rotateControl: isFullscreen });
+            if (fullscreenCloseControlRef.current) {
+              fullscreenCloseControlRef.current.style.display = isFullscreen ? "flex" : "none";
+            }
           }}
         />
         {!mapReady && (

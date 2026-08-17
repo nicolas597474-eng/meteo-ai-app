@@ -1859,3 +1859,9 @@
 - [x] Audit: Vérifier le contrôle Street View et l’événement d’agrandissement de la carte.
 - [x] Interface: Masquer Street View dans la carte compacte et l’activer en plein écran.
 - [x] Validation: Vérifier les contrôles, TypeScript, Vitest et build avant publication.
+
+## Contrôles directionnels et fermeture de la carte
+- [x] Audit: Identifier le contrôle directionnel qui recouvre l’agrandissement et le conteneur de plein écran.
+- [x] Interface: Réserver les contrôles directionnels à la carte agrandie.
+- [x] Interface: Ajouter un bouton pour fermer facilement la carte en plein écran.
+- [x] Validation: Vérifier les contrôles, TypeScript, Vitest et build avant publication.
