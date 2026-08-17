@@ -149,7 +149,7 @@ export default function ReliabilityLaboratory() {
   return (
     <main className="weather-page-sky min-h-screen bg-[#080a0f] pb-28" style={pageSkyStyle}>
       <div className="mx-auto max-w-6xl px-3 pt-3 sm:px-5 sm:pt-5">
-        <header className="weather-surface-hero mb-4 overflow-hidden rounded-2xl border p-4 sm:p-5">
+        <header className="mb-4 overflow-hidden rounded-2xl border border-sky-500/15 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,.18),transparent_40%),linear-gradient(135deg,#101827,#090d15)] p-4 sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-2xl">
               <div className="flex items-center gap-2 text-sky-300"><MeteoIcon name="confidence" size={21} /><span className="text-xs font-semibold uppercase tracking-[0.17em]">Centre d’analyse MeteoAI</span></div>
@@ -171,7 +171,7 @@ export default function ReliabilityLaboratory() {
             <div><p className="text-xs font-semibold text-slate-200">Période analysée</p><p className="mt-0.5 text-[11px] text-slate-500">Choisissez la période et l’échéance à comparer. Aucun résultat n’est estimé.</p></div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-700 bg-[#090d14] p-1 [scrollbar-width:none]">
-                {PERIODS.map((choice) => <button type="button" key={choice.id} onClick={() => setPeriod(choice.id)} className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${period === choice.id ? "bg-primary text-primary-foreground" : "text-slate-300"}`}>{choice.label}</button>)}
+                {PERIODS.map((choice) => <button type="button" key={choice.id} onClick={() => setPeriod(choice.id)} className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${period === choice.id ? "bg-sky-600 text-white" : "text-slate-400"}`}>{choice.label}</button>)}
               </div>
               <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-[#090d14] px-3 py-2 text-[11px] text-slate-400">Horizon<select value={horizon} onChange={(event) => setHorizon(event.target.value as HorizonId)} className="bg-transparent font-semibold text-slate-100 outline-none"><option value="0-6h">0–6 h</option><option value="6-24h">6–24 h</option><option value="24-48h">24–48 h</option><option value="2-3d">2–3 jours</option><option value="4-7d">4–7 jours</option><option value="8-10d">8–10 jours</option><option value="11-15d">11–15 jours</option></select></label>
             </div>
