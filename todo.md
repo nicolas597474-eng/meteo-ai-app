@@ -1750,3 +1750,10 @@
 - [x] Interface: Appliquer les nouvelles surfaces et accents aux pages hors Dashboard : Fiabilité, Stations, Historique, AI Lab, Prévisions détaillées et réglages.
 - [x] Contrainte: Préserver le Dashboard dans son apparence antérieure, sans le soumettre au nouvel habillage bleu lumineux.
 - [x] Validation: Vérifier contrastes, rendus mobile/desktop, TypeScript, Vitest et build avant publication.
+
+## Réalignement sur le style du Dashboard
+- [x] Audit: Comparer les jetons, voiles de ciel, cartes et accents du Dashboard aux pages hors Dashboard.
+- [x] Design system: Restaurer une palette sombre et des surfaces à ciel dynamique inspirées directement du Dashboard.
+- [x] Interface: Retirer l’habillage bleu lumineux uniforme des pages hors Dashboard et les réaligner sur le style du Dashboard.
+- [x] Contrainte: Ne pas modifier le Dashboard lui-même ni les couleurs métier d’alerte, de température et de précipitation.
+- [x] Validation: Vérifier Fiabilité, Stations, Historique, AI Lab, Prévisions détaillées, Dashboard, TypeScript, Vitest et build avant publication.

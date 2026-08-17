@@ -36,9 +36,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain(">Maintenant</text>");
     expect(source).toContain("hourlyCardStride = 170");
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
-    expect(source).toContain("rgba(21,130,203,0.50)");
-    expect(source).toContain("rgba(33,165,236,0.72)");
-    expect(source).toContain("bg-primary text-primary-foreground");
+    expect(source).toContain("rgba(77,105,132,0.38)");
+    expect(source).toContain("rgba(44,128,181,0.48)");
     expect(source).toContain("HourlyMetric");
     expect(source).toContain("hourlyTemperatureTone(h.temp)");
     expect(source).toContain('return "text-amber-200"');

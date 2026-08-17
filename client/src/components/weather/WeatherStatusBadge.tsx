@@ -19,11 +19,11 @@ type WeatherStatusBadgeProps = {
 
 const toneClasses: Record<WeatherStatusBadgeTone, { surface: string; icon: string; label: string; value: string; dot: string }> = {
   info: {
-    surface: "border-primary/70 bg-primary/35 shadow-[inset_0_1px_0_rgba(224,248,255,0.22)]",
-    icon: "border-white/25 bg-white/15 text-white",
-    label: "text-white/75",
-    value: "text-white",
-    dot: "bg-white",
+    surface: "border-sky-400/40 bg-[linear-gradient(135deg,rgba(14,116,144,0.28),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(186,230,253,0.14)]",
+    icon: "border-sky-300/20 bg-sky-400/10 text-sky-200",
+    label: "text-sky-100/65",
+    value: "text-sky-100",
+    dot: "bg-sky-300",
   },
   success: {
     surface: "border-emerald-400/40 bg-[linear-gradient(135deg,rgba(6,95,70,0.28),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(167,243,208,0.12)]",
@@ -40,18 +40,18 @@ const toneClasses: Record<WeatherStatusBadgeTone, { surface: string; icon: strin
     dot: "bg-amber-300",
   },
   lab: {
-    surface: "border-primary/60 bg-primary/25 shadow-[inset_0_1px_0_rgba(224,248,255,0.18)]",
-    icon: "border-primary/30 bg-primary/20 text-primary-foreground",
-    label: "text-primary-foreground/70",
-    value: "text-primary-foreground",
-    dot: "bg-primary",
+    surface: "border-violet-400/40 bg-[linear-gradient(135deg,rgba(91,33,182,0.26),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(221,214,254,0.12)]",
+    icon: "border-violet-300/20 bg-violet-400/10 text-violet-200",
+    label: "text-violet-100/65",
+    value: "text-violet-100",
+    dot: "bg-violet-300",
   },
   neutral: {
-    surface: "border-primary/45 bg-primary/18 shadow-[inset_0_1px_0_rgba(224,248,255,0.14)]",
-    icon: "border-primary/25 bg-primary/15 text-primary-foreground",
-    label: "text-primary-foreground/65",
-    value: "text-primary-foreground",
-    dot: "bg-primary",
+    surface: "border-slate-500/45 bg-[linear-gradient(135deg,rgba(51,65,85,0.34),rgba(15,23,42,0.94))] shadow-[inset_0_1px_0_rgba(226,232,240,0.1)]",
+    icon: "border-slate-400/20 bg-slate-400/10 text-slate-200",
+    label: "text-slate-200/60",
+    value: "text-slate-100",
+    dot: "bg-slate-300",
   },
   danger: {
     surface: "border-rose-400/40 bg-[linear-gradient(135deg,rgba(159,18,57,0.28),rgba(15,23,42,0.92))] shadow-[inset_0_1px_0_rgba(254,205,211,0.12)]",

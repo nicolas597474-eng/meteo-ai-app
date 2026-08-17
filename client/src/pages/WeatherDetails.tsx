@@ -144,7 +144,7 @@ export default function WeatherDetails() {
       <div className="mx-auto max-w-2xl space-y-5 px-3 py-4 pb-28">
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[26px] border border-primary/35 bg-[rgba(10,121,201,0.46)] p-3">
+        <MeteoSurface as="section" tone="default" className="rounded-[26px] border border-white/10 bg-[rgba(26,48,70,0.56)] p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10"><MeteoIcon name="refresh" size={18} /></span>
@@ -164,8 +164,8 @@ export default function WeatherDetails() {
                     key={h.hour}
                     className={`weather-surface-inset flex-shrink-0 w-[160px] rounded-[22px] border p-3 transition-colors ${
                       isNow
-                        ? "border-primary bg-[linear-gradient(160deg,rgba(33,165,236,0.72),rgba(6,95,170,0.82))]"
-                        : "border-primary/35 bg-[linear-gradient(160deg,rgba(21,130,203,0.50),rgba(5,70,139,0.72))]"
+                        ? "border-sky-200/60 bg-[linear-gradient(160deg,rgba(44,128,181,0.48),rgba(22,57,89,0.58))]"
+                        : "border-white/15 bg-[linear-gradient(160deg,rgba(77,105,132,0.38),rgba(34,55,78,0.52))]"
                     }`}
                   >
                     {/* Hour + Now badge */}
@@ -246,7 +246,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 2: GRAPHIQUES INTERACTIFS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-primary/35 bg-[rgba(7,102,177,0.78)] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-white/10 bg-[rgba(11,17,28,0.86)] p-4">
           <div className="mb-4 flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full border border-white/12 bg-white/[0.04]"><MeteoIcon name="chart" size={16} /></span><div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">Lecture dynamique</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Graphiques</h2></div></div>
           
           {/* Chart selector */}
@@ -257,8 +257,8 @@ export default function WeatherDetails() {
                 onClick={() => setActiveChart(opt.key)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   activeChart === opt.key
-                    ? "border border-primary bg-primary text-primary-foreground"
-                    : "border border-primary/30 bg-white/[0.05] text-slate-100 hover:border-primary/60 hover:text-white"
+                    ? "border border-sky-200/45 bg-sky-300/12 text-sky-50"
+                    : "border border-white/10 bg-white/[0.035] text-slate-300 hover:border-white/20 hover:text-white"
                 }`}
               >
                 {opt.label}
@@ -273,7 +273,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 3: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-primary/35 bg-[rgba(7,102,177,0.78)] p-4">
+        <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-white/10 bg-[rgba(11,17,28,0.86)] p-4">
           <div className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-full border border-white/12 bg-white/[0.04]"><MeteoIcon name="calendar" size={16} /></span>
             <div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">Tendance étendue</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Prochains jours</h2></div>
