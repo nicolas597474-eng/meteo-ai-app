@@ -1728,3 +1728,8 @@
 - [x] Audit: Identifier la fonction et les seuils thermiques employés par le Dashboard.
 - [x] Interface: Appliquer ces teintes aux températures des cartes horaires détaillées.
 - [x] Validation: Vérifier les seuils sur mobile, TypeScript, Vitest et build avant publication.
+
+## Repère actuel sans ligne verticale
+- [x] Audit: Identifier le tracé de la ligne verticale du repère actuel dans le graphique.
+- [x] Interface: Retirer la ligne et conserver uniquement « Maintenant » sous l’heure.
+- [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.

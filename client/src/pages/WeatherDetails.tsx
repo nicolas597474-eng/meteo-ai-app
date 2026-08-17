@@ -594,15 +594,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         
         {/* Current hour indicator */}
         {currentIdx < hours.length && (
-          <>
-            <line
-            x1={currentX}
-            x2={currentX}
-            y1={chartTop} y2={chartBottom}
-              stroke="#60a5fa" strokeWidth="2" strokeDasharray="5 3" opacity="0.9"
-            />
-            <text x={currentX} y={chartH + 58} textAnchor="middle" fill="#bfdbfe" fontSize="11" fontWeight="700">Maintenant</text>
-          </>
+          <text x={currentX} y={chartH + 58} textAnchor="middle" fill="#bfdbfe" fontSize="11" fontWeight="700">Maintenant</text>
         )}
         
         {/* Line */}

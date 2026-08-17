@@ -43,8 +43,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('return "text-amber-200"');
     expect(source).toContain('return "text-orange-300"');
     expect(source).toContain("Déroulé temporel");
-    expect(source).not.toContain("Prévision officielle");
+    expect(source).toContain('>Maintenant</text>');
     expect(source).toContain('y={chartH + 58} textAnchor="middle"');
+    expect(source).not.toContain('strokeDasharray="5 3"');
     expect(source).toContain('fontSize="14"');
     expect(source).toContain('fontSize={i === currentIdx ? "13" : "12"}');
   });
