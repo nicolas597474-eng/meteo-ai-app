@@ -334,6 +334,7 @@ img.moon-3d-first-crescent {
   .meteo-icon-motion-fog { animation: meteo-icon-fog 6.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
   .meteo-icon-motion-night { animation: meteo-icon-night 4.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
   .meteo-icon-motion-wind { animation: meteo-icon-wind 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .meteo-icon-motion-humidity { animation: meteo-icon-humidity 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
   .sun-altitude-marker .meteo-icon-motion-sun { animation: celestial-sun-breathe 8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
 }
 
@@ -411,4 +412,9 @@ img.moon-3d-first-crescent {
 @keyframes meteo-icon-wind {
   0%, 100% { transform: translateX(-1.5px); }
   50% { transform: translateX(2px); }
+}
+
+@keyframes meteo-icon-humidity {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(1.5px) scale(0.96); }
 }

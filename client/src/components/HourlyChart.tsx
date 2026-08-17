@@ -183,8 +183,8 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           </div>
 
           {/* Vent */}
-          <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
-            <div className="flex items-center gap-1.5 mb-1"><Wind className="h-3.5 w-3.5 text-emerald-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Vent</span></div>
+            <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
+              <div className="flex items-center gap-1.5 mb-1"><MeteoIcon name="wind_param" size={17} className="shrink-0" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Vent</span></div>
             <p className="text-sm font-bold text-white">{hour.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span></p>
             {hasGust && <p className="text-[10px] text-orange-300 mt-0.5">Rafales: {hour.windGust!.toFixed(0)} km/h</p>}
           </div>
@@ -215,8 +215,8 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           </div>
 
           {/* Humidité */}
-          <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
-            <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-cyan-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Humidité</span></div>
+            <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
+              <div className="flex items-center gap-1.5 mb-1"><MeteoIcon name="humidity" size={17} className="shrink-0" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Humidité</span></div>
             <p className="text-sm font-bold text-cyan-400">{hour.humidity != null ? `${Math.round(hour.humidity)}%` : "—"}</p>
             <p className="mt-0.5 text-[10px] text-slate-500">Point de rosée {hour.dewPoint != null ? `${hour.dewPoint.toFixed(1)}°C` : "—"}</p>
           </div>

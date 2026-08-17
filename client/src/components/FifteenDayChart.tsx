@@ -167,11 +167,11 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-orange-400" />} label="Température" value={<>{day.tempMax ?? "—"}° <span className="text-blue-400 text-xs">/ {day.tempMin ?? "—"}°</span></>} />
           <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-pink-400" />} label="Ressenti" value={<>{day.feelsLikeMax ?? "—"}° <span className="text-blue-400 text-xs">/ {day.feelsLikeMin ?? "—"}°</span></>} />
-          <DetailCard icon={<Wind className="h-3.5 w-3.5 text-emerald-400" />} label="Vent moyen" value={<>{day.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
+          <DetailCard icon={<MeteoIcon name="wind_param" size={17} className="shrink-0" />} label="Vent moyen" value={<>{day.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
           <DetailCard icon={<Wind className="h-3.5 w-3.5 text-orange-400" />} label="Rafales" value={<>{day.windGust != null ? Math.round(day.windGust) : "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
           <DetailCard icon={<Navigation className="h-3.5 w-3.5 text-sky-400" style={{ transform: `rotate(${(day.windDirection ?? 0) + 180}deg)` }} />} label="Direction" value={<>{degToCompass(day.windDirection)} <span className="text-[10px] text-slate-500">{day.windDirection != null ? `${Math.round(day.windDirection)}°` : ""}</span></>} />
           <DetailCard icon={<Droplets className="h-3.5 w-3.5 text-blue-400" />} label="Précipitations" value={<span className="text-blue-400">{day.precipitation ?? 0} mm</span>} />
-          <DetailCard icon={<Eye className="h-3.5 w-3.5 text-cyan-400" />} label="Humidité" value={<span className="text-cyan-400">{day.humidity != null ? `${Math.round(day.humidity)}%` : "—"}</span>} />
+          <DetailCard icon={<MeteoIcon name="humidity" size={17} className="shrink-0" />} label="Humidité" value={<span className="text-cyan-400">{day.humidity != null ? `${Math.round(day.humidity)}%` : "—"}</span>} />
           <DetailCard icon={<Sun className="h-3.5 w-3.5 text-yellow-400" />} label="Indice UV" value={<><span className={uv.color}>{day.uvIndex != null ? Math.round(day.uvIndex) : "—"}</span> <span className={`text-[10px] ${uv.color}`}>{uv.text}</span></>} />
           <DetailCard icon={<Cloud className="h-3.5 w-3.5 text-slate-400" />} label="Nébulosité" value={<>{day.cloudCover != null ? `${Math.round(day.cloudCover)}%` : "—"}</>} />
           <DetailCard icon={<Sunrise className="h-3.5 w-3.5 text-amber-400" />} label="Lever" value={<span className="text-amber-400">{day.sunrise ?? "—"}</span>} />

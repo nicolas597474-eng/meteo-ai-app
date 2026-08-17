@@ -704,16 +704,16 @@ export default function Dashboard() {
                 </p>
                 <p className="text-base sm:text-lg font-semibold">{today?.windGust ?? "—"} km/h</p>
               </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Wind className="h-3 w-3" />Vent max
-                </p>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                    <MeteoIcon name="wind_param" size={16} className="shrink-0" />Vent max
+                  </p>
                 <p className="text-base sm:text-lg font-semibold">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
               </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
-                  <Droplets className="h-3 w-3 opacity-60" />Humidité
-                </p>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
+                    <MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité
+                  </p>
                 <p className="text-base sm:text-lg font-semibold">{today?.humidity ?? "—"}%</p>
               </div>
               <div className="text-center">

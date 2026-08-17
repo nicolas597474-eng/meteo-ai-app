@@ -1677,3 +1677,8 @@
 - [x] Audit: Vérifier la persistance et le score des précipitations pour les observations personnelles.
 - [x] Interface: Afficher un champ de millimètres pour les conditions pluvieuses et envoyer sa valeur.
 - [x] Validation: Vérifier la saisie mobile, le score, TypeScript, Vitest et build avant publication.
+
+## Icônes animées de vent et d’humidité
+- [x] Audit: Identifier les cartes météo et les icônes réutilisables pour le vent et l’humidité.
+- [x] Interface: Ajouter des animations discrètes respectant la réduction des mouvements.
+- [x] Validation: Vérifier les cartes mobiles, TypeScript, Vitest et build avant publication.

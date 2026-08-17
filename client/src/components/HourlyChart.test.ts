@@ -68,6 +68,8 @@ describe("HourlyChart", () => {
     expect(source).toContain("Pression de surface");
     expect(source).toContain("Portée {visibilityLabel");
     expect(source).not.toContain("Régime opérationnel");
+    expect(source).toContain('MeteoIcon name="wind_param" size={17}');
+    expect(source).toContain('MeteoIcon name="humidity" size={17}');
   });
 
   it("retire les sections de régime et d’évolution à court terme du panneau détaillé", () => {

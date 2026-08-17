@@ -7,6 +7,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).not.toContain("Prévision officielle consolidée");
     expect(source).toContain("Moyenne locale pondérée");
     expect(source).toContain("Mes observations");
+    expect(source).toContain('MeteoIcon name="wind_param" size={16}');
+    expect(source).toContain('MeteoIcon name="humidity" size={16}');
     expect(source).toContain("Précipitations observées (mm)");
     expect(source).toContain("acceptsPersonalPrecipitation");
     expect(source).toContain("Enregistrer et comparer aux modèles");

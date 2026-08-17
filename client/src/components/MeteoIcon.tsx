@@ -57,10 +57,18 @@ function getPictorialAnimationClass(name: string) {
   return "meteo-icon-motion-ambient";
 }
 
+function getInlineAnimationClass(name: string) {
+  const key = name.toLowerCase();
+  if (["wind_moderate", "windy", "wind_param"].includes(key)) return "meteo-icon-motion-wind";
+  if (["humidity", "precipitation"].includes(key)) return "meteo-icon-motion-humidity";
+  return "";
+}
+
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
   const pictorialIcon = PICTORIAL_WEATHER_ICONS[name.toLowerCase()];
   const animationClass = getPictorialAnimationClass(name);
+  const inlineAnimationClass = getInlineAnimationClass(name);
   if (pictorialIcon) {
     return (
       <img
@@ -89,7 +97,7 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
       viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`meteo-icon-3d ${className}`}
+      className={`meteo-icon-3d ${inlineAnimationClass} ${className}`}
       role="img"
       aria-label={`Icône météo : ${name}`}
     >
