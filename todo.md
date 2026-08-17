@@ -1652,3 +1652,13 @@
 - [x] Audit: Vérifier les états nocturnes où Soleil et Lune sont simultanément sous l’horizon.
 - [x] Interface: Afficher deux indicateurs célestes distincts sous l’arche, sans faux positionnement dans le ciel.
 - [x] Validation: Vérifier le panneau nocturne mobile, TypeScript, Vitest et build avant publication.
+
+## Astres affichés sur l’arche en permanence
+- [x] Audit: Identifier la géométrie de référence et les règles actuelles de masquage hors horizon.
+- [x] Interface: Conserver Soleil et Lune visibles, séparés et légendés directement sur le demi-cercle.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Collecte quotidienne de prévisions à 05:00
+- [x] Audit: Vérifier la tâche de 05:00, les huit modèles et les relevés de stations effectivement archivés.
+- [x] Correction: Aucune correction requise : la collecte active couvre déjà les modèles experts et les stations, avec contrôle de couverture.
+- [ ] Validation: Contrôler les données produites et la prochaine exécution planifiée.

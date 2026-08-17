@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
-const modernSunMoonSource = source.slice(source.indexOf("function SunMoonPanelHorizonAware"));
+const modernSunMoonSource = source.slice(source.indexOf("function SunMoonPanelAlwaysVisible"));
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -24,7 +24,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
-    expect(modernSunMoonSource).toContain("Éphémérides locales avec positions et états visibles de chaque astre.");
+    expect(modernSunMoonSource).toContain("Les deux astres restent visibles et distincts sur l’arche des éphémérides.");
   });
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
@@ -35,10 +35,8 @@ describe("EnvironmentalPanels", () => {
   });
 
   it("distingue les positions du Soleil et de la Lune à partir des heures réelles", () => {
-    expect(source).toContain("celestialArcPosition");
-    expect(source).toContain("moonPosition");
-    expect(source).toContain("Position actuelle de la Lune");
-    expect(source).toContain("Lune sous l’horizon");
+    expect(modernSunMoonSource).toContain("celestialArcPosition");
+    expect(modernSunMoonSource).toContain("moonPosition");
     expect(modernSunMoonSource).toContain("meteoai-realistic-sun-3d-clean_e4a6a1ea.png");
     expect(modernSunMoonSource).toContain("celestial-realistic-sun");
     expect(modernSunMoonSource).not.toContain("formatAltitude(astronomy.sunAltitudeDeg)");
@@ -47,10 +45,10 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("isNightAtLocalMinutes");
     expect(modernSunMoonSource).toContain("celestial-night-marker");
     expect(modernSunMoonSource).toContain("markersAreClose");
-    expect(modernSunMoonSource).toContain("Soleil sous l’horizon");
-    expect(modernSunMoonSource).toContain("Lune sous l’horizon");
-    expect(modernSunMoonSource).toContain("Astres sous l’horizon");
-    expect(modernSunMoonSource).toContain("Soleil sous l’horizon");
+    expect(modernSunMoonSource).toContain("sunDisplayPosition");
+    expect(modernSunMoonSource).toContain("moonDisplayPosition");
+    expect(modernSunMoonSource).toContain("Position du Soleil sur l’arche");
+    expect(modernSunMoonSource).toContain("Position de la Lune sur l’arche");
     expect(styles).not.toContain('content: "Nuit locale"');
   });
 
