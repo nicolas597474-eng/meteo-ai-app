@@ -1688,3 +1688,8 @@
 - [x] Interface: Moderniser l’en-tête et les surfaces de lecture de la page.
 - [x] Interface: Améliorer les cartes horaires et l’état de l’heure actuelle sur mobile.
 - [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
+
+## Style éditorial alternatif des prévisions détaillées
+- [x] Direction: Définir un style éditorial plus épuré, limité à cette page.
+- [x] Interface: Recomposer l’en-tête, les contrôles et les cartes sans modifier les autres pages.
+- [x] Validation: Vérifier le rendu mobile, TypeScript, Vitest et build avant publication.
