@@ -74,7 +74,7 @@ function FavoritePillContent({ loc, weather, active }: { loc: LocationItem; weat
   const hasCondition = Boolean(weather?.condition);
 
   return <>
-    {hasCondition ? <MeteoIcon name={getIconNameFromCondition(weather?.condition)} size={20} className="h-5 w-5 shrink-0" /> : <Star className={`h-4 w-4 shrink-0 ${active ? "fill-primary" : ""}`} />}
+    {hasCondition ? <MeteoIcon name={getIconNameFromCondition(weather?.condition)} size={18} className="h-[18px] w-[18px] shrink-0" /> : <Star className={`h-4 w-4 shrink-0 ${active ? "fill-primary" : ""}`} />}
     <span className="max-w-[104px] truncate text-[13px] font-semibold tracking-tight">{loc.name}</span>
     <span className={`ml-0.5 text-sm font-bold tabular-nums ${hasCurrentTemperature ? "text-sky-200" : "text-slate-500"}`}>
       {hasCurrentTemperature ? `${Math.round(weather!.temp!)}°` : "—"}
@@ -99,7 +99,7 @@ function SortableFavoritePill({ loc, weather, active, onSelect }: { loc: Locatio
     }}
     {...attributes}
     aria-label={`${loc.name}, ${hasCurrentTemperature ? `température actuelle ${Math.round(weather!.temp!)} degrés` : "température actuelle indisponible"}. Balayez pour faire défiler, ou utilisez la poignée pour réorganiser.`}
-    className={`group flex min-h-11 shrink-0 touch-pan-x items-center gap-2 rounded-full border px-3.5 py-2 transition-all ${
+    className={`group flex min-h-10 shrink-0 touch-pan-x items-center gap-1.5 rounded-full border px-3 py-1.5 transition-all ${
       active ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"
     } ${isDragging ? "cursor-grabbing opacity-35" : "cursor-grab active:cursor-grabbing"}`}
   >
@@ -110,9 +110,9 @@ function SortableFavoritePill({ loc, weather, active, onSelect }: { loc: Locatio
       tabIndex={0}
       onClick={(event) => event.stopPropagation()}
       aria-label={`Réorganiser ${loc.name}`}
-      className="flex h-7 w-3 shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground/60 active:cursor-grabbing active:text-primary"
+      className="flex h-6 w-3 shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground/60 active:cursor-grabbing active:text-primary"
     >
-      <GripVertical className="h-4 w-4" />
+      <GripVertical className="h-3.5 w-3.5" />
     </span>
     <FavoritePillContent loc={loc} weather={weather} active={active} />
   </div>;
@@ -297,7 +297,7 @@ export function FavoritesBar({
             className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
             style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
           >
-            {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
+            {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
             <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
               {orderedFavorites.map((loc) => {
                 const active = isActive(loc);
@@ -309,7 +309,7 @@ export function FavoritesBar({
             {totalFavCount < MAX_FAVORITES && (
               <button
                 onClick={() => setShowAddDialog(true)}
-                className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/55 bg-primary/[0.06] px-3 py-2 text-[13px] font-semibold tracking-tight text-primary transition-colors hover:border-primary hover:bg-primary/10"
+                className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/55 bg-primary/[0.06] px-3 py-1.5 text-[13px] font-semibold tracking-tight text-primary transition-colors hover:border-primary hover:bg-primary/10"
                 aria-label="Ajouter un lieu favori"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -321,14 +321,14 @@ export function FavoritesBar({
                 href="/favorites"
                 aria-label="Gérer, modifier ou supprimer mes villes favorites"
                 title="Gérer mes villes"
-                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-primary/45 bg-primary/[0.06] text-primary transition-colors hover:border-primary hover:bg-primary/10"
+                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-xl border border-primary/45 bg-primary/[0.06] text-primary transition-colors hover:border-primary hover:bg-primary/10"
               >
                 <Settings className="h-4 w-4" />
               </Link>
             )}
           </div>
           <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.23, 1, 0.32, 1)" }}>
-            {activeDragLocation ? <div className="flex min-h-11 items-center gap-2 rounded-full border border-primary/80 bg-slate-950 px-3.5 py-2 text-primary ring-1 ring-sky-300/60"><FavoritePillContent loc={activeDragLocation} weather={prefetchedWeather?.get(activeDragLocation.id)} active /></div> : null}
+            {activeDragLocation ? <div className="flex min-h-10 items-center gap-1.5 rounded-full border border-primary/80 bg-slate-950 px-3 py-1.5 text-primary ring-1 ring-sky-300/60"><FavoritePillContent loc={activeDragLocation} weather={prefetchedWeather?.get(activeDragLocation.id)} active /></div> : null}
           </DragOverlay>
         </DndContext>
 

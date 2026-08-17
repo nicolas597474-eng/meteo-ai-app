@@ -1883,3 +1883,8 @@
 - [x] Interface: Colorer l’heure du dernier relevé selon sa fraîcheur.
 - [x] Contrainte: Afficher un état neutre lorsque l’horodatage est indisponible.
 - [x] Validation: Vérifier les infobulles, TypeScript, Vitest et build avant publication.
+
+## Pastilles de lieux favoris plus compactes
+- [x] Audit: Identifier la hauteur, le rembourrage et les icônes des pastilles actuelles.
+- [x] Interface: Réduire légèrement leur hauteur sans diminuer la lisibilité.
+- [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.

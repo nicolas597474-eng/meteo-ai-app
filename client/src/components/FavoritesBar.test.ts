@@ -35,6 +35,12 @@ describe("FavoritesBar", () => {
     expect(source).toContain('text-sm font-bold tabular-nums');
   });
 
+  it("conserve des pastilles compactes sans réduire la lisibilité des favoris", () => {
+    expect(source).toContain('min-h-10');
+    expect(source).toContain('px-3 py-1.5');
+    expect(source).toContain('size={18}');
+  });
+
   it("priorise la même donnée actuelle que la carte Dashboard pour le favori actif", () => {
     expect(source).toContain("activeWeather?: FavoriteWeather");
     expect(source).toContain("active ? activeWeather ?? prefetchedWeather?.get(loc.id)");
