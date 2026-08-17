@@ -21,6 +21,14 @@ describe("FavoritesBar", () => {
     expect(source).toContain('totalFavCount < MAX_FAVORITES');
   });
 
+  it("place l’action Ajouter après les villes et les paramètres dans la rangée", () => {
+    const addIndex = source.indexOf('aria-label="Ajouter un lieu favori"');
+    const settingsIndex = source.indexOf('Gérer, modifier ou supprimer mes villes favorites');
+    const sortableIndex = source.indexOf('<SortableContext items={orderedFavorites.map');
+    expect(addIndex).toBeGreaterThan(settingsIndex);
+    expect(addIndex).toBeGreaterThan(sortableIndex);
+  });
+
   it("affiche une température actuelle explicite avec la typographie des pastilles du Dashboard", () => {
     expect(source).toContain('température actuelle indisponible');
     expect(source).toContain('text-[13px] font-semibold tracking-tight');

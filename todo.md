@@ -1790,3 +1790,9 @@
 - [x] Interface: Ajouter un repère de défilement et un accès évident à l’ajout sans fixer la commande.
 - [x] Données: Augmenter de manière cohérente la capacité de cinq à huit villes favorites côté interface et serveur.
 - [x] Validation: Vérifier le parcours mobile, TypeScript, Vitest et build avant publication.
+
+## Ajout à droite dans les favoris défilants
+- [x] Audit: Vérifier l’ordre des villes, des paramètres et de l’action Ajouter dans la rangée.
+- [x] Interface: Placer l’action Ajouter tout à droite de la rangée défilante.
+- [x] Interface: Préserver le défilement horizontal dans les deux sens sur mobile et desktop.
+- [x] Validation: Vérifier le parcours mobile, TypeScript, Vitest et build avant publication.
