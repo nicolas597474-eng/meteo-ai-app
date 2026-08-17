@@ -24,7 +24,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
-    expect(modernSunMoonSource).toContain("Éphémérides locales et état actuel du cycle jour-nuit");
+    expect(modernSunMoonSource).toContain("Éphémérides locales et positions distinctes des deux astres.");
   });
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
@@ -46,6 +46,10 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain('MeteoIcon name="clear_night" size={40}');
     expect(modernSunMoonSource).toContain("isNightAtLocalMinutes");
     expect(modernSunMoonSource).toContain("celestial-night-marker");
+    expect(modernSunMoonSource).toContain("markersAreClose");
+    expect(modernSunMoonSource).toContain("Soleil sous l’horizon");
+    expect(modernSunMoonSource).toContain("Lune sous l’horizon");
+    expect(styles).not.toContain('content: "Nuit locale"');
   });
 
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {

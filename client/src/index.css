@@ -351,22 +351,6 @@ img.moon-3d-first-crescent {
     linear-gradient(145deg, rgba(3, 7, 24, 0.94), rgba(12, 18, 43, 0.90)) !important;
 }
 
-.weather-surface:has(.celestial-night-marker)::before {
-  content: "Nuit locale";
-  position: absolute;
-  top: 0.9rem;
-  right: 1rem;
-  z-index: 1;
-  border: 1px solid rgba(165, 180, 252, 0.45);
-  border-radius: 999px;
-  padding: 0.18rem 0.55rem;
-  color: rgb(224, 231, 255);
-  background: rgba(49, 46, 129, 0.28);
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .weather-surface:has(.celestial-night-marker) .sun-altitude-marker {
   opacity: 0.28;
   filter: saturate(0.55);

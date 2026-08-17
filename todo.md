@@ -1641,3 +1641,9 @@
 - [x] Audit: Identifier le composant et les contraintes de taille actuelles du panneau d’ajout de lieu.
 - [x] Interface: Afficher la recherche de lieu en plein écran mobile avec fermeture accessible.
 - [x] Validation: Vérifier l’intégralité du panneau sur mobile, TypeScript, Vitest et build avant publication.
+
+## Séparation visuelle Soleil & Lune
+- [x] Audit: Identifier l’origine de toute superposition des marqueurs sur l’arche.
+- [x] Interface: Distinguer les calques, styles et positions des astres, y compris lorsqu’ils sont sous l’horizon.
+- [x] Validation: Vérifier le tracé mobile, TypeScript, Vitest et build avant publication.
+- [x] Interface: Retirer le libellé « Nuit locale » du panneau tout en conservant le thème nocturne.
