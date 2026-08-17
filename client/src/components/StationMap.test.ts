@@ -8,5 +8,7 @@ describe("carte des stations", () => {
     expect(source).toContain("panorama.setPosition(position)");
     expect(source).toContain("marker.addListener(\"click\"");
     expect(source).toContain("Satellite · touchez un point pour la vue réelle");
+    expect(source).toContain('className="space-y-2"');
+    expect(source).not.toContain('absolute right-2 top-2 min-h-10');
   });
 });

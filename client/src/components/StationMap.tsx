@@ -68,36 +68,40 @@ export function StationMap({
   }, [renderMarkers]);
 
   return (
-    <div className="relative h-56 overflow-hidden rounded-xl border border-slate-800 bg-[#090b10]">
-      <MapView
-        className="h-full w-full"
-        initialCenter={{ lat: center.lat, lng: center.lon }}
-        initialZoom={stations.length > 0 ? 11 : 10}
-        mapTypeId="satellite"
-        onMapReady={(map) => {
-          mapRef.current = map;
-          streetViewRef.current = map.getStreetView();
-          renderMarkers(map);
-          setMapReady(true);
-        }}
-      />
+    <div className="space-y-2">
+      <div className="relative h-52 overflow-hidden rounded-xl border border-slate-800 bg-[#090b10]">
+        <MapView
+          className="h-full w-full"
+          initialCenter={{ lat: center.lat, lng: center.lon }}
+          initialZoom={stations.length > 0 ? 11 : 10}
+          mapTypeId="satellite"
+          onMapReady={(map) => {
+            mapRef.current = map;
+            streetViewRef.current = map.getStreetView();
+            renderMarkers(map);
+            setMapReady(true);
+          }}
+        />
+        {!mapReady && (
+          <div className="absolute inset-0 grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.16),transparent_34%),linear-gradient(rgba(30,41,59,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(30,41,59,0.32)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px]">
+            <div className="absolute h-36 w-36 rounded-full border border-blue-500/20" />
+            <div className="absolute h-24 w-24 rounded-full border border-blue-500/30" />
+            <div className="relative flex flex-col items-center"><span className="grid h-10 w-10 place-items-center rounded-full border-2 border-blue-200 bg-blue-600 text-base text-white">●</span><span className="mt-2 rounded-full border border-slate-700 bg-[#10131a] px-2 py-1 text-[10px] text-slate-300">Lieu de référence</span></div>
+            <p className="absolute bottom-3 text-[10px] text-slate-500">Repère local — fond cartographique en chargement</p>
+          </div>
+        )}
+      </div>
       {mapReady && (
-        <button
-          type="button"
-          aria-label="Vue réelle du lieu"
-          onClick={() => showStreetViewAt({ lat: center.lat, lng: center.lon }, "Lieu de référence")}
-          className="absolute right-2 top-2 min-h-10 rounded-lg border border-sky-300/70 bg-slate-950/85 px-2.5 text-[11px] font-semibold text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-        >
-          Vue réelle ici
-        </button>
-      )}
-      {mapReady && <p className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-slate-950/80 px-2 py-1 text-[10px] text-slate-100">Satellite · touchez un point pour la vue réelle</p>}
-      {!mapReady && (
-        <div className="absolute inset-0 grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.16),transparent_34%),linear-gradient(rgba(30,41,59,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(30,41,59,0.32)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px]">
-          <div className="absolute h-36 w-36 rounded-full border border-blue-500/20" />
-          <div className="absolute h-24 w-24 rounded-full border border-blue-500/30" />
-          <div className="relative flex flex-col items-center"><span className="grid h-10 w-10 place-items-center rounded-full border-2 border-blue-200 bg-blue-600 text-base text-white">●</span><span className="mt-2 rounded-full border border-slate-700 bg-[#10131a] px-2 py-1 text-[10px] text-slate-300">Lieu de référence</span></div>
-          <p className="absolute bottom-3 text-[10px] text-slate-500">Repère local — fond cartographique en chargement</p>
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090b10] px-2.5 py-1.5">
+          <p className="text-[10px] text-slate-400">Satellite · touchez un point pour la vue réelle</p>
+          <button
+            type="button"
+            aria-label="Vue réelle du lieu"
+            onClick={() => showStreetViewAt({ lat: center.lat, lng: center.lon }, "Lieu de référence")}
+            className="min-h-9 shrink-0 rounded-md border border-sky-300/70 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          >
+            Vue réelle ici
+          </button>
         </div>
       )}
     </div>

@@ -1843,3 +1843,8 @@
 - [x] Interface: Alimenter les favoris avec la même température actuelle que la carte Dashboard pour le lieu actif.
 - [x] Contrainte: Ne jamais remplacer une donnée indisponible par une température estimée non issue de la source partagée.
 - [x] Validation: Vérifier la concordance, TypeScript, Vitest et build avant publication.
+
+## Placement non conflictuel de la vue réelle
+- [x] Audit: Vérifier les positions des commandes natives de carte et de la commande Vue réelle.
+- [x] Interface: Positionner Vue réelle sans recouvrir les boutons d’agrandissement ou de zoom.
+- [x] Validation: Vérifier sur mobile, TypeScript, Vitest et build avant publication.
