@@ -273,17 +273,15 @@ export function FavoritesBar({
       {/* Favorites strip */}
       <div className="relative">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveDragId(null)} onDragEnd={handleDragEnd}>
-          <div className="flex min-w-0 items-center gap-2">
-            <div
-              ref={scrollRef}
-              className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 scrollbar-hide"
-              style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
-            >
-              {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
-              <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
-                {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
-              </SortableContext>
-            </div>
+          <div
+            ref={scrollRef}
+            className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
+            style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
+          >
+            {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold tracking-tight transition-all ${isActive(locations[0]) ? "border-primary/70 bg-primary/15 text-primary" : "border-border bg-card/80 text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
+            <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
+              {orderedFavorites.map((loc) => <SortableFavoritePill key={loc.id} loc={loc} weather={prefetchedWeather?.get(loc.id)} active={isActive(loc)} onSelect={() => onLocationChange({ lat: loc.lat, lon: loc.lon, name: loc.name, radiusKm: loc.radiusKm, favoriteId: loc.favoriteId, localMode: loc.localMode })} />)}
+            </SortableContext>
 
             {totalFavCount < 5 && (
               <button

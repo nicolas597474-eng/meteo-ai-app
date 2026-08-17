@@ -12,8 +12,8 @@ describe("FavoritesBar", () => {
     expect(source).toContain('aria-label="Fermer l’ajout de lieu"');
   });
 
-  it("garde l’ajout et les paramètres sur la même ligne que les favoris", () => {
-    expect(source).toContain('flex min-w-0 items-center gap-2');
+  it("place l’ajout et les paramètres dans le défilement horizontal des favoris", () => {
+    expect(source).toContain('flex gap-2 overflow-x-auto pb-1 scrollbar-hide');
     expect(source).toContain('aria-label="Ajouter un lieu favori"');
     expect(source).toContain('Gérer, modifier ou supprimer mes villes favorites');
     expect(source).toContain('totalFavCount < 5');

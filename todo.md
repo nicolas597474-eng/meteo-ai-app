@@ -1779,3 +1779,8 @@
 - [x] Interface: Replacer « Ajouter un lieu » dans la ligne défilante des favoris.
 - [x] Interface: Toujours afficher l’icône Paramètres pour gérer les villes connectées.
 - [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.
+
+## Défilement libre des commandes de favoris
+- [x] Audit: Identifier les conteneurs qui maintiennent l’ajout et les paramètres fixes.
+- [x] Interface: Mettre l’ajout et les paramètres dans le même défilement horizontal que les villes.
+- [x] Validation: Vérifier le défilement mobile, TypeScript, Vitest et build avant publication.
