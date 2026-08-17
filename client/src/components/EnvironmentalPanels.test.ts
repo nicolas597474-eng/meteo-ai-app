@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
-const modernSunMoonSource = source.slice(source.indexOf("function SunMoonPanelModern"));
+const modernSunMoonSource = source.slice(source.indexOf("function SunMoonPanelHorizonAware"));
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -24,7 +24,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
-    expect(modernSunMoonSource).toContain("Éphémérides locales et positions distinctes des deux astres.");
+    expect(modernSunMoonSource).toContain("Éphémérides locales avec positions et états visibles de chaque astre.");
   });
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
@@ -49,6 +49,8 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("markersAreClose");
     expect(modernSunMoonSource).toContain("Soleil sous l’horizon");
     expect(modernSunMoonSource).toContain("Lune sous l’horizon");
+    expect(modernSunMoonSource).toContain("Astres sous l’horizon");
+    expect(modernSunMoonSource).toContain("Soleil sous l’horizon");
     expect(styles).not.toContain('content: "Nuit locale"');
   });
 

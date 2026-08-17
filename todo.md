@@ -1647,3 +1647,8 @@
 - [x] Interface: Distinguer les calques, styles et positions des astres, y compris lorsqu’ils sont sous l’horizon.
 - [x] Validation: Vérifier le tracé mobile, TypeScript, Vitest et build avant publication.
 - [x] Interface: Retirer le libellé « Nuit locale » du panneau tout en conservant le thème nocturne.
+
+## Astres visibles sous l’horizon
+- [x] Audit: Vérifier les états nocturnes où Soleil et Lune sont simultanément sous l’horizon.
+- [x] Interface: Afficher deux indicateurs célestes distincts sous l’arche, sans faux positionnement dans le ciel.
+- [x] Validation: Vérifier le panneau nocturne mobile, TypeScript, Vitest et build avant publication.
