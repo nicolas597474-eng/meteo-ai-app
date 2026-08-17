@@ -1942,7 +1942,7 @@
 ## Dashboard — provenance après les prévisions détaillées
 - [x] Analyse: Identifier les deux sections à réordonner sans modifier la carte météo principale.
 - [x] Interface: Déplacer la provenance sous l’accès aux prévisions détaillées.
-- [ ] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication — élément ensuite retiré à la demande de l’utilisateur.
 
 ## Dashboard — suppression de la provenance
 - [x] Interface: Retirer entièrement le panneau « Provenance · Valeur actuelle ».
