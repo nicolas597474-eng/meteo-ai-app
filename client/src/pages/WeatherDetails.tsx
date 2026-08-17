@@ -103,7 +103,7 @@ export default function WeatherDetails() {
   useEffect(() => {
     const rail = hourlyRef.current;
     if (!rail || !data?.hours?.length) return;
-    const hourlyCardStride = 214; // largeur 202px + espacement 12px
+    const hourlyCardStride = 170; // largeur 160px + espacement 10px
     const targetLeft = Math.max(0, currentHourIdx * hourlyCardStride - 8);
     const frame = requestAnimationFrame(() => rail.scrollTo({ left: targetLeft, behavior: "auto" }));
     return () => cancelAnimationFrame(frame);
@@ -133,8 +133,8 @@ export default function WeatherDetails() {
       <div className="mx-auto max-w-2xl space-y-5 px-3 py-4 pb-28">
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[28px] border border-white/10 bg-[rgba(9,16,28,0.88)] p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
+        <MeteoSurface as="section" tone="default" className="rounded-[26px] border border-white/10 bg-[rgba(26,48,70,0.56)] p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10"><MeteoIcon name="refresh" size={18} /></span>
               <div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/55">Déroulé temporel</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Heure par heure</h2></div>
@@ -144,58 +144,58 @@ export default function WeatherDetails() {
           
           {/* Horizontal scrollable hourly cards */}
           <div ref={hourlyRef} className="overflow-x-auto pb-2 -mx-3 px-3 scrollbar-hide">
-            <div className="flex gap-3" style={{ width: `${hours.length * 214}px` }}>
+            <div className="flex gap-2.5" style={{ width: `${hours.length * 170}px` }}>
               {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
                 const pTrend = pressureTrend(hours, i);
                 return (
                   <div
                     key={h.hour}
-                    className={`weather-surface-inset flex-shrink-0 w-[202px] rounded-[26px] border p-4 transition-colors ${
+                    className={`weather-surface-inset flex-shrink-0 w-[160px] rounded-[22px] border p-3 transition-colors ${
                       isNow
-                        ? "border-sky-200/60 bg-[linear-gradient(160deg,rgba(19,85,125,0.78),rgba(9,26,44,0.96))]"
-                        : "border-white/10 bg-[linear-gradient(160deg,rgba(30,43,59,0.62),rgba(11,20,33,0.94))]"
+                        ? "border-sky-200/60 bg-[linear-gradient(160deg,rgba(44,128,181,0.48),rgba(22,57,89,0.58))]"
+                        : "border-white/15 bg-[linear-gradient(160deg,rgba(77,105,132,0.38),rgba(34,55,78,0.52))]"
                     }`}
                   >
                     {/* Hour + Now badge */}
                     <div className="flex items-center justify-between">
-                      <span className={`text-[22px] font-semibold tracking-[-0.05em] ${isNow ? "text-sky-100" : "text-white"}`}>{h.hour}</span>
-                      {isNow && <span className="rounded-full border border-sky-200/25 bg-sky-300/10 px-2 py-0.5 text-[9px] font-semibold tracking-[0.12em] text-sky-100">MAINTENANT</span>}
+                      <span className={`text-[19px] font-semibold tracking-[-0.05em] ${isNow ? "text-sky-100" : "text-white"}`}>{h.hour}</span>
+                      {isNow && <span className="rounded-full border border-sky-200/25 bg-sky-300/10 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.1em] text-sky-100">MAINTENANT</span>}
                     </div>
                     
                     {/* Icon + condition */}
-                    <div className="mb-4 mt-4 flex items-center justify-between">
-                      <MeteoIcon name={getIconNameFromCondition(h.condition)} size={46} />
-                      <span className="max-w-[88px] text-right text-xs font-medium leading-tight text-slate-200">{h.condition ?? "—"}</span>
+                    <div className="mb-3 mt-3 flex items-center justify-between">
+                      <MeteoIcon name={getIconNameFromCondition(h.condition)} size={38} />
+                      <span className="max-w-[72px] text-right text-[11px] font-medium leading-tight text-slate-100">{h.condition ?? "—"}</span>
                     </div>
                     
                     {/* Temperature */}
-                    <div className="mb-4 border-b border-white/10 pb-4">
-                      <span className="text-[44px] font-semibold leading-none tracking-[-0.075em] text-white">{h.temp?.toFixed(1) ?? "—"}°</span>
-                      <span className="ml-2 text-[11px] font-medium text-slate-400">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
+                    <div className="mb-3 border-b border-white/12 pb-3">
+                      <span className="text-[36px] font-semibold leading-none tracking-[-0.075em] text-white">{h.temp?.toFixed(1) ?? "—"}°</span>
+                      <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
                     </div>
                     
                     {/* Precipitation */}
-                    <div className="mb-3 flex items-center gap-1.5 rounded-2xl border border-sky-200/15 bg-sky-300/[0.06] px-2.5 py-2">
-                      <MeteoIcon name="precipitation" size={16} />
-                      <span className="text-xs font-semibold text-slate-100">{h.precipProb ?? 0}%</span>
+                    <div className="mb-2.5 flex items-center gap-1.5 rounded-xl border border-sky-100/20 bg-sky-100/[0.08] px-2 py-1.5">
+                      <MeteoIcon name="precipitation" size={14} />
+                      <span className="text-[11px] font-semibold text-slate-50">{h.precipProb ?? 0}%</span>
                       {(h.precipitation ?? 0) > 0 && (
-                        <span className="text-xs font-semibold text-sky-200">{h.precipitation?.toFixed(1)} mm</span>
+                        <span className="text-[11px] font-semibold text-sky-100">{h.precipitation?.toFixed(1)} mm</span>
                       )}
-                      {h.precipType && <span className="text-[10px] text-sky-100/65">{h.precipType === "snow" ? "neige" : h.precipType === "freezing_rain" ? "verglas" : "pluie"}</span>}
+                      {h.precipType && <span className="text-[9px] text-sky-50/75">{h.precipType === "snow" ? "neige" : h.precipType === "freezing_rain" ? "verglas" : "pluie"}</span>}
                     </div>
                     {h.precipIntensity && (
-                      <span className="-mt-2 mb-3 block text-[10px] text-slate-300">Intensité {h.precipIntensity === "heavy" ? "forte" : h.precipIntensity === "moderate" ? "modérée" : "faible"}</span>
+                      <span className="-mt-1 mb-2 block text-[9px] text-slate-200">Intensité {h.precipIntensity === "heavy" ? "forte" : h.precipIntensity === "moderate" ? "modérée" : "faible"}</span>
                     )}
 
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                       <HourlyMetric icon="humidity" label="Humidité" value={`${h.humidity ?? "—"}%`} detail={h.dewPoint != null ? `Rosée ${h.dewPoint.toFixed(0)}°` : undefined} />
                       <HourlyMetric icon="wind_param" label="Vent" value={`${h.windSpeed?.toFixed(0) ?? "—"} km/h`} detail={`${windDirectionLabel(h.windDirection)}${h.windGust != null ? ` · raf. ${h.windGust.toFixed(0)}` : ""}`} />
                       <HourlyMetric icon="pressure" label="Pression" value={`${h.pressure?.toFixed(0) ?? "—"} hPa`} detail={pTrend === "rising" ? "En hausse" : pTrend === "falling" ? "En baisse" : "Stable"} />
                       <HourlyMetric icon="cloud_cover" label="Nuages" value={`${h.cloudCover ?? "—"}%`} />
                     </div>
                     {(h.cloudLow != null || h.cloudMid != null || h.cloudHigh != null) && (
-                      <div className="mt-2 flex gap-1.5 text-[10px] text-slate-400">
+                      <div className="mt-2 hidden gap-1.5 text-[10px] text-slate-300 md:flex">
                         {h.cloudLow != null && <span>Bas {h.cloudLow}%</span>}
                         {h.cloudMid != null && <span>Moy {h.cloudMid}%</span>}
                         {h.cloudHigh != null && <span>Haut {h.cloudHigh}%</span>}
@@ -204,22 +204,22 @@ export default function WeatherDetails() {
                     
                     {/* Visibility */}
                     {h.visibility != null && (
-                      <div className="mt-2 text-[10px] text-slate-400">Visibilité {h.visibility} km</div>
+                      <div className="mt-2 hidden text-[10px] text-slate-300 md:block">Visibilité {h.visibility} km</div>
                     )}
                     
                     {/* UV */}
                     {h.uvIndex != null && h.uvIndex > 0 && (
-                      <div className="mt-1 text-[10px] text-slate-400">UV {h.uvIndex.toFixed(0)}</div>
+                      <div className="mt-1 hidden text-[10px] text-slate-300 md:block">UV {h.uvIndex.toFixed(0)}</div>
                     )}
                     
                     {/* Solar radiation */}
                     {h.solarRadiation != null && h.solarRadiation > 0 && (
-                      <div className="mt-1 text-[10px] text-slate-400">Rayonnement {h.solarRadiation.toFixed(0)} W/m²</div>
+                      <div className="mt-1 hidden text-[10px] text-slate-300 md:block">Rayonnement {h.solarRadiation.toFixed(0)} W/m²</div>
                     )}
                     
                     {/* Régime opérationnel partagé */}
                     {regime && (
-                      <div className="mt-3 border-t border-slate-400/15 pt-2">
+                      <div className="mt-3 hidden border-t border-slate-300/20 pt-2 md:block">
                         <div className="flex items-center gap-1">
                           <MeteoIcon name={getIconNameFromRegime(regime.primary.id)} size={14} />
                           <span className="text-[10px] font-medium text-slate-300">{regime.primary.label}</span>
@@ -371,13 +371,13 @@ function DetailCell({ label, value }: { label: string; value: string }) {
 
 function HourlyMetric({ icon, label, value, detail }: { icon: string; label: string; value: string; detail?: string }) {
   return (
-    <div className="border-t border-white/8 pt-2">
-      <div className="flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-wide text-slate-400">
-        <MeteoIcon name={icon} size={14} />
+    <div className="border-t border-white/12 pt-1.5">
+      <div className="flex items-center gap-1 text-[8px] font-medium uppercase tracking-wide text-slate-200/85">
+        <MeteoIcon name={icon} size={12} />
         <span>{label}</span>
       </div>
-      <p className="mt-1 text-xs font-semibold text-slate-100">{value}</p>
-      {detail && <p className="mt-0.5 truncate text-[9px] text-slate-400">{detail}</p>}
+      <p className="mt-0.5 text-[11px] font-semibold text-white">{value}</p>
+      {detail && <p className="mt-0.5 truncate text-[8px] text-slate-200/75">{detail}</p>}
     </div>
   );
 }

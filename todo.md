@@ -1718,3 +1718,8 @@
 - [x] Audit: Identifier la carte d’introduction et les styles sombres résiduels autour des valeurs.
 - [x] Interface: Retirer la première carte et supprimer tout effet sombre restant sur les chiffres du graphique.
 - [x] Validation: Vérifier la page mobile, TypeScript, Vitest et build avant publication.
+
+## Cartes horaires compactes et lumineuses
+- [x] Audit: Identifier les dimensions, débordements et surfaces actuelles des cartes sur mobile.
+- [x] Interface: Compacter les cartes et éclaircir leurs fonds transparents.
+- [x] Validation: Vérifier l’ouverture mobile, TypeScript, Vitest et build avant publication.

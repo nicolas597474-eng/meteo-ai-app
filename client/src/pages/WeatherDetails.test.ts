@@ -10,9 +10,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('tone="default"');
     expect(source).toContain("weather-chart-3d");
     expect(source).toContain("<BackToTopButton />");
-    expect(source).toContain("w-[202px]");
-    expect(source).toContain("hours.length * 214");
-    expect(source).toContain("text-[44px] font-semibold leading-none");
+    expect(source).toContain("w-[160px]");
+    expect(source).toContain("hours.length * 170");
+    expect(source).toContain("text-[36px] font-semibold leading-none");
     expect(source).toContain("Détails par heure");
     expect(source).toContain('aria-label="Détails horaires défilables"');
     expect(source).toContain("hours.length * 186");
@@ -34,10 +34,10 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("chartH + 42");
     expect(source).toContain("MAINTENANT");
     expect(source).toContain(">Maintenant</text>");
-    expect(source).toContain("hourlyCardStride = 214");
+    expect(source).toContain("hourlyCardStride = 170");
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
-    expect(source).toContain("rgba(30,43,59,0.62)");
-    expect(source).toContain("rgba(19,85,125,0.78)");
+    expect(source).toContain("rgba(77,105,132,0.38)");
+    expect(source).toContain("rgba(44,128,181,0.48)");
     expect(source).toContain("HourlyMetric");
     expect(source).toContain("Déroulé temporel");
     expect(source).not.toContain("Prévision officielle");
