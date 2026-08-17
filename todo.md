@@ -1807,3 +1807,8 @@
 - [x] Audit: Vérifier l’ordre actuel de l’ajout et des paramètres dans la rangée.
 - [x] Interface: Placer Ajouter avant Paramètres dans le défilement horizontal.
 - [x] Validation: Vérifier TypeScript, Vitest et build avant publication.
+
+## Ajustement des espaces supérieurs du Dashboard
+- [x] Audit: Identifier les marges entre les favoris, les indicateurs et la date.
+- [x] Interface: Réduire légèrement ces espaces sans modifier la taille de la carte principale.
+- [x] Validation: Vérifier mobile, TypeScript, Vitest et build avant publication.

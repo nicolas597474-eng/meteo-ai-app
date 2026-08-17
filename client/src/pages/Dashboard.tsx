@@ -453,7 +453,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>
-      <div className="mx-auto max-w-2xl space-y-3 px-3 pb-3 pt-1 sm:space-y-6 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-2xl space-y-2 px-3 pb-3 pt-1 sm:space-y-6 sm:px-6 sm:py-8">
 
         {!authLoading && !user && (
           <div role="status" className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-xs text-blue-100">
@@ -469,7 +469,7 @@ export default function Dashboard() {
         />
 
         {/* ── Hero : Température actuelle + max/min ── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl p-4 sm:p-6">
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-4 pb-4 pt-3 sm:p-6">
           {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
           <img
             src={dashboardSkyImage}
@@ -479,7 +479,7 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* Source label + Regime badge */}
-            <div className="mb-2 flex justify-center sm:mb-3">
+            <div className="mb-1.5 flex justify-center sm:mb-3">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/55 bg-slate-950/70 px-3 py-1.5 text-sm font-bold text-slate-50">
                 <CalendarDays className="h-4 w-4 text-sky-300" aria-hidden="true" />
                 {panelDate}
