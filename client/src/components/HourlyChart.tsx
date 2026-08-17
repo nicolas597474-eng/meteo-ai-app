@@ -423,11 +423,8 @@ export default function HourlyChart({ hours, locationName }: Props) {
       const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP);
       const temperatureLabel = `${v.toFixed(1)}°`;
       const labelWidth = ctx.measureText(temperatureLabel).width;
-      ctx.fillStyle = "rgba(5, 10, 18, 0.9)";
+      ctx.fillStyle = "rgba(12, 30, 50, 0.82)";
       ctx.fillRect(pt.x - labelWidth / 2 - 4, temperatureLabelY - 14, labelWidth + 8, 18);
-      ctx.strokeStyle = nowHour === i ? "rgba(147, 197, 253, 0.9)" : "rgba(254, 215, 170, 0.82)";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(pt.x - labelWidth / 2 - 4, temperatureLabelY - 14, labelWidth + 8, 18);
       ctx.fillStyle = nowHour === i ? "#dbeafe" : "#ffedd5";
       ctx.fillText(temperatureLabel, pt.x, temperatureLabelY);
     });

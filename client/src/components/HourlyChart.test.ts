@@ -15,7 +15,6 @@ describe("HourlyChart", () => {
     expect(source).toContain("text-sky-400");
     expect(source).toContain("const temperatureLabel = `${v.toFixed(1)}°`");
     expect(source).toContain("ctx.fillRect(pt.x - labelWidth / 2 - 4, temperatureLabelY - 14");
-    expect(source).toContain("ctx.strokeRect(pt.x - labelWidth / 2 - 4, temperatureLabelY - 14");
     expect(source).toContain("ctx.fillText(temperatureLabel, pt.x, temperatureLabelY)");
     expect(source).toContain("getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP)");
     expect(source).not.toContain("ctx.shadowBlur = 10");
@@ -40,6 +39,7 @@ describe("HourlyChart", () => {
     expect(source).toContain("drawPrecipLabel(precipZoneBot - 5)");
     expect(source).not.toContain("rounded-b-xl border border-blue-300/70");
     expect(source).not.toContain("ctx.strokeRect(x + 0.5, 0.5, COL_W - 1, CHART_H - 1)");
+    expect(source).not.toContain("ctx.strokeRect(pt.x - labelWidth / 2 - 4");
   });
 
   it("affiche les détails horaires au-dessus du graphique sélectionné", () => {

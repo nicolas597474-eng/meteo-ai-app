@@ -1703,3 +1703,8 @@
 - [x] Audit: Identifier les conflits de contraste et de position entre valeurs et courbe SVG.
 - [x] Interface: Renforcer le contour, la lisibilité et l’espacement des valeurs.
 - [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
+
+## Valeurs du graphique sans contour noir
+- [x] Audit: Identifier les contours appliqués aux cartouches de température, vent et pluie.
+- [x] Interface: Retirer les contours noirs en préservant le contraste typographique.
+- [x] Validation: Vérifier le graphique mobile, TypeScript, Vitest et build avant publication.
