@@ -1,9 +1,10 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { getSwipeNavigationTarget, isQualifiedPageSwipe, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import Dashboard from "./pages/Dashboard";
 import {
   LayoutDashboard,
@@ -32,6 +33,40 @@ const navItems = [
   { path: "/history", label: "Historique", icon: Calendar },
   { path: "/ai-lab", label: "AI Lab", icon: FlaskConical },
 ];
+
+function shouldIgnorePageSwipe(target: EventTarget | null) {
+  if (!(target instanceof Element)) return true;
+  return Boolean(target.closest(PAGE_SWIPE_IGNORE_SELECTOR));
+}
+
+function PageSwipeNavigator({ children }: { children: ReactNode }) {
+  const [location, setLocation] = useLocation();
+  const gestureRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch" || shouldIgnorePageSwipe(event.target)) {
+      gestureRef.current = null;
+      return;
+    }
+    gestureRef.current = { x: event.clientX, y: event.clientY, time: event.timeStamp };
+  };
+
+  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    if (!gesture || event.pointerType !== "touch") return;
+
+    const deltaX = event.clientX - gesture.x;
+    const deltaY = event.clientY - gesture.y;
+    const elapsed = event.timeStamp - gesture.time;
+    if (!isQualifiedPageSwipe(deltaX, deltaY, elapsed)) return;
+
+    const target = getSwipeNavigationTarget(location, deltaX);
+    if (target) setLocation(target);
+  };
+
+  return <div className="touch-pan-y sm:touch-auto" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>{children}</div>;
+}
 
 function TopNav() {
   const [location] = useLocation();
@@ -150,11 +185,13 @@ function App() {
           <Toaster />
           <TopNav />
           <ScrollToTopOnRouteChange />
-          <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
-            <Suspense fallback={<RouteLoadingFallback />}>
-              <Router />
-            </Suspense>
-          </div>
+          <PageSwipeNavigator>
+            <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
+              <Suspense fallback={<RouteLoadingFallback />}>
+                <Router />
+              </Suspense>
+            </div>
+          </PageSwipeNavigator>
           <BottomNav />
         </TooltipProvider>
       </ThemeProvider>

@@ -1962,3 +1962,10 @@
 - [x] Interface: Réduire légèrement le demi-cercle pour qu’il tienne intégralement sur mobile.
 - [x] Contrainte: Conserver les astres, les horaires et l’ensemble des autres données du panneau.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Navigation entre pages par glissement
+- [x] Interaction: Naviguer par balayage horizontal entre Dashboard, Fiabilité, Stations, Historique et AI Lab.
+- [x] Sens: Prendre en charge les glissements gauche et droite, avec des limites aux première et dernière pages.
+- [x] Protection: Ignorer les gestes démarrés sur un contrôle, un défilement horizontal, une carte ou un graphique interactif.
+- [x] Accessibilité: Conserver la navigation par barre et les URL directes existantes.
+- [x] Validation: Tester les seuils, les limites, TypeScript et les interactions internes avant publication.
