@@ -169,12 +169,12 @@
 
 /* L’arche Soleil & Lune conserve sa forme complète, y compris sur les écrans mobiles étroits. */
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 {
-  height: 12rem !important;
+  height: 11rem !important;
   overflow: visible !important;
 }
 
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > div:first-child {
-  height: 10rem !important;
+  height: 9rem !important;
   bottom: 1rem !important;
 }
 

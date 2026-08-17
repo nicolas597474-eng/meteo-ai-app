@@ -1957,3 +1957,8 @@
 ## Arche Soleil & Lune — libellés superposés
 - [x] Interface: Retirer les textes « Soleil » et « Lune » dessinés au niveau des astres.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Arche Soleil & Lune — demi-cercle plus compact
+- [x] Interface: Réduire légèrement le demi-cercle pour qu’il tienne intégralement sur mobile.
+- [x] Contrainte: Conserver les astres, les horaires et l’ensemble des autres données du panneau.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
