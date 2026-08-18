@@ -10,6 +10,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
+import { getHourScrollLeft, getNearestHourIndex } from "@/lib/hourlyScrollSync";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -467,55 +468,33 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const detailScrollRef = useRef<HTMLDivElement>(null);
   const chartH = 148;
   const chartW = Math.max(720, hours.length * 68);
+  const chartHourStride = chartW / Math.max(hours.length - 1, 1);
+  const detailCardStride = 186;
+  const [selectedIdx, setSelectedIdx] = useState(currentIdx);
 
-  useEffect(() => {
-    if (hours.length < 2 || currentIdx < 0 || currentIdx >= hours.length) return;
+  const syncSelectedHour = (index: number, origin: "chart" | "detail" | "initial") => {
+    const nextIndex = getNearestHourIndex(index, 1, hours.length);
+    setSelectedIdx(nextIndex);
 
-    const currentX = (currentIdx / (hours.length - 1)) * chartW;
-    const chartScrollContainer = chartScrollRef.current;
-    if (chartScrollContainer) {
-      const targetLeft = Math.max(0, currentX - chartScrollContainer.clientWidth * 0.34);
-      chartScrollContainer.scrollTo({ left: targetLeft, behavior: "auto" });
+    if (origin !== "chart" && chartScrollRef.current) {
+      chartScrollRef.current.scrollLeft = getHourScrollLeft(nextIndex, chartHourStride, hours.length);
     }
-
-    const detailScrollContainer = detailScrollRef.current;
-    if (detailScrollContainer) {
-      const detailCardStride = 186;
-      const detailTargetLeft = Math.max(0, currentIdx * detailCardStride - detailScrollContainer.clientWidth * 0.18);
-      detailScrollContainer.scrollTo({ left: detailTargetLeft, behavior: "auto" });
-    }
-  }, [chartW, currentIdx, hours.length]);
-
-  const syncDetailScroll = (event: UIEvent<HTMLDivElement>) => {
-    const chartScrollContainer = event.currentTarget;
-    const detailScrollContainer = detailScrollRef.current;
-    if (!detailScrollContainer) return;
-
-    const chartScrollableWidth = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
-    const detailScrollableWidth = detailScrollContainer.scrollWidth - detailScrollContainer.clientWidth;
-    if (chartScrollableWidth <= 0 || detailScrollableWidth <= 0) return;
-
-    const progress = chartScrollContainer.scrollLeft / chartScrollableWidth;
-    const detailTargetLeft = progress * detailScrollableWidth;
-    if (Math.abs(detailScrollContainer.scrollLeft - detailTargetLeft) > 0.5) {
-      detailScrollContainer.scrollLeft = detailTargetLeft;
+    if (origin !== "detail" && detailScrollRef.current) {
+      detailScrollRef.current.scrollLeft = getHourScrollLeft(nextIndex, detailCardStride, hours.length);
     }
   };
 
+  useEffect(() => {
+    if (hours.length < 2 || currentIdx < 0 || currentIdx >= hours.length) return;
+    syncSelectedHour(currentIdx, "initial");
+  }, [currentIdx, hours.length]);
+
+  const syncDetailScroll = (event: UIEvent<HTMLDivElement>) => {
+    syncSelectedHour(getNearestHourIndex(event.currentTarget.scrollLeft, chartHourStride, hours.length), "chart");
+  };
+
   const syncChartScroll = (event: UIEvent<HTMLDivElement>) => {
-    const detailScrollContainer = event.currentTarget;
-    const chartScrollContainer = chartScrollRef.current;
-    if (!chartScrollContainer) return;
-
-    const detailScrollableWidth = detailScrollContainer.scrollWidth - detailScrollContainer.clientWidth;
-    const chartScrollableWidth = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
-    if (detailScrollableWidth <= 0 || chartScrollableWidth <= 0) return;
-
-    const progress = detailScrollContainer.scrollLeft / detailScrollableWidth;
-    const chartTargetLeft = progress * chartScrollableWidth;
-    if (Math.abs(chartScrollContainer.scrollLeft - chartTargetLeft) > 0.5) {
-      chartScrollContainer.scrollLeft = chartTargetLeft;
-    }
+    syncSelectedHour(getNearestHourIndex(event.currentTarget.scrollLeft, detailCardStride, hours.length), "detail");
   };
 
   if (hours.length === 0) return <p className="text-slate-500 text-xs">Aucune donnée disponible</p>;
@@ -603,8 +582,8 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         {/* Points */}
         {points.map((p) => (
           <g key={p.hourIndex}>
-            {p.hourIndex === currentIdx && <circle cx={p.x} cy={p.y} r="8" fill="#60a5fa" opacity="0.28" />}
-            <circle cx={p.x} cy={p.y} r={p.hourIndex === currentIdx ? 5 : 2.5} fill={color} stroke={p.hourIndex === currentIdx ? "#fff" : "none"} strokeWidth={p.hourIndex === currentIdx ? 2 : 0} />
+            {p.hourIndex === selectedIdx && <circle cx={p.x} cy={p.y} r="8" fill="#60a5fa" opacity="0.28" />}
+            <circle cx={p.x} cy={p.y} r={p.hourIndex === selectedIdx ? 5 : 2.5} fill={color} stroke={p.hourIndex === selectedIdx ? "#fff" : "none"} strokeWidth={p.hourIndex === selectedIdx ? 2 : 0} />
           </g>
         ))}
         
@@ -612,7 +591,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         {hours.map((h: any, i: number) => {
           const x = (i / (hours.length - 1)) * chartW;
           return (
-            <text key={i} x={x} y={chartH + 42} textAnchor="middle" fill={i === currentIdx ? "#bfdbfe" : "#94a3b8"} fontSize={i === currentIdx ? "13" : "12"} fontWeight={i === currentIdx ? "700" : "500"}>{h.hour}</text>
+            <text key={i} x={x} y={chartH + 42} textAnchor="middle" fill={i === selectedIdx ? "#bfdbfe" : "#94a3b8"} fontSize={i === selectedIdx ? "13" : "12"} fontWeight={i === selectedIdx ? "700" : "500"}>{h.hour}</text>
           );
         })}
         
@@ -641,7 +620,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
             {hours.map((h: any, i: number) => {
               const selectedValue = getValue(h);
               return (
-                <div key={`detail-${h.hour}-${i}`} className={`w-[174px] flex-shrink-0 rounded-xl border p-2.5 ${i === currentIdx ? "border-sky-300/70 bg-sky-950/50" : "border-slate-700/70 bg-slate-950/40"}`}>
+                <div key={`detail-${h.hour}-${i}`} className={`w-[174px] flex-shrink-0 rounded-xl border p-2.5 ${i === selectedIdx ? "border-sky-300/70 bg-sky-950/50" : "border-slate-700/70 bg-slate-950/40"}`}>
                   <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-bold text-white">{h.hour}</span>

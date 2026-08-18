@@ -1988,3 +1988,9 @@
 - [x] Interface: Afficher les deux listes sous les compteurs « Modèles jour » et « Modèles horaires ».
 - [x] Repli: Signaler explicitement les modèles indisponibles sans les afficher comme collectés.
 - [x] Validation: Tester les listes, les états partiels et le rendu mobile avant publication.
+
+## Prévisions détaillées — synchronisation courbe et cartes
+- [x] Diagnostic: Identifier les index et heures distincts utilisés par la courbe et le ruban de cartes.
+- [x] Interaction: Utiliser une sélection horaire unique lors du glissement de la courbe ou des cartes.
+- [x] Alignement: Centrer la carte correspondant exactement au point et à l’heure sélectionnés.
+- [x] Validation: Tester les glissements gauche/droite, les limites et le rendu mobile avant publication.
