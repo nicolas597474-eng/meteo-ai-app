@@ -46,6 +46,7 @@ import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
+import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
@@ -896,7 +897,8 @@ export const weatherRouter = router({
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
     const today = getTodayParis();
-    const locationKey = input?.lat && input?.lon ? makeLocationKey(input.lat, input.lon) : undefined;
+    const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : null;
+    const locationKey = coords ? makeLocationKey(coords.lat, coords.lon) : undefined;
     const observation = locationKey
       ? await getObservationByDate(today, locationKey)
       : await getObservationByDate(today);
@@ -906,10 +908,19 @@ export const weatherRouter = router({
     const archivedMeteoAI = !currentMeteoAI && locationKey
       ? (await getLatestMeteoAIForecasts(1, locationKey))[0] ?? null
       : null;
-    const meteoAI = currentMeteoAI ?? archivedMeteoAI;
-    const snapshotStatus = currentMeteoAI ? "current" : archivedMeteoAI ? "archived" : "unavailable";
+    const persistedMeteoAI = currentMeteoAI ?? archivedMeteoAI;
+    const liveForecasts: LiveModelForecast[] = !persistedMeteoAI && coords
+      ? await collectExpertForecasts(today, coords)
+      : [];
+    const liveMeteoAI = !persistedMeteoAI
+      ? buildLiveAILabSnapshot(today, liveForecasts)
+      : null;
+    const meteoAI = persistedMeteoAI ?? liveMeteoAI;
+    const snapshotStatus = currentMeteoAI ? "current" : archivedMeteoAI ? "archived" : liveMeteoAI ? "live" : "unavailable";
     const snapshotDate = meteoAI?.date ?? null;
-    const forecasts = snapshotDate
+    const forecasts = liveForecasts.length > 0
+      ? liveForecasts
+      : snapshotDate
       ? (locationKey ? await getForecastsByDate(snapshotDate, locationKey) : await getForecastsByDate(snapshotDate))
       : (locationKey ? await getForecastsByDate(today, locationKey) : await getForecastsByDate(today));
     const ranking = locationKey
@@ -920,7 +931,7 @@ export const weatherRouter = router({
     // 1. Régime opérationnel partagé avec le Dashboard. Une observation ne peut
     // remplacer la fusion officielle que si elle est plus récente, fraîche et
     // couvre notamment la nébulosité.
-    const liveHours = await collectHourlyForecast(today, input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined);
+    const liveHours = await collectHourlyForecast(today, coords ?? undefined);
     const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours));
     const regime = operationalRegime.primary.id;
     const regimeDef = operationalRegime.primary;

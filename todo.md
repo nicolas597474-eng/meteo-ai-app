@@ -1969,3 +1969,16 @@
 - [x] Protection: Ignorer les gestes démarrés sur un contrôle, un défilement horizontal, une carte ou un graphique interactif.
 - [x] Accessibilité: Conserver la navigation par barre et les URL directes existantes.
 - [x] Validation: Tester les seuils, les limites, TypeScript et les interactions internes avant publication.
+
+## Collecte quotidienne modèles et stations à 05h00
+- [x] Planification: Exécuter à 05h00, heure de Paris, la collecte des prévisions horaires et journalières de tous les modèles actifs.
+- [x] Stations: Relever les stations météorologiques disponibles pour chaque lieu favori dans le même cycle.
+- [x] Persistance: Archiver les prévisions de modèles, les relevés de stations et le statut par source sans fabriquer de données manquantes.
+- [x] Observabilité: Exposer un bilan de cycle indiquant les modèles et stations effectivement collectés, les indisponibilités et les échecs.
+- [x] Validation: Tester la planification, la collecte et la persistance avant publication.
+
+## AI Lab — indicateurs de fusion indisponibles
+- [x] Diagnostic: Vérifier la résolution du snapshot partagé et la clé géographique utilisée par l’AI Lab.
+- [x] Données: Rétablir confiance, stabilité et nombre de modèles uniquement depuis une fusion horodatée et traçable.
+- [x] Repli: Conserver l’état « indisponible » lorsqu’aucune donnée validée ne peut être associée au lieu actif.
+- [x] Validation: Tester les états avec snapshot, sans snapshot et en changement de lieu avant publication.
