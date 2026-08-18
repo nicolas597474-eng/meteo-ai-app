@@ -560,3 +560,45 @@ img.moon-3d-first-crescent {
   from { transform: translateX(-10px); opacity: 0.8; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+/* Position choisie par l’utilisateur sur la carte d’éclipse : point précis et onde discrète. */
+.eclipse-user-location-marker {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+}
+
+.eclipse-user-location-marker__core {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  border: 3px solid #eff6ff;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 0 2px rgb(8 47 73 / 0.75);
+}
+
+.eclipse-user-location-marker__pulse {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgb(56 189 248 / 0.85);
+  border-radius: 999px;
+  animation: eclipse-location-pulse 1.8s ease-out infinite;
+}
+
+@keyframes eclipse-location-pulse {
+  0% { transform: scale(0.45); opacity: 0.95; }
+  75%, 100% { transform: scale(1.1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eclipse-user-location-marker__pulse {
+    animation: none;
+    opacity: 0.42;
+    transform: scale(0.82);
+  }
+}

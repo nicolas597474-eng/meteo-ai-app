@@ -2163,3 +2163,10 @@
 - [x] Interface: Afficher l’angle et la direction cardinale dans les détails d’éclipse.
 - [x] Transparence: Préciser que la direction est mesurée depuis le nord géographique.
 - [x] Validation: Tester les calculs solaire et lunaire, TypeScript et le rendu mobile avant publication.
+
+## Carte astronomique — localisation animée
+- [x] Interaction: Afficher un état de chargement pendant la demande de géolocalisation.
+- [x] Carte: Remplacer le marqueur statique de position par un marqueur précis avec animation discrète.
+- [x] Accessibilité: Préserver le libellé de la position et respecter la réduction des mouvements.
+- [x] Erreurs: Conserver un message clair en cas de refus ou d’indisponibilité de la géolocalisation.
+- [x] Validation: Tester les états de localisation, TypeScript et le rendu mobile avant publication.
