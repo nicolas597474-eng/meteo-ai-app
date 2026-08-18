@@ -2035,3 +2035,10 @@
 - [x] Interface: Placer les textes Lever et Coucher sous la ligne horizontale.
 - [x] Lisibilité: Conserver les heures de lever/coucher visibles sans chevauchement.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## AI Lab — lexique et méthode de calcul
+- [x] Inventaire: Recenser les indicateurs, tableaux et termes de chaque section AI Lab.
+- [x] Contenu: Expliquer la fusion, confiance, stabilité, accord, dispersion, poids, modèle appliqué et collecte.
+- [x] Méthode: Décrire les calculs réellement appliqués et les limites lorsque les données sont insuffisantes.
+- [x] Interface: Ajouter un panneau déroulant clair, accessible depuis l’AI Lab sur mobile.
+- [x] Validation: Tester le contenu, l’ouverture du panneau, TypeScript et le rendu mobile avant publication.

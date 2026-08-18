@@ -10,6 +10,12 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Modèle principal");
     expect(source).toContain("Régime de prévision dominant");
     expect(source).toContain("Le Dashboard indique séparément le phénomène immédiat");
+    expect(source).toContain("Lexique et méthode de calcul");
+    expect(source).toContain("AI_LAB_GLOSSARY");
+    expect(source).toContain("Confiance");
+    expect(source).toContain("Stabilité des modèles");
+    expect(source).toContain("Données insuffisantes / —");
+    expect(source).toContain("group-open:rotate-180");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {

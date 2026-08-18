@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { Link } from "wouter";
-import { AlertTriangle, BarChart3, ClipboardCheck, Database, FlaskConical, MapPin, RefreshCw, ShieldCheck, Zap } from "lucide-react";
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardCheck, Database, FlaskConical, MapPin, RefreshCw, ShieldCheck, Zap } from "lucide-react";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { getValidationModelSource } from "@/lib/validationModelSource";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
@@ -16,6 +16,52 @@ function Divergence({ label, value, max, unit, color }: { label: string; value: 
   const level = ratio < 30 ? "Faible" : ratio < 60 ? "Modéré" : "Élevé";
   const tone = ratio < 30 ? "text-emerald-400" : ratio < 60 ? "text-amber-300" : "text-red-300";
   return <div className="space-y-1"><div className="flex justify-between gap-2 text-xs"><span className="text-slate-400">{label}</span><span className="font-semibold text-slate-200">{value} {unit} <span className={tone}>· {level}</span></span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className={`h-full rounded-full ${color}`} style={{ width: `${ratio}%` }} /></div></div>;
+}
+
+const AI_LAB_GLOSSARY = [
+  {
+    title: "Fusion et indicateurs du haut",
+    entries: [
+      ["Fusion officielle", "Prévision combinée à partir des modèles actifs qui ont fourni une donnée exploitable. Les modèles candidats en validation restent exclus de cette fusion."],
+      ["Snapshot", "Trace horodatée d’une fusion. « Archivé » désigne une collecte enregistrée ; « live » est un calcul consultable pour une position qui ne possède pas encore de trace collectée."],
+      ["Confiance", "Indice sur 100 combinant l’accord des modèles (40 %), la performance historique qualifiée si elle existe (30 %), la cohérence de stations physiques si elle existe (20 %) et l’échéance (10 %). Les éléments absents ne sont pas inventés et limitent l’indice."],
+      ["Stabilité des modèles", "Mesure la dispersion entre contributeurs : 60 % provient de la variabilité des températures maximales et 40 % de celle des précipitations. Une valeur élevée signifie que les modèles sont proches, non que la météo sera forcément calme."],
+      ["Modèles appliqués", "Nombre de modèles présents dans la trace de fusion actuelle. Ce compteur ne mesure ni leur qualité ni le nombre de stations."],
+    ],
+  },
+  {
+    title: "Poids, paramètres et régime",
+    entries: [
+      ["Poids appliqué", "Part attribuée à un modèle pour un paramètre donné dans la fusion. Les poids sont des coefficients de calcul ; ils ne sont ni une probabilité ni une observation de station."],
+      ["Sources appliquées par paramètre", "Liste distincte pour température, précipitations et vent. Un modèle peut contribuer différemment selon le paramètre si ses données ou ses preuves disponibles diffèrent."],
+      ["Régime de prévision dominant", "Scénario météorologique du créneau horaire, déduit des prévisions de température, précipitations et vent. Il est volontairement distinct du phénomène immédiatement observé sur le Dashboard."],
+      ["Pastilles T°, Pluie, Vent, Nuages", "Importance relative des paramètres pour le régime actuel. Elles ne sont pas les poids des modèles et servent à lire la priorité du scénario."],
+    ],
+  },
+  {
+    title: "Accord, tableaux et collecte",
+    entries: [
+      ["Accord des modèles", "Écart entre la valeur minimale et la valeur maximale des seuls contributeurs tracés. Faible écart signifie accord relatif ; il ne garantit pas une prévision exacte."],
+      ["Prévisions quotidiennes des contributeurs", "Valeurs journalières fournies par chaque modèle participant, avec leurs poids moyens affichés. Ce tableau présente des prévisions, pas des relevés observés."],
+      ["Dernière collecte vérifiable", "Bilan du cycle le plus récent : stations physiques réellement trouvées, modèles journaliers et horaires réellement récupérés, et éventuelles indisponibilités."],
+      ["Modèles en validation", "Candidats archivés séparément pour comparaison. Ils n’influencent ni la fusion, ni les poids, ni les compteurs actifs avant décision explicite fondée sur des preuves qualifiées."],
+      ["Données insuffisantes / —", "Aucune valeur n’est affichée lorsqu’il manque une trace, plusieurs contributeurs ou des preuves physiques qualifiées. Ce n’est pas une note nulle."],
+    ],
+  },
+] as const;
+
+function AILabGlossary() {
+  return <details className="group rounded-2xl border border-sky-400/25 bg-sky-400/[0.055]">
+    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+      <span className="flex min-w-0 items-center gap-2"><BookOpen className="h-4 w-4 shrink-0 text-sky-200" /><span className="min-w-0"><span className="block text-sm font-semibold text-slate-100">Lexique et méthode de calcul</span><span className="mt-0.5 block text-[10px] leading-relaxed text-slate-400">Comprendre les indicateurs, les poids, les collectes et les limites de l’AI Lab.</span></span></span>
+      <ChevronDown className="h-4 w-4 shrink-0 text-sky-200 transition-transform duration-200 group-open:rotate-180" />
+    </summary>
+    <div className="space-y-4 border-t border-sky-300/15 px-4 py-4">
+      <p className="text-[11px] leading-relaxed text-slate-300">Les explications décrivent les calculs affichés pour le lieu et la trace en cours. Elles ne transforment jamais une prévision, une estimation ou une donnée manquante en observation réelle.</p>
+      {AI_LAB_GLOSSARY.map((group) => <section key={group.title} className="rounded-xl border border-white/8 bg-black/15 p-3"><h2 className="text-xs font-semibold text-sky-100">{group.title}</h2><dl className="mt-2.5 space-y-2.5">{group.entries.map(([term, definition]) => <div key={term}><dt className="text-[11px] font-semibold text-slate-100">{term}</dt><dd className="mt-0.5 text-[10px] leading-relaxed text-slate-400">{definition}</dd></div>)}</dl></section>)}
+      <p className="rounded-xl border border-amber-300/15 bg-amber-300/[0.045] p-3 text-[10px] leading-relaxed text-amber-100"><b>À retenir :</b> un modèle peut être présent dans un tableau sans être « meilleur », un poids n’est pas une probabilité, et un accord entre modèles ne remplace pas une validation par observation physique.</p>
+    </div>
+  </details>;
 }
 
 export default function WeatherAILab() {
@@ -61,6 +107,8 @@ export default function WeatherAILab() {
     {refreshFusion.isError && <p className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-100">La relance n’a pas abouti : {refreshFusion.error.message}</p>}
     {refreshFusion.data?.status === "cooldown" && <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">Une fusion vient déjà d’être calculée. Réessayez dans environ {refreshFusion.data.retryAfterSeconds} s.</p>}
     {refreshFusion.data?.status === "refreshed" && <p className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-100">Fusion relancée avec {refreshFusion.data.modelCount} modèles ; la trace vient d’être actualisée.</p>}
+
+    <AILabGlossary />
 
     <section className="grid grid-cols-3 gap-2"><Stat label="Confiance prévision" value={hasSnapshot ? `${Math.round(data.confidenceScore)}%` : "—"} tone={hasSnapshot ? confidenceTone : "text-slate-500"} /><Stat label="Stabilité modèles" value={hasSnapshot ? `${Math.round(data.stabilityScore)}%` : "—"} tone={hasSnapshot ? "text-sky-300" : "text-slate-500"} /><Stat label="Modèles appliqués" value={hasTrace ? String(data.modelsUsed) : "—"} tone={hasTrace ? "text-violet-300" : "text-slate-500"} /></section>
 
