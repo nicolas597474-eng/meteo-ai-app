@@ -27,6 +27,7 @@ describe("navigation entre pages par glissement", () => {
 
   it("protège les contrôles et contenus susceptibles de défiler horizontalement", () => {
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("button");
+    expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("[data-swipe-exclude]");
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain(".overflow-x-auto");
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("canvas");
   });

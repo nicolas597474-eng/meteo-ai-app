@@ -1,5 +1,5 @@
 export const MAIN_PAGE_PATHS = ["/", "/laboratoire", "/ranking", "/history", "/ai-lab"] as const;
-export const PAGE_SWIPE_IGNORE_SELECTOR = "a, button, input, textarea, select, [role='button'], [role='slider'], [data-swipe-ignore], [data-horizontal-scroll], .overflow-x-auto, .overflow-x-scroll, canvas, svg";
+export const PAGE_SWIPE_IGNORE_SELECTOR = "a, button, input, textarea, select, [role='button'], [role='slider'], [data-swipe-ignore], [data-swipe-exclude], [data-horizontal-scroll], .overflow-x-auto, .overflow-x-scroll, canvas, svg";
 
 export function getSwipeNavigationTarget(location: string, deltaX: number) {
   const currentIndex = MAIN_PAGE_PATHS.indexOf(location as (typeof MAIN_PAGE_PATHS)[number]);

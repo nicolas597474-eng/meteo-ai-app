@@ -2236,3 +2236,9 @@
 - [x] Carte: Dissocier le redimensionnement d’initialisation des gestes continus de zoom et déplacement.
 - [x] Interface: Éviter que les curseurs et boutons superposés capturent involontairement les gestes cartographiques.
 - [x] Validation: Tester le pincement tactile, le déplacement, la réouverture, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — zoom tactile excessif persistant
+- [x] Diagnostic: Éliminer les comportements Google Maps et navigateur qui amplifient le pincement tactile.
+- [x] Interaction: Appliquer une politique de geste unique et stable pour la carte compacte et agrandie.
+- [x] Carte: Empêcher les changements de niveau de zoom involontaires lors des changements de taille ou de contrôles.
+- [x] Validation: Tester les pincements rapides répétés sur mobile, TypeScript et la suite de régression avant publication.
