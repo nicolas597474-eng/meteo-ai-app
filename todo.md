@@ -2208,3 +2208,8 @@
 - [x] Carte compacte: Désactiver le contrôle natif de déplacement visible sous les boutons personnalisés.
 - [x] Interface: Conserver exclusivement les actions d’agrandissement et de localisation sur la carte compacte.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Carte astronomique — indication de lieu sans chevauchement
+- [x] Carte agrandie: Déplacer l’indication de lieu hors de la zone réservée à la boussole et aux actions.
+- [x] Interface: Préserver une zone libre pour les contrôles natifs et les notifications éventuelles.
+- [x] Validation: Vérifier le rendu mobile et grand écran, TypeScript et les tests avant publication.

@@ -209,7 +209,10 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     if (isExpanded) expandedMapRef.current = map;
     else compactMapRef.current = map;
     map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, cameraControl: false, gestureHandling: isExpanded ? "greedy" : "cooperative", mapTypeControlOptions: isExpanded ? { position: google.maps.ControlPosition.TOP_RIGHT } : undefined, zoomControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined, streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined });
-    if (isExpanded) map.addListener("heading_changed", () => setExpandedHeading(map.getHeading() ?? 0));
+    if (isExpanded) {
+      map.addListener("heading_changed", () => setExpandedHeading(map.getHeading() ?? 0));
+      map.getStreetView().setOptions({ addressControlOptions: { position: google.maps.ControlPosition.BOTTOM_CENTER } });
+    }
     const localPosition = { lat: center.lat, lng: center.lon };
     new google.maps.marker.AdvancedMarkerElement({ map, position: localPosition, title: "Lieu actif" });
     new google.maps.Circle({ map, center: localPosition, radius: 25_000, strokeColor: "#f8fafc", strokeOpacity: 0.65, strokeWeight: 1, fillColor: "#e2e8f0", fillOpacity: 0.06, clickable: false });

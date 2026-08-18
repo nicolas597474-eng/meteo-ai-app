@@ -35,6 +35,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Carte de visibilité d’éclipse");
     expect(source).toContain("map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded");
     expect(source).toContain("cameraControl: false");
+    expect(source).toContain("addressControlOptions: { position: google.maps.ControlPosition.BOTTOM_CENTER }");
     expect(source).toContain("Me localiser");
     expect(source).toContain("getEclipseCircumstances");
     expect(source).toContain("Cliquez sur une zone de visibilité");
