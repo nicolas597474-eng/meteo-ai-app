@@ -27,6 +27,20 @@ export type EclipseMapLayer = {
   };
 };
 
+export type LocalEclipseCircumstances = {
+  eventId: string;
+  visibility: "full_event" | "partial" | "not_visible";
+  label: string;
+  peakAt: string | null;
+  startAt: string | null;
+  endAt: string | null;
+  durationMinutes: number | null;
+  altitudeDegrees: number | null;
+  obscurationPercent: number | null;
+  detail: string;
+  precisionLabel: string;
+};
+
 type EclipseCandidate = {
   id: string;
   title: string;
@@ -165,4 +179,74 @@ export function getEclipseVisibilityLayers(events: EclipseCandidate[]) {
     if (event.id === "solar_partial_2027_08_02") return [buildSolarVisibilityLayer(event)];
     return [];
   });
+}
+
+function toIso(time: Astronomy.AstroTime) {
+  return time.date.toISOString();
+}
+
+function lunarKindLabel(kind: Astronomy.EclipseKind) {
+  if (kind === Astronomy.EclipseKind.Total) return "Éclipse lunaire totale";
+  if (kind === Astronomy.EclipseKind.Partial) return "Éclipse lunaire partielle";
+  return "Éclipse lunaire pénombrale";
+}
+
+function solarKindLabel(kind: Astronomy.EclipseKind) {
+  if (kind === Astronomy.EclipseKind.Total) return "Éclipse solaire totale";
+  if (kind === Astronomy.EclipseKind.Annular) return "Éclipse solaire annulaire";
+  return "Éclipse solaire partielle";
+}
+
+/**
+ * Circumstances calculées à la demande pour le point choisi sur la carte.
+ * Les résultats ne modélisent pas l'horizon, les bâtiments ou la météo locale.
+ */
+export function getLocalEclipseCircumstances(input: { eventId: string; lat: number; lon: number }): LocalEclipseCircumstances {
+  const observer = new Astronomy.Observer(input.lat, input.lon, 0);
+
+  if (input.eventId === "lunar_partial_2026_08_28") {
+    const eclipse = Astronomy.SearchLunarEclipse(new Date("2026-08-28T00:00:00Z"));
+    const duration = eclipse.sd_partial > 0 ? eclipse.sd_partial : eclipse.sd_penum;
+    const start = new Astronomy.AstroTime(eclipse.peak.ut - duration / 1440);
+    const end = new Astronomy.AstroTime(eclipse.peak.ut + duration / 1440);
+    const peakAltitude = moonAltitudeAt(eclipse.peak, observer);
+    const startAltitude = moonAltitudeAt(start, observer);
+    const endAltitude = moonAltitudeAt(end, observer);
+    const visibility = peakAltitude <= 0 ? "not_visible" : startAltitude > 0 && endAltitude > 0 ? "full_event" : "partial";
+    return {
+      eventId: input.eventId,
+      visibility,
+      label: lunarKindLabel(eclipse.kind),
+      peakAt: toIso(eclipse.peak),
+      startAt: visibility === "not_visible" ? null : toIso(start),
+      endAt: visibility === "not_visible" ? null : toIso(end),
+      durationMinutes: visibility === "not_visible" ? null : Math.round(duration * 2),
+      altitudeDegrees: Math.round(peakAltitude * 10) / 10,
+      obscurationPercent: Math.round(eclipse.obscuration * 100),
+      detail: visibility === "full_event" ? "La Lune est au-dessus de l’horizon pendant toute la phase calculée." : visibility === "partial" ? "La Lune est au-dessus de l’horizon au maximum, mais pas pendant toute la phase calculée." : "La Lune est sous l’horizon au maximum de l’éclipse pour cette position.",
+      precisionLabel: "Calcul Astronomy Engine au point sélectionné ; horizon réel, obstacles et météo non modélisés.",
+    };
+  }
+
+  if (input.eventId === "solar_partial_2027_08_02") {
+    const eclipse = Astronomy.SearchLocalSolarEclipse(new Date("2027-08-02T00:00:00Z"), observer);
+    const isExpectedDate = withinOneDay(eclipse.peak.time.date, "2027-08-02");
+    const visibility = !isExpectedDate || eclipse.peak.altitude <= 0 ? "not_visible" : eclipse.partial_begin.altitude > 0 && eclipse.partial_end.altitude > 0 ? "full_event" : "partial";
+    const duration = (eclipse.partial_end.time.ut - eclipse.partial_begin.time.ut) * 1440;
+    return {
+      eventId: input.eventId,
+      visibility,
+      label: solarKindLabel(eclipse.kind),
+      peakAt: isExpectedDate ? toIso(eclipse.peak.time) : null,
+      startAt: visibility === "not_visible" ? null : toIso(eclipse.partial_begin.time),
+      endAt: visibility === "not_visible" ? null : toIso(eclipse.partial_end.time),
+      durationMinutes: visibility === "not_visible" ? null : Math.round(duration),
+      altitudeDegrees: Math.round(eclipse.peak.altitude * 10) / 10,
+      obscurationPercent: isExpectedDate ? Math.round(eclipse.obscuration * 100) : null,
+      detail: visibility === "full_event" ? "Le Soleil est au-dessus de l’horizon pendant toute la phase partielle calculée." : visibility === "partial" ? "Le Soleil est au-dessus de l’horizon au maximum, mais la phase complète est tronquée par l’horizon." : "Le Soleil est sous l’horizon au maximum de l’éclipse pour cette position.",
+      precisionLabel: "Calcul Astronomy Engine au point sélectionné ; horizon réel, obstacles, nuages et sécurité d’observation non modélisés.",
+    };
+  }
+
+  throw new Error("Événement d’éclipse non pris en charge.");
 }

@@ -53,6 +53,7 @@ import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoo
 import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
 import { getEnvironmentalSnapshot } from "../environmentalData";
 import { refreshManualFusionForFavorite } from "../manualFusion";
+import { getLocalEclipseCircumstances } from "../eclipseVisibility";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -587,6 +588,15 @@ export const weatherRouter = router({
   getEnvironmentalSnapshot: publicProcedure
     .input(requiredCoordinatesSchema)
     .query(({ input }) => getEnvironmentalSnapshot({ lat: input.lat, lon: input.lon })),
+
+  /** Circonstances calculées pour une position choisie sur la carte d’éclipse. */
+  getEclipseCircumstances: publicProcedure
+    .input(z.object({
+      eventId: z.enum(["lunar_partial_2026_08_28", "solar_partial_2027_08_02"]),
+      lat: latitudeSchema,
+      lon: longitudeSchema,
+    }))
+    .query(({ input }) => getLocalEclipseCircumstances(input)),
 
   /**
    * Detailed forecast page: 48h hourly + 15-day daily + regime + confidence

@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { MapView } from "@/components/Map";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { isNightAtLocalMinutes } from "@/lib/celestialNight";
+import { trpc } from "@/lib/trpc";
 
 type EnvironmentalData = {
   air: {
@@ -87,6 +88,8 @@ const aqiPalette = {
 };
 
 function displayTime(value: string | null) { return value?.match(/T(\d{2}:\d{2})/)?.[1] ?? "—"; }
+function displayTimeInZone(value: string | null, timeZone: string) { return value ? new Intl.DateTimeFormat("fr-FR", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(value)) : "—"; }
+function displayMinutes(value: number | null) { return value == null ? "—" : `${Math.floor(value / 60)} h ${String(value % 60).padStart(2, "0")} min`; }
 function displayDuration(value: number | null) { if (value == null) return "—"; const minutes = Math.round(value / 60); return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`; }
 function displayAstronomyDate(value: string) { return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`)); }
 function daysUntil(value: string) { return Math.max(0, Math.ceil((new Date(`${value}T12:00:00Z`).getTime() - Date.now()) / 86_400_000)); }
@@ -159,11 +162,25 @@ function AstronomyVisibilityMap({ astronomy, eventTitle, eventKind }: { astronom
 function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<EnvironmentalData["astronomy"]>; layers: EclipseMapLayer[] }) {
   const [selectedLayerId, setSelectedLayerId] = useState(layers[0]?.eventId ?? "");
   const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [selectedPoint, setSelectedPoint] = useState<{ lat: number; lon: number; label: string } | null>(null);
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
   const selectedLayer = layers.find((layer) => layer.eventId === selectedLayerId) ?? layers[0];
   if (!selectedLayer) return null;
-
   const center = astronomy.coordinates;
+
+  const circumstancesQuery = trpc.weather.getEclipseCircumstances.useQuery(
+    selectedPoint
+      ? { eventId: selectedLayer.eventId as "lunar_partial_2026_08_28" | "solar_partial_2027_08_02", lat: selectedPoint.lat, lon: selectedPoint.lon }
+      : { eventId: selectedLayer.eventId as "lunar_partial_2026_08_28" | "solar_partial_2027_08_02", lat: center.lat, lon: center.lon },
+    { enabled: Boolean(selectedPoint) },
+  );
+
+  const requestCircumstances = (lat: number, lon: number, label: string) => {
+    setSelectedPoint({ lat, lon, label });
+  };
   const onMapReady = (map: google.maps.Map) => {
+    mapRef.current = map;
     map.setOptions({ fullscreenControl: false });
     const localPosition = { lat: center.lat, lng: center.lon };
     new google.maps.marker.AdvancedMarkerElement({ map, position: localPosition, title: "Lieu actif" });
@@ -171,21 +188,46 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     const bounds = new google.maps.LatLngBounds();
     selectedLayer.visibilityCells.forEach((cell) => {
       const isFull = cell.visibility === "full_event";
-      new google.maps.Rectangle({ map, bounds: { north: cell.north, south: cell.south, east: cell.east, west: cell.west }, strokeColor: isFull ? "#38bdf8" : "#a78bfa", strokeOpacity: isFull ? 0.7 : 0.35, strokeWeight: 1, fillColor: isFull ? "#38bdf8" : "#a78bfa", fillOpacity: isFull ? 0.24 : 0.10, clickable: false });
+      const rectangle = new google.maps.Rectangle({ map, bounds: { north: cell.north, south: cell.south, east: cell.east, west: cell.west }, strokeColor: isFull ? "#38bdf8" : "#a78bfa", strokeOpacity: isFull ? 0.7 : 0.35, strokeWeight: 1, fillColor: isFull ? "#38bdf8" : "#a78bfa", fillOpacity: isFull ? 0.24 : 0.10, clickable: true });
+      rectangle.addListener("click", (event: google.maps.MapMouseEvent) => {
+        const lat = event.latLng?.lat() ?? (cell.north + cell.south) / 2;
+        const lon = event.latLng?.lng() ?? (cell.east + cell.west) / 2;
+        requestCircumstances(lat, lon, isFull ? "Zone entièrement visible" : "Zone de visibilité partielle");
+      });
       bounds.extend({ lat: cell.north, lng: cell.east });
       bounds.extend({ lat: cell.south, lng: cell.west });
     });
     if (selectedLayer.centralPath) {
       const band = [...selectedLayer.centralPath.northLimit, ...selectedLayer.centralPath.southLimit.slice().reverse()];
-      new google.maps.Polygon({ map, paths: band, strokeColor: "#fbbf24", strokeOpacity: 0.95, strokeWeight: 2, fillColor: "#fbbf24", fillOpacity: 0.28, clickable: false });
+      const polygon = new google.maps.Polygon({ map, paths: band, strokeColor: "#fbbf24", strokeOpacity: 0.95, strokeWeight: 2, fillColor: "#fbbf24", fillOpacity: 0.28, clickable: true });
+      polygon.addListener("click", (event: google.maps.MapMouseEvent) => { if (event.latLng) requestCircumstances(event.latLng.lat(), event.latLng.lng(), "Bande centrale NASA"); });
       new google.maps.Polyline({ map, path: selectedLayer.centralPath.centerLine, strokeColor: "#fff7cc", strokeOpacity: 0.95, strokeWeight: 2, clickable: false });
       selectedLayer.centralPath.northLimit.forEach((point) => bounds.extend(point));
       selectedLayer.centralPath.southLimit.forEach((point) => bounds.extend(point));
     }
     if (!bounds.isEmpty()) map.fitBounds(bounds, 18);
   };
+  const locateMe = () => {
+    if (!navigator.geolocation) { setLocationStatus("La géolocalisation n’est pas disponible sur cet appareil."); return; }
+    setLocationStatus("Localisation en cours…");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const point = { lat: coords.latitude, lng: coords.longitude };
+        setLocationStatus("Position actuelle utilisée pour le calcul.");
+        mapRef.current?.panTo(point);
+        mapRef.current?.setZoom(Math.max(mapRef.current.getZoom() ?? 4, 6));
+        new google.maps.marker.AdvancedMarkerElement({ map: mapRef.current ?? undefined, position: point, title: "Ma position actuelle" });
+        requestCircumstances(point.lat, point.lng, "Ma position actuelle");
+      },
+      () => setLocationStatus("Position non disponible ou autorisation refusée. Le lieu actif reste affiché."),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+    );
+  };
+  const circumstances = circumstancesQuery.data;
+  const visibilityLabel = circumstances?.visibility === "full_event" ? "Événement entièrement visible" : circumstances?.visibility === "partial" ? "Visibilité partielle" : circumstances?.visibility === "not_visible" ? "Non visible à cette position" : null;
+  const mapContent = (suffix: string, height: string) => <MapView key={`${selectedLayer.eventId}-${suffix}`} className={height} initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId="terrain" mapTypeControl={false} fullscreenControl={false} zoomControl streetViewControl={false} rotateControl={false} onMapReady={onMapReady} />;
 
-  return <div className="mt-3 overflow-hidden rounded-xl border border-sky-300/35 bg-slate-950/40"><div className="flex items-start justify-between gap-3 px-3 py-2.5"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Zones de visibilité d’éclipse</p><p className="mt-1 text-xs font-semibold text-slate-100">{selectedLayer.title}</p></div><span className="rounded-full border border-sky-300/35 px-2 py-1 text-[9px] text-sky-100">{selectedLayer.type === "solar" ? "Solaire" : "Lunaire"}</span></div>{layers.length > 1 && <div className="flex gap-2 border-t border-slate-700/60 px-3 py-2" data-swipe-exclude>{layers.map((layer) => <button key={layer.eventId} type="button" onClick={() => setSelectedLayerId(layer.eventId)} className={`min-h-8 rounded-full border px-2.5 text-[10px] font-medium ${layer.eventId === selectedLayer.eventId ? "border-sky-300/70 bg-sky-400/15 text-sky-100" : "border-slate-600/70 text-slate-400"}`}>{layer.type === "solar" ? "Solaire" : "Lunaire"} · {displayAstronomyDate(layer.date)}</button>)}</div>}<div data-swipe-exclude><MapView key={selectedLayer.eventId} className="h-[210px]" initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId="terrain" mapTypeControl={false} fullscreenControl={false} zoomControl streetViewControl={false} rotateControl={false} onMapReady={onMapReady} /></div><div className="border-t border-slate-700/60 px-3 py-2.5 text-[9px] leading-relaxed text-slate-400"><div className="flex flex-wrap gap-x-3 gap-y-1"><span><i className="inline-block h-2 w-2 rounded-sm bg-sky-400/80" /> Événement entièrement visible</span><span><i className="inline-block h-2 w-2 rounded-sm bg-violet-400/80" /> Visibilité partielle</span>{selectedLayer.centralPath && <span><i className="inline-block h-2 w-2 rounded-sm bg-amber-300" /> Bande centrale NASA</span>}</div><p className="mt-2">{selectedLayer.precisionLabel}</p><p className="mt-1">Source : <a href={selectedLayer.sourceUrl} target="_blank" rel="noreferrer" className="text-sky-200 underline underline-offset-2">{selectedLayer.sourceLabel}</a>. Le cercle blanc situe seulement le lieu actif et son contexte local.</p><Dialog open={isMapExpanded} onOpenChange={setIsMapExpanded}><DialogTrigger asChild><button type="button" data-swipe-exclude className="mt-3 min-h-9 rounded-lg border border-sky-300/40 bg-sky-400/[0.10] px-3 text-[10px] font-semibold text-sky-100">Agrandir la carte ↗</button></DialogTrigger><DialogContent className="max-h-[calc(100dvh-1.25rem)] overflow-y-auto border-slate-700 bg-[#0b111b] p-0 text-slate-100 sm:max-w-5xl"><DialogHeader className="border-b border-slate-700/70 px-5 pt-5 pb-4 text-left"><DialogTitle className="text-lg text-white">Carte de visibilité d’éclipse</DialogTitle><DialogDescription className="text-xs leading-relaxed text-slate-400">{selectedLayer.title} · couches de visibilité et contexte local.</DialogDescription></DialogHeader><div className="px-4 py-4" data-swipe-exclude><MapView key={`${selectedLayer.eventId}-expanded`} className="h-[min(68dvh,620px)]" initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId="terrain" mapTypeControl={false} fullscreenControl={false} zoomControl streetViewControl={false} rotateControl={false} onMapReady={onMapReady} /></div><DialogFooter className="border-t border-slate-700/70 px-5 py-3"><DialogClose className="min-h-10 rounded-xl border border-slate-600 bg-slate-800/70 px-4 text-xs font-medium text-slate-100">Fermer la carte</DialogClose></DialogFooter></DialogContent></Dialog></div></div>;
+  return <div className="mt-3 overflow-hidden rounded-xl border border-sky-300/35 bg-slate-950/40"><div className="flex items-start justify-between gap-3 px-3 py-2.5"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Zones de visibilité d’éclipse</p><p className="mt-1 text-xs font-semibold text-slate-100">{selectedLayer.title}</p></div><span className="rounded-full border border-sky-300/35 px-2 py-1 text-[9px] text-sky-100">{selectedLayer.type === "solar" ? "Solaire" : "Lunaire"}</span></div>{layers.length > 1 && <div className="flex gap-2 border-t border-slate-700/60 px-3 py-2" data-swipe-exclude>{layers.map((layer) => <button key={layer.eventId} type="button" onClick={() => { setSelectedLayerId(layer.eventId); setSelectedPoint(null); }} className={`min-h-8 rounded-full border px-2.5 text-[10px] font-medium ${layer.eventId === selectedLayer.eventId ? "border-sky-300/70 bg-sky-400/15 text-sky-100" : "border-slate-600/70 text-slate-400"}`}>{layer.type === "solar" ? "Solaire" : "Lunaire"} · {displayAstronomyDate(layer.date)}</button>)}</div>}<div data-swipe-exclude>{mapContent("compact", "h-[210px]")}</div><div className="border-t border-slate-700/60 px-3 py-2.5 text-[9px] leading-relaxed text-slate-400"><div className="flex flex-wrap gap-x-3 gap-y-1"><span><i className="inline-block h-2 w-2 rounded-sm bg-sky-400/80" /> Événement entièrement visible</span><span><i className="inline-block h-2 w-2 rounded-sm bg-violet-400/80" /> Visibilité partielle</span>{selectedLayer.centralPath && <span><i className="inline-block h-2 w-2 rounded-sm bg-amber-300" /> Bande centrale NASA</span>}</div><div className="mt-3 rounded-lg border border-slate-700/70 bg-slate-900/50 p-2.5"><p className="text-[10px] font-semibold text-sky-100">{selectedPoint ? `${selectedPoint.label} · ${selectedPoint.lat.toFixed(3)}°, ${selectedPoint.lon.toFixed(3)}°` : "Cliquez sur une zone de visibilité pour voir ses détails."}</p>{circumstancesQuery.isLoading && <p className="mt-1 text-[10px] text-slate-400">Calcul des circonstances locales…</p>}{circumstancesQuery.error && <p className="mt-1 text-[10px] text-rose-200">Calcul indisponible : {circumstancesQuery.error.message}</p>}{circumstances && <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-slate-300"><p className="col-span-2 font-semibold text-slate-100">{visibilityLabel} · {circumstances.label}</p><p>Début : {displayTimeInZone(circumstances.startAt, astronomy.timezone)}</p><p>Maximum : {displayTimeInZone(circumstances.peakAt, astronomy.timezone)}</p><p>Fin : {displayTimeInZone(circumstances.endAt, astronomy.timezone)}</p><p>Durée : {displayMinutes(circumstances.durationMinutes)}</p><p>Hauteur : {circumstances.altitudeDegrees == null ? "—" : `${circumstances.altitudeDegrees}°`}</p><p>Obscuration : {circumstances.obscurationPercent == null ? "—" : `${circumstances.obscurationPercent}%`}</p><p className="col-span-2 mt-1 text-slate-400">{circumstances.detail}</p><p className="col-span-2 text-[9px] text-slate-500">{circumstances.precisionLabel}</p></div>}</div><p className="mt-2">{selectedLayer.precisionLabel}</p><p className="mt-1">Source : <a href={selectedLayer.sourceUrl} target="_blank" rel="noreferrer" className="text-sky-200 underline underline-offset-2">{selectedLayer.sourceLabel}</a>. Le cercle blanc situe seulement le lieu actif et son contexte local.</p><div className="mt-3 flex flex-wrap gap-2" data-swipe-exclude><button type="button" onClick={locateMe} className="min-h-9 rounded-lg border border-violet-300/40 bg-violet-400/[0.10] px-3 text-[10px] font-semibold text-violet-100">Me localiser</button><Dialog open={isMapExpanded} onOpenChange={setIsMapExpanded}><DialogTrigger asChild><button type="button" className="min-h-9 rounded-lg border border-sky-300/40 bg-sky-400/[0.10] px-3 text-[10px] font-semibold text-sky-100">Agrandir la carte ↗</button></DialogTrigger><DialogContent className="max-h-[calc(100dvh-1.25rem)] overflow-y-auto border-slate-700 bg-[#0b111b] p-0 text-slate-100 sm:max-w-5xl"><DialogHeader className="border-b border-slate-700/70 px-5 pt-5 pb-4 text-left"><DialogTitle className="text-lg text-white">Carte de visibilité d’éclipse</DialogTitle><DialogDescription className="text-xs leading-relaxed text-slate-400">{selectedLayer.title} · cliquez sur une zone pour ses circonstances locales.</DialogDescription></DialogHeader><div className="px-4 py-4" data-swipe-exclude>{mapContent("expanded", "h-[min(68dvh,620px)]")}</div><DialogFooter className="border-t border-slate-700/70 px-5 py-3"><DialogClose className="min-h-10 rounded-xl border border-slate-600 bg-slate-800/70 px-4 text-xs font-medium text-slate-100">Fermer la carte</DialogClose></DialogFooter></DialogContent></Dialog></div>{locationStatus && <p className="mt-2 text-[9px] text-slate-400">{locationStatus}</p>}</div></div>;
 }
 
 function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["astronomy"] }) {

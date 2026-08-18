@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEclipseVisibilityLayers } from "./eclipseVisibility";
+import { getEclipseVisibilityLayers, getLocalEclipseCircumstances } from "./eclipseVisibility";
 
 describe("eclipse visibility layers", () => {
   const layers = getEclipseVisibilityLayers([
@@ -18,5 +18,19 @@ describe("eclipse visibility layers", () => {
     expect(layer?.centralPath?.northLimit.length).toBeGreaterThan(8);
     expect(layer?.centralPath?.southLimit.length).toBe(layer?.centralPath?.northLimit.length);
     expect(layer?.centralPath?.attribution).toContain("NASA");
+  });
+
+  it("returns local lunar circumstances without claiming visibility below the horizon", () => {
+    const circumstances = getLocalEclipseCircumstances({ eventId: "lunar_partial_2026_08_28", lat: 50.7567, lon: 2.5204 });
+    expect(circumstances.label).toContain("lunaire");
+    expect(circumstances.peakAt).toMatch(/2026-08/);
+    expect(circumstances.precisionLabel).toContain("horizon réel");
+  });
+
+  it("returns calculated solar circumstances at the selected point", () => {
+    const circumstances = getLocalEclipseCircumstances({ eventId: "solar_partial_2027_08_02", lat: 50.7567, lon: 2.5204 });
+    expect(circumstances.label).toContain("solaire");
+    expect(circumstances.peakAt).toMatch(/2027-08/);
+    expect(["full_event", "partial", "not_visible"]).toContain(circumstances.visibility);
   });
 });

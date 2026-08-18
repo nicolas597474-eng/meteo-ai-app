@@ -2150,3 +2150,10 @@
 - [x] Interaction: Ajouter un bouton explicite pour ouvrir une vue agrandie de la carte.
 - [x] Carte: Préserver les couches, la légende et les contrôles de zoom dans la vue agrandie.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Carte astronomique — détails et position actuelle
+- [x] Données: Calculer les circonstances et la visibilité d’éclipse pour une coordonnée sélectionnée.
+- [x] Infobulle: Afficher au clic sur une zone le type de visibilité, l’heure du maximum et les limites de précision.
+- [x] Localisation: Ajouter un bouton « Me localiser » pour centrer la carte sur la position du navigateur et évaluer la visibilité.
+- [x] Transparence: Gérer l’absence ou le refus de géolocalisation sans fabriquer de position.
+- [x] Validation: Tester les zones, les coordonnées, les erreurs de localisation et le rendu mobile avant publication.
