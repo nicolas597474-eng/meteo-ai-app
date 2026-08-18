@@ -1982,3 +1982,9 @@
 - [x] Données: Rétablir confiance, stabilité et nombre de modèles uniquement depuis une fusion horodatée et traçable.
 - [x] Repli: Conserver l’état « indisponible » lorsqu’aucune donnée validée ne peut être associée au lieu actif.
 - [x] Validation: Tester les états avec snapshot, sans snapshot et en changement de lieu avant publication.
+
+## AI Lab — modèles collectés jour et horaires
+- [x] Données: Exposer les noms des modèles journaliers et horaires réellement collectés dans le bilan de cycle.
+- [x] Interface: Afficher les deux listes sous les compteurs « Modèles jour » et « Modèles horaires ».
+- [x] Repli: Signaler explicitement les modèles indisponibles sans les afficher comme collectés.
+- [x] Validation: Tester les listes, les états partiels et le rendu mobile avant publication.

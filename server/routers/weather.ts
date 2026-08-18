@@ -47,6 +47,7 @@ import { buildAppliedModelWeights } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
+import { getCollectedModelNames, getMissingModelNames } from "../stationCollectionModels";
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
@@ -1049,6 +1050,9 @@ export const weatherRouter = router({
       { name: "Scores de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Aucun classement avant seuil statistique" },
     ];
     const latestStationCollection = (await getStationCollectionSnapshots(locationKey ?? "default", 1))[0] ?? null;
+    const activeModelNames = WEATHER_SERVICES.expert.map((model) => model.name);
+    const dailyMissingModels = latestStationCollection ? getMissingModelNames(latestStationCollection.dailyMissingModels) : [];
+    const hourlyMissingModels = latestStationCollection ? getMissingModelNames(latestStationCollection.hourlyMissingModels) : [];
 
     return {
       date: today,
@@ -1078,8 +1082,10 @@ export const weatherRouter = router({
         radiusKm: latestStationCollection.radiusKm,
         dailyModelCount: latestStationCollection.dailyModelCount,
         hourlyModelCount: latestStationCollection.hourlyModelCount,
-        dailyMissingModels: latestStationCollection.dailyMissingModels,
-        hourlyMissingModels: latestStationCollection.hourlyMissingModels,
+        dailyMissingModels,
+        hourlyMissingModels,
+        dailyCollectedModels: getCollectedModelNames(activeModelNames, dailyMissingModels),
+        hourlyCollectedModels: getCollectedModelNames(activeModelNames, hourlyMissingModels),
         status: latestStationCollection.status,
         collectedAt: latestStationCollection.collectedAt,
       } : null,
