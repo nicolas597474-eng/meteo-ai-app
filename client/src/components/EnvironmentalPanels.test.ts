@@ -46,6 +46,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("streetViewControl={isExpanded}");
     expect(source).toContain('gestureHandling: isExpanded ? "greedy" : "cooperative"');
     expect(source).toContain("utilisez les contrôles de zoom et la flèche de direction");
+    expect(source).toContain("Boussole, nord géographique");
+    expect(source).toContain("Recentrer sur la zone initiale de l’éclipse");
+    expect(source).toContain("expandedInitialBoundsRef");
+    expect(source).toContain("recenterExpandedMap");
     expect(source).toContain("data-swipe-exclude");
     expect(source).toContain("🌕 Prochaine pleine lune");
     expect(source).toContain("Icône d’éclipse");

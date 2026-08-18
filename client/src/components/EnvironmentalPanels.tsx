@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { LocateFixed, Maximize2 } from "lucide-react";
+import { Compass, LocateFixed, Maximize2, RotateCcw } from "lucide-react";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { MapView } from "@/components/Map";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -166,9 +166,11 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const [selectedPoint, setSelectedPoint] = useState<{ lat: number; lon: number; label: string } | null>(null);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [expandedHeading, setExpandedHeading] = useState(0);
   const mapRef = useRef<google.maps.Map | null>(null);
   const compactMapRef = useRef<google.maps.Map | null>(null);
   const expandedMapRef = useRef<google.maps.Map | null>(null);
+  const expandedInitialBoundsRef = useRef<google.maps.LatLngBounds | null>(null);
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const selectedLayer = layers.find((layer) => layer.eventId === selectedLayerId) ?? layers[0];
   if (!selectedLayer) return null;
@@ -193,6 +195,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     if (isExpanded) expandedMapRef.current = map;
     else compactMapRef.current = map;
     map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, gestureHandling: isExpanded ? "greedy" : "cooperative" });
+    if (isExpanded) map.addListener("heading_changed", () => setExpandedHeading(map.getHeading() ?? 0));
     const localPosition = { lat: center.lat, lng: center.lon };
     new google.maps.marker.AdvancedMarkerElement({ map, position: localPosition, title: "Lieu actif" });
     new google.maps.Circle({ map, center: localPosition, radius: 25_000, strokeColor: "#f8fafc", strokeOpacity: 0.65, strokeWeight: 1, fillColor: "#e2e8f0", fillOpacity: 0.06, clickable: false });
@@ -216,7 +219,10 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
       selectedLayer.centralPath.northLimit.forEach((point) => bounds.extend(point));
       selectedLayer.centralPath.southLimit.forEach((point) => bounds.extend(point));
     }
-    if (!bounds.isEmpty()) map.fitBounds(bounds, 18);
+    if (!bounds.isEmpty()) {
+      if (isExpanded) expandedInitialBoundsRef.current = bounds;
+      map.fitBounds(bounds, 18);
+    }
   };
   const locateMe = () => {
     if (!navigator.geolocation) { setLocationStatus("La géolocalisation n’est pas disponible sur cet appareil."); return; }
@@ -244,7 +250,21 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   };
   const circumstances = circumstancesQuery.data;
   const visibilityLabel = circumstances?.visibility === "full_event" ? "Événement entièrement visible" : circumstances?.visibility === "partial" ? "Visibilité partielle" : circumstances?.visibility === "not_visible" ? "Non visible à cette position" : null;
-  const mapContent = (suffix: string, height: string, isExpanded = false) => <MapView key={`${selectedLayer.eventId}-${suffix}`} className={height} initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId="terrain" mapTypeControl={isExpanded} fullscreenControl={false} zoomControl streetViewControl={isExpanded} rotateControl={false} onMapReady={(map) => onMapReady(map, isExpanded)}>{!isExpanded && <div className="absolute right-3 top-3 z-20 flex flex-col gap-2" data-swipe-exclude><button type="button" onClick={() => setIsMapExpanded(true)} aria-label="Agrandir la carte" title="Agrandir la carte" className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 text-slate-700 shadow-md transition-transform active:scale-95"><Maximize2 size={21} strokeWidth={2.6} aria-hidden="true" /></button><button type="button" onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Me localiser"} title={isLocating ? "Localisation en cours" : "Me localiser"} aria-busy={isLocating} className="flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/80 bg-white/95 text-sky-700 shadow-md transition-transform active:scale-95 disabled:cursor-wait disabled:opacity-70"><LocateFixed size={21} strokeWidth={2.5} aria-hidden="true" /></button></div>}</MapView>;
+  const recenterExpandedMap = () => {
+    const map = expandedMapRef.current;
+    const bounds = expandedInitialBoundsRef.current;
+    if (!map || !bounds) return;
+    map.setHeading(0);
+    map.setTilt(0);
+    map.fitBounds(bounds, 18);
+    setExpandedHeading(0);
+  };
+  const mapContent = (suffix: string, height: string, isExpanded = false) => (
+    <MapView key={`${selectedLayer.eventId}-${suffix}`} className={height} initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId="terrain" mapTypeControl={isExpanded} fullscreenControl={false} zoomControl streetViewControl={isExpanded} rotateControl={isExpanded} onMapReady={(map) => onMapReady(map, isExpanded)}>
+      {!isExpanded && <div className="absolute right-3 top-3 z-20 flex flex-col gap-2" data-swipe-exclude><button type="button" onClick={() => setIsMapExpanded(true)} aria-label="Agrandir la carte" title="Agrandir la carte" className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 text-slate-700 shadow-md transition-transform active:scale-95"><Maximize2 size={21} strokeWidth={2.6} aria-hidden="true" /></button><button type="button" onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Me localiser"} title={isLocating ? "Localisation en cours" : "Me localiser"} aria-busy={isLocating} className="flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/80 bg-white/95 text-sky-700 shadow-md transition-transform active:scale-95 disabled:cursor-wait disabled:opacity-70"><LocateFixed size={21} strokeWidth={2.5} aria-hidden="true" /></button></div>}
+      {isExpanded && <div className="absolute left-3 top-3 z-20 flex items-start gap-2" data-swipe-exclude><div className="relative flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-700 shadow-md" role="img" aria-label={`Boussole, nord géographique. Orientation ${Math.round(expandedHeading)} degrés.`}><span className="absolute top-0.5 text-[9px] font-black text-rose-600">N</span><Compass size={27} strokeWidth={2.25} aria-hidden="true" style={{ transform: `rotate(${-expandedHeading}deg)` }} /></div><button type="button" onClick={recenterExpandedMap} aria-label="Recentrer sur la zone initiale de l’éclipse" title="Recentrer sur la zone initiale" className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-700 shadow-md transition-transform active:scale-95"><RotateCcw size={21} strokeWidth={2.5} aria-hidden="true" /></button></div>}
+    </MapView>
+  );
 
   return <div className="mt-3 overflow-hidden rounded-xl border border-sky-300/35 bg-slate-950/40"><div className="flex items-start justify-between gap-3 px-3 py-2.5"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Zones de visibilité d’éclipse</p><p className="mt-1 text-xs font-semibold text-slate-100">{selectedLayer.title}</p></div><span className="rounded-full border border-sky-300/35 px-2 py-1 text-[9px] text-sky-100">{selectedLayer.type === "solar" ? "Solaire" : "Lunaire"}</span></div>{layers.length > 1 && <div className="flex gap-2 border-t border-slate-700/60 px-3 py-2" data-swipe-exclude>{layers.map((layer) => <button key={layer.eventId} type="button" onClick={() => { setSelectedLayerId(layer.eventId); setSelectedPoint(null); }} className={`min-h-8 rounded-full border px-2.5 text-[10px] font-medium ${layer.eventId === selectedLayer.eventId ? "border-sky-300/70 bg-sky-400/15 text-sky-100" : "border-slate-600/70 text-slate-400"}`}>{layer.type === "solar" ? "Solaire" : "Lunaire"} · {displayAstronomyDate(layer.date)}</button>)}</div>}<div data-swipe-exclude>{mapContent("compact", "h-[210px]")}</div><div className="border-t border-slate-700/60 px-3 py-2.5 text-[9px] leading-relaxed text-slate-400"><div className="flex flex-wrap gap-x-3 gap-y-1"><span><i className="inline-block h-2 w-2 rounded-sm bg-sky-400/80" /> Événement entièrement visible</span><span><i className="inline-block h-2 w-2 rounded-sm bg-violet-400/80" /> Visibilité partielle</span>{selectedLayer.centralPath && <span><i className="inline-block h-2 w-2 rounded-sm bg-amber-300" /> Bande centrale NASA</span>}</div><div className="mt-3 rounded-lg border border-slate-700/70 bg-slate-900/50 p-2.5"><p className="text-[10px] font-semibold text-sky-100">{selectedPoint ? `${selectedPoint.label} · ${selectedPoint.lat.toFixed(3)}°, ${selectedPoint.lon.toFixed(3)}°` : "Cliquez sur une zone de visibilité pour voir ses détails."}</p>{circumstancesQuery.isLoading && <p className="mt-1 text-[10px] text-slate-400">Calcul des circonstances locales…</p>}{circumstancesQuery.error && <p className="mt-1 text-[10px] text-rose-200">Calcul indisponible : {circumstancesQuery.error.message}</p>}{circumstances && <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-slate-300"><p className="col-span-2 font-semibold text-slate-100">{visibilityLabel} · {circumstances.label}</p><p>Début : {displayTimeInZone(circumstances.startAt, astronomy.timezone)}</p><p>Maximum : {displayTimeInZone(circumstances.peakAt, astronomy.timezone)}</p><p>Fin : {displayTimeInZone(circumstances.endAt, astronomy.timezone)}</p><p>Durée : {displayMinutes(circumstances.durationMinutes)}</p><p>Hauteur : {circumstances.altitudeDegrees == null ? "—" : `${circumstances.altitudeDegrees}°`}</p><p>Azimut : {circumstances.azimuthDegrees == null ? "—" : `${circumstances.azimuthDegrees}° ${circumstances.azimuthCardinal ?? ""}`}</p><p>Obscuration : {circumstances.obscurationPercent == null ? "—" : `${circumstances.obscurationPercent}%`}</p><p className="col-span-2 text-[9px] text-slate-500">Direction mesurée depuis le nord géographique, dans le sens horaire.</p><p className="col-span-2 mt-1 text-slate-400">{circumstances.detail}</p><p className="col-span-2 text-[9px] text-slate-500">{circumstances.precisionLabel}</p></div>}</div><p className="mt-2">{selectedLayer.precisionLabel}</p><p className="mt-1">Source : <a href={selectedLayer.sourceUrl} target="_blank" rel="noreferrer" className="text-sky-200 underline underline-offset-2">{selectedLayer.sourceLabel}</a>. Le cercle blanc situe seulement le lieu actif et son contexte local.</p><Dialog open={isMapExpanded} onOpenChange={setIsMapExpanded}><DialogContent className="max-h-[calc(100dvh-1.25rem)] overflow-y-auto border-slate-700 bg-[#0b111b] p-0 text-slate-100 sm:max-w-5xl"><DialogHeader className="border-b border-slate-700/70 px-5 pt-5 pb-4 text-left"><DialogTitle className="text-lg text-white">Carte de visibilité d’éclipse</DialogTitle><DialogDescription className="text-xs leading-relaxed text-slate-400">{selectedLayer.title} · utilisez les contrôles de zoom et la flèche de direction pour explorer la carte.</DialogDescription></DialogHeader><div className="px-4 py-4" data-swipe-exclude>{mapContent("expanded", "h-[min(68dvh,620px)]", true)}</div><DialogFooter className="border-t border-slate-700/70 px-5 py-3"><DialogClose className="min-h-10 rounded-xl border border-slate-600 bg-slate-800/70 px-4 text-xs font-medium text-slate-100">Fermer la carte</DialogClose></DialogFooter></DialogContent></Dialog>{locationStatus && <p className="mt-2 text-[9px] text-slate-400" role="status">{locationStatus}</p>}</div></div>;
 }

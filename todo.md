@@ -2177,3 +2177,9 @@
 - [x] Carte: Corriger le réagencement et la disponibilité du zoom après ouverture de la vue agrandie.
 - [x] Accessibilité: Ajouter des libellés explicites aux boutons iconographiques et préserver leurs états de chargement.
 - [x] Validation: Tester la carte compacte, la vue agrandie, le zoom, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — orientation et recentrage
+- [x] Vue agrandie: Afficher une boussole lisible indiquant le nord géographique et la rotation courante de la carte.
+- [x] Commande: Ajouter un bouton de recentrage vers le cadrage initial des zones de visibilité.
+- [x] Accessibilité: Associer un libellé explicite aux nouvelles commandes de la carte.
+- [x] Validation: Tester la boussole, le recentrage, TypeScript et la suite de régression avant publication.
