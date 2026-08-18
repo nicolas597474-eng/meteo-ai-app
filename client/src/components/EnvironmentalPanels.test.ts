@@ -37,8 +37,14 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("cameraControl: false");
     expect(source).toContain("addressControlOptions: { position: google.maps.ControlPosition.BOTTOM_CENTER }");
     expect(source).toContain('strokeColor: isFull ? "#0284c7" : "#7c3aed"');
-    expect(source).toContain("fillOpacity: isFull ? 0.46 : 0.30");
+    expect(source).toContain("fillOpacity: baseOpacity * (visibilityOpacity / 100)");
     expect(source).toContain("zIndex: isFull ? 4 : 3");
+    expect(source).toContain("visibilityOpacity");
+    expect(source).toContain("Opacité des zones de visibilité");
+    expect(source).toContain("openExpandedMap");
+    expect(source).toContain("isMapOpeningRef");
+    expect(source).toContain('google.maps.event.trigger(map, "resize")');
+    expect(styles).toContain("map-opacity-control");
     expect(source).toContain("Me localiser");
     expect(source).toContain("getEclipseCircumstances");
     expect(source).toContain("Cliquez sur une zone de visibilité");

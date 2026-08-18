@@ -2219,3 +2219,14 @@
 - [x] Localisation: Conserver ces couches visibles après recentrage sur la position autorisée.
 - [x] Vue agrandie: Préserver la même lisibilité après ouverture de la carte en grand.
 - [x] Validation: Tester les couches solaire et lunaire, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — réglage d’opacité des zones
+- [x] Interaction: Ajouter un curseur accessible permettant de régler l’opacité des zones calculées.
+- [x] Cartographie: Appliquer le réglage aux couches bleues et violettes sans modifier leurs contours ni leur ordre.
+- [x] Interface: Préserver une position de curseur qui ne chevauche pas les autres contrôles de carte.
+- [x] Validation: Tester les valeurs minimale, médiane et maximale, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — ouverture rapide de la carte agrandie
+- [x] Interaction: Empêcher les ouvertures concurrentes lors d’appuis rapides sur l’action d’agrandissement.
+- [x] Carte: Attendre l’initialisation et le redimensionnement de la vue agrandie avant de réactiver les contrôles.
+- [x] Validation: Tester les ouvertures répétées, la fermeture puis réouverture, TypeScript et la suite de régression avant publication.

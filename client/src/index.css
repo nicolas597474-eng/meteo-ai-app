@@ -647,6 +647,30 @@ img.moon-3d-first-crescent {
   max-width: min(32rem, calc(100% - 1.5rem));
 }
 
+.map-opacity-control {
+  width: 8.75rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid rgb(186 230 253 / 0.8);
+  border-radius: 0.75rem;
+  background: rgb(7 17 32 / 0.94);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.26);
+}
+
+.map-opacity-control__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: #e0f2fe;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.map-opacity-control input[type="range"] {
+  width: 100%;
+  margin-top: 0.35rem;
+  accent-color: #38bdf8;
+}
+
 @media (max-width: 420px) {
   .map-control-cluster {
     gap: 0.5rem;
