@@ -2183,3 +2183,9 @@
 - [x] Commande: Ajouter un bouton de recentrage vers le cadrage initial des zones de visibilité.
 - [x] Accessibilité: Associer un libellé explicite aux nouvelles commandes de la carte.
 - [x] Validation: Tester la boussole, le recentrage, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — azimut sur la boussole
+- [x] Données: Réutiliser l’azimut calculé et sa direction cardinale pour le point sélectionné.
+- [x] Vue agrandie: Afficher l’azimut de l’astre directement avec la boussole.
+- [x] Transparence: Signaler l’indisponibilité de l’azimut tant qu’aucune circonstance locale n’est calculée.
+- [x] Validation: Tester l’affichage solaire et lunaire, TypeScript et la suite de régression avant publication.

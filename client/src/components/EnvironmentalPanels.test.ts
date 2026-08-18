@@ -50,6 +50,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Recentrer sur la zone initiale de l’éclipse");
     expect(source).toContain("expandedInitialBoundsRef");
     expect(source).toContain("recenterExpandedMap");
+    expect(source).toContain("astronomicalAzimuthLabel");
+    expect(source).toContain("Azimut de l’astre");
+    expect(source).toContain("astronomicalDirection");
     expect(source).toContain("data-swipe-exclude");
     expect(source).toContain("🌕 Prochaine pleine lune");
     expect(source).toContain("Icône d’éclipse");
