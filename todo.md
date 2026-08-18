@@ -2213,3 +2213,9 @@
 - [x] Carte agrandie: Déplacer l’indication de lieu hors de la zone réservée à la boussole et aux actions.
 - [x] Interface: Préserver une zone libre pour les contrôles natifs et les notifications éventuelles.
 - [x] Validation: Vérifier le rendu mobile et grand écran, TypeScript et les tests avant publication.
+
+## Carte astronomique — couches de visibilité renforcées
+- [x] Cartographie: Augmenter le contraste, l’opacité et l’épaisseur des zones bleues et violettes calculées.
+- [x] Localisation: Conserver ces couches visibles après recentrage sur la position autorisée.
+- [x] Vue agrandie: Préserver la même lisibilité après ouverture de la carte en grand.
+- [x] Validation: Tester les couches solaire et lunaire, TypeScript et la suite de régression avant publication.

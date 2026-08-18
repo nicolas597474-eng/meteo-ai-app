@@ -219,7 +219,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     const bounds = new google.maps.LatLngBounds();
     selectedLayer.visibilityCells.forEach((cell) => {
       const isFull = cell.visibility === "full_event";
-      const rectangle = new google.maps.Rectangle({ map, bounds: { north: cell.north, south: cell.south, east: cell.east, west: cell.west }, strokeColor: isFull ? "#38bdf8" : "#a78bfa", strokeOpacity: isFull ? 0.7 : 0.35, strokeWeight: 1, fillColor: isFull ? "#38bdf8" : "#a78bfa", fillOpacity: isFull ? 0.24 : 0.10, clickable: true });
+      const rectangle = new google.maps.Rectangle({ map, bounds: { north: cell.north, south: cell.south, east: cell.east, west: cell.west }, strokeColor: isFull ? "#0284c7" : "#7c3aed", strokeOpacity: isFull ? 0.96 : 0.88, strokeWeight: isFull ? 2.5 : 2, fillColor: isFull ? "#0ea5e9" : "#8b5cf6", fillOpacity: isFull ? 0.46 : 0.30, clickable: true, zIndex: isFull ? 4 : 3 });
       rectangle.addListener("click", (event: google.maps.MapMouseEvent) => {
         const lat = event.latLng?.lat() ?? (cell.north + cell.south) / 2;
         const lon = event.latLng?.lng() ?? (cell.east + cell.west) / 2;
