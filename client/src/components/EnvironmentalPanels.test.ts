@@ -45,6 +45,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("isMapOpeningRef");
     expect(source).toContain('google.maps.event.trigger(map, "resize")');
     expect(styles).toContain("map-opacity-control");
+    expect(source).toContain('gestureHandling: "greedy"');
     expect(source).toContain("Me localiser");
     expect(source).toContain("getEclipseCircumstances");
     expect(source).toContain("Cliquez sur une zone de visibilité");
@@ -55,7 +56,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Maximize2");
     expect(source).toContain("LocateFixed");
     expect(source).toContain("streetViewControl={isExpanded}");
-    expect(source).toContain('gestureHandling: isExpanded ? "greedy" : "cooperative"');
+    expect(source).toContain('gestureHandling: "greedy"');
     expect(source).toContain("utilisez les contrôles de zoom et la flèche de direction");
     expect(source).toContain("Boussole, nord géographique");
     expect(source).toContain("Recentrer sur la zone initiale de l’éclipse");

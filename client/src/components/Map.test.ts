@@ -15,6 +15,9 @@ describe("repli de cartographie", () => {
     expect(source).toContain("zoomControl?: boolean");
     expect(source).toContain("cameraControl?: boolean");
     expect(source).toContain("cameraControl = false");
+    expect(source).toContain("touchGestureActive");
+    expect(source).toContain("touch-none");
+    expect(source).toContain("touchGestureActive.current");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
     expect(source).toContain("ResizeObserver");

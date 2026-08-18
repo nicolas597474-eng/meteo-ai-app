@@ -2230,3 +2230,9 @@
 - [x] Interaction: Empêcher les ouvertures concurrentes lors d’appuis rapides sur l’action d’agrandissement.
 - [x] Carte: Attendre l’initialisation et le redimensionnement de la vue agrandie avant de réactiver les contrôles.
 - [x] Validation: Tester les ouvertures répétées, la fermeture puis réouverture, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — zoom tactile stable
+- [x] Interaction: Préserver le zoom à deux doigts sans déclencher de réinitialisation de cadrage.
+- [x] Carte: Dissocier le redimensionnement d’initialisation des gestes continus de zoom et déplacement.
+- [x] Interface: Éviter que les curseurs et boutons superposés capturent involontairement les gestes cartographiques.
+- [x] Validation: Tester le pincement tactile, le déplacement, la réouverture, TypeScript et la suite de régression avant publication.

@@ -151,6 +151,8 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
+  const touchGestureActive = useRef(false);
+  const touchReleaseTimer = useRef<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -198,10 +200,8 @@ export function MapView({
     if (isLoading || !mapContainer.current || !map.current) return;
     const resizeObserver = new ResizeObserver(() => {
       const mapInstance = map.current;
-      if (!mapInstance || !window.google?.maps) return;
-      const currentCenter = mapInstance.getCenter();
+      if (!mapInstance || !window.google?.maps || touchGestureActive.current) return;
       window.google.maps.event.trigger(mapInstance, "resize");
-      if (currentCenter) mapInstance.setCenter(currentCenter);
     });
     resizeObserver.observe(mapContainer.current);
     return () => resizeObserver.disconnect();
@@ -221,7 +221,7 @@ export function MapView({
   return (
     <div className={cn("relative h-[500px] w-full", className)}>
       {isLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Chargement de la carte…</div>}
-      <div ref={mapContainer} className="h-full w-full" />
+      <div ref={mapContainer} className="h-full w-full touch-none" onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
       {children}
     </div>
   );
