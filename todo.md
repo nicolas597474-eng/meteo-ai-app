@@ -2030,3 +2030,8 @@
 - [x] Interface: Utiliser un vrai demi-cercle ou un arc circulaire sans sommet plat.
 - [x] Contrainte: Préserver la position des astres, les horaires et les données astronomiques.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Soleil & Lune — libellés sous la ligne d’horizon
+- [x] Interface: Placer les textes Lever et Coucher sous la ligne horizontale.
+- [x] Lisibilité: Conserver les heures de lever/coucher visibles sans chevauchement.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

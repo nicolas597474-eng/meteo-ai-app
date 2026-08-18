@@ -187,6 +187,19 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   display: none;
 }
 
+/* Les heures restent juste au-dessus de l’horizon ; leurs libellés sont
+   sortis de leur flux afin d’apparaître clairement sous la ligne. */
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.bottom-0.left-0,
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.bottom-0.right-0 {
+  bottom: 1.15rem !important;
+}
+
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.bottom-0 > small {
+  position: absolute;
+  top: calc(100% + 0.2rem);
+  white-space: nowrap;
+}
+
 /* Premier croissant : seul l’astre est visible, sans pastille, cercle ni fond décoratif. */
 section[aria-label="Qualité de l’air, soleil et lune"] div:has(> img.moon-3d-first-crescent) {
   width: 6rem !important;
