@@ -170,33 +170,33 @@
 /* L’arche Soleil & Lune conserve une géométrie de demi-cercle complète,
    y compris sur les écrans mobiles étroits. Un ratio 2:1 évite le sommet aplati
    produit par une ellipse trop basse. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 {
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 {
   height: 12rem !important;
   overflow: visible !important;
 }
 
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > div:first-child {
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > div:first-child {
   height: auto !important;
   aspect-ratio: 2 / 1;
   bottom: 1rem !important;
 }
 
 /* Les astres restent lisibles par leur forme ; leurs textes ne se superposent plus à l’arche. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.text-amber-100,
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.text-indigo-100 {
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.text-amber-100,
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.text-indigo-100 {
   display: none;
 }
 
 /* Les heures restent juste au-dessus de l’horizon ; leurs libellés sont
    sortis de leur flux afin d’apparaître clairement sous la ligne. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.bottom-0.left-0,
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.bottom-0.right-0 {
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0.left-0,
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0.right-0 {
   bottom: 1.15rem !important;
 }
 
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > span.absolute.bottom-0 > small {
+section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0 > small {
   position: absolute;
-  top: calc(100% + 0.2rem);
+  top: calc(100% + 0.75rem);
   white-space: nowrap;
 }
 

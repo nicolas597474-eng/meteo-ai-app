@@ -2085,3 +2085,14 @@
 - [x] Interface: Retirer toute bordure, fond de pastille et contour autour de la date.
 - [x] Lisibilité: Conserver une date agrandie et contrastée en texte seul.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Soleil & Lune — espace entre les astres et le titre
+- [x] Diagnostic: Vérifier la position haute des astres par rapport au sous-titre du panneau.
+- [x] Interface: Réserver une zone de sécurité pour empêcher la Lune ou le Soleil de chevaucher le titre.
+- [x] Contrainte: Préserver l’arche, les horaires et le positionnement astronomique relatif.
+- [x] Validation: Tester les positions extrêmes, TypeScript et le rendu mobile avant publication.
+
+## Soleil & Lune — repères Lever et Coucher dégagés
+- [x] Interface: Décaler les libellés Lever et Coucher sous la ligne d’horizon avec un espace fixe.
+- [x] Lisibilité: Conserver les heures de lever et coucher visibles au-dessus de la ligne.
+- [x] Validation: Tester les positions extrêmes, TypeScript et le rendu mobile avant publication.

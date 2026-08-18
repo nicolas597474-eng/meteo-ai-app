@@ -34,7 +34,7 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("aspect-ratio: 2 / 1");
     expect(styles).toContain("ratio 2:1 évite le sommet aplati");
     expect(styles).toContain("bottom: 1.15rem !important");
-    expect(styles).toContain("top: calc(100% + 0.2rem)");
+    expect(styles).toContain("top: calc(100% + 0.75rem)");
     expect(styles).toContain("text-amber-100");
     expect(styles).toContain("text-indigo-100");
     expect(styles).toContain("celestial-solar-disc-breathe");
@@ -54,6 +54,8 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("markersAreClose");
     expect(modernSunMoonSource).toContain("sunDisplayPosition");
     expect(modernSunMoonSource).toContain("moonDisplayPosition");
+    expect(modernSunMoonSource).toContain("safeArcMarkerBottom");
+    expect(modernSunMoonSource).toContain('relative mx-auto mt-7 h-40');
     expect(source).toContain("Math.sin((position / 100) * Math.PI) * 140");
     expect(modernSunMoonSource).toContain("Position du Soleil sur l’arche");
     expect(modernSunMoonSource).toContain("Position de la Lune sur l’arche");
