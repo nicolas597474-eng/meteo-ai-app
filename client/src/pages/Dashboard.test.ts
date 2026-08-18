@@ -50,7 +50,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Synthèse horaire · {regimeFreshnessLabel}");
     expect(source).toContain("whitespace-nowrap text-[15px] font-medium leading-tight");
     expect(source).toContain('nextRegimeChange.hour.replace(":00", "h")');
-    expect(source).toContain("Évolution · {nextRegimeChange");
+    expect(source).toContain('Évolution · {nextRegimeChange');
+    expect(source).toContain('text-white">{currentHour?.condition');
+    expect(source).toContain('text-white">{nextRegimeChange ? nextRegimeChange.label');
     expect(source).toContain('text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');

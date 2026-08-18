@@ -2075,3 +2075,8 @@
 - [x] Typographie: Agrandir la date tout en conservant la lisibilité mobile.
 - [x] Cohérence: Garder la date dans le panneau de régime, sans réintroduire de pastille externe.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Dashboard — harmonisation phénomène et évolution
+- [x] Interface: Utiliser la même teinte bleue pour les libellés Phénomène actuel et Évolution.
+- [x] Lisibilité: Afficher les conditions Bruine, Averses et les autres valeurs de condition en blanc.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

@@ -656,18 +656,21 @@ export default function Dashboard() {
             <div className="mt-1 min-w-0 space-y-0.5 sm:mt-1.5 sm:space-y-1">
               <p className="whitespace-nowrap text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg">
                 <span className="font-semibold text-sky-200/90">Phénomène actuel · </span>
-                {currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible"}
+                <span className="text-white">{currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible"}</span>
               </p>
               {(nextRegimeChange ?? nextConditionChange) && (
                 <>
-                  <p className="whitespace-nowrap text-[15px] font-medium leading-tight text-sky-300 sm:hidden">Évolution · {nextRegimeChange
-                    ? `${nextRegimeChange.hour.replace(":00", "h")} · ${nextRegimeChange.emoji} ${nextRegimeChange.label}`
-                    : `${nextConditionChange!.hour.replace(":00", "h")} · ${nextConditionChange!.condition}`}</p>
+                  <p className="whitespace-nowrap text-[15px] font-medium leading-tight sm:hidden">
+                    <span className="text-sky-200/90">Évolution · {nextRegimeChange
+                      ? `${nextRegimeChange.hour.replace(":00", "h")} · ${nextRegimeChange.emoji} `
+                      : `${nextConditionChange!.hour.replace(":00", "h")} · `}</span>
+                    <span className="text-white">{nextRegimeChange ? nextRegimeChange.label : nextConditionChange!.condition}</span>
+                  </p>
                   <p className="hidden items-center gap-1 text-[11px] font-medium text-sky-300 sm:flex">
                     <Clock className="h-3 w-3" />
-                    <span>Évolution horaire : {nextRegimeChange
-                    ? `${nextRegimeChange.emoji} ${nextRegimeChange.label} à ${nextRegimeChange.hour}`
-                    : `${nextConditionChange!.condition} à ${nextConditionChange!.hour}`}</span>
+                    <span>Évolution horaire : {nextRegimeChange ? `${nextRegimeChange.emoji} ` : ""}</span>
+                    <span className="text-white">{nextRegimeChange ? nextRegimeChange.label : nextConditionChange!.condition}</span>
+                    <span>à {nextRegimeChange ? nextRegimeChange.hour : nextConditionChange!.hour}</span>
                   </p>
                 </>
               )}
