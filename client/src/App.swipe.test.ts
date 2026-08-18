@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { MAIN_PAGE_PATHS, getSwipeNavigationTarget, isQualifiedPageSwipe, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 
 describe("navigation entre pages par glissement", () => {
@@ -28,5 +29,15 @@ describe("navigation entre pages par glissement", () => {
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("button");
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain(".overflow-x-auto");
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("canvas");
+  });
+
+  it("anime la page cible selon le sens du geste sans animer les préférences de mouvement réduit", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const styles = readFileSync(new URL("./index.css", import.meta.url), "utf8");
+    expect(appSource).toContain("page-swipe-transition--${transition.direction}");
+    expect(appSource).toContain('deltaX < 0 ? "forward" : "backward"');
+    expect(styles).toContain("page-swipe-enter-from-right");
+    expect(styles).toContain("page-swipe-enter-from-left");
+    expect(styles).toContain("prefers-reduced-motion: no-preference");
   });
 });

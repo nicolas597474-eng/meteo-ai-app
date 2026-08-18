@@ -2049,3 +2049,10 @@
 - [x] Méthode: Expliquer la correction de biais, la dispersion, les sources actives/validation et les limites de maillage ou microclimat.
 - [x] Interface: Organiser ces informations dans le panneau déroulant sans nuire à la lecture mobile.
 - [x] Validation: Tester le contenu, TypeScript et le rendu mobile avant publication.
+
+## Navigation entre pages — transition fluide
+- [x] Interaction: Animer l’entrée de la page cible après un glissement horizontal valide.
+- [x] Direction: Adapter le sens de la transition au balayage gauche ou droit.
+- [x] Accessibilité: Désactiver l’animation non essentielle si la réduction des mouvements est demandée.
+- [x] Protection: Préserver les gestes exclus et les URL directes existantes.
+- [x] Validation: Tester la navigation, TypeScript et le rendu mobile avant publication.

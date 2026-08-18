@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -42,6 +42,13 @@ function shouldIgnorePageSwipe(target: EventTarget | null) {
 function PageSwipeNavigator({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const gestureRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const [transition, setTransition] = useState<{ location: string; direction: "forward" | "backward" } | null>(null);
+
+  useEffect(() => {
+    if (transition?.location !== location) return;
+    const timer = window.setTimeout(() => setTransition(null), 220);
+    return () => window.clearTimeout(timer);
+  }, [location, transition]);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch" || shouldIgnorePageSwipe(event.target)) {
@@ -62,10 +69,17 @@ function PageSwipeNavigator({ children }: { children: ReactNode }) {
     if (!isQualifiedPageSwipe(deltaX, deltaY, elapsed)) return;
 
     const target = getSwipeNavigationTarget(location, deltaX);
-    if (target) setLocation(target);
+    if (target) {
+      setTransition({ location: target, direction: deltaX < 0 ? "forward" : "backward" });
+      setLocation(target);
+    }
   };
 
-  return <div className="touch-pan-y sm:touch-auto" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>{children}</div>;
+  const transitionClass = transition?.location === location
+    ? `page-swipe-transition page-swipe-transition--${transition.direction}`
+    : "";
+
+  return <div className="touch-pan-y sm:touch-auto" onPointerDown={onPointerDown} onPointerUp={onPointerUp}><div key={location} className={transitionClass}>{children}</div></div>;
 }
 
 function TopNav() {
