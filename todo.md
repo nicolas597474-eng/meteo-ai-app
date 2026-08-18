@@ -2056,3 +2056,10 @@
 - [x] Accessibilité: Désactiver l’animation non essentielle si la réduction des mouvements est demandée.
 - [x] Protection: Préserver les gestes exclus et les URL directes existantes.
 - [x] Validation: Tester la navigation, TypeScript et le rendu mobile avant publication.
+
+## Navigation entre pages — optimisation de fluidité
+- [x] Chargement: Précharger les pages principales après l’affichage initial sans bloquer le Dashboard.
+- [x] Transition: Raccourcir et simplifier la transition directionnelle pour les gestes rapides.
+- [x] Rafraîchissement: Éviter les rechargements superflus et le travail bloquant pendant le changement de route.
+- [x] Accessibilité: Préserver la préférence de réduction des mouvements et les interactions protégées.
+- [x] Validation: Tester le préchargement, TypeScript, la navigation tactile et le rendu mobile avant publication.

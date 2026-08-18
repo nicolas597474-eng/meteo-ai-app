@@ -16,14 +16,18 @@ import {
   ChartNoAxesCombined,
 } from "lucide-react";
 
-const Ranking = lazy(() => import("./pages/Ranking"));
-const History = lazy(() => import("./pages/History"));
+const loadRanking = () => import("./pages/Ranking");
+const loadHistory = () => import("./pages/History");
+const loadWeatherAILab = () => import("./pages/WeatherAILab");
+const loadReliabilityLaboratory = () => import("./pages/ReliabilityLaboratory");
+const Ranking = lazy(loadRanking);
+const History = lazy(loadHistory);
 const Report = lazy(() => import("./pages/Report"));
-const WeatherAILab = lazy(() => import("./pages/WeatherAILab"));
+const WeatherAILab = lazy(loadWeatherAILab);
 const FavoriteSettings = lazy(() => import("./pages/FavoriteSettings"));
 const WeatherDetails = lazy(() => import("./pages/WeatherDetails"));
 const WeightComparison = lazy(() => import("./pages/WeightComparison"));
-const ReliabilityLaboratory = lazy(() => import("./pages/ReliabilityLaboratory"));
+const ReliabilityLaboratory = lazy(loadReliabilityLaboratory);
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const navItems = [
@@ -39,6 +43,27 @@ function shouldIgnorePageSwipe(target: EventTarget | null) {
   return Boolean(target.closest(PAGE_SWIPE_IGNORE_SELECTOR));
 }
 
+function useMainPagePreload() {
+  useEffect(() => {
+    let cancelled = false;
+    const preload = () => {
+      if (cancelled) return;
+      void Promise.all([
+        loadReliabilityLaboratory(),
+        loadRanking(),
+        loadHistory(),
+        loadWeatherAILab(),
+      ]).catch(() => undefined);
+    };
+
+    const timeoutId = window.setTimeout(preload, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+}
+
 function PageSwipeNavigator({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const gestureRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -46,7 +71,7 @@ function PageSwipeNavigator({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (transition?.location !== location) return;
-    const timer = window.setTimeout(() => setTransition(null), 220);
+    const timer = window.setTimeout(() => setTransition(null), 170);
     return () => window.clearTimeout(timer);
   }, [location, transition]);
 
@@ -192,6 +217,8 @@ function Router() {
 }
 
 function App() {
+  useMainPagePreload();
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">

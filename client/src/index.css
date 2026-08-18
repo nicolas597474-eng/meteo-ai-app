@@ -527,20 +527,20 @@ img.moon-3d-first-crescent {
 
 @media (prefers-reduced-motion: no-preference) {
   .page-swipe-transition--forward {
-    animation: page-swipe-enter-from-right 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+    animation: page-swipe-enter-from-right 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
   }
 
   .page-swipe-transition--backward {
-    animation: page-swipe-enter-from-left 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+    animation: page-swipe-enter-from-left 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
   }
 }
 
 @keyframes page-swipe-enter-from-right {
-  from { transform: translateX(14px); opacity: 0.72; }
+  from { transform: translateX(10px); opacity: 0.8; }
   to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes page-swipe-enter-from-left {
-  from { transform: translateX(-14px); opacity: 0.72; }
+  from { transform: translateX(-10px); opacity: 0.8; }
   to { transform: translateX(0); opacity: 1; }
 }

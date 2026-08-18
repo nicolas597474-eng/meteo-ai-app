@@ -40,4 +40,14 @@ describe("navigation entre pages par glissement", () => {
     expect(styles).toContain("page-swipe-enter-from-left");
     expect(styles).toContain("prefers-reduced-motion: no-preference");
   });
+
+  it("précharge les pages principales après l’affichage initial et allège la durée de transition", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const styles = readFileSync(new URL("./index.css", import.meta.url), "utf8");
+    expect(appSource).toContain("function useMainPagePreload");
+    expect(appSource).toContain("window.setTimeout(preload, 250)");
+    expect(appSource).toContain("loadWeatherAILab()");
+    expect(appSource).toContain("setTransition(null), 170");
+    expect(styles).toContain("150ms cubic-bezier(0.23, 1, 0.32, 1)");
+  });
 });
