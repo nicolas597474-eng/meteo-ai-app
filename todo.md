@@ -2012,3 +2012,15 @@
 - [x] Interface: Ajouter un panneau déroulant sous la synthèse d’écart avec une flèche explicite.
 - [x] Explication: Décrire factuellement le rôle de chaque modèle et l’écart calculé sans inventer de performance.
 - [x] Validation: Tester les états avec deux modèles, un modèle ou aucune comparaison avant publication.
+
+## Évaluation d’intégration des modèles de validation
+- [x] Couverture: Vérifier la couverture géographique et temporelle de chaque modèle candidat pour les lieux actuels.
+- [x] Disponibilité: Vérifier le statut de production et la disponibilité technique via le fournisseur actif.
+- [x] Recommandation: Distinguer les candidats immédiatement intégrables des modèles à laisser en validation.
+- [x] Décision: Proposer un ordre d’intégration sans modifier la fusion officielle sans accord explicite.
+
+## Cartes horaires — ciel visible en transparence
+- [x] Interface: Remplacer le fond opaque des cartes horaires par une couche sombre translucide.
+- [x] Lisibilité: Conserver des contrastes suffisants pour les températures, étiquettes et métriques.
+- [x] Cohérence: Préserver les bordures et l’état « Maintenant » sans ajouter d’effet flou.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

@@ -21,11 +21,12 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("chartScrollRef");
     expect(source).toContain("detailScrollRef");
     expect(source).toContain("detailCardStride = 186");
-    expect(source).toContain('scrollTo({ left: detailTargetLeft, behavior: "auto" })');
+    expect(source).toContain("getCenteredHourScrollLeft");
+    expect(source).toContain("scrollToCenteredHour");
     expect(source).toContain("syncDetailScroll");
     expect(source).toContain("syncChartScroll");
-    expect(source).toContain("detailTargetLeft = progress * detailScrollableWidth");
-    expect(source).toContain("chartTargetLeft = progress * chartScrollableWidth");
+    expect(source).toContain("getNearestCenteredHourIndex");
+    expect(source).toContain("scheduleCenteredSnap");
     expect(source).toContain("onScroll={syncDetailScroll}");
     expect(source).toContain("onScroll={syncChartScroll}");
     expect(source).toContain("const chartTop = 36");
@@ -36,8 +37,10 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain(">Maintenant</text>");
     expect(source).toContain("hourlyCardStride = 170");
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
-    expect(source).toContain("rgba(77,105,132,0.38)");
-    expect(source).toContain("rgba(44,128,181,0.48)");
+    expect(source).toContain("rgba(77,105,132,0.20)");
+    expect(source).toContain("rgba(44,128,181,0.30)");
+    expect(source).toContain("border-white/20 bg-[linear-gradient(160deg,rgba(77,105,132,0.20),rgba(16,36,56,0.28))]");
+    expect(source).toContain("border-sky-200/65 bg-[linear-gradient(160deg,rgba(44,128,181,0.30),rgba(10,35,60,0.34))]");
     expect(source).toContain("HourlyMetric");
     expect(source).toContain("hourlyTemperatureTone(h.temp)");
     expect(source).toContain('return "text-amber-200"');
@@ -47,6 +50,6 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('y={chartH + 58} textAnchor="middle"');
     expect(source).not.toContain('strokeDasharray="5 3"');
     expect(source).toContain('fontSize="14"');
-    expect(source).toContain('fontSize={i === currentIdx ? "13" : "12"}');
+    expect(source).toContain('fontSize={i === selectedIdx ? "13" : "12"}');
   });
 });

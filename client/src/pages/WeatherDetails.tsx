@@ -163,10 +163,10 @@ export default function WeatherDetails() {
                 return (
                   <div
                     key={h.hour}
-                    className={`weather-surface-inset flex-shrink-0 w-[160px] rounded-[22px] border p-3 transition-colors ${
+                    className={`flex-shrink-0 w-[160px] rounded-[22px] border p-3 transition-colors ${
                       isNow
-                        ? "border-sky-200/60 bg-[linear-gradient(160deg,rgba(44,128,181,0.48),rgba(22,57,89,0.58))]"
-                        : "border-white/15 bg-[linear-gradient(160deg,rgba(77,105,132,0.38),rgba(34,55,78,0.52))]"
+                        ? "border-sky-200/65 bg-[linear-gradient(160deg,rgba(44,128,181,0.30),rgba(10,35,60,0.34))]"
+                        : "border-white/20 bg-[linear-gradient(160deg,rgba(77,105,132,0.20),rgba(16,36,56,0.28))]"
                     }`}
                   >
                     {/* Hour + Now badge */}
