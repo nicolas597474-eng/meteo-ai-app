@@ -36,6 +36,8 @@ export type LocalEclipseCircumstances = {
   endAt: string | null;
   durationMinutes: number | null;
   altitudeDegrees: number | null;
+  azimuthDegrees: number | null;
+  azimuthCardinal: string | null;
   obscurationPercent: number | null;
   detail: string;
   precisionLabel: string;
@@ -68,6 +70,16 @@ function withinOneDay(actual: Date, expectedDate: string) {
 function moonAltitudeAt(time: Astronomy.AstroTime, observer: Astronomy.Observer) {
   const equator = Astronomy.Equator(Astronomy.Body.Moon, time, observer, true, true);
   return Astronomy.Horizon(time, observer, equator.ra, equator.dec, "normal").altitude;
+}
+
+function bodyAzimuthAt(body: Astronomy.Body, time: Astronomy.AstroTime, observer: Astronomy.Observer) {
+  const equator = Astronomy.Equator(body, time, observer, true, true);
+  return Astronomy.Horizon(time, observer, equator.ra, equator.dec, "normal").azimuth;
+}
+
+function cardinalDirection(azimuth: number) {
+  const labels = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+  return labels[Math.round((((azimuth % 360) + 360) % 360) / 45) % 8];
 }
 
 function buildLunarVisibilityLayer(event: EclipseCandidate): EclipseMapLayer {
@@ -212,6 +224,7 @@ export function getLocalEclipseCircumstances(input: { eventId: string; lat: numb
     const peakAltitude = moonAltitudeAt(eclipse.peak, observer);
     const startAltitude = moonAltitudeAt(start, observer);
     const endAltitude = moonAltitudeAt(end, observer);
+    const azimuth = bodyAzimuthAt(Astronomy.Body.Moon, eclipse.peak, observer);
     const visibility = peakAltitude <= 0 ? "not_visible" : startAltitude > 0 && endAltitude > 0 ? "full_event" : "partial";
     return {
       eventId: input.eventId,
@@ -222,6 +235,8 @@ export function getLocalEclipseCircumstances(input: { eventId: string; lat: numb
       endAt: visibility === "not_visible" ? null : toIso(end),
       durationMinutes: visibility === "not_visible" ? null : Math.round(duration * 2),
       altitudeDegrees: Math.round(peakAltitude * 10) / 10,
+      azimuthDegrees: Math.round(azimuth * 10) / 10,
+      azimuthCardinal: cardinalDirection(azimuth),
       obscurationPercent: Math.round(eclipse.obscuration * 100),
       detail: visibility === "full_event" ? "La Lune est au-dessus de l’horizon pendant toute la phase calculée." : visibility === "partial" ? "La Lune est au-dessus de l’horizon au maximum, mais pas pendant toute la phase calculée." : "La Lune est sous l’horizon au maximum de l’éclipse pour cette position.",
       precisionLabel: "Calcul Astronomy Engine au point sélectionné ; horizon réel, obstacles et météo non modélisés.",
@@ -233,6 +248,7 @@ export function getLocalEclipseCircumstances(input: { eventId: string; lat: numb
     const isExpectedDate = withinOneDay(eclipse.peak.time.date, "2027-08-02");
     const visibility = !isExpectedDate || eclipse.peak.altitude <= 0 ? "not_visible" : eclipse.partial_begin.altitude > 0 && eclipse.partial_end.altitude > 0 ? "full_event" : "partial";
     const duration = (eclipse.partial_end.time.ut - eclipse.partial_begin.time.ut) * 1440;
+    const azimuth = isExpectedDate ? bodyAzimuthAt(Astronomy.Body.Sun, eclipse.peak.time, observer) : null;
     return {
       eventId: input.eventId,
       visibility,
@@ -242,6 +258,8 @@ export function getLocalEclipseCircumstances(input: { eventId: string; lat: numb
       endAt: visibility === "not_visible" ? null : toIso(eclipse.partial_end.time),
       durationMinutes: visibility === "not_visible" ? null : Math.round(duration),
       altitudeDegrees: Math.round(eclipse.peak.altitude * 10) / 10,
+      azimuthDegrees: azimuth == null ? null : Math.round(azimuth * 10) / 10,
+      azimuthCardinal: azimuth == null ? null : cardinalDirection(azimuth),
       obscurationPercent: isExpectedDate ? Math.round(eclipse.obscuration * 100) : null,
       detail: visibility === "full_event" ? "Le Soleil est au-dessus de l’horizon pendant toute la phase partielle calculée." : visibility === "partial" ? "Le Soleil est au-dessus de l’horizon au maximum, mais la phase complète est tronquée par l’horizon." : "Le Soleil est sous l’horizon au maximum de l’éclipse pour cette position.",
       precisionLabel: "Calcul Astronomy Engine au point sélectionné ; horizon réel, obstacles, nuages et sécurité d’observation non modélisés.",

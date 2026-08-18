@@ -2157,3 +2157,9 @@
 - [x] Localisation: Ajouter un bouton « Me localiser » pour centrer la carte sur la position du navigateur et évaluer la visibilité.
 - [x] Transparence: Gérer l’absence ou le refus de géolocalisation sans fabriquer de position.
 - [x] Validation: Tester les zones, les coordonnées, les erreurs de localisation et le rendu mobile avant publication.
+
+## Carte astronomique — azimut de l’astre
+- [x] Données: Calculer l’azimut du Soleil ou de la Lune au maximum pour le point sélectionné.
+- [x] Interface: Afficher l’angle et la direction cardinale dans les détails d’éclipse.
+- [x] Transparence: Préciser que la direction est mesurée depuis le nord géographique.
+- [x] Validation: Tester les calculs solaire et lunaire, TypeScript et le rendu mobile avant publication.

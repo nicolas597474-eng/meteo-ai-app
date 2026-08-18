@@ -37,6 +37,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Me localiser");
     expect(source).toContain("getEclipseCircumstances");
     expect(source).toContain("Cliquez sur une zone de visibilité");
+    expect(source).toContain("Azimut :");
+    expect(source).toContain("nord géographique");
     expect(source).toContain("data-swipe-exclude");
     expect(source).toContain("🌕 Prochaine pleine lune");
     expect(source).toContain("Icône d’éclipse");

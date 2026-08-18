@@ -24,6 +24,8 @@ describe("eclipse visibility layers", () => {
     const circumstances = getLocalEclipseCircumstances({ eventId: "lunar_partial_2026_08_28", lat: 50.7567, lon: 2.5204 });
     expect(circumstances.label).toContain("lunaire");
     expect(circumstances.peakAt).toMatch(/2026-08/);
+    expect(circumstances.azimuthDegrees).toBeGreaterThanOrEqual(0);
+    expect(circumstances.azimuthCardinal).toMatch(/^(N|NE|E|SE|S|SO|O|NO)$/);
     expect(circumstances.precisionLabel).toContain("horizon réel");
   });
 
@@ -31,6 +33,8 @@ describe("eclipse visibility layers", () => {
     const circumstances = getLocalEclipseCircumstances({ eventId: "solar_partial_2027_08_02", lat: 50.7567, lon: 2.5204 });
     expect(circumstances.label).toContain("solaire");
     expect(circumstances.peakAt).toMatch(/2027-08/);
+    expect(circumstances.azimuthDegrees).toBeGreaterThanOrEqual(0);
+    expect(circumstances.azimuthCardinal).toMatch(/^(N|NE|E|SE|S|SO|O|NO)$/);
     expect(["full_event", "partial", "not_visible"]).toContain(circumstances.visibility);
   });
 });
