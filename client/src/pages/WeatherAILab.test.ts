@@ -16,6 +16,12 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Stabilité des modèles");
     expect(source).toContain("Données insuffisantes / —");
     expect(source).toContain("group-open:rotate-180");
+    expect(source).toContain("Horizon de prévision");
+    expect(source).toContain("MAE");
+    expect(source).toContain("RMSE");
+    expect(source).toContain("Seuils de décision");
+    expect(source).toContain("Correction de biais");
+    expect(source).toContain("Maille et microclimat");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {

@@ -48,6 +48,28 @@ const AI_LAB_GLOSSARY = [
       ["Données insuffisantes / —", "Aucune valeur n’est affichée lorsqu’il manque une trace, plusieurs contributeurs ou des preuves physiques qualifiées. Ce n’est pas une note nulle."],
     ],
   },
+  {
+    title: "Fiabilité, erreurs et horizons",
+    entries: [
+      ["Horizon de prévision", "Délai entre le calcul et l’heure ou le jour prévus. L’indice de confiance applique un facteur de 95 pour 0–6 h, 85 pour 6–24 h, 75 pour 1–3 jours, 60 pour 4–7 jours et 45 pour 8–15 jours : plus l’échéance est lointaine, plus l’incertitude compte."],
+      ["MAE", "Erreur absolue moyenne : moyenne des écarts, sans signe, entre une prévision et une observation physique alignée. Plus elle est faible, plus la prévision a été proche des observations comparées."],
+      ["RMSE", "Racine de l’erreur quadratique moyenne. Les grands écarts sont d’abord mis au carré, donc cette mesure pénalise davantage les erreurs importantes que le MAE."],
+      ["Biais", "Tendance moyenne d’un modèle à surestimer ou sous-estimer. Un biais positif signifie que la prévision est trop élevée ; un biais négatif qu’elle est trop basse."],
+      ["Taille d’échantillon", "Nombre de paires prévision–observation physiques réellement comparables. Une valeur élevée améliore la maturité statistique, mais ne garantit pas à elle seule qu’un modèle est meilleur dans tous les contextes."],
+      ["Seuils de décision", "Le calcul de fiabilité exige au moins 18 comparaisons physiques alignées sur 2 jours. Un classement public demande 30 comparaisons sur 7 jours ; la confiance statistique devient moyenne à 72 comparaisons sur 7 jours et élevée à 180 sur 30 jours."],
+    ],
+  },
+  {
+    title: "Stations, corrections et limites locales",
+    entries: [
+      ["Station physique", "Relevé local issu d’un capteur, distinct d’un modèle. Une station n’est retenue que si sa mesure, sa fraîcheur et ses contrôles de qualité sont suffisants ; une donnée absente, trop ancienne, incohérente ou peu fiable est écartée."],
+      ["Fraîcheur, distance et continuité", "La fraîcheur indique l’ancienneté d’un relevé, la distance son éloignement du lieu, et la continuité sa régularité dans le temps. Ces éléments aident à qualifier une station ; ils ne changent pas une prévision en observation réelle."],
+      ["Correction de biais", "Ajustement prudent d’une prévision à partir d’un écart historique mesuré. La correction est atténuée à 70 % et ne s’applique que si le biais dépasse 0,1 °C pour la température, 0,2 mm pour la pluie ou 1 km/h pour le vent."],
+      ["Dispersion", "Amplitude des différences entre les modèles contributeurs. Elle rend visible le désaccord, mais ne désigne pas le bon modèle et ne remplace pas une vérification par observation physique."],
+      ["Source active ou en validation", "Un modèle actif peut contribuer à la fusion. Un modèle en validation est collecté et comparé séparément ; il reste hors fusion jusqu’à une décision explicite fondée sur des preuves qualifiées."],
+      ["Maille et microclimat", "Un modèle représente une zone de calcul, pas chaque rue ou jardin. Relief, urbanisation, littoral ou capteurs rares peuvent créer des écarts locaux. L’AI Lab signale cette limite plutôt que d’inventer un ajustement microclimatique non corroboré."],
+    ],
+  },
 ] as const;
 
 function AILabGlossary() {

@@ -2042,3 +2042,10 @@
 - [x] Méthode: Décrire les calculs réellement appliqués et les limites lorsque les données sont insuffisantes.
 - [x] Interface: Ajouter un panneau déroulant clair, accessible depuis l’AI Lab sur mobile.
 - [x] Validation: Tester le contenu, l’ouverture du panneau, TypeScript et le rendu mobile avant publication.
+
+## AI Lab — lexique avancé de fiabilité et de sources
+- [x] Contenu: Ajouter les horizons de prévision, MAE, RMSE, biais, taille d’échantillon et seuils de décision.
+- [x] Stations: Expliquer fraîcheur, distance, continuité, fiabilité et règles d’exclusion des relevés physiques.
+- [x] Méthode: Expliquer la correction de biais, la dispersion, les sources actives/validation et les limites de maillage ou microclimat.
+- [x] Interface: Organiser ces informations dans le panneau déroulant sans nuire à la lecture mobile.
+- [x] Validation: Tester le contenu, TypeScript et le rendu mobile avant publication.
