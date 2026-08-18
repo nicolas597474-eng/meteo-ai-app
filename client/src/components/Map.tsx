@@ -76,7 +76,7 @@
 
 /// <reference types="@types/google.maps" />
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { cn } from "@/lib/utils";
 
@@ -128,6 +128,7 @@ interface MapViewProps {
   zoomControl?: boolean;
   streetViewControl?: boolean;
   rotateControl?: boolean;
+  children?: ReactNode;
   onMapReady?: (map: google.maps.Map) => void;
   onFullscreenChange?: (isFullscreen: boolean, map: google.maps.Map | null) => void;
 }
@@ -142,6 +143,7 @@ export function MapView({
   zoomControl = true,
   streetViewControl = true,
   rotateControl = true,
+  children,
   onMapReady,
   onFullscreenChange,
 }: MapViewProps) {
@@ -189,6 +191,19 @@ export function MapView({
     return () => document.removeEventListener("fullscreenchange", reportFullscreen);
   }, [onFullscreenChange]);
 
+  useEffect(() => {
+    if (isLoading || !mapContainer.current || !map.current) return;
+    const resizeObserver = new ResizeObserver(() => {
+      const mapInstance = map.current;
+      if (!mapInstance || !window.google?.maps) return;
+      const currentCenter = mapInstance.getCenter();
+      window.google.maps.event.trigger(mapInstance, "resize");
+      if (currentCenter) mapInstance.setCenter(currentCenter);
+    });
+    resizeObserver.observe(mapContainer.current);
+    return () => resizeObserver.disconnect();
+  }, [isLoading]);
+
   if (loadError) {
     return (
       <div className={cn("flex h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-border bg-muted/30 p-6 text-center", className)} role="alert">
@@ -204,6 +219,7 @@ export function MapView({
     <div className={cn("relative h-[500px] w-full", className)}>
       {isLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Chargement de la carte…</div>}
       <div ref={mapContainer} className="h-full w-full" />
+      {children}
     </div>
   );
 }

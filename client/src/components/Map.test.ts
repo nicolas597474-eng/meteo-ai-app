@@ -15,5 +15,7 @@ describe("repli de cartographie", () => {
     expect(source).toContain("zoomControl?: boolean");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
+    expect(source).toContain("ResizeObserver");
+    expect(source).toContain('window.google.maps.event.trigger(mapInstance, "resize")');
   });
 });

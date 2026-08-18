@@ -2170,3 +2170,10 @@
 - [x] Accessibilité: Préserver le libellé de la position et respecter la réduction des mouvements.
 - [x] Erreurs: Conserver un message clair en cas de refus ou d’indisponibilité de la géolocalisation.
 - [x] Validation: Tester les états de localisation, TypeScript et le rendu mobile avant publication.
+
+## Carte astronomique — contrôles et zoom
+- [x] Interface compacte: Afficher des boutons iconographiques superposés pour agrandir la carte et demander la localisation.
+- [x] Vue agrandie: Réserver la commande Street View / direction à la carte ouverte en grand.
+- [x] Carte: Corriger le réagencement et la disponibilité du zoom après ouverture de la vue agrandie.
+- [x] Accessibilité: Ajouter des libellés explicites aux boutons iconographiques et préserver leurs états de chargement.
+- [x] Validation: Tester la carte compacte, la vue agrandie, le zoom, TypeScript et la suite de régression avant publication.
