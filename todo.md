@@ -1994,3 +1994,9 @@
 - [x] Interaction: Utiliser une sélection horaire unique lors du glissement de la courbe ou des cartes.
 - [x] Alignement: Centrer la carte correspondant exactement au point et à l’heure sélectionnés.
 - [x] Validation: Tester les glissements gauche/droite, les limites et le rendu mobile avant publication.
+
+## Prévisions détaillées — alignement géométrique de toutes les heures
+- [x] Diagnostic: Vérifier les largeurs, offsets et pas horaires de la courbe et des cartes.
+- [x] Interface: Utiliser la même origine et le même pas horaire pour placer chaque carte sous son repère de courbe.
+- [x] Interaction: Préserver le défilement synchronisé tout en gardant la carte active sous son point.
+- [x] Validation: Tester maintenant, les heures voisines, les extrémités et le rendu mobile avant publication.

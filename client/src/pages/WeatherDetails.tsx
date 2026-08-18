@@ -10,7 +10,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
-import { getHourScrollLeft, getNearestHourIndex } from "@/lib/hourlyScrollSync";
+import { getHourCenterX, getHourScrollLeft, getNearestHourIndex } from "@/lib/hourlyScrollSync";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -467,9 +467,10 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const chartScrollRef = useRef<HTMLDivElement>(null);
   const detailScrollRef = useRef<HTMLDivElement>(null);
   const chartH = 148;
-  const chartW = Math.max(720, hours.length * 68);
-  const chartHourStride = chartW / Math.max(hours.length - 1, 1);
+  const detailCardWidth = 174;
   const detailCardStride = 186;
+  const chartW = Math.max(720, hours.length * detailCardStride);
+  const chartHourStride = detailCardStride;
   const [selectedIdx, setSelectedIdx] = useState(currentIdx);
 
   const syncSelectedHour = (index: number, origin: "chart" | "detail" | "initial") => {
@@ -544,11 +545,11 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const chartTop = 36;
   const chartBottom = chartH - 8;
   const chartPlotHeight = chartBottom - chartTop;
-  const currentX = (currentIdx / Math.max(hours.length - 1, 1)) * chartW;
+  const currentX = getHourCenterX(currentIdx, chartHourStride, detailCardWidth, hours.length);
 
   const points = values.map((v, hourIndex) => {
     if (v == null) return null;
-    const x = (hourIndex / (hours.length - 1)) * chartW;
+    const x = getHourCenterX(hourIndex, chartHourStride, detailCardWidth, hours.length);
     const y = chartBottom - ((v - min) / range) * chartPlotHeight;
     return { x, y, v, hourIndex };
   }).filter(Boolean) as { x: number; y: number; v: number; hourIndex: number }[];
@@ -558,7 +559,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
 
   return (
     <div className="space-y-3">
-      <div ref={chartScrollRef} onScroll={syncDetailScroll} className="overflow-x-auto scrollbar-hide">
+      <div ref={chartScrollRef} onScroll={syncDetailScroll} className="-mx-3 overflow-x-auto px-3 scrollbar-hide">
         <svg width={chartW} height={chartH + 70} className="min-w-full">
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
@@ -567,7 +568,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
 
         {/* Repères pour chaque heure afin de relier précisément valeurs et courbe. */}
         {hours.map((_, i) => {
-          const x = (i / (hours.length - 1)) * chartW;
+          const x = getHourCenterX(i, chartHourStride, detailCardWidth, hours.length);
           return <line key={`hour-grid-${i}`} x1={x} x2={x} y1={chartTop} y2={chartBottom} stroke="#334155" strokeWidth="0.5" opacity="0.45" />;
         })}
         
@@ -589,7 +590,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
         
         {/* Chaque heure est libellée : le défilement horizontal conserve la lisibilité. */}
         {hours.map((h: any, i: number) => {
-          const x = (i / (hours.length - 1)) * chartW;
+          const x = getHourCenterX(i, chartHourStride, detailCardWidth, hours.length);
           return (
             <text key={i} x={x} y={chartH + 42} textAnchor="middle" fill={i === selectedIdx ? "#bfdbfe" : "#94a3b8"} fontSize={i === selectedIdx ? "13" : "12"} fontWeight={i === selectedIdx ? "700" : "500"}>{h.hour}</text>
           );

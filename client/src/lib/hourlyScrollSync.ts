@@ -10,3 +10,7 @@ export function getNearestHourIndex(scrollLeft: number, hourStride: number, hour
 export function getHourScrollLeft(hourIndex: number, hourStride: number, hourCount: number) {
   return clampHourIndex(hourIndex, hourCount) * Math.max(hourStride, 0);
 }
+
+export function getHourCenterX(hourIndex: number, hourStride: number, cardWidth: number, hourCount: number) {
+  return getHourScrollLeft(hourIndex, hourStride, hourCount) + Math.max(cardWidth, 0) / 2;
+}
