@@ -10,7 +10,7 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Modèle principal");
     expect(source).toContain("Régime de prévision dominant");
     expect(source).toContain("Le Dashboard indique séparément le phénomène immédiat");
-    expect(source).toContain("Lexique et méthode de calcul");
+    expect(source).toContain("Lexique, méthode et sources");
     expect(source).toContain("AI_LAB_GLOSSARY");
     expect(source).toContain("Confiance");
     expect(source).toContain("Stabilité des modèles");
@@ -22,6 +22,11 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Seuils de décision");
     expect(source).toContain("Correction de biais");
     expect(source).toContain("Maille et microclimat");
+    expect(source).toContain("Sources, provenance et cartes");
+    expect(source).toContain("Netatmo Weather API");
+    expect(source).toContain("Google Maps JavaScript API");
+    expect(source).toContain("Astronomy Engine");
+    expect(source).toContain("Visibilité d’éclipse");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {

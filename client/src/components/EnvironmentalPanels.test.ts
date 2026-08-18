@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
-const modernSunMoonSource = source.slice(source.indexOf("function SunMoonPanelAlwaysVisible"));
+const modernSunMoonSource = source.slice(source.lastIndexOf("function SunMoonPanelAlwaysVisible"));
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -17,6 +17,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Soleil & Lune");
     expect(source).toContain("Éphémérides locales du jour");
     expect(source).toContain("Éclairage");
+    expect(modernSunMoonSource).toContain("Hauteur actuelle");
+    expect(modernSunMoonSource).toContain("Open-Meteo (horaires, durée du jour, phase)");
+    expect(modernSunMoonSource).toContain("Astronomy Engine (hauteurs)");
+    expect(modernSunMoonSource).toContain("Lecture et limites");
     expect(source).toContain("Éphémérides réelles temporairement indisponibles");
     expect(source).toContain("Prochains repères astronomiques");
     expect(source).toContain("Prochaine pleine lune");
@@ -87,7 +91,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
-    expect(modernSunMoonSource).toContain("Les deux astres restent visibles et distincts sur l’arche des éphémérides.");
+    expect(modernSunMoonSource).toContain("Détails locaux des horaires, phases, hauteurs et limites d’observation.");
   });
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
@@ -109,8 +113,8 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("moonPosition");
     expect(modernSunMoonSource).toContain("meteoai-solar-disc-textured_d3eb7ecc.png");
     expect(modernSunMoonSource).toContain("celestial-realistic-sun");
-    expect(modernSunMoonSource).not.toContain("formatAltitude(astronomy.sunAltitudeDeg)");
-    expect(modernSunMoonSource).not.toContain("formatAltitude(astronomy.moonAltitudeDeg)");
+    expect(modernSunMoonSource).toContain("formatAltitude(astronomy.sunAltitudeDeg)");
+    expect(modernSunMoonSource).toContain("formatAltitude(astronomy.moonAltitudeDeg)");
     expect(modernSunMoonSource).toContain('MeteoIcon name="clear_night" size={40}');
     expect(modernSunMoonSource).toContain("isNightAtLocalMinutes");
     expect(modernSunMoonSource).toContain("celestial-night-marker");

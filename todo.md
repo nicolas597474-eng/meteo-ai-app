@@ -2242,3 +2242,9 @@
 - [x] Interaction: Appliquer une politique de geste unique et stable pour la carte compacte et agrandie.
 - [x] Carte: Empêcher les changements de niveau de zoom involontaires lors des changements de taille ou de contrôles.
 - [x] Validation: Tester les pincements rapides répétés sur mobile, TypeScript et la suite de régression avant publication.
+
+## AI Lab et Tableau de bord — sources et astronomie
+- [x] AI Lab: Ajouter au lexique une section détaillant les sources effectivement utilisées, leur rôle et leurs limites.
+- [x] Tableau de bord: Compléter le panneau Soleil & Lune avec les grandeurs, événements et limites disponibles.
+- [x] Transparence: Distinguer clairement calcul astronomique, données observées et contexte réel d’observation.
+- [x] Validation: Tester les contenus, la lisibilité mobile, TypeScript et la suite de régression avant publication.
