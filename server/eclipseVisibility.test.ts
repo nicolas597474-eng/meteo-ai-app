@@ -4,7 +4,7 @@ import { getEclipseVisibilityLayers } from "./eclipseVisibility";
 describe("eclipse visibility layers", () => {
   const layers = getEclipseVisibilityLayers([
     { id: "lunar_partial_2026_08_28", title: "Éclipse lunaire partielle", date: "2026-08-28" },
-    { id: "solar_partial_2027_08_02", title: "Éclipse solaire partielle", date: "2027-08-02" },
+    { id: "solar_partial_2027_08_02", title: "Éclipse solaire totale", date: "2027-08-02" },
   ]);
 
   it("exposes a calculated lunar visibility grid", () => {

@@ -2140,3 +2140,7 @@
 - [x] Local: Conserver le lieu actif, la météo disponible et l’horizon comme contexte séparé de la géométrie de l’éclipse.
 - [x] Transparence: Afficher la source, l’horodatage, la précision et les limites de chaque couche.
 - [x] Validation: Tester les coordonnées, les zones, la carte interactive et le rendu mobile avant publication.
+
+## Éclipse solaire 2027 — libellé global et visibilité française
+- [x] Données: Nommer l’événement comme une éclipse solaire totale avec visibilité partielle depuis la France.
+- [x] Validation: Vérifier les alertes et les zones de carte après correction du libellé.

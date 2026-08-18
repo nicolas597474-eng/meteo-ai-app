@@ -82,7 +82,7 @@ const ECLIPSES: Omit<EclipseAlert, "skyOutlook">[] = [
   },
   {
     id: "solar_partial_2027_08_02",
-    title: "Éclipse solaire partielle",
+    title: "Éclipse solaire totale",
     date: "2027-08-02",
     visibility: "Partielle depuis la France",
     safetyNote: "Observation directe uniquement avec des lunettes d’éclipse homologuées.",
