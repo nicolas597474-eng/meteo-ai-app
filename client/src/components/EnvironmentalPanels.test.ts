@@ -28,6 +28,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("météores/h au zénith dans des conditions idéales");
     expect(source).toContain("Carte locale d’observation");
     expect(source).toContain("Il ne représente pas la bande géométrique d’une éclipse");
+    expect(source).toContain("Zones de visibilité d’éclipse");
+    expect(source).toContain("Bande centrale NASA");
+    expect(source).toContain("eclipseMapLayers");
     expect(source).toContain("data-swipe-exclude");
     expect(source).toContain("🌕 Prochaine pleine lune");
     expect(source).toContain("Icône d’éclipse");

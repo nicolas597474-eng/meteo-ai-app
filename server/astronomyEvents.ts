@@ -1,3 +1,5 @@
+import { getEclipseVisibilityLayers, type EclipseMapLayer } from "./eclipseVisibility";
+
 export type MoonMilestone = {
   id: "new_moon" | "first_quarter" | "full_moon" | "last_quarter";
   label: string;
@@ -37,6 +39,7 @@ export type AstronomyOutlook = {
   nextSolarMilestone: SolarMilestone | null;
   daylightChangeTomorrowSeconds: number | null;
   upcomingEclipses: EclipseAlert[];
+  eclipseMapLayers: EclipseMapLayer[];
   upcomingMeteorShowers: MeteorShowerAlert[];
 };
 
@@ -228,5 +231,6 @@ export function buildAstronomyOutlook(input: {
           : null,
       };
     });
-  return { moonMilestones, nextSolarMilestone, daylightChangeTomorrowSeconds, upcomingEclipses, upcomingMeteorShowers };
+  const eclipseMapLayers = getEclipseVisibilityLayers(upcomingEclipses);
+  return { moonMilestones, nextSolarMilestone, daylightChangeTomorrowSeconds, upcomingEclipses, eclipseMapLayers, upcomingMeteorShowers };
 }

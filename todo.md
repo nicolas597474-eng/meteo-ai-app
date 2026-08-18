@@ -2121,3 +2121,22 @@
 - [x] Interface: Agrandir légèrement les descriptions, sources et indications de visibilité.
 - [x] Hiérarchie: Conserver les titres principaux visuellement prioritaires sur mobile.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Éclipses — compatibilité Timeanddate et carte locale
+- [x] Données: Vérifier le périmètre, la disponibilité et les limites de réutilisation des informations Timeanddate.
+- [x] Carte: Comparer ces informations à la carte locale existante et à sa représentation actuelle du rayon de 25 km.
+- [x] Transparence: Déterminer ce qui peut être affiché sans présenter le contexte local comme une bande officielle d’éclipse.
+- [x] Rapport: Documenter la recommandation sans modifier la carte sans accord explicite.
+
+## Éclipses — carte officielle de trajectoire ou visibilité
+- [x] Sources: Comparer les données ouvertes officielles, les API sous licence et les calculs géométriques indépendants.
+- [x] Précision: Définir les couches de visibilité, de pénombre/ombre et les données locales complémentaires.
+- [x] Conformité: Déterminer les droits de réutilisation, l’attribution et la méthode de mise à jour.
+- [x] Recommandation: Proposer une architecture sans modifier la carte sans accord explicite.
+
+## Éclipses — zones de visibilité sur la carte interactive
+- [x] Données: Construire des zones traçables de visibilité solaire et lunaire à partir de sources officielles ou de calculs vérifiables.
+- [x] Carte: Afficher les couches, limites et légendes avec un style distinct par type d’éclipse.
+- [x] Local: Conserver le lieu actif, la météo disponible et l’horizon comme contexte séparé de la géométrie de l’éclipse.
+- [x] Transparence: Afficher la source, l’horodatage, la précision et les limites de chaque couche.
+- [x] Validation: Tester les coordonnées, les zones, la carte interactive et le rendu mobile avant publication.
