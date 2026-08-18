@@ -266,7 +266,31 @@ export type HourlyPoint = {
   tempSpread?: number | null;    // Max - Min across models (°C)
   precipAgreement?: number | null; // % de modèles comparés prévoyant de la pluie
   modelCount?: number;           // Number of models contributing
+  temperatureComparison?: {
+    lower: { name: string; temperature: number };
+    higher: { name: string; temperature: number };
+    rationale: string;
+  } | null;
 };
+
+export function buildHourlyTemperatureComparison(bestTemp: number | null, aromeTemp: number | null) {
+  if (bestTemp == null || aromeTemp == null) return null;
+  const compared = [
+    {
+      name: "Open-Meteo Best Match",
+      temperature: bestTemp,
+    },
+    {
+      name: "AROME",
+      temperature: aromeTemp,
+    },
+  ].sort((left, right) => left.temperature - right.temperature);
+  return {
+    lower: compared[0],
+    higher: compared[1],
+    rationale: "Ces deux contributeurs horaires sont les seules valeurs effectivement reçues par la collecte live pour mesurer l’écart thermique. Cette comparaison n’est pas un classement de fiabilité.",
+  };
+}
 
 /** Une direction est circulaire : 350° et 10° sont proches du nord, pas du sud. */
 export function circularMeanDegrees(values: readonly number[]): number | null {
@@ -462,6 +486,7 @@ export async function collectHourlyForecast(
       const tempSpread = (bestTemp != null && aromeTemp != null)
         ? Math.abs(bestTemp - aromeTemp)
         : null;
+      const temperatureComparison = buildHourlyTemperatureComparison(bestTemp, aromeTemp);
       // Accord de détection de pluie entre les deux modèles réellement comparés.
       // Ce n'est pas une probabilité calibrée ni une probabilité d'ensemble.
       const bestRain = (precip ?? 0) >= 0.1;
@@ -508,6 +533,7 @@ export async function collectHourlyForecast(
         tempSpread,
         precipAgreement,
         modelCount,
+        temperatureComparison,
       });
     }
 

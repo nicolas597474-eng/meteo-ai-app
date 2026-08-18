@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, Gauge, Eye } from "lucide-react";
+import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, Gauge, Eye, ChevronDown } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
@@ -31,6 +31,11 @@ export interface HourData {
   tempSpread?: number | null;
   precipAgreement?: number | null;
   modelCount?: number;
+  temperatureComparison?: {
+    lower: { name: string; temperature: number };
+    higher: { name: string; temperature: number };
+    rationale: string;
+  } | null;
 }
 
 interface Props {
@@ -120,6 +125,8 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
   const hasSpread = hour.tempSpread != null && hour.tempSpread > 0;
   const hasPrecipAgreement = hour.precipAgreement != null;
   const hasGust = hour.windGust != null && hour.windGust > 0;
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const temperatureComparison = hour.temperatureComparison ?? null;
 
   // Confidence from spread: low spread = high confidence
   const spreadConfidence = hasSpread
@@ -150,19 +157,36 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
 
         {/* Multi-model confidence banner */}
         {(hasSpread || hasPrecipAgreement) && (
-          <div className="mb-3 bg-slate-700/40 border border-slate-600/30 rounded-xl px-3 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">🤖 {hour.modelCount ?? 2} modèles</span>
-              {hasSpread && (
-                <span className="text-xs text-slate-400">
-                  · Écart T: <span className={`font-mono font-bold ${(hour.tempSpread! < 0.5) ? 'text-green-400' : (hour.tempSpread! < 1.5) ? 'text-yellow-400' : 'text-orange-400'}`}>
-                    ±{hour.tempSpread!.toFixed(1)}°C
+          <div className="mb-3 rounded-xl border border-slate-600/30 bg-slate-700/40">
+            <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="text-xs text-slate-400">🤖 {hour.modelCount ?? 2} modèles</span>
+                {hasSpread && (
+                  <span className="text-xs text-slate-400">
+                    · Écart T: <span className={`font-mono font-bold ${(hour.tempSpread! < 0.5) ? 'text-green-400' : (hour.tempSpread! < 1.5) ? 'text-yellow-400' : 'text-orange-400'}`}>
+                      ±{hour.tempSpread!.toFixed(1)}°C
+                    </span>
                   </span>
-                </span>
-              )}
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {spreadConfidence != null && <span className={`text-xs font-bold ${confidenceColor}`}>{spreadConfidence}% conf.</span>}
+                {temperatureComparison && (
+                  <button type="button" onClick={() => setComparisonOpen((open) => !open)} aria-expanded={comparisonOpen} aria-label={comparisonOpen ? "Masquer les modèles comparés" : "Afficher les modèles comparés"} className="grid h-7 w-7 place-items-center rounded-lg border border-slate-500/40 bg-slate-900/35 text-slate-200 active:scale-95">
+                    <ChevronDown className={`h-4 w-4 transition-transform ${comparisonOpen ? "rotate-180" : ""}`} />
+                  </button>
+                )}
+              </div>
             </div>
-            {spreadConfidence != null && (
-              <span className={`text-xs font-bold ${confidenceColor}`}>{spreadConfidence}% conf.</span>
+            {temperatureComparison && comparisonOpen && (
+              <div className="border-t border-slate-600/30 px-3 pb-3 pt-2.5 text-[11px]">
+                <p className="font-semibold text-slate-100">Modèles comparés pour l’écart de température</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-sky-400/20 bg-sky-400/5 px-2.5 py-2"><p className="text-[9px] uppercase tracking-wide text-sky-200/75">Plus bas</p><p className="mt-1 font-semibold text-slate-100">{temperatureComparison.lower.name}</p><p className="text-sky-200">{temperatureComparison.lower.temperature.toFixed(1)}°C</p></div>
+                  <div className="rounded-lg border border-orange-400/20 bg-orange-400/5 px-2.5 py-2"><p className="text-[9px] uppercase tracking-wide text-orange-200/75">Plus haut</p><p className="mt-1 font-semibold text-slate-100">{temperatureComparison.higher.name}</p><p className="text-orange-200">{temperatureComparison.higher.temperature.toFixed(1)}°C</p></div>
+                </div>
+                <p className="mt-2 leading-relaxed text-slate-400">{temperatureComparison.rationale}</p>
+              </div>
             )}
           </div>
         )}

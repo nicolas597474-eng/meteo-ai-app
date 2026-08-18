@@ -2006,3 +2006,9 @@
 - [x] Interface: Recentrer automatiquement l’heure sélectionnée dans les deux vues.
 - [x] Limites: Respecter le premier et le dernier créneau sans défilement impossible.
 - [x] Validation: Tester le calage après glissement, la synchronisation et le rendu mobile avant publication.
+
+## Prévisions horaires — détail des modèles à l’origine de l’écart
+- [x] Données: Identifier les modèles min/max qui déterminent l’écart thermique réellement affiché.
+- [x] Interface: Ajouter un panneau déroulant sous la synthèse d’écart avec une flèche explicite.
+- [x] Explication: Décrire factuellement le rôle de chaque modèle et l’écart calculé sans inventer de performance.
+- [x] Validation: Tester les états avec deux modèles, un modèle ou aucune comparaison avant publication.
