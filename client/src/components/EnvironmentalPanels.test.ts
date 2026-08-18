@@ -31,6 +31,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Zones de visibilité d’éclipse");
     expect(source).toContain("Bande centrale NASA");
     expect(source).toContain("eclipseMapLayers");
+    expect(source).toContain("Agrandir la carte");
+    expect(source).toContain("Carte de visibilité d’éclipse");
+    expect(source).toContain("map.setOptions({ fullscreenControl: false })");
     expect(source).toContain("data-swipe-exclude");
     expect(source).toContain("🌕 Prochaine pleine lune");
     expect(source).toContain("Icône d’éclipse");

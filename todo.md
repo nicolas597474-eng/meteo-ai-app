@@ -2144,3 +2144,9 @@
 ## Éclipse solaire 2027 — libellé global et visibilité française
 - [x] Données: Nommer l’événement comme une éclipse solaire totale avec visibilité partielle depuis la France.
 - [x] Validation: Vérifier les alertes et les zones de carte après correction du libellé.
+
+## Carte astronomique — agrandissement intégré
+- [x] Interface: Retirer le contrôle déplacé de la carte de visibilité.
+- [x] Interaction: Ajouter un bouton explicite pour ouvrir une vue agrandie de la carte.
+- [x] Carte: Préserver les couches, la légende et les contrôles de zoom dans la vue agrandie.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
