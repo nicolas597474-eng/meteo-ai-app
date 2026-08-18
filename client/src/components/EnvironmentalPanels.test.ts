@@ -57,6 +57,11 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("fenêtre calculée d’observabilité");
     expect(source).toContain("Calcul astronomique : vérifiez l’horizon, les nuages");
     expect(source).toContain("Ma position actuelle");
+    expect(source).toContain("soundAlertEnabled");
+    expect(source).toContain("Activer l’alerte sonore");
+    expect(source).toContain("observationAlertFiredRef");
+    expect(source).toContain("map-control-cluster");
+    expect(styles).toContain("Groupes de commandes flottantes");
     expect(source).toContain("data-swipe-exclude");
     expect(source).toContain("🌕 Prochaine pleine lune");
     expect(source).toContain("Icône d’éclipse");

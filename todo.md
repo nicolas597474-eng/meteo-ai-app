@@ -2196,3 +2196,10 @@
 - [x] Interface: Afficher une notification visuelle claire lorsque l’astre devient observable depuis cette position.
 - [x] Transparence: Distinguer le calcul astronomique des limites réelles d’horizon, de nuages et de sécurité solaire.
 - [x] Validation: Tester les états observable, non observable et sans position autorisée avant publication.
+
+## Carte astronomique — alerte sonore et contrôles sans chevauchement
+- [x] Interaction: Ajouter une activation volontaire et réversible d’une alerte sonore discrète.
+- [x] Alerte: Jouer le son une seule fois lors du passage à l’état observable, sans lecture automatique non sollicitée.
+- [x] Carte: Séparer les contrôles personnalisés des commandes Google Maps sur mobile et grand écran.
+- [x] Interface: Définir une règle commune d’espacement et de superposition sûre pour les groupes de commandes de l’application.
+- [x] Validation: Tester le son optionnel, les contrôles de carte, les formats mobile/desktop, TypeScript et la suite de régression.

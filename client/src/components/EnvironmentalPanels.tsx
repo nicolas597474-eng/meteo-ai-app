@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Compass, LocateFixed, Maximize2, Navigation, RotateCcw } from "lucide-react";
+import { Compass, LocateFixed, Maximize2, Navigation, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { MapView } from "@/components/Map";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -168,11 +168,14 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const [isLocating, setIsLocating] = useState(false);
   const [expandedHeading, setExpandedHeading] = useState(0);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
+  const [soundAlertEnabled, setSoundAlertEnabled] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const compactMapRef = useRef<google.maps.Map | null>(null);
   const expandedMapRef = useRef<google.maps.Map | null>(null);
   const expandedInitialBoundsRef = useRef<google.maps.LatLngBounds | null>(null);
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const soundContextRef = useRef<AudioContext | null>(null);
+  const observationAlertFiredRef = useRef(false);
   const selectedLayer = layers.find((layer) => layer.eventId === selectedLayerId) ?? layers[0];
   if (!selectedLayer) return null;
   const center = astronomy.coordinates;
@@ -205,7 +208,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     mapRef.current = map;
     if (isExpanded) expandedMapRef.current = map;
     else compactMapRef.current = map;
-    map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, gestureHandling: isExpanded ? "greedy" : "cooperative" });
+    map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, gestureHandling: isExpanded ? "greedy" : "cooperative", mapTypeControlOptions: isExpanded ? { position: google.maps.ControlPosition.TOP_RIGHT } : undefined, zoomControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined, streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined });
     if (isExpanded) map.addListener("heading_changed", () => setExpandedHeading(map.getHeading() ?? 0));
     const localPosition = { lat: center.lat, lng: center.lon };
     new google.maps.marker.AdvancedMarkerElement({ map, position: localPosition, title: "Lieu actif" });
@@ -268,6 +271,43 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const isAstronomicalWindowOpen = observationWindowStart != null && observationWindowEnd != null && currentTimestamp >= observationWindowStart && currentTimestamp <= observationWindowEnd;
   const isAstroObservableNow = isUsingAuthorizedPosition && circumstances?.visibility !== "not_visible" && circumstances?.altitudeDegrees != null && circumstances.altitudeDegrees > 0 && isAstronomicalWindowOpen;
   const observationNotice = isAstroObservableNow ? `${selectedLayer.type === "solar" ? "Le Soleil" : "La Lune"} est dans sa fenêtre calculée d’observabilité depuis votre position.` : null;
+  const toggleSoundAlert = () => {
+    if (soundAlertEnabled) {
+      setSoundAlertEnabled(false);
+      observationAlertFiredRef.current = false;
+      return;
+    }
+    if (typeof AudioContext === "undefined") {
+      setLocationStatus("L’alerte sonore n’est pas prise en charge par ce navigateur.");
+      return;
+    }
+    const context = soundContextRef.current ?? new AudioContext();
+    soundContextRef.current = context;
+    void context.resume();
+    observationAlertFiredRef.current = false;
+    setSoundAlertEnabled(true);
+  };
+  useEffect(() => () => { void soundContextRef.current?.close(); }, []);
+  useEffect(() => {
+    if (!isAstroObservableNow) {
+      observationAlertFiredRef.current = false;
+      return;
+    }
+    if (!soundAlertEnabled || observationAlertFiredRef.current || !soundContextRef.current) return;
+    const context = soundContextRef.current;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(660, context.currentTime);
+    oscillator.frequency.linearRampToValueAtTime(880, context.currentTime + 0.18);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.025, context.currentTime + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.34);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.36);
+    observationAlertFiredRef.current = true;
+  }, [isAstroObservableNow, soundAlertEnabled]);
   const recenterExpandedMap = () => {
     const map = expandedMapRef.current;
     const bounds = expandedInitialBoundsRef.current;
@@ -280,8 +320,8 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const mapContent = (suffix: string, height: string, isExpanded = false) => (
     <MapView key={`${selectedLayer.eventId}-${suffix}`} className={height} initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId="terrain" mapTypeControl={isExpanded} fullscreenControl={false} zoomControl streetViewControl={isExpanded} rotateControl={isExpanded} onMapReady={(map) => onMapReady(map, isExpanded)}>
       {!isExpanded && <div className="absolute right-3 top-3 z-20 flex flex-col gap-2" data-swipe-exclude><button type="button" onClick={() => setIsMapExpanded(true)} aria-label="Agrandir la carte" title="Agrandir la carte" className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 text-slate-700 shadow-md transition-transform active:scale-95"><Maximize2 size={21} strokeWidth={2.6} aria-hidden="true" /></button><button type="button" onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Me localiser"} title={isLocating ? "Localisation en cours" : "Me localiser"} aria-busy={isLocating} className="flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/80 bg-white/95 text-sky-700 shadow-md transition-transform active:scale-95 disabled:cursor-wait disabled:opacity-70"><LocateFixed size={21} strokeWidth={2.5} aria-hidden="true" /></button></div>}
-      {isExpanded && <div className="absolute left-3 top-3 z-20 flex items-start gap-2" data-swipe-exclude><div className="relative flex h-[58px] w-[58px] items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-700 shadow-md" role="img" aria-label={`Boussole, nord géographique. Orientation ${Math.round(expandedHeading)} degrés. ${astronomicalAzimuthLabel}.`}><span className="absolute top-0.5 text-[9px] font-black text-rose-600">N</span><Compass size={29} strokeWidth={2.25} aria-hidden="true" style={{ transform: `rotate(${-expandedHeading}deg)` }} />{astronomicalAzimuth != null && <Navigation className="absolute text-amber-600" size={16} fill="currentColor" aria-hidden="true" style={{ transform: `rotate(${astronomicalAzimuth - expandedHeading}deg) translateY(-11px)` }} />}<span className="absolute bottom-1 rounded bg-slate-800/90 px-1 py-px text-[8px] font-bold leading-none text-white">{astronomicalAzimuth == null ? "Az. —" : `${astronomicalAzimuth}° ${astronomicalDirection ?? ""}`}</span></div><button type="button" onClick={recenterExpandedMap} aria-label="Recentrer sur la zone initiale de l’éclipse" title="Recentrer sur la zone initiale" className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-700 shadow-md transition-transform active:scale-95"><RotateCcw size={21} strokeWidth={2.5} aria-hidden="true" /></button></div>}
-      {observationNotice && <div className="absolute inset-x-3 bottom-3 z-20 flex items-start gap-2 rounded-xl border border-emerald-200/80 bg-emerald-950/95 px-3 py-2 text-emerald-50 shadow-lg" role="alert"><Navigation size={16} className="mt-0.5 shrink-0 text-emerald-300" aria-hidden="true" /><p className="text-[10px] font-semibold leading-snug">{observationNotice}<span className="mt-0.5 block text-[9px] font-normal text-emerald-100/80">Calcul astronomique : vérifiez l’horizon, les nuages et, pour le Soleil, utilisez une protection adaptée.</span></p></div>}
+      {isExpanded && <div className="map-control-cluster absolute left-3 top-3 z-20" data-swipe-exclude><div className="relative flex h-[58px] w-[58px] items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-700 shadow-md" role="img" aria-label={`Boussole, nord géographique. Orientation ${Math.round(expandedHeading)} degrés. ${astronomicalAzimuthLabel}.`}><span className="absolute top-0.5 text-[9px] font-black text-rose-600">N</span><Compass size={29} strokeWidth={2.25} aria-hidden="true" style={{ transform: `rotate(${-expandedHeading}deg)` }} />{astronomicalAzimuth != null && <Navigation className="absolute text-amber-600" size={16} fill="currentColor" aria-hidden="true" style={{ transform: `rotate(${astronomicalAzimuth - expandedHeading}deg) translateY(-11px)` }} />}<span className="absolute bottom-1 rounded bg-slate-800/90 px-1 py-px text-[8px] font-bold leading-none text-white">{astronomicalAzimuth == null ? "Az. —" : `${astronomicalAzimuth}° ${astronomicalDirection ?? ""}`}</span></div><div className="map-control-cluster__actions"><button type="button" onClick={recenterExpandedMap} aria-label="Recentrer sur la zone initiale de l’éclipse" title="Recentrer sur la zone initiale" className="map-control-button"><RotateCcw size={21} strokeWidth={2.5} aria-hidden="true" /></button><button type="button" onClick={toggleSoundAlert} aria-label={soundAlertEnabled ? "Désactiver l’alerte sonore" : "Activer l’alerte sonore"} title={soundAlertEnabled ? "Alerte sonore active" : "Activer l’alerte sonore"} aria-pressed={soundAlertEnabled} className={`map-control-button ${soundAlertEnabled ? "map-control-button--active" : ""}`}>{soundAlertEnabled ? <Volume2 size={20} strokeWidth={2.5} aria-hidden="true" /> : <VolumeX size={20} strokeWidth={2.5} aria-hidden="true" />}</button></div></div>}
+      {observationNotice && <div className="map-observability-notice absolute inset-x-3 bottom-3 z-20 flex items-start gap-2 rounded-xl border border-emerald-200/80 bg-emerald-950/95 px-3 py-2 text-emerald-50 shadow-lg" role="alert"><Navigation size={16} className="mt-0.5 shrink-0 text-emerald-300" aria-hidden="true" /><p className="text-[10px] font-semibold leading-snug">{observationNotice}<span className="mt-0.5 block text-[9px] font-normal text-emerald-100/80">Calcul astronomique : vérifiez l’horizon, les nuages et, pour le Soleil, utilisez une protection adaptée.</span></p></div>}
     </MapView>
   );
 

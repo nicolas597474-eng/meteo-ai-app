@@ -602,3 +602,58 @@ img.moon-3d-first-crescent {
     transform: scale(0.82);
   }
 }
+
+/* Groupes de commandes flottantes : chaque commande conserve sa propre zone tactile. */
+.map-control-cluster {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  max-width: calc(100% - 1.5rem);
+  pointer-events: none;
+}
+
+.map-control-cluster > *,
+.map-control-cluster__actions > * {
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+
+.map-control-cluster__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.map-control-button {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(226 232 240 / 0.9);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.95);
+  color: #334155;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.22);
+}
+
+.map-control-button--active {
+  border-color: rgb(56 189 248 / 0.95);
+  background: rgb(7 89 133 / 0.94);
+  color: #e0f2fe;
+}
+
+.map-observability-notice {
+  max-width: min(32rem, calc(100% - 1.5rem));
+}
+
+@media (max-width: 420px) {
+  .map-control-cluster {
+    gap: 0.5rem;
+  }
+
+  .map-control-button {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
