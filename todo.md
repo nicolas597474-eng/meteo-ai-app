@@ -2069,3 +2069,9 @@
 - [x] Nettoyage: Retirer la pastille de date indépendante au-dessus du panneau.
 - [x] Lisibilité: Préserver la hiérarchie du régime, de la condition et des indicateurs associés.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Dashboard — date agrandie en tête du régime
+- [x] Interface: Placer la date au-dessus du libellé Régime de prévision dominant.
+- [x] Typographie: Agrandir la date tout en conservant la lisibilité mobile.
+- [x] Cohérence: Garder la date dans le panneau de régime, sans réintroduire de pastille externe.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

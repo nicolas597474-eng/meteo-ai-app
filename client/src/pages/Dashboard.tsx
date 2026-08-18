@@ -487,6 +487,12 @@ export default function Dashboard() {
             {/* ── Regime badge ── */}
             {regime && (
               <div className="mb-1 rounded-xl border border-slate-600/50 bg-slate-800/60 px-2.5 py-1 sm:mb-2 sm:px-3 sm:py-1.5">
+                <div className="mb-1 flex justify-center sm:mb-1.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/45 bg-slate-950/50 px-2.5 py-1 text-sm font-bold text-slate-50 sm:px-3 sm:text-base">
+                    <CalendarDays className="h-4 w-4 text-sky-300 sm:h-4.5 sm:w-4.5" aria-hidden="true" />
+                    {panelDate}
+                  </span>
+                </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
@@ -497,13 +503,7 @@ export default function Dashboard() {
                   >
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-950/35 text-sm sm:h-7 sm:w-7 sm:text-base">{regime.emoji}</span>
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                        <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">Régime de prévision dominant</p>
-                        <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-sky-100/90 sm:text-[9px]">
-                          <CalendarDays className="h-3 w-3 text-sky-200/80" aria-hidden="true" />
-                          {panelDate}
-                        </span>
-                      </div>
+                      <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">Régime de prévision dominant</p>
                       <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
                       <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>
