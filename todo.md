@@ -2248,3 +2248,9 @@
 - [x] Tableau de bord: Compléter le panneau Soleil & Lune avec les grandeurs, événements et limites disponibles.
 - [x] Transparence: Distinguer clairement calcul astronomique, données observées et contexte réel d’observation.
 - [x] Validation: Tester les contenus, la lisibilité mobile, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — transition douce de zoom
+- [x] Interaction: Animer avec fluidité les zooms déclenchés par les commandes de carte.
+- [x] Tactile: Préserver le pincement natif sans ajouter d’animation concurrente ni de redimensionnement parasite.
+- [x] Accessibilité: Respecter la préférence de réduction des mouvements.
+- [x] Validation: Tester les commandes, le pincement, TypeScript et la suite de régression avant publication.

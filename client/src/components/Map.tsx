@@ -129,6 +129,7 @@ interface MapViewProps {
   streetViewControl?: boolean;
   rotateControl?: boolean;
   cameraControl?: boolean;
+  isFractionalZoomEnabled?: boolean;
   children?: ReactNode;
   onMapReady?: (map: google.maps.Map) => void;
   onFullscreenChange?: (isFullscreen: boolean, map: google.maps.Map | null) => void;
@@ -145,6 +146,7 @@ export function MapView({
   streetViewControl = true,
   rotateControl = true,
   cameraControl = false,
+  isFractionalZoomEnabled = true,
   children,
   onMapReady,
   onFullscreenChange,
@@ -164,6 +166,7 @@ export function MapView({
       if (!mapContainer.current || !window.google?.maps) {
         throw new Error("La carte ne peut pas être initialisée.");
       }
+      const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
       map.current = new window.google.maps.Map(mapContainer.current, {
         zoom: initialZoom,
         center: initialCenter,
@@ -174,6 +177,7 @@ export function MapView({
         streetViewControl,
         rotateControl,
         cameraControl,
+        isFractionalZoomEnabled: isFractionalZoomEnabled && !prefersReducedMotion,
         mapId: "DEMO_MAP_ID",
       });
       onMapReady?.(map.current);
@@ -221,7 +225,7 @@ export function MapView({
   return (
     <div className={cn("relative h-[500px] w-full", className)}>
       {isLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Chargement de la carte…</div>}
-      <div ref={mapContainer} className="h-full w-full touch-none" onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
+      <div ref={mapContainer} className="h-full w-full touch-none [will-change:transform]" onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
       {children}
     </div>
   );

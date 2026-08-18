@@ -15,6 +15,10 @@ describe("repli de cartographie", () => {
     expect(source).toContain("zoomControl?: boolean");
     expect(source).toContain("cameraControl?: boolean");
     expect(source).toContain("cameraControl = false");
+    expect(source).toContain("isFractionalZoomEnabled?: boolean");
+    expect(source).toContain("isFractionalZoomEnabled = true");
+    expect(source).toContain("isFractionalZoomEnabled: isFractionalZoomEnabled && !prefersReducedMotion");
+    expect(source).toContain("prefers-reduced-motion: reduce");
     expect(source).toContain("touchGestureActive");
     expect(source).toContain("touch-none");
     expect(source).toContain("touchGestureActive.current");
