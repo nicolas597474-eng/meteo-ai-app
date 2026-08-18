@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { MeteoIcon } from "@/components/MeteoIcon";
+import { MapView } from "@/components/Map";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { isNightAtLocalMinutes } from "@/lib/celestialNight";
 
@@ -39,9 +40,21 @@ type EnvironmentalData = {
         safetyNote: string | null;
         sourceLabel: string;
         sourceUrl: string;
-        skyOutlook: { cloudCoverMean: number; label: string } | null;
+        skyOutlook: { cloudCoverMean: number; label: string; moonIllumination: number | null } | null;
+      }>;
+      upcomingMeteorShowers: Array<{
+        id: string;
+        title: string;
+        date: string;
+        activeRange: string;
+        zhr: number;
+        observationNote: string;
+        sourceLabel: string;
+        sourceUrl: string;
+        skyOutlook: { cloudCoverMean: number; label: string; moonIllumination: number | null } | null;
       }>;
     };
+    coordinates: { lat: number; lon: number };
   } | null;
   source: string;
 };
@@ -104,6 +117,27 @@ function Metric({ label, value, unit }: { label: string; value: number | null; u
 function PollutantDetail({ label, value, description }: { label: string; value: number | null; description: string }) { return <div className="rounded-xl border border-slate-700/70 bg-slate-950/45 p-3"><p className="text-[10px] font-semibold text-slate-200">{label}</p><p className="mt-1 text-lg font-light text-white">{value == null ? "—" : value.toFixed(0)} <span className="text-[10px] text-slate-500">µg/m³</span></p><p className="mt-2 text-[10px] leading-relaxed text-slate-500">{description}</p></div>; }
 function AstronomyDetail({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-slate-700/70 bg-slate-950/45 p-3"><p className="text-[10px] text-slate-500">{label}</p><p className="mt-1 text-sm font-semibold text-slate-100">{value}</p></div>; }
 
+function AstronomyVisibilityMap({ astronomy, eventTitle, eventKind }: { astronomy: NonNullable<EnvironmentalData["astronomy"]>; eventTitle: string; eventKind: "eclipse" | "meteor" }) {
+  const center = astronomy.coordinates;
+  const accent = eventKind === "eclipse" ? "#7dd3fc" : "#c084fc";
+  const onMapReady = (map: google.maps.Map) => {
+    const position = { lat: center.lat, lng: center.lon };
+    new google.maps.marker.AdvancedMarkerElement({ map, position, title: "Lieu actif" });
+    new google.maps.Circle({
+      map,
+      center: position,
+      radius: 25_000,
+      strokeColor: accent,
+      strokeOpacity: 0.85,
+      strokeWeight: 2,
+      fillColor: accent,
+      fillOpacity: 0.12,
+      clickable: false,
+    });
+  };
+  return <div className="mt-3 overflow-hidden rounded-xl border border-slate-600/50 bg-slate-950/40"><div className="flex items-start justify-between gap-3 px-3 py-2.5"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Carte locale d’observation</p><p className="mt-1 text-xs font-semibold text-slate-100">{eventTitle}</p></div><span className="rounded-full border border-slate-500/50 px-2 py-1 text-[9px] text-slate-300">Rayon 25 km</span></div><div data-swipe-exclude><MapView className="h-[190px]" initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={9} mapTypeId="terrain" mapTypeControl={false} fullscreenControl={false} zoomControl={true} streetViewControl={false} rotateControl={false} onMapReady={onMapReady} /></div><p className="border-t border-slate-700/60 px-3 py-2 text-[9px] leading-relaxed text-slate-400">Le cercle situe le lieu actif et son contexte d’observation. Il ne représente pas la bande géométrique d’une éclipse ; la visibilité dépend aussi de l’horizon, de la météo et de la luminosité locale.</p></div>;
+}
+
 function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["astronomy"] }) {
   const outlook = astronomy?.outlook;
   if (!astronomy || !outlook) return null;
@@ -111,6 +145,7 @@ function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["as
   const newMoon = outlook.moonMilestones.find((milestone) => milestone.id === "new_moon") ?? null;
   const quarterMilestones = outlook.moonMilestones.filter((milestone) => milestone.id === "first_quarter" || milestone.id === "last_quarter");
   const primaryEclipse = outlook.upcomingEclipses[0] ?? null;
+  const primaryMeteorShower = outlook.upcomingMeteorShowers[0] ?? null;
   const daylightTrend = outlook.daylightChangeTomorrowSeconds == null
     ? "Variation demain indisponible"
     : outlook.daylightChangeTomorrowSeconds === 0
@@ -127,6 +162,9 @@ function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["as
     <div className="mt-2 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2.5"><p className="text-[10px] font-semibold uppercase tracking-wide text-amber-100">Soleil</p><p className="mt-1 text-xs font-semibold text-slate-100">{outlook.nextSolarMilestone ? `${outlook.nextSolarMilestone.label} · ${displayAstronomyDate(outlook.nextSolarMilestone.date)}` : "Prochain jalon solaire indisponible"}</p><p className="mt-1 text-[10px] text-slate-400">{daylightTrend}</p></div>
     {primaryEclipse && <div className="mt-3 rounded-xl border border-sky-300/25 bg-sky-400/[0.08] p-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-base" aria-hidden="true">◐</span><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Alerte astronomique</p><p className="mt-1 text-sm font-semibold text-slate-100">{primaryEclipse.title}</p><p className="mt-0.5 text-[11px] text-slate-300">{displayAstronomyDate(primaryEclipse.date)} · dans {daysUntil(primaryEclipse.date)} jours</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">{primaryEclipse.visibility}{primaryEclipse.skyOutlook ? ` · ${primaryEclipse.skyOutlook.label} (${primaryEclipse.skyOutlook.cloudCoverMean}% de nuages prévus)` : " · Prévision de ciel trop lointaine ou indisponible"}</p>{primaryEclipse.safetyNote && <p className="mt-2 text-[10px] leading-relaxed text-amber-100">{primaryEclipse.safetyNote}</p>}<p className="mt-2 text-[9px] text-slate-500">Visibilité à confirmer selon l’horizon local · Événement astronomique, distinct des alertes météo · {primaryEclipse.sourceLabel}</p></div></div></div>}
     {outlook.upcomingEclipses.slice(1).length > 0 && <p className="mt-3 text-[10px] leading-relaxed text-slate-400">Autres éclipses référencées : {outlook.upcomingEclipses.slice(1).map((event) => `${event.title} (${displayAstronomyDate(event.date)})`).join(" · ")}.</p>}
+    {primaryMeteorShower && <div className="mt-3 rounded-xl border border-violet-300/25 bg-violet-400/[0.07] p-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-base" aria-hidden="true">☄</span><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Étoiles filantes</p><p className="mt-1 text-sm font-semibold text-slate-100">{primaryMeteorShower.title}</p><p className="mt-0.5 text-[11px] text-slate-300">Pic {displayAstronomyDate(primaryMeteorShower.date)} · dans {daysUntil(primaryMeteorShower.date)} jours</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">{primaryMeteorShower.activeRange} · jusqu’à {primaryMeteorShower.zhr} météores/h au zénith dans des conditions idéales.</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">{primaryMeteorShower.observationNote}{primaryMeteorShower.skyOutlook ? ` · ${primaryMeteorShower.skyOutlook.label} (${primaryMeteorShower.skyOutlook.cloudCoverMean}% de nuages prévus)` : " · Prévision de ciel trop lointaine ou indisponible"}</p><p className="mt-2 text-[9px] text-slate-500">Rythme théorique, non garanti localement · {primaryMeteorShower.sourceLabel}</p></div></div></div>}
+    {outlook.upcomingMeteorShowers.slice(1).length > 0 && <p className="mt-3 text-[10px] leading-relaxed text-slate-400">Autres essaims à venir : {outlook.upcomingMeteorShowers.slice(1).map((event) => `${event.title} (${displayAstronomyDate(event.date)})`).join(" · ")}.</p>}
+    {(primaryEclipse || primaryMeteorShower) && <AstronomyVisibilityMap astronomy={astronomy} eventTitle={primaryEclipse?.title ?? primaryMeteorShower!.title} eventKind={primaryEclipse ? "eclipse" : "meteor"} />}
   </section>;
 }
 

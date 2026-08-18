@@ -17,7 +17,19 @@ export type EclipseAlert = {
   safetyNote: string | null;
   sourceLabel: string;
   sourceUrl: string;
-  skyOutlook: { cloudCoverMean: number; label: string } | null;
+  skyOutlook: { cloudCoverMean: number; label: string; moonIllumination: number | null } | null;
+};
+
+export type MeteorShowerAlert = {
+  id: string;
+  title: string;
+  date: string;
+  activeRange: string;
+  zhr: number;
+  observationNote: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  skyOutlook: { cloudCoverMean: number; label: string; moonIllumination: number | null } | null;
 };
 
 export type AstronomyOutlook = {
@@ -25,6 +37,7 @@ export type AstronomyOutlook = {
   nextSolarMilestone: SolarMilestone | null;
   daylightChangeTomorrowSeconds: number | null;
   upcomingEclipses: EclipseAlert[];
+  upcomingMeteorShowers: MeteorShowerAlert[];
 };
 
 const MOON_TARGETS: Array<{ id: MoonMilestone["id"]; label: string; phase: number }> = [
@@ -93,10 +106,77 @@ const ECLIPSES: Omit<EclipseAlert, "skyOutlook">[] = [
   },
 ];
 
+const METEOR_SHOWERS: Omit<MeteorShowerAlert, "skyOutlook">[] = [
+  {
+    id: "orionids_2026",
+    title: "Orionides",
+    date: "2026-10-21",
+    activeRange: "2 octobre–7 novembre",
+    zhr: 20,
+    observationNote: "À observer après minuit ; la Lune peut réduire le contraste en 2026.",
+    sourceLabel: "NASA / American Meteor Society",
+    sourceUrl: "https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/",
+  },
+  {
+    id: "taurids_2026",
+    title: "Taurides",
+    date: "2026-11-04",
+    activeRange: "20 septembre–20 novembre",
+    zhr: 5,
+    observationNote: "Faible cadence, mais possibilité de bolides lumineux ; observation nocturne recommandée.",
+    sourceLabel: "American Meteor Society",
+    sourceUrl: "https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/",
+  },
+  {
+    id: "leonids_2026",
+    title: "Léonides",
+    date: "2026-11-16",
+    activeRange: "6–30 novembre",
+    zhr: 15,
+    observationNote: "Meilleures conditions après minuit, loin des lumières directes.",
+    sourceLabel: "NASA / American Meteor Society",
+    sourceUrl: "https://science.nasa.gov/solar-system/meteors-meteorites/meteor-showers/",
+  },
+  {
+    id: "geminids_2026",
+    title: "Géminides",
+    date: "2026-12-13",
+    activeRange: "4–17 décembre",
+    zhr: 150,
+    observationNote: "Essaim majeur ; activité possible avant minuit lorsque le ciel est dégagé.",
+    sourceLabel: "NASA / American Meteor Society",
+    sourceUrl: "https://science.nasa.gov/solar-system/meteors-meteorites/meteor-showers/",
+  },
+  {
+    id: "ursids_2026",
+    title: "Ursides",
+    date: "2026-12-21",
+    activeRange: "17–26 décembre",
+    zhr: 10,
+    observationNote: "Essaim de l’hémisphère Nord ; fenêtre utile entre le coucher de la Lune et l’aube.",
+    sourceLabel: "NASA / American Meteor Society",
+    sourceUrl: "https://science.nasa.gov/solar-system/meteors-meteorites/meteor-showers/",
+  },
+  {
+    id: "quadrantids_2027",
+    title: "Quadrantides",
+    date: "2027-01-03",
+    activeRange: "28 décembre–12 janvier",
+    zhr: 120,
+    observationNote: "Pic bref ; le calendrier AMS indique une fenêtre favorable pour l’Europe en 2027.",
+    sourceLabel: "NASA / American Meteor Society",
+    sourceUrl: "https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/",
+  },
+];
+
 function skyLabel(cloudCoverMean: number) {
   if (cloudCoverMean <= 25) return "Ciel plutôt dégagé prévu";
   if (cloudCoverMean <= 60) return "Ciel variable prévu";
   return "Ciel possiblement nuageux";
+}
+
+function moonIllumination(phase: number | null) {
+  return phase == null || !Number.isFinite(phase) ? null : Math.round(50 * (1 - Math.cos(Math.PI * 2 * phase)));
 }
 
 function calculateMoonMilestones(today: string, currentPhase: number | null) {
@@ -123,6 +203,7 @@ export function buildAstronomyOutlook(input: {
     ? Math.round(input.daylightDurations[1]! - input.daylightDurations[0]!)
     : null;
   const cloudByDate = new Map(input.dates.map((date, index) => [date, input.cloudCoverMeans[index] ?? null]));
+  const moonPhaseByDate = new Map(input.dates.map((date, index) => [date, input.moonPhases[index] ?? null]));
   const upcomingEclipses = ECLIPSES
     .filter((event) => event.date >= input.today)
     .slice(0, 3)
@@ -131,9 +212,21 @@ export function buildAstronomyOutlook(input: {
       return {
         ...event,
         skyOutlook: cloudCoverMean != null && Number.isFinite(cloudCoverMean)
-          ? { cloudCoverMean: Math.round(cloudCoverMean), label: skyLabel(cloudCoverMean) }
+          ? { cloudCoverMean: Math.round(cloudCoverMean), label: skyLabel(cloudCoverMean), moonIllumination: moonIllumination(moonPhaseByDate.get(event.date) ?? null) }
           : null,
       };
     });
-  return { moonMilestones, nextSolarMilestone, daylightChangeTomorrowSeconds, upcomingEclipses };
+  const upcomingMeteorShowers = METEOR_SHOWERS
+    .filter((event) => event.date >= input.today)
+    .slice(0, 3)
+    .map((event) => {
+      const cloudCoverMean = cloudByDate.get(event.date);
+      return {
+        ...event,
+        skyOutlook: cloudCoverMean != null && Number.isFinite(cloudCoverMean)
+          ? { cloudCoverMean: Math.round(cloudCoverMean), label: skyLabel(cloudCoverMean), moonIllumination: moonIllumination(moonPhaseByDate.get(event.date) ?? null) }
+          : null,
+      };
+    });
+  return { moonMilestones, nextSolarMilestone, daylightChangeTomorrowSeconds, upcomingEclipses, upcomingMeteorShowers };
 }

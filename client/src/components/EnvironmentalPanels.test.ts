@@ -24,6 +24,11 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Alerte astronomique");
     expect(source).toContain("Visibilité à confirmer selon l’horizon local");
     expect(source).toContain("distinct des alertes météo");
+    expect(source).toContain("Étoiles filantes");
+    expect(source).toContain("météores/h au zénith dans des conditions idéales");
+    expect(source).toContain("Carte locale d’observation");
+    expect(source).toContain("Il ne représente pas la bande géométrique d’une éclipse");
+    expect(source).toContain("data-swipe-exclude");
   });
 
   it("ouvre des modales de détail accessibles depuis les deux panneaux", () => {

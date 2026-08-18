@@ -2103,3 +2103,10 @@
 - [x] Alertes: Ajouter les éclipses et phénomènes astronomiques à venir, avec visibilité ou non pour le lieu actif.
 - [x] Transparence: Distinguer strictement les alertes astronomiques des alertes météo et indiquer la source ou la limite de visibilité.
 - [x] Validation: Tester les calculs de dates, les états sans événement et le rendu mobile avant publication.
+
+## Alertes astronomiques — essaims et carte locale
+- [x] Essaims: Ajouter les principaux pics de météores avec date, fréquence indicative et conditions d’observation.
+- [x] Visibilité: Calculer une appréciation locale à partir de la nuit, de la phase lunaire et de la nébulosité disponible.
+- [x] Carte: Intégrer une petite carte interactive centrée sur le lieu actif, avec le périmètre et les consignes de visibilité des éclipses ou essaims.
+- [x] Transparence: Distinguer la visibilité astronomique théorique, la couverture nuageuse prévue et les limites de l’horizon local.
+- [x] Validation: Tester les événements, la carte, les états d’indisponibilité et le rendu mobile avant publication.

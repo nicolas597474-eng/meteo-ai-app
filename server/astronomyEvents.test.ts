@@ -16,12 +16,14 @@ describe("buildAstronomyOutlook", () => {
     expect(outlook.daylightChangeTomorrowSeconds).toBe(-120);
     expect(outlook.upcomingEclipses[0]).toMatchObject({ title: "Éclipse lunaire partielle", date: "2026-08-28", skyOutlook: { cloudCoverMean: 80 } });
     expect(outlook.upcomingEclipses[1]?.skyOutlook).toBeNull();
+    expect(outlook.upcomingMeteorShowers[0]).toMatchObject({ title: "Orionides", date: "2026-10-21", zhr: 20, skyOutlook: null });
   });
 
   it("conserve une alerte solaire avec sa consigne de sécurité", () => {
-    const outlook = buildAstronomyOutlook({ dates: [], moonPhases: [], daylightDurations: [], cloudCoverMeans: [], today: "2027-07-01" });
+    const outlook = buildAstronomyOutlook({ dates: [], moonPhases: [], daylightDurations: [], cloudCoverMeans: [], today: "2026-07-01" });
     const solar = outlook.upcomingEclipses.find((event) => event.id === "solar_partial_2027_08_02");
     expect(solar?.visibility).toBe("Partielle depuis la France");
     expect(solar?.safetyNote).toContain("lunettes d’éclipse homologuées");
+    expect(outlook.upcomingMeteorShowers.find((event) => event.id === "leonids_2026")?.zhr).toBe(15);
   });
 });

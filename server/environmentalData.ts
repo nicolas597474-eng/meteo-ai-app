@@ -109,6 +109,7 @@ export type EnvironmentalSnapshot = {
     altitudeCalculatedAt: string;
     timezone: string;
     outlook: AstronomyOutlook;
+    coordinates: { lat: number; lon: number };
   } | null;
   source: "Open-Meteo / CAMS";
   timezone: string;
@@ -197,6 +198,7 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
         cloudCoverMeans: dailyCloudCoverMeans,
         today: dailyDates[0] ?? altitudeCalculatedAt.toISOString().slice(0, 10),
       }),
+      coordinates: { lat: coords.lat, lon: coords.lon },
     } : null,
     source: "Open-Meteo / CAMS",
     timezone,
