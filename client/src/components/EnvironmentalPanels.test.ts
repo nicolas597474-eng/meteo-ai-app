@@ -33,6 +33,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Icône d’éclipse");
     expect(source).toContain("Icône de pluie de météores");
     expect(source).toContain("Icône de pleine lune");
+    expect(source).toContain("astronomy-outlook-panel");
+    expect(styles).toContain("Alertes astronomiques : les informations secondaires restent lisibles");
   });
 
   it("ouvre des modales de détail accessibles depuis les deux panneaux", () => {

@@ -2116,3 +2116,8 @@
 - [x] Lisibilité: Conserver un code visuel cohérent dans les cartes et le détail du panneau.
 - [x] Accessibilité: Ajouter un libellé textuel ou alternatif pour chaque icône.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Alertes astronomiques — typographie plus lisible
+- [x] Interface: Agrandir légèrement les descriptions, sources et indications de visibilité.
+- [x] Hiérarchie: Conserver les titres principaux visuellement prioritaires sur mobile.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

@@ -200,6 +200,22 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   white-space: nowrap;
 }
 
+/* Alertes astronomiques : les informations secondaires restent lisibles sans concurrencer les titres. */
+.astronomy-outlook-panel .text-\[9px\] {
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+.astronomy-outlook-panel .text-\[10px\] {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.astronomy-outlook-panel .text-\[11px\] {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 /* Premier croissant : seul l’astre est visible, sans pastille, cercle ni fond décoratif. */
 section[aria-label="Qualité de l’air, soleil et lune"] div:has(> img.moon-3d-first-crescent) {
   width: 6rem !important;
