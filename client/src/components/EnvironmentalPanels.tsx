@@ -27,6 +27,21 @@ type EnvironmentalData = {
     moonAltitudeDeg: number | null;
     altitudeCalculatedAt: string;
     timezone: string;
+    outlook?: {
+      moonMilestones: Array<{ id: "new_moon" | "first_quarter" | "full_moon" | "last_quarter"; label: string; date: string }>;
+      nextSolarMilestone: { label: string; date: string } | null;
+      daylightChangeTomorrowSeconds: number | null;
+      upcomingEclipses: Array<{
+        id: string;
+        title: string;
+        date: string;
+        visibility: string;
+        safetyNote: string | null;
+        sourceLabel: string;
+        sourceUrl: string;
+        skyOutlook: { cloudCoverMean: number; label: string } | null;
+      }>;
+    };
   } | null;
   source: string;
 };
@@ -42,6 +57,8 @@ const aqiPalette = {
 
 function displayTime(value: string | null) { return value?.match(/T(\d{2}:\d{2})/)?.[1] ?? "—"; }
 function displayDuration(value: number | null) { if (value == null) return "—"; const minutes = Math.round(value / 60); return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`; }
+function displayAstronomyDate(value: string) { return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`)); }
+function daysUntil(value: string) { return Math.max(0, Math.ceil((new Date(`${value}T12:00:00Z`).getTime() - Date.now()) / 86_400_000)); }
 function DetailHint() { return <p className="mt-3 flex items-center gap-1 text-[10px] font-medium text-sky-200/90"><span>Voir les détails</span><span aria-hidden="true">→</span></p>; }
 function formatAltitude(altitude: number | null) { return altitude == null ? "Altitude —" : `Altitude ${altitude >= 0 ? "+" : ""}${altitude.toFixed(1)}°`; }
 
@@ -86,6 +103,32 @@ function PanelDialog({ title, description, children, content, className }: { tit
 function Metric({ label, value, unit }: { label: string; value: number | null; unit: string }) { return <div className="rounded-xl border border-white/5 bg-black/10 py-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">{label}</p><p className="mt-0.5 text-xs font-semibold text-slate-200">{value == null ? "—" : value.toFixed(0)}</p><p className="text-[8px] text-slate-500">{unit}</p></div>; }
 function PollutantDetail({ label, value, description }: { label: string; value: number | null; description: string }) { return <div className="rounded-xl border border-slate-700/70 bg-slate-950/45 p-3"><p className="text-[10px] font-semibold text-slate-200">{label}</p><p className="mt-1 text-lg font-light text-white">{value == null ? "—" : value.toFixed(0)} <span className="text-[10px] text-slate-500">µg/m³</span></p><p className="mt-2 text-[10px] leading-relaxed text-slate-500">{description}</p></div>; }
 function AstronomyDetail({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-slate-700/70 bg-slate-950/45 p-3"><p className="text-[10px] text-slate-500">{label}</p><p className="mt-1 text-sm font-semibold text-slate-100">{value}</p></div>; }
+
+function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["astronomy"] }) {
+  const outlook = astronomy?.outlook;
+  if (!astronomy || !outlook) return null;
+  const fullMoon = outlook.moonMilestones.find((milestone) => milestone.id === "full_moon") ?? null;
+  const newMoon = outlook.moonMilestones.find((milestone) => milestone.id === "new_moon") ?? null;
+  const quarterMilestones = outlook.moonMilestones.filter((milestone) => milestone.id === "first_quarter" || milestone.id === "last_quarter");
+  const primaryEclipse = outlook.upcomingEclipses[0] ?? null;
+  const daylightTrend = outlook.daylightChangeTomorrowSeconds == null
+    ? "Variation demain indisponible"
+    : outlook.daylightChangeTomorrowSeconds === 0
+      ? "Durée du jour stable demain"
+      : `${outlook.daylightChangeTomorrowSeconds > 0 ? "+" : "−"}${Math.abs(Math.round(outlook.daylightChangeTomorrowSeconds / 60))} min de jour demain`;
+
+  return <section className="weather-surface border border-violet-300/20 bg-gradient-to-br from-indigo-500/[0.10] via-slate-950/35 to-sky-500/[0.07] p-4" aria-label="Prochains repères astronomiques">
+    <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-200">Ciel à venir</p><h3 className="mt-1 text-base font-semibold text-slate-100">Prochains repères astronomiques</h3></div><span className="text-xl" aria-hidden="true">✦</span></div>
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      <AstronomyDetail label="Prochaine pleine lune" value={fullMoon ? displayAstronomyDate(fullMoon.date) : "Indisponible"} />
+      <AstronomyDetail label="Prochaine nouvelle lune" value={newMoon ? displayAstronomyDate(newMoon.date) : "Indisponible"} />
+    </div>
+    {quarterMilestones.length > 0 && <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Autres phases : {quarterMilestones.map((milestone) => `${milestone.label} · ${displayAstronomyDate(milestone.date)}`).join(" · ")}.</p>}
+    <div className="mt-2 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2.5"><p className="text-[10px] font-semibold uppercase tracking-wide text-amber-100">Soleil</p><p className="mt-1 text-xs font-semibold text-slate-100">{outlook.nextSolarMilestone ? `${outlook.nextSolarMilestone.label} · ${displayAstronomyDate(outlook.nextSolarMilestone.date)}` : "Prochain jalon solaire indisponible"}</p><p className="mt-1 text-[10px] text-slate-400">{daylightTrend}</p></div>
+    {primaryEclipse && <div className="mt-3 rounded-xl border border-sky-300/25 bg-sky-400/[0.08] p-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-base" aria-hidden="true">◐</span><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Alerte astronomique</p><p className="mt-1 text-sm font-semibold text-slate-100">{primaryEclipse.title}</p><p className="mt-0.5 text-[11px] text-slate-300">{displayAstronomyDate(primaryEclipse.date)} · dans {daysUntil(primaryEclipse.date)} jours</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">{primaryEclipse.visibility}{primaryEclipse.skyOutlook ? ` · ${primaryEclipse.skyOutlook.label} (${primaryEclipse.skyOutlook.cloudCoverMean}% de nuages prévus)` : " · Prévision de ciel trop lointaine ou indisponible"}</p>{primaryEclipse.safetyNote && <p className="mt-2 text-[10px] leading-relaxed text-amber-100">{primaryEclipse.safetyNote}</p>}<p className="mt-2 text-[9px] text-slate-500">Visibilité à confirmer selon l’horizon local · Événement astronomique, distinct des alertes météo · {primaryEclipse.sourceLabel}</p></div></div></div>}
+    {outlook.upcomingEclipses.slice(1).length > 0 && <p className="mt-3 text-[10px] leading-relaxed text-slate-400">Autres éclipses référencées : {outlook.upcomingEclipses.slice(1).map((event) => `${event.title} (${displayAstronomyDate(event.date)})`).join(" · ")}.</p>}
+  </section>;
+}
 
 function AirQualityPanel({ air, source }: { air: EnvironmentalData["air"]; source: string }) {
   if (!air) return <section className="weather-surface rounded-[22px] border border-slate-700/60 p-4"><div className="flex items-center gap-3"><MeteoIcon name="wind_moderate" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Qualité de l’air</h2><p className="mt-1 text-xs text-slate-400">Données réelles temporairement indisponibles. Aucune valeur n’est estimée.</p></div></div></section>;
@@ -200,5 +243,5 @@ function SunMoonPanelAlwaysVisible({ astronomy, source }: { astronomy: Environme
 
 export function EnvironmentalPanels({ data, isLoading }: { data: EnvironmentalData | null | undefined; isLoading?: boolean }) {
   if (isLoading && !data) return <div className="grid gap-3 sm:grid-cols-2"><div className="h-64 animate-pulse rounded-[22px] bg-slate-800/40" /><div className="h-64 animate-pulse rounded-[22px] bg-slate-800/40" /></div>;
-  return <section className="grid gap-3 sm:grid-cols-2" aria-label="Qualité de l’air, soleil et lune"><AirQualityPanel air={data?.air ?? null} source={data?.source ?? "Open-Meteo / CAMS"} /><SunMoonPanelAlwaysVisible astronomy={data?.astronomy ?? null} source={data?.source ?? "Open-Meteo"} /></section>;
+  return <section className="grid gap-3 sm:grid-cols-2" aria-label="Qualité de l’air, soleil et lune"><AirQualityPanel air={data?.air ?? null} source={data?.source ?? "Open-Meteo / CAMS"} /><div className="space-y-3"><SunMoonPanelAlwaysVisible astronomy={data?.astronomy ?? null} source={data?.source ?? "Open-Meteo"} /><AstronomyOutlookPanel astronomy={data?.astronomy ?? null} /></div></section>;
 }

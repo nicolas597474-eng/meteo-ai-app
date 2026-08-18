@@ -18,6 +18,12 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Éphémérides locales du jour");
     expect(source).toContain("Éclairage");
     expect(source).toContain("Éphémérides réelles temporairement indisponibles");
+    expect(source).toContain("Prochains repères astronomiques");
+    expect(source).toContain("Prochaine pleine lune");
+    expect(source).toContain("Autres phases");
+    expect(source).toContain("Alerte astronomique");
+    expect(source).toContain("Visibilité à confirmer selon l’horizon local");
+    expect(source).toContain("distinct des alertes météo");
   });
 
   it("ouvre des modales de détail accessibles depuis les deux panneaux", () => {

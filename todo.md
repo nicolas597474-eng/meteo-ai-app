@@ -2096,3 +2096,10 @@
 - [x] Interface: Décaler les libellés Lever et Coucher sous la ligne d’horizon avec un espace fixe.
 - [x] Lisibilité: Conserver les heures de lever et coucher visibles au-dessus de la ligne.
 - [x] Validation: Tester les positions extrêmes, TypeScript et le rendu mobile avant publication.
+
+## Soleil & Lune — prochains repères et alertes astronomiques
+- [x] Lune: Afficher la prochaine pleine lune, nouvelle lune, quartier et phase actuelle avec des dates calculées.
+- [x] Soleil: Afficher les prochains jalons de durée du jour et les repères solaires pertinents.
+- [x] Alertes: Ajouter les éclipses et phénomènes astronomiques à venir, avec visibilité ou non pour le lieu actif.
+- [x] Transparence: Distinguer strictement les alertes astronomiques des alertes météo et indiquer la source ou la limite de visibilité.
+- [x] Validation: Tester les calculs de dates, les états sans événement et le rendu mobile avant publication.

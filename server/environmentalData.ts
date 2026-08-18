@@ -1,5 +1,6 @@
 import { fetchWeather } from "./weatherFetch";
 import { getMoonPosition, getPosition } from "suncalc";
+import { buildAstronomyOutlook, type AstronomyOutlook } from "./astronomyEvents";
 
 export type AqiDescriptor = {
   label: string;
@@ -107,6 +108,7 @@ export type EnvironmentalSnapshot = {
     moonAltitudeDeg: number | null;
     altitudeCalculatedAt: string;
     timezone: string;
+    outlook: AstronomyOutlook;
   } | null;
   source: "Open-Meteo / CAMS";
   timezone: string;
@@ -123,8 +125,8 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
   weatherUrl.search = new URLSearchParams({
     latitude: String(coords.lat),
     longitude: String(coords.lon),
-    daily: "sunrise,sunset,daylight_duration,moonrise,moonset,moon_phase",
-    forecast_days: "1",
+    daily: "sunrise,sunset,daylight_duration,moonrise,moonset,moon_phase,cloud_cover_mean",
+    forecast_days: "16",
     timezone: "auto",
   }).toString();
 
@@ -144,6 +146,10 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
   const timezone = resolveTimeZone(weather?.timezone ?? airResponse?.timezone);
 
   const daily = weather?.daily ?? null;
+  const dailyDates = Array.isArray(daily?.time) ? daily.time.filter((value: unknown): value is string => typeof value === "string") : [];
+  const dailyMoonPhases = Array.isArray(daily?.moon_phase) ? daily.moon_phase.map(asNumber) : [];
+  const dailyDaylightDurations = Array.isArray(daily?.daylight_duration) ? daily.daylight_duration.map(asNumber) : [];
+  const dailyCloudCoverMeans = Array.isArray(daily?.cloud_cover_mean) ? daily.cloud_cover_mean.map(asNumber) : [];
   const sunrise = typeof daily?.sunrise?.[0] === "string" ? daily.sunrise[0] : null;
   const sunset = typeof daily?.sunset?.[0] === "string" ? daily.sunset[0] : null;
   const moonPhase = asNumber(daily?.moon_phase?.[0]);
@@ -184,6 +190,13 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
       moonAltitudeDeg,
       altitudeCalculatedAt: altitudeCalculatedAt.toISOString(),
       timezone,
+      outlook: buildAstronomyOutlook({
+        dates: dailyDates,
+        moonPhases: dailyMoonPhases,
+        daylightDurations: dailyDaylightDurations,
+        cloudCoverMeans: dailyCloudCoverMeans,
+        today: dailyDates[0] ?? altitudeCalculatedAt.toISOString().slice(0, 10),
+      }),
     } : null,
     source: "Open-Meteo / CAMS",
     timezone,
