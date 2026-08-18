@@ -2063,3 +2063,9 @@
 - [x] Rafraîchissement: Éviter les rechargements superflus et le travail bloquant pendant le changement de route.
 - [x] Accessibilité: Préserver la préférence de réduction des mouvements et les interactions protégées.
 - [x] Validation: Tester le préchargement, TypeScript, la navigation tactile et le rendu mobile avant publication.
+
+## Dashboard — date intégrée au régime dominant
+- [x] Interface: Déplacer la date complète dans le panneau Régime de prévision dominant.
+- [x] Nettoyage: Retirer la pastille de date indépendante au-dessus du panneau.
+- [x] Lisibilité: Préserver la hiérarchie du régime, de la condition et des indicateurs associés.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

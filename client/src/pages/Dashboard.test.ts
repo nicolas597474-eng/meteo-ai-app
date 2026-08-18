@@ -54,10 +54,12 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');
-    expect(source).toContain('CalendarDays className="h-3.5 w-3.5 text-sky-300 sm:h-4 sm:w-4"');
+    expect(source).toContain('CalendarDays className="h-3 w-3 text-sky-200/80"');
     expect(source).toContain('space-y-2 px-3 pb-3 pt-1');
     expect(source).toContain('px-3 pb-3 pt-1 sm:p-6');
-    expect(source).toContain('mb-0.5 flex justify-center sm:mb-3');
+    expect(source).not.toContain('mb-0.5 flex justify-center sm:mb-3');
+    expect(source).toContain('Régime de prévision dominant</p>');
+    expect(source).toContain('{panelDate}');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');
     expect(source).not.toContain('aria-label="Actualiser la météo maintenant"');
     expect(source).toContain('getExtremeTemperatureTone("max", maxTemperature)');
