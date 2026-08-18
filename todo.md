@@ -2203,3 +2203,8 @@
 - [x] Carte: Séparer les contrôles personnalisés des commandes Google Maps sur mobile et grand écran.
 - [x] Interface: Définir une règle commune d’espacement et de superposition sûre pour les groupes de commandes de l’application.
 - [x] Validation: Tester le son optionnel, les contrôles de carte, les formats mobile/desktop, TypeScript et la suite de régression.
+
+## Carte astronomique — suppression du contrôle de déplacement
+- [x] Carte compacte: Désactiver le contrôle natif de déplacement visible sous les boutons personnalisés.
+- [x] Interface: Conserver exclusivement les actions d’agrandissement et de localisation sur la carte compacte.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

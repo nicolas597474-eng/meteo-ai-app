@@ -128,6 +128,7 @@ interface MapViewProps {
   zoomControl?: boolean;
   streetViewControl?: boolean;
   rotateControl?: boolean;
+  cameraControl?: boolean;
   children?: ReactNode;
   onMapReady?: (map: google.maps.Map) => void;
   onFullscreenChange?: (isFullscreen: boolean, map: google.maps.Map | null) => void;
@@ -143,6 +144,7 @@ export function MapView({
   zoomControl = true,
   streetViewControl = true,
   rotateControl = true,
+  cameraControl = false,
   children,
   onMapReady,
   onFullscreenChange,
@@ -169,6 +171,7 @@ export function MapView({
         zoomControl,
         streetViewControl,
         rotateControl,
+        cameraControl,
         mapId: "DEMO_MAP_ID",
       });
       onMapReady?.(map.current);

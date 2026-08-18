@@ -13,6 +13,8 @@ describe("repli de cartographie", () => {
     expect(source).toContain("mapTypeControl?: boolean");
     expect(source).toContain("fullscreenControl?: boolean");
     expect(source).toContain("zoomControl?: boolean");
+    expect(source).toContain("cameraControl?: boolean");
+    expect(source).toContain("cameraControl = false");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
     expect(source).toContain("ResizeObserver");

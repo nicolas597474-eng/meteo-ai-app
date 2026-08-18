@@ -208,7 +208,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     mapRef.current = map;
     if (isExpanded) expandedMapRef.current = map;
     else compactMapRef.current = map;
-    map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, gestureHandling: isExpanded ? "greedy" : "cooperative", mapTypeControlOptions: isExpanded ? { position: google.maps.ControlPosition.TOP_RIGHT } : undefined, zoomControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined, streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined });
+    map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, cameraControl: false, gestureHandling: isExpanded ? "greedy" : "cooperative", mapTypeControlOptions: isExpanded ? { position: google.maps.ControlPosition.TOP_RIGHT } : undefined, zoomControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined, streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined });
     if (isExpanded) map.addListener("heading_changed", () => setExpandedHeading(map.getHeading() ?? 0));
     const localPosition = { lat: center.lat, lng: center.lon };
     new google.maps.marker.AdvancedMarkerElement({ map, position: localPosition, title: "Lieu actif" });
