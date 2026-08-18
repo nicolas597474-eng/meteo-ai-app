@@ -488,10 +488,9 @@ export default function Dashboard() {
             {regime && (
               <div className="mb-1 rounded-xl border border-slate-600/50 bg-slate-800/60 px-2.5 py-1 sm:mb-2 sm:px-3 sm:py-1.5">
                 <div className="mb-1 flex justify-center sm:mb-1.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/45 bg-slate-950/50 px-2.5 py-1 text-sm font-bold text-slate-50 sm:px-3 sm:text-base">
-                    <CalendarDays className="h-4 w-4 text-sky-300 sm:h-4.5 sm:w-4.5" aria-hidden="true" />
+                  <p className="text-lg font-bold tracking-tight text-slate-50 sm:text-xl">
                     {panelDate}
-                  </span>
+                  </p>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button

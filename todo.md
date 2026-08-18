@@ -2080,3 +2080,8 @@
 - [x] Interface: Utiliser la même teinte bleue pour les libellés Phénomène actuel et Évolution.
 - [x] Lisibilité: Afficher les conditions Bruine, Averses et les autres valeurs de condition en blanc.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Dashboard — date sans contour
+- [x] Interface: Retirer toute bordure, fond de pastille et contour autour de la date.
+- [x] Lisibilité: Conserver une date agrandie et contrastée en texte seul.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
