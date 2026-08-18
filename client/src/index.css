@@ -167,14 +167,17 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* L’arche Soleil & Lune conserve sa forme complète, y compris sur les écrans mobiles étroits. */
+/* L’arche Soleil & Lune conserve une géométrie de demi-cercle complète,
+   y compris sur les écrans mobiles étroits. Un ratio 2:1 évite le sommet aplati
+   produit par une ellipse trop basse. */
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 {
-  height: 11rem !important;
+  height: 12rem !important;
   overflow: visible !important;
 }
 
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-5 > div:first-child {
-  height: 9rem !important;
+  height: auto !important;
+  aspect-ratio: 2 / 1;
   bottom: 1rem !important;
 }
 

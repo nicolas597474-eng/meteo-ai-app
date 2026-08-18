@@ -71,7 +71,8 @@ function celestialArcPosition(rise: string | null, set: string | null, now: numb
   return null;
 }
 
-function arcBottom(position: number) { return 22 + Math.sin((position / 100) * Math.PI) * 84; }
+/** Arc de cercle : hauteur maximale cohérente avec le demi-cercle affiché. */
+function arcBottom(position: number) { return 18 + Math.sin((position / 100) * Math.PI) * 140; }
 
 function PanelDialog({ title, description, children, content, className }: { title: string; description: string; children: ReactNode; content: ReactNode; className: string }) {
   return <Dialog><section className={`relative rounded-[22px] border p-4 ${className}`} aria-label={`${title} — ouvrir les détails`}><DialogTrigger asChild><button type="button" className="absolute inset-0 z-10 rounded-[22px] outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080a0f]"><span className="sr-only">Ouvrir les détails : {title}</span></button></DialogTrigger>{children}</section><DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto border-slate-700 bg-[#0b111b] p-0 text-slate-100 sm:max-w-lg"><DialogHeader className="border-b border-slate-700/70 px-5 pt-5 pb-4 text-left"><DialogTitle className="text-lg text-white">{title}</DialogTitle><DialogDescription className="text-xs leading-relaxed text-slate-400">{description}</DialogDescription></DialogHeader><div className="px-5 py-4">{content}</div><DialogFooter className="border-t border-slate-700/70 px-5 py-3"><DialogClose className="rounded-xl border border-slate-600 bg-slate-800/70 px-4 py-2 text-xs font-medium text-slate-100">Fermer</DialogClose></DialogFooter></DialogContent></Dialog>;

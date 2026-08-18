@@ -30,8 +30,9 @@ describe("EnvironmentalPanels", () => {
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
     expect(source).toContain("rounded-t-full");
     expect(styles).toContain("Qualité de l’air, soleil et lune");
-    expect(styles).toContain("height: 11rem !important");
-    expect(styles).toContain("height: 9rem !important");
+    expect(styles).toContain("height: 12rem !important");
+    expect(styles).toContain("aspect-ratio: 2 / 1");
+    expect(styles).toContain("ratio 2:1 évite le sommet aplati");
     expect(styles).toContain("text-amber-100");
     expect(styles).toContain("text-indigo-100");
     expect(styles).toContain("celestial-solar-disc-breathe");
@@ -51,6 +52,7 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("markersAreClose");
     expect(modernSunMoonSource).toContain("sunDisplayPosition");
     expect(modernSunMoonSource).toContain("moonDisplayPosition");
+    expect(source).toContain("Math.sin((position / 100) * Math.PI) * 140");
     expect(modernSunMoonSource).toContain("Position du Soleil sur l’arche");
     expect(modernSunMoonSource).toContain("Position de la Lune sur l’arche");
     expect(modernSunMoonSource).toContain("h-12 w-12");

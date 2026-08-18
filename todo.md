@@ -2024,3 +2024,9 @@
 - [x] Lisibilité: Conserver des contrastes suffisants pour les températures, étiquettes et métriques.
 - [x] Cohérence: Préserver les bordures et l’état « Maintenant » sans ajouter d’effet flou.
 - [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
+
+## Soleil & Lune — arche circulaire régulière
+- [x] Diagnostic: Identifier la géométrie elliptique qui aplatit le sommet de l’arche.
+- [x] Interface: Utiliser un vrai demi-cercle ou un arc circulaire sans sommet plat.
+- [x] Contrainte: Préserver la position des astres, les horaires et les données astronomiques.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.
