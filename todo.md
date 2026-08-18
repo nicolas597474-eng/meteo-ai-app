@@ -2000,3 +2000,9 @@
 - [x] Interface: Utiliser la même origine et le même pas horaire pour placer chaque carte sous son repère de courbe.
 - [x] Interaction: Préserver le défilement synchronisé tout en gardant la carte active sous son point.
 - [x] Validation: Tester maintenant, les heures voisines, les extrémités et le rendu mobile avant publication.
+
+## Prévisions détaillées — accrochage centré après défilement
+- [x] Interaction: Détecter la fin du défilement de la courbe ou des cartes.
+- [x] Interface: Recentrer automatiquement l’heure sélectionnée dans les deux vues.
+- [x] Limites: Respecter le premier et le dernier créneau sans défilement impossible.
+- [x] Validation: Tester le calage après glissement, la synchronisation et le rendu mobile avant publication.

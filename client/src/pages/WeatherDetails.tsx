@@ -10,7 +10,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
-import { getHourCenterX, getHourScrollLeft, getNearestHourIndex } from "@/lib/hourlyScrollSync";
+import { getCenteredHourScrollLeft, getHourCenterX, getNearestCenteredHourIndex, getNearestHourIndex } from "@/lib/hourlyScrollSync";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -466,6 +466,7 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
 function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartType; currentIdx: number }) {
   const chartScrollRef = useRef<HTMLDivElement>(null);
   const detailScrollRef = useRef<HTMLDivElement>(null);
+  const snapTimerRef = useRef<number | null>(null);
   const chartH = 148;
   const detailCardWidth = 174;
   const detailCardStride = 186;
@@ -473,16 +474,42 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   const chartHourStride = detailCardStride;
   const [selectedIdx, setSelectedIdx] = useState(currentIdx);
 
+  const scrollToCenteredHour = (container: HTMLDivElement | null, index: number, behavior: ScrollBehavior) => {
+    if (!container) return;
+    container.scrollTo({
+      left: getCenteredHourScrollLeft(index, detailCardStride, detailCardWidth, hours.length, container.clientWidth),
+      behavior,
+    });
+  };
+
   const syncSelectedHour = (index: number, origin: "chart" | "detail" | "initial") => {
     const nextIndex = getNearestHourIndex(index, 1, hours.length);
     setSelectedIdx(nextIndex);
 
     if (origin !== "chart" && chartScrollRef.current) {
-      chartScrollRef.current.scrollLeft = getHourScrollLeft(nextIndex, chartHourStride, hours.length);
+      scrollToCenteredHour(chartScrollRef.current, nextIndex, "auto");
     }
     if (origin !== "detail" && detailScrollRef.current) {
-      detailScrollRef.current.scrollLeft = getHourScrollLeft(nextIndex, detailCardStride, hours.length);
+      scrollToCenteredHour(detailScrollRef.current, nextIndex, "auto");
     }
+  };
+
+  const scheduleCenteredSnap = (origin: "chart" | "detail") => {
+    if (snapTimerRef.current != null) window.clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = window.setTimeout(() => {
+      const source = origin === "chart" ? chartScrollRef.current : detailScrollRef.current;
+      if (!source) return;
+      const nextIndex = getNearestCenteredHourIndex(
+        source.scrollLeft,
+        source.clientWidth,
+        detailCardStride,
+        detailCardWidth,
+        hours.length,
+      );
+      setSelectedIdx(nextIndex);
+      scrollToCenteredHour(chartScrollRef.current, nextIndex, "smooth");
+      scrollToCenteredHour(detailScrollRef.current, nextIndex, "smooth");
+    }, 120);
   };
 
   useEffect(() => {
@@ -490,12 +517,18 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
     syncSelectedHour(currentIdx, "initial");
   }, [currentIdx, hours.length]);
 
+  useEffect(() => () => {
+    if (snapTimerRef.current != null) window.clearTimeout(snapTimerRef.current);
+  }, []);
+
   const syncDetailScroll = (event: UIEvent<HTMLDivElement>) => {
-    syncSelectedHour(getNearestHourIndex(event.currentTarget.scrollLeft, chartHourStride, hours.length), "chart");
+    syncSelectedHour(getNearestCenteredHourIndex(event.currentTarget.scrollLeft, event.currentTarget.clientWidth, detailCardStride, detailCardWidth, hours.length), "chart");
+    scheduleCenteredSnap("chart");
   };
 
   const syncChartScroll = (event: UIEvent<HTMLDivElement>) => {
-    syncSelectedHour(getNearestHourIndex(event.currentTarget.scrollLeft, detailCardStride, hours.length), "detail");
+    syncSelectedHour(getNearestCenteredHourIndex(event.currentTarget.scrollLeft, event.currentTarget.clientWidth, detailCardStride, detailCardWidth, hours.length), "detail");
+    scheduleCenteredSnap("detail");
   };
 
   if (hours.length === 0) return <p className="text-slate-500 text-xs">Aucune donnée disponible</p>;

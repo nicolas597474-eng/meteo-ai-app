@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getHourCenterX, getHourScrollLeft, getNearestHourIndex } from "./hourlyScrollSync";
+import { getCenteredHourScrollLeft, getHourCenterX, getHourScrollLeft, getNearestCenteredHourIndex, getNearestHourIndex } from "./hourlyScrollSync";
 
 describe("synchronisation horaire courbe et cartes", () => {
   it("résout la même heure depuis un défilement de courbe ou de cartes", () => {
@@ -15,6 +15,12 @@ describe("synchronisation horaire courbe et cartes", () => {
   it("place le point de la courbe au centre de la carte correspondante", () => {
     expect(getHourCenterX(0, 186, 174, 24)).toBe(87);
     expect(getHourCenterX(7, 186, 174, 24)).toBe(1389);
+  });
+
+  it("calle le créneau choisi au centre sans dépasser les extrémités", () => {
+    expect(getCenteredHourScrollLeft(0, 186, 174, 24, 360)).toBe(0);
+    expect(getCenteredHourScrollLeft(3, 186, 174, 24, 360)).toBe(465);
+    expect(getNearestCenteredHourIndex(465, 360, 186, 174, 24)).toBe(3);
   });
 
   it("respecte les limites de la première et dernière heure", () => {
