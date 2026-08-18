@@ -2189,3 +2189,10 @@
 - [x] Vue agrandie: Afficher l’azimut de l’astre directement avec la boussole.
 - [x] Transparence: Signaler l’indisponibilité de l’azimut tant qu’aucune circonstance locale n’est calculée.
 - [x] Validation: Tester l’affichage solaire et lunaire, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — alerte d’observabilité
+- [x] Position: Réutiliser uniquement une position du navigateur explicitement autorisée, sans inventer de localisation.
+- [x] Conditions: Déterminer l’observabilité à partir des circonstances locales calculées et de la hauteur de l’astre.
+- [x] Interface: Afficher une notification visuelle claire lorsque l’astre devient observable depuis cette position.
+- [x] Transparence: Distinguer le calcul astronomique des limites réelles d’horizon, de nuages et de sécurité solaire.
+- [x] Validation: Tester les états observable, non observable et sans position autorisée avant publication.

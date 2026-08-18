@@ -53,6 +53,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("astronomicalAzimuthLabel");
     expect(source).toContain("Azimut de l’astre");
     expect(source).toContain("astronomicalDirection");
+    expect(source).toContain("isAstroObservableNow");
+    expect(source).toContain("fenêtre calculée d’observabilité");
+    expect(source).toContain("Calcul astronomique : vérifiez l’horizon, les nuages");
+    expect(source).toContain("Ma position actuelle");
     expect(source).toContain("data-swipe-exclude");
     expect(source).toContain("🌕 Prochaine pleine lune");
     expect(source).toContain("Icône d’éclipse");
