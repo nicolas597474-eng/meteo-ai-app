@@ -2110,3 +2110,9 @@
 - [x] Carte: Intégrer une petite carte interactive centrée sur le lieu actif, avec le périmètre et les consignes de visibilité des éclipses ou essaims.
 - [x] Transparence: Distinguer la visibilité astronomique théorique, la couverture nuageuse prévue et les limites de l’horizon local.
 - [x] Validation: Tester les événements, la carte, les états d’indisponibilité et le rendu mobile avant publication.
+
+## Alertes astronomiques — icônes distinctives
+- [x] Interface: Associer une icône explicite aux éclipses, essaims de météores et pleines lunes.
+- [x] Lisibilité: Conserver un code visuel cohérent dans les cartes et le détail du panneau.
+- [x] Accessibilité: Ajouter un libellé textuel ou alternatif pour chaque icône.
+- [x] Validation: Vérifier le rendu mobile, TypeScript et les tests avant publication.

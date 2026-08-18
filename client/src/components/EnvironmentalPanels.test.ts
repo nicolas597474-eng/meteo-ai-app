@@ -29,6 +29,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Carte locale d’observation");
     expect(source).toContain("Il ne représente pas la bande géométrique d’une éclipse");
     expect(source).toContain("data-swipe-exclude");
+    expect(source).toContain("🌕 Prochaine pleine lune");
+    expect(source).toContain("Icône d’éclipse");
+    expect(source).toContain("Icône de pluie de météores");
+    expect(source).toContain("Icône de pleine lune");
   });
 
   it("ouvre des modales de détail accessibles depuis les deux panneaux", () => {

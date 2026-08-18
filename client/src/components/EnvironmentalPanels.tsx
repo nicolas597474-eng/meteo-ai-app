@@ -154,8 +154,9 @@ function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["as
 
   return <section className="weather-surface border border-violet-300/20 bg-gradient-to-br from-indigo-500/[0.10] via-slate-950/35 to-sky-500/[0.07] p-4" aria-label="Prochains repères astronomiques">
     <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-200">Ciel à venir</p><h3 className="mt-1 text-base font-semibold text-slate-100">Prochains repères astronomiques</h3></div><span className="text-xl" aria-hidden="true">✦</span></div>
+    <div className="mt-3 flex flex-wrap gap-2 text-[9px] text-slate-300"><span className="inline-flex items-center gap-1 rounded-full border border-indigo-300/30 bg-indigo-400/[0.08] px-2 py-1" role="img" aria-label="Icône de pleine lune">🌕 <span>Pleine lune</span></span><span className="inline-flex items-center gap-1 rounded-full border border-sky-300/30 bg-sky-400/[0.08] px-2 py-1" role="img" aria-label="Icône d’éclipse">◐ <span>Éclipse</span></span><span className="inline-flex items-center gap-1 rounded-full border border-violet-300/30 bg-violet-400/[0.08] px-2 py-1" role="img" aria-label="Icône de pluie de météores">☄ <span>Étoiles filantes</span></span></div>
     <div className="mt-3 grid grid-cols-2 gap-2">
-      <AstronomyDetail label="Prochaine pleine lune" value={fullMoon ? displayAstronomyDate(fullMoon.date) : "Indisponible"} />
+      <AstronomyDetail label="🌕 Prochaine pleine lune" value={fullMoon ? displayAstronomyDate(fullMoon.date) : "Indisponible"} />
       <AstronomyDetail label="Prochaine nouvelle lune" value={newMoon ? displayAstronomyDate(newMoon.date) : "Indisponible"} />
     </div>
     {quarterMilestones.length > 0 && <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Autres phases : {quarterMilestones.map((milestone) => `${milestone.label} · ${displayAstronomyDate(milestone.date)}`).join(" · ")}.</p>}
