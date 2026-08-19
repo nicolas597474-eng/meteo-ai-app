@@ -190,6 +190,9 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
             {otherAgreementParts.length > 0 && <div className="space-y-1">{otherAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
             {windAgreementParts.length > 0 && <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-cyan-100">Vent</p>{windAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
             {humidityAgreementParts.length > 0 && <div className="rounded-lg border border-sky-300/15 bg-sky-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-sky-100">Humidité & nuages</p>{humidityAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
+            <div className="border-t border-white/10 pt-2 text-[10px] text-slate-400" aria-label="Légende des seuils d’accord global">
+              <span className="font-semibold text-slate-300">Seuils : </span><span className="text-emerald-300">Élevé 80–100 %</span><span> · </span><span className="text-sky-300">Modéré 60–79 %</span><span> · </span><span className="text-amber-300">Faible &lt; 60 %</span>
+            </div>
           </div>}
         </div>}
         {temperatureComparison && (

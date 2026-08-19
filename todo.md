@@ -2515,3 +2515,8 @@
 - [x] Mettre en évidence les accords de vent et d’humidité dans le détail ouvert.
 - [x] Conserver les valeurs seulement lorsqu’elles sont réellement comparées.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Accord global — légende des seuils
+- [x] Définir les niveaux faible, modéré et élevé avec leurs bornes chiffrées.
+- [x] Ajouter une légende accessible depuis le détail d’accord.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
