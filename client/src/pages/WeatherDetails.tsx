@@ -121,6 +121,7 @@ export default function WeatherDetails() {
   }
 
   const hours = data?.hours ?? [];
+  const periodHours = data?.periodHours ?? hours;
   const days = data?.days ?? [];
   const regime = data?.regime;
   const confidence = data?.confidence;
@@ -294,7 +295,7 @@ export default function WeatherDetails() {
                       )}
                       
                       {/* Period breakdown */}
-                      <DayPeriodBreakdown dayDate={day.date} hours={hours} regime={regime} />
+                      <DayPeriodBreakdown dayDate={day.date} hours={periodHours} regime={regime} />
                       
                     </div>
                   )}
@@ -363,21 +364,23 @@ function calculateSunshineDuration(sunrise: string, sunset: string): string {
 }
 
 function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours: any[]; regime: any }) {
-  // For today, use actual hourly data; for future days, show estimated from daily data
-  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
-  const isToday = dayDate === todayStr;
-  
-  if (!isToday) {
-    // For future days, we don't have hourly data — show placeholder
+  const dayHours = hours.filter((hour) => hour.date === dayDate);
+
+  if (dayHours.length === 0) {
     return (
-      <div className="text-[9px] text-slate-500 italic">
-        Découpage horaire disponible uniquement pour aujourd'hui et demain.
+      <div className="grid grid-cols-2 gap-2">
+        {(["matin", "apres_midi", "soir", "nuit"] as Period[]).map((period) => (
+          <div key={period} className="rounded-xl border border-white/8 bg-slate-950/25 p-2.5">
+            <p className="text-[10px] font-semibold text-slate-200">{PERIOD_LABELS[period].emoji} {PERIOD_LABELS[period].label}</p>
+            <p className="mt-2 text-[9px] leading-relaxed text-slate-500">Détail horaire non disponible pour cette journée.</p>
+          </div>
+        ))}
       </div>
     );
   }
 
   const periods: Record<Period, any[]> = { matin: [], apres_midi: [], soir: [], nuit: [] };
-  hours.forEach((h: any) => {
+  dayHours.forEach((h: any) => {
     const p = getPeriod(h.hour);
     periods[p].push(h);
   });

@@ -620,6 +620,7 @@ export const weatherRouter = router({
 
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
       const hours = snapshot.hourly;
+      const periodHours = await collectHourlyForecast(today, coords, 16);
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
 
@@ -661,6 +662,7 @@ export const weatherRouter = router({
         today: snapshot.weatherDate,
         officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source },
         hours,
+        periodHours,
         days,
         modelsUsed,
         regime: {

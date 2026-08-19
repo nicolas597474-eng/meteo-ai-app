@@ -26,5 +26,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('return "text-orange-300"');
     expect(source).toContain("Déroulé temporel");
     expect(source).toContain("Glissez pour voir les heures suivantes");
+    expect(source).toContain("const periodHours = data?.periodHours ?? hours");
+    expect(source).toContain("hours={periodHours}");
+    expect(source).toContain("Détail horaire non disponible pour cette journée.");
   });
 });

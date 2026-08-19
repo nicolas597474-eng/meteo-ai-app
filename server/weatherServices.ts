@@ -238,6 +238,7 @@ export type DayForecast = {
 };
 
 export type HourlyPoint = {
+  date?: string;              // YYYY-MM-DD, nécessaire lorsque la couverture dépasse la journée courante
   hour: string;      // "HH:00"
   temp: number | null;
   apparentTemp: number | null;
@@ -422,7 +423,8 @@ export async function collect15DayForecast(
  */
 export async function collectHourlyForecast(
   targetDate: string,
-  coords?: { lat: number; lon: number }
+  coords?: { lat: number; lon: number },
+  forecastDays = 2,
 ): Promise<HourlyPoint[]> {
   const location = coords ?? HONDEGHEM;
   try {
@@ -432,14 +434,14 @@ export async function collectHourlyForecast(
     url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index,surface_pressure,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall,weather_code");
     url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,weather_code");
     url.searchParams.set("timezone", "Europe/Paris");
-    url.searchParams.set("forecast_days", "2");
+    url.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
 
     const aromeUrl = new URL("https://api.open-meteo.com/v1/forecast");
     aromeUrl.searchParams.set("latitude", location.lat.toString());
     aromeUrl.searchParams.set("longitude", location.lon.toString());
     aromeUrl.searchParams.set("hourly", "temperature_2m,precipitation");
     aromeUrl.searchParams.set("timezone", "Europe/Paris");
-    aromeUrl.searchParams.set("forecast_days", "2");
+    aromeUrl.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
     aromeUrl.searchParams.set("models", "meteofrance_arome_france_hd");
     const aromeResponse = fetchWeather(aromeUrl.toString(), {}, { timeoutMs: 5_000, attempts: 1 }).catch(() => null);
 
@@ -459,10 +461,8 @@ export async function collectHourlyForecast(
         const aromeData = await aromeResp.json();
         if (aromeData.hourly?.time) {
           for (let j = 0; j < aromeData.hourly.time.length; j++) {
-            if (aromeData.hourly.time[j].startsWith(targetDate)) {
-              aromeTemps.push(aromeData.hourly.temperature_2m?.[j] ?? null);
-              aromePrecips.push(aromeData.hourly.precipitation?.[j] ?? null);
-            }
+            aromeTemps.push(aromeData.hourly.temperature_2m?.[j] ?? null);
+            aromePrecips.push(aromeData.hourly.precipitation?.[j] ?? null);
           }
         }
       }
@@ -472,7 +472,7 @@ export async function collectHourlyForecast(
     let aromeIdx = 0;
     for (let i = 0; i < hourly.time.length; i++) {
       const dt = hourly.time[i]; // "2026-07-05T14:00"
-      if (!dt.startsWith(targetDate)) continue;
+      const date = dt.slice(0, 10);
       const hour = dt.slice(11, 16); // "14:00"
       const precip = hourly.precipitation?.[i] ?? null;
       const cloud = hourly.cloud_cover?.[i] ?? null;
@@ -507,6 +507,7 @@ export async function collectHourlyForecast(
       }
 
       points.push({
+        date,
         hour,
         temp: bestTemp,
         apparentTemp: hourly.apparent_temperature?.[i] ?? null,

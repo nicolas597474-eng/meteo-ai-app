@@ -2453,3 +2453,9 @@
 - [x] Supprimer les onglets, diagrammes et cartes de détails horaires de la section Graphiques.
 - [x] Retirer les états, types et composants devenus inutiles sans affecter le déroulé horaire ni les prochains jours.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Prévisions détaillées — cartes de période pour tous les jours
+- [x] Vérifier la couverture horaire réelle disponible pour aujourd’hui, demain et les jours suivants.
+- [x] Afficher Matin, Après-midi, Soir et Nuit pour chaque jour avec les données disponibles.
+- [x] Distinguer clairement les valeurs issues du découpage horaire des valeurs quotidiennes agrégées, sans inventer de données.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
