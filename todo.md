@@ -2442,3 +2442,10 @@
 - [x] Identifier les méthodes, indicateurs, sources, limites et calculs encore absents du lexique.
 - [x] Ajouter les définitions vérifiables du module Soleil & Lune, des prévisions, de la fiabilité et des stations.
 - [x] Vérifier la couverture, la lisibilité mobile, TypeScript et Vitest avant publication.
+
+## Graphique horaire — diagrammes et frise de qualité
+- [x] Auditer les données horaires réelles disponibles pour température, ressenti, précipitations et vent.
+- [x] Recomposer les vues en diagrammes sélectionnables, sans inventer de valeurs manquantes.
+- [x] Ajouter une frise de qualité sur 24 heures inspirée de la référence, avec barres arrondies et couleurs déterminées par les données disponibles.
+- [x] Préserver le défilement tactile, le créneau actif et la lisibilité mobile.
+- [x] Valider TypeScript, Vitest et le rendu mobile avant publication.

@@ -43,6 +43,8 @@ interface Props {
   locationName?: string;
 }
 
+type DiagramMetric = "temperature" | "apparent" | "precipitation" | "wind";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getConditionLabel(cloudCover: number | null, precip: number | null, condition: string | null): string {
   if (condition && /(orage|brouillard|neige|pluie|averse)/i.test(condition)) return condition;
@@ -286,6 +288,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [diagramMetric, setDiagramMetric] = useState<DiagramMetric>("temperature");
   const [containerWidth, setContainerWidth] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -329,6 +332,29 @@ export default function HourlyChart({ hours, locationName }: Props) {
     const h = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
     return hours.findIndex(hr => hr.hour === h);
   }, [hours]);
+
+  const diagram = useMemo(() => {
+    const options = {
+      temperature: { label: "Température", unit: "°C", color: "#fb5a5a", softColor: "rgba(251,90,90,0.18)", values: hours.map((hour) => hour.temp) },
+      apparent: { label: "Ressenti", unit: "°C", color: "#e879f9", softColor: "rgba(232,121,249,0.18)", values: hours.map((hour) => hour.apparentTemp) },
+      precipitation: { label: "Précipitations", unit: "mm", color: "#38bdf8", softColor: "rgba(56,189,248,0.18)", values: hours.map((hour) => hour.precipitation) },
+      wind: { label: "Vent", unit: "km/h", color: "#2dd4bf", softColor: "rgba(45,212,191,0.18)", values: hours.map((hour) => hour.windSpeed) },
+    } as const;
+    const current = options[diagramMetric];
+    const finite = current.values.filter((value): value is number => value != null && Number.isFinite(value));
+    const min = finite.length ? Math.min(...finite) : 0;
+    const max = finite.length ? Math.max(...finite) : 1;
+    const range = Math.max(max - min, diagramMetric === "precipitation" ? 1 : 2);
+    return { ...current, min, max, range };
+  }, [diagramMetric, hours]);
+
+  const qualityBars = useMemo(() => hours.map((hour) => {
+    const spread = hour.tempSpread;
+    const agreement = hour.precipAgreement;
+    if (spread == null && agreement == null) return "bg-slate-600/70";
+    const score = Math.max(0, Math.min(100, ((spread == null ? 70 : 100 - spread * 25) + (agreement ?? 70)) / 2));
+    return score >= 75 ? "bg-[linear-gradient(180deg,#b6f34a_0%,#5c9616_100%)]" : score >= 55 ? "bg-[linear-gradient(180deg,#59dfc5_0%,#167d72_100%)]" : "bg-[linear-gradient(180deg,#f6c453_0%,#9c6814_100%)]";
+  }), [hours]);
 
   // ── Draw canvas ──────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -566,11 +592,6 @@ export default function HourlyChart({ hours, locationName }: Props) {
             <MapPin className="h-3 w-3" /> {locationName}
           </p>
         )}
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
-          <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Temp °C</span>
-          <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
-          <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
-        </div>
       </div>
 
       {selectedHour !== null && selectedHour < hours.length && (
@@ -579,59 +600,48 @@ export default function HourlyChart({ hours, locationName }: Props) {
         </div>
       )}
 
-      {/* Chart area */}
-      <div className="overflow-hidden rounded-[16px] border border-slate-700/70 bg-[#05070a]" style={{ height: TOTAL_H }}>
-        <div className="flex h-full">
-          <HourlyScaleLabels totalHeight={TOTAL_H} tempTop={tempZoneTop} tempBottom={tempZoneBot} windTop={windZoneTop} windBottom={windZoneBot} precipTop={precipZoneTop} precipBottom={precipZoneBot} scaleTop={scaleTop} scaleBot={scaleBot} windMax={windScaleTop} precipMax={precipScaleTop} />
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
-          <div className="relative" style={{ width: scrollableW, height: TOTAL_H }}>
-            {/* En-tête de chaque créneau : heure + grande icône météo */}
-            <div className="pointer-events-none absolute left-0 top-0 flex" style={{ height: 78, width: scrollableW }}>
-              {hours.map((h, i) => {
-                const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
-                const isCurrent = i === nowHour;
-                return (
-                  <div key={h.hour} className="flex flex-col items-center justify-start pt-2" style={{ width: COL_W }}>
-                    <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
-                    <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
-                  </div>
-                );
-              })}
-            </div>
-            <canvas ref={canvasRef} style={{ width: scrollableW, height: TOTAL_H, cursor: "pointer", display: "block", backgroundColor: "#05070a" }} onClick={onClick} />
-          </div>
+      <div className="rounded-[18px] border border-sky-300/25 bg-[#0a1421]/90 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <div className="mb-3 flex items-end justify-between border-b border-slate-600/45 pb-2">
+          <span className="text-[11px] font-semibold text-slate-300">Qualité des données sur 24 h</span>
+          <span className="text-[11px] text-slate-500">Prochaines 24 h</span>
         </div>
+        <div className="flex h-12 items-end gap-1 overflow-hidden" aria-label="Frise de qualité des données horaires">
+          {qualityBars.map((barClass, index) => <span key={`${hours[index]?.hour}-${index}`} className={`min-w-[13px] flex-1 rounded-t-[9px] ${barClass}`} style={{ height: `${30 + ((index % 4) * 4)}px` }} />)}
         </div>
+        <div className="mt-2 flex justify-between text-[10px] text-slate-500"><span>{hours[0]?.hour ?? "—"}</span><span>Prochaines 24 h</span><span>{hours[hours.length - 1]?.hour ?? "—"}</span></div>
       </div>
 
-      {/* Progress bar (interactive) */}
-      {N > VISIBLE_HOURS && (
-          <div className="mt-2 mx-auto" style={{ width: "60%", maxWidth: 200 }}>
-          <div
-            ref={progressBarRef}
-            className="h-[6px] rounded-full bg-slate-700/40 relative cursor-pointer group"
-            onClick={(e) => {
-              const bar = progressBarRef.current;
-              const scroll = scrollRef.current;
-              if (!bar || !scroll) return;
-              const rect = bar.getBoundingClientRect();
-              const clickX = e.clientX - rect.left;
-              const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-              const maxScroll = scroll.scrollWidth - scroll.clientWidth;
-              scroll.scrollTo({ left: ratio * maxScroll, behavior: 'smooth' });
-            }}
-          >
-            <div
-              className="absolute h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-transform duration-150 group-hover:from-blue-500 group-hover:to-blue-300"
-              style={{
-                width: `${(VISIBLE_HOURS / N) * 100}%`,
-                transform: `translateX(${scrollProgress * ((N / VISIBLE_HOURS) - 1) * 100}%)`
-              }}
-            />
-          </div>
-          <p className="text-center text-[9px] text-slate-500 mt-1">Cliquez ou glissez pour naviguer</p>
+      <div className="mt-3 rounded-[20px] border border-slate-600/70 bg-[linear-gradient(145deg,#182739_0%,#0b1420_100%)] p-3">
+        <div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-full border border-sky-300/25 bg-sky-400/10 text-lg">🌦</span><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200/70">Lecture dynamique</p><h3 className="text-xl font-bold text-white">Graphiques</h3></div></div>
+        <div className="mt-3 grid grid-cols-4 gap-1.5" role="tablist" aria-label="Choix du diagramme horaire">
+          {(["temperature", "apparent", "precipitation", "wind"] as DiagramMetric[]).map((metric) => {
+            const labels: Record<DiagramMetric, string> = { temperature: "Température", apparent: "Ressenti", precipitation: "Précipitations", wind: "Vent" };
+            const active = diagramMetric === metric;
+            return <button key={metric} type="button" onClick={() => setDiagramMetric(metric)} className={`min-h-11 rounded-xl border px-1 text-[10px] font-semibold transition-colors ${active ? "border-sky-200/80 bg-sky-300/15 text-sky-50" : "border-slate-500/55 bg-slate-950/20 text-slate-300"}`}>{labels[metric]}</button>;
+          })}
         </div>
-      )}
+
+        <div ref={scrollRef} className="mt-3 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+          <div className="relative min-w-[1152px] overflow-hidden rounded-[18px] border border-sky-200/35 bg-[linear-gradient(180deg,rgba(19,42,65,0.76),rgba(10,20,32,0.95))] p-4" style={{ minHeight: 290 }}>
+            <div className="pointer-events-none absolute inset-x-4 top-1/4 border-t border-slate-500/20" /><div className="pointer-events-none absolute inset-x-4 top-1/2 border-t border-slate-500/20" /><div className="pointer-events-none absolute inset-x-4 top-3/4 border-t border-slate-500/20" />
+            <div className="relative flex h-[235px] items-end gap-2">
+              {hours.map((hour, index) => {
+                const value = diagram.values[index];
+                const normalized = value == null ? 0 : diagramMetric === "precipitation" ? Math.min(1, value / Math.max(diagram.max, 0.1)) : Math.max(0.08, (value - diagram.min) / diagram.range);
+                const isCurrent = index === nowHour;
+                return <button key={`${hour.hour}-${index}`} type="button" onClick={() => setSelectedHour(index)} className={`relative flex h-full min-w-[42px] flex-1 snap-center flex-col justify-end rounded-t-xl px-0.5 text-center ${isCurrent ? "bg-sky-400/8" : ""}`} aria-label={`Voir les détails de ${hour.hour}`}>
+                  {value != null ? <span className="mb-1 text-xs font-bold" style={{ color: diagram.color }}>{value.toFixed(1)}{diagram.unit}</span> : <span className="mb-1 text-xs text-slate-600">—</span>}
+                  <span className="w-full rounded-t-[10px] border border-white/10" style={{ height: `${Math.round(normalized * 168)}px`, background: `linear-gradient(180deg, ${diagram.color}, ${diagram.softColor})` }} />
+                  <span className={`mt-2 text-[10px] font-semibold ${isCurrent ? "text-sky-100" : "text-slate-400"}`}>{hour.hour}</span>
+                  {isCurrent && <span className="mt-0.5 text-[9px] font-bold text-sky-200">MAINTENANT</span>}
+                </button>;
+              })}
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-slate-600/45 pt-3 text-xs"><span className="text-slate-400">Min. {diagram.min.toFixed(1)} {diagram.unit}</span><span className="font-semibold text-slate-200">{diagram.label} par heure</span><span className="text-slate-400">Max. {diagram.max.toFixed(1)} {diagram.unit}</span></div>
+          </div>
+        </div>
+        <p className="mt-2 text-center text-[10px] text-slate-500">Glissez horizontalement pour voir les heures suivantes · touchez une colonne pour les détails</p>
+      </div>
 
     </section>
   );
