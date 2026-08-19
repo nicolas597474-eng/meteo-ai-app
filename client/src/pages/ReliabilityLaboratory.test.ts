@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./ReliabilityLaboratory.tsx", import.meta.url), "utf8");
 
 describe("ReliabilityLaboratory", () => {
+  it("ouvre la période de fiabilité sur 7 jours", () => {
+    expect(source).toContain('useState<PeriodId>("7d")');
+  });
+
   it("privilégie une synthèse courte et des modèles effectivement classables", () => {
     expect(source).toContain("Fiabilité en bref");
     expect(source).toContain("Classement en préparation");

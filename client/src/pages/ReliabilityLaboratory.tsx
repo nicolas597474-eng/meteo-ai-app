@@ -99,7 +99,7 @@ function EmptyFigure({ title, reason }: { title: string; reason: string }) {
 export default function ReliabilityLaboratory() {
   const { activeLocation } = useLocation();
   const { style: pageSkyStyle } = usePageWeatherSky();
-  const [period, setPeriod] = useState<PeriodId>("30d");
+  const [period, setPeriod] = useState<PeriodId>("7d");
   const [horizon, setHorizon] = useState<HorizonId>("6-24h");
   const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]>("Vue générale");
   const [sortBy, setSortBy] = useState<SortId>("score");

@@ -2325,3 +2325,8 @@
 - [x] Automatisation: Alléger la tâche de 05h00 en séparant la découverte et les relevés de stations afin d’éviter les délais d’exécution.
 - [x] Planification: Confirmer la tâche active de 05h00 Paris pour les prévisions et maintenir la collecte physique horaire séparée.
 - [x] Validation: Tester la couverture des modèles, la séparation des relevés, TypeScript et la suite de régression avant publication.
+
+## Fiabilité — période par défaut de 7 jours
+- [x] État initial: Sélectionner automatiquement la période de 7 jours à l’ouverture de la page.
+- [x] Interface: Conserver le choix manuel des autres périodes après l’initialisation.
+- [x] Validation: Tester l’état initial, TypeScript et la suite de régression avant publication.
