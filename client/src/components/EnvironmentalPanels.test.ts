@@ -191,6 +191,14 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("celestial-time-markers");
   });
 
+  it("affiche la phase, l’éclairage et l’orientation issus du calcul géométrique lunaire", () => {
+    expect(temporalSunMoonSource).toContain("position.lunar");
+    expect(temporalSunMoonSource).toContain("brightLimbAngleDeg");
+    expect(temporalSunMoonSource).toContain("illuminationPct");
+    expect(temporalSunMoonSource).toContain("rotate(${moonPhase.brightLimbAngleDeg}deg)");
+    expect(temporalSunMoonSource).toContain("moon: { label: position.lunar.label");
+  });
+
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {
     expect(source).toContain("meteoai-first-quarter-moon-3d-realistic_64387ecc.png");
     expect(source).toContain('["Premier croissant", "Premier quartier"].includes(astronomy.moon.label)');

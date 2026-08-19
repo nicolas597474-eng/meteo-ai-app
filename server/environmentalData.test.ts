@@ -48,6 +48,22 @@ describe("environmentalData", () => {
     expect(day.trajectory.moon.every((point) => point.at.endsWith(".000Z"))).toBe(true);
   });
 
+  it("calcule la phase lunaire et les événements depuis la géométrie Astronomy Engine", () => {
+    const paris = { lat: 48.8566, lon: 2.3522 };
+    const instant = new Date("2026-08-19T08:00:00.000Z");
+    const position = getApparentAstronomyPosition(paris, instant);
+
+    expect(position.lunar.angleDeg).toBeGreaterThan(0);
+    expect(position.lunar.angleDeg).toBeLessThan(360);
+    expect(position.lunar.illuminationPct).toBeGreaterThanOrEqual(0);
+    expect(position.lunar.illuminationPct).toBeLessThanOrEqual(100);
+    expect(position.lunar.label).not.toBe("Premier quartier");
+    expect(position.events.sun.rise).toBeTruthy();
+    expect(position.events.sun.culmination).toBeTruthy();
+    expect(position.events.sun.set).toBeTruthy();
+    expect(position.events.moon.culmination).toBeTruthy();
+  });
+
   it("respecte les variations de lieu, de saison et de latitude dans l’état d’horizon", () => {
     const equatorEquinox = getApparentAstronomyPosition({ lat: 0, lon: 0 }, new Date("2026-03-20T12:00:00.000Z"));
     const northPoleSummer = getApparentAstronomyPosition({ lat: 89, lon: 0 }, new Date("2026-06-21T12:00:00.000Z"));

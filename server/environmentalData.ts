@@ -39,6 +39,44 @@ export function getMoonIllumination(value: number | null) {
   return Math.round(50 * (1 - Math.cos(Math.PI * 2 * value)));
 }
 
+export type AstronomicalMoonPhase = {
+  angleDeg: number;
+  label: string;
+  symbol: string;
+  waxing: boolean;
+  illuminationPct: number;
+  brightLimbAngleDeg: number;
+};
+
+function normalizeDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
+}
+
+export function getAstronomicalMoonPhase(instant: Date, observer: AstronomyObserver): AstronomicalMoonPhase {
+  const angleDeg = normalizeDegrees(Astronomy.MoonPhase(instant));
+  const illuminationPct = Math.round(Astronomy.Illumination(Astronomy.Body.Moon, instant).phase_fraction * 100);
+  const waxing = angleDeg > 0 && angleDeg < 180;
+  const label = angleDeg < 5 || angleDeg >= 355 ? "Nouvelle lune"
+    : angleDeg < 85 ? "Croissant croissant"
+      : angleDeg <= 95 ? "Premier quartier"
+        : angleDeg < 175 ? "Gibbeuse croissante"
+          : angleDeg <= 185 ? "Pleine lune"
+            : angleDeg < 265 ? "Gibbeuse décroissante"
+              : angleDeg <= 275 ? "Dernier quartier"
+                : "Croissant décroissant";
+  const symbol = label === "Pleine lune" ? "●" : label.includes("quartier") ? "◐" : label.includes("Gibbeuse") ? "◕" : label === "Nouvelle lune" ? "●" : "◔";
+  const moon = Astronomy.Equator(Astronomy.Body.Moon, instant, observer, true, true);
+  const sun = Astronomy.Equator(Astronomy.Body.Sun, instant, observer, true, true);
+  const raDelta = (sun.ra - moon.ra) * 15 * Math.PI / 180;
+  const moonDec = moon.dec * Math.PI / 180;
+  const sunDec = sun.dec * Math.PI / 180;
+  const brightLimbPositionAngle = Math.atan2(Math.cos(sunDec) * Math.sin(raDelta), Math.sin(sunDec) * Math.cos(moonDec) - Math.cos(sunDec) * Math.sin(moonDec) * Math.cos(raDelta));
+  const hourAngle = Astronomy.HourAngle(Astronomy.Body.Moon, instant, observer) * 15 * Math.PI / 180;
+  const latitude = observer.latitude * Math.PI / 180;
+  const parallacticAngle = Math.atan2(Math.sin(hourAngle), Math.tan(latitude) * Math.cos(moonDec) - Math.sin(moonDec) * Math.cos(hourAngle));
+  return { angleDeg: Math.round(angleDeg * 10) / 10, label, symbol, waxing, illuminationPct, brightLimbAngleDeg: Math.round(normalizeDegrees((brightLimbPositionAngle - parallacticAngle) * 180 / Math.PI) * 10) / 10 };
+}
+
 export function roundAltitudeDegrees(value: number | null | undefined) {
   return value == null || !Number.isFinite(value) ? null : Math.round(value * 10) / 10;
 }
@@ -56,6 +94,11 @@ export type ApparentTrajectoryPoint = ApparentBodyPosition & {
 export type ApparentAstronomyPosition = {
   sun: ApparentBodyPosition;
   moon: ApparentBodyPosition;
+  lunar: AstronomicalMoonPhase;
+  events: {
+    sun: { rise: string | null; culmination: string | null; set: string | null };
+    moon: { rise: string | null; culmination: string | null; set: string | null };
+  };
   trajectory: {
     sun: ApparentTrajectoryPoint[];
     moon: ApparentTrajectoryPoint[];
@@ -83,12 +126,25 @@ function getApparentTrajectory(body: AstronomyBody, observer: AstronomyObserver,
   });
 }
 
+function getAstronomicalEvents(body: AstronomyBody, observer: AstronomyObserver, instant: Date) {
+  const start = new Date(Date.UTC(instant.getUTCFullYear(), instant.getUTCMonth(), instant.getUTCDate()));
+  const rise = Astronomy.SearchRiseSet(body, observer, 1, start, 1);
+  const set = Astronomy.SearchRiseSet(body, observer, -1, start, 1);
+  const culmination = Astronomy.SearchHourAngle(body, observer, 0, start, 1);
+  return { rise: rise?.date.toISOString() ?? null, culmination: culmination?.time.date.toISOString() ?? null, set: set?.date.toISOString() ?? null };
+}
+
 /** Coordonnées horizontales topocentriques apparentes au lieu et à l’instant fournis. */
 export function getApparentAstronomyPosition(coords: { lat: number; lon: number }, instant = new Date()): ApparentAstronomyPosition {
   const observer = new Astronomy.Observer(coords.lat, coords.lon, 0);
   return {
     sun: getApparentBodyPosition(Astronomy.Body.Sun, instant, observer),
     moon: getApparentBodyPosition(Astronomy.Body.Moon, instant, observer),
+    lunar: getAstronomicalMoonPhase(instant, observer),
+    events: {
+      sun: getAstronomicalEvents(Astronomy.Body.Sun, observer, instant),
+      moon: getAstronomicalEvents(Astronomy.Body.Moon, observer, instant),
+    },
     trajectory: {
       sun: getApparentTrajectory(Astronomy.Body.Sun, observer, instant),
       moon: getApparentTrajectory(Astronomy.Body.Moon, observer, instant),
@@ -158,6 +214,8 @@ export type EnvironmentalSnapshot = {
     daylightDurationSeconds: number | null;
     moonrise: string | null;
     moonset: string | null;
+    sunCulmination: string | null;
+    moonCulmination: string | null;
     moonPhase: number | null;
     moon: ReturnType<typeof getMoonPhaseDescriptor>;
     moonIllumination: number | null;
@@ -239,14 +297,16 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
       hourly,
     } : null,
     astronomy: weather ? {
-      sunrise,
-      sunset,
+      sunrise: apparentPosition.events.sun.rise ?? sunrise,
+      sunset: apparentPosition.events.sun.set ?? sunset,
       daylightDurationSeconds: asNumber(daily?.daylight_duration?.[0]),
-      moonrise: typeof daily?.moonrise?.[0] === "string" ? daily.moonrise[0] : null,
-      moonset: typeof daily?.moonset?.[0] === "string" ? daily.moonset[0] : null,
-      moonPhase,
-      moon: getMoonPhaseDescriptor(moonPhase),
-      moonIllumination: getMoonIllumination(moonPhase),
+      moonrise: apparentPosition.events.moon.rise ?? (typeof daily?.moonrise?.[0] === "string" ? daily.moonrise[0] : null),
+      moonset: apparentPosition.events.moon.set ?? (typeof daily?.moonset?.[0] === "string" ? daily.moonset[0] : null),
+      sunCulmination: apparentPosition.events.sun.culmination,
+      moonCulmination: apparentPosition.events.moon.culmination,
+      moonPhase: apparentPosition.lunar.angleDeg,
+      moon: { label: apparentPosition.lunar.label, symbol: apparentPosition.lunar.symbol },
+      moonIllumination: apparentPosition.lunar.illuminationPct,
       dayProgress: calculateDayProgress(sunrise, sunset, timezone),
       sunAltitudeDeg: apparentPosition.sun.altitudeDeg,
       moonAltitudeDeg: apparentPosition.moon.altitudeDeg,

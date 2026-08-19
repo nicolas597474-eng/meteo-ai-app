@@ -2398,3 +2398,12 @@
 - [x] Lisibilité: Assurer le contraste des repères, des horaires de lever/coucher et des astres sur les trois ambiances.
 - [x] Stabilité: Préserver les trajectoires réelles, les interruptions sous l’horizon et la Lune fixe sans rotation.
 - [x] Validation: Tester TypeScript, Vitest et le rendu mobile avant publication.
+
+## Soleil & Lune — correction astronomique complète
+- [x] Audit: Identifier toute phase, image, horaire, trajectoire ou position encore dérivée d’un pourcentage ou d’une approximation.
+- [x] Lune: Calculer phase géométrique, éclairage indépendant, azimut, altitude, lever, culmination, coucher et trajectoire au lieu et à l’instant actifs.
+- [x] Soleil: Calculer lever, culmination, coucher, azimut, altitude et trajectoire pour les coordonnées et la date exactes du lieu sélectionné.
+- [x] Projection: Représenter exclusivement les coordonnées topocentriques réelles et la position actuelle dans l’arche, sans segment décoratif ni position fixe statique.
+- [x] Visuel: Orienter le disque lunaire selon la phase et la géométrie locales sans ajouter de rotation décorative.
+- [x] Temps réel: Rafraîchir positions, visibilité, phase, éclairage, horaires et trajectoires au changement d’instant ou de lieu.
+- [x] Validation: Vérifier les calculs sur plusieurs lieux et dates avec TypeScript, Vitest et le rendu mobile avant publication.
