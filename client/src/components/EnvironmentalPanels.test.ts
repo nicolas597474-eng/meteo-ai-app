@@ -80,9 +80,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Ouvrir les détails de la boussole");
     expect(source).toContain("isCompassDetailsOpen");
     expect(source).toContain("Comment lire la boussole");
-    expect(source).toContain("Recentrer sur la zone initiale de l’éclipse");
-    expect(source).toContain("expandedInitialBoundsRef");
-    expect(source).toContain("recenterExpandedMap");
+    expect(source).not.toContain("Recentrer sur la zone initiale de l’éclipse");
+    expect(source).not.toContain("RotateCcw");
     expect(source).toContain("astronomicalAzimuthLabel");
     expect(source).toContain("Azimut de l’astre");
     expect(source).toContain("astronomicalDirection");
@@ -92,6 +91,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Ma position actuelle");
     expect(source).toContain("soundAlertEnabled");
     expect(source).toContain("Activer l’alerte sonore");
+    expect(source).toContain("Alerte sonore d’observabilité");
+    expect(source).toContain("un son discret est joué une seule fois");
+    expect(source).toContain("TooltipContent");
+    expect(source).not.toContain("RotateCcw");
     expect(source).toContain("observationAlertFiredRef");
     expect(source).toContain("map-control-cluster");
     expect(styles).toContain("Groupes de commandes flottantes");

@@ -2283,3 +2283,9 @@
 - [x] Interface: Mettre ce repère en évidence avec une couleur distincte et un libellé accessible.
 - [x] Transparence: Conserver l’angle exact et distinguer l’arrondi visuel du relèvement calculé.
 - [x] Validation: Tester les directions cardinales et intermédiaires, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — commandes simplifiées et aide sonore
+- [x] Interface: Retirer la commande de rotation / recentrage de la rose des vents.
+- [x] Position: Placer l’alerte sonore sous la rose des vents, à gauche de la carte agrandie.
+- [x] Aide: Ajouter une infobulle expliquant l’activation volontaire et le déclenchement unique de l’alerte sonore.
+- [x] Validation: Tester les commandes, l’infobulle, TypeScript et la suite de régression avant publication.
