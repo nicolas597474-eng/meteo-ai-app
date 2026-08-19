@@ -157,6 +157,9 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
     : globalAgreement >= 60
       ? "border-sky-300/35 bg-sky-300/10 text-sky-50"
       : "border-amber-300/35 bg-amber-300/10 text-amber-50";
+  const windAgreementParts = agreementParts.filter((part) => ["Vent", "Rafales", "Direction"].includes(part.label));
+  const humidityAgreementParts = agreementParts.filter((part) => ["Humidité", "Nuages"].includes(part.label));
+  const otherAgreementParts = agreementParts.filter((part) => !["Vent", "Rafales", "Direction", "Humidité", "Nuages"].includes(part.label));
 
   return (
     <section className="mb-3 rounded-2xl border border-blue-400/25 bg-[#0a0e14] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.35)] animate-in slide-in-from-top-2 duration-200" role="region" aria-labelledby="hour-detail-title">
@@ -182,7 +185,12 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
             <span><span className="block text-[13px] font-bold">Accord global {globalAgreement}%</span><span className="block text-[10px] opacity-80">{agreementLevel} · {agreementParts.length} paramètre{agreementParts.length > 1 ? "s" : ""} comparé{agreementParts.length > 1 ? "s" : ""}</span></span>
             <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${agreementOpen ? "rotate-180" : ""}`} />
           </button>
-          {agreementOpen && <div className="border-t border-white/10 px-3 py-2 text-[11px] text-slate-200">{agreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
+          {agreementOpen && <div className="space-y-2 border-t border-white/10 px-3 py-2 text-[11px] text-slate-200">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Accord par paramètre</p>
+            {otherAgreementParts.length > 0 && <div className="space-y-1">{otherAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
+            {windAgreementParts.length > 0 && <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-cyan-100">Vent</p>{windAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
+            {humidityAgreementParts.length > 0 && <div className="rounded-lg border border-sky-300/15 bg-sky-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-sky-100">Humidité & nuages</p>{humidityAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
+          </div>}
         </div>}
         {temperatureComparison && (
           <div className="mb-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06]">

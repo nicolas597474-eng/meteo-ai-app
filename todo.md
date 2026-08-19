@@ -2510,3 +2510,8 @@
 - [x] Afficher l’ensemble des paramètres disponibles dans le détail d’accord de la carte principale.
 - [x] Conserver l’absence explicite de paramètres non reçus, sans score inventé.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Carte principale — détail explicite vent et humidité
+- [x] Mettre en évidence les accords de vent et d’humidité dans le détail ouvert.
+- [x] Conserver les valeurs seulement lorsqu’elles sont réellement comparées.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.

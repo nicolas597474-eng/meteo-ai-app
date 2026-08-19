@@ -83,6 +83,8 @@ describe("HourlyChart", () => {
     expect(source).toContain("windDirectionDifference");
     expect(source).toContain("humiditySpread");
     expect(source).toContain("cloudCoverSpread");
+    expect(source).toContain("Humidité & nuages");
+    expect(source).toContain("windAgreementParts");
   });
 
   it("retire les sections de régime et d’évolution à court terme du panneau détaillé", () => {
