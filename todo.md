@@ -2295,3 +2295,9 @@
 - [x] Carte: Recentrer et zoomer directement sur la position du navigateur après autorisation.
 - [x] Accessibilité: Préserver les états de chargement et les messages de refus ou d’indisponibilité.
 - [x] Validation: Tester la carte compacte et agrandie, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — commandes à droite sans chevauchement
+- [x] Position: Placer la localisation et l’alerte sonore à droite, entre le sélecteur Plan/Satellite et le zoom.
+- [x] Interface: Garantir les espacements entre commandes personnalisées et contrôles Google Maps.
+- [x] Aide: Conserver l’infobulle de l’alerte sonore à côté de son nouveau bouton.
+- [x] Validation: Tester les formats mobile et grand écran, TypeScript et la suite de régression avant publication.

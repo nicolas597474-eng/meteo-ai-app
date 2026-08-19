@@ -64,6 +64,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Localisation en cours");
     expect(source).toContain("eclipse-user-location-marker");
     expect(source).toContain("Me localiser dans la carte agrandie");
+    expect(source).toContain("right-3 top-[116px]");
+    expect(source).toContain('side="left"');
+    expect(source).toContain("flex flex-col items-end gap-3");
     expect(source).toContain("expandedMapRef.current ?? mapRef.current");
     expect(source).toContain("setZoom(Math.max(activeMap.getZoom() ?? 4, 9))");
     expect(source).toContain("Maximize2");
