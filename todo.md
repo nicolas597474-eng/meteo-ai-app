@@ -2430,3 +2430,9 @@
 - [x] Ajouter un curseur interactif pour naviguer manuellement dans la simulation.
 - [x] Supprimer la rotation 3D horizontale de la Lune (demande utilisateur).
 - [x] Valider TypeScript, Vitest et le rendu mobile avant publication.
+
+## Soleil & Lune — lisibilité des repères de trajectoire
+- [x] Déplacer l’indication des astres sous l’horizon dans une zone dédiée, hors des pointillés.
+- [x] Agrandir les repères horaires et leur donner un fond de contraste sans masquer les trajectoires.
+- [x] Renforcer le contraste du tracé vert du relief local sans masquer les trajectoires célestes.
+- [x] Vérifier l’absence de chevauchement sur mobile, TypeScript et Vitest avant publication.

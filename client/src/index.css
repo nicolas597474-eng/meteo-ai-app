@@ -591,7 +591,7 @@ img.moon-3d-first-crescent {
   gap: 0.1rem;
   transform: translate(-50%, 52%);
   color: rgb(241 245 249 / 0.92);
-  font-size: 0.5rem;
+  font-size: 0.7rem;
   font-weight: 700;
   line-height: 1;
   text-shadow: 0 1px 4px rgb(2 6 23 / 0.9);
@@ -599,8 +599,8 @@ img.moon-3d-first-crescent {
 
 .celestial-time-marker i {
   display: block;
-  width: 0.25rem;
-  height: 0.25rem;
+  width: 0.35rem;
+  height: 0.35rem;
   border: 1px solid rgb(255 255 255 / 0.82);
   border-radius: 999px;
   background: currentColor;
@@ -609,6 +609,26 @@ img.moon-3d-first-crescent {
 
 .celestial-time-marker--sun { color: #fde047; }
 .celestial-time-marker--moon { color: #c7d2fe; }
+
+.celestial-time-marker small {
+  display: block;
+  padding: 0.08rem 0.22rem;
+  border-radius: 0.25rem;
+  background: rgb(2 6 23 / 0.82);
+  box-shadow: 0 1px 5px rgb(2 6 23 / 0.7);
+}
+
+.celestial-below-horizon-label {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  padding: 0.18rem 0.45rem;
+  width: fit-content;
+  margin-inline: auto;
+  border: 1px solid rgb(148 163 184 / 0.35);
+  border-radius: 999px;
+  background: rgb(2 6 23 / 0.86);
+  box-shadow: 0 2px 8px rgb(2 6 23 / 0.65);
+}
 
 @keyframes meteo-icon-float {
   0%, 100% { transform: translateY(0); }
@@ -837,10 +857,11 @@ img.moon-3d-first-crescent {
 }
 
 .celestial-terrain-horizon {
-  fill: oklch(0.35 0.04 160 / 0.35);
-  stroke: oklch(0.65 0.12 160 / 0.6);
-  stroke-width: 0.4;
+  fill: oklch(0.42 0.08 160 / 0.42);
+  stroke: oklch(0.82 0.18 156 / 0.98);
+  stroke-width: 1.15;
   stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px oklch(0.8 0.18 156 / 0.75));
 }
 
 /* Curseur de simulation 24 h */
