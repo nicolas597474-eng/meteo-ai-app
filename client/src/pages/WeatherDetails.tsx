@@ -593,51 +593,30 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
   return (
     <div className="space-y-3">
       <div ref={chartScrollRef} onScroll={syncDetailScroll} className="-mx-3 overflow-x-auto px-3 scrollbar-hide">
-        <svg width={chartW} height={chartH + 70} className="min-w-full">
-        {/* Grid lines */}
-        {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
-          <line key={pct} x1={0} x2={chartW} y1={chartBottom - pct * chartPlotHeight} y2={chartBottom - pct * chartPlotHeight} stroke="#1e293b" strokeWidth="1" />
-        ))}
-
-        {/* Repères pour chaque heure afin de relier précisément valeurs et courbe. */}
-        {hours.map((_, i) => {
-          const x = getHourCenterX(i, chartHourStride, detailCardWidth, hours.length);
-          return <line key={`hour-grid-${i}`} x1={x} x2={x} y1={chartTop} y2={chartBottom} stroke="#334155" strokeWidth="0.5" opacity="0.45" />;
-        })}
-        
-        {/* Current hour indicator */}
-        {currentIdx < hours.length && (
-          <text x={currentX} y={chartH + 58} textAnchor="middle" fill="#bfdbfe" fontSize="11" fontWeight="700">Maintenant</text>
-        )}
-        
-        {/* Line */}
-        <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        
-        {/* Points */}
-        {points.map((p) => (
-          <g key={p.hourIndex}>
-            {p.hourIndex === selectedIdx && <circle cx={p.x} cy={p.y} r="8" fill="#60a5fa" opacity="0.28" />}
-            <circle cx={p.x} cy={p.y} r={p.hourIndex === selectedIdx ? 5 : 2.5} fill={color} stroke={p.hourIndex === selectedIdx ? "#fff" : "none"} strokeWidth={p.hourIndex === selectedIdx ? 2 : 0} />
-          </g>
-        ))}
-        
-        {/* Chaque heure est libellée : le défilement horizontal conserve la lisibilité. */}
-        {hours.map((h: any, i: number) => {
-          const x = getHourCenterX(i, chartHourStride, detailCardWidth, hours.length);
-          return (
-            <text key={i} x={x} y={chartH + 42} textAnchor="middle" fill={i === selectedIdx ? "#bfdbfe" : "#94a3b8"} fontSize={i === selectedIdx ? "13" : "12"} fontWeight={i === selectedIdx ? "700" : "500"}>{h.hour}</text>
-          );
-        })}
-        
-        {/* Valeur sélectionnée au-dessus de chaque heure. */}
-        {points.map((p) => {
-          return (
-            <text key={`value-${p.hourIndex}`} x={p.x} y={Math.max(p.y - 12, 20)} textAnchor="middle" fill={color} fontSize="14" fontWeight="bold">
-              {type === "pressure" ? p.v.toFixed(0) : p.v.toFixed(1)}
-            </text>
-          );
-        })}
-        </svg>
+        <div className="min-w-[720px] rounded-[18px] border border-sky-300/25 bg-[linear-gradient(180deg,rgba(25,48,72,0.75),rgba(9,20,31,0.96))] p-3">
+          <div className="mb-3 border-b border-slate-500/45 pb-2"><div className="flex h-10 items-end gap-1.5 overflow-hidden">
+            {hours.map((hour: any, index: number) => {
+              const agreement = hour.precipAgreement;
+              const spread = hour.tempSpread;
+              const quality = agreement == null && spread == null ? 0 : Math.max(0, Math.min(100, ((agreement ?? 70) + (spread == null ? 70 : 100 - spread * 25)) / 2));
+              const barTone = quality >= 75 ? "from-lime-300 to-lime-700" : quality >= 55 ? "from-teal-300 to-teal-700" : quality > 0 ? "from-amber-300 to-amber-700" : "from-slate-500 to-slate-700";
+              return <span key={`quality-${hour.hour}-${index}`} className={`min-w-[14px] flex-1 rounded-t-[8px] bg-gradient-to-b ${barTone}`} style={{ height: `${28 + ((index % 4) * 3)}px` }} />;
+            })}
+          </div><div className="mt-1.5 flex justify-between text-[9px] text-slate-500"><span>{hours[0]?.hour ?? "—"}</span><span>Prochaines 48 h</span><span>{hours[hours.length - 1]?.hour ?? "—"}</span></div></div>
+          <div className="relative flex h-[188px] items-end gap-2 border-b border-slate-500/35 pt-5">
+            <div className="pointer-events-none absolute inset-x-0 top-1/3 border-t border-slate-500/20" /><div className="pointer-events-none absolute inset-x-0 top-2/3 border-t border-slate-500/20" />
+            {hours.map((hour: any, index: number) => {
+              const value = getValue(hour);
+              const normalized = value == null ? 0 : type === "precip" ? Math.min(1, value / Math.max(max, 0.1)) : Math.max(0.08, (value - min) / range);
+              const selected = index === selectedIdx;
+              return <button key={`bar-${hour.hour}-${index}`} type="button" onClick={() => syncSelectedHour(index, "chart")} className={`relative flex h-full min-w-[42px] flex-1 snap-center flex-col justify-end rounded-t-xl px-0.5 text-center ${selected ? "bg-sky-400/10" : ""}`}>
+                <span className="mb-1 text-[11px] font-bold" style={{ color }}>{value == null ? "—" : `${type === "pressure" ? value.toFixed(0) : value.toFixed(1)}${getUnit()}`}</span>
+                <span className="w-full rounded-t-[9px] border border-white/10" style={{ height: `${Math.round(normalized * 132)}px`, background: `linear-gradient(180deg, ${color}, rgba(15,23,42,0.45))` }} />
+                <span className={`mt-1.5 text-[10px] font-semibold ${selected ? "text-sky-100" : "text-slate-400"}`}>{hour.hour}</span>{index === currentIdx && <span className="text-[8px] font-bold text-sky-200">MAINTENANT</span>}
+              </button>;
+            })}
+          </div>
+        </div>
       </div>
       <div className="flex justify-between mt-1">
         <span className="text-[9px] text-slate-500">Min: {min.toFixed(1)} {getUnit()}</span>

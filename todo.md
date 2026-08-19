@@ -2442,3 +2442,9 @@
 - [x] Identifier les méthodes, indicateurs, sources, limites et calculs encore absents du lexique.
 - [x] Ajouter les définitions vérifiables du module Soleil & Lune, des prévisions, de la fiabilité et des stations.
 - [x] Vérifier la couverture, la lisibilité mobile, TypeScript et Vitest avant publication.
+
+## Correction de placement — diagrammes des prévisions détaillées
+- [x] Restaurer le graphique horaire du Dashboard dans son rendu précédent.
+- [x] Refondre uniquement le graphique de la page Prévisions détaillées en diagrammes sélectionnables.
+- [x] Préserver les données réelles, les interactions et la lisibilité mobile dans les deux emplacements.
+- [x] Valider TypeScript, Vitest et le rendu avant publication.
