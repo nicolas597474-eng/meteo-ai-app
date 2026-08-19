@@ -2313,3 +2313,8 @@
 - [x] Interface: Positionner l’aide au-dessus de la carte avec une largeur adaptée au mobile.
 - [x] Accessibilité: Exposer l’état étendu et garder le contenu lisible au clavier.
 - [x] Validation: Tester le clic, la fermeture, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — fermeture de carte entièrement visible
+- [x] Mobile: Réserver une hauteur suffisante à la zone de fermeture dans la fenêtre agrandie.
+- [x] Interface: Réduire la hauteur de carte si nécessaire sans rogner le bouton « Fermer la carte ».
+- [x] Validation: Tester le rendu mobile et grand écran, TypeScript et la suite de régression avant publication.

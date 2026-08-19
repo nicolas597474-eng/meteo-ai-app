@@ -671,6 +671,34 @@ img.moon-3d-first-crescent {
   accent-color: #38bdf8;
 }
 
+/* La fenêtre de carte garde toujours sa commande de fermeture dans le viewport. */
+[data-slot="dialog-content"]:has(.gm-style) {
+  display: flex !important;
+  flex-direction: column;
+  gap: 0 !important;
+  max-height: calc(100dvh - 1rem) !important;
+  overflow: hidden !important;
+}
+
+[data-slot="dialog-content"]:has(.gm-style) > [data-slot="dialog-header"],
+[data-slot="dialog-content"]:has(.gm-style) > [data-slot="dialog-footer"] {
+  flex: 0 0 auto;
+}
+
+[data-slot="dialog-content"]:has(.gm-style) > [data-swipe-exclude] {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+[data-slot="dialog-content"]:has(.gm-style) > [data-swipe-exclude] > div {
+  height: min(52dvh, 500px) !important;
+}
+
+[data-slot="dialog-content"]:has(.gm-style) > [data-slot="dialog-footer"] {
+  background: #0b111b;
+}
+
 @media (max-width: 420px) {
   .map-control-cluster {
     gap: 0.5rem;
