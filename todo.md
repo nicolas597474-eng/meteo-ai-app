@@ -2265,3 +2265,9 @@
 - [x] Position: Placer cette commande en bas à gauche de la vue agrandie, hors des crédits et des contrôles natifs.
 - [x] Interaction: Ouvrir et fermer le réglage d’opacité depuis le bouton sans gêner les gestes cartographiques.
 - [x] Validation: Tester la commande en vue agrandie, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — détails de la boussole
+- [x] Interaction: Rendre la boussole activable au toucher et au clavier.
+- [x] Informations: Afficher l’orientation de la carte, l’azimut de l’astre, sa direction et la méthode de lecture.
+- [x] Transparence: Préciser que l’azimut est géographique et que l’horizon réel reste à vérifier.
+- [x] Validation: Tester l’ouverture, la fermeture, TypeScript et la suite de régression avant publication.

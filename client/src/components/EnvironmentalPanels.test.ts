@@ -69,6 +69,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain('gestureHandling: "greedy"');
     expect(source).toContain("utilisez les contrôles de zoom et la flèche de direction");
     expect(source).toContain("Boussole, nord géographique");
+    expect(source).toContain("Détails de la boussole");
+    expect(source).toContain("Ouvrir les détails de la boussole");
+    expect(source).toContain("isCompassDetailsOpen");
+    expect(source).toContain("Comment lire la boussole");
     expect(source).toContain("Recentrer sur la zone initiale de l’éclipse");
     expect(source).toContain("expandedInitialBoundsRef");
     expect(source).toContain("recenterExpandedMap");
