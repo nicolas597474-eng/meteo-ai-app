@@ -2465,3 +2465,9 @@
 - [x] Afficher l’indicateur sur les cartes heure par heure.
 - [x] Agréger l’indicateur sans interpolation pour les cartes Matin, Après-midi, Soir et Nuit.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Prévisions détaillées — accord multi-paramètres
+- [x] Étendre les collectes multi-modèles horaires au vent, à l’humidité et à la nébulosité.
+- [x] Calculer des accords transparents à partir des écarts réellement observés entre modèles.
+- [x] Intégrer les nouveaux accords à l’indicateur des cartes heure par heure et de période.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.

@@ -31,5 +31,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Détail horaire non disponible pour cette journée.");
     expect(source).toContain("getSlotAgreementConfidence");
     expect(source).toContain("Accord {value}%");
+    expect(source).toContain("windSpeedSpread");
+    expect(source).toContain("humiditySpread");
+    expect(source).toContain("cloudCoverSpread");
   });
 });

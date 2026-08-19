@@ -265,6 +265,9 @@ export type HourlyPoint = {
   precipIntensity?: string | null; // light, moderate, heavy
   // Multi-model spread (optional, populated when available)
   tempSpread?: number | null;    // Max - Min across models (°C)
+  windSpeedSpread?: number | null; // Écart de vent moyen entre modèles (km/h)
+  humiditySpread?: number | null;  // Écart d’humidité relative entre modèles (points %)
+  cloudCoverSpread?: number | null; // Écart de nébulosité entre modèles (points %)
   precipAgreement?: number | null; // % de modèles comparés prévoyant de la pluie
   modelCount?: number;           // Number of models contributing
   temperatureComparison?: {
@@ -439,7 +442,7 @@ export async function collectHourlyForecast(
     const aromeUrl = new URL("https://api.open-meteo.com/v1/forecast");
     aromeUrl.searchParams.set("latitude", location.lat.toString());
     aromeUrl.searchParams.set("longitude", location.lon.toString());
-    aromeUrl.searchParams.set("hourly", "temperature_2m,precipitation");
+    aromeUrl.searchParams.set("hourly", "temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m,cloud_cover");
     aromeUrl.searchParams.set("timezone", "Europe/Paris");
     aromeUrl.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
     aromeUrl.searchParams.set("models", "meteofrance_arome_france_hd");
@@ -455,6 +458,9 @@ export async function collectHourlyForecast(
     // Fetch a second model (AROME) for spread estimation
     let aromeTemps: (number | null)[] = [];
     let aromePrecips: (number | null)[] = [];
+    let aromeWinds: (number | null)[] = [];
+    let aromeHumidities: (number | null)[] = [];
+    let aromeClouds: (number | null)[] = [];
     try {
       const aromeResp = await aromeResponse;
       if (aromeResp?.ok) {
@@ -463,6 +469,9 @@ export async function collectHourlyForecast(
           for (let j = 0; j < aromeData.hourly.time.length; j++) {
             aromeTemps.push(aromeData.hourly.temperature_2m?.[j] ?? null);
             aromePrecips.push(aromeData.hourly.precipitation?.[j] ?? null);
+            aromeWinds.push(aromeData.hourly.wind_speed_10m?.[j] ?? null);
+            aromeHumidities.push(aromeData.hourly.relative_humidity_2m?.[j] ?? null);
+            aromeClouds.push(aromeData.hourly.cloud_cover?.[j] ?? null);
           }
         }
       }
@@ -480,6 +489,9 @@ export async function collectHourlyForecast(
       const bestTemp = hourly.temperature_2m?.[i] ?? null;
       const aromeTemp = aromeTemps[aromeIdx] ?? null;
       const aromePrecip = aromePrecips[aromeIdx] ?? null;
+      const aromeWind = aromeWinds[aromeIdx] ?? null;
+      const aromeHumidity = aromeHumidities[aromeIdx] ?? null;
+      const aromeCloud = aromeClouds[aromeIdx] ?? null;
       aromeIdx++;
 
       // Spread: difference between best_match and AROME
@@ -487,6 +499,11 @@ export async function collectHourlyForecast(
         ? Math.abs(bestTemp - aromeTemp)
         : null;
       const temperatureComparison = buildHourlyTemperatureComparison(bestTemp, aromeTemp);
+      const windSpeed = hourly.wind_speed_10m?.[i] ?? null;
+      const humidity = hourly.relative_humidity_2m?.[i] ?? null;
+      const windSpeedSpread = windSpeed != null && aromeWind != null ? Math.abs(windSpeed - aromeWind) : null;
+      const humiditySpread = humidity != null && aromeHumidity != null ? Math.abs(humidity - aromeHumidity) : null;
+      const cloudCoverSpread = cloud != null && aromeCloud != null ? Math.abs(cloud - aromeCloud) : null;
       // Accord de détection de pluie entre les deux modèles réellement comparés.
       // Ce n'est pas une probabilité calibrée ni une probabilité d'ensemble.
       const bestRain = (precip ?? 0) >= 0.1;
@@ -512,11 +529,11 @@ export async function collectHourlyForecast(
         temp: bestTemp,
         apparentTemp: hourly.apparent_temperature?.[i] ?? null,
         precipitation: precip,
-        windSpeed: hourly.wind_speed_10m?.[i] ?? null,
+        windSpeed,
         windGust: hourly.wind_gusts_10m?.[i] ?? null,
         windDirection: hourly.wind_direction_10m?.[i] ?? null,
         cloudCover: cloud,
-        humidity: hourly.relative_humidity_2m?.[i] ?? null,
+        humidity,
         uvIndex: hourly.uv_index?.[i] ?? null,
         condition: conditionFromWmoWeatherCode(weatherCode, precip, cloud),
         weatherCode,
@@ -532,6 +549,9 @@ export async function collectHourlyForecast(
         precipIntensity,
         // Multi-model
         tempSpread,
+        windSpeedSpread,
+        humiditySpread,
+        cloudCoverSpread,
         precipAgreement,
         modelCount,
         temperatureComparison,

@@ -78,6 +78,9 @@ function getSlotAgreementConfidence(hour: any): number | null {
   const components: number[] = [];
   if (typeof hour?.precipAgreement === "number") components.push(hour.precipAgreement);
   if (typeof hour?.tempSpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.tempSpread * 25)));
+  if (typeof hour?.windSpeedSpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.windSpeedSpread * 10)));
+  if (typeof hour?.humiditySpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.humiditySpread)));
+  if (typeof hour?.cloudCoverSpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.cloudCoverSpread)));
   if (components.length === 0) return null;
   return Math.round(components.reduce((sum, value) => sum + value, 0) / components.length);
 }
