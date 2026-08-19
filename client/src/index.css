@@ -827,3 +827,10 @@ img.moon-3d-first-crescent {
     height: 2.5rem;
   }
 }
+
+.celestial-terrain-horizon {
+  fill: oklch(0.35 0.04 160 / 0.35);
+  stroke: oklch(0.65 0.12 160 / 0.6);
+  stroke-width: 0.4;
+  stroke-linejoin: round;
+}

@@ -134,7 +134,7 @@ function getAstronomicalEvents(body: AstronomyBody, observer: AstronomyObserver,
   return { rise: rise?.date.toISOString() ?? null, culmination: culmination?.time.date.toISOString() ?? null, set: set?.date.toISOString() ?? null };
 }
 
-/** Coordonnées horizontales topocentriques apparentes au lieu et à l’instant fournis. */
+/** Coordonnées horizontales topocentriques apparentes au lieu et à l'instant fournis. */
 export function getApparentAstronomyPosition(coords: { lat: number; lon: number }, instant = new Date()): ApparentAstronomyPosition {
   const observer = new Astronomy.Observer(coords.lat, coords.lon, 0);
   return {
@@ -151,6 +151,79 @@ export function getApparentAstronomyPosition(coords: { lat: number; lon: number 
     },
     calculatedAt: instant.toISOString(),
   };
+}
+
+/* ─── Profil de relief local ─── */
+
+export type TerrainHorizonPoint = {
+  azimuthDeg: number;
+  elevationDeg: number;
+};
+
+export type TerrainHorizonProfile = {
+  points: TerrainHorizonPoint[];
+  observerElevationM: number;
+  resolutionM: number;
+  source: string;
+};
+
+const terrainCache = new Map<string, { expiresAt: number; value: TerrainHorizonProfile }>();
+
+/**
+ * Échantillonne l'altitude du terrain autour du lieu actif et calcule
+ * l'angle d'élévation apparent de l'horizon dans chaque direction.
+ * Utilise l'API Open-Meteo Elevation (Copernicus GLO-90, résolution 90 m).
+ */
+export async function getTerrainHorizonProfile(coords: { lat: number; lon: number }): Promise<TerrainHorizonProfile> {
+  const key = `${coords.lat.toFixed(3)},${coords.lon.toFixed(3)}`;
+  const cached = terrainCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const SAMPLE_AZIMUTHS = 36;
+  const SAMPLE_DISTANCE_KM = 5;
+  const EARTH_RADIUS_KM = 6371;
+
+  const latRad = coords.lat * Math.PI / 180;
+  const lonRad = coords.lon * Math.PI / 180;
+
+  const sampleCoords: { lat: number; lon: number; azimuth: number }[] = [];
+  for (let i = 0; i < SAMPLE_AZIMUTHS; i++) {
+    const azimuth = (i * 360) / SAMPLE_AZIMUTHS;
+    const bearing = azimuth * Math.PI / 180;
+    const angularDist = SAMPLE_DISTANCE_KM / EARTH_RADIUS_KM;
+    const sampleLat = Math.asin(Math.sin(latRad) * Math.cos(angularDist) + Math.cos(latRad) * Math.sin(angularDist) * Math.cos(bearing));
+    const sampleLon = lonRad + Math.atan2(Math.sin(bearing) * Math.sin(angularDist) * Math.cos(latRad), Math.cos(angularDist) - Math.sin(latRad) * Math.sin(sampleLat));
+    sampleCoords.push({ lat: sampleLat * 180 / Math.PI, lon: sampleLon * 180 / Math.PI, azimuth });
+  }
+
+  const allLats = [coords.lat, ...sampleCoords.map((s) => s.lat)];
+  const allLons = [coords.lon, ...sampleCoords.map((s) => s.lon)];
+
+  const url = new URL("https://api.open-meteo.com/v1/elevation");
+  url.searchParams.set("latitude", allLats.map((v) => v.toFixed(5)).join(","));
+  url.searchParams.set("longitude", allLons.map((v) => v.toFixed(5)).join(","));
+
+  let elevations: number[];
+  try {
+    const response = await fetchWeather(url, {}, { timeoutMs: 5_000, attempts: 2 });
+    if (!response.ok) throw new Error(`Elevation API HTTP ${response.status}`);
+    const json = await response.json() as { elevation?: number[] };
+    elevations = Array.isArray(json.elevation) ? json.elevation.map((v) => (typeof v === "number" && Number.isFinite(v) ? v : 0)) : [];
+  } catch {
+    elevations = new Array(allLats.length).fill(0);
+  }
+
+  const observerElevation = elevations[0] ?? 0;
+  const points: TerrainHorizonPoint[] = sampleCoords.map((sample, index) => {
+    const terrainElevation = (elevations[index + 1] ?? 0) - observerElevation;
+    const distanceM = SAMPLE_DISTANCE_KM * 1000;
+    const elevationAngle = Math.atan2(terrainElevation, distanceM) * 180 / Math.PI;
+    return { azimuthDeg: sample.azimuth, elevationDeg: Math.round(Math.max(0, elevationAngle) * 10) / 10 };
+  });
+
+  const profile: TerrainHorizonProfile = { points, observerElevationM: Math.round(observerElevation), resolutionM: 90, source: "Copernicus GLO-90 via Open-Meteo" };
+  terrainCache.set(key, { value: profile, expiresAt: Date.now() + 60 * 60 * 1_000 });
+  return profile;
 }
 
 function asNumber(value: unknown): number | null {

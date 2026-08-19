@@ -51,7 +51,7 @@ import { getCollectedModelNames, getMissingModelNames } from "../stationCollecti
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
-import { getApparentAstronomyPosition, getEnvironmentalSnapshot } from "../environmentalData";
+import { getApparentAstronomyPosition, getEnvironmentalSnapshot, getTerrainHorizonProfile } from "../environmentalData";
 import { refreshManualFusionForFavorite } from "../manualFusion";
 import { getLocalEclipseCircumstances } from "../eclipseVisibility";
 
@@ -589,10 +589,15 @@ export const weatherRouter = router({
     .input(requiredCoordinatesSchema)
     .query(({ input }) => getEnvironmentalSnapshot({ lat: input.lat, lon: input.lon })),
 
-  /** Coordonnées apparentes actualisées des astres pour l’arche Soleil & Lune. */
+  /** Coordonnées apparentes actualisées des astres pour l'arche Soleil & Lune. */
   getApparentAstronomyPosition: publicProcedure
     .input(requiredCoordinatesSchema)
     .query(({ input }) => getApparentAstronomyPosition({ lat: input.lat, lon: input.lon })),
+
+  /** Profil de relief local pour la superposition terrain de l'arche. */
+  getTerrainHorizonProfile: publicProcedure
+    .input(requiredCoordinatesSchema)
+    .query(({ input }) => getTerrainHorizonProfile({ lat: input.lat, lon: input.lon })),
 
   /** Circonstances calculées pour une position choisie sur la carte d’éclipse. */
   getEclipseCircumstances: publicProcedure

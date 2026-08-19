@@ -2407,3 +2407,10 @@
 - [x] Visuel: Orienter le disque lunaire selon la phase et la géométrie locales sans ajouter de rotation décorative.
 - [x] Temps réel: Rafraîchir positions, visibilité, phase, éclairage, horaires et trajectoires au changement d’instant ou de lieu.
 - [x] Validation: Vérifier les calculs sur plusieurs lieux et dates avec TypeScript, Vitest et le rendu mobile avant publication.
+
+## Soleil & Lune — horizon de relief local
+- [x] Données: Identifier une source d'altitude terrain et documenter la précision de l'horizon calculé.
+- [x] Calcul: Échantillonner l'altitude du relief par direction autour du lieu actif et la projeter sur l'azimut de l'arche.
+- [x] Interface: Ajouter un contrôle optionnel pour afficher ou masquer le profil de relief sans remplacer l'horizon astronomique.
+- [x] Information: Indiquer les limites de l'estimation terrain et conserver les trajectoires astronomiques indépendantes.
+- [x] Validation: Tester le comportement mobile, les coordonnées variables, TypeScript et Vitest avant publication.
