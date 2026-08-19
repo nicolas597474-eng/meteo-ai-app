@@ -69,6 +69,29 @@ const PERIOD_LABELS: Record<Period, { label: string; emoji: string }> = {
   nuit: { label: "Nuit", emoji: "🌙" },
 };
 
+/**
+ * Indicateur local de créneau : il combine uniquement l'accord pluie réellement
+ * comparé et la dispersion thermique réellement disponible. Il ne prétend pas
+ * reproduire le score officiel de confiance, qui reste présenté séparément.
+ */
+function getSlotAgreementConfidence(hour: any): number | null {
+  const components: number[] = [];
+  if (typeof hour?.precipAgreement === "number") components.push(hour.precipAgreement);
+  if (typeof hour?.tempSpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.tempSpread * 25)));
+  if (components.length === 0) return null;
+  return Math.round(components.reduce((sum, value) => sum + value, 0) / components.length);
+}
+
+function SlotConfidenceBadge({ value }: { value: number | null }) {
+  if (value == null) return null;
+  const tone = value >= 75
+    ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+    : value >= 55
+      ? "border-sky-300/25 bg-sky-300/10 text-sky-100"
+      : "border-amber-300/25 bg-amber-300/10 text-amber-100";
+  return <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold ${tone}`}>Accord {value}%</span>;
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 type ChartType = "temp" | "feels" | "precip" | "wind" | "gusts" | "humidity" | "pressure" | "clouds";
@@ -172,6 +195,7 @@ export default function WeatherDetails() {
                     <div className="mb-3 border-b border-white/12 pb-3">
                       <span className={`text-[36px] font-semibold leading-none tracking-[-0.075em] ${hourlyTemperatureTone(h.temp)}`}>{h.temp?.toFixed(1) ?? "—"}°</span>
                       <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
+                      <div className="mt-1.5"><SlotConfidenceBadge value={getSlotAgreementConfidence(h)} /></div>
                     </div>
                     
                     {/* Precipitation */}
@@ -397,6 +421,10 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
         const avgHumidity = Math.round(periodHours.reduce((s: number, h: any) => s + (h.humidity ?? 0), 0) / periodHours.length);
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
+        const agreementValues = periodHours.map(getSlotAgreementConfidence).filter((value): value is number => value != null);
+        const periodAgreement = agreementValues.length > 0
+          ? Math.round(agreementValues.reduce((sum, value) => sum + value, 0) / agreementValues.length)
+          : null;
         return (
           <div key={p} className="bg-slate-800/30 rounded-xl p-2">
             <div className="flex items-center gap-1.5 mb-1">
@@ -404,6 +432,7 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
               <span className="text-[10px] text-white font-semibold">{PERIOD_LABELS[p].label}</span>
               <MeteoIcon name={getIconNameFromCondition(dominantCondition)} size={14} className="ml-auto" />
             </div>
+            <div className="mb-1.5"><SlotConfidenceBadge value={periodAgreement} /></div>
             <div className="space-y-0.5 text-[9px] text-slate-300">
               <div className="flex justify-between"><span>Temp.</span><span className="text-white font-medium">{avgTemp}°C</span></div>
               <div className="flex justify-between"><span>Vent</span><span>{avgWind} km/h</span></div>

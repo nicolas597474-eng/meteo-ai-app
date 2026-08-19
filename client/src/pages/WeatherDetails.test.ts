@@ -29,5 +29,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("const periodHours = data?.periodHours ?? hours");
     expect(source).toContain("hours={periodHours}");
     expect(source).toContain("Détail horaire non disponible pour cette journée.");
+    expect(source).toContain("getSlotAgreementConfidence");
+    expect(source).toContain("Accord {value}%");
   });
 });

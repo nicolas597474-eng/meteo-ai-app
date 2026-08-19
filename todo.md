@@ -2459,3 +2459,9 @@
 - [x] Afficher Matin, Après-midi, Soir et Nuit pour chaque jour avec les données disponibles.
 - [x] Distinguer clairement les valeurs issues du découpage horaire des valeurs quotidiennes agrégées, sans inventer de données.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Prévisions détaillées — confiance par créneau
+- [x] Définir un indicateur basé sur l’accord horaire et la couverture réellement disponibles.
+- [x] Afficher l’indicateur sur les cartes heure par heure.
+- [x] Agréger l’indicateur sans interpolation pour les cartes Matin, Après-midi, Soir et Nuit.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
