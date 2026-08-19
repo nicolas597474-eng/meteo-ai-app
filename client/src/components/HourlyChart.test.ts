@@ -85,9 +85,13 @@ describe("HourlyChart", () => {
     expect(source).toContain("cloudCoverSpread");
     expect(source).toContain("Humidité & nuages");
     expect(source).toContain("windAgreementParts");
-    expect(source).toContain("Élevé 80–100 %");
-    expect(source).toContain("Modéré 60–79 %");
-    expect(source).toContain("Faible &lt; 60 %");
+    expect(source).toContain("Repères d’accord");
+    expect(source).toContain("Élevé");
+    expect(source).toContain("80–100 %");
+    expect(source).toContain("Modéré");
+    expect(source).toContain("60–79 %");
+    expect(source).toContain("Faible");
+    expect(source).toContain("&lt; 60 %");
   });
 
   it("retire les sections de régime et d’évolution à court terme du panneau détaillé", () => {

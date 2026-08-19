@@ -2520,3 +2520,8 @@
 - [x] Définir les niveaux faible, modéré et élevé avec leurs bornes chiffrées.
 - [x] Ajouter une légende accessible depuis le détail d’accord.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Accord global — légende visuellement harmonisée
+- [x] Recomposer la légende avec les surfaces et espacements du panneau détaillé.
+- [x] Conserver les couleurs des niveaux sans créer de rupture visuelle.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
