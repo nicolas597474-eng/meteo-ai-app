@@ -69,22 +69,9 @@ const PERIOD_LABELS: Record<Period, { label: string; emoji: string }> = {
   nuit: { label: "Nuit", emoji: "🌙" },
 };
 
-// ─── Chart types ────────────────────────────────────────────────────────────
+// ─── Main Component ─────────────────────────────────────────────────────────
 
 type ChartType = "temp" | "feels" | "precip" | "wind" | "gusts" | "humidity" | "pressure" | "clouds";
-
-const CHART_OPTIONS: { key: ChartType; label: string }[] = [
-  { key: "temp", label: "Température" },
-  { key: "feels", label: "Ressenti" },
-  { key: "precip", label: "Précipitations" },
-  { key: "wind", label: "Vent" },
-  { key: "gusts", label: "Rafales" },
-  { key: "humidity", label: "Humidité" },
-  { key: "pressure", label: "Pression" },
-  { key: "clouds", label: "Nuages" },
-];
-
-// ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function WeatherDetails() {
   const { activeLocation } = useLocation();
@@ -94,7 +81,6 @@ export default function WeatherDetails() {
     : undefined, [activeLocation?.lat, activeLocation?.lon]);
 
   const { data, isLoading } = trpc.weather.getDetailedForecast.useQuery(coordsInput);
-  const [activeChart, setActiveChart] = useState<ChartType>("temp");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const hourlyRef = useRef<HTMLDivElement>(null);
 
@@ -246,34 +232,7 @@ export default function WeatherDetails() {
           <p className="mt-2 text-center text-[10px] text-slate-500">← Glissez pour voir les heures suivantes →</p>
         </MeteoSurface>
 
-        {/* ═══ SECTION 2: GRAPHIQUES INTERACTIFS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-white/10 bg-[rgba(11,17,28,0.86)] p-4">
-          <div className="mb-4 flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full border border-white/12 bg-white/[0.04]"><MeteoIcon name="chart" size={16} /></span><div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">Lecture dynamique</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Graphiques</h2></div></div>
-          
-          {/* Chart selector */}
-          <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide mb-3">
-            {CHART_OPTIONS.map((opt) => (
-              <button
-                key={opt.key}
-                onClick={() => setActiveChart(opt.key)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  activeChart === opt.key
-                    ? "border border-sky-200/45 bg-sky-300/12 text-sky-50"
-                    : "border border-white/10 bg-white/[0.035] text-slate-300 hover:border-white/20 hover:text-white"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          
-          {/* Chart area */}
-          <div className="weather-chart-3d rounded-[20px] border border-white/10 bg-black/20 p-3">
-            <HourlyChart hours={hours} type={activeChart} currentIdx={currentHourIdx} />
-          </div>
-        </MeteoSurface>
-
-        {/* ═══ SECTION 3: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
+        {/* ═══ SECTION 2: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
         <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-white/10 bg-[rgba(11,17,28,0.86)] p-4">
           <div className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-full border border-white/12 bg-white/[0.04]"><MeteoIcon name="calendar" size={16} /></span>

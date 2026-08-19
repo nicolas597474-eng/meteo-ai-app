@@ -2448,3 +2448,8 @@
 - [x] Refondre uniquement le graphique de la page Prévisions détaillées en diagrammes sélectionnables.
 - [x] Préserver les données réelles, les interactions et la lisibilité mobile dans les deux emplacements.
 - [x] Valider TypeScript, Vitest et le rendu avant publication.
+
+## Prévisions détaillées — suppression de la section Graphiques
+- [x] Supprimer les onglets, diagrammes et cartes de détails horaires de la section Graphiques.
+- [x] Retirer les états, types et composants devenus inutiles sans affecter le déroulé horaire ni les prochains jours.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.

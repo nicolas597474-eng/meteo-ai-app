@@ -4,36 +4,15 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url), "utf8");
 
 describe("page Prévisions détaillées", () => {
-  it("réutilise les surfaces et contrôles visuels MeteoAI", () => {
+  it("conserve le déroulé horaire sans afficher de section Graphiques", () => {
     expect(source).toContain('import { MeteoSurface } from "@/components/weather/MeteoSurface"');
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
     expect(source).toContain('tone="default"');
-    expect(source).toContain("weather-chart-3d");
+    expect(source).not.toContain("weather-chart-3d");
     expect(source).toContain("<BackToTopButton />");
     expect(source).toContain("w-[160px]");
     expect(source).toContain("hours.length * 170");
     expect(source).toContain("text-[36px] font-semibold leading-none");
-    expect(source).toContain("Détails par heure");
-    expect(source).toContain('aria-label="Détails horaires défilables"');
-    expect(source).toContain("hours.length * 186");
-    expect(source).toContain("w-[174px]");
-    expect(source).toContain("Temp. · ressenti · vent · pluie · humidité · pression");
-    expect(source).toContain("chartScrollRef");
-    expect(source).toContain("detailScrollRef");
-    expect(source).toContain("detailCardStride = 186");
-    expect(source).toContain("getCenteredHourScrollLeft");
-    expect(source).toContain("scrollToCenteredHour");
-    expect(source).toContain("syncDetailScroll");
-    expect(source).toContain("syncChartScroll");
-    expect(source).toContain("getNearestCenteredHourIndex");
-    expect(source).toContain("scheduleCenteredSnap");
-    expect(source).toContain("onScroll={syncDetailScroll}");
-    expect(source).toContain("onScroll={syncChartScroll}");
-    expect(source).toContain("Prochaines 48 h");
-    expect(source).toContain("quality-${hour.hour}-${index}");
-    expect(source).toContain("bg-gradient-to-b ${barTone}");
-    expect(source).toContain("bar-${hour.hour}-${index}");
-    expect(source).toContain("linear-gradient(180deg, ${color}");
     expect(source).toContain("MAINTENANT");
     expect(source).toContain("hourlyCardStride = 170");
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
@@ -46,7 +25,6 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('return "text-amber-200"');
     expect(source).toContain('return "text-orange-300"');
     expect(source).toContain("Déroulé temporel");
-    expect(source).toContain("syncSelectedHour(index, \"chart\")");
     expect(source).toContain("Glissez pour voir les heures suivantes");
   });
 });
