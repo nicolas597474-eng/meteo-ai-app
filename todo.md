@@ -2340,3 +2340,9 @@
 - [x] Rendu: Restaurer l’image réaliste de la Lune pour la phase Premier quartier.
 - [x] Cohérence: Utiliser le même visuel sur l’arche et près du libellé de phase.
 - [x] Validation: Tester le rendu de phase, TypeScript et la suite de régression avant publication.
+
+## Soleil & Lune — mouvement horizontal continu
+- [x] Animation: Ajouter un déplacement horizontal continu et discret au Soleil et à la Lune de l’arche.
+- [x] Calcul: Préserver les positions astronomiques calculées comme point de départ visuel.
+- [x] Accessibilité: Désactiver le mouvement lorsque la réduction des mouvements est demandée.
+- [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.

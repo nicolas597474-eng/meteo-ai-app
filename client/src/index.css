@@ -484,6 +484,28 @@ img.moon-3d-first-crescent {
   transform: scale(1.06);
 }
 
+/* L’oscillation ne déplace que le visuel : les coordonnées de l’arche restent astronomiquement calculées. */
+.celestial-horizontal-drift {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .celestial-horizontal-drift {
+    animation: celestial-horizontal-drift 6s ease-in-out infinite;
+  }
+
+  .celestial-horizontal-drift--moon {
+    animation-delay: -3s;
+  }
+}
+
+@keyframes celestial-horizontal-drift {
+  0%, 100% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+}
+
 @keyframes meteo-icon-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
