@@ -2364,3 +2364,9 @@
 - [x] Interaction: Bloquer les mises à jour concurrentes tant qu’un zoom ou dézoom est en cours.
 - [x] Carte: Préserver le centre et le niveau de zoom choisis par l’utilisateur.
 - [x] Validation: Tester les zooms rapides répétés sur mobile, TypeScript et la suite de régression avant publication.
+
+## Soleil & Lune — rotation axiale de la Lune
+- [x] Animation: Faire tourner uniquement la Lune sur son axe de façon continue.
+- [x] Position: Conserver la Lune sur sa position astronomique fixe de l’arche.
+- [x] Accessibilité: Désactiver la rotation lorsque la réduction des mouvements est demandée.
+- [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.

@@ -484,22 +484,22 @@ img.moon-3d-first-crescent {
   transform: scale(1.06);
 }
 
-/* La Lune parcourt visuellement l’arche sans modifier les coordonnées astronomiques de référence. */
-.celestial-moon-arc-travel {
+/* La Lune tourne sur son axe sans modifier sa position astronomique sur l’arche. */
+.celestial-moon-axis-rotation {
   display: block;
   width: 100%;
   height: 100%;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .celestial-moon-arc-travel {
-    animation: celestial-moon-arc-travel 12s ease-in-out infinite alternate;
+  .celestial-moon-axis-rotation {
+    animation: celestial-moon-axis-rotation 11s linear infinite;
   }
 }
 
-@keyframes celestial-moon-arc-travel {
-  from { transform: translateX(-118px); }
-  to { transform: translateX(118px); }
+@keyframes celestial-moon-axis-rotation {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes meteo-icon-float {
