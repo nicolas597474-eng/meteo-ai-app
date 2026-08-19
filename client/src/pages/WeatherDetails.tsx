@@ -74,25 +74,43 @@ const PERIOD_LABELS: Record<Period, { label: string; emoji: string }> = {
  * comparé et la dispersion thermique réellement disponible. Il ne prétend pas
  * reproduire le score officiel de confiance, qui reste présenté séparément.
  */
-function getSlotAgreementConfidence(hour: any): number | null {
-  const components: number[] = [];
-  if (typeof hour?.precipAgreement === "number") components.push(hour.precipAgreement);
-  if (typeof hour?.tempSpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.tempSpread * 25)));
-  if (typeof hour?.windSpeedSpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.windSpeedSpread * 10)));
-  if (typeof hour?.humiditySpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.humiditySpread)));
-  if (typeof hour?.cloudCoverSpread === "number") components.push(Math.max(0, Math.min(100, 100 - hour.cloudCoverSpread)));
-  if (components.length === 0) return null;
-  return Math.round(components.reduce((sum, value) => sum + value, 0) / components.length);
+type AgreementDetail = { label: string; value: number };
+
+function getSlotAgreementDetails(hour: any): AgreementDetail[] {
+  const bound = (value: number) => Math.max(0, Math.min(100, value));
+  const details: AgreementDetail[] = [];
+  if (typeof hour?.precipAgreement === "number") details.push({ label: "Pluie", value: hour.precipAgreement });
+  if (typeof hour?.tempSpread === "number") details.push({ label: "Température", value: bound(100 - hour.tempSpread * 25) });
+  if (typeof hour?.windSpeedSpread === "number") details.push({ label: "Vent", value: bound(100 - hour.windSpeedSpread * 10) });
+  if (typeof hour?.windGustSpread === "number") details.push({ label: "Rafales", value: bound(100 - hour.windGustSpread * 8) });
+  if (typeof hour?.windDirectionDifference === "number") details.push({ label: "Direction", value: bound(100 - hour.windDirectionDifference / 1.8) });
+  if (typeof hour?.humiditySpread === "number") details.push({ label: "Humidité", value: bound(100 - hour.humiditySpread) });
+  if (typeof hour?.cloudCoverSpread === "number") details.push({ label: "Nuages", value: bound(100 - hour.cloudCoverSpread) });
+  return details.map((detail) => ({ ...detail, value: Math.round(detail.value) }));
 }
 
-function SlotConfidenceBadge({ value }: { value: number | null }) {
-  if (value == null) return null;
+function getSlotAgreementConfidence(hour: any): number | null {
+  const details = getSlotAgreementDetails(hour);
+  return details.length > 0 ? Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length) : null;
+}
+
+function SlotConfidenceBadge({ details }: { details: AgreementDetail[] }) {
+  const [open, setOpen] = useState(false);
+  if (details.length === 0) return null;
+  const value = Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length);
   const tone = value >= 75
     ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
     : value >= 55
       ? "border-sky-300/25 bg-sky-300/10 text-sky-100"
       : "border-amber-300/25 bg-amber-300/10 text-amber-100";
-  return <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold ${tone}`}>Accord {value}%</span>;
+  const level = value >= 75 ? "élevé" : value >= 55 ? "modéré" : "faible";
+  return <span className="relative inline-block">
+    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold ${tone}`}>Accord {value}% · {level}</button>
+    {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
+      <span className="mb-1 block text-slate-300">Accord par paramètre</span>
+      {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.value}%</span></span>)}
+    </span>}
+  </span>;
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
@@ -198,7 +216,7 @@ export default function WeatherDetails() {
                     <div className="mb-3 border-b border-white/12 pb-3">
                       <span className={`text-[36px] font-semibold leading-none tracking-[-0.075em] ${hourlyTemperatureTone(h.temp)}`}>{h.temp?.toFixed(1) ?? "—"}°</span>
                       <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
-                      <div className="mt-1.5"><SlotConfidenceBadge value={getSlotAgreementConfidence(h)} /></div>
+                      <div className="mt-1.5"><SlotConfidenceBadge details={getSlotAgreementDetails(h)} /></div>
                     </div>
                     
                     {/* Precipitation */}
@@ -424,10 +442,14 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
         const avgHumidity = Math.round(periodHours.reduce((s: number, h: any) => s + (h.humidity ?? 0), 0) / periodHours.length);
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
-        const agreementValues = periodHours.map(getSlotAgreementConfidence).filter((value): value is number => value != null);
-        const periodAgreement = agreementValues.length > 0
-          ? Math.round(agreementValues.reduce((sum, value) => sum + value, 0) / agreementValues.length)
-          : null;
+        const detailByLabel = new Map<string, number[]>();
+        periodHours.flatMap(getSlotAgreementDetails).forEach((detail) => {
+          detailByLabel.set(detail.label, [...(detailByLabel.get(detail.label) ?? []), detail.value]);
+        });
+        const periodAgreementDetails = Array.from(detailByLabel.entries()).map(([label, values]: [string, number[]]) => ({
+          label,
+          value: Math.round(values.reduce((sum: number, value: number) => sum + value, 0) / values.length),
+        }));
         return (
           <div key={p} className="bg-slate-800/30 rounded-xl p-2">
             <div className="flex items-center gap-1.5 mb-1">
@@ -435,7 +457,7 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
               <span className="text-[10px] text-white font-semibold">{PERIOD_LABELS[p].label}</span>
               <MeteoIcon name={getIconNameFromCondition(dominantCondition)} size={14} className="ml-auto" />
             </div>
-            <div className="mb-1.5"><SlotConfidenceBadge value={periodAgreement} /></div>
+            <div className="mb-1.5"><SlotConfidenceBadge details={periodAgreementDetails} /></div>
             <div className="space-y-0.5 text-[9px] text-slate-300">
               <div className="flex justify-between"><span>Temp.</span><span className="text-white font-medium">{avgTemp}°C</span></div>
               <div className="flex justify-between"><span>Vent</span><span>{avgWind} km/h</span></div>

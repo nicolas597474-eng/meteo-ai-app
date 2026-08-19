@@ -34,5 +34,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("windSpeedSpread");
     expect(source).toContain("humiditySpread");
     expect(source).toContain("cloudCoverSpread");
+    expect(source).toContain("windGustSpread");
+    expect(source).toContain("windDirectionDifference");
+    expect(source).toContain("Accord par paramètre");
   });
 });

@@ -2471,3 +2471,9 @@
 - [x] Calculer des accords transparents à partir des écarts réellement observés entre modèles.
 - [x] Intégrer les nouveaux accords à l’indicateur des cartes heure par heure et de période.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Prévisions détaillées — accord détaillable et code couleur
+- [x] Étendre les comparaisons multi-modèles aux rafales et à la direction du vent.
+- [x] Ajouter un code couleur explicite pour le niveau d’accord global.
+- [x] Afficher au toucher le détail des paramètres réellement inclus dans l’accord.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
