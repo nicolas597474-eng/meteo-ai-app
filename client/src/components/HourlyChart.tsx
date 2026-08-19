@@ -132,7 +132,24 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
   const hasGust = hour.windGust != null && hour.windGust > 0;
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
+  const [agreementContentMounted, setAgreementContentMounted] = useState(false);
+  const [agreementClosing, setAgreementClosing] = useState(false);
   const temperatureComparison = hour.temperatureComparison ?? null;
+
+  useEffect(() => {
+    if (agreementOpen) {
+      setAgreementContentMounted(true);
+      setAgreementClosing(false);
+      return;
+    }
+    if (!agreementContentMounted) return;
+    setAgreementClosing(true);
+    const timeoutId = window.setTimeout(() => {
+      setAgreementContentMounted(false);
+      setAgreementClosing(false);
+    }, 200);
+    return () => window.clearTimeout(timeoutId);
+  }, [agreementOpen, agreementContentMounted]);
 
   // Confidence from spread: low spread = high confidence
   const spreadConfidence = hasSpread
@@ -185,7 +202,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
             <span><span className="block text-[13px] font-bold">Accord global {globalAgreement}%</span><span className="block text-[10px] opacity-80">{agreementLevel} · {agreementParts.length} paramètre{agreementParts.length > 1 ? "s" : ""} comparé{agreementParts.length > 1 ? "s" : ""}</span></span>
             <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${agreementOpen ? "rotate-180" : ""}`} />
           </button>
-          {agreementOpen && <div className="space-y-2 border-t border-white/10 px-3 py-2 text-[11px] text-slate-200">
+          {agreementContentMounted && <div className={`${agreementClosing ? "animate-out fade-out slide-out-to-top-1 duration-200 motion-reduce:animate-none" : "animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none"} space-y-2 border-t border-white/10 px-3 py-2 text-[11px] text-slate-200`}>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Accord par paramètre</p>
             {otherAgreementParts.length > 0 && <div className="space-y-1">{otherAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
             {windAgreementParts.length > 0 && <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-cyan-100">Vent</p>{windAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}

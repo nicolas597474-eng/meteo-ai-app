@@ -87,6 +87,8 @@ describe("HourlyChart", () => {
     expect(source).toContain("windAgreementParts");
     expect(source).toContain("Repères d’accord");
     expect(source).toContain("motion-reduce:animate-none");
+    expect(source).toContain("agreementContentMounted");
+    expect(source).toContain("slide-out-to-top-1");
     expect(source).toContain("Élevé");
     expect(source).toContain("80–100 %");
     expect(source).toContain("Modéré");

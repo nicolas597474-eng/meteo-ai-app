@@ -2530,3 +2530,8 @@
 - [x] Ajouter une entrée discrète fondée sur l’opacité et la translation.
 - [x] Respecter la préférence de réduction des mouvements.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Accord global — fermeture animée de la légende
+- [x] Préserver la légende dans le DOM durant l’animation de fermeture.
+- [x] Animer la sortie avec opacité et translation, sans animer la géométrie de page.
+- [x] Respecter la préférence de réduction des mouvements et vérifier TypeScript, Vitest et le rendu mobile.
