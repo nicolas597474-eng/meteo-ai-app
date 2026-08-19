@@ -2414,3 +2414,8 @@
 - [x] Interface: Ajouter un contrôle optionnel pour afficher ou masquer le profil de relief sans remplacer l'horizon astronomique.
 - [x] Information: Indiquer les limites de l'estimation terrain et conserver les trajectoires astronomiques indépendantes.
 - [x] Validation: Tester le comportement mobile, les coordonnées variables, TypeScript et Vitest avant publication.
+
+## Soleil & Lune — transition fluide des marqueurs
+- [x] Ajouter une transition CSS sur left/bottom des marqueurs Soleil et Lune pour un déplacement progressif lors de l'actualisation.
+- [x] Respecter prefers-reduced-motion en désactivant la transition si l'utilisateur le demande.
+- [x] Vérifier que la Lune ne reçoit aucune rotation ni animation décorative.

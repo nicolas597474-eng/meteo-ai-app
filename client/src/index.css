@@ -484,6 +484,14 @@ img.moon-3d-first-crescent {
   transform: scale(1.06);
 }
 
+/* Transition fluide des marqueurs lors de la mise à jour de la position. */
+@media (prefers-reduced-motion: no-preference) {
+  .sun-altitude-marker,
+  .moon-altitude-marker {
+    transition: left 1.2s cubic-bezier(0.23, 1, 0.32, 1), bottom 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+}
+
 /* Arche immersive : ciel nocturne, halo de crépuscule et trajectoires calculées. */
 .celestial-trajectory-card {
   background:
