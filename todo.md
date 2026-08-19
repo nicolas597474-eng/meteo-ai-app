@@ -2301,3 +2301,9 @@
 - [x] Interface: Garantir les espacements entre commandes personnalisées et contrôles Google Maps.
 - [x] Aide: Conserver l’infobulle de l’alerte sonore à côté de son nouveau bouton.
 - [x] Validation: Tester les formats mobile et grand écran, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — alerte sonore sous le zoom
+- [x] Position: Placer l’alerte sonore sous les commandes + / − de Google Maps.
+- [x] Interface: Conserver un espace vertical sûr avec les boutons de zoom et les crédits de carte.
+- [x] Aide: Garder l’infobulle de l’alerte sonore lisible depuis sa nouvelle position.
+- [x] Validation: Tester les formats mobile et grand écran, TypeScript et la suite de régression avant publication.
