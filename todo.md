@@ -2289,3 +2289,9 @@
 - [x] Position: Placer l’alerte sonore sous la rose des vents, à gauche de la carte agrandie.
 - [x] Aide: Ajouter une infobulle expliquant l’activation volontaire et le déclenchement unique de l’alerte sonore.
 - [x] Validation: Tester les commandes, l’infobulle, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — localisation en vue agrandie
+- [x] Commande: Afficher l’action de localisation dans la carte agrandie.
+- [x] Carte: Recentrer et zoomer directement sur la position du navigateur après autorisation.
+- [x] Accessibilité: Préserver les états de chargement et les messages de refus ou d’indisponibilité.
+- [x] Validation: Tester la carte compacte et agrandie, TypeScript et la suite de régression avant publication.

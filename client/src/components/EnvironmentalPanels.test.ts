@@ -61,8 +61,11 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Cliquez sur une zone de visibilité");
     expect(source).toContain("Azimut :");
     expect(source).toContain("nord géographique");
-    expect(source).toContain("aria-busy={isLocating}");
+    expect(source).toContain("Localisation en cours");
     expect(source).toContain("eclipse-user-location-marker");
+    expect(source).toContain("Me localiser dans la carte agrandie");
+    expect(source).toContain("expandedMapRef.current ?? mapRef.current");
+    expect(source).toContain("setZoom(Math.max(activeMap.getZoom() ?? 4, 9))");
     expect(source).toContain("Maximize2");
     expect(source).toContain("LocateFixed");
     expect(source).toContain("streetViewControl={isExpanded}");
