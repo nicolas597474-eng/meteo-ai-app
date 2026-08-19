@@ -155,6 +155,7 @@ export function MapView({
   const map = useRef<google.maps.Map | null>(null);
   const touchGestureActive = useRef(false);
   const touchReleaseTimer = useRef<number | null>(null);
+  const resizeFrame = useRef<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -203,12 +204,22 @@ export function MapView({
   useEffect(() => {
     if (isLoading || !mapContainer.current || !map.current) return;
     const resizeObserver = new ResizeObserver(() => {
-      const mapInstance = map.current;
-      if (!mapInstance || !window.google?.maps || touchGestureActive.current) return;
-      window.google.maps.event.trigger(mapInstance, "resize");
+      if (touchGestureActive.current || resizeFrame.current !== null) return;
+      resizeFrame.current = window.requestAnimationFrame(() => {
+        resizeFrame.current = null;
+        const mapInstance = map.current;
+        if (!mapInstance || !window.google?.maps || touchGestureActive.current) return;
+        window.google.maps.event.trigger(mapInstance, "resize");
+      });
     });
     resizeObserver.observe(mapContainer.current);
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+      if (resizeFrame.current !== null) {
+        window.cancelAnimationFrame(resizeFrame.current);
+        resizeFrame.current = null;
+      }
+    };
   }, [isLoading]);
 
   if (loadError) {
@@ -223,7 +234,7 @@ export function MapView({
   }
 
   return (
-    <div className={cn("relative h-[500px] w-full", className)}>
+    <div data-swipe-exclude data-swipe-ignore className={cn("relative h-[500px] w-full", className)}>
       {isLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Chargement de la carte…</div>}
       <div ref={mapContainer} className="h-full w-full touch-none [will-change:transform]" onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
       {children}

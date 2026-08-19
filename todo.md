@@ -2358,3 +2358,9 @@
 - [x] Soleil: Conserver le Soleil fixe sur sa position astronomique calculée.
 - [x] Accessibilité: Désactiver le mouvement lorsque la réduction des mouvements est demandée.
 - [x] Validation: Tester le parcours mobile, TypeScript et la suite de régression avant publication.
+
+## Cartes agrandies — zoom rapide stabilisé
+- [x] Diagnostic: Identifier les redimensionnements et rappels de caméra déclenchés pendant les gestes rapides.
+- [x] Interaction: Bloquer les mises à jour concurrentes tant qu’un zoom ou dézoom est en cours.
+- [x] Carte: Préserver le centre et le niveau de zoom choisis par l’utilisateur.
+- [x] Validation: Tester les zooms rapides répétés sur mobile, TypeScript et la suite de régression avant publication.

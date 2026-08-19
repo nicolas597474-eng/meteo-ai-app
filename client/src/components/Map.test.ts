@@ -22,6 +22,10 @@ describe("repli de cartographie", () => {
     expect(source).toContain("touchGestureActive");
     expect(source).toContain("touch-none");
     expect(source).toContain("touchGestureActive.current");
+    expect(source).toContain("data-swipe-exclude");
+    expect(source).toContain("resizeFrame");
+    expect(source).toContain("window.requestAnimationFrame");
+    expect(source).toContain("window.cancelAnimationFrame");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
     expect(source).toContain("ResizeObserver");
