@@ -2370,3 +2370,9 @@
 - [x] Position: Conserver la Lune sur sa position astronomique fixe de l’arche.
 - [x] Accessibilité: Désactiver la rotation lorsque la réduction des mouvements est demandée.
 - [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.
+
+## Soleil & Lune — rotation horizontale 3D de la Lune
+- [x] Animation: Remplacer la rotation plane par une bascule continue sur l’axe horizontal de la Lune.
+- [x] Position: Conserver la Lune sur sa position astronomique fixe de l’arche.
+- [x] Accessibilité: Désactiver la rotation 3D lorsque la réduction des mouvements est demandée.
+- [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.

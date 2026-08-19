@@ -158,6 +158,7 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("Position actuelle de la Lune sur l’arche, rotation continue sur son axe");
     expect(modernSunMoonSource).toContain("celestial-moon-axis-rotation");
     expect(styles).toContain("@keyframes celestial-moon-axis-rotation");
+    expect(styles).toContain("rotateY(360deg)");
     expect(modernSunMoonSource).toContain("h-12 w-12");
     expect(styles).not.toContain('content: "Nuit locale"');
   });
