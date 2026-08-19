@@ -2489,3 +2489,18 @@
 - [x] Présenter les valeurs par paramètre sans les convertir en score fictif.
 - [x] Afficher le détail dans les cartes horaires et de période lorsque les mesures existent.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Maquette — accord global et écart thermique
+- [x] Proposer une hiérarchie visuelle où l’accord global est prioritaire et l’écart thermique reste accessible.
+- [x] Présenter une maquette de carte horaire mobile sans modifier l’application.
+
+## Cartes horaires — hiérarchie accord global
+- [x] Mettre l’accord global et son niveau au premier plan sous la température.
+- [x] Déplacer l’écart thermique dans une action secondaire ouvrant la comparaison des contributeurs.
+- [x] Conserver le détail par paramètre, les performances historiques et la lisibilité mobile.
+- [x] Vérifier TypeScript, Vitest et le rendu avant publication.
+
+## Carte détaillée principale — hiérarchie accord global
+- [x] Mettre l’accord global au premier plan dans la vue détaillée de l’heure.
+- [x] Conserver l’écart thermique et les deux contributeurs dans une action secondaire.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.

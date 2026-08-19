@@ -126,6 +126,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
   const hasPrecipAgreement = hour.precipAgreement != null;
   const hasGust = hour.windGust != null && hour.windGust > 0;
   const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [agreementOpen, setAgreementOpen] = useState(false);
   const temperatureComparison = hour.temperatureComparison ?? null;
 
   // Confidence from spread: low spread = high confidence
@@ -136,6 +137,19 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
     : spreadConfidence >= 80 ? "text-green-400"
     : spreadConfidence >= 60 ? "text-yellow-400"
     : "text-orange-400";
+  const agreementParts = [
+    spreadConfidence == null ? null : { label: "Température", value: spreadConfidence },
+    hasPrecipAgreement ? { label: "Pluie", value: hour.precipAgreement! } : null,
+  ].filter((part): part is { label: string; value: number } => part != null);
+  const globalAgreement = agreementParts.length > 0
+    ? Math.round(agreementParts.reduce((sum, part) => sum + part.value, 0) / agreementParts.length)
+    : null;
+  const agreementLevel = globalAgreement == null ? null : globalAgreement >= 80 ? "élevé" : globalAgreement >= 60 ? "modéré" : "faible";
+  const agreementTone = globalAgreement == null ? "" : globalAgreement >= 80
+    ? "border-emerald-300/35 bg-emerald-300/10 text-emerald-50"
+    : globalAgreement >= 60
+      ? "border-sky-300/35 bg-sky-300/10 text-sky-50"
+      : "border-amber-300/35 bg-amber-300/10 text-amber-50";
 
   return (
     <section className="mb-3 rounded-2xl border border-blue-400/25 bg-[#0a0e14] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.35)] animate-in slide-in-from-top-2 duration-200" role="region" aria-labelledby="hour-detail-title">
@@ -155,30 +169,21 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           </button>
         </div>
 
-        {/* Multi-model confidence banner */}
-        {(hasSpread || hasPrecipAgreement) && (
-          <div className="mb-3 rounded-xl border border-slate-600/30 bg-slate-700/40">
-            <div className="flex items-center justify-between gap-2 px-3 py-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="text-xs text-slate-400">🤖 {hour.modelCount ?? 2} modèles</span>
-                {hasSpread && (
-                  <span className="text-xs text-slate-400">
-                    · Écart T: <span className={`font-mono font-bold ${(hour.tempSpread! < 0.5) ? 'text-green-400' : (hour.tempSpread! < 1.5) ? 'text-yellow-400' : 'text-orange-400'}`}>
-                      ±{hour.tempSpread!.toFixed(1)}°C
-                    </span>
-                  </span>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {spreadConfidence != null && <span className={`text-xs font-bold ${confidenceColor}`}>{spreadConfidence}% conf.</span>}
-                {temperatureComparison && (
-                  <button type="button" onClick={() => setComparisonOpen((open) => !open)} aria-expanded={comparisonOpen} aria-label={comparisonOpen ? "Masquer les modèles comparés" : "Afficher les modèles comparés"} className="grid h-7 w-7 place-items-center rounded-lg border border-slate-500/40 bg-slate-900/35 text-slate-200 active:scale-95">
-                    <ChevronDown className={`h-4 w-4 transition-transform ${comparisonOpen ? "rotate-180" : ""}`} />
-                  </button>
-                )}
-              </div>
-            </div>
-            {temperatureComparison && comparisonOpen && (
+        {/* L’accord global est prioritaire ; l’écart thermique reste un détail explicable. */}
+        {globalAgreement != null && <div className="mb-2 rounded-xl border border-white/10 bg-slate-900/35">
+          <button type="button" onClick={() => setAgreementOpen((open) => !open)} aria-expanded={agreementOpen} className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left active:scale-[0.99] ${agreementTone}`}>
+            <span><span className="block text-[13px] font-bold">Accord global {globalAgreement}%</span><span className="block text-[10px] opacity-80">{agreementLevel} · {agreementParts.length} paramètre{agreementParts.length > 1 ? "s" : ""} comparé{agreementParts.length > 1 ? "s" : ""}</span></span>
+            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${agreementOpen ? "rotate-180" : ""}`} />
+          </button>
+          {agreementOpen && <div className="border-t border-white/10 px-3 py-2 text-[11px] text-slate-200">{agreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
+        </div>}
+        {temperatureComparison && (
+          <div className="mb-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06]">
+            <button type="button" onClick={() => setComparisonOpen((open) => !open)} aria-expanded={comparisonOpen} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-amber-50 active:scale-[0.99]">
+              <span><span className="font-semibold">Écart température ±{hour.tempSpread?.toFixed(1) ?? "—"}°C</span><span className="ml-1 text-[10px] text-amber-100/70">· {hour.modelCount ?? 2} contributeurs</span></span>
+              <span className="flex items-center gap-1 text-[10px]">Comparer <ChevronDown className={`h-3.5 w-3.5 transition-transform ${comparisonOpen ? "rotate-180" : ""}`} /></span>
+            </button>
+            {comparisonOpen && (
               <div className="border-t border-slate-600/30 px-3 pb-3 pt-2.5 text-[11px]">
                 <p className="font-semibold text-slate-100">Modèles comparés pour l’écart de température</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
