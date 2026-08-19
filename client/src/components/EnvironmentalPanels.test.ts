@@ -73,6 +73,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain('label: "NE"');
     expect(source).toContain('label: "SO"');
     expect(source).toContain("Rose des vents complète");
+    expect(source).toContain("nearestCompassRosePoint");
+    expect(source).toContain("bg-amber-300");
+    expect(source).toContain("Repère de rose");
     expect(source).toContain("Détails de la boussole");
     expect(source).toContain("Ouvrir les détails de la boussole");
     expect(source).toContain("isCompassDetailsOpen");

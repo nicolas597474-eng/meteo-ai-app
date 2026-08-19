@@ -2277,3 +2277,9 @@
 - [x] Orientation: Tourner les repères avec la carte tout en préservant le nord géographique et l’azimut de l’astre.
 - [x] Interface: Préserver des contrôles lisibles et sans chevauchement sur mobile.
 - [x] Validation: Tester les orientations, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — direction de l’astre mise en évidence
+- [x] Calcul: Associer l’azimut calculé de l’astre au repère de rose des vents le plus proche.
+- [x] Interface: Mettre ce repère en évidence avec une couleur distincte et un libellé accessible.
+- [x] Transparence: Conserver l’angle exact et distinguer l’arrondi visuel du relèvement calculé.
+- [x] Validation: Tester les directions cardinales et intermédiaires, TypeScript et la suite de régression avant publication.
