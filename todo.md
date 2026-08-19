@@ -2307,3 +2307,9 @@
 - [x] Interface: Conserver un espace vertical sûr avec les boutons de zoom et les crédits de carte.
 - [x] Aide: Garder l’infobulle de l’alerte sonore lisible depuis sa nouvelle position.
 - [x] Validation: Tester les formats mobile et grand écran, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — aide sonore au clic
+- [x] Interaction: Ouvrir et fermer l’aide de l’alerte sonore au clic, sans dépendre du survol.
+- [x] Interface: Positionner l’aide au-dessus de la carte avec une largeur adaptée au mobile.
+- [x] Accessibilité: Exposer l’état étendu et garder le contenu lisible au clavier.
+- [x] Validation: Tester le clic, la fermeture, TypeScript et la suite de régression avant publication.

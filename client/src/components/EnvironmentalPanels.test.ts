@@ -66,7 +66,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Me localiser dans la carte agrandie");
     expect(source).toContain("right-3 top-[116px]");
     expect(source).toContain("bottom-[112px] right-3");
-    expect(source).toContain('side="left"');
+    expect(source).toContain("bottom-full right-0 mb-3 w-60");
     expect(source).not.toContain("flex flex-col items-end gap-3");
     expect(source).toContain("expandedMapRef.current ?? mapRef.current");
     expect(source).toContain("setZoom(Math.max(activeMap.getZoom() ?? 4, 9))");
@@ -100,7 +100,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Activer l’alerte sonore");
     expect(source).toContain("Alerte sonore d’observabilité");
     expect(source).toContain("un son discret est joué une seule fois");
-    expect(source).toContain("TooltipContent");
+    expect(source).toContain("isSoundHelpOpen");
+    expect(source).toContain("setIsSoundHelpOpen(true)");
+    expect(source).toContain('role="status"');
+    expect(source).toContain("Alerte sonore.");
     expect(source).not.toContain("RotateCcw");
     expect(source).toContain("observationAlertFiredRef");
     expect(source).toContain("map-control-cluster");
