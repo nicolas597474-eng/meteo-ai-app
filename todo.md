@@ -2477,3 +2477,9 @@
 - [x] Ajouter un code couleur explicite pour le niveau d’accord global.
 - [x] Afficher au toucher le détail des paramètres réellement inclus dans l’accord.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Prévisions détaillées — performances historiques qualifiées
+- [x] Identifier les performances historiques qualifiées disponibles pour les modèles réellement comparés.
+- [x] Calculer une contribution historique distincte de l’accord instantané, sans repli artificiel.
+- [x] Afficher la contribution historique dans le détail des cartes horaires et de période.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.

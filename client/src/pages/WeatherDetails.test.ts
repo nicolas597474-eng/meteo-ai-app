@@ -37,5 +37,6 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("windGustSpread");
     expect(source).toContain("windDirectionDifference");
     expect(source).toContain("Accord par paramètre");
+    expect(source).toContain("Historique qualifié");
   });
 });

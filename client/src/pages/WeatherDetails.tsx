@@ -76,7 +76,7 @@ const PERIOD_LABELS: Record<Period, { label: string; emoji: string }> = {
  */
 type AgreementDetail = { label: string; value: number };
 
-function getSlotAgreementDetails(hour: any): AgreementDetail[] {
+function getSlotAgreementDetails(hour: any, historical: any = null): AgreementDetail[] {
   const bound = (value: number) => Math.max(0, Math.min(100, value));
   const details: AgreementDetail[] = [];
   if (typeof hour?.precipAgreement === "number") details.push({ label: "Pluie", value: hour.precipAgreement });
@@ -86,15 +86,18 @@ function getSlotAgreementDetails(hour: any): AgreementDetail[] {
   if (typeof hour?.windDirectionDifference === "number") details.push({ label: "Direction", value: bound(100 - hour.windDirectionDifference / 1.8) });
   if (typeof hour?.humiditySpread === "number") details.push({ label: "Humidité", value: bound(100 - hour.humiditySpread) });
   if (typeof hour?.cloudCoverSpread === "number") details.push({ label: "Nuages", value: bound(100 - hour.cloudCoverSpread) });
+  if (typeof historical?.score === "number" && typeof historical?.comparisons === "number" && historical.comparisons > 0) {
+    details.push({ label: `Historique qualifié (${historical.comparisons} comp.)`, value: bound(historical.score) });
+  }
   return details.map((detail) => ({ ...detail, value: Math.round(detail.value) }));
 }
 
-function getSlotAgreementConfidence(hour: any): number | null {
-  const details = getSlotAgreementDetails(hour);
+function getSlotAgreementConfidence(hour: any, historical: any = null): number | null {
+  const details = getSlotAgreementDetails(hour, historical);
   return details.length > 0 ? Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length) : null;
 }
 
-function SlotConfidenceBadge({ details }: { details: AgreementDetail[] }) {
+function SlotConfidenceBadge({ details, historicalModels = [] }: { details: AgreementDetail[]; historicalModels?: Array<{ name: string; score: number; comparisons: number }> }) {
   const [open, setOpen] = useState(false);
   if (details.length === 0) return null;
   const value = Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length);
@@ -109,6 +112,7 @@ function SlotConfidenceBadge({ details }: { details: AgreementDetail[] }) {
     {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
       <span className="mb-1 block text-slate-300">Accord par paramètre</span>
       {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.value}%</span></span>)}
+      {historicalModels.length > 0 && <span className="mt-1 block border-t border-white/10 pt-1 text-slate-300">Historique : {historicalModels.map((model) => `${model.name} ${model.score}%`).join(" · ")}</span>}
     </span>}
   </span>;
 }
@@ -169,6 +173,7 @@ export default function WeatherDetails() {
   const days = data?.days ?? [];
   const regime = data?.regime;
   const confidence = data?.confidence;
+  const historicalPerformance = data?.historicalModelPerformance ?? null;
   const currentHour = hours[currentHourIdx] ?? hours[0];
 
   return (
@@ -216,7 +221,7 @@ export default function WeatherDetails() {
                     <div className="mb-3 border-b border-white/12 pb-3">
                       <span className={`text-[36px] font-semibold leading-none tracking-[-0.075em] ${hourlyTemperatureTone(h.temp)}`}>{h.temp?.toFixed(1) ?? "—"}°</span>
                       <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
-                      <div className="mt-1.5"><SlotConfidenceBadge details={getSlotAgreementDetails(h)} /></div>
+                      <div className="mt-1.5"><SlotConfidenceBadge details={getSlotAgreementDetails(h, historicalPerformance)} historicalModels={historicalPerformance?.models ?? []} /></div>
                     </div>
                     
                     {/* Precipitation */}
@@ -340,7 +345,7 @@ export default function WeatherDetails() {
                       )}
                       
                       {/* Period breakdown */}
-                      <DayPeriodBreakdown dayDate={day.date} hours={periodHours} regime={regime} />
+                      <DayPeriodBreakdown dayDate={day.date} hours={periodHours} regime={regime} historicalPerformance={historicalPerformance} />
                       
                     </div>
                   )}
@@ -408,7 +413,7 @@ function calculateSunshineDuration(sunrise: string, sunset: string): string {
   return `${h}h${m.toString().padStart(2, "0")}`;
 }
 
-function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours: any[]; regime: any }) {
+function DayPeriodBreakdown({ dayDate, hours, regime, historicalPerformance }: { dayDate: string; hours: any[]; regime: any; historicalPerformance: any }) {
   const dayHours = hours.filter((hour) => hour.date === dayDate);
 
   if (dayHours.length === 0) {
@@ -443,7 +448,7 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
         const detailByLabel = new Map<string, number[]>();
-        periodHours.flatMap(getSlotAgreementDetails).forEach((detail) => {
+        periodHours.flatMap((hour) => getSlotAgreementDetails(hour, historicalPerformance)).forEach((detail) => {
           detailByLabel.set(detail.label, [...(detailByLabel.get(detail.label) ?? []), detail.value]);
         });
         const periodAgreementDetails = Array.from(detailByLabel.entries()).map(([label, values]: [string, number[]]) => ({
@@ -457,7 +462,7 @@ function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours
               <span className="text-[10px] text-white font-semibold">{PERIOD_LABELS[p].label}</span>
               <MeteoIcon name={getIconNameFromCondition(dominantCondition)} size={14} className="ml-auto" />
             </div>
-            <div className="mb-1.5"><SlotConfidenceBadge details={periodAgreementDetails} /></div>
+            <div className="mb-1.5"><SlotConfidenceBadge details={periodAgreementDetails} historicalModels={historicalPerformance?.models ?? []} /></div>
             <div className="space-y-0.5 text-[9px] text-slate-300">
               <div className="flex justify-between"><span>Temp.</span><span className="text-white font-medium">{avgTemp}°C</span></div>
               <div className="flex justify-between"><span>Vent</span><span>{avgWind} km/h</span></div>

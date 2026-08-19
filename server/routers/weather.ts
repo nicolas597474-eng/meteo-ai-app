@@ -624,9 +624,10 @@ export const weatherRouter = router({
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
 
-      const [meteoAI, observation] = await Promise.all([
+      const [meteoAI, observation, qualifiedRanking] = await Promise.all([
         getMeteoAIForecastByDate(today, locKey),
         getObservationByDate(today, locKey),
+        getQualifiedCumulativeRankingForLocation(locKey),
       ]);
       const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours));
       const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id);
@@ -657,6 +658,20 @@ export const weatherRouter = router({
         leadTimeBucket: "4-7d",
       });
       const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
+      const qualifiedHistoricalModels = qualifiedRanking
+        .filter((row) => row.avgScore != null && row.totalSamples != null)
+        .map((row) => ({
+          name: row.serviceName,
+          score: Math.round(Number(row.avgScore)),
+          comparisons: Number(row.totalSamples),
+        }));
+      const historicalModelPerformance = qualifiedHistoricalModels.length > 0
+        ? {
+            score: Math.round(qualifiedHistoricalModels.reduce((sum, model) => sum + model.score, 0) / qualifiedHistoricalModels.length),
+            comparisons: qualifiedHistoricalModels.reduce((sum, model) => sum + model.comparisons, 0),
+            models: qualifiedHistoricalModels,
+          }
+        : null;
 
       return {
         today: snapshot.weatherDate,
@@ -684,6 +699,7 @@ export const weatherRouter = router({
           week: weekConfidence,
           stabilityIndex: meteoAI?.stabilityIndex ?? null,
         },
+        historicalModelPerformance,
         bestModel: bestModel ? { name: bestModel.serviceName, score: bestModel.avgScore ?? 0 } : null,
         trace: trace
           ? { ...trace, snapshotComputedAt: meteoAI?.computedAt?.toISOString?.() ?? null }
