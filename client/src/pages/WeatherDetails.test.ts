@@ -38,5 +38,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("windDirectionDifference");
     expect(source).toContain("Accord par paramètre");
     expect(source).toContain("Historique qualifié");
+    expect(source).toContain("temperatureMae");
+    expect(source).toContain("precipitationMae");
+    expect(source).toContain("windMae");
   });
 });

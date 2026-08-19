@@ -97,7 +97,7 @@ function getSlotAgreementConfidence(hour: any, historical: any = null): number |
   return details.length > 0 ? Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length) : null;
 }
 
-function SlotConfidenceBadge({ details, historicalModels = [] }: { details: AgreementDetail[]; historicalModels?: Array<{ name: string; score: number; comparisons: number }> }) {
+function SlotConfidenceBadge({ details, historicalModels = [] }: { details: AgreementDetail[]; historicalModels?: Array<{ name: string; score: number; comparisons: number; temperatureMae?: number | null; precipitationMae?: number | null; windMae?: number | null }> }) {
   const [open, setOpen] = useState(false);
   if (details.length === 0) return null;
   const value = Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length);
@@ -112,7 +112,12 @@ function SlotConfidenceBadge({ details, historicalModels = [] }: { details: Agre
     {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
       <span className="mb-1 block text-slate-300">Accord par paramètre</span>
       {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.value}%</span></span>)}
-      {historicalModels.length > 0 && <span className="mt-1 block border-t border-white/10 pt-1 text-slate-300">Historique : {historicalModels.map((model) => `${model.name} ${model.score}%`).join(" · ")}</span>}
+      {historicalModels.length > 0 && <span className="mt-1 block border-t border-white/10 pt-1 text-slate-300">
+        <span className="mb-0.5 block">Historique qualifié par modèle</span>
+        {historicalModels.map((model) => <span key={model.name} className="block text-[8px] text-slate-200">
+          {model.name} · T {model.temperatureMae == null ? "—" : `${model.temperatureMae}°C`} · Pluie {model.precipitationMae == null ? "—" : `${model.precipitationMae} mm`} · Vent {model.windMae == null ? "—" : `${model.windMae} km/h`}
+        </span>)}
+      </span>}
     </span>}
   </span>;
 }

@@ -2483,3 +2483,9 @@
 - [x] Calculer une contribution historique distincte de l’accord instantané, sans repli artificiel.
 - [x] Afficher la contribution historique dans le détail des cartes horaires et de période.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Prévisions détaillées — historique par paramètre
+- [x] Exposer les erreurs historiques qualifiées de température, précipitations et vent par modèle.
+- [x] Présenter les valeurs par paramètre sans les convertir en score fictif.
+- [x] Afficher le détail dans les cartes horaires et de période lorsque les mesures existent.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.

@@ -664,6 +664,9 @@ export const weatherRouter = router({
           name: row.serviceName,
           score: Math.round(Number(row.avgScore)),
           comparisons: Number(row.totalSamples),
+          temperatureMae: row.avgMaeTemp == null ? null : Math.round(Number(row.avgMaeTemp) * 10) / 10,
+          precipitationMae: row.avgMaePrecip == null ? null : Math.round(Number(row.avgMaePrecip) * 10) / 10,
+          windMae: row.avgMaeWind == null ? null : Math.round(Number(row.avgMaeWind) * 10) / 10,
         }));
       const historicalModelPerformance = qualifiedHistoricalModels.length > 0
         ? {
