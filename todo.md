@@ -2424,3 +2424,9 @@
 - [x] Intégrer le hook useTimelapseSimulation dans le panneau actif avec bouton de déclenchement.
 - [x] Rétablir la rotation 3D horizontale de la Lune sur l'arche (CSS keyframes + prefers-reduced-motion).
 - [x] Valider TypeScript, Vitest et le rendu mobile avant publication.
+
+## Soleil & Lune — contrôles lecture/pause/curseur et suppression rotation lunaire
+- [x] Ajouter lecture, pause, reprise et arrêt au mode accéléré 24 h.
+- [x] Ajouter un curseur interactif pour naviguer manuellement dans la simulation.
+- [x] Supprimer la rotation 3D horizontale de la Lune (demande utilisateur).
+- [x] Valider TypeScript, Vitest et le rendu mobile avant publication.

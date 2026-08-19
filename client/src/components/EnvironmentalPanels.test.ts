@@ -154,14 +154,14 @@ describe("EnvironmentalPanels", () => {
     expect(apparentSunMoonSource).toContain("celestial-night-marker");
     expect(apparentSunMoonSource).toContain('relative mx-auto mt-7 h-40');
     expect(apparentSunMoonSource).toContain("Position apparente de la Lune");
-    expect(apparentSunMoonSource).toContain("celestial-moon-axis-rotation");
-    expect(styles).toContain("@keyframes celestial-moon-axis-rotation");
-    expect(styles).toContain("rotateY(360deg)");
+    expect(apparentSunMoonSource).not.toContain("celestial-moon-axis-rotation");
+    expect(styles).not.toContain("@keyframes celestial-moon-axis-rotation");
+    expect(styles).not.toContain("rotateY(360deg)");
     expect(apparentSunMoonSource).toContain("h-12 w-12");
     expect(styles).not.toContain('content: "Nuit locale"');
   });
 
-  it("trace les parcours réels du Soleil et de la Lune sur un ciel crépusculaire avec rotation lunaire", () => {
+  it("trace les parcours réels du Soleil et de la Lune sur un ciel crépusculaire sans rotation lunaire", () => {
     expect(source).toContain("buildTrajectoryPath");
     expect(trajectorySunMoonSource).toContain("position.trajectory?.sun");
     expect(trajectorySunMoonSource).toContain("position.trajectory?.moon");

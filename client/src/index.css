@@ -843,14 +843,21 @@ img.moon-3d-first-crescent {
   stroke-linejoin: round;
 }
 
-/* Rotation 3D horizontale de la Lune sur l'arche. */
-@keyframes celestial-moon-axis-rotation {
-  0%   { transform: perspective(200px) rotateY(0deg); }
-  100% { transform: perspective(200px) rotateY(360deg); }
+/* Curseur de simulation 24 h */
+.celestial-timelapse-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fbbf24;
+  border: none;
+  cursor: pointer;
 }
-
-@media (prefers-reduced-motion: no-preference) {
-  .celestial-moon-axis-rotation {
-    animation: celestial-moon-axis-rotation 12s linear infinite;
-  }
+.celestial-timelapse-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fbbf24;
+  border: none;
+  cursor: pointer;
 }
