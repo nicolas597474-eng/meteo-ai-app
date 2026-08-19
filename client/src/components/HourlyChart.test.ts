@@ -76,6 +76,15 @@ describe("HourlyChart", () => {
     expect(source).toContain('MeteoIcon name="humidity" size={17}');
   });
 
+  it("inclut tous les accords multi-paramètres réellement disponibles", () => {
+    expect(source).toContain("Accord global");
+    expect(source).toContain("windSpeedSpread");
+    expect(source).toContain("windGustSpread");
+    expect(source).toContain("windDirectionDifference");
+    expect(source).toContain("humiditySpread");
+    expect(source).toContain("cloudCoverSpread");
+  });
+
   it("retire les sections de régime et d’évolution à court terme du panneau détaillé", () => {
     expect(source).not.toContain("getHourlyDetailInsights");
     expect(source).not.toContain("Évolution à court terme");

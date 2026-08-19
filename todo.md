@@ -2504,3 +2504,9 @@
 - [x] Mettre l’accord global au premier plan dans la vue détaillée de l’heure.
 - [x] Conserver l’écart thermique et les deux contributeurs dans une action secondaire.
 - [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.
+
+## Carte principale — accord multi-paramètres complet
+- [x] Transmettre les accords réels de vent, rafales, direction, humidité et nuages au flux horaire principal.
+- [x] Afficher l’ensemble des paramètres disponibles dans le détail d’accord de la carte principale.
+- [x] Conserver l’absence explicite de paramètres non reçus, sans score inventé.
+- [x] Vérifier TypeScript, Vitest et le rendu mobile avant publication.

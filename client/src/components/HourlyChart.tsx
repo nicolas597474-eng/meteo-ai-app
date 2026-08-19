@@ -30,6 +30,11 @@ export interface HourData {
   // Multi-model spread
   tempSpread?: number | null;
   precipAgreement?: number | null;
+  windSpeedSpread?: number | null;
+  windGustSpread?: number | null;
+  windDirectionDifference?: number | null;
+  humiditySpread?: number | null;
+  cloudCoverSpread?: number | null;
   modelCount?: number;
   temperatureComparison?: {
     lower: { name: string; temperature: number };
@@ -133,14 +138,16 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
   const spreadConfidence = hasSpread
     ? Math.max(0, Math.round(100 - (hour.tempSpread! * 25)))
     : null;
-  const confidenceColor = spreadConfidence == null ? "text-slate-400"
-    : spreadConfidence >= 80 ? "text-green-400"
-    : spreadConfidence >= 60 ? "text-yellow-400"
-    : "text-orange-400";
+  const boundAgreement = (value: number) => Math.max(0, Math.min(100, value));
   const agreementParts = [
     spreadConfidence == null ? null : { label: "Température", value: spreadConfidence },
     hasPrecipAgreement ? { label: "Pluie", value: hour.precipAgreement! } : null,
-  ].filter((part): part is { label: string; value: number } => part != null);
+    typeof hour.windSpeedSpread === "number" ? { label: "Vent", value: boundAgreement(100 - hour.windSpeedSpread * 10) } : null,
+    typeof hour.windGustSpread === "number" ? { label: "Rafales", value: boundAgreement(100 - hour.windGustSpread * 8) } : null,
+    typeof hour.windDirectionDifference === "number" ? { label: "Direction", value: boundAgreement(100 - hour.windDirectionDifference / 1.8) } : null,
+    typeof hour.humiditySpread === "number" ? { label: "Humidité", value: boundAgreement(100 - hour.humiditySpread) } : null,
+    typeof hour.cloudCoverSpread === "number" ? { label: "Nuages", value: boundAgreement(100 - hour.cloudCoverSpread) } : null,
+  ].filter((part): part is { label: string; value: number } => part != null).map((part) => ({ ...part, value: Math.round(part.value) }));
   const globalAgreement = agreementParts.length > 0
     ? Math.round(agreementParts.reduce((sum, part) => sum + part.value, 0) / agreementParts.length)
     : null;
