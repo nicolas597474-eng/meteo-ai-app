@@ -533,6 +533,75 @@ img.moon-3d-first-crescent {
   filter: drop-shadow(0 0 2px rgb(199 210 254 / 0.45));
 }
 
+.celestial-trajectory-card--day {
+  background:
+    radial-gradient(ellipse 72% 52% at 50% 92%, rgb(255 192 103 / 0.43), transparent 56%),
+    linear-gradient(150deg, #1a4a84 0%, #12376b 50%, #07172e 100%) !important;
+}
+
+.celestial-trajectory-card--twilight {
+  background:
+    radial-gradient(ellipse 72% 52% at 50% 92%, rgb(251 146 60 / 0.48), transparent 57%),
+    linear-gradient(150deg, #263b75 0%, #1b2450 52%, #090d24 100%) !important;
+}
+
+.celestial-trajectory-card--night {
+  background:
+    radial-gradient(ellipse 72% 52% at 50% 96%, rgb(30 64 175 / 0.22), transparent 56%),
+    linear-gradient(150deg, #0b1b46 0%, #07112e 55%, #020510 100%) !important;
+}
+
+.celestial-arc-scene--day .celestial-arc-backdrop {
+  background:
+    radial-gradient(ellipse 66% 36% at 50% 100%, rgb(255 201 112 / 0.74), rgb(251 146 60 / 0.32) 36%, transparent 66%),
+    linear-gradient(180deg, rgb(30 99 176 / 0.74), rgb(16 75 138 / 0.64) 58%, rgb(25 55 97 / 0.30));
+}
+
+.celestial-arc-scene--twilight .celestial-arc-backdrop {
+  background:
+    radial-gradient(ellipse 66% 36% at 50% 100%, rgb(251 146 60 / 0.82), rgb(194 65 12 / 0.35) 38%, transparent 67%),
+    linear-gradient(180deg, rgb(41 39 108 / 0.76), rgb(36 38 89 / 0.66) 54%, rgb(29 30 56 / 0.36));
+}
+
+.celestial-arc-scene--night .celestial-arc-backdrop {
+  background:
+    radial-gradient(ellipse 62% 33% at 50% 100%, rgb(37 99 235 / 0.22), transparent 66%),
+    linear-gradient(180deg, rgb(3 15 52 / 0.83), rgb(5 17 53 / 0.72) 58%, rgb(4 12 31 / 0.44));
+}
+
+.celestial-time-markers {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.celestial-time-marker {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  transform: translate(-50%, 52%);
+  color: rgb(241 245 249 / 0.92);
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 4px rgb(2 6 23 / 0.9);
+}
+
+.celestial-time-marker i {
+  display: block;
+  width: 0.25rem;
+  height: 0.25rem;
+  border: 1px solid rgb(255 255 255 / 0.82);
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 5px currentColor;
+}
+
+.celestial-time-marker--sun { color: #fde047; }
+.celestial-time-marker--moon { color: #c7d2fe; }
+
 @keyframes meteo-icon-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }

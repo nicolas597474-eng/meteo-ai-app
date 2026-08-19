@@ -2391,3 +2391,10 @@
 - [x] Lisibilité: Préserver la visibilité des horaires de lever/coucher, des marqueurs et de l’état sous l’horizon sur mobile.
 - [x] Stabilité: Conserver la Lune fixe et exclure toute rotation ou animation décorative de son marqueur ou de sa trajectoire.
 - [x] Validation: Contrôler le rendu mobile, TypeScript et la suite de régression avant publication.
+
+## Soleil & Lune — repères horaires et lumière contextuelle
+- [x] Repères: Afficher des heures utiles le long des trajectoires, ancrées sur les échantillons apparents réels visibles.
+- [x] Ambiance: Déduire le mode jour, crépuscule ou nuit à partir de la hauteur réelle du Soleil et adapter le fond sans données décoratives inventées.
+- [x] Lisibilité: Assurer le contraste des repères, des horaires de lever/coucher et des astres sur les trois ambiances.
+- [x] Stabilité: Préserver les trajectoires réelles, les interruptions sous l’horizon et la Lune fixe sans rotation.
+- [x] Validation: Tester TypeScript, Vitest et le rendu mobile avant publication.

@@ -5,6 +5,7 @@ const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const apparentSunMoonSource = source.slice(source.indexOf("function SunMoonPanelApparent"), source.indexOf("export function EnvironmentalPanels"));
 const trajectorySunMoonSource = source.slice(source.indexOf("function SunMoonPanelTrajectory"), source.indexOf("export function EnvironmentalPanels"));
+const temporalSunMoonSource = source.slice(source.indexOf("function SunMoonPanelTemporal"), source.indexOf("export function EnvironmentalPanels"));
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -173,6 +174,21 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("celestial-trajectory--sun");
     expect(styles).toContain("celestial-trajectory--moon");
     expect(styles).toContain("stroke-dasharray");
+  });
+
+  it("place des repères horaires visibles et adapte le ciel à la hauteur réelle du Soleil", () => {
+    expect(source).toContain("selectTrajectoryTimeMarkers");
+    expect(source).toContain("getCelestialLightPhase");
+    expect(temporalSunMoonSource).toContain("sunTimeMarkers");
+    expect(temporalSunMoonSource).toContain("moonTimeMarkers");
+    expect(temporalSunMoonSource).toContain('celestial-time-marker--sun');
+    expect(temporalSunMoonSource).toContain('celestial-time-marker--moon');
+    expect(temporalSunMoonSource).toContain('celestial-trajectory-card--${lightPhase}');
+    expect(temporalSunMoonSource).toContain('celestial-arc-scene--${lightPhase}');
+    expect(styles).toContain("celestial-trajectory-card--day");
+    expect(styles).toContain("celestial-trajectory-card--twilight");
+    expect(styles).toContain("celestial-trajectory-card--night");
+    expect(styles).toContain("celestial-time-markers");
   });
 
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {
