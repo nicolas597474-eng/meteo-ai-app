@@ -2318,3 +2318,10 @@
 - [x] Mobile: Réserver une hauteur suffisante à la zone de fermeture dans la fenêtre agrandie.
 - [x] Interface: Réduire la hauteur de carte si nécessaire sans rogner le bouton « Fermer la carte ».
 - [x] Validation: Tester le rendu mobile et grand écran, TypeScript et la suite de régression avant publication.
+
+## Collecte météo — prévisions 05h00 et stations
+- [x] Audit: Identifier les modèles actifs, candidats et sources de stations réellement disponibles à la collecte, ainsi que le délai d’exécution constaté.
+- [x] Stratégie: Confirmer que la tâche active de 05h00 collecte déjà les prévisions quotidiennes et horaires des modèles actifs et candidats, ainsi que les stations disponibles par lieu favori.
+- [x] Automatisation: Alléger la tâche de 05h00 en séparant la découverte et les relevés de stations afin d’éviter les délais d’exécution.
+- [x] Planification: Confirmer la tâche active de 05h00 Paris pour les prévisions et maintenir la collecte physique horaire séparée.
+- [x] Validation: Tester la couverture des modèles, la séparation des relevés, TypeScript et la suite de régression avant publication.

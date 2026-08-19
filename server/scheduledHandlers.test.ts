@@ -47,6 +47,12 @@ describe("collecte horaire de 05h00", () => {
     expect(source).toContain("collectModel(model, 1)");
     expect(source).toContain("return [...collected");
   });
+
+  it("délègue les relevés physiques à la tâche dédiée pour préserver le délai de prévision", () => {
+    const source = readFileSync(new URL("./scheduledHandlers.ts", import.meta.url), "utf8");
+    expect(source).toContain("const stationCollectionDeferred = true");
+    expect(source).toContain("relevés physiques confiés à la collecte horaire dédiée");
+  });
 });
 
 describe("buildStationCollectionSnapshot", () => {

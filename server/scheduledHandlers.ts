@@ -610,6 +610,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       reliabilityMap[r.serviceName] = r.avgScore ?? 50;
     });
 
+    // Les relevés physiques ont leur propre tâche horaire : les exécuter ici
+    // pouvait faire dépasser le délai de la collecte de prévisions de 05h00.
+    const stationCollectionDeferred = true;
     let locationsProcessed = 0;
     const errors: string[] = [];
     const coverageByLocation: Array<{
@@ -617,6 +620,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       daily: ReturnType<typeof getModelCoverage>;
       hourly: ReturnType<typeof getModelCoverage>;
       physicalStationCount: number;
+      stationCollectionDeferred: boolean;
     }> = [];
 
     for (const fav of uniqueLocations) {
@@ -631,7 +635,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // Collect physical station evidence once per unique location. Proxy
         // networks/model grid points are deliberately excluded from persistence
         // as station observations (see stationService.PHYSICAL_STATION_SOURCES).
-        try {
+        if (!stationCollectionDeferred) try {
           const discoveredStations = await collectNearbyStations(fav.lat, fav.lon, radiusKm, fav.customName ?? fav.name, { netatmoUserId: fav.userId });
           const physicalStations = getPhysicalActiveStations(discoveredStations);
           physicalStationCount = physicalStations.length;
@@ -733,6 +737,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           console.log(`[Stations] ${fav.name}: ${physicalStations.length} station(s) physique(s) stockée(s)`);
         } catch (stationError: any) {
           console.warn(`[Stations] Collection échouée pour ${fav.name}:`, stationError.message);
+        }
+        if (stationCollectionDeferred) {
+          console.log(`[Stations] ${fav.name}: relevés physiques confiés à la collecte horaire dédiée`);
         }
 
         // Get location-specific ranking (fallback to global)
@@ -1023,16 +1030,19 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           daily: dailyCoverage,
           hourly: hourlyCoverage,
           physicalStationCount,
+          stationCollectionDeferred,
         });
 
-        await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
-          locationKey: locKey,
-          date: today,
-          radiusKm,
-          physicalStationCount,
-          daily: dailyCoverage,
-          hourly: hourlyCoverage,
-        }));
+        if (!stationCollectionDeferred) {
+          await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
+            locationKey: locKey,
+            date: today,
+            radiusKm,
+            physicalStationCount,
+            daily: dailyCoverage,
+            hourly: hourlyCoverage,
+          }));
+        }
 
         locationsProcessed++;
 
