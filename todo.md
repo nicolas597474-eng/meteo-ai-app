@@ -2384,3 +2384,10 @@
 - [x] Temps réel: Actualiser progressivement les positions quand l’heure locale évolue, sans animation décorative ni rotation de la Lune.
 - [x] Cas limites: Gérer lever, coucher, crépuscule, nuit, phases lunaires, changement de lieu, date et fuseau.
 - [x] Validation: Comparer les positions calculées à Astronomy Engine sur plusieurs lieux et heures, puis tester l’interface avant publication.
+
+## Soleil & Lune — trajectoires et fond céleste de l’arche
+- [x] Référence: Adapter l’ambiance nocturne crépusculaire et les contrastes de la référence sans modifier les données astronomiques.
+- [x] Trajectoires: Dessiner les parcours apparents du Soleil et de la Lune en pointillés, distincts et alignés à leurs positions calculées.
+- [x] Lisibilité: Préserver la visibilité des horaires de lever/coucher, des marqueurs et de l’état sous l’horizon sur mobile.
+- [x] Stabilité: Conserver la Lune fixe et exclure toute rotation ou animation décorative de son marqueur ou de sa trajectoire.
+- [x] Validation: Contrôler le rendu mobile, TypeScript et la suite de régression avant publication.

@@ -128,9 +128,17 @@ type ApparentBodyPosition = {
   aboveHorizon: boolean;
 };
 
+type ApparentTrajectoryPoint = ApparentBodyPosition & {
+  at: string;
+};
+
 type ApparentAstronomyPosition = {
   sun: ApparentBodyPosition;
   moon: ApparentBodyPosition;
+  trajectory?: {
+    sun: ApparentTrajectoryPoint[];
+    moon: ApparentTrajectoryPoint[];
+  };
   calculatedAt: string;
 };
 
@@ -143,6 +151,20 @@ function projectApparentBodyOnArc(position: ApparentBodyPosition) {
     left: 50 - 42 * Math.sin(azimuthRadians),
     bottom: 16 + Math.max(0, Math.sin(altitudeRadians)) * 124,
   };
+}
+
+function buildTrajectoryPath(points: ApparentTrajectoryPoint[]) {
+  let hasVisiblePoint = false;
+  return points.reduce((path, point) => {
+    const projected = projectApparentBodyOnArc(point);
+    if (!projected) {
+      hasVisiblePoint = false;
+      return path;
+    }
+    const command = hasVisiblePoint ? "L" : "M";
+    hasVisiblePoint = true;
+    return `${path}${command}${projected.left.toFixed(2)} ${(160 - projected.bottom).toFixed(2)} `;
+  }, "").trim();
 }
 
 function minutesNow(timeZone: string) {
@@ -616,7 +638,29 @@ function SunMoonPanelApparent({ astronomy, source }: { astronomy: EnvironmentalD
   return <PanelDialog title="Soleil & Lune" description="Positions apparentes réelles et actualisées localement pour le lieu actif." content={content} className="weather-surface border-amber-400/20 bg-gradient-to-br from-amber-400/[0.05] via-slate-950/10 to-indigo-500/[0.06]"><div className="flex items-center justify-between gap-3">{isNight && <span className="celestial-night-marker sr-only">Thème nocturne actif</span>}<div className="flex items-center gap-2.5"><span className="grid h-8 w-8 place-items-center">{sunMarker}</span><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="text-[11px] text-slate-400">Éphémérides locales du jour</p></div></div><span className="rounded-full border border-amber-300/30 bg-amber-300/[0.06] px-2.5 py-1 text-[10px] font-semibold text-amber-100">Jour {displayDuration(astronomy.daylightDurationSeconds)}</span></div><div className="relative mx-auto mt-7 h-40 max-w-[330px] overflow-hidden"><div className="absolute bottom-2 left-0 right-0 h-36 rounded-t-full border-x border-t border-sky-300/35 bg-gradient-to-b from-blue-400/30 via-blue-400/10 to-transparent" /><div className="absolute bottom-2 left-0 right-0 border-t border-slate-300/60" />{sunArc && <span aria-label={`Position apparente du Soleil, ${formatAltitude(apparentPosition.sun.altitudeDeg)}, ${formatAzimuth(apparentPosition.sun.azimuthDeg)}`} className="sun-altitude-marker absolute z-10 grid h-12 w-12 -translate-x-1/2 place-items-center" style={{ left: `${sunArc.left}%`, bottom: `${sunArc.bottom - 24}px` }}>{sunMarker}</span>}{moonArc && <span aria-label={`Position apparente fixe de la Lune, ${formatAltitude(apparentPosition.moon.altitudeDeg)}, ${formatAzimuth(apparentPosition.moon.azimuthDeg)}`} className="moon-altitude-marker absolute z-20 grid h-10 w-10 -translate-x-1/2 place-items-center" style={{ left: `${moonArc.left}%`, bottom: `${moonArc.bottom - 20}px` }}>{moonMarker}</span>}{belowHorizon.length > 0 && <div className="absolute inset-x-3 bottom-9 z-30 flex flex-wrap justify-center gap-x-3 gap-y-1 text-center text-[9px] text-slate-400" aria-label="Astres sous l’horizon">{belowHorizon.map((label) => <span key={label}>{label}</span>)}</div>}<span className="absolute bottom-0 left-0 text-[11px] text-slate-300">{displayTime(astronomy.sunrise)}<small className="block text-[9px] text-slate-500">Lever</small></span><span className="absolute bottom-0 right-0 text-right text-[11px] text-slate-300">{displayTime(astronomy.sunset)}<small className="block text-[9px] text-slate-500">Coucher</small></span></div><div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-slate-400"><span><b className="text-amber-100">Soleil</b> · {formatAltitude(apparentPosition.sun.altitudeDeg)} · {formatAzimuth(apparentPosition.sun.azimuthDeg)}</span><span><b className="text-indigo-100">Lune</b> · {formatAltitude(apparentPosition.moon.altitudeDeg)} · {formatAzimuth(apparentPosition.moon.azimuthDeg)}</span></div><div className="mt-3 grid grid-cols-[80px_1fr] items-center gap-3 border-t border-slate-600/25 pt-3"><div className="grid h-16 w-16 place-items-center text-2xl">{moonVisual}</div><div><p className="text-sm font-semibold text-slate-100">{astronomy.moon.label}</p><p className="mt-0.5 text-xs text-slate-400">Éclairage {astronomy.moonIllumination == null ? "—" : `${astronomy.moonIllumination}%`}</p><p className="mt-2 text-[10px] text-slate-500">Position fixe calculée à {displayTime(apparentPosition.calculatedAt)} · sans rotation.</p></div></div><p className="mt-3 text-[10px] text-slate-500">Coordonnées apparentes actualisées chaque minute · Astronomy Engine + Open-Meteo.</p><DetailHint /></PanelDialog>;
 }
 
+function SunMoonPanelTrajectory({ astronomy, source }: { astronomy: EnvironmentalData["astronomy"]; source: string }) {
+  const coordinates = astronomy?.coordinates ?? { lat: 0, lon: 0 };
+  const positionQuery = trpc.weather.getApparentAstronomyPosition.useQuery(coordinates, { enabled: astronomy != null, staleTime: 45_000, refetchInterval: 60_000, refetchOnWindowFocus: true });
+  if (!astronomy) return <section className="weather-surface rounded-[22px] border border-slate-700/60 p-4"><div className="flex items-center gap-3"><MeteoIcon name="sunny" size={30} /><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="mt-1 text-xs text-slate-400">Éphémérides réelles temporairement indisponibles.</p></div></div></section>;
+
+  const fallback: ApparentAstronomyPosition = { sun: { altitudeDeg: astronomy.sunAltitudeDeg, azimuthDeg: astronomy.sunAzimuthDeg, aboveHorizon: astronomy.sunAboveHorizon }, moon: { altitudeDeg: astronomy.moonAltitudeDeg, azimuthDeg: astronomy.moonAzimuthDeg, aboveHorizon: astronomy.moonAboveHorizon }, calculatedAt: astronomy.altitudeCalculatedAt };
+  const position = positionQuery.data ?? fallback;
+  const sunArc = projectApparentBodyOnArc(position.sun);
+  const moonArc = projectApparentBodyOnArc(position.moon);
+  const sunTrajectoryPath = buildTrajectoryPath(position.trajectory?.sun ?? []);
+  const moonTrajectoryPath = buildTrajectoryPath(position.trajectory?.moon ?? []);
+  const isNight = isNightAtLocalMinutes(astronomy.sunrise, astronomy.sunset, minutesNow(astronomy.timezone));
+  const moonAsset = ["Premier croissant", "Premier quartier"].includes(astronomy.moon.label) ? "/manus-storage/meteoai-first-quarter-moon-3d-realistic_64387ecc.png" : null;
+  const sunMarker = <img src="/manus-storage/meteoai-solar-disc-textured_d3eb7ecc.png" alt="Disque solaire texturé" className="celestial-realistic-sun h-full w-full object-contain" />;
+  const moonMarker = moonAsset ? <img src={moonAsset} alt="Lune réaliste fixe" className="moon-3d-first-crescent h-full w-full object-contain" /> : <MeteoIcon name="clear_night" size={40} className="h-10 w-10" />;
+  const moonVisual = moonAsset ? <img src={moonAsset} alt={`Lune réaliste représentant ${astronomy.moon.label}`} className="moon-3d-first-crescent h-full w-full object-contain" /> : astronomy.moon.symbol;
+  const belowHorizon = [!sunArc ? "Soleil sous l’horizon" : null, !moonArc ? "Lune sous l’horizon" : null].filter(Boolean).join(" · ");
+  const details = <div className="space-y-4"><div className="grid grid-cols-2 gap-2"><AstronomyDetail label="Hauteur du Soleil" value={formatAltitude(position.sun.altitudeDeg)} /><AstronomyDetail label="Azimut du Soleil" value={formatAzimuth(position.sun.azimuthDeg)} /><AstronomyDetail label="Hauteur de la Lune" value={formatAltitude(position.moon.altitudeDeg)} /><AstronomyDetail label="Azimut de la Lune" value={formatAzimuth(position.moon.azimuthDeg)} /></div><div className="rounded-xl border border-sky-300/20 bg-sky-400/[0.05] p-3 text-[11px] leading-relaxed text-slate-300"><p className="font-semibold text-sky-100">Trajectoires apparentes</p><p className="mt-1">Les pointillés suivent des coordonnées topocentriques calculées toutes les trente minutes pour le lieu actif. Le tracé s’interrompt sous l’horizon, tandis que la Lune reste fixe sur sa position courante, sans rotation.</p></div><p className="text-[10px] text-slate-500">Éphémérides : Open-Meteo · trajectoires et positions : Astronomy Engine · données environnementales : {source}.</p></div>;
+
+  return <PanelDialog title="Soleil & Lune" description="Trajectoires apparentes, positions actuelles et éphémérides locales." content={details} className="weather-surface celestial-trajectory-card border-amber-400/20"><div className="flex items-center justify-between gap-3">{isNight && <span className="celestial-night-marker sr-only">Thème nocturne actif</span>}<div className="flex items-center gap-2.5"><span className="grid h-8 w-8 place-items-center">{sunMarker}</span><div><h2 className="text-base font-semibold text-slate-100">Soleil & Lune</h2><p className="text-[11px] text-slate-300/80">Éphémérides locales du jour</p></div></div><span className="rounded-full border border-amber-300/55 bg-slate-950/35 px-2.5 py-1 text-[10px] font-semibold text-amber-100">Jour {displayDuration(astronomy.daylightDurationSeconds)}</span></div><div className="celestial-arc-scene relative mx-auto mt-7 h-40 max-w-[330px] overflow-hidden"><div className="celestial-arc-backdrop absolute bottom-2 left-0 right-0 h-36 rounded-t-full border-x border-t border-sky-300/60" /><svg aria-hidden="true" className="celestial-trajectory-overlay absolute inset-x-0 bottom-0 h-40 w-full" viewBox="0 0 100 160" preserveAspectRatio="none"><path className="celestial-trajectory celestial-trajectory--sun" d={sunTrajectoryPath} /><path className="celestial-trajectory celestial-trajectory--moon" d={moonTrajectoryPath} /></svg><div className="absolute bottom-2 left-0 right-0 border-t border-sky-100/75" />{sunArc && <span aria-label={`Position apparente du Soleil, ${formatAltitude(position.sun.altitudeDeg)}, ${formatAzimuth(position.sun.azimuthDeg)}`} className="sun-altitude-marker absolute z-10 grid h-12 w-12 -translate-x-1/2 place-items-center" style={{ left: `${sunArc.left}%`, bottom: `${sunArc.bottom - 24}px` }}>{sunMarker}</span>}{moonArc && <span aria-label={`Position apparente fixe de la Lune, ${formatAltitude(position.moon.altitudeDeg)}, ${formatAzimuth(position.moon.azimuthDeg)}`} className="moon-altitude-marker absolute z-20 grid h-10 w-10 -translate-x-1/2 place-items-center" style={{ left: `${moonArc.left}%`, bottom: `${moonArc.bottom - 20}px` }}>{moonMarker}</span>}{belowHorizon && <span className="absolute inset-x-3 bottom-9 z-30 text-center text-[9px] text-slate-200/85">{belowHorizon}</span>}<span className="absolute bottom-0 left-0 text-[11px] text-slate-100">{displayTime(astronomy.sunrise)}<small className="block text-[9px] text-sky-100/70">Lever</small></span><span className="absolute bottom-0 right-0 text-right text-[11px] text-slate-100">{displayTime(astronomy.sunset)}<small className="block text-[9px] text-sky-100/70">Coucher</small></span></div><div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-slate-300"><span><b className="text-amber-100">Soleil</b> · {displayTime(astronomy.sunrise)}–{displayTime(astronomy.sunset)}</span><span><b className="text-indigo-100">Lune</b> · {displayTime(astronomy.moonrise)}–{displayTime(astronomy.moonset)}</span></div><div className="mt-3 grid grid-cols-[80px_1fr] items-center gap-3 border-t border-sky-100/15 pt-3"><div className="grid h-16 w-16 place-items-center text-2xl">{moonVisual}</div><div><p className="text-sm font-semibold text-slate-100">{astronomy.moon.label}</p><p className="mt-0.5 text-xs text-slate-300/80">Éclairage {astronomy.moonIllumination == null ? "—" : `${astronomy.moonIllumination}%`}</p><p className="mt-2 text-[10px] text-slate-400">Position fixe calculée à {displayTime(position.calculatedAt)} · sans rotation.</p></div></div><p className="mt-3 text-[10px] text-slate-400">Trajectoires en pointillés · coordonnées actualisées chaque minute · Astronomy Engine + Open-Meteo.</p><DetailHint /></PanelDialog>;
+}
+
 export function EnvironmentalPanels({ data, isLoading }: { data: EnvironmentalData | null | undefined; isLoading?: boolean }) {
   if (isLoading && !data) return <div className="grid gap-3 sm:grid-cols-2"><div className="h-64 animate-pulse rounded-[22px] bg-slate-800/40" /><div className="h-64 animate-pulse rounded-[22px] bg-slate-800/40" /></div>;
-  return <section className="grid gap-3 sm:grid-cols-2" aria-label="Qualité de l’air, soleil et lune"><AirQualityPanel air={data?.air ?? null} source={data?.source ?? "Open-Meteo / CAMS"} /><div className="space-y-3"><SunMoonPanelApparent astronomy={data?.astronomy ?? null} source={data?.source ?? "Open-Meteo"} /><AstronomyOutlookPanel astronomy={data?.astronomy ?? null} /></div></section>;
+  return <section className="grid gap-3 sm:grid-cols-2" aria-label="Qualité de l’air, soleil et lune"><AirQualityPanel air={data?.air ?? null} source={data?.source ?? "Open-Meteo / CAMS"} /><div className="space-y-3"><SunMoonPanelTrajectory astronomy={data?.astronomy ?? null} source={data?.source ?? "Open-Meteo"} /><AstronomyOutlookPanel astronomy={data?.astronomy ?? null} /></div></section>;
 }

@@ -49,9 +49,17 @@ export type ApparentBodyPosition = {
   aboveHorizon: boolean;
 };
 
+export type ApparentTrajectoryPoint = ApparentBodyPosition & {
+  at: string;
+};
+
 export type ApparentAstronomyPosition = {
   sun: ApparentBodyPosition;
   moon: ApparentBodyPosition;
+  trajectory: {
+    sun: ApparentTrajectoryPoint[];
+    moon: ApparentTrajectoryPoint[];
+  };
   calculatedAt: string;
 };
 
@@ -67,12 +75,24 @@ function getApparentBodyPosition(body: AstronomyBody, instant: Date, observer: A
   };
 }
 
+function getApparentTrajectory(body: AstronomyBody, observer: AstronomyObserver, instant: Date): ApparentTrajectoryPoint[] {
+  const startOfUtcDay = Date.UTC(instant.getUTCFullYear(), instant.getUTCMonth(), instant.getUTCDate());
+  return Array.from({ length: 49 }, (_, index) => {
+    const sampledAt = new Date(startOfUtcDay + index * 30 * 60_000);
+    return { ...getApparentBodyPosition(body, sampledAt, observer), at: sampledAt.toISOString() };
+  });
+}
+
 /** Coordonnées horizontales topocentriques apparentes au lieu et à l’instant fournis. */
 export function getApparentAstronomyPosition(coords: { lat: number; lon: number }, instant = new Date()): ApparentAstronomyPosition {
   const observer = new Astronomy.Observer(coords.lat, coords.lon, 0);
   return {
     sun: getApparentBodyPosition(Astronomy.Body.Sun, instant, observer),
     moon: getApparentBodyPosition(Astronomy.Body.Moon, instant, observer),
+    trajectory: {
+      sun: getApparentTrajectory(Astronomy.Body.Sun, observer, instant),
+      moon: getApparentTrajectory(Astronomy.Body.Moon, observer, instant),
+    },
     calculatedAt: instant.toISOString(),
   };
 }

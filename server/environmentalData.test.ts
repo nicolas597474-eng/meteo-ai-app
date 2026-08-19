@@ -42,6 +42,10 @@ describe("environmentalData", () => {
     expect(day.moon.altitudeDeg).not.toBeNull();
     expect(day.moon.azimuthDeg).not.toBeNull();
     expect(day.moon.aboveHorizon).toBe(day.moon.altitudeDeg! > 0);
+    expect(day.trajectory.sun).toHaveLength(49);
+    expect(day.trajectory.moon).toHaveLength(49);
+    expect(day.trajectory.sun.some((point) => point.aboveHorizon)).toBe(true);
+    expect(day.trajectory.moon.every((point) => point.at.endsWith(".000Z"))).toBe(true);
   });
 
   it("respecte les variations de lieu, de saison et de latitude dans l’état d’horizon", () => {

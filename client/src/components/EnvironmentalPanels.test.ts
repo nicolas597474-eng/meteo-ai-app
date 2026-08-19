@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const apparentSunMoonSource = source.slice(source.indexOf("function SunMoonPanelApparent"), source.indexOf("export function EnvironmentalPanels"));
+const trajectorySunMoonSource = source.slice(source.indexOf("function SunMoonPanelTrajectory"), source.indexOf("export function EnvironmentalPanels"));
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -157,6 +158,21 @@ describe("EnvironmentalPanels", () => {
     expect(styles).not.toContain("rotateY(360deg)");
     expect(apparentSunMoonSource).toContain("h-12 w-12");
     expect(styles).not.toContain('content: "Nuit locale"');
+  });
+
+  it("trace les parcours réels du Soleil et de la Lune sur un ciel crépusculaire sans animer la Lune", () => {
+    expect(source).toContain("buildTrajectoryPath");
+    expect(trajectorySunMoonSource).toContain("position.trajectory?.sun");
+    expect(trajectorySunMoonSource).toContain("position.trajectory?.moon");
+    expect(trajectorySunMoonSource).toContain("celestial-trajectory--sun");
+    expect(trajectorySunMoonSource).toContain("celestial-trajectory--moon");
+    expect(trajectorySunMoonSource).toContain("celestial-arc-backdrop");
+    expect(trajectorySunMoonSource).toContain("Lune réaliste fixe");
+    expect(trajectorySunMoonSource).toContain("sans rotation");
+    expect(styles).toContain("celestial-trajectory-card");
+    expect(styles).toContain("celestial-trajectory--sun");
+    expect(styles).toContain("celestial-trajectory--moon");
+    expect(styles).toContain("stroke-dasharray");
   });
 
   it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {

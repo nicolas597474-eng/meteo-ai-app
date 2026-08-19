@@ -484,6 +484,55 @@ img.moon-3d-first-crescent {
   transform: scale(1.06);
 }
 
+/* Arche immersive : ciel nocturne, halo de crépuscule et trajectoires calculées. */
+.celestial-trajectory-card {
+  background:
+    radial-gradient(ellipse 72% 52% at 50% 92%, rgb(253 132 47 / 0.34), transparent 56%),
+    radial-gradient(circle at 14% 24%, rgb(125 211 252 / 0.16) 0 1px, transparent 2px),
+    radial-gradient(circle at 78% 18%, rgb(191 219 254 / 0.16) 0 1px, transparent 2px),
+    linear-gradient(150deg, #102452 0%, #071a43 50%, #030718 100%) !important;
+  border-color: rgb(96 165 250 / 0.38) !important;
+}
+
+.celestial-arc-scene {
+  isolation: isolate;
+}
+
+.celestial-arc-backdrop {
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 62% 35% at 50% 100%, rgb(255 164 73 / 0.72), rgb(236 112 43 / 0.25) 34%, transparent 65%),
+    radial-gradient(circle at 22% 18%, rgb(191 219 254 / 0.20) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 70% 28%, rgb(219 234 254 / 0.15) 0 1px, transparent 1.5px),
+    linear-gradient(180deg, rgb(4 17 58 / 0.74), rgb(8 24 63 / 0.72) 54%, rgb(16 28 53 / 0.36));
+  box-shadow: inset 0 0 42px rgb(8 47 105 / 0.38), inset 0 -20px 30px rgb(255 137 51 / 0.16);
+}
+
+.celestial-trajectory-overlay {
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.celestial-trajectory {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.15;
+  stroke-dasharray: 3.2 2.8;
+}
+
+.celestial-trajectory--sun {
+  stroke: #facc15;
+  filter: drop-shadow(0 0 2px rgb(250 204 21 / 0.55));
+}
+
+.celestial-trajectory--moon {
+  stroke: #c7d2fe;
+  stroke-dasharray: 2.7 3.3;
+  filter: drop-shadow(0 0 2px rgb(199 210 254 / 0.45));
+}
+
 @keyframes meteo-icon-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
