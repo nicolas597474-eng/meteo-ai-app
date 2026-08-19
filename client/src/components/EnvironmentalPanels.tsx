@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Compass, LocateFixed, Maximize2, Navigation, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { Compass, LocateFixed, Maximize2, Navigation, RotateCcw, SlidersHorizontal, Volume2, VolumeX } from "lucide-react";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { MapView } from "@/components/Map";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -170,6 +170,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(false);
   const [visibilityOpacity, setVisibilityOpacity] = useState(100);
+  const [isOpacityPanelOpen, setIsOpacityPanelOpen] = useState(false);
   const [isMapOpening, setIsMapOpening] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const compactMapRef = useRef<google.maps.Map | null>(null);
@@ -348,7 +349,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     setIsMapOpening(false);
     setIsMapExpanded(false);
   };
-  const opacityControl = <div className="map-opacity-control absolute left-3 top-[7.5rem] z-20" data-swipe-exclude><label htmlFor="eclipse-opacity-expanded" className="map-opacity-control__label">Opacité <span>{visibilityOpacity}%</span></label><input id="eclipse-opacity-expanded" type="range" min="25" max="100" step="5" value={visibilityOpacity} onChange={(event) => setVisibilityOpacity(Number(event.target.value))} aria-label="Opacité des zones de visibilité" /></div>;
+  const opacityControl = <div className="absolute bottom-16 left-3 z-20 flex flex-col items-start gap-2" data-swipe-exclude>{isOpacityPanelOpen && <div className="map-opacity-control"><label htmlFor="eclipse-opacity-expanded" className="map-opacity-control__label">Opacité <span>{visibilityOpacity}%</span></label><input id="eclipse-opacity-expanded" type="range" min="25" max="100" step="5" value={visibilityOpacity} onChange={(event) => setVisibilityOpacity(Number(event.target.value))} aria-label="Opacité des zones de visibilité" /></div>}<button type="button" onClick={() => setIsOpacityPanelOpen((open) => !open)} aria-label="Régler l’opacité des zones de visibilité" aria-expanded={isOpacityPanelOpen} title="Opacité des zones" className={`map-control-button ${isOpacityPanelOpen ? "map-control-button--active" : ""}`}><SlidersHorizontal size={21} strokeWidth={2.5} aria-hidden="true" /></button></div>;
   const mapContent = (suffix: string, height: string, isExpanded = false) => (
     <MapView key={`${selectedLayer.eventId}-${suffix}`} className={height} initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId="terrain" mapTypeControl={isExpanded} fullscreenControl={false} zoomControl streetViewControl={isExpanded} rotateControl={isExpanded} onMapReady={(map) => onMapReady(map, isExpanded)}>
       {!isExpanded && <div className="absolute right-3 top-3 z-20 flex flex-col gap-2" data-swipe-exclude><button type="button" onClick={openExpandedMap} disabled={isMapOpening} aria-label={isMapOpening ? "Ouverture de la carte" : "Agrandir la carte"} title={isMapOpening ? "Ouverture de la carte…" : "Agrandir la carte"} aria-busy={isMapOpening} className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 text-slate-700 shadow-md transition-transform active:scale-95 disabled:cursor-wait disabled:opacity-70"><Maximize2 size={21} strokeWidth={2.6} aria-hidden="true" /></button><button type="button" onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Me localiser"} title={isLocating ? "Localisation en cours" : "Me localiser"} aria-busy={isLocating} className="flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/80 bg-white/95 text-sky-700 shadow-md transition-transform active:scale-95 disabled:cursor-wait disabled:opacity-70"><LocateFixed size={21} strokeWidth={2.5} aria-hidden="true" /></button></div>}

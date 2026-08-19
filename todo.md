@@ -2259,3 +2259,9 @@
 - [x] Interface compacte: Masquer le curseur de transparence lorsque la carte n’est pas agrandie.
 - [x] Vue agrandie: Conserver le réglage et remplacer le libellé « Zones » par « Opacité ».
 - [x] Validation: Tester les deux formats de carte, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — bouton d’opacité bas gauche
+- [x] Commande: Afficher un bouton rond d’opacité cohérent avec les autres actions de carte.
+- [x] Position: Placer cette commande en bas à gauche de la vue agrandie, hors des crédits et des contrôles natifs.
+- [x] Interaction: Ouvrir et fermer le réglage d’opacité depuis le bouton sans gêner les gestes cartographiques.
+- [x] Validation: Tester la commande en vue agrandie, TypeScript et la suite de régression avant publication.
