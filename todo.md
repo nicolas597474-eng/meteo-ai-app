@@ -2376,3 +2376,11 @@
 - [x] Position: Conserver la Lune sur sa position astronomique fixe de l’arche.
 - [x] Accessibilité: Désactiver la rotation 3D lorsque la réduction des mouvements est demandée.
 - [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.
+
+## Soleil & Lune — positions astronomiques apparentes réelles
+- [x] Audit: Vérifier les coordonnées actuelles, les sources et les champs de calcul pour les deux astres.
+- [x] Calcul: Déterminer l’azimut, la hauteur et l’état sous/sur l’horizon pour le lieu, la date, l’heure et le fuseau actifs.
+- [x] Projection: Positionner les astres dans l’arche à partir des données apparentes, sans coordonnées esthétiques fixes.
+- [x] Temps réel: Actualiser progressivement les positions quand l’heure locale évolue, sans animation décorative ni rotation de la Lune.
+- [x] Cas limites: Gérer lever, coucher, crépuscule, nuit, phases lunaires, changement de lieu, date et fuseau.
+- [x] Validation: Comparer les positions calculées à Astronomy Engine sur plusieurs lieux et heures, puis tester l’interface avant publication.

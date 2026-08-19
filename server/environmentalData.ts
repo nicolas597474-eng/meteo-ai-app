@@ -1,6 +1,10 @@
 import { fetchWeather } from "./weatherFetch";
-import { getMoonPosition, getPosition } from "suncalc";
 import { buildAstronomyOutlook, type AstronomyOutlook } from "./astronomyEvents";
+import type { Body as AstronomyBody, Observer as AstronomyObserver } from "astronomy-engine";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const Astronomy = require("astronomy-engine") as typeof import("astronomy-engine");
 
 export type AqiDescriptor = {
   label: string;
@@ -37,6 +41,40 @@ export function getMoonIllumination(value: number | null) {
 
 export function roundAltitudeDegrees(value: number | null | undefined) {
   return value == null || !Number.isFinite(value) ? null : Math.round(value * 10) / 10;
+}
+
+export type ApparentBodyPosition = {
+  altitudeDeg: number | null;
+  azimuthDeg: number | null;
+  aboveHorizon: boolean;
+};
+
+export type ApparentAstronomyPosition = {
+  sun: ApparentBodyPosition;
+  moon: ApparentBodyPosition;
+  calculatedAt: string;
+};
+
+function getApparentBodyPosition(body: AstronomyBody, instant: Date, observer: AstronomyObserver): ApparentBodyPosition {
+  const equator = Astronomy.Equator(body, instant, observer, true, true);
+  const horizon = Astronomy.Horizon(instant, observer, equator.ra, equator.dec, "normal");
+  const altitudeDeg = roundAltitudeDegrees(horizon.altitude);
+  const azimuthDeg = roundAltitudeDegrees(horizon.azimuth);
+  return {
+    altitudeDeg,
+    azimuthDeg,
+    aboveHorizon: Number.isFinite(horizon.altitude) && horizon.altitude > 0,
+  };
+}
+
+/** Coordonnées horizontales topocentriques apparentes au lieu et à l’instant fournis. */
+export function getApparentAstronomyPosition(coords: { lat: number; lon: number }, instant = new Date()): ApparentAstronomyPosition {
+  const observer = new Astronomy.Observer(coords.lat, coords.lon, 0);
+  return {
+    sun: getApparentBodyPosition(Astronomy.Body.Sun, instant, observer),
+    moon: getApparentBodyPosition(Astronomy.Body.Moon, instant, observer),
+    calculatedAt: instant.toISOString(),
+  };
 }
 
 function asNumber(value: unknown): number | null {
@@ -106,6 +144,10 @@ export type EnvironmentalSnapshot = {
     dayProgress: number | null;
     sunAltitudeDeg: number | null;
     moonAltitudeDeg: number | null;
+    sunAzimuthDeg: number | null;
+    moonAzimuthDeg: number | null;
+    sunAboveHorizon: boolean;
+    moonAboveHorizon: boolean;
     altitudeCalculatedAt: string;
     timezone: string;
     outlook: AstronomyOutlook;
@@ -163,8 +205,7 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
     .slice(0, 24);
   const aqi = asNumber(currentAir?.european_aqi);
   const altitudeCalculatedAt = new Date();
-  const sunAltitudeDeg = roundAltitudeDegrees(getPosition(altitudeCalculatedAt, coords.lat, coords.lon).altitude);
-  const moonAltitudeDeg = roundAltitudeDegrees(getMoonPosition(altitudeCalculatedAt, coords.lat, coords.lon).altitude);
+  const apparentPosition = getApparentAstronomyPosition(coords, altitudeCalculatedAt);
 
   const value: EnvironmentalSnapshot = {
     air: airResponse ? {
@@ -187,8 +228,12 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
       moon: getMoonPhaseDescriptor(moonPhase),
       moonIllumination: getMoonIllumination(moonPhase),
       dayProgress: calculateDayProgress(sunrise, sunset, timezone),
-      sunAltitudeDeg,
-      moonAltitudeDeg,
+      sunAltitudeDeg: apparentPosition.sun.altitudeDeg,
+      moonAltitudeDeg: apparentPosition.moon.altitudeDeg,
+      sunAzimuthDeg: apparentPosition.sun.azimuthDeg,
+      moonAzimuthDeg: apparentPosition.moon.azimuthDeg,
+      sunAboveHorizon: apparentPosition.sun.aboveHorizon,
+      moonAboveHorizon: apparentPosition.moon.aboveHorizon,
       altitudeCalculatedAt: altitudeCalculatedAt.toISOString(),
       timezone,
       outlook: buildAstronomyOutlook({

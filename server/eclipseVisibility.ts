@@ -1,4 +1,8 @@
-import * as Astronomy from "astronomy-engine";
+import { createRequire } from "node:module";
+import type { AstroTime, Body as AstronomyBody, EclipseKind, Observer as AstronomyObserver } from "astronomy-engine";
+
+const require = createRequire(import.meta.url);
+const Astronomy = require("astronomy-engine") as typeof import("astronomy-engine");
 
 export type EclipseVisibilityKind = "full_event" | "partial";
 
@@ -67,12 +71,12 @@ function withinOneDay(actual: Date, expectedDate: string) {
   return Math.abs(actual.getTime() - expected) < 36 * 60 * 60 * 1_000;
 }
 
-function moonAltitudeAt(time: Astronomy.AstroTime, observer: Astronomy.Observer) {
+function moonAltitudeAt(time: AstroTime, observer: AstronomyObserver) {
   const equator = Astronomy.Equator(Astronomy.Body.Moon, time, observer, true, true);
   return Astronomy.Horizon(time, observer, equator.ra, equator.dec, "normal").altitude;
 }
 
-function bodyAzimuthAt(body: Astronomy.Body, time: Astronomy.AstroTime, observer: Astronomy.Observer) {
+function bodyAzimuthAt(body: AstronomyBody, time: AstroTime, observer: AstronomyObserver) {
   const equator = Astronomy.Equator(body, time, observer, true, true);
   return Astronomy.Horizon(time, observer, equator.ra, equator.dec, "normal").azimuth;
 }
@@ -193,17 +197,17 @@ export function getEclipseVisibilityLayers(events: EclipseCandidate[]) {
   });
 }
 
-function toIso(time: Astronomy.AstroTime) {
+function toIso(time: AstroTime) {
   return time.date.toISOString();
 }
 
-function lunarKindLabel(kind: Astronomy.EclipseKind) {
+function lunarKindLabel(kind: EclipseKind) {
   if (kind === Astronomy.EclipseKind.Total) return "Éclipse lunaire totale";
   if (kind === Astronomy.EclipseKind.Partial) return "Éclipse lunaire partielle";
   return "Éclipse lunaire pénombrale";
 }
 
-function solarKindLabel(kind: Astronomy.EclipseKind) {
+function solarKindLabel(kind: EclipseKind) {
   if (kind === Astronomy.EclipseKind.Total) return "Éclipse solaire totale";
   if (kind === Astronomy.EclipseKind.Annular) return "Éclipse solaire annulaire";
   return "Éclipse solaire partielle";

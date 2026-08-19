@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
-const modernSunMoonSource = source.slice(source.lastIndexOf("function SunMoonPanelAlwaysVisible"));
+const apparentSunMoonSource = source.slice(source.indexOf("function SunMoonPanelApparent"), source.indexOf("export function EnvironmentalPanels"));
 
 describe("EnvironmentalPanels", () => {
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
@@ -17,10 +17,10 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Soleil & Lune");
     expect(source).toContain("Éphémérides locales du jour");
     expect(source).toContain("Éclairage");
-    expect(modernSunMoonSource).toContain("Hauteur actuelle");
-    expect(modernSunMoonSource).toContain("Open-Meteo (horaires, durée du jour, phase)");
-    expect(modernSunMoonSource).toContain("Astronomy Engine (hauteurs)");
-    expect(modernSunMoonSource).toContain("Lecture et limites");
+    expect(apparentSunMoonSource).toContain("Hauteur apparente");
+    expect(apparentSunMoonSource).toContain("Mise à jour automatique toutes les minutes avec Astronomy Engine");
+    expect(apparentSunMoonSource).toContain("La Lune reste fixe à sa coordonnée calculée");
+    expect(apparentSunMoonSource).toContain("Lecture et limites");
     expect(source).toContain("Éphémérides réelles temporairement indisponibles");
     expect(source).toContain("Prochains repères astronomiques");
     expect(source).toContain("Prochaine pleine lune");
@@ -121,7 +121,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
-    expect(modernSunMoonSource).toContain("Détails locaux des horaires, phases, hauteurs et limites d’observation.");
+    expect(apparentSunMoonSource).toContain("Positions apparentes réelles et actualisées localement pour le lieu actif.");
   });
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
@@ -138,28 +138,24 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("prefers-reduced-motion: no-preference");
   });
 
-  it("distingue les positions du Soleil et de la Lune à partir des heures réelles", () => {
-    expect(modernSunMoonSource).toContain("celestialArcPosition");
-    expect(modernSunMoonSource).toContain("moonPosition");
-    expect(modernSunMoonSource).toContain("meteoai-solar-disc-textured_d3eb7ecc.png");
-    expect(modernSunMoonSource).toContain("celestial-realistic-sun");
-    expect(modernSunMoonSource).toContain("formatAltitude(astronomy.sunAltitudeDeg)");
-    expect(modernSunMoonSource).toContain("formatAltitude(astronomy.moonAltitudeDeg)");
-    expect(modernSunMoonSource).toContain('MeteoIcon name="clear_night" size={40}');
-    expect(modernSunMoonSource).toContain("isNightAtLocalMinutes");
-    expect(modernSunMoonSource).toContain("celestial-night-marker");
-    expect(modernSunMoonSource).toContain("markersAreClose");
-    expect(modernSunMoonSource).toContain("sunDisplayPosition");
-    expect(modernSunMoonSource).toContain("moonDisplayPosition");
-    expect(modernSunMoonSource).toContain("safeArcMarkerBottom");
-    expect(modernSunMoonSource).toContain('relative mx-auto mt-7 h-40');
-    expect(source).toContain("Math.sin((position / 100) * Math.PI) * 140");
-    expect(modernSunMoonSource).toContain("Position actuelle du Soleil sur l’arche");
-    expect(modernSunMoonSource).toContain("Position actuelle de la Lune sur l’arche, rotation continue sur son axe");
-    expect(modernSunMoonSource).toContain("celestial-moon-axis-rotation");
-    expect(styles).toContain("@keyframes celestial-moon-axis-rotation");
-    expect(styles).toContain("rotateY(360deg)");
-    expect(modernSunMoonSource).toContain("h-12 w-12");
+  it("distingue les positions du Soleil et de la Lune à partir de coordonnées apparentes réelles", () => {
+    expect(apparentSunMoonSource).toContain("getApparentAstronomyPosition.useQuery");
+    expect(apparentSunMoonSource).toContain("refetchInterval: 60_000");
+    expect(apparentSunMoonSource).toContain("projectApparentBodyOnArc");
+    expect(source).toContain("left: 50 - 42 * Math.sin(azimuthRadians)");
+    expect(source).toContain("Math.sin(altitudeRadians)");
+    expect(apparentSunMoonSource).toContain("sunArc");
+    expect(apparentSunMoonSource).toContain("moonArc");
+    expect(apparentSunMoonSource).toContain("formatAzimuth(apparentPosition.sun.azimuthDeg)");
+    expect(apparentSunMoonSource).toContain("formatAzimuth(apparentPosition.moon.azimuthDeg)");
+    expect(apparentSunMoonSource).toContain('MeteoIcon name="clear_night" size={40}');
+    expect(apparentSunMoonSource).toContain("celestial-night-marker");
+    expect(apparentSunMoonSource).toContain('relative mx-auto mt-7 h-40');
+    expect(apparentSunMoonSource).toContain("Position apparente fixe de la Lune");
+    expect(apparentSunMoonSource).not.toContain("celestial-moon-axis-rotation");
+    expect(styles).not.toContain("@keyframes celestial-moon-axis-rotation");
+    expect(styles).not.toContain("rotateY(360deg)");
+    expect(apparentSunMoonSource).toContain("h-12 w-12");
     expect(styles).not.toContain('content: "Nuit locale"');
   });
 

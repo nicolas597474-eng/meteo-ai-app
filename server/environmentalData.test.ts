@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEuropeanAqiDescriptor, getMinutesInTimeZone, getMoonIllumination, getMoonPhaseDescriptor, roundAltitudeDegrees } from "./environmentalData";
+import { getApparentAstronomyPosition, getEuropeanAqiDescriptor, getMinutesInTimeZone, getMoonIllumination, getMoonPhaseDescriptor, roundAltitudeDegrees } from "./environmentalData";
 
 describe("environmentalData", () => {
   it("présente les seuils documentés de l’indice européen de qualité de l’air", () => {
@@ -26,5 +26,33 @@ describe("environmentalData", () => {
     const instant = new Date("2026-08-17T12:30:00.000Z");
     expect(getMinutesInTimeZone("UTC", instant)).toBe(750);
     expect(getMinutesInTimeZone("Europe/Paris", instant)).toBe(870);
+  });
+
+  it("calcule les coordonnées horizontales apparentes au lieu et à l’instant demandés", () => {
+    const paris = { lat: 48.8566, lon: 2.3522 };
+    const day = getApparentAstronomyPosition(paris, new Date("2026-06-21T12:00:00.000Z"));
+    const night = getApparentAstronomyPosition(paris, new Date("2026-06-21T00:00:00.000Z"));
+
+    expect(day.sun.aboveHorizon).toBe(true);
+    expect(day.sun.altitudeDeg).toBeGreaterThan(40);
+    expect(day.sun.azimuthDeg).toBeGreaterThan(160);
+    expect(day.sun.azimuthDeg).toBeLessThan(230);
+    expect(night.sun.aboveHorizon).toBe(false);
+    expect(night.sun.altitudeDeg).toBeLessThan(0);
+    expect(day.moon.altitudeDeg).not.toBeNull();
+    expect(day.moon.azimuthDeg).not.toBeNull();
+    expect(day.moon.aboveHorizon).toBe(day.moon.altitudeDeg! > 0);
+  });
+
+  it("respecte les variations de lieu, de saison et de latitude dans l’état d’horizon", () => {
+    const equatorEquinox = getApparentAstronomyPosition({ lat: 0, lon: 0 }, new Date("2026-03-20T12:00:00.000Z"));
+    const northPoleSummer = getApparentAstronomyPosition({ lat: 89, lon: 0 }, new Date("2026-06-21T12:00:00.000Z"));
+    const northPoleWinter = getApparentAstronomyPosition({ lat: 89, lon: 0 }, new Date("2026-12-21T12:00:00.000Z"));
+
+    expect(equatorEquinox.sun.aboveHorizon).toBe(true);
+    expect(equatorEquinox.sun.altitudeDeg).toBeGreaterThan(80);
+    expect(northPoleSummer.sun.aboveHorizon).toBe(true);
+    expect(northPoleWinter.sun.aboveHorizon).toBe(false);
+    expect(northPoleWinter.sun.altitudeDeg).toBeLessThan(0);
   });
 });
