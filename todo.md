@@ -2346,3 +2346,9 @@
 - [x] Calcul: Préserver les positions astronomiques calculées comme point de départ visuel.
 - [x] Accessibilité: Désactiver le mouvement lorsque la réduction des mouvements est demandée.
 - [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.
+
+## Soleil & Lune — rotation continue à 360 degrés
+- [x] Animation: Remplacer l’oscillation horizontale par une rotation complète et continue des deux astres.
+- [x] Calcul: Conserver les coordonnées astronomiques de l’arche sans déplacement latéral.
+- [x] Accessibilité: Respecter la réduction des mouvements pour la rotation.
+- [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.

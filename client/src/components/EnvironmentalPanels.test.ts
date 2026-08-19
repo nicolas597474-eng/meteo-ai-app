@@ -154,10 +154,10 @@ describe("EnvironmentalPanels", () => {
     expect(modernSunMoonSource).toContain("safeArcMarkerBottom");
     expect(modernSunMoonSource).toContain('relative mx-auto mt-7 h-40');
     expect(source).toContain("Math.sin((position / 100) * Math.PI) * 140");
-    expect(modernSunMoonSource).toContain("Position actuelle animée du Soleil sur l’arche");
-    expect(modernSunMoonSource).toContain("Position actuelle animée de la Lune sur l’arche");
-    expect(modernSunMoonSource).toContain("celestial-horizontal-drift");
-    expect(styles).toContain("@keyframes celestial-horizontal-drift");
+    expect(modernSunMoonSource).toContain("Position actuelle du Soleil sur l’arche, rotation continue");
+    expect(modernSunMoonSource).toContain("Position actuelle de la Lune sur l’arche, rotation continue");
+    expect(modernSunMoonSource).toContain("celestial-rotation");
+    expect(styles).toContain("@keyframes celestial-self-rotation");
     expect(modernSunMoonSource).toContain("h-12 w-12");
     expect(styles).not.toContain('content: "Nuit locale"');
   });
