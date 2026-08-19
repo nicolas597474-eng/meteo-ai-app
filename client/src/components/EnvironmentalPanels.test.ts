@@ -68,7 +68,11 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("streetViewControl={isExpanded}");
     expect(source).toContain('gestureHandling: "greedy"');
     expect(source).toContain("utilisez les contrôles de zoom et la flèche de direction");
-    expect(source).toContain("Boussole, nord géographique");
+    expect(source).toContain("Rose des vents complète, nord géographique");
+    expect(source).toContain("COMPASS_ROSE_POINTS");
+    expect(source).toContain('label: "NE"');
+    expect(source).toContain('label: "SO"');
+    expect(source).toContain("Rose des vents complète");
     expect(source).toContain("Détails de la boussole");
     expect(source).toContain("Ouvrir les détails de la boussole");
     expect(source).toContain("isCompassDetailsOpen");

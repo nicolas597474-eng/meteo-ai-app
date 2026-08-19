@@ -2271,3 +2271,9 @@
 - [x] Informations: Afficher l’orientation de la carte, l’azimut de l’astre, sa direction et la méthode de lecture.
 - [x] Transparence: Préciser que l’azimut est géographique et que l’horizon réel reste à vérifier.
 - [x] Validation: Tester l’ouverture, la fermeture, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — rose des vents complète
+- [x] Carte agrandie: Afficher les huit directions cardinales et intermédiaires autour de la boussole.
+- [x] Orientation: Tourner les repères avec la carte tout en préservant le nord géographique et l’azimut de l’astre.
+- [x] Interface: Préserver des contrôles lisibles et sans chevauchement sur mobile.
+- [x] Validation: Tester les orientations, TypeScript et la suite de régression avant publication.
