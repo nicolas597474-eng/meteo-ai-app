@@ -2419,3 +2419,8 @@
 - [x] Ajouter une transition CSS sur left/bottom des marqueurs Soleil et Lune pour un déplacement progressif lors de l'actualisation.
 - [x] Respecter prefers-reduced-motion en désactivant la transition si l'utilisateur le demande.
 - [x] Vérifier que la Lune ne reçoit aucune rotation ni animation décorative.
+
+## Soleil & Lune — mode accéléré 24 h et rotation lunaire
+- [x] Intégrer le hook useTimelapseSimulation dans le panneau actif avec bouton de déclenchement.
+- [x] Rétablir la rotation 3D horizontale de la Lune sur l'arche (CSS keyframes + prefers-reduced-motion).
+- [x] Valider TypeScript, Vitest et le rendu mobile avant publication.
