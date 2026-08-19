@@ -2436,3 +2436,9 @@
 - [x] Agrandir les repères horaires et leur donner un fond de contraste sans masquer les trajectoires.
 - [x] Renforcer le contraste du tracé vert du relief local sans masquer les trajectoires célestes.
 - [x] Vérifier l’absence de chevauchement sur mobile, TypeScript et Vitest avant publication.
+
+## AI Lab — audit global du lexique
+- [x] Inventorier le lexique déjà exposé et l’ensemble des modules utiles à l’utilisateur.
+- [x] Identifier les méthodes, indicateurs, sources, limites et calculs encore absents du lexique.
+- [x] Ajouter les définitions vérifiables du module Soleil & Lune, des prévisions, de la fiabilité et des stations.
+- [x] Vérifier la couverture, la lisibilité mobile, TypeScript et Vitest avant publication.
