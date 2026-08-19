@@ -484,26 +484,22 @@ img.moon-3d-first-crescent {
   transform: scale(1.06);
 }
 
-/* La rotation ne déplace que le visuel : les coordonnées de l’arche restent astronomiquement calculées. */
-.celestial-rotation {
+/* La Lune parcourt visuellement l’arche sans modifier les coordonnées astronomiques de référence. */
+.celestial-moon-arc-travel {
   display: block;
   width: 100%;
   height: 100%;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .celestial-rotation {
-    animation: celestial-self-rotation 9s linear infinite;
-  }
-
-  .celestial-rotation--moon {
-    animation-duration: 11s;
+  .celestial-moon-arc-travel {
+    animation: celestial-moon-arc-travel 12s ease-in-out infinite alternate;
   }
 }
 
-@keyframes celestial-self-rotation {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes celestial-moon-arc-travel {
+  from { transform: translateX(-118px); }
+  to { transform: translateX(118px); }
 }
 
 @keyframes meteo-icon-float {

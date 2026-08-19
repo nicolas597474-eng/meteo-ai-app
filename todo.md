@@ -2352,3 +2352,9 @@
 - [x] Calcul: Conserver les coordonnées astronomiques de l’arche sans déplacement latéral.
 - [x] Accessibilité: Respecter la réduction des mouvements pour la rotation.
 - [x] Validation: Tester le rendu mobile, TypeScript et la suite de régression avant publication.
+
+## Soleil & Lune — parcours gauche-droite de la Lune
+- [x] Animation: Déplacer la Lune continuellement de gauche à droite sur l’arche, sans la faire tourner sur elle-même.
+- [x] Soleil: Conserver le Soleil fixe sur sa position astronomique calculée.
+- [x] Accessibilité: Désactiver le mouvement lorsque la réduction des mouvements est demandée.
+- [x] Validation: Tester le parcours mobile, TypeScript et la suite de régression avant publication.
