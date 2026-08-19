@@ -45,6 +45,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("zIndex: isFull ? 4 : 3");
     expect(source).toContain("visibilityOpacity");
     expect(source).toContain("Opacité des zones de visibilité");
+    expect(source).toContain("Opacité <span>{visibilityOpacity}%</span>");
+    expect(source).toContain("{isExpanded && opacityControl}");
     expect(source).toContain("openExpandedMap");
     expect(source).toContain("isMapOpeningRef");
     expect(source).toContain('google.maps.event.trigger(map, "resize")');

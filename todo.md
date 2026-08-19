@@ -2254,3 +2254,8 @@
 - [x] Tactile: Préserver le pincement natif sans ajouter d’animation concurrente ni de redimensionnement parasite.
 - [x] Accessibilité: Respecter la préférence de réduction des mouvements.
 - [x] Validation: Tester les commandes, le pincement, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — curseur d’opacité en vue agrandie
+- [x] Interface compacte: Masquer le curseur de transparence lorsque la carte n’est pas agrandie.
+- [x] Vue agrandie: Conserver le réglage et remplacer le libellé « Zones » par « Opacité ».
+- [x] Validation: Tester les deux formats de carte, TypeScript et la suite de régression avant publication.
