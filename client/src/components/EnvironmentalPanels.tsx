@@ -242,7 +242,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, cameraControl: false, gestureHandling: "greedy", mapTypeControlOptions: isExpanded ? { position: google.maps.ControlPosition.TOP_RIGHT } : undefined, zoomControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined, streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined });
     if (isExpanded) {
       map.addListener("heading_changed", () => setExpandedHeading(map.getHeading() ?? 0));
-      map.getStreetView().setOptions({ addressControlOptions: { position: google.maps.ControlPosition.BOTTOM_CENTER } });
+      map.getStreetView().setOptions({ addressControlOptions: { position: google.maps.ControlPosition.TOP_CENTER } });
     }
     const localPosition = { lat: center.lat, lng: center.lon };
     new google.maps.marker.AdvancedMarkerElement({ map, position: localPosition, title: "Lieu actif" });

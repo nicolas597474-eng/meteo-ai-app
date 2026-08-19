@@ -2330,3 +2330,8 @@
 - [x] État initial: Sélectionner automatiquement la période de 7 jours à l’ouverture de la page.
 - [x] Interface: Conserver le choix manuel des autres périodes après l’initialisation.
 - [x] Validation: Tester l’état initial, TypeScript et la suite de régression avant publication.
+
+## Carte astronomique — indication de lieu Street View visible
+- [x] Position: Remonter l’indication native de lieu au-dessus des crédits de carte.
+- [x] Interface: Préserver l’espace entre ce libellé, les commandes et le pied de carte.
+- [x] Validation: Tester le rendu mobile et grand écran, TypeScript et la suite de régression avant publication.

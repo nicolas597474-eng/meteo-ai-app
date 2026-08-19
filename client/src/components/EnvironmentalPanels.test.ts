@@ -39,7 +39,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Carte de visibilité d’éclipse");
     expect(source).toContain("map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded");
     expect(source).toContain("cameraControl: false");
-    expect(source).toContain("addressControlOptions: { position: google.maps.ControlPosition.BOTTOM_CENTER }");
+    expect(source).toContain("addressControlOptions: { position: google.maps.ControlPosition.TOP_CENTER }");
     expect(source).toContain('strokeColor: isFull ? "#0284c7" : "#7c3aed"');
     expect(source).toContain("fillOpacity: baseOpacity * (visibilityOpacity / 100)");
     expect(source).toContain("zIndex: isFull ? 4 : 3");
