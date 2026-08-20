@@ -2630,3 +2630,8 @@
 - [x] Renforcer les arrondis du conteneur et des pastilles.
 - [x] Appliquer un contour bleu lumineux inspiré de la référence, sans compromettre la lisibilité.
 - [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.
+
+## Dashboard — lieux favoris bleu Facebook
+- [x] Utiliser un contour bleu Facebook pour la barre des lieux favoris.
+- [x] Retirer l’arrondi du conteneur englobant, tout en conservant les pastilles arrondies.
+- [x] Vérifier TypeScript et Vitest avant publication.

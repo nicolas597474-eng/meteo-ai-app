@@ -290,7 +290,7 @@ export function FavoritesBar({
   return (
     <>
       {/* Favorites strip */}
-      <div className="relative rounded-[34px] border border-sky-300/65 bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,14,24,0.92))] p-2.5 shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_10px_28px_rgba(2,6,23,0.2)] ring-1 ring-sky-300/10">
+      <div className="relative rounded-none border border-[#1877F2] bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,14,24,0.92))] p-2.5 shadow-[0_0_0_1px_rgba(24,119,242,0.16),0_10px_28px_rgba(2,6,23,0.2)] ring-1 ring-[#1877F2]/20">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveDragId(null)} onDragEnd={handleDragEnd}>
           <div
             ref={scrollRef}
