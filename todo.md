@@ -2610,3 +2610,8 @@
 - [x] Ajouter Prévisions détaillées entre Dashboard et Fiabilité dans la navigation principale.
 - [x] Préserver la route et le contenu existants de la page détaillée.
 - [x] Vérifier l’ordre mobile, TypeScript et Vitest avant publication.
+
+## Dashboard — retrait du lien Prévisions détaillées
+- [x] Retirer uniquement le lien « Voir les prévisions détaillées » du Dashboard.
+- [x] Préserver la page Prévisions et son accès depuis la navigation principale.
+- [x] Vérifier TypeScript et Vitest avant publication.

@@ -1,6 +1,5 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Link } from "wouter";
 import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -748,13 +747,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
-        {/* ── Link to details page ── */}
-        <Link href="/details" className="dashboard-sky-card flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-2 hover:bg-primary/20 transition-colors">
-          <MeteoIcon name="chevron_right" size={16} />
-          <span className="text-xs font-semibold text-primary">Voir les prévisions détaillées</span>
-          <span className="text-primary text-xs">→</span>
-        </Link>
 
         <div className="dashboard-sky-card flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />

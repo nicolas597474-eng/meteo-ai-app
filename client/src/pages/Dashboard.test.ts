@@ -76,6 +76,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("overflow-visible rounded-[22px]");
     expect(source).toContain("dashboard-weather-page");
     expect(source).toContain("dashboard-sky-card");
+    expect(source).not.toContain("Voir les prévisions détaillées");
+    expect(source).not.toContain('href="/details"');
     expect(source).toContain("dashboardSkyImage");
     expect(source).toContain('temp: pf.forecast.tempCurrent ?? null');
     expect(source).toContain("const activeFavoriteWeather = {");
