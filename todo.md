@@ -2615,3 +2615,8 @@
 - [x] Retirer uniquement le lien « Voir les prévisions détaillées » du Dashboard.
 - [x] Préserver la page Prévisions et son accès depuis la navigation principale.
 - [x] Vérifier TypeScript et Vitest avant publication.
+
+## Dashboard — harmonisation des lieux favoris
+- [x] Harmoniser la surface, les bordures et les contrastes de la barre des lieux favoris.
+- [x] Conserver les états actif, inactif et les interactions existantes.
+- [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.

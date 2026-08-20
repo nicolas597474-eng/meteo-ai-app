@@ -13,7 +13,7 @@ describe("FavoritesBar", () => {
   });
 
   it("place l’ajout et les paramètres dans le défilement horizontal des favoris", () => {
-    expect(source).toContain('flex gap-2 overflow-x-auto pb-1 scrollbar-hide');
+    expect(source).toContain('flex gap-2 overflow-x-auto scrollbar-hide');
     expect(source).toContain('aria-label="Ajouter un lieu favori"');
     expect(source).toContain('<span>Ajouter</span>');
     expect(source).toContain('Gérer, modifier ou supprimer mes villes favorites');
@@ -39,6 +39,13 @@ describe("FavoritesBar", () => {
     expect(source).toContain('min-h-10');
     expect(source).toContain('px-3 py-1.5');
     expect(source).toContain('size={18}');
+  });
+
+  it("harmonise la barre avec les surfaces sombres MeteoAI et distingue le lieu actif", () => {
+    expect(source).toContain('rounded-2xl border border-slate-700/65');
+    expect(source).toContain('bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,14,24,0.92))]');
+    expect(source).toContain('border-sky-300/55');
+    expect(source).toContain('bg-[#101722]/82');
   });
 
   it("tronque les noms longs tout en exposant leur libellé complet", () => {
