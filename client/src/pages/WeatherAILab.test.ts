@@ -4,10 +4,10 @@ import { readFileSync } from "node:fs";
 describe("Weather AI Lab — transparence de fusion", () => {
   it("centralise la méthode et les sources de fusion hors du Dashboard", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
-    expect(source).toContain("Fusion officielle actuelle");
-    expect(source).toContain("Méthode de fusion");
-    expect(source).toContain("Sources appliquées par paramètre");
-    expect(source).toContain("Modèle principal");
+    expect(source).toContain("Simulation de la fusion");
+    expect(source).toContain("Pondération finale");
+    expect(source).toContain("Résultat officiel");
+    expect(source).toContain("Données exploitables");
     expect(source).toContain("Régime de prévision dominant");
     expect(source).toContain("Le Dashboard indique séparément le phénomène immédiat");
     expect(source).toContain("Lexique, méthode et sources");
@@ -56,9 +56,9 @@ describe("Weather AI Lab — transparence de fusion", () => {
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
     expect(source).toContain("snapshotStatus");
-    expect(source).toContain("Dernière fusion archivée");
-    expect(source).toContain("Elle ne pilote pas la prévision actuelle");
-    expect(source).toContain("La simulation lit une fusion conservée pour transparence");
+    expect(source).not.toContain("Dernière fusion archivée");
+    expect(source).toContain("photo enregistrée à un moment précis");
+    expect(source).toContain("photo conservée des modèles reçus");
   });
 
   it("propose une relance manuelle pour le lieu favori avec ses états explicites", () => {

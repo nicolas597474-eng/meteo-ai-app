@@ -2586,3 +2586,8 @@
 - [x] Ajouter la recherche, le filtrage physique, la qualification et la synthèse locale comme étapes explicites.
 - [x] Distinguer les observations de contexte, les contributions locales et les preuves qualifiées sans inventer de statut.
 - [x] Vérifier le rendu de la branche, TypeScript et Vitest avant publication.
+
+## AI Lab — snapshot et fusion archivée
+- [x] Reformuler clairement la définition de snapshot pour un utilisateur novice.
+- [x] Retirer uniquement la section « Dernière fusion archivée » sans modifier les autres contenus AI Lab.
+- [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.
