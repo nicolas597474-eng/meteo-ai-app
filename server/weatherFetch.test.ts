@@ -57,6 +57,26 @@ describe("reprises des sources météo", () => {
     }]);
   });
 
+  it("reprend un délai réseau puis conserve le succès réel sans réponse fictive", async () => {
+    const timeoutError = new DOMException("La requête a dépassé le délai", "TimeoutError");
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ recovered: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetchWeather("https://api.example.test/retry", {}, { attempts: 2, cacheTtlMs: 0 });
+
+    expect(await response.json()).toEqual({ recovered: true });
+    expect(getWeatherProviderDiagnostics()).toMatchObject([{
+      provider: "api.example.test",
+      lastOutcome: "success",
+      lastStatus: 200,
+      lastAttempts: 2,
+      lastRetries: 1,
+      lastError: null,
+    }]);
+  });
+
   it("expose une erreur HTTP réelle sans fraîcheur ni statut fictifs", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("indisponible", { status: 404 })));
 

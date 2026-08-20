@@ -2654,9 +2654,9 @@
 - [x] Vérifier TypeScript, Vitest et les rendus avant publication.
 
 ## Présentation PowerPoint — audit MeteoAI
-- [ ] Structurer les conclusions, preuves et priorités de l’audit.
-- [ ] Créer les diapositives PowerPoint et vérifier leur cohérence visuelle.
-- [ ] Livrer le support de présentation final.
+- [x] Structurer les conclusions, preuves et priorités de l’audit. — Annulé à la demande de l’utilisateur.
+- [x] Créer les diapositives PowerPoint et vérifier leur cohérence visuelle. — Annulé à la demande de l’utilisateur.
+- [x] Livrer le support de présentation final. — Annulé à la demande de l’utilisateur.
 
 ## Corrections P0/P1 — moteur futur et affichage uniquement
 - [x] Relever les invariants sans modifier les données persistées.
@@ -2666,8 +2666,9 @@
 - [x] Vérifier la confiance et les poids par variable du mode Ultra-local.
 - [x] Unifier provenance, couverture et fraîcheur affichées entre les pages.
 - [x] Ajouter un repli Dashboard quotidien daté et des diagnostics fournisseurs sans inventer d’heures.
-- [ ] Corriger la lecture des réponses HTTP et stabiliser la compilation avant publication.
-- [ ] Valider TypeScript, Vitest, rendu et invariants de données avant publication.
+- [x] Corriger la lecture des réponses HTTP et stabiliser la compilation avant publication.
+- [x] Confirmer par test la réutilisation d’une réponse consommée et la reprise après délai réseau.
+- [x] Valider TypeScript, Vitest, rendu et invariants de données avant publication.
 
 ## Validation ciblée — diagnostic fournisseur
 - [x] Redémarrer le service de développement sans opération de données.
