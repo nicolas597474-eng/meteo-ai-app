@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp } from "lucide-react";
+import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, X } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -812,7 +812,12 @@ export default function Dashboard() {
           <section className="space-y-2" aria-labelledby="local-context-title">
             <div className="flex items-center justify-between gap-2 px-1">
               <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
-              <span className="text-[10px] text-muted-foreground">{locationWeatherFetching && locationWeatherIsPlaceholder ? "Filtre local en cours…" : "n’influence pas la prévision officielle"}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">{locationWeatherFetching && locationWeatherIsPlaceholder ? "Filtre local en cours…" : "n’influence pas la prévision officielle"}</span>
+                <button type="button" onClick={() => handleModeChange("standard")} aria-label="Fermer le contexte local et revenir au mode Officiel" title="Revenir au mode Officiel" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-slate-600/70 bg-slate-900/70 text-slate-200 transition-colors hover:border-sky-300/65 hover:bg-sky-400/15 hover:text-sky-100 active:scale-95">
+                  <X className="size-4" />
+                </button>
+              </div>
             </div>
             <div className="dashboard-sky-card rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
               <div className="flex items-start justify-between gap-3">

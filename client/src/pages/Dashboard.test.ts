@@ -36,6 +36,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("placeholderData: keepPreviousData");
     expect(source).toContain("gcTime: 10 * 60 * 1000");
     expect(source).toContain("Filtre local en cours…");
+    expect(source).toContain('onClick={() => handleModeChange("standard")}');
+    expect(source).toContain('aria-label="Fermer le contexte local et revenir au mode Officiel"');
     expect(source).toContain("Données horaires temporairement indisponibles.");
     expect(source).toContain("trpc.weather.getHourlyForecast.useQuery");
     expect(source).toContain('refetchOnReconnect: "always"');

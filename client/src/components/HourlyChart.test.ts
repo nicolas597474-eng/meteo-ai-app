@@ -68,6 +68,15 @@ describe("HourlyChart", () => {
     expect(source).not.toContain(">24h⌄</span>");
   });
 
+  it("marque clairement le passage à demain dans les prévisions 48 h", () => {
+    expect(source).toContain("const dayBoundaryIndexes = useMemo");
+    expect(source).toContain('index > 0 && hour.hour === "00:00"');
+    expect(source).toContain("ctx.setLineDash([6, 4])");
+    expect(source).toContain("rgba(96, 165, 250, 0.88)");
+    expect(source).toContain('isNewDay && <span');
+    expect(source).toContain(">Demain</span>");
+  });
+
   it("présente tous les paramètres horaires réellement fournis dans le panneau détaillé", () => {
     expect(source).toContain("dewPoint?: number | null");
     expect(source).toContain("pressure?: number | null");

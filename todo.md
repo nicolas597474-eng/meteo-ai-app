@@ -2646,3 +2646,9 @@
 - [x] Auditer les journaux et les composants météo pour identifier les autres défauts reproductibles.
 - [x] Corriger uniquement les anomalies confirmées, avec des tests de non-régression.
 - [x] Vérifier TypeScript, Vitest et les rendus avant publication.
+
+## Graphique 48 h — transition de journée et modes locaux
+- [x] Ajouter un séparateur visuel clair entre aujourd’hui et demain dans le graphique horaire.
+- [x] Clarifier le comportement attendu du bouton de fermeture associé aux modes Local et Ultra-local.
+- [x] Ajouter une croix qui ferme le bloc de contexte local et repasse en mode Officiel.
+- [x] Vérifier TypeScript, Vitest et les rendus avant publication.

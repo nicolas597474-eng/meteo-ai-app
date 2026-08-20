@@ -374,6 +374,13 @@ export default function HourlyChart({ hours, locationName }: Props) {
     const h = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
     return hours.findIndex(hr => hr.hour === h);
   }, [hours]);
+  const dayBoundaryIndexes = useMemo(
+    () => hours.reduce<number[]>((indexes, hour, index) => {
+      if (index > 0 && hour.hour === "00:00") indexes.push(index);
+      return indexes;
+    }, []),
+    [hours],
+  );
 
   // ── Draw canvas ──────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -408,6 +415,21 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.lineWidth = 1;
       ctx.stroke();
     }
+
+    // Le changement de journée reste visible dans les 48 heures, sans modifier
+    // les relevés horaires ni les axes de lecture.
+    dayBoundaryIndexes.forEach((boundaryIndex) => {
+      const x = boundaryIndex * COL_W;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, CHART_H);
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = "rgba(96, 165, 250, 0.88)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    });
 
     // Horizontal grid (temp)
     for (let t = scaleBot; t <= scaleTop; t += gridStep) {
@@ -545,7 +567,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.fillRect(x - barW / 2, barTop, barW, barH);
     });
 
-  }, [hours, N, selectedHour, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
+  }, [hours, N, selectedHour, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, dayBoundaryIndexes, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
 
   // Resize observer
   useEffect(() => {
@@ -635,8 +657,10 @@ export default function HourlyChart({ hours, locationName }: Props) {
               {hours.map((h, i) => {
                 const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
                 const isCurrent = i === nowHour;
+                const isNewDay = i > 0 && h.hour === "00:00";
                 return (
-                  <div key={`${h.hour}-${i}`} className="flex flex-col items-center justify-start pt-2" style={{ width: COL_W }}>
+                  <div key={`${h.hour}-${i}`} className={`relative flex flex-col items-center justify-start ${isNewDay ? "pt-5" : "pt-2"}`} style={{ width: COL_W }}>
+                    {isNewDay && <span className="absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-full border border-sky-300/55 bg-sky-500/20 px-1.5 py-0.5 text-[8px] font-bold text-sky-100">Demain</span>}
                     <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
                     <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>
