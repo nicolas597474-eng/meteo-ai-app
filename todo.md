@@ -2685,6 +2685,8 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Ajouter une lueur lunaire légère et animée autour de la Lune réaliste, avec prise en charge de prefers-reduced-motion.
+- [x] Vérifier le rendu mobile et les tests du module Soleil & Lune avant publication.
 - [x] Identifier le visuel de Lune réaliste précédent et le composant qui l’a remplacé dans l’arche astronomique.
 - [x] Rétablir la Lune réaliste dans l’arche et dans le panneau de phase, sans modifier phase, azimut, altitude ou calculs.
 - [x] Vérifier le rendu mobile du module Soleil & Lune et les tests astronomiques avant publication.

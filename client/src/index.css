@@ -231,6 +231,26 @@ img.moon-3d-first-crescent {
   transform: scale(1.18);
 }
 
+/* Lueur lunaire légère : elle souligne la texture sans altérer la phase ou son orientation. */
+.realistic-moon-glow {
+  box-shadow: 0 0 7px rgba(220, 232, 255, 0.26), 0 0 15px rgba(148, 163, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .realistic-moon-glow {
+    animation: meteoai-lunar-glow 4.8s cubic-bezier(0.23, 1, 0.32, 1) infinite alternate;
+  }
+
+  @keyframes meteoai-lunar-glow {
+    from {
+      box-shadow: 0 0 6px rgba(220, 232, 255, 0.20), 0 0 13px rgba(148, 163, 255, 0.10);
+    }
+    to {
+      box-shadow: 0 0 11px rgba(231, 239, 255, 0.42), 0 0 24px rgba(148, 163, 255, 0.24);
+    }
+  }
+}
+
 /* Surfaces MeteoAI : dégradés minéraux sombres, lisibles sur mobile et cohérents entre les pages. */
 :root {
   --weather-surface-base: linear-gradient(145deg, rgba(16, 27, 40, 0.96) 0%, rgba(10, 18, 29, 0.97) 55%, rgba(7, 12, 20, 0.985) 100%);

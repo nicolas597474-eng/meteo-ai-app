@@ -744,7 +744,7 @@ function RealisticMoon({ phase, size, alt }: { phase: { label: string; illuminat
   const highlightPosition = isWaxing ? "100% 50%" : "0% 50%";
   const transparentStop = Math.max(2, Math.min(96, illumination));
   const diameter = size === "marker" ? "h-10 w-10" : "h-16 w-16";
-  return <span className={`relative block ${diameter} overflow-hidden rounded-full`} style={{ transform: `rotate(${phase.brightLimbAngleDeg}deg)` }}><img src={REALISTIC_MOON_SURFACE} alt={alt} className="h-full w-full object-contain" /><span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(ellipse at ${highlightPosition}, rgba(2, 6, 23, 0) 0%, rgba(2, 6, 23, 0) ${transparentStop}%, rgba(2, 6, 23, 0.94) ${Math.min(100, transparentStop + 16)}%, rgba(2, 6, 23, 0.98) 100%)` }} /></span>;
+  return <span className={`realistic-moon-glow relative block ${diameter} overflow-hidden rounded-full`} style={{ transform: `rotate(${phase.brightLimbAngleDeg}deg)` }}><img src={REALISTIC_MOON_SURFACE} alt={alt} className="h-full w-full object-contain" /><span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(ellipse at ${highlightPosition}, rgba(2, 6, 23, 0) 0%, rgba(2, 6, 23, 0) ${transparentStop}%, rgba(2, 6, 23, 0.94) ${Math.min(100, transparentStop + 16)}%, rgba(2, 6, 23, 0.98) 100%)` }} /></span>;
 }
 
 function SunMoonPanelTemporal({ astronomy, source }: { astronomy: EnvironmentalData["astronomy"]; source: string }) {
