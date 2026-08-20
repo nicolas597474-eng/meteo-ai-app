@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs } from "./officialWeatherSnapshot";
+import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs } from "./officialWeatherSnapshot";
 
 describe("buildOfficialWeatherSnapshot", () => {
   it("sélectionne une unique valeur officielle pour le même lieu et la même heure", () => {
@@ -27,5 +27,30 @@ describe("buildOfficialWeatherSnapshot", () => {
     expect(getOfficialSnapshotTtlMs([
       { hour: "14:00", temp: 23.4, apparentTemp: 23.2, precipitation: 0, windSpeed: 9, windGust: 14, windDirection: 180, cloudCover: 12, humidity: 50, uvIndex: 6, condition: "Ensoleillé" },
     ])).toBe(120_000);
+  });
+
+  it("conserve la date et l’horodatage d’une fusion quotidienne sans la présenter comme horaire", () => {
+    const fallback = buildDatedDailyFusionFallback({
+      date: "2026-08-11",
+      computedAt: new Date("2026-08-11T03:05:00.000Z"),
+      tempMax: 24.1,
+      tempMin: 13.2,
+      precipitation: 1.4,
+      windSpeed: 18,
+      condition: "Nuageux",
+      confidenceScore: 72,
+    });
+
+    expect(fallback).toEqual({
+      kind: "daily_fusion",
+      date: "2026-08-11",
+      computedAt: "2026-08-11T03:05:00.000Z",
+      tempMax: 24.1,
+      tempMin: 13.2,
+      precipitation: 1.4,
+      windSpeed: 18,
+      condition: "Nuageux",
+      confidenceScore: 72,
+    });
   });
 });

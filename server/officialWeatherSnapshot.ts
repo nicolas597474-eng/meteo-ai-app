@@ -15,6 +15,50 @@ export type OfficialWeatherSnapshot = {
   modelsUsed: string[];
 };
 
+export type DatedDailyFusionFallback = {
+  kind: "daily_fusion";
+  date: string;
+  computedAt: string;
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  condition: string | null;
+  confidenceScore: number | null;
+};
+
+type DailyFusionSource = {
+  date: string;
+  computedAt: Date | string;
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  condition: string | null;
+  confidenceScore: number | null;
+};
+
+/**
+ * Keeps a persisted daily fusion distinct from the live hourly forecast. The
+ * caller must expose this object only when no hourly point is available.
+ */
+export function buildDatedDailyFusionFallback(source: DailyFusionSource | null | undefined): DatedDailyFusionFallback | null {
+  if (!source) return null;
+  const computedAt = source.computedAt instanceof Date ? source.computedAt : new Date(source.computedAt);
+  if (!Number.isFinite(computedAt.getTime())) return null;
+  return {
+    kind: "daily_fusion",
+    date: source.date,
+    computedAt: computedAt.toISOString(),
+    tempMax: source.tempMax,
+    tempMin: source.tempMin,
+    precipitation: source.precipitation,
+    windSpeed: source.windSpeed,
+    condition: source.condition,
+    confidenceScore: source.confidenceScore,
+  };
+}
+
 type CacheEntry = { expiresAt: number; value: Promise<OfficialWeatherSnapshot> };
 const snapshotCache = new Map<string, CacheEntry>();
 const SNAPSHOT_TTL_MS = 2 * 60_000;

@@ -56,8 +56,11 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("whitespace-nowrap text-[15px] font-medium leading-tight");
     expect(source).toContain('nextRegimeChange.hour.replace(":00", "h")');
     expect(source).toContain('Évolution · {nextRegimeChange');
-    expect(source).toContain('text-white">{currentHour?.condition');
+    expect(source).toContain('text-white">{displayedCondition');
     expect(source).toContain('text-white">{nextRegimeChange ? nextRegimeChange.label');
+    expect(source).toContain("Créneaux horaires indisponibles");
+    expect(source).toContain("Dernière fusion quotidienne réelle");
+    expect(source).toContain('isDailyFallback ? "Tendance quotidienne · " : "Phénomène actuel · "');
     expect(source).toContain('text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');

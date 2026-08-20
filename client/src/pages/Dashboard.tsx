@@ -375,6 +375,7 @@ export default function Dashboard() {
   const hours: any[] = personalizedHourly?.applied
     ? officialHours.map((hour) => hour.isCurrent ? hour : (personalizedByHour.get(hour.hour) ?? hour))
     : officialHours;
+  const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const panelDate = formatDashboardCompactDate(officialForecast?.today ?? dash?.today);
   const localObservedRegime = lw
@@ -401,7 +402,7 @@ export default function Dashboard() {
     : officialDataUpdatedAt
       ? Math.max(0, Math.floor((Date.now() - officialDataUpdatedAt) / 60000))
       : null;
-  const regimeFreshnessLabel = regimeAgeMinutes == null
+  const liveRegimeFreshnessLabel = regimeAgeMinutes == null
     ? "Mise à jour en cours"
     : regimeAgeMinutes === 0
       ? "Mis à jour à l’instant"
@@ -422,10 +423,12 @@ export default function Dashboard() {
     : (dash as any)?.multiRegime ?? null;
   const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "variable";
   const regimeConfidence: number = multiRegime?.confidenceScore ?? 70;
+  const fallbackConfidence = dailyFallback?.kind === "daily_fusion" ? dailyFallback.confidenceScore : null;
   // La confiance mesure la qualité / accord des sources ; la stabilité mesure
   // seulement la dispersion des modèles. Ne jamais les confondre dans l'UI.
   const forecastConfidence: number = lw?.scores?.confidenceScore
     ?? officialForecast?.confidence?.current
+    ?? fallbackConfidence
     ?? dash?.meteoAI?.confidenceScore
     ?? 0;
   const stabilityIndex: number = officialForecast?.confidence?.stabilityIndex ?? today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0;
@@ -433,25 +436,36 @@ export default function Dashboard() {
   // Le Dashboard présente un unique snapshot officiel multi-modèles : les
   // observations locales restent auditables dans Fiabilité, sans modifier cette valeur.
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
-  const nextConditionChange = findNextConditionChange(hours, currentHour?.hour ?? nowHour);
+  const isDailyFallback = currentHour == null && dailyFallback?.kind === "daily_fusion";
+  const fallbackDateLabel = isDailyFallback
+    ? new Date(`${dailyFallback.date}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", timeZone: "Europe/Paris" })
+    : null;
+  const fallbackComputedAtLabel = isDailyFallback
+    ? new Date(dailyFallback.computedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
+    : null;
+  const regimeFreshnessLabel = isDailyFallback
+    ? `Fusion quotidienne du ${fallbackDateLabel}`
+    : liveRegimeFreshnessLabel;
+  const nextConditionChange = isDailyFallback ? null : findNextConditionChange(hours, currentHour?.hour ?? nowHour);
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
-  const officialCurrentTemp = currentHour?.temp ?? today?.tempMax ?? meteoAI?.tempMax ?? null;
+  const officialCurrentTemp = currentHour?.temp ?? null;
   const currentTemp = officialCurrentTemp;
+  const displayedCondition = currentHour?.condition ?? (isDailyFallback ? dailyFallback.condition : today?.condition ?? meteoAI?.condition ?? null);
   const activeFavoriteWeather = {
     temp: currentTemp,
-    condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null,
+    condition: displayedCondition,
     confidenceScore: forecastConfidence,
   };
-  const maxTemperature = today?.tempMax ?? meteoAI?.tempMax ?? null;
-  const minTemperature = today?.tempMin ?? meteoAI?.tempMin ?? null;
+  const maxTemperature = isDailyFallback ? dailyFallback.tempMax : today?.tempMax ?? meteoAI?.tempMax ?? null;
+  const minTemperature = isDailyFallback ? dailyFallback.tempMin : today?.tempMin ?? meteoAI?.tempMin ?? null;
   const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
   const minTemperatureTone = getExtremeTemperatureTone("min", minTemperature);
   const apparentTemp = currentHour?.apparentTemp ?? null;
   const currentUV = hours.find((h: any) => h.uvIndex != null && h.hour >= nowHour)?.uvIndex ?? null;
   const windDir = currentHour?.windDirection ?? null;
-  const windSpeed = currentHour?.windSpeed ?? today?.windSpeed ?? meteoAI?.windSpeed ?? null;
+  const windSpeed = currentHour?.windSpeed ?? (isDailyFallback ? dailyFallback.windSpeed : today?.windSpeed ?? meteoAI?.windSpeed) ?? null;
   const currentCloudCover = currentHour?.cloudCover ?? today?.cloudCover ?? null;
-  const dashboardSkyImage = getDashboardWeatherImage({ condition: currentHour?.condition ?? today?.condition ?? meteoAI?.condition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (today as any)?.precipitation ?? undefined, windSpeed: windSpeed ?? undefined });
+  const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (isDailyFallback ? dailyFallback.precipitation : (today as any)?.precipitation) ?? undefined, windSpeed: windSpeed ?? undefined });
   const dashboardSkyStyle = { "--dashboard-sky-image": `url("${dashboardSkyImage}")` } as CSSProperties;
   const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
   const modelFallbackContributors = locationWeather?.ultraLocal?.modelFallback?.contributors ?? [];
@@ -600,6 +614,18 @@ export default function Dashboard() {
               </div>
             )}
 
+            {isDailyFallback && (
+              <div role="status" className="mb-3 rounded-xl border border-amber-300/35 bg-amber-300/[0.09] px-3 py-2 text-[11px] leading-relaxed text-amber-50">
+                <div className="flex items-start gap-2">
+                  <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
+                  <div>
+                    <p className="font-semibold">Créneaux horaires indisponibles</p>
+                    <p className="mt-0.5 text-amber-100/85">Dernière fusion quotidienne réelle : {fallbackDateLabel} · calculée le {fallbackComputedAtLabel}. Les valeurs ci-dessous sont des indicateurs journaliers, pas une météo observée à l’instant.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {nextWeatherAlert && (
               <div className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 ${
                 nextWeatherAlert.kind === "thunderstorm"
@@ -625,10 +651,10 @@ export default function Dashboard() {
 
             {/* Main temperature row */}
             <div className="flex items-start gap-2 sm:gap-6">
-              {/* Icon — current hour condition (not day) */}
+              {/* The condition remains daily only when the hourly feed is unavailable. */}
               <div className="w-12 shrink-0 pt-1 sm:w-auto sm:pt-0">
-                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={48} className="sm:hidden" />
-                <MeteoIcon name={getIconNameFromCondition(currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? null)} size={64} className="hidden sm:block" />
+                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={48} className="sm:hidden" />
+                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} className="hidden sm:block" />
               </div>
 
               <div className={dashboardTemperatureLayout.content}>
@@ -659,8 +685,8 @@ export default function Dashboard() {
 
             <div className="mt-1 min-w-0 space-y-0.5 sm:mt-1.5 sm:space-y-1">
               <p className="whitespace-nowrap text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg">
-                <span className="font-semibold text-sky-200/90">Phénomène actuel · </span>
-                <span className="text-white">{currentHour?.condition ?? today?.condition ?? meteoAI?.condition ?? "Condition indisponible"}</span>
+                <span className="font-semibold text-sky-200/90">{isDailyFallback ? "Tendance quotidienne · " : "Phénomène actuel · "}</span>
+                <span className="text-white">{displayedCondition ?? "Condition indisponible"}</span>
               </p>
               {(nextRegimeChange ?? nextConditionChange) && (
                 <>
@@ -715,7 +741,7 @@ export default function Dashboard() {
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                   <Droplets className="h-3 w-3" />Précip.
                 </p>
-                <p className="text-sm font-semibold sm:text-lg">{today?.precipitation ?? meteoAI?.precipitation ?? 0} mm</p>
+                <p className="text-sm font-semibold sm:text-lg">{isDailyFallback ? dailyFallback.precipitation ?? "—" : today?.precipitation ?? meteoAI?.precipitation ?? "—"} mm</p>
               </div>
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">

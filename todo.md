@@ -2685,7 +2685,10 @@
 
 ## Fiabilisation nécessaire — ordre validé
 - [x] Repartir d’une arborescence synchronisée depuis le jalon stable `bcd2c15`.
-- [ ] Ajouter un repli Dashboard quotidien daté sans donnée horaire inventée.
+- [x] Ajouter un repli Dashboard quotidien daté sans donnée horaire inventée.
+- [x] Exposer explicitement le statut, la date et l’horodatage de la dernière fusion quotidienne lorsque les horaires sont indisponibles.
+- [x] Empêcher la carte principale de présenter une valeur quotidienne comme une observation horaire actuelle.
+- [x] Couvrir le repli quotidien daté par des tests sans écriture en base.
 - [ ] Mesurer délais, erreurs, reprises et fraîcheur par fournisseur météo.
 - [ ] Harmoniser provenance, couverture et motifs de repli entre les pages.
 - [ ] Consolider les garde-fous de confiance et les tests Ultra-local par variable.

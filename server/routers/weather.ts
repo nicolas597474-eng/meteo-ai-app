@@ -45,7 +45,7 @@ import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
-import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
+import { buildDatedDailyFusionFallback, resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
 import { getCollectedModelNames, getMissingModelNames } from "../stationCollectionModels";
 import { isOperationalObservation } from "../observationProvenance";
@@ -198,6 +198,9 @@ export const weatherRouter = router({
 
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
+    const dailyFallback = officialSnapshot.hourly.length === 0
+      ? buildDatedDailyFusionFallback(meteoAI ?? recentForecasts[0])
+      : null;
 
     const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly));
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
@@ -212,6 +215,7 @@ export const weatherRouter = router({
       topServices: ranking.slice(0, 5),
       recentForecasts,
       allServices: [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public],
+      dailyFallback,
       regime: {
         id: officialRegime.primary.id,
         label: officialRegime.primary.label,
@@ -624,11 +628,15 @@ export const weatherRouter = router({
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
 
-      const [meteoAI, observation, qualifiedRanking] = await Promise.all([
+      const [meteoAI, observation, qualifiedRanking, recentForecasts] = await Promise.all([
         getMeteoAIForecastByDate(today, locKey),
         getObservationByDate(today, locKey),
         getQualifiedCumulativeRankingForLocation(locKey),
+        getLatestMeteoAIForecasts(1, locKey),
       ]);
+      const dailyFallback = hours.length === 0
+        ? buildDatedDailyFusionFallback(meteoAI ?? recentForecasts[0])
+        : null;
       const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours));
       const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id);
 
@@ -683,6 +691,7 @@ export const weatherRouter = router({
         periodHours,
         days,
         modelsUsed,
+        dailyFallback,
         regime: {
           primary: officialRegime.primary,
           active: officialRegime.active,
