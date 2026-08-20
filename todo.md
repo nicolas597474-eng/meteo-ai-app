@@ -2625,3 +2625,8 @@
 - [x] Augmenter les arrondis du conteneur, des pastilles et des actions des lieux favoris.
 - [x] Préserver les états actif, inactif, ajout et réorganisation.
 - [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.
+
+## Dashboard — lieux favoris bleu lumineux
+- [x] Renforcer les arrondis du conteneur et des pastilles.
+- [x] Appliquer un contour bleu lumineux inspiré de la référence, sans compromettre la lisibilité.
+- [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.

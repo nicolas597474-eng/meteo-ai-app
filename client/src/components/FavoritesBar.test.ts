@@ -42,8 +42,8 @@ describe("FavoritesBar", () => {
   });
 
   it("harmonise la barre avec les surfaces sombres MeteoAI et distingue le lieu actif", () => {
-    expect(source).toContain('rounded-[28px] border border-slate-700/65');
-    expect(source).toContain('rounded-2xl border px-3 py-1.5');
+    expect(source).toContain('rounded-[34px] border border-sky-300/65');
+    expect(source).toContain('rounded-[22px] border px-3 py-1.5');
     expect(source).toContain('bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,14,24,0.92))]');
     expect(source).toContain('border-sky-300/55');
     expect(source).toContain('bg-[#101722]/82');
