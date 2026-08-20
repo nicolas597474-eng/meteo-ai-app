@@ -2630,3 +2630,8 @@
 - [x] Forcer une largeur et une hauteur identiques, avec un cercle réel pour chaque bouton.
 - [x] Vérifier qu’aucune page ne conserve un bouton rectangulaire ou carré arrondi.
 - [x] Valider mobile, TypeScript et Vitest avant publication.
+
+## Stations — retrait du détail de synthèse
+- [x] Retirer uniquement le bouton « Détails de calcul de la synthèse ».
+- [x] Préserver les indicateurs, le rayon, la carte et les autres sections Stations.
+- [x] Vérifier TypeScript et Vitest avant publication.
