@@ -1165,12 +1165,10 @@ export function getLeadTimeWeights(
   targetBucket: LeadTimeBucket,
   now = new Date(),
 ): Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number }> {
-  const orderedBuckets: LeadTimeBucket[] = ["0-6h", "6-24h", "1-3d", "4-7d", "8-15d"];
-  const targetIndex = orderedBuckets.indexOf(targetBucket);
-  const bucketPriority = [...orderedBuckets].sort((left, right) => {
-    const distanceDifference = Math.abs(orderedBuckets.indexOf(left) - targetIndex) - Math.abs(orderedBuckets.indexOf(right) - targetIndex);
-    return distanceDifference || orderedBuckets.indexOf(left) - orderedBuckets.indexOf(right);
-  });
+  const bucketPriority: LeadTimeBucket[] = [
+    targetBucket,
+    ...["0-6h", "6-24h", "1-3d", "4-7d", "8-15d"].filter(b => b !== targetBucket) as LeadTimeBucket[],
+  ];
 
   const result: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number }> = {};
 

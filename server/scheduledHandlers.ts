@@ -312,7 +312,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         const condition = determineMajorityCondition(allForecasts);
 
         // Compute true confidence score (accord modèles + performances historiques + échéance)
-        const bestModelScore = ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60;
+        const bestModelScore = ranking[0]?.avgScore != null ? Number(ranking[0].avgScore) : null;
         const trueConfidenceScore = computeConfidenceScore({
           forecasts: biasCorrectedForecasts,
           bestModelScore,

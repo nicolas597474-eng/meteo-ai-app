@@ -285,9 +285,6 @@ function calcTempDimension(forecasts: ForecastRow[], observations: ObservationRo
     if (f.tempMin != null && o.tempMin != null) { pred.push(f.tempMin); actual.push(o.tempMin); }
   }
 
-  if (pred.length === 0) {
-    return { mae: 0, bias: 0, maxError: 0, rmse: 0, score: null, sampleSize: 0 };
-  }
   const maeVal = mae(pred, actual);
   return {
     mae: round2(maeVal),
@@ -334,22 +331,17 @@ function calcPrecipDimension(forecasts: ForecastRow[], observations: Observation
     }
   }
 
-  const sampleSize = hits + misses + falseAlarms + correctNeg;
-  if (sampleSize === 0) {
-    return { pod: 0, far: 0, csi: 0, falsePositives: 0, falseNegatives: 0, maeQuantity: 0, biasQuantity: 0, score: null, sampleSize: 0 };
-  }
   const pod = (hits + misses) > 0 ? hits / (hits + misses) : 0;
   const far = (hits + falseAlarms) > 0 ? falseAlarms / (hits + falseAlarms) : 0;
-  const csi = (hits + misses + falseAlarms) > 0 ? hits / (hits + misses + falseAlarms) : 0;
+  const csi = (hits + misses + falseAlarms) > 0 ? hits / (hits + misses + falseAlarms) : 1;
 
   const maeQ = mae(quantityPred, quantityActual);
   const biasQ = bias(quantityPred, quantityActual);
 
   // Composite score: 50% detection skill (CSI) + 50% quantity accuracy
   const detectionScore = csi * 100;
-  const compositeScore = quantityPred.length > 0
-    ? (detectionScore * 0.5) + (maeToScore(maeQ, 15) * 0.5)
-    : detectionScore;
+  const quantityScore = quantityPred.length > 0 ? maeToScore(maeQ, 15) : 70;
+  const compositeScore = (detectionScore * 0.5) + (quantityScore * 0.5);
 
   return {
     pod: round2(pod),
@@ -360,7 +352,7 @@ function calcPrecipDimension(forecasts: ForecastRow[], observations: Observation
     maeQuantity: round2(maeQ),
     biasQuantity: round2(biasQ),
     score: round2(compositeScore),
-    sampleSize,
+    sampleSize: hits + misses + falseAlarms + correctNeg,
   };
 }
 
@@ -381,9 +373,6 @@ function calcWindDimension(forecasts: ForecastRow[], observations: ObservationRo
     if (f.windGust != null && o.windGust != null) { gustPred.push(f.windGust); gustActual.push(o.windGust); }
   }
 
-  if (meanPred.length === 0) {
-    return { maeMean: 0, maeGusts: 0, biasMean: 0, maxError: 0, score: null, sampleSize: 0 };
-  }
   const maeMean = mae(meanPred, meanActual);
   const maeGusts = gustPred.length > 0 ? mae(gustPred, gustActual) : 0;
 
@@ -470,9 +459,6 @@ function calcConditionDimension(forecasts: ForecastRow[], observations: Observat
     const f = forecasts[i], o = observations[i];
     if (!f || !o) continue;
 
-    const forecastHasCondition = f.condition != null || f.cloudCover != null;
-    const observationHasCondition = o.condition != null || o.cloudCover != null;
-    if (!forecastHasCondition || !observationHasCondition) continue;
     const fCat = conditionCategory(f.condition, f.cloudCover);
     const oCat = conditionCategory(o.condition, o.cloudCover);
     total++;
@@ -484,10 +470,7 @@ function calcConditionDimension(forecasts: ForecastRow[], observations: Observat
     }
   }
 
-  if (total === 0) {
-    return { concordance: 0, maeCloudCover: 0, score: null, sampleSize: 0 };
-  }
-  const concordance = (matches / total) * 100;
+  const concordance = total > 0 ? (matches / total) * 100 : 70;
   const maeCloud = cloudPred.length > 0 ? mae(cloudPred, cloudActual) : 0;
 
   // Score: concordance is primary, cloud MAE is secondary
@@ -551,8 +534,8 @@ export function calculateReliabilityScore(
   const laboratoryPressure = calcScalarDimension(forecasts, observations, row => row.pressure, row => row.pressure, 20);
 
   const laboratoryComponents = {
-    temperature: tempDim.score,
-    precipitation: precipDim.score,
+    temperature: tempDim.sampleSize > 0 ? tempDim.score : null,
+    precipitation: precipDim.sampleSize > 0 ? precipDim.score : null,
     wind: laboratoryWind.score,
     gusts: laboratoryGusts.score,
     humidity: laboratoryHumidity.score,
@@ -602,16 +585,11 @@ export function calculateReliabilityScore(
   const { weights } = regimeInfo;
 
   // Contextually-weighted final score
-  const measuredDimensions = [
-    { score: tempDim.score, weight: weights.temp },
-    { score: precipDim.score, weight: weights.precip },
-    { score: windDim.score, weight: weights.wind },
-    { score: condDim.score, weight: weights.condition },
-  ].filter((dimension): dimension is { score: number; weight: number } => dimension.score !== null);
-  const measuredWeight = measuredDimensions.reduce((total, dimension) => total + dimension.weight, 0);
-  const weightedScore = measuredWeight > 0
-    ? measuredDimensions.reduce((total, dimension) => total + dimension.score * (dimension.weight / measuredWeight), 0)
-    : null;
+  const weightedScore =
+    (tempDim.score * weights.temp) +
+    (precipDim.score * weights.precip) +
+    (windDim.score * weights.wind) +
+    (condDim.score * weights.condition);
 
   return {
     serviceName: "",
@@ -626,7 +604,7 @@ export function calculateReliabilityScore(
     biasPrecip: precipDim.biasQuantity,
     biasWind: windDim.biasMean,
     conditionAccuracy: condDim.concordance / 100,
-    weightedScore: weightedScore == null ? null : round2(weightedScore),
+    weightedScore: round2(weightedScore),
     normalizedScore,
     // Dimension detail
     dimensions: {

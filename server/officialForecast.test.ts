@@ -35,4 +35,21 @@ describe("computeOfficialDailyForecast", () => {
     expect(first.trace.parameterSources.wind.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
     expect(first.cloudCover).toBeLessThan(57.5);
   });
+
+  it("départage chaque paramètre avec son propre historique, pas avec le score global", () => {
+    const result = computeOfficialDailyForecast([
+      { serviceName: "Fort en température", tempMax: 20, tempMin: 10, precipitation: 8, windSpeed: 25 },
+      { serviceName: "Fort en pluie", tempMax: 28, tempMin: 18, precipitation: 1, windSpeed: 25 },
+    ], {
+      "Fort en température": { maeTemp: 0.1, maePrecip: 10, maeWind: 4, weightedScore: 95 },
+      "Fort en pluie": { maeTemp: 5, maePrecip: 0.1, maeWind: 4, weightedScore: 20 },
+    });
+
+    expect(result.weights["Fort en température"].tempWeight).toBeGreaterThan(
+      result.weights["Fort en pluie"].tempWeight,
+    );
+    expect(result.weights["Fort en pluie"].precipWeight).toBeGreaterThan(
+      result.weights["Fort en température"].precipWeight,
+    );
+  });
 });

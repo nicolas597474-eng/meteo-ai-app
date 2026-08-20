@@ -103,7 +103,7 @@ export function computeOfficialDailyForecast(
         windGust: forecast.windGust ?? null,
         cloudCover: forecast.cloudCover ?? null,
         updatedAt: now,
-        // Sans MAE pour le paramètre, 50 est un poids neutre égalitaire entre
+        // Sans MAE pour le paramètre, 50 reste un poids neutre égalitaire entre
         // sources disponibles ; il n’est jamais présenté comme une performance.
         reliabilityScore: reliabilityFromMetricMae(metric, metricMae),
         maeTemp: metricMae,

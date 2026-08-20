@@ -486,15 +486,15 @@ export const weatherRouter = router({
       // Compute live dimension scores per service for this date
       let dimensionScores: Array<{
         serviceName: string;
-        weightedScore: number | null;
+        weightedScore: number;
         regime: string;
         regimeEmoji: string;
         regimeLabel: string;
         dimensions: {
-          temperature: { mae: number; bias: number; maxError: number; score: number | null };
-          precipitation: { pod: number; far: number; csi: number; falsePositives: number; falseNegatives: number; maeQuantity: number; score: number | null };
-          wind: { maeMean: number; maeGusts: number; biasMean: number; score: number | null };
-          condition: { concordance: number; maeCloudCover: number; score: number | null };
+          temperature: { mae: number; bias: number; maxError: number; score: number };
+          precipitation: { pod: number; far: number; csi: number; falsePositives: number; falseNegatives: number; maeQuantity: number; score: number };
+          wind: { maeMean: number; maeGusts: number; biasMean: number; score: number };
+          condition: { concordance: number; maeCloudCover: number; score: number };
         };
         weights: { temp: number; precip: number; wind: number; condition: number };
       }> = [];
@@ -642,7 +642,7 @@ export const weatherRouter = router({
         precipitation: forecast.precipitation,
         windSpeed: forecast.windSpeed,
       }));
-      const bestModelScore = bestModel?.avgScore != null ? Number(bestModel.avgScore) : 60;
+      const bestModelScore = bestModel?.avgScore != null ? Number(bestModel.avgScore) : null;
       // La confiance courante stockée par le cron combine accord, historique,
       // stations et horizon. Le repli conserve exactement la même formule.
       const todayConfidence = meteoAI?.confidenceScore ?? computeConfidenceScore({
@@ -799,7 +799,7 @@ export const weatherRouter = router({
             maeTemp: leadTime?.maeTemp ?? (row.avgMaeTemp != null ? Number(row.avgMaeTemp) : undefined),
             maePrecip: leadTime?.maePrecip ?? (row.avgMaePrecip != null ? Number(row.avgMaePrecip) : undefined),
             maeWind: leadTime?.maeWind ?? (row.avgMaeWind != null ? Number(row.avgMaeWind) : undefined),
-            weightedScore: row.avgScore != null ? Number(row.avgScore) : 50,
+            weightedScore: row.avgScore != null ? Number(row.avgScore) : undefined,
           };
         });
         const meteoAI = computeOfficialDailyForecast(correctedForecasts, performanceByService);
@@ -821,7 +821,7 @@ export const weatherRouter = router({
           stabilityLabel: stability.label,
           confidenceScore: computeConfidenceScore({
             forecasts: correctedForecasts.map(f => ({ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed })),
-            bestModelScore: ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60,
+            bestModelScore: ranking[0]?.avgScore != null ? Number(ranking[0].avgScore) : null,
             leadTimeBucket: "6-24h",
           }),
           weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
