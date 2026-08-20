@@ -675,7 +675,7 @@ export const weatherRouter = router({
         precipitation: forecast.precipitation,
         windSpeed: forecast.windSpeed,
       }));
-      const bestModelScore = bestModel?.avgScore != null ? Number(bestModel.avgScore) : 60;
+      const bestModelScore = bestModel?.avgScore != null ? Number(bestModel.avgScore) : undefined;
       // La confiance courante stockée par le cron combine accord, historique,
       // stations et horizon. Le repli conserve exactement la même formule.
       const todayConfidence = meteoAI?.confidenceScore ?? computeConfidenceScore({
@@ -855,7 +855,7 @@ export const weatherRouter = router({
           stabilityLabel: stability.label,
           confidenceScore: computeConfidenceScore({
             forecasts: correctedForecasts.map(f => ({ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed })),
-            bestModelScore: ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60,
+            bestModelScore: ranking[0]?.avgScore != null ? Number(ranking[0].avgScore) : undefined,
             leadTimeBucket: "6-24h",
           }),
           weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,

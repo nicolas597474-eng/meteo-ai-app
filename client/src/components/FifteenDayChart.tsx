@@ -179,7 +179,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5 col-span-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Gauge className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Confiance de la prévision</span>
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Stabilité des modèles</span>
               <span className={`ml-auto text-sm font-bold ${stabilityColor}`}>{day.stabilityIndex}%</span>
             </div>
             <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">

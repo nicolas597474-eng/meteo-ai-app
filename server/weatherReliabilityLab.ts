@@ -139,7 +139,10 @@ export async function buildReliabilityLaboratory(input: {
           mae: round(numberOrNull(aggregate?.averageMaeWind), 2),
           gustMae: round(numberOrNull(aggregate?.averageMaeGusts), 2),
         },
-        humidityScore: round(numberOrNull(aggregate?.averageHumidityScore), 1),
+        humidity: {
+          score: round(numberOrNull(aggregate?.averageHumidityScore), 1),
+          mae: round(numberOrNull(aggregate?.averageHumidityMae), 2),
+        },
         pressureScore: round(numberOrNull(aggregate?.averagePressureScore), 1),
       },
       insufficiencyReason: insufficiencyReason({
@@ -238,6 +241,8 @@ export async function buildReliabilityLaboratory(input: {
       maeTemp: round(numberOrNull(point.maeTemp), 2),
       rmseTemp: round(numberOrNull(point.rmseTemp), 2),
       maeWind: round(numberOrNull(point.maeWind), 2),
+      humidityScore: round(numberOrNull(point.humidityScore), 1),
+      humidityMae: round(numberOrNull(point.humidityMae), 2),
     })),
     horizons: horizonAnalysis,
     stations,

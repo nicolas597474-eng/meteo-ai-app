@@ -23,6 +23,7 @@ type ForecastTrace = {
     temperature: TraceSource[];
     precipitation: TraceSource[];
     wind: TraceSource[];
+    humidity: TraceSource[];
   };
   excludedSources?: Array<{ id: string; name: string; reason: string }>;
   message?: string;
@@ -32,6 +33,7 @@ const PARAMETER_META = [
   { key: "temperature" as const, label: "Température", icon: "temperature", color: "text-orange-300", bar: "bg-orange-400" },
   { key: "precipitation" as const, label: "Précipitations", icon: "precipitation", color: "text-blue-300", bar: "bg-blue-400" },
   { key: "wind" as const, label: "Vent", icon: "wind_param", color: "text-cyan-300", bar: "bg-cyan-400" },
+  { key: "humidity" as const, label: "Humidité", icon: "humidity", color: "text-sky-200", bar: "bg-sky-300" },
 ];
 
 function sourceLabel(type: TraceSource["type"]) {
@@ -69,7 +71,7 @@ export function ForecastTraceability({ trace, compact = false }: { trace?: Forec
       </p>
 
       {available && (
-        <div className={`mt-4 grid gap-3 ${compact ? "" : "lg:grid-cols-3"}`}>
+        <div className={`mt-4 grid gap-3 ${compact ? "" : "lg:grid-cols-2"}`}>
           {PARAMETER_META.map((parameter) => {
             const sources = trace?.parameterSources?.[parameter.key] ?? [];
             return (

@@ -6,6 +6,9 @@ describe("Weather AI Lab — transparence de fusion", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
     expect(source).toContain("Simulation de la fusion");
     expect(source).toContain("Pondération finale");
+    expect(source).toContain("Poids réellement appliqués par paramètre");
+    expect(source).toContain('key: "humidity"');
+    expect(source).toContain("Aucune trace disponible.");
     expect(source).toContain("Résultat officiel");
     expect(source).toContain("Données exploitables");
     expect(source).toContain("Régime de prévision dominant");

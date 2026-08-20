@@ -13,6 +13,7 @@ import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
+import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { Clock3, X } from "lucide-react";
 
 type ComparisonPoint = {
@@ -196,6 +197,7 @@ export default function Ranking() {
         </header>
 
         <ForecastProvenanceBadge data={forecastProvenance} className="mb-4" />
+        <ForecastMetricDefinitions className="mb-4" />
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
           <div className="grid grid-cols-3 gap-2">

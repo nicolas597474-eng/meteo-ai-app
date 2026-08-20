@@ -2685,6 +2685,10 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Auditer et unifier les définitions de stabilité et confiance dans les calculs, libellés et aides concernés.
+- [x] Afficher les poids réels par paramètre de la dernière fusion dans l’AI Lab, sans valeur de démonstration.
+- [x] Exposer et visualiser l’évolution réelle de la MAE et du score d’humidité par modèle.
+- [x] Valider les trois améliorations sans modifier les données historiques ni créer de valeurs fictives.
 - [x] Auditer les poids officiels de température, pluie, vent et humidité ainsi que les preuves qualifiées disponibles.
 - [x] Proposer une pondération par paramètre fondée uniquement sur des scores observés et suffisants.
 - [x] Ajouter, après confirmation, une colonne d’humidité nullable à la synthèse future sans remplir ni recalculer l’historique.

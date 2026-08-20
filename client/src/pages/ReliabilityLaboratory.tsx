@@ -3,6 +3,7 @@ import { MeteoIcon } from "@/components/MeteoIcon";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
+import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
@@ -144,6 +145,7 @@ export default function ReliabilityLaboratory() {
     temperature: activeModels.filter((model) => model.metrics?.temperature?.mae !== null && model.metrics?.temperature?.mae !== undefined).sort((left, right) => Number(left.metrics.temperature.mae) - Number(right.metrics.temperature.mae)),
     precipitation: activeModels.filter((model) => model.metrics?.precipitation?.score !== null && model.metrics?.precipitation?.score !== undefined).sort((left, right) => Number(right.metrics.precipitation.score) - Number(left.metrics.precipitation.score)),
     wind: activeModels.filter((model) => model.metrics?.wind?.mae !== null && model.metrics?.wind?.mae !== undefined).sort((left, right) => Number(left.metrics.wind.mae) - Number(right.metrics.wind.mae)),
+    humidity: activeModels.filter((model) => model.metrics?.humidity?.mae !== null && model.metrics?.humidity?.mae !== undefined).sort((left, right) => Number(left.metrics.humidity.mae) - Number(right.metrics.humidity.mae)),
   }), [activeModels]);
   const selectSection = (section: (typeof SECTIONS)[number]) => {
     setActiveSection(section);
@@ -171,6 +173,7 @@ export default function ReliabilityLaboratory() {
         </header>
 
         <ForecastProvenanceBadge data={forecastProvenance} className="mb-4" />
+        <ForecastMetricDefinitions className="mb-4" />
 
         <MeteoSurface tone="lab" className="mb-4 rounded-2xl p-3 sm:p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -199,11 +202,13 @@ export default function ReliabilityLaboratory() {
           <section className="mb-4 scroll-mt-20" id="tendances-provisoires">
             <MeteoSurface tone="lab" className="rounded-2xl p-4">
               <SectionHeading title="Tendances provisoires" description="Ces indicateurs montrent les mesures déjà disponibles par paramètre. Leur note décrit la couverture des preuves, pas une fiabilité prédictive validée ni une performance par condition météo." icon="trending" />
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <ProvisionalTrendCard title="Température" detail="MAE la plus faible observée" models={provisionalTrends.temperature} value={(model) => metric(model.metrics.temperature.mae, " °C", 2)} accent="text-orange-200" />
                 <ProvisionalTrendCard title="Pluie" detail="Score de précipitation le plus élevé observé" models={provisionalTrends.precipitation} value={(model) => metric(model.metrics.precipitation.score, "/100", 0)} accent="text-sky-200" />
                 <ProvisionalTrendCard title="Vent" detail="MAE la plus faible observée" models={provisionalTrends.wind} value={(model) => metric(model.metrics.wind.mae, " km/h", 2)} accent="text-cyan-200" />
+                <ProvisionalTrendCard title="Humidité" detail="MAE la plus faible observée" models={provisionalTrends.humidity} value={(model) => metric(model.metrics.humidity.mae, " %", 2)} accent="text-violet-200" />
               </div>
+              <div className="mt-3"><HumidityTimelineFigure points={scoreTimeline} /></div>
               <p className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-[11px] leading-relaxed text-sky-100">Note de preuve provisoire : elle compare le volume réellement archivé à 72 comparaisons et 7 jours. Elle mesure la solidité de l’échantillon, pas la performance future du modèle. Le classement officiel reste masqué tant que le score normalisé complet et les régimes météorologiques ne sont pas archivés.</p>
             </MeteoSurface>
           </section>
@@ -266,6 +271,15 @@ function MetricEvidenceFigure({ points }: { points: any[] }) {
   if (usable.length === 0) return <EmptyFigure title="MAE température" reason="Aucune erreur de température qualifiée n’est archivée pour cette période." />;
   const highest = Math.max(...usable.map((point) => Number(point.maeTemp)), 0.1);
   return <div className="space-y-2">{usable.slice(0, 8).map((point, index) => <div key={`${point.date}-${point.serviceName}-${index}`} className="rounded-lg border border-slate-800 bg-[#090d14] p-2.5"><div className="flex items-center justify-between gap-3 text-[10px]"><span className="truncate text-slate-300">{point.serviceName} · {point.date}</span><span className="font-semibold text-white">MAE {metric(point.maeTemp, " °C", 2)}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.min(100, (Number(point.maeTemp) / highest) * 100)}%` }} /></div></div>)}</div>;
+}
+
+function HumidityTimelineFigure({ points }: { points: any[] }) {
+  const usable = points.filter((point) => point.humidityMae !== null && point.humidityMae !== undefined);
+  if (usable.length === 0) return <EmptyFigure title="Évolution humidité" reason="Aucune MAE d’humidité qualifiée n’est archivée sur cette période." />;
+  const highest = Math.max(...usable.map((point) => Number(point.humidityMae)), 0.1);
+  const grouped = new Map<string, any[]>();
+  usable.forEach((point) => grouped.set(point.serviceName, [...(grouped.get(point.serviceName) ?? []), point]));
+  return <section className="rounded-xl border border-violet-500/25 bg-violet-500/[0.045] p-3" aria-label="Évolution des performances d’humidité"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-violet-100">Évolution des performances d’humidité</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">MAE quotidienne qualifiée par modèle : plus la barre est courte, plus l’écart moyen d’humidité est faible.</p></div><span className="shrink-0 rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-[9px] font-semibold text-violet-100">{usable.length} point(s)</span></div><div className="mt-3 space-y-2">{Array.from(grouped.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([name, series]) => <article key={name} className="rounded-lg border border-violet-400/15 bg-slate-950/25 p-2.5"><div className="flex items-center justify-between gap-2"><p className="truncate text-xs font-semibold text-slate-200">{name}</p><p className="text-[10px] text-slate-400">{series.length} mesure(s)</p></div><div className="mt-2 flex items-end gap-1" aria-label={`Évolution de la MAE d’humidité pour ${name}`}>{[...series].sort((left, right) => String(left.date).localeCompare(String(right.date))).map((point) => { const height = Math.max(8, Math.round((Number(point.humidityMae) / highest) * 44)); return <div key={`${point.date}-${point.serviceName}`} className="flex min-w-0 flex-1 flex-col items-center gap-1"><span className="text-[9px] font-semibold text-violet-100">{Number(point.humidityMae).toFixed(1)}%</span><div className="w-full rounded-t bg-violet-400/75" style={{ height }} title={`${point.date} · MAE ${Number(point.humidityMae).toFixed(2)} % · score ${point.humidityScore == null ? "—" : `${Math.round(Number(point.humidityScore))}/100`}`} /><span className="truncate text-[8px] text-slate-500">{String(point.date).slice(5)}</span></div>; })}</div></article>)}</div></section>;
 }
 
 function KeyValue({ label, value }: { label: string; value: string }) { return <div><p className="text-[10px] text-slate-500">{label}</p><p className="mt-0.5 text-xs font-medium text-slate-200">{value}</p></div>; }

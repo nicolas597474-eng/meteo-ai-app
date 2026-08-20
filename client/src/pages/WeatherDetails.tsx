@@ -10,6 +10,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
+import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getCenteredHourScrollLeft, getHourCenterX, getNearestCenteredHourIndex, getNearestHourIndex } from "@/lib/hourlyScrollSync";
 
@@ -190,6 +191,7 @@ export default function WeatherDetails() {
       <div className="mx-auto max-w-2xl space-y-5 px-3 py-4 pb-28">
 
         <ForecastProvenanceBadge data={forecastProvenance} />
+        <ForecastMetricDefinitions />
 
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
         <MeteoSurface as="section" tone="default" className="rounded-[26px] border border-white/10 bg-[rgba(26,48,70,0.56)] p-3">

@@ -30,6 +30,9 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("Température");
     expect(source).toContain("Pluie");
     expect(source).toContain("Vent");
+    expect(source).toContain("Humidité");
+    expect(source).toContain("Évolution des performances d’humidité");
+    expect(source).toContain("Aucune MAE d’humidité qualifiée");
     expect(source).toContain("ProvisionalTrendCard");
   });
 

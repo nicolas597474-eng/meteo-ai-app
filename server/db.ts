@@ -1290,6 +1290,7 @@ export async function getLaboratoryModelAggregates(locationKey: string, startDat
       averageMaeWind: sql<number>`AVG(${reliabilityScores.maeWind})`.as("averageMaeWind"),
       averageMaeGusts: sql<number>`AVG(${reliabilityScores.windMaeGusts})`.as("averageMaeGusts"),
       averageHumidityScore: sql<number>`AVG(${reliabilityScores.humidityScore})`.as("averageHumidityScore"),
+      averageHumidityMae: sql<number>`AVG(${reliabilityScores.humidityMae})`.as("averageHumidityMae"),
       averagePressureScore: sql<number>`AVG(${reliabilityScores.pressureScore})`.as("averagePressureScore"),
     })
     .from(reliabilityScores)
@@ -1316,6 +1317,8 @@ export async function getLaboratoryScoreTimeline(locationKey: string, startDate:
       maeTemp: reliabilityScores.maeTemp,
       rmseTemp: reliabilityScores.rmseTemp,
       maeWind: reliabilityScores.maeWind,
+      humidityScore: reliabilityScores.humidityScore,
+      humidityMae: reliabilityScores.humidityMae,
     })
     .from(reliabilityScores)
     .where(and(
