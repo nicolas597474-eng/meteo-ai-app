@@ -198,16 +198,16 @@ describe("EnvironmentalPanels", () => {
     expect(temporalSunMoonSource).toContain("position.lunar");
     expect(temporalSunMoonSource).toContain("brightLimbAngleDeg");
     expect(temporalSunMoonSource).toContain("illuminationPct");
-    expect(temporalSunMoonSource).toContain("rotate(${moonPhase.brightLimbAngleDeg}deg)");
+    expect(temporalSunMoonSource).toContain("<RealisticMoon phase={moonPhase}");
+    expect(source).toContain("rotate(${phase.brightLimbAngleDeg}deg)");
     expect(temporalSunMoonSource).toContain("moon: { label: position.lunar.label");
   });
 
-  it("remplace explicitement le premier croissant par une lune 3D réaliste", () => {
-    expect(source).toContain("meteoai-first-quarter-moon-3d-realistic_64387ecc.png");
-    expect(source).toContain('["Premier croissant", "Premier quartier"].includes(astronomy.moon.label)');
-    expect(source).toContain("Lune 3D représentant le premier croissant");
-    expect(source).toContain('astronomy.moon.label === "Premier croissant"');
-    expect(source).toContain("moon-3d-first-crescent");
+  it("utilise une texture réaliste pour toute phase lunaire visible", () => {
+    expect(source).toContain("meteoai-realistic-moon-surface_f2f79daf.png");
+    expect(source).toContain("function RealisticMoon");
+    expect(source).toContain("radial-gradient(ellipse at ${highlightPosition}");
+    expect(source).toContain("Lune réaliste représentant ${moonPhase.label}");
     expect(styles).toContain("Premier croissant : seul l’astre est visible");
     expect(styles).toContain("background: transparent !important");
   });

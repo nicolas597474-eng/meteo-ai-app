@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Identifier le visuel de Lune réaliste précédent et le composant qui l’a remplacé dans l’arche astronomique.
+- [x] Rétablir la Lune réaliste dans l’arche et dans le panneau de phase, sans modifier phase, azimut, altitude ou calculs.
+- [x] Vérifier le rendu mobile du module Soleil & Lune et les tests astronomiques avant publication.
 - [x] Auditer et unifier les définitions de stabilité et confiance dans les calculs, libellés et aides concernés.
 - [x] Afficher les poids réels par paramètre de la dernière fusion dans l’AI Lab, sans valeur de démonstration.
 - [x] Exposer et visualiser l’évolution réelle de la MAE et du score d’humidité par modèle.
