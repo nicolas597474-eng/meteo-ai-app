@@ -2685,6 +2685,10 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Auditer le déclencheur 05h00, les exécutions récentes et l’idempotence de la collecte sans modifier la planification.
+- [x] Proposer le correctif minimal de collecte ou de planification avant toute modification affectant les prévisions futures.
+- [x] Remplacer l’autorisation expirée de la tâche 05h00 puis désactiver l’ancienne tâche seulement après création réussie.
+- [x] Valider le correctif de collecte sans recalculer ni modifier l’historique existant.
 - [x] Repartir d’une arborescence synchronisée depuis le jalon stable `bcd2c15`.
 - [x] Ajouter un repli Dashboard quotidien daté sans donnée horaire inventée.
 - [x] Exposer explicitement le statut, la date et l’horodatage de la dernière fusion quotidienne lorsque les horaires sont indisponibles.
