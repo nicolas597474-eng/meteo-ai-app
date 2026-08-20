@@ -2541,3 +2541,8 @@
 - [x] Confirmer la collecte horaire et quotidienne des prévisions sans mélanger les observations de stations physiques.
 - [x] Ajuster la tâche si nécessaire et vérifier son exécution.
 - [x] Valider TypeScript, Vitest et la configuration planifiée avant publication.
+
+## Page Stations — retrait des bilans techniques
+- [x] Retirer les sections « Dernier bilan de collecte », « Disponibilité des stations » et « Preuves physiques pour le scoring ».
+- [x] Nettoyer les données et imports devenus inutilisés sans retirer la collecte ni le scoring serveur.
+- [x] Vérifier le rendu mobile de la page Stations, TypeScript et Vitest avant publication.

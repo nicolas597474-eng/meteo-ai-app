@@ -74,17 +74,19 @@ describe("page Fiabilité", () => {
     expect(source).toContain('label="Collecte" value="05h00 Paris"');
   });
 
-  it("place la carte des stations juste après le rayon de recherche", () => {
+  it("retire les trois bilans techniques demandés après la carte des stations", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source.indexOf("Rayon de recherche")).toBeLessThan(source.indexOf("Carte des stations"));
-    expect(source.indexOf("Carte des stations")).toBeLessThan(source.indexOf("Dernier bilan de collecte"));
     expect(source).toContain("Vue satellite");
+    expect(source).not.toContain("Dernier bilan de collecte");
+    expect(source).not.toContain("Disponibilité des stations");
+    expect(source).not.toContain("Preuves physiques pour le scoring");
   });
 
   it("explique lorsque les modèles existent mais que les stations physiques sont insuffisantes", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Modèles disponibles, relevés physiques insuffisants");
-    expect(source).toContain("Vérification actuelle : {physicalStationExplanation}");
+    expect(source).toContain("{physicalStationExplanation}");
     expect(source).toContain("La source Netatmo a répondu, mais aucune station physique n’a été renvoyée");
     expect(source).toContain("station physique n’a été trouvée dans le rayon");
   });
