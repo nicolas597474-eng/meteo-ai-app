@@ -34,6 +34,8 @@ import { StationData, StationContribution, StationExclusion, haversineKm } from 
 
 export type LocalMode = "standard" | "local" | "ultra-local";
 
+type UltraLocalParameter = "temperature" | "humidity" | "pressure" | "windSpeed" | "windGust" | "precipitation";
+
 export type RadiusBand = {
   minKm: number;
   maxKm: number;
@@ -58,6 +60,7 @@ export type UltraLocalResult = {
   microclimateFactors: MicroclimateFactor[];
   stationCount: number;
   confidenceScore: number;
+  confidenceByParameter: Record<UltraLocalParameter, number | null>;
   explanation: string;
 };
 
@@ -515,18 +518,42 @@ export function calculateUltraLocal(
     finalTemp = Math.round(((weightedTemp / totalWeight) + microAdjustment) * 10) / 10;
   }
 
-  // Weighted averages for other variables
-  function weightedAvgVar(field: "humidity" | "pressure" | "windSpeed" | "windGust" | "precipitation"): number | null {
-    let sum = 0, wSum = 0;
-    activeStations.forEach((v, idx) => {
-      const val = v.station[field] as number | null;
-      const w = contributions[idx]?.weight ?? 0;
-      if (val != null && w > 0) {
-        sum += val * w;
-        wSum += w;
-      }
+  // The contribution order follows distance bands, while activeStations retains input
+  // order. Resolve the weight by station id so each variable uses its own station's
+  // contribution rather than the contribution at the same array index.
+  const contributionWeightByStation = new Map(
+    contributions.map(contribution => [contribution.stationId, contribution.weight])
+  );
+  type NonTemperatureParameter = Exclude<UltraLocalParameter, "temperature">;
+  type WeightedValue = { value: number; weight: number };
+
+  function weightedValues(field: NonTemperatureParameter): WeightedValue[] {
+    return activeStations.flatMap(({ station }) => {
+      const value = station[field] as number | null;
+      const weight = contributionWeightByStation.get(station.stationId) ?? 0;
+      return value != null && weight > 0 ? [{ value, weight }] : [];
     });
-    return wSum > 0 ? Math.round((sum / wSum) * 10) / 10 : null;
+  }
+
+  function weightedAverage(values: WeightedValue[]): number | null {
+    const totalWeight = values.reduce((sum, entry) => sum + entry.weight, 0);
+    if (totalWeight <= 0) return null;
+    return Math.round((values.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / totalWeight) * 10) / 10;
+  }
+
+  function confidenceForValues(values: WeightedValue[], spreadAtLowConfidence: number): number | null {
+    if (values.length === 0) return null;
+    const totalWeight = values.reduce((sum, entry) => sum + entry.weight, 0);
+    if (totalWeight <= 0) return null;
+    const mean = values.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / totalWeight;
+    const weightedVariance = values.reduce(
+      (sum, entry) => sum + entry.weight * (entry.value - mean) ** 2,
+      0
+    ) / totalWeight;
+    const weightedStdDev = Math.sqrt(weightedVariance);
+    const agreementPenalty = Math.min(60, (weightedStdDev / spreadAtLowConfidence) * 60);
+    const availabilityPenalty = Math.max(0, 4 - values.length) * 8;
+    return Math.max(0, Math.min(100, Math.round(100 - agreementPenalty - availabilityPenalty)));
   }
 
   // Confidence score
@@ -539,6 +566,14 @@ export function calculateUltraLocal(
   const confidenceScore = Math.max(0, Math.min(100, Math.round(
     100 - tempStd * 8 - Math.max(0, 4 - activeStations.length) * 8
   )));
+  const confidenceByParameter: Record<UltraLocalParameter, number | null> = {
+    temperature: confidenceScore,
+    humidity: confidenceForValues(weightedValues("humidity"), 20),
+    pressure: confidenceForValues(weightedValues("pressure"), 8),
+    windSpeed: confidenceForValues(weightedValues("windSpeed"), 12),
+    windGust: confidenceForValues(weightedValues("windGust"), 15),
+    precipitation: confidenceForValues(weightedValues("precipitation"), 5),
+  };
 
   // Generate explanation
   const explanation = generateExplanation(mode, contributions, bandBreakdown, microFactors, finalTemp, modelTemperature);
@@ -552,11 +587,11 @@ export function calculateUltraLocal(
   return {
     mode,
     temperature: finalTemp,
-    humidity: weightedAvgVar("humidity"),
-    pressure: weightedAvgVar("pressure"),
-    windSpeed: weightedAvgVar("windSpeed"),
-    windGust: weightedAvgVar("windGust"),
-    precipitation: weightedAvgVar("precipitation"),
+    humidity: weightedAverage(weightedValues("humidity")),
+    pressure: weightedAverage(weightedValues("pressure")),
+    windSpeed: weightedAverage(weightedValues("windSpeed")),
+    windGust: weightedAverage(weightedValues("windGust")),
+    precipitation: weightedAverage(weightedValues("precipitation")),
     stationsUsed: contributions,
     stationsIgnored,
     modelContribution: modelTemperature,
@@ -566,6 +601,7 @@ export function calculateUltraLocal(
     microclimateFactors: microFactors,
     stationCount: activeStations.length,
     confidenceScore,
+    confidenceByParameter,
     explanation,
   };
 }
