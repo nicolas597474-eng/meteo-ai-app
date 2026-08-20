@@ -2640,3 +2640,9 @@
 - [x] Mesurer les requêtes et calculs qui ralentissent le basculement Local et Ultra-local.
 - [x] Optimiser le cache et le chargement sans retirer ni inventer de données.
 - [x] Vérifier la réactivité mobile, TypeScript et Vitest avant publication.
+
+## Correctifs — graphique horaire et audit technique
+- [x] Corriger les clés dupliquées des heures dans le graphique du Dashboard.
+- [x] Auditer les journaux et les composants météo pour identifier les autres défauts reproductibles.
+- [x] Corriger uniquement les anomalies confirmées, avec des tests de non-régression.
+- [x] Vérifier TypeScript, Vitest et les rendus avant publication.

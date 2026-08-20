@@ -604,7 +604,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
               <span className="block text-[11px] font-normal text-slate-400">Prévisions détaillées</span>
             </span>
           </h2>
-          <span className="rounded-full border border-slate-500/45 bg-slate-900/60 px-3 py-1.5 text-[11px] font-semibold text-slate-200">24h⌄</span>
+          <span className="rounded-full border border-slate-500/45 bg-slate-900/60 px-3 py-1.5 text-[11px] font-semibold text-slate-200">{N} h</span>
         </div>
         {locationName && (
           <p className="text-[11px] text-primary/70 flex items-center gap-1 mt-0.5">
@@ -636,7 +636,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
                 const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
                 const isCurrent = i === nowHour;
                 return (
-                  <div key={h.hour} className="flex flex-col items-center justify-start pt-2" style={{ width: COL_W }}>
+                  <div key={`${h.hour}-${i}`} className="flex flex-col items-center justify-start pt-2" style={{ width: COL_W }}>
                     <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
                     <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>

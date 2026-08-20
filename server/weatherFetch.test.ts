@@ -25,4 +25,16 @@ describe("reprises des sources météo", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(getWeatherFetchCacheMetrics()).toMatchObject({ entries: 1, hits: 1, misses: 1 });
   });
+
+  it("conserve une réponse en cache lisible après consommation de la première réponse", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ hourly: [1, 2] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = await fetchWeather("https://api.example.test/hourly", {}, { cacheTtlMs: 10_000 });
+    expect(await first.json()).toEqual({ hourly: [1, 2] });
+    const cached = await fetchWeather("https://api.example.test/hourly", {}, { cacheTtlMs: 10_000 });
+
+    expect(await cached.json()).toEqual({ hourly: [1, 2] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

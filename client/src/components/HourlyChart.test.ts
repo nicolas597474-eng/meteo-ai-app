@@ -61,6 +61,13 @@ describe("HourlyChart", () => {
     expect(source).toContain("[hours, nowHour, COL_W]");
   });
 
+  it("distingue les créneaux portant la même heure sur des jours consécutifs", () => {
+    expect(source).toContain('key={`${h.hour}-${i}`}');
+    expect(source).not.toContain("key={h.hour}");
+    expect(source).toContain("{N} h");
+    expect(source).not.toContain(">24h⌄</span>");
+  });
+
   it("présente tous les paramètres horaires réellement fournis dans le panneau détaillé", () => {
     expect(source).toContain("dewPoint?: number | null");
     expect(source).toContain("pressure?: number | null");
