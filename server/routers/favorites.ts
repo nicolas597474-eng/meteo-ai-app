@@ -16,7 +16,7 @@ import {
 export type DashboardCurrentTemperature = {
   temperature: number;
   stationCount: number;
-  confidenceScore: number;
+  confidenceScore: number | null;
   source: "local_validated" | "model_fallback";
   observedAt: string | null;
   deltaFromOfficialC: number | null;
@@ -62,7 +62,7 @@ export function buildDashboardCurrentTemperature(input: {
   localMode: "standard" | "local" | "ultra-local";
   temperature: number | null;
   stationCount: number;
-  confidenceScore: number;
+  confidenceScore: number | null;
   observedAt: string | Date | null;
   officialTemperature: number | null;
   modelFallbackTemperature?: number | null;

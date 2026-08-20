@@ -66,4 +66,36 @@ describe("calculateUltraLocal", () => {
     expect(result.windGust).toBeNull();
     expect(result.confidenceByParameter.windGust).toBeNull();
   });
+
+  it("n’invente pas de confiance avec une seule observation par variable", () => {
+    const result = calculateUltraLocal([
+      station({ stationId: "unique", humidity: 75, precipitation: 1.2, windSpeed: 18, windGust: 35 }),
+      station({ stationId: "temp-only", distanceKm: 3, humidity: null, precipitation: null, windSpeed: null, windGust: null }),
+    ], "local", 50.75, 2.52, 40, null);
+
+    expect(result.temperature).not.toBeNull();
+    expect(result.confidenceScore).not.toBeNull();
+    expect(result.humidity).toBe(75);
+    expect(result.precipitation).toBe(1.2);
+    expect(result.windSpeed).toBe(18);
+    expect(result.windGust).toBe(35);
+    expect(result.confidenceByParameter).toMatchObject({ humidity: null, precipitation: null, windSpeed: null, windGust: null });
+  });
+
+  it("pondère indépendamment pluie, vent et rafales et écarte une station non fraîche", () => {
+    const now = Date.now();
+    const result = calculateUltraLocal([
+      station({ stationId: "near", distanceKm: 1, precipitation: 0.2, windSpeed: 8, windGust: 14, updatedAt: new Date(now).toISOString() }),
+      station({ stationId: "far", distanceKm: 4, precipitation: 8, windSpeed: 42, windGust: 70, updatedAt: new Date(now).toISOString() }),
+      station({ stationId: "stale", distanceKm: 1.2, precipitation: 99, windSpeed: 99, windGust: 99, updatedAt: new Date(now - 90 * 60_000).toISOString() }),
+    ], "ultra-local", 50.75, 2.52, 40, null);
+
+    expect(result.stationsIgnored.map((item) => item.stationId)).toContain("stale");
+    expect(result.precipitation).toBeLessThan(4);
+    expect(result.windSpeed).toBeLessThan(25);
+    expect(result.windGust).toBeLessThan(45);
+    expect(result.confidenceByParameter.precipitation).not.toBeNull();
+    expect(result.confidenceByParameter.windSpeed).not.toBeNull();
+    expect(result.confidenceByParameter.windGust).not.toBeNull();
+  });
 });

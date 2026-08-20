@@ -2697,5 +2697,8 @@
 - [x] Créer un contrat de provenance commun, calculé uniquement depuis le snapshot officiel et la dernière fusion quotidienne réelle.
 - [x] Afficher le même indicateur compact dans Dashboard, Prévisions, Fiabilité, Stations et AI Lab.
 - [x] Tester les provenances horaire, quotidienne de repli et indisponible sans donnée fictive.
-- [ ] Consolider les garde-fous de confiance et les tests Ultra-local par variable.
-- [ ] Valider TypeScript, Vitest, rendu et invariants de données avant publication.
+- [x] Consolider les garde-fous de confiance et les tests Ultra-local par variable.
+- [x] Renvoyer une confiance nulle et un motif explicite lorsqu’une variable ne dispose pas de preuve locale suffisante.
+- [x] Couvrir température, humidité, précipitations, vent et rafales avec stations propres, manquantes ou écartées.
+- [x] Vérifier que l’absence d’une variable n’affecte pas les poids ni les confiances des autres variables.
+- [x] Valider TypeScript, Vitest, rendu et invariants de données avant publication.

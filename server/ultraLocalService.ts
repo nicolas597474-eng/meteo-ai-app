@@ -59,7 +59,7 @@ export type UltraLocalResult = {
   microclimateAdjustment: number; // °C adjustment applied
   microclimateFactors: MicroclimateFactor[];
   stationCount: number;
-  confidenceScore: number;
+  confidenceScore: number | null;
   confidenceByParameter: Record<UltraLocalParameter, number | null>;
   explanation: string;
 };
@@ -542,7 +542,10 @@ export function calculateUltraLocal(
   }
 
   function confidenceForValues(values: WeightedValue[], spreadAtLowConfidence: number): number | null {
-    if (values.length === 0) return null;
+    // Une seule station renseigne un contexte, mais ne permet pas de mesurer
+    // l'accord inter-stations. La confiance reste donc explicitement
+    // indisponible au lieu d'afficher une valeur artificiellement favorable.
+    if (values.length < 2) return null;
     const totalWeight = values.reduce((sum, entry) => sum + entry.weight, 0);
     if (totalWeight <= 0) return null;
     const mean = values.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / totalWeight;
@@ -556,24 +559,19 @@ export function calculateUltraLocal(
     return Math.max(0, Math.min(100, Math.round(100 - agreementPenalty - availabilityPenalty)));
   }
 
-  // Confidence score
-  const temps = contributions
-    .map(c => c.adjustedTemperature ?? c.temperature)
-    .filter((t): t is number => t != null);
-  const tempStd = temps.length > 1
-    ? Math.sqrt(temps.reduce((s, v) => s + (v - temps.reduce((a, b) => a + b) / temps.length) ** 2, 0) / temps.length)
-    : 0;
-  const confidenceScore = Math.max(0, Math.min(100, Math.round(
-    100 - tempStd * 8 - Math.max(0, 4 - activeStations.length) * 8
-  )));
+  const temperatureValues: WeightedValue[] = contributions.flatMap((contribution) => {
+    const value = contribution.adjustedTemperature ?? contribution.temperature;
+    return value != null && contribution.weight > 0 ? [{ value, weight: contribution.weight }] : [];
+  });
   const confidenceByParameter: Record<UltraLocalParameter, number | null> = {
-    temperature: confidenceScore,
+    temperature: confidenceForValues(temperatureValues, 4),
     humidity: confidenceForValues(weightedValues("humidity"), 20),
     pressure: confidenceForValues(weightedValues("pressure"), 8),
     windSpeed: confidenceForValues(weightedValues("windSpeed"), 12),
     windGust: confidenceForValues(weightedValues("windGust"), 15),
     precipitation: confidenceForValues(weightedValues("precipitation"), 5),
   };
+  const confidenceScore = confidenceByParameter.temperature;
 
   // Generate explanation
   const explanation = generateExplanation(mode, contributions, bandBreakdown, microFactors, finalTemp, modelTemperature);
