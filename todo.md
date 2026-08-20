@@ -2652,3 +2652,10 @@
 - [x] Clarifier le comportement attendu du bouton de fermeture associé aux modes Local et Ultra-local.
 - [x] Ajouter une croix qui ferme le bloc de contexte local et repasse en mode Officiel.
 - [x] Vérifier TypeScript, Vitest et les rendus avant publication.
+
+## Audit complet — calculs, données et méthode météorologique
+- [x] Cartographier les calculs critiques, leurs entrées, leurs sorties et les données persistées.
+- [x] Vérifier les fusions, pondérations, niveaux de confiance, corrections de biais et règles de repli.
+- [x] Vérifier les observations physiques, les collectes planifiées, l’idempotence et la cohérence temporelle.
+- [x] Auditer les incohérences entre pages, les erreurs de calcul possibles, les performances et les journaux.
+- [x] Produire un rapport priorisé séparant les défauts prouvés, risques à confirmer et améliorations proposées.
