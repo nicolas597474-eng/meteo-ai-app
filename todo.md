@@ -2576,3 +2576,8 @@
 - [x] Expliquer les données absentes sans les remplacer et distinguer clairement les snapshots archivés, courants et directs.
 - [x] Ajouter une section de résultat final distincte pour les stations locales, leur fraîcheur, distance, cohérence et statut de contribution.
 - [x] Vérifier le parcours mobile, TypeScript et Vitest avant publication.
+
+## AI Lab — frise verticale de simulation
+- [x] Réorganiser les étapes en repères verticaux à gauche et explication active à droite.
+- [x] Préserver une disposition compacte et tactile sur mobile sans couper les libellés.
+- [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.
