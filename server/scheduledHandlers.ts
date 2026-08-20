@@ -109,6 +109,28 @@ export function buildStationCollectionSnapshot(input: {
 }
 
 /**
+ * Exécute chaque lieu une seule fois, avec une concurrence bornée. La collecte
+ * reste donc complète pour tous les favoris, sans sérialiser inutilement les
+ * appels indépendants ni surcharger le fournisseur météo.
+ */
+export async function processWithConcurrency<T>(
+  items: readonly T[],
+  maxConcurrency: number,
+  work: (item: T) => Promise<void>,
+): Promise<void> {
+  const workerCount = Math.min(Math.max(1, maxConcurrency), items.length);
+  let nextIndex = 0;
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      await work(item);
+    }
+  }));
+}
+
+/**
  * Handler: Collect forecasts from all expert models
  * Triggered daily at 07h30 Paris time
  */
@@ -623,7 +645,10 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       stationCollectionDeferred: boolean;
     }> = [];
 
-    for (const fav of uniqueLocations) {
+    // Deux lieux sont traités en parallèle. À l'heure actuelle, cela permet
+    // d'achever les deux favoris avant le délai du callback, tout en bornant
+    // les appels réseau et les écritures en base lorsque la liste grandit.
+    await processWithConcurrency(uniqueLocations, 2, async (fav) => {
       try {
         console.log(`[MeteoAI] Collecting forecasts for ${fav.name} (${fav.lat}, ${fav.lon})`);
         let physicalStationCount = 0;
@@ -768,7 +793,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             hourly: dailyCoverage,
             forceFailed: true,
           }));
-          continue;
+          return;
         }
 
         // Calculate stability index
@@ -1046,13 +1071,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
         locationsProcessed++;
 
-        // Rate limit between locations
-        await new Promise((r) => setTimeout(r, 500));
       } catch (err: any) {
         console.error(`[MeteoAI] Error collecting for ${fav.name}:`, err.message);
         errors.push(`${fav.name}: ${err.message}`);
       }
-    }
+    });
 
     res.json({
       ok: true,

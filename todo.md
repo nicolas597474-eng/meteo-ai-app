@@ -2535,3 +2535,9 @@
 - [x] Préserver la légende dans le DOM durant l’animation de fermeture.
 - [x] Animer la sortie avec opacité et translation, sans animer la géométrie de page.
 - [x] Respecter la préférence de réduction des mouvements et vérifier TypeScript, Vitest et le rendu mobile.
+
+## Collecte quotidienne — prévisions de 05h00
+- [x] Vérifier la tâche planifiée et sa couverture des modèles actifs pour tous les lieux favoris.
+- [x] Confirmer la collecte horaire et quotidienne des prévisions sans mélanger les observations de stations physiques.
+- [x] Ajuster la tâche si nécessaire et vérifier son exécution.
+- [x] Valider TypeScript, Vitest et la configuration planifiée avant publication.

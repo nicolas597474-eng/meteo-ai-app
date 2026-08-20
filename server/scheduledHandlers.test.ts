@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildStationCollectionSnapshot, getModelCoverage } from "./scheduledHandlers";
+import { buildStationCollectionSnapshot, getModelCoverage, processWithConcurrency } from "./scheduledHandlers";
 import { VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
 describe("getModelCoverage", () => {
@@ -39,6 +39,23 @@ describe("getModelCoverage", () => {
 });
 
 describe("collecte horaire de 05h00", () => {
+  it("borne la concurrence des lieux tout en traitant chaque favori", async () => {
+    const active: number[] = [];
+    const processed: number[] = [];
+    let peakConcurrency = 0;
+
+    await processWithConcurrency([1, 2, 3, 4, 5], 2, async (location) => {
+      active.push(location);
+      peakConcurrency = Math.max(peakConcurrency, active.length);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      processed.push(location);
+      active.splice(active.indexOf(location), 1);
+    });
+
+    expect(peakConcurrency).toBeLessThanOrEqual(2);
+    expect(processed.sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+
   it("relance uniquement les modèles absents sans remplacer les données déjà archivées", () => {
     const source = readFileSync(new URL("./weatherServices.ts", import.meta.url), "utf8");
     expect(source).toContain("Retry targeted for missing models");
