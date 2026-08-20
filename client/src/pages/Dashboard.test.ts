@@ -33,6 +33,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("aria-expanded={isExpanded}");
     expect(source).toContain('const needsLocalStations = localMode !== "standard"');
     expect(source).toContain("enabled: !!selectedLocation && needsLocalStations");
+    expect(source).toContain("placeholderData: keepPreviousData");
+    expect(source).toContain("gcTime: 10 * 60 * 1000");
+    expect(source).toContain("Filtre local en cours…");
     expect(source).toContain("Données horaires temporairement indisponibles.");
     expect(source).toContain("trpc.weather.getHourlyForecast.useQuery");
     expect(source).toContain('refetchOnReconnect: "always"');

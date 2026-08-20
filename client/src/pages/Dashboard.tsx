@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -164,9 +165,14 @@ export default function Dashboard() {
   }), [selectedLocation?.lat, selectedLocation?.lon, activeLocation?.radiusKm, localMode]);
 
   const needsLocalStations = localMode !== "standard";
-  const { data: locationWeather } = trpc.favorites.getLocationWeather.useQuery(
+  const { data: locationWeather, isFetching: locationWeatherFetching, isPlaceholderData: locationWeatherIsPlaceholder } = trpc.favorites.getLocationWeather.useQuery(
     queryInput,
-    { enabled: !!selectedLocation && needsLocalStations, staleTime: 2 * 60 * 1000 }
+    {
+      enabled: !!selectedLocation && needsLocalStations,
+      staleTime: 90 * 1000,
+      gcTime: 10 * 60 * 1000,
+      placeholderData: keepPreviousData,
+    }
   );
 
   // Pre-loaded forecasts for all favorites (from 05h00 cron)
@@ -806,7 +812,7 @@ export default function Dashboard() {
           <section className="space-y-2" aria-labelledby="local-context-title">
             <div className="flex items-center justify-between gap-2 px-1">
               <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
-              <span className="text-[10px] text-muted-foreground">n’influence pas la prévision officielle</span>
+              <span className="text-[10px] text-muted-foreground">{locationWeatherFetching && locationWeatherIsPlaceholder ? "Filtre local en cours…" : "n’influence pas la prévision officielle"}</span>
             </div>
             <div className="dashboard-sky-card rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
               <div className="flex items-start justify-between gap-3">

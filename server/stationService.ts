@@ -149,6 +149,26 @@ const SOURCE_DEFAULTS: Record<StationSource, { reliability: number; updateFreqMi
   opensensemap: { reliability: 0, updateFreqMin: 15, availability: 0 },
 };
 
+// La même collecte de stations alimente les modes Local et Ultra-local. Un cache
+// très court évite de solliciter quatre fournisseurs à chaque changement de filtre,
+// sans masquer un relevé durablement obsolète.
+export const NEARBY_STATIONS_CACHE_TTL_MS = 90_000;
+type NearbyStationsCacheEntry = {
+  expiresAt: number;
+  stations?: StationData[];
+  pending?: Promise<StationData[]>;
+};
+const nearbyStationsCache = new Map<string, NearbyStationsCacheEntry>();
+
+function makeNearbyStationsCacheKey(
+  lat: number,
+  lon: number,
+  radiusKm: number,
+  netatmoUserId?: number,
+) {
+  return [lat.toFixed(4), lon.toFixed(4), radiusKm.toFixed(1), netatmoUserId ?? "public"].join(":");
+}
+
 // ─── Helper: fetch one Open-Meteo grid point ──────────────────────────────────
 
 async function fetchOpenMeteoPoint(lat: number, lon: number, model?: string): Promise<{
@@ -436,7 +456,7 @@ async function fetchSYNOPReference(
 
 // ─── Main: collect all stations ───────────────────────────────────────────────
 
-export async function collectNearbyStations(
+async function collectNearbyStationsUncached(
   lat: number,
   lon: number,
   radiusKm: number = 20,
@@ -510,6 +530,34 @@ export async function collectNearbyStations(
     }
     return s;
   });
+}
+
+export async function collectNearbyStations(
+  lat: number,
+  lon: number,
+  radiusKm: number = 20,
+  townName: string = "Local",
+  options: { netatmoUserId?: number; onNetatmoStatus?: (status: import("./netatmoService").NetatmoAvailability) => void } = {},
+): Promise<StationData[]> {
+  const cacheKey = makeNearbyStationsCacheKey(lat, lon, radiusKm, options.netatmoUserId);
+  const now = Date.now();
+  const cached = nearbyStationsCache.get(cacheKey);
+  if (cached?.stations && cached.expiresAt > now) {
+    options.onNetatmoStatus?.(options.netatmoUserId === undefined ? "not_connected" : "fresh_cache");
+    return cached.stations;
+  }
+  if (cached?.pending) return cached.pending;
+
+  const pending = collectNearbyStationsUncached(lat, lon, radiusKm, townName, options);
+  nearbyStationsCache.set(cacheKey, { expiresAt: now + NEARBY_STATIONS_CACHE_TTL_MS, pending });
+  try {
+    const stations = await pending;
+    nearbyStationsCache.set(cacheKey, { expiresAt: Date.now() + NEARBY_STATIONS_CACHE_TTL_MS, stations });
+    return stations;
+  } catch (error) {
+    nearbyStationsCache.delete(cacheKey);
+    throw error;
+  }
 }
 
 // ─── Ranking ─────────────────────────────────────────────────────────────────

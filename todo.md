@@ -2635,3 +2635,8 @@
 - [x] Retirer uniquement le bouton « Détails de calcul de la synthèse ».
 - [x] Préserver les indicateurs, le rayon, la carte et les autres sections Stations.
 - [x] Vérifier TypeScript et Vitest avant publication.
+
+## Dashboard — modes Local et Ultra-local réactifs
+- [x] Mesurer les requêtes et calculs qui ralentissent le basculement Local et Ultra-local.
+- [x] Optimiser le cache et le chargement sans retirer ni inventer de données.
+- [x] Vérifier la réactivité mobile, TypeScript et Vitest avant publication.
