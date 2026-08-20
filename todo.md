@@ -2620,3 +2620,8 @@
 - [x] Afficher exactement deux cartes horaires complètes à l’écran sur mobile.
 - [x] Masquer les aperçus latéraux des cartes voisines sans casser le défilement tactile.
 - [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.
+
+## Interface — boutons de remontée uniformisés
+- [x] Utiliser le style circulaire de la page principale pour tous les boutons de remontée.
+- [x] Préserver le placement, l’accessibilité et le comportement de défilement.
+- [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.
