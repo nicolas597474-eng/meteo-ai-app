@@ -143,6 +143,11 @@ export const reliabilityScores = mysqlTable("reliability_scores", {
   condMaeCloud: float("condMaeCloud"),
   /** Exact count of aligned forecast/physical-observation pairs used by this score. */
   sampleSize: int("sampleSize"),
+  tempSampleSize: int("tempSampleSize"),
+  precipSampleSize: int("precipSampleSize"),
+  windSampleSize: int("windSampleSize"),
+  humiditySampleSize: int("humiditySampleSize"),
+  pressureSampleSize: int("pressureSampleSize"),
   /** Laboratory score using the centralized six-variable weights, when all inputs exist. */
   normalizedScore: float("normalizedScore"),
   humidityScore: float("humidityScore"),
