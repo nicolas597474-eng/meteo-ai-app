@@ -11,6 +11,9 @@ describe("WeatherStatusBadge", () => {
     expect(source).toContain("PopoverContent");
     expect(source).toContain("collisionPadding={12}");
     expect(source).toContain("Ouvrir l’aide");
+    expect(source).toContain("PopoverClose");
+    expect(source).toContain("Fermer l’aide");
+    expect(source).toContain("h-2 w-2 shrink-0 opacity-55");
     expect(source).toContain("À propos de cet indicateur");
     expect(source).toContain("description?: string");
   });

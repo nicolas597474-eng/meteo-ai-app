@@ -16,6 +16,8 @@ describe("page Fiabilité", () => {
     expect(source).toContain("PopoverContent");
     expect(source).toContain("collisionPadding={12}");
     expect(source).toContain("À propos de ce statut");
+    expect(source).toContain("PopoverClose");
+    expect(source).toContain("Fermer l’aide");
   });
 
   it("distingue explicitement les références de modèles des stations locales", () => {

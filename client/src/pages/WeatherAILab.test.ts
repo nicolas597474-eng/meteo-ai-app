@@ -33,6 +33,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("40 % accord des modèles");
     expect(source).toContain("60 % de stabilité des températures maximales");
     expect(source).toContain("poids final strictement positif");
+    expect(source).toContain("PopoverClose");
+    expect(source).toContain("h-6 w-6");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {

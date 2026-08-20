@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { CircleHelp } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CircleHelp, X } from "lucide-react";
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export type WeatherStatusBadgeTone = "info" | "success" | "warning" | "lab" | "neutral" | "danger";
 
@@ -90,7 +90,7 @@ export function WeatherStatusBadge({
         {pulse ? <span className={`absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full border border-[#10131a] ${styles.dot} motion-safe:animate-pulse`} /> : null}
       </span>
       <span className="min-w-0 text-left leading-none">
-        <span className={`flex items-center gap-0.5 font-semibold uppercase ${compact ? "text-[7px] tracking-[0.08em]" : dense ? "text-[8px] tracking-[0.12em]" : "text-[9px] tracking-[0.14em]"} ${styles.label}`}><span className="truncate">{label}</span>{description ? <CircleHelp className="h-2.5 w-2.5 shrink-0 opacity-75" aria-hidden="true" /> : null}</span>
+        <span className={`flex items-center gap-0.5 font-semibold uppercase ${compact ? "text-[7px] tracking-[0.08em]" : dense ? "text-[8px] tracking-[0.12em]" : "text-[9px] tracking-[0.14em]"} ${styles.label}`}><span className="truncate">{label}</span>{description ? <CircleHelp className="h-2 w-2 shrink-0 opacity-55" aria-hidden="true" /> : null}</span>
         {hasValue ? <span className={`block truncate font-bold tracking-tight ${compact ? "mt-0.5 text-[9px]" : dense ? "mt-0.5 text-xs" : "mt-1 text-sm"} ${styles.value}`}>{value}</span> : null}
       </span>
     </span>
@@ -98,5 +98,5 @@ export function WeatherStatusBadge({
 
   if (!description) return badgeContent;
 
-  return <Popover><PopoverTrigger asChild><button type="button" className="max-w-full cursor-pointer rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300" aria-label={`${accessibleLabel}. Ouvrir l’aide`}>{badgeContent}</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-slate-600 bg-[#101622] px-3 py-3 text-[11px] leading-relaxed text-slate-100 shadow-xl"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/75">{HELP_POPOVER_TITLE}</p><p className="mt-1.5 text-slate-200">{description}</p></PopoverContent></Popover>;
+  return <Popover><PopoverTrigger asChild><button type="button" className="max-w-full cursor-pointer rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300" aria-label={`${accessibleLabel}. Ouvrir l’aide`}>{badgeContent}</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-slate-600 bg-[#101622] px-3 py-3 text-[11px] leading-relaxed text-slate-100 shadow-xl"><div className="flex items-start justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/75">{HELP_POPOVER_TITLE}</p><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-700/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><p className="mt-1.5 text-slate-200">{description}</p></PopoverContent></Popover>;
 }

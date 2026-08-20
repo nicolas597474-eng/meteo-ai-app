@@ -2565,3 +2565,8 @@
 - [x] Exposer le calcul et les facteurs réellement disponibles pour Confiance prévision, Stabilité modèles et Modèles appliqués.
 - [x] Ajouter un panneau d’aide accessible à chacune des trois cartes sans inventer de raison ou de pourcentage.
 - [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.
+
+## Aides contextuelles — contrôle discret et fermeture rapide
+- [x] Réduire visuellement les déclencheurs d’aide sans diminuer leur accessibilité tactile.
+- [x] Ajouter une croix de fermeture explicite à tous les panneaux d’aide contextuels.
+- [x] Vérifier les interactions mobiles, TypeScript et Vitest avant publication.
