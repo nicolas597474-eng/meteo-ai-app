@@ -150,12 +150,14 @@ export default function WeatherDetails() {
   }, [data?.hours, currentHourStr]);
 
   // À l’ouverture ou au changement de lieu, placer directement la carte de
-  // l’heure réelle de Paris au début du ruban horizontal.
+  // l’heure réelle de Paris au début du ruban horizontal, sans révéler les
+  // cartes voisines sur les côtés.
   useEffect(() => {
     const rail = hourlyRef.current;
     if (!rail || !data?.hours?.length) return;
-    const hourlyCardStride = 170; // largeur 160px + espacement 10px
-    const targetLeft = Math.max(0, currentHourIdx * hourlyCardStride - 8);
+    const firstCard = rail.querySelector<HTMLElement>('[data-hour-index="0"]');
+    const currentCard = rail.querySelector<HTMLElement>(`[data-hour-index="${currentHourIdx}"]`);
+    const targetLeft = Math.max(0, (currentCard?.offsetLeft ?? 0) - (firstCard?.offsetLeft ?? 0));
     const frame = requestAnimationFrame(() => rail.scrollTo({ left: targetLeft, behavior: "auto" }));
     return () => cancelAnimationFrame(frame);
   }, [data?.hours?.length, currentHourIdx, activeLocation?.lat, activeLocation?.lon]);
@@ -196,15 +198,16 @@ export default function WeatherDetails() {
           </div>
           
           {/* Horizontal scrollable hourly cards */}
-          <div ref={hourlyRef} className="overflow-x-auto pb-2 -mx-3 px-3 scrollbar-hide">
-            <div className="flex gap-2.5" style={{ width: `${hours.length * 170}px` }}>
+          <div ref={hourlyRef} className="-mx-3 overflow-x-auto overscroll-x-contain px-3 pb-2 scrollbar-hide snap-x snap-mandatory scroll-px-3">
+            <div className="flex gap-2.5">
               {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
                 const pTrend = pressureTrend(hours, i);
                 return (
                   <div
                     key={h.hour}
-                    className={`flex-shrink-0 w-[160px] rounded-[22px] border p-3 transition-colors ${
+                    data-hour-index={i}
+                    className={`w-[calc((100%-10px)/2)] shrink-0 snap-start rounded-[22px] border p-3 transition-colors ${
                       isNow
                         ? "border-sky-200/65 bg-[linear-gradient(160deg,rgba(44,128,181,0.30),rgba(10,35,60,0.34))]"
                         : "border-white/20 bg-[linear-gradient(160deg,rgba(77,105,132,0.20),rgba(16,36,56,0.28))]"

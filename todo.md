@@ -2615,3 +2615,8 @@
 - [x] Retirer uniquement le lien « Voir les prévisions détaillées » du Dashboard.
 - [x] Préserver la page Prévisions et son accès depuis la navigation principale.
 - [x] Vérifier TypeScript et Vitest avant publication.
+
+## Prévisions détaillées — carrousel horaire à deux cartes
+- [x] Afficher exactement deux cartes horaires complètes à l’écran sur mobile.
+- [x] Masquer les aperçus latéraux des cartes voisines sans casser le défilement tactile.
+- [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.

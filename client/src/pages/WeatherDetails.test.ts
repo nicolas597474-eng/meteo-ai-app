@@ -10,11 +10,12 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('tone="default"');
     expect(source).not.toContain("weather-chart-3d");
     expect(source).toContain("<BackToTopButton />");
-    expect(source).toContain("w-[160px]");
-    expect(source).toContain("hours.length * 170");
+    expect(source).toContain('w-[calc((100%-10px)/2)]');
+    expect(source).toContain('snap-x snap-mandatory');
+    expect(source).toContain('data-hour-index={i}');
     expect(source).toContain("text-[36px] font-semibold leading-none");
     expect(source).toContain("MAINTENANT");
-    expect(source).toContain("hourlyCardStride = 170");
+    expect(source).toContain('currentCard?.offsetLeft');
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
     expect(source).toContain("rgba(77,105,132,0.20)");
     expect(source).toContain("rgba(44,128,181,0.30)");
