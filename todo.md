@@ -2581,3 +2581,8 @@
 - [x] Réorganiser les étapes en repères verticaux à gauche et explication active à droite.
 - [x] Préserver une disposition compacte et tactile sur mobile sans couper les libellés.
 - [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.
+
+## AI Lab — branche Stations dans la frise
+- [x] Ajouter la recherche, le filtrage physique, la qualification et la synthèse locale comme étapes explicites.
+- [x] Distinguer les observations de contexte, les contributions locales et les preuves qualifiées sans inventer de statut.
+- [x] Vérifier le rendu de la branche, TypeScript et Vitest avant publication.

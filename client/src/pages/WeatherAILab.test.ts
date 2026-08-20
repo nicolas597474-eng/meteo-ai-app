@@ -45,6 +45,12 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("grid-cols-[minmax(90px,0.72fr)_minmax(0,1.5fr)]");
     expect(source).toContain("before:bg-sky-300/20");
     expect(source).toContain("Étape {activeStep + 1} sur {steps.length}");
+    expect(source).toContain("Branche complémentaire · Stations locales");
+    expect(source).toContain("Recherche locale");
+    expect(source).toContain("Filtre physique");
+    expect(source).toContain("Synthèse locale");
+    expect(source).toContain("Preuve qualifiée");
+    expect(source).toContain("getEvidenceStatus");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {
