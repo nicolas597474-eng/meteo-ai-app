@@ -1,3 +1,0 @@
-ALTER TABLE `meteoai_forecast` ADD CONSTRAINT `meteoai_forecast_location_date_unique` UNIQUE(`locationKey`,`date`);--> statement-breakpoint
-ALTER TABLE `observations` ADD CONSTRAINT `observations_location_date_provenance_unique` UNIQUE(`locationKey`,`date`,`provenanceType`);--> statement-breakpoint
-ALTER TABLE `reliability_scores` ADD CONSTRAINT `reliability_scores_location_date_service_evidence_unique` UNIQUE(`locationKey`,`date`,`serviceName`,`evidenceType`);
