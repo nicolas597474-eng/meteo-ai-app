@@ -54,6 +54,7 @@ import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
 import { getApparentAstronomyPosition, getEnvironmentalSnapshot, getTerrainHorizonProfile } from "../environmentalData";
 import { refreshManualFusionForFavorite } from "../manualFusion";
 import { getLocalEclipseCircumstances } from "../eclipseVisibility";
+import { getWeatherProviderDiagnostics } from "../weatherFetch";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -587,6 +588,10 @@ export const weatherRouter = router({
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
       return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
+
+  /** Diagnostics éphémères des appels fournisseurs, sans persistance en base. */
+  getProviderDiagnostics: publicProcedure
+    .query(() => getWeatherProviderDiagnostics()),
 
   /** Qualité de l’air et éphémérides réelles pour le lieu actif. */
   getEnvironmentalSnapshot: publicProcedure

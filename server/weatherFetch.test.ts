@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchWeather, getWeatherFetchCacheMetrics, isTransientWeatherStatus, resetWeatherFetchCache } from "./weatherFetch";
+import { fetchWeather, getWeatherFetchCacheMetrics, getWeatherProviderDiagnostics, isTransientWeatherStatus, resetWeatherFetchCache, resetWeatherProviderDiagnostics } from "./weatherFetch";
 
 afterEach(() => {
   resetWeatherFetchCache();
+  resetWeatherProviderDiagnostics();
   vi.unstubAllGlobals();
 });
 
@@ -36,5 +37,39 @@ describe("reprises des sources météo", () => {
 
     expect(await cached.json()).toEqual({ hourly: [1, 2] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("mesure un succès fournisseur avec le nombre réel de reprises", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("temporaire", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchWeather("https://api.example.test/hourly", {}, { attempts: 2, cacheTtlMs: 0 });
+
+    expect(getWeatherProviderDiagnostics()).toMatchObject([{
+      provider: "api.example.test",
+      lastOutcome: "success",
+      lastStatus: 200,
+      lastAttempts: 2,
+      lastRetries: 1,
+      lastError: null,
+    }]);
+  });
+
+  it("expose une erreur HTTP réelle sans fraîcheur ni statut fictifs", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("indisponible", { status: 404 })));
+
+    const response = await fetchWeather("https://meteo.example.test/daily", {}, { cacheTtlMs: 0 });
+
+    expect(response.status).toBe(404);
+    expect(getWeatherProviderDiagnostics()).toMatchObject([{
+      provider: "meteo.example.test",
+      lastOutcome: "http_error",
+      lastStatus: 404,
+      lastAttempts: 1,
+      lastRetries: 0,
+      freshnessMs: null,
+    }]);
   });
 });

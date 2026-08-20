@@ -2665,13 +2665,13 @@
 - [x] Corriger le bilan de collecte des nouveaux scores, sans recalcul de l’historique.
 - [x] Vérifier la confiance et les poids par variable du mode Ultra-local.
 - [x] Unifier provenance, couverture et fraîcheur affichées entre les pages.
-- [ ] Ajouter un repli Dashboard quotidien daté et des diagnostics fournisseurs sans inventer d’heures.
+- [x] Ajouter un repli Dashboard quotidien daté et des diagnostics fournisseurs sans inventer d’heures.
 - [ ] Corriger la lecture des réponses HTTP et stabiliser la compilation avant publication.
 - [ ] Valider TypeScript, Vitest, rendu et invariants de données avant publication.
 
 ## Validation ciblée — diagnostic fournisseur
-- [ ] Redémarrer le service de développement sans opération de données.
-- [ ] Revalider le test de diagnostic fournisseur sur les sources actuelles.
+- [x] Redémarrer le service de développement sans opération de données.
+- [x] Revalider le test de diagnostic fournisseur sur les sources actuelles.
 
 ## Vérification post-restauration bcd2c15
 - [x] Restaurer seulement les fichiers de code validés depuis bcd2c15, sans opération de base de données.
@@ -2689,7 +2689,10 @@
 - [x] Exposer explicitement le statut, la date et l’horodatage de la dernière fusion quotidienne lorsque les horaires sont indisponibles.
 - [x] Empêcher la carte principale de présenter une valeur quotidienne comme une observation horaire actuelle.
 - [x] Couvrir le repli quotidien daté par des tests sans écriture en base.
-- [ ] Mesurer délais, erreurs, reprises et fraîcheur par fournisseur météo.
+- [x] Mesurer délais, erreurs, reprises et fraîcheur par fournisseur météo.
+- [x] Instrumenter en mémoire les appels fournisseur, sans persister de diagnostics en base.
+- [x] Exposer la dernière mesure réelle et l’état d’indisponibilité sans valeur par défaut.
+- [x] Couvrir les mesures de succès, erreur et nouvelle tentative par des tests unitaires.
 - [ ] Harmoniser provenance, couverture et motifs de repli entre les pages.
 - [ ] Consolider les garde-fous de confiance et les tests Ultra-local par variable.
 - [ ] Valider TypeScript, Vitest, rendu et invariants de données avant publication.
