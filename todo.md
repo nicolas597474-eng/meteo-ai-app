@@ -2620,3 +2620,8 @@
 - [x] Harmoniser la surface, les bordures et les contrastes de la barre des lieux favoris.
 - [x] Conserver les états actif, inactif et les interactions existantes.
 - [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.
+
+## Dashboard — lieux favoris au design doux
+- [x] Augmenter les arrondis du conteneur, des pastilles et des actions des lieux favoris.
+- [x] Préserver les états actif, inactif, ajout et réorganisation.
+- [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.

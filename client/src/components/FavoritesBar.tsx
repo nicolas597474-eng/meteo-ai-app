@@ -99,7 +99,7 @@ function SortableFavoritePill({ loc, weather, active, onSelect }: { loc: Locatio
     }}
     {...attributes}
     aria-label={`${loc.name}, ${hasCurrentTemperature ? `température actuelle ${Math.round(weather!.temp!)} degrés` : "température actuelle indisponible"}. Balayez pour faire défiler, ou utilisez la poignée pour réorganiser.`}
-    className={`group flex min-h-10 shrink-0 touch-pan-x items-center gap-1.5 rounded-xl border px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors ${
+    className={`group flex min-h-10 shrink-0 touch-pan-x items-center gap-1.5 rounded-2xl border px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors ${
       active ? "border-sky-300/55 bg-[linear-gradient(135deg,rgba(14,116,144,0.18),rgba(15,23,42,0.82))] text-slate-50 ring-1 ring-sky-300/15" : "border-slate-700/80 bg-[#101722]/82 text-slate-300 hover:border-sky-300/35 hover:bg-slate-800/80 hover:text-slate-100"
     } ${isDragging ? "cursor-grabbing opacity-35" : "cursor-grab active:cursor-grabbing"}`}
   >
@@ -290,14 +290,14 @@ export function FavoritesBar({
   return (
     <>
       {/* Favorites strip */}
-      <div className="relative rounded-2xl border border-slate-700/65 bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,14,24,0.92))] p-2 shadow-[0_8px_24px_rgba(2,6,23,0.18)]">
+      <div className="relative rounded-[28px] border border-slate-700/65 bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,14,24,0.92))] p-2.5 shadow-[0_8px_24px_rgba(2,6,23,0.18)]">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveDragId(null)} onDragEnd={handleDragEnd}>
           <div
             ref={scrollRef}
             className="flex gap-2 overflow-x-auto scrollbar-hide"
             style={{ scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
           >
-            {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[13px] font-semibold tracking-tight shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors ${isActive(locations[0]) ? "border-sky-300/55 bg-[linear-gradient(135deg,rgba(14,116,144,0.18),rgba(15,23,42,0.82))] text-slate-50 ring-1 ring-sky-300/15" : "border-slate-700/80 bg-[#101722]/82 text-slate-300 hover:border-sky-300/35 hover:bg-slate-800/80 hover:text-slate-100"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
+            {currentPos && <button onClick={() => onLocationChange({ lat: currentPos.lat, lon: currentPos.lon, name: "Position actuelle", radiusKm: 10 })} className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-[13px] font-semibold tracking-tight shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors ${isActive(locations[0]) ? "border-sky-300/55 bg-[linear-gradient(135deg,rgba(14,116,144,0.18),rgba(15,23,42,0.82))] text-slate-50 ring-1 ring-sky-300/15" : "border-slate-700/80 bg-[#101722]/82 text-slate-300 hover:border-sky-300/35 hover:bg-slate-800/80 hover:text-slate-100"}`}><Navigation className="h-4 w-4 shrink-0" /><span>Position actuelle</span></button>}
             <SortableContext items={orderedFavorites.map((location) => location.id)} strategy={horizontalListSortingStrategy}>
               {orderedFavorites.map((loc) => {
                 const active = isActive(loc);
@@ -309,7 +309,7 @@ export function FavoritesBar({
             {totalFavCount < MAX_FAVORITES && (
               <button
                 onClick={() => setShowAddDialog(true)}
-                className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-sky-300/45 bg-sky-400/[0.06] px-3 py-1.5 text-[13px] font-semibold tracking-tight text-sky-200 transition-colors hover:border-sky-300/70 hover:bg-sky-400/10"
+                className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-dashed border-sky-300/45 bg-sky-400/[0.06] px-3 py-1.5 text-[13px] font-semibold tracking-tight text-sky-200 transition-colors hover:border-sky-300/70 hover:bg-sky-400/10"
                 aria-label="Ajouter un lieu favori"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -321,14 +321,14 @@ export function FavoritesBar({
                 href="/favorites"
                 aria-label="Gérer, modifier ou supprimer mes villes favorites"
                 title="Gérer mes villes"
-                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700/80 bg-[#101722]/82 text-slate-300 transition-colors hover:border-sky-300/35 hover:bg-slate-800/80 hover:text-sky-100"
+                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-[#101722]/82 text-slate-300 transition-colors hover:border-sky-300/35 hover:bg-slate-800/80 hover:text-sky-100"
               >
                 <Settings className="h-4 w-4" />
               </Link>
             )}
           </div>
           <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.23, 1, 0.32, 1)" }}>
-            {activeDragLocation ? <div className="flex min-h-10 items-center gap-1.5 rounded-xl border border-sky-300/70 bg-[#101722] px-3 py-1.5 text-slate-50 ring-1 ring-sky-300/35"><FavoritePillContent loc={activeDragLocation} weather={prefetchedWeather?.get(activeDragLocation.id)} active /></div> : null}
+            {activeDragLocation ? <div className="flex min-h-10 items-center gap-1.5 rounded-2xl border border-sky-300/70 bg-[#101722] px-3 py-1.5 text-slate-50 ring-1 ring-sky-300/35"><FavoritePillContent loc={activeDragLocation} weather={prefetchedWeather?.get(activeDragLocation.id)} active /></div> : null}
           </DragOverlay>
         </DndContext>
 
