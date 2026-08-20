@@ -2560,3 +2560,8 @@
 - [x] Recenser les textes d’aide et définir une structure commune, concise et factuelle.
 - [x] Uniformiser la mise en forme des panneaux d’aide et les textes existants sans inventer de données.
 - [x] Vérifier les aides sur mobile, TypeScript et Vitest avant publication.
+
+## AI Lab — aide des indicateurs de fusion
+- [x] Exposer le calcul et les facteurs réellement disponibles pour Confiance prévision, Stabilité modèles et Modèles appliqués.
+- [x] Ajouter un panneau d’aide accessible à chacune des trois cartes sans inventer de raison ou de pourcentage.
+- [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.
