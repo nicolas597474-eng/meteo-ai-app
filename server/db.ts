@@ -238,7 +238,6 @@ export async function insertObservation(data: InsertObservation): Promise<void> 
       provenanceType: data.provenanceType,
       isQualified: data.isQualified,
       rawData: data.rawData,
-      collectedAt: data.collectedAt ?? new Date(),
     },
   });
 }
@@ -278,14 +277,7 @@ export async function getObservationsByDateRange(startDate: string, endDate: str
 export async function insertReliabilityScores(data: InsertReliabilityScore[]): Promise<void> {
   const db = await getDb();
   if (!db || data.length === 0) return;
-  for (const score of data) {
-    await db.insert(reliabilityScores).values(score).onDuplicateKeyUpdate({
-      set: {
-        ...score,
-        computedAt: score.computedAt ?? new Date(),
-      },
-    });
-  }
+  await db.insert(reliabilityScores).values(data);
 }
 
 export async function getLatestReliabilityScores(locationKey = "default") {
@@ -454,7 +446,6 @@ export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast): Promis
       confidenceScore: data.confidenceScore,
       weights: data.weights,
       explanation: data.explanation,
-      computedAt: data.computedAt ?? new Date(),
     },
   });
 }

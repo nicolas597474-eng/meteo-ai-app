@@ -24,11 +24,6 @@ type HourlyForecast = {
 export type QualifiedHourlyModelScore = {
   serviceName: string;
   sampleSize: number;
-  tempSampleSize: number;
-  precipSampleSize: number;
-  windSampleSize: number;
-  humiditySampleSize: number;
-  pressureSampleSize: number;
   maeTemp: number | null;
   rmseTemp: number | null;
   biasTemp: number | null;
@@ -93,11 +88,6 @@ export function scoreQualifiedHourlyModels(snapshots: PhysicalSnapshot[], foreca
     return [{
       serviceName,
       sampleSize: pairs.length,
-      tempSampleSize: score.dimensions.temperature.sampleSize,
-      precipSampleSize: score.dimensions.precipitation.sampleSize,
-      windSampleSize: score.dimensions.wind.sampleSize,
-      humiditySampleSize: score.laboratory.humidity.sampleSize,
-      pressureSampleSize: score.laboratory.pressure.sampleSize,
       maeTemp: score.maeTemp,
       rmseTemp: score.rmseTemp,
       biasTemp: score.biasTemp,

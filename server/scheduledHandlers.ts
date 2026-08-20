@@ -312,7 +312,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         const condition = determineMajorityCondition(allForecasts);
 
         // Compute true confidence score (accord modèles + performances historiques + échéance)
-        const bestModelScore = ranking[0]?.avgScore != null ? Number(ranking[0].avgScore) : null;
+        const bestModelScore = ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60;
         const trueConfidenceScore = computeConfidenceScore({
           forecasts: biasCorrectedForecasts,
           bestModelScore,
@@ -455,11 +455,6 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             date: yesterday,
             serviceName: score.serviceName,
             sampleSize: score.sampleSize,
-            tempSampleSize: score.tempSampleSize,
-            precipSampleSize: score.precipSampleSize,
-            windSampleSize: score.windSampleSize,
-            humiditySampleSize: score.humiditySampleSize,
-            pressureSampleSize: score.pressureSampleSize,
             maeTemp: score.maeTemp,
             maePrecip: score.maePrecip,
             maeWind: score.maeWind,

@@ -79,6 +79,15 @@ describe("getLeadTimeWeights", () => {
       "Validé": { maeTemp: 0.4, maePrecip: 0.2, maeWind: 1.2 },
     });
   });
+
+  it("choisit le voisin d’échéance le plus proche avant une performance très courte", () => {
+    const weights = getLeadTimeWeights([
+      { serviceName: "AROME", bucket: "0-6h", avgMaeTemp: 0.1, avgMaePrecip: 0.2, avgMaeWind: 1, sampleSize: 10, latestScoreDate: "2026-08-11" },
+      { serviceName: "AROME", bucket: "4-7d", avgMaeTemp: 1.8, avgMaePrecip: 2.2, avgMaeWind: 8, sampleSize: 10, latestScoreDate: "2026-08-11" },
+    ], "8-15d", new Date("2026-08-12T12:00:00.000Z"));
+
+    expect(weights.AROME).toEqual({ maeTemp: 1.8, maePrecip: 2.2, maeWind: 8 });
+  });
 });
 
 describe("isEligibleGlobalReliabilityScore", () => {

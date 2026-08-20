@@ -2652,3 +2652,27 @@
 - [x] Clarifier le comportement attendu du bouton de fermeture associé aux modes Local et Ultra-local.
 - [x] Ajouter une croix qui ferme le bloc de contexte local et repasse en mode Officiel.
 - [x] Vérifier TypeScript, Vitest et les rendus avant publication.
+
+## Audit complet — calculs, données et méthode météorologique
+- [x] Cartographier les calculs critiques, leurs entrées, leurs sorties et les données persistées.
+- [x] Vérifier les fusions, pondérations, niveaux de confiance, corrections de biais et règles de repli.
+- [x] Vérifier les observations physiques, les collectes planifiées, l’idempotence et la cohérence temporelle.
+- [x] Auditer les incohérences entre pages, les erreurs de calcul possibles, les performances et les journaux.
+- [x] Produire un rapport priorisé séparant les défauts prouvés, risques à confirmer et améliorations proposées.
+
+## Corrections globales issues de l’audit méthodologique
+- [x] Dédupliquer les snapshots et scores existants sans supprimer la version la plus récente.
+- [x] Ajouter les contraintes d’unicité métier et les upserts idempotents des snapshots, observations et scores.
+- [x] Rendre les dimensions sans observation non calculables au lieu de leur attribuer une bonne note.
+- [ ] Stocker et utiliser la couverture par dimension pour les scores de fiabilité.
+- [x] Corriger les replis de pondération par proximité réelle d’échéance.
+- [x] Supprimer la valeur historique fictive de 60 et conserver la confiance bornée sans preuve qualifiée.
+- [ ] Séparer explicitement les performances par paramètre dans tous les calculs de fusion.
+- [ ] Corriger l’association poids-station et la confiance par paramètre du mode Ultra-local.
+- [ ] Réordonner les régimes météo spécifiques et signaler les données insuffisantes sans valeurs météo inventées.
+- [ ] Rendre l’indice de stabilité non calculable lorsque le nombre de modèles est insuffisant et unifier son périmètre affiché.
+- [ ] Corriger le bilan des collectes, leurs alertes, leur idempotence et les échecs d’autorisation vérifiables.
+- [ ] Ajouter un repli Dashboard sur snapshot persistant, un délai de réponse borné et une fraîcheur explicite.
+- [ ] Unifier la provenance, les modèles appliqués, la couverture et les motifs de repli entre toutes les pages.
+- [ ] Ajouter la segmentation par horizon, saison, régime et seuil, ainsi que les métriques d’observabilité des fournisseurs.
+- [ ] Étendre les tests de régression et valider TypeScript, Vitest, migration, tâches et interfaces avant publication.
