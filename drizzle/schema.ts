@@ -176,6 +176,8 @@ export const meteoaiForecast = mysqlTable("meteoai_forecast", {
   tempMin: float("tempMin"),
   precipitation: float("precipitation"),
   windSpeed: float("windSpeed"),
+  /** Nullable for historical rows created before humidity joined the official fusion. */
+  humidity: float("humidity"),
   condition: varchar("condition", { length: 128 }),
   stabilityIndex: float("stabilityIndex"), // 0-100
   stabilityLabel: mysqlEnum("stabilityLabel", ["stable", "unstable"]).notNull(),

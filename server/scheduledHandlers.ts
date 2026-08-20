@@ -247,6 +247,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           precipitation: f.precipitation,
           windSpeed: f.windSpeed,
           windGust: null as number | null,
+          humidity: f.humidity ?? null,
           cloudCover: f.cloudCover ?? null,
         }));
 
@@ -269,7 +270,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
 
         // Merge lead-time weights with global performance map (lead-time takes priority)
         const leadTimeWeights = getLeadTimeWeights(leadTimePerfs, "6-24h"); // today = 6-24h horizon
-        const performanceMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; maeCloud?: number; weightedScore?: number }> = {};
+        const performanceMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; maeHumidity?: number; maeCloud?: number; weightedScore?: number }> = {};
         ranking.filter((r) => isEligibleGlobalReliabilityScore(Number(r.daysTracked ?? 0), r.latestScoreDate ?? null)).forEach((r) => {
           const ltw = leadTimeWeights[r.serviceName];
           performanceMap[r.serviceName] = {
@@ -277,6 +278,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
             maeTemp: ltw?.maeTemp ?? (r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined),
             maePrecip: ltw?.maePrecip ?? (r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined),
             maeWind: ltw?.maeWind ?? (r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined),
+            maeHumidity: r.avgMaeHumidity != null ? Number(r.avgMaeHumidity) : undefined,
             maeCloud: r.avgCondMaeCloud != null ? Number(r.avgCondMaeCloud) : undefined,
             weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
           };
@@ -327,6 +329,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           tempMin: meteoAI.tempMin,
           precipitation: meteoAI.precipitation,
           windSpeed: meteoAI.windSpeed,
+          humidity: meteoAI.humidity,
           condition,
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,

@@ -410,6 +410,7 @@ export async function getQualifiedCumulativeRankingForLocation(locationKey = "de
       avgMaeTemp: sql<number>`AVG(${reliabilityScores.maeTemp})`,
       avgMaePrecip: sql<number>`AVG(${reliabilityScores.maePrecip})`,
       avgMaeWind: sql<number>`AVG(${reliabilityScores.maeWind})`,
+      avgMaeHumidity: sql<number>`AVG(${reliabilityScores.humidityMae})`,
       avgBiasTemp: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgBiasPrecip: sql<number>`AVG(${reliabilityScores.biasPrecip})`,
       daysTracked: sql<number>`COUNT(*)`,

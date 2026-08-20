@@ -7,6 +7,7 @@ export type OfficialDailyForecastInput = {
   precipitation: number | null;
   windSpeed: number | null;
   windGust?: number | null;
+  humidity?: number | null;
   cloudCover?: number | null;
 };
 
@@ -14,6 +15,7 @@ export type OfficialServicePerformance = {
   maeTemp?: number;
   maePrecip?: number;
   maeWind?: number;
+  maeHumidity?: number;
   maeCloud?: number;
   weightedScore?: number;
 };
@@ -39,6 +41,7 @@ export type ForecastTrace = {
     temperature: ForecastTraceSource[];
     precipitation: ForecastTraceSource[];
     wind: ForecastTraceSource[];
+    humidity: ForecastTraceSource[];
   };
   excludedSources: Array<{ id: string; name: string; reason: string }>;
 };
@@ -57,9 +60,9 @@ function toTraceSources(result: FusionResult): ForecastTraceSource[] {
   }));
 }
 
-function reliabilityFromMetricMae(metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "cloudCover", mae: number | undefined): number {
+function reliabilityFromMetricMae(metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "humidity" | "cloudCover", mae: number | undefined): number {
   if (mae == null || !Number.isFinite(mae)) return 50;
-  const expectedError = metric === "precipitation" ? 15 : metric === "windSpeed" ? 25 : metric === "cloudCover" ? 40 : 10;
+  const expectedError = metric === "precipitation" ? 15 : metric === "windSpeed" ? 25 : metric === "humidity" || metric === "cloudCover" ? 40 : 10;
   return Math.max(0, Math.min(100, 100 * Math.exp((-3 * mae) / expectedError)));
 }
 
@@ -73,13 +76,15 @@ export function computeOfficialDailyForecast(
   performanceByService: Record<string, OfficialServicePerformance>
 ) {
   const now = new Date();
-  const makeSources = (metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "cloudCover"): FusionSource[] =>
+  const makeSources = (metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "humidity" | "cloudCover"): FusionSource[] =>
     forecasts.map((forecast) => {
       const performance = performanceByService[forecast.serviceName] ?? {};
       const metricMae = metric === "precipitation"
         ? performance.maePrecip
         : metric === "windSpeed"
           ? performance.maeWind
+          : metric === "humidity"
+            ? performance.maeHumidity
           : metric === "cloudCover"
             ? performance.maeCloud
           : performance.maeTemp;
@@ -101,6 +106,7 @@ export function computeOfficialDailyForecast(
         precipitation: forecast.precipitation,
         windSpeed: forecast.windSpeed,
         windGust: forecast.windGust ?? null,
+        humidity: forecast.humidity ?? null,
         cloudCover: forecast.cloudCover ?? null,
         updatedAt: now,
         // Sans MAE pour le paramètre, 50 est un poids neutre égalitaire entre
@@ -125,18 +131,20 @@ export function computeOfficialDailyForecast(
   const minFusion = computeFusion(makeSources("tempMin"), config);
   const precipFusion = computeFusion(makeSources("precipitation"), config);
   const windFusion = computeFusion(makeSources("windSpeed"), config);
+  const humidityFusion = computeFusion(makeSources("humidity"), config);
   const cloudFusion = computeFusion(makeSources("cloudCover"), config);
 
-  const weights: Record<string, { tempWeight: number; precipWeight: number; windWeight: number }> = {};
+  const weights: Record<string, { tempWeight: number; precipWeight: number; windWeight: number; humidityWeight: number }> = {};
   for (const source of maxFusion.usedSources) {
     weights[source.name] = {
       tempWeight: source.finalWeight,
       precipWeight: precipFusion.usedSources.find((entry) => entry.name === source.name)?.finalWeight ?? 0,
       windWeight: windFusion.usedSources.find((entry) => entry.name === source.name)?.finalWeight ?? 0,
+      humidityWeight: humidityFusion.usedSources.find((entry) => entry.name === source.name)?.finalWeight ?? 0,
     };
   }
 
-  const excludedSources = [...maxFusion.excludedSources, ...precipFusion.excludedSources, ...windFusion.excludedSources]
+  const excludedSources = [...maxFusion.excludedSources, ...precipFusion.excludedSources, ...windFusion.excludedSources, ...humidityFusion.excludedSources]
     .filter((source, index, all) => all.findIndex((entry) => entry.id === source.id && entry.reason === source.reason) === index)
     .map((source) => ({ id: source.id, name: source.name, reason: source.reason }));
   const trace: ForecastTrace = {
@@ -148,6 +156,7 @@ export function computeOfficialDailyForecast(
       temperature: toTraceSources(maxFusion),
       precipitation: toTraceSources(precipFusion),
       wind: toTraceSources(windFusion),
+      humidity: toTraceSources(humidityFusion),
     },
     excludedSources,
   };
@@ -158,6 +167,7 @@ export function computeOfficialDailyForecast(
     precipitation: precipFusion.precipitation,
     windSpeed: windFusion.windSpeed,
     windGust: windFusion.windGust,
+    humidity: humidityFusion.humidity,
     cloudCover: cloudFusion.temperature,
     weights,
     trace,

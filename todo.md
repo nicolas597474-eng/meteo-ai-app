@@ -2685,6 +2685,11 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Auditer les poids officiels de température, pluie, vent et humidité ainsi que les preuves qualifiées disponibles.
+- [x] Proposer une pondération par paramètre fondée uniquement sur des scores observés et suffisants.
+- [x] Ajouter, après confirmation, une colonne d’humidité nullable à la synthèse future sans remplir ni recalculer l’historique.
+- [x] Tester les poids distincts, l’absence de preuve et l’invariance des autres paramètres.
+- [x] Valider la fusion future sans recalculer les prévisions ni scores historiques.
 - [x] Auditer le déclencheur 05h00, les exécutions récentes et l’idempotence de la collecte sans modifier la planification.
 - [x] Proposer le correctif minimal de collecte ou de planification avant toute modification affectant les prévisions futures.
 - [x] Remplacer l’autorisation expirée de la tâche 05h00 puis désactiver l’ancienne tâche seulement après création réussie.
