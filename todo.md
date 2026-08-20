@@ -2546,3 +2546,7 @@
 - [x] Retirer les sections « Dernier bilan de collecte », « Disponibilité des stations » et « Preuves physiques pour le scoring ».
 - [x] Nettoyer les données et imports devenus inutilisés sans retirer la collecte ni le scoring serveur.
 - [x] Vérifier le rendu mobile de la page Stations, TypeScript et Vitest avant publication.
+
+## Page Stations — bandeau de collecte discret
+- [x] Simplifier visuellement le bandeau « Collecte 05h00 Paris » sans supprimer l’information d’automatisation.
+- [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.

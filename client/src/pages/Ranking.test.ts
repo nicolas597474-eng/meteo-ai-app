@@ -66,12 +66,12 @@ describe("page Fiabilité", () => {
     expect(source).toContain("aria-expanded={showAdditionalModelReferences}");
   });
 
-  it("présente la collecte planifiée dans un badge visuel accessible", () => {
+  it("présente la collecte planifiée dans une indication compacte et accessible", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Clock3");
-    expect(source).toContain("WeatherStatusBadge");
-    expect(source).toContain("Collecte automatique planifiée à 05h00, heure de Paris");
-    expect(source).toContain('label="Collecte" value="05h00 Paris"');
+    expect(source).toContain("Collecte automatique quotidienne à 05h00, heure de Paris");
+    expect(source).toContain("Auto · 05h00 Paris");
+    expect(source).toContain("rounded-full border border-slate-700/80");
   });
 
   it("retire les trois bilans techniques demandés après la carte des stations", () => {

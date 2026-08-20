@@ -222,7 +222,10 @@ export default function Ranking() {
             <h1 className="mt-2 text-xl font-bold text-white">Stations & fiabilité locale</h1>
             <p className="mt-1 text-xs text-slate-500">Relevés physiques et comparaison avec la prévision officielle.</p>
           </div>
-          <WeatherStatusBadge className="w-[142px]" label="Collecte" value="05h00 Paris" tone="info" icon={<Clock3 className="h-4 w-4" />} pulse ariaLabel="Collecte automatique planifiée à 05h00, heure de Paris" description="Les prévisions et les stations disponibles sont archivées chaque jour à 05h00, heure de Paris. Cette heure ne garantit pas qu’une source externe réponde instantanément." />
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-700/80 bg-[#0b0f16]/75 px-2.5 py-1 text-[10px] font-medium text-slate-400" aria-label="Collecte automatique quotidienne à 05h00, heure de Paris">
+            <Clock3 className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+            Auto · 05h00 Paris
+          </span>
         </header>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
