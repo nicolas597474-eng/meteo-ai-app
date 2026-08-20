@@ -3,19 +3,19 @@ import { readFileSync } from "node:fs";
 import { MAIN_PAGE_PATHS, getSwipeNavigationTarget, isQualifiedPageSwipe, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 
 describe("navigation entre pages par glissement", () => {
-  it("ordonne les cinq pages principales", () => {
-    expect(MAIN_PAGE_PATHS).toEqual(["/", "/laboratoire", "/ranking", "/history", "/ai-lab"]);
+  it("ordonne les six pages principales", () => {
+    expect(MAIN_PAGE_PATHS).toEqual(["/", "/details", "/laboratoire", "/ranking", "/history", "/ai-lab"]);
   });
 
   it("navigue dans les deux sens sans dépasser les extrémités", () => {
-    expect(getSwipeNavigationTarget("/", -120)).toBe("/laboratoire");
-    expect(getSwipeNavigationTarget("/laboratoire", 120)).toBe("/");
+    expect(getSwipeNavigationTarget("/", -120)).toBe("/details");
+    expect(getSwipeNavigationTarget("/details", 120)).toBe("/");
     expect(getSwipeNavigationTarget("/ai-lab", -120)).toBeNull();
     expect(getSwipeNavigationTarget("/", 120)).toBeNull();
   });
 
   it("ignore les routes secondaires", () => {
-    expect(getSwipeNavigationTarget("/details", -120)).toBeNull();
+    expect(getSwipeNavigationTarget("/report", -120)).toBeNull();
   });
 
   it("ne qualifie que les gestes rapides, horizontaux et suffisamment amples", () => {
@@ -48,6 +48,7 @@ describe("navigation entre pages par glissement", () => {
     expect(appSource).toContain("function useMainPagePreload");
     expect(appSource).toContain("window.setTimeout(preload, 250)");
     expect(appSource).toContain("loadWeatherAILab()");
+    expect(appSource).toContain("loadWeatherDetails()");
     expect(appSource).toContain("setTransition(null), 170");
     expect(styles).toContain("150ms cubic-bezier(0.23, 1, 0.32, 1)");
   });

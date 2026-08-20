@@ -9,6 +9,7 @@ describe("navigation MeteoAI", () => {
     expect(source).toContain('aria-label="Navigation principale"');
     expect(source).toContain('bg-[#0d1117]');
     expect(source).toContain("pb-[calc(4rem+env(safe-area-inset-bottom))]");
+    expect(source).toContain('{ path: "/details", label: "Prévisions", icon: FileText }');
     expect(source).not.toContain("backdrop-blur-xl");
   });
 

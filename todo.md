@@ -2605,3 +2605,8 @@
 - [x] Retirer l’illustration et le texte d’aide débutant de la simulation.
 - [x] Retirer uniquement la rubrique « Débuter dans l’AI Lab » du lexique.
 - [x] Vérifier TypeScript et Vitest sans modifier les autres définitions du lexique.
+
+## Navigation — Prévisions détaillées
+- [x] Ajouter Prévisions détaillées entre Dashboard et Fiabilité dans la navigation principale.
+- [x] Préserver la route et le contenu existants de la page détaillée.
+- [x] Vérifier l’ordre mobile, TypeScript et Vitest avant publication.

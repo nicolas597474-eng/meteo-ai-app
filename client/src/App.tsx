@@ -19,19 +19,21 @@ import {
 const loadRanking = () => import("./pages/Ranking");
 const loadHistory = () => import("./pages/History");
 const loadWeatherAILab = () => import("./pages/WeatherAILab");
+const loadWeatherDetails = () => import("./pages/WeatherDetails");
 const loadReliabilityLaboratory = () => import("./pages/ReliabilityLaboratory");
 const Ranking = lazy(loadRanking);
 const History = lazy(loadHistory);
 const Report = lazy(() => import("./pages/Report"));
 const WeatherAILab = lazy(loadWeatherAILab);
 const FavoriteSettings = lazy(() => import("./pages/FavoriteSettings"));
-const WeatherDetails = lazy(() => import("./pages/WeatherDetails"));
+const WeatherDetails = lazy(loadWeatherDetails);
 const WeightComparison = lazy(() => import("./pages/WeightComparison"));
 const ReliabilityLaboratory = lazy(loadReliabilityLaboratory);
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/details", label: "Prévisions", icon: FileText },
   { path: "/laboratoire", label: "Fiabilité", icon: ChartNoAxesCombined },
   { path: "/ranking", label: "Stations", icon: Trophy },
   { path: "/history", label: "Historique", icon: Calendar },
@@ -53,6 +55,7 @@ function useMainPagePreload() {
         loadRanking(),
         loadHistory(),
         loadWeatherAILab(),
+        loadWeatherDetails(),
       ]).catch(() => undefined);
     };
 
