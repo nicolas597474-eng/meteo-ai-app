@@ -13,6 +13,8 @@ describe("page Fiabilité", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Comprendre le statut capteur en validation");
     expect(source).toContain("il n’influence pas la température locale tant qu’un gain de précision n’est pas démontré");
+    expect(source).toContain("PopoverContent");
+    expect(source).toContain("collisionPadding={12}");
   });
 
   it("distingue explicitement les références de modèles des stations locales", () => {

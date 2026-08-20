@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { CircleHelp } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export type WeatherStatusBadgeTone = "info" | "success" | "warning" | "lab" | "neutral" | "danger";
 
@@ -96,5 +96,5 @@ export function WeatherStatusBadge({
 
   if (!description) return badgeContent;
 
-  return <Tooltip><TooltipTrigger asChild><button type="button" className="max-w-full cursor-help rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">{badgeContent}</button></TooltipTrigger><TooltipContent side="top" sideOffset={8} className="max-w-64 border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100">{description}</TooltipContent></Tooltip>;
+  return <Popover><PopoverTrigger asChild><button type="button" className="max-w-full cursor-pointer rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300" aria-label={`${accessibleLabel}. Ouvrir l’aide`}>{badgeContent}</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100 shadow-xl">{description}</PopoverContent></Popover>;
 }

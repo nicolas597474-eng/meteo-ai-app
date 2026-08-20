@@ -2550,3 +2550,8 @@
 ## Page Stations — bandeau de collecte discret
 - [x] Simplifier visuellement le bandeau « Collecte 05h00 Paris » sans supprimer l’information d’automatisation.
 - [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.
+
+## Aides contextuelles — affichage et cohérence
+- [x] Corriger l’ouverture de l’aide « Confiance synthèse » sans découpe ni invisibilité sur mobile.
+- [x] Auditer les autres déclencheurs d’aide et harmoniser leur comportement entre les pages.
+- [x] Vérifier les interactions mobiles, TypeScript et Vitest avant publication.
