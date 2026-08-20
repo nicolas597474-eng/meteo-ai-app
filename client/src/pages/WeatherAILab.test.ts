@@ -64,6 +64,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Photo du calcul");
     expect(source).toContain("snapshotDateTimeLabel");
     expect(source).toContain("Toutes les heures sont affichées en heure de Paris");
+    expect(source).not.toContain(">Actualiser</button>");
+    expect(source).toContain('"Relancer"');
   });
 
   it("propose une relance manuelle pour le lieu favori avec ses états explicites", () => {

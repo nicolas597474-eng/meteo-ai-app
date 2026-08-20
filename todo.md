@@ -2596,3 +2596,7 @@
 - [x] Ajouter une illustration simple de la photo du calcul à partir des données réellement présentes.
 - [x] Rendre visibles la date, l’heure et le fuseau du snapshot dans la simulation.
 - [x] Ajouter un parcours débutant dans le lexique et vérifier TypeScript, Vitest et le rendu mobile.
+
+## AI Lab — en-tête simplifié
+- [x] Retirer uniquement le bouton « Actualiser » de l’en-tête.
+- [x] Conserver le bouton « Relancer » et valider TypeScript et Vitest avant publication.
