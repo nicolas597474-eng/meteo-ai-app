@@ -188,9 +188,26 @@ describe("calculateReliabilityScore — dimensions", () => {
 
   it("handles empty arrays gracefully", () => {
     const result = calculateReliabilityScore([], []);
-    expect(typeof result.weightedScore).toBe("number");
+    expect(result.weightedScore).toBeNull();
     expect(result.dimensions.temperature.sampleSize).toBe(0);
     expect(result.dimensions.precipitation.sampleSize).toBe(0);
+    expect(result.dimensions.temperature.score).toBeNull();
+    expect(result.dimensions.precipitation.score).toBeNull();
+    expect(result.dimensions.wind.score).toBeNull();
+    expect(result.dimensions.condition.score).toBeNull();
+  });
+
+  it("renormalise uniquement les dimensions réellement observées", () => {
+    const result = calculateReliabilityScore(
+      [{ tempMax: 22, tempMin: 12, precipitation: null, windSpeed: null, condition: null }],
+      [{ tempMax: 22, tempMin: 12, precipitation: null, windSpeed: null, condition: null }],
+    );
+
+    expect(result.dimensions.temperature.score).toBe(100);
+    expect(result.dimensions.precipitation.score).toBeNull();
+    expect(result.dimensions.wind.score).toBeNull();
+    expect(result.dimensions.condition.score).toBeNull();
+    expect(result.weightedScore).toBe(100);
   });
 
   it("calcule un score normalisé complet de 100 lorsque les six variables sont exactes", () => {

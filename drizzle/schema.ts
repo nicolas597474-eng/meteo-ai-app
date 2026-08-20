@@ -99,7 +99,9 @@ export const observations = mysqlTable("observations", {
   isQualified: int("isQualified").notNull().default(0),
   rawData: json("rawData"),
   collectedAt: timestamp("collectedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("observations_location_date_provenance_unique").on(table.locationKey, table.date, table.provenanceType),
+]);
 
 export type Observation = typeof observations.$inferSelect;
 export type InsertObservation = typeof observations.$inferInsert;
@@ -155,7 +157,9 @@ export const reliabilityScores = mysqlTable("reliability_scores", {
   pressureBias: float("pressureBias"),
   evidenceType: mysqlEnum("evidenceType", ["physical_observation", "model_reference", "legacy_unqualified"]).notNull().default("legacy_unqualified"),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("reliability_scores_location_date_service_evidence_unique").on(table.locationKey, table.date, table.serviceName, table.evidenceType),
+]);
 
 export type ReliabilityScore = typeof reliabilityScores.$inferSelect;
 export type InsertReliabilityScore = typeof reliabilityScores.$inferInsert;
@@ -179,7 +183,9 @@ export const meteoaiForecast = mysqlTable("meteoai_forecast", {
   weights: json("weights"), // { serviceName: weight% }
   explanation: text("explanation"), // AI-generated explanation
   computedAt: timestamp("computedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("meteoai_forecast_location_date_unique").on(table.locationKey, table.date),
+]);
 
 export type MeteoAIForecast = typeof meteoaiForecast.$inferSelect;
 export type InsertMeteoAIForecast = typeof meteoaiForecast.$inferInsert;

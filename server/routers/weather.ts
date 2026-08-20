@@ -486,15 +486,15 @@ export const weatherRouter = router({
       // Compute live dimension scores per service for this date
       let dimensionScores: Array<{
         serviceName: string;
-        weightedScore: number;
+        weightedScore: number | null;
         regime: string;
         regimeEmoji: string;
         regimeLabel: string;
         dimensions: {
-          temperature: { mae: number; bias: number; maxError: number; score: number };
-          precipitation: { pod: number; far: number; csi: number; falsePositives: number; falseNegatives: number; maeQuantity: number; score: number };
-          wind: { maeMean: number; maeGusts: number; biasMean: number; score: number };
-          condition: { concordance: number; maeCloudCover: number; score: number };
+          temperature: { mae: number; bias: number; maxError: number; score: number | null };
+          precipitation: { pod: number; far: number; csi: number; falsePositives: number; falseNegatives: number; maeQuantity: number; score: number | null };
+          wind: { maeMean: number; maeGusts: number; biasMean: number; score: number | null };
+          condition: { concordance: number; maeCloudCover: number; score: number | null };
         };
         weights: { temp: number; precip: number; wind: number; condition: number };
       }> = [];

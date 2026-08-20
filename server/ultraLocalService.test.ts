@@ -44,4 +44,26 @@ describe("calculateUltraLocal", () => {
     expect(fresh?.weight).toBeGreaterThan(older?.weight ?? 1);
     expect(result.temperature).toBeGreaterThan(18);
   });
+
+  it("applique le poids de chaque contribution à la même station pour l’humidité", () => {
+    const result = calculateUltraLocal([
+      station({ stationId: "far", name: "Lointaine", distanceKm: 4, humidity: 90, temperature: 20 }),
+      station({ stationId: "near", name: "Proche", distanceKm: 1, humidity: 20, temperature: 20 }),
+    ], "ultra-local", 50.75, 2.52, 40, null);
+
+    expect(result.humidity).not.toBeNull();
+    expect(result.humidity!).toBeLessThan(50);
+    expect(result.confidenceByParameter.humidity).not.toBeNull();
+    expect(result.confidenceByParameter.temperature).toBe(result.confidenceScore);
+  });
+
+  it("signale une confiance indisponible pour une variable absente de toutes les stations", () => {
+    const result = calculateUltraLocal([
+      station({ stationId: "one", windGust: null }),
+      station({ stationId: "two", distanceKm: 3, windGust: null }),
+    ], "local", 50.75, 2.52, 40, null);
+
+    expect(result.windGust).toBeNull();
+    expect(result.confidenceByParameter.windGust).toBeNull();
+  });
 });

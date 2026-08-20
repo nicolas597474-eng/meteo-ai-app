@@ -57,6 +57,12 @@ function toTraceSources(result: FusionResult): ForecastTraceSource[] {
   }));
 }
 
+function reliabilityFromMetricMae(metric: "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "cloudCover", mae: number | undefined): number {
+  if (mae == null || !Number.isFinite(mae)) return 50;
+  const expectedError = metric === "precipitation" ? 15 : metric === "windSpeed" ? 25 : metric === "cloudCover" ? 40 : 10;
+  return Math.max(0, Math.min(100, 100 * Math.exp((-3 * mae) / expectedError)));
+}
+
 /**
  * Fusion quotidienne officielle de MeteoAI.
  * Chaque paramètre utilise son MAE historique dédié et les mêmes règles, quel
@@ -97,7 +103,9 @@ export function computeOfficialDailyForecast(
         windGust: forecast.windGust ?? null,
         cloudCover: forecast.cloudCover ?? null,
         updatedAt: now,
-        reliabilityScore: performance.weightedScore ?? 50,
+        // Sans MAE pour le paramètre, 50 est un poids neutre égalitaire entre
+        // sources disponibles ; il n’est jamais présenté comme une performance.
+        reliabilityScore: reliabilityFromMetricMae(metric, metricMae),
         maeTemp: metricMae,
         type: "model" as const,
       };
