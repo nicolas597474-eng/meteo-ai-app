@@ -2625,3 +2625,8 @@
 - [x] Utiliser le style circulaire de la page principale pour tous les boutons de remontée.
 - [x] Préserver le placement, l’accessibilité et le comportement de défilement.
 - [x] Vérifier les rendus mobile et ordinateur, TypeScript et Vitest avant publication.
+
+## Interface — boutons de remontée strictement circulaires
+- [x] Forcer une largeur et une hauteur identiques, avec un cercle réel pour chaque bouton.
+- [x] Vérifier qu’aucune page ne conserve un bouton rectangulaire ou carré arrondi.
+- [x] Valider mobile, TypeScript et Vitest avant publication.

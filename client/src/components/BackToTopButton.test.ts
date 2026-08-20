@@ -7,5 +7,8 @@ describe("BackToTopButton", () => {
     expect(source).toContain("window.scrollY > 360");
     expect(source).toContain('behavior: "smooth"');
     expect(source).toContain('aria-label="Retourner au début de la page"');
+    expect(source).toContain("!h-11 !w-11");
+    expect(source).toContain("aspect-square");
+    expect(source).toContain("!rounded-full");
   });
 });

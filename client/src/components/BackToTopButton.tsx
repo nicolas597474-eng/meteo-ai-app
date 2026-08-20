@@ -18,7 +18,7 @@ export function BackToTopButton() {
     <button
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-3 z-40 grid h-10 w-10 place-items-center rounded-full border border-blue-400/45 bg-slate-950 text-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:bottom-6 sm:right-6"
+      className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-3 z-40 grid !h-11 !w-11 !min-h-11 !min-w-11 !max-h-11 !max-w-11 aspect-square place-items-center !rounded-full border border-blue-400/45 bg-slate-950 text-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:bottom-6 sm:right-6"
       aria-label="Retourner au début de la page"
       title="Retourner au début"
     >
