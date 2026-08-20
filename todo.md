@@ -2600,3 +2600,8 @@
 ## AI Lab — en-tête simplifié
 - [x] Retirer uniquement le bouton « Actualiser » de l’en-tête.
 - [x] Conserver le bouton « Relancer » et valider TypeScript et Vitest avant publication.
+
+## AI Lab — retrait de l’aide débutant
+- [x] Retirer l’illustration et le texte d’aide débutant de la simulation.
+- [x] Retirer uniquement la rubrique « Débuter dans l’AI Lab » du lexique.
+- [x] Vérifier TypeScript et Vitest sans modifier les autres définitions du lexique.
