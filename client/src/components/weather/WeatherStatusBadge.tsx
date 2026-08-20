@@ -62,6 +62,8 @@ const toneClasses: Record<WeatherStatusBadgeTone, { surface: string; icon: strin
   },
 };
 
+const HELP_POPOVER_TITLE = "À propos de cet indicateur";
+
 export function WeatherStatusBadge({
   label,
   value,
@@ -96,5 +98,5 @@ export function WeatherStatusBadge({
 
   if (!description) return badgeContent;
 
-  return <Popover><PopoverTrigger asChild><button type="button" className="max-w-full cursor-pointer rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300" aria-label={`${accessibleLabel}. Ouvrir l’aide`}>{badgeContent}</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] border border-slate-600 bg-[#101622] px-3 py-2 text-[11px] leading-relaxed text-slate-100 shadow-xl">{description}</PopoverContent></Popover>;
+  return <Popover><PopoverTrigger asChild><button type="button" className="max-w-full cursor-pointer rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300" aria-label={`${accessibleLabel}. Ouvrir l’aide`}>{badgeContent}</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-slate-600 bg-[#101622] px-3 py-3 text-[11px] leading-relaxed text-slate-100 shadow-xl"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/75">{HELP_POPOVER_TITLE}</p><p className="mt-1.5 text-slate-200">{description}</p></PopoverContent></Popover>;
 }

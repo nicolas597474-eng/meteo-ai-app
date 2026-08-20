@@ -12,9 +12,10 @@ describe("page Fiabilité", () => {
   it("explique le statut des capteurs citoyens en validation", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Comprendre le statut capteur en validation");
-    expect(source).toContain("il n’influence pas la température locale tant qu’un gain de précision n’est pas démontré");
+    expect(source).toContain("Il reste hors de la température locale tant qu’un gain de fiabilité n’est pas mesuré.");
     expect(source).toContain("PopoverContent");
     expect(source).toContain("collisionPadding={12}");
+    expect(source).toContain("À propos de ce statut");
   });
 
   it("distingue explicitement les références de modèles des stations locales", () => {

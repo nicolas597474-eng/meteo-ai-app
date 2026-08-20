@@ -123,6 +123,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DialogTrigger");
     expect(source).toContain("Voir les détails");
     expect(source).toContain("Détails de l’indice et des polluants");
+    expect(source).toContain("À propos</span>{description}");
+    expect(source).toContain("uppercase tracking-[0.12em] text-sky-200/75");
     expect(apparentSunMoonSource).toContain("Positions apparentes réelles et actualisées localement pour le lieu actif.");
   });
 

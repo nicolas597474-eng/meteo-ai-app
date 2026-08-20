@@ -2555,3 +2555,8 @@
 - [x] Corriger l’ouverture de l’aide « Confiance synthèse » sans découpe ni invisibilité sur mobile.
 - [x] Auditer les autres déclencheurs d’aide et harmoniser leur comportement entre les pages.
 - [x] Vérifier les interactions mobiles, TypeScript et Vitest avant publication.
+
+## Aides contextuelles — langage et style communs
+- [x] Recenser les textes d’aide et définir une structure commune, concise et factuelle.
+- [x] Uniformiser la mise en forme des panneaux d’aide et les textes existants sans inventer de données.
+- [x] Vérifier les aides sur mobile, TypeScript et Vitest avant publication.

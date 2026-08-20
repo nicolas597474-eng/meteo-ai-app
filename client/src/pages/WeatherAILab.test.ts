@@ -27,6 +27,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Google Maps JavaScript API");
     expect(source).toContain("Astronomy Engine");
     expect(source).toContain("Visibilité d’éclipse");
+    expect(source).toContain("Ces modèles sont archivés pour une validation historique");
+    expect(source).toContain("gain de fiabilité n’est pas mesuré");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {
