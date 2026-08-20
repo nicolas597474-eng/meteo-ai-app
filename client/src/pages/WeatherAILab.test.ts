@@ -35,6 +35,13 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("poids final strictement positif");
     expect(source).toContain("PopoverClose");
     expect(source).toContain("h-6 w-6");
+    expect(source).toContain("Simulation de la fusion");
+    expect(source).toContain("Snapshot retenu");
+    expect(source).toContain("Collecte des modèles");
+    expect(source).toContain("Pondération finale");
+    expect(source).toContain("Résultat officiel");
+    expect(source).toContain("Résultat final · contexte des stations locales");
+    expect(source).toContain("Aucune station physique locale active");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {
@@ -42,6 +49,7 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("snapshotStatus");
     expect(source).toContain("Dernière fusion archivée");
     expect(source).toContain("Elle ne pilote pas la prévision actuelle");
+    expect(source).toContain("La simulation lit une fusion conservée pour transparence");
   });
 
   it("propose une relance manuelle pour le lieu favori avec ses états explicites", () => {

@@ -2570,3 +2570,9 @@
 - [x] Réduire visuellement les déclencheurs d’aide sans diminuer leur accessibilité tactile.
 - [x] Ajouter une croix de fermeture explicite à tous les panneaux d’aide contextuels.
 - [x] Vérifier les interactions mobiles, TypeScript et Vitest avant publication.
+
+## AI Lab — simulation de fusion et stations locales
+- [x] Construire une frise pas-à-pas à partir des traces réelles : collecte, disponibilité, régime, poids, accord, confiance et résultat officiel.
+- [x] Expliquer les données absentes sans les remplacer et distinguer clairement les snapshots archivés, courants et directs.
+- [x] Ajouter une section de résultat final distincte pour les stations locales, leur fraîcheur, distance, cohérence et statut de contribution.
+- [x] Vérifier le parcours mobile, TypeScript et Vitest avant publication.

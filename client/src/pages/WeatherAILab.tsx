@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { Link } from "wouter";
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, CircleHelp, ClipboardCheck, Database, FlaskConical, MapPin, RefreshCw, ShieldCheck, X, Zap } from "lucide-react";
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDashed, CircleHelp, ClipboardCheck, Database, FlaskConical, ListTree, MapPinned, MapPin, RefreshCw, ShieldCheck, SlidersHorizontal, X, Zap } from "lucide-react";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { getValidationModelSource } from "@/lib/validationModelSource";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
@@ -15,6 +15,38 @@ function IndicatorHelp({ title, children }: { title: string; children: ReactNode
 
 function HelpDetail({ label, children }: { label: string; children: ReactNode }) {
   return <p><span className="font-semibold text-sky-100">{label} · </span>{children}</p>;
+}
+
+type SimulationStep = {
+  id: string;
+  title: string;
+  summary: string;
+  detail: ReactNode;
+  status: "complete" | "partial" | "waiting";
+};
+
+function SimulationStatusIcon({ status }: { status: SimulationStep["status"] }) {
+  if (status === "complete") return <CircleCheck className="h-4 w-4 text-emerald-300" />;
+  if (status === "partial") return <CircleAlert className="h-4 w-4 text-amber-300" />;
+  return <CircleDashed className="h-4 w-4 text-slate-500" />;
+}
+
+function FusionSimulation({ steps, snapshotLabel }: { steps: SimulationStep[]; snapshotLabel: string }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const current = steps[Math.min(activeStep, Math.max(steps.length - 1, 0))];
+  if (!current) return null;
+  const goTo = (index: number) => setActiveStep(Math.max(0, Math.min(steps.length - 1, index)));
+  return <section className="rounded-2xl border border-sky-400/25 bg-[linear-gradient(135deg,rgba(14,116,144,0.10),rgba(13,19,29,0.98)_42%)] p-4" aria-labelledby="fusion-simulation-title"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-2"><ListTree className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" /><div><h2 id="fusion-simulation-title" className="text-sm font-semibold text-slate-100">Simulation de la fusion</h2><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Parcours de la trace réellement disponible : chaque étape décrit le snapshot, sans rejouer ni inventer de données.</p></div></div><span className="shrink-0 rounded-full border border-sky-300/20 bg-sky-400/10 px-2 py-1 text-[9px] font-semibold text-sky-100">{snapshotLabel}</span></div><div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="Étapes de la simulation">{steps.map((step, index) => <button key={step.id} type="button" onClick={() => goTo(index)} aria-current={index === activeStep ? "step" : undefined} className={`min-w-[78px] flex-1 rounded-xl border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${index === activeStep ? "border-sky-300/55 bg-sky-400/15" : "border-slate-700 bg-slate-950/30"}`}><span className="flex items-center justify-between gap-1"><span className="text-[10px] font-semibold text-slate-200">{index + 1}</span><SimulationStatusIcon status={step.status} /></span><span className="mt-1 block text-[9px] leading-tight text-slate-400">{step.title}</span></button>)}</div><article className="mt-3 rounded-xl border border-slate-700/80 bg-[#080d14]/80 p-3" aria-live="polite"><div className="flex items-start gap-2"><SimulationStatusIcon status={current.status} /><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/75">Étape {activeStep + 1} sur {steps.length}</p><h3 className="mt-1 text-sm font-semibold text-slate-100">{current.title}</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{current.summary}</p></div></div><div className="mt-3 border-t border-slate-700/70 pt-3 text-[11px] leading-relaxed text-slate-400">{current.detail}</div></article><div className="mt-3 flex items-center justify-between gap-2"><button type="button" onClick={() => goTo(activeStep - 1)} disabled={activeStep === 0} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-700 px-2.5 text-[11px] font-medium text-slate-300 disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />Précédent</button><span className="text-[10px] text-slate-500">Utilisez les étapes ou les flèches</span><button type="button" onClick={() => goTo(activeStep + 1)} disabled={activeStep === steps.length - 1} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-sky-400/35 bg-sky-400/10 px-2.5 text-[11px] font-semibold text-sky-100 disabled:opacity-40">Suivant<ChevronRight className="h-3.5 w-3.5" /></button></div></section>;
+}
+
+function stationFreshnessLabel(updatedAt: Date | string | null | undefined) {
+  if (!updatedAt) return "Heure de mise à jour indisponible";
+  const date = new Date(updatedAt);
+  if (!Number.isFinite(date.getTime())) return "Heure de mise à jour indisponible";
+  const elapsedMinutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60_000));
+  if (elapsedMinutes < 2) return "Mise à jour il y a moins de 2 min";
+  if (elapsedMinutes < 60) return `Mise à jour il y a ${elapsedMinutes} min`;
+  return `Mise à jour à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}`;
 }
 
 function Stat({ label, value, tone = "text-slate-100", help }: { label: string; value: string; tone?: string; help?: ReactNode }) {
@@ -146,6 +178,8 @@ export default function WeatherAILab() {
   const { style: pageSkyStyle } = usePageWeatherSky();
   const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: true });
+  const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
+  const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 60_000, refetchOnWindowFocus: true });
   const refreshFusion = trpc.weather.refreshManualFusion.useMutation({
     onSuccess: async () => { await refetch(); },
   });
@@ -180,6 +214,70 @@ export default function WeatherAILab() {
     100 - data.divergence.precipRange * 15,
     100 - data.divergence.windRange * 3,
   )));
+  const snapshotLabel = isArchivedSnapshot ? "Snapshot archivé" : isLiveSnapshot ? "Calcul direct" : hasSnapshot ? "Snapshot officiel" : "Snapshot indisponible";
+  const verifiedModels = Array.from(new Set([...(collection?.dailyCollectedModels ?? []), ...(collection?.hourlyCollectedModels ?? [])]));
+  const missingModels = Array.from(new Set([...(collection?.dailyMissingModels ?? []), ...(collection?.hourlyMissingModels ?? [])]));
+  const physicalStations = (stationData?.stations ?? []).filter((station) => station.sourceKind === "physical");
+  const activePhysicalStations = physicalStations.filter((station) => station.isActive);
+  const stationContext = stationData?.groundTruth ?? null;
+  const simulationSteps: SimulationStep[] = [
+    {
+      id: "snapshot",
+      title: "Snapshot retenu",
+      summary: hasSnapshot ? `${snapshotLabel} du ${snapshotDateLabel ?? "jour disponible"}${updatedAt ? ` à ${updatedAt}` : ""}.` : "Aucun snapshot de fusion n’est disponible pour ce lieu.",
+      detail: <p>{isArchivedSnapshot ? "La simulation lit une fusion conservée pour transparence ; elle ne prétend pas piloter la prévision actuelle." : isLiveSnapshot ? "La simulation utilise un calcul consultable pour cette position. Il n’est pas présenté comme une collecte planifiée archivée." : hasSnapshot ? "La simulation lit la même trace que la prévision officielle affichée sur cette page." : "Sans snapshot, aucune étape de pondération ou de résultat n’est reconstituée."}</p>,
+      status: hasSnapshot ? "complete" : "waiting",
+    },
+    {
+      id: "collection",
+      title: "Collecte des modèles",
+      summary: collection ? `${collection.dailyModelCount} modèle(s) quotidien(s) et ${collection.hourlyModelCount} horaire(s) réellement reçus lors du dernier bilan.` : "Aucun bilan de collecte vérifiable n’est disponible pour ce lieu.",
+      detail: <div className="space-y-1"><p><span className="font-semibold text-sky-100">Reçus · </span>{verifiedModels.length ? verifiedModels.join(" · ") : "Aucun modèle vérifié dans le bilan disponible."}</p>{missingModels.length ? <p className="text-amber-200"><span className="font-semibold">Indisponibles · </span>{missingModels.join(" · ")}</p> : collection ? <p className="text-emerald-200">Aucun modèle manquant n’est signalé dans ce bilan.</p> : null}</div>,
+      status: collection ? missingModels.length ? "partial" : "complete" : "waiting",
+    },
+    {
+      id: "contributors",
+      title: "Données exploitables",
+      summary: hasTrace ? `${data.modelsUsed} modèle(s) possèdent un poids final positif dans la trace.` : "Aucun contributeur n’est affiché sans trace de poids final.",
+      detail: contributors.length ? <div className="space-y-1">{contributors.map((model) => <p key={model.name}><span className="font-semibold text-violet-200">{model.name}</span> · poids moyen {Math.round(model.averageWeight * 100)} %.</p>)}</div> : <p>Les modèles reçus ne sont pas automatiquement considérés comme appliqués : une trace de contribution est requise.</p>,
+      status: hasTrace ? "complete" : "waiting",
+    },
+    {
+      id: "regime",
+      title: "Régime détecté",
+      summary: `${data.regimeLabel} ${data.regimeEmoji} : ${data.regimeDescription}`,
+      detail: <p>Ce régime rend visibles les priorités du scénario : température {Math.round(data.weights.temp * 100)} %, précipitations {Math.round(data.weights.precip * 100)} %, vent {Math.round(data.weights.wind * 100)} % et conditions {Math.round(data.weights.condition * 100)} %.</p>,
+      status: hasSnapshot ? "complete" : "partial",
+    },
+    {
+      id: "weights",
+      title: "Pondération finale",
+      summary: fusionParameters.some((parameter) => parameter.sources.length > 0) ? "Les poids sont lus séparément pour chaque paramètre disponible." : "Aucune pondération détaillée n’est disponible pour ce snapshot.",
+      detail: fusionParameters.some((parameter) => parameter.sources.length > 0) ? <div className="space-y-1">{fusionParameters.filter((parameter) => parameter.sources.length > 0).map((parameter) => <p key={parameter.key}><span className={`font-semibold ${parameter.tone}`}>{parameter.label}</span> · {parameter.sources.map((source) => `${source.name} ${Math.round(source.finalWeight * 100)} %`).join(" · ")}</p>)}</div> : <p>La page ne déduit pas de poids décoratif lorsqu’une trace détaillée est absente.</p>,
+      status: fusionParameters.some((parameter) => parameter.sources.length > 0) ? "complete" : "waiting",
+    },
+    {
+      id: "agreement",
+      title: "Accord des modèles",
+      summary: hasTrace && data.modelsUsed > 1 ? `Accord lisible ${agreementScore}/100, limité par le paramètre le plus dispersé.` : "L’accord inter-modèles nécessite plusieurs contributeurs réellement tracés.",
+      detail: <p>Écarts constatés entre contributeurs : {data.divergence.tempRange} °C en température, {data.divergence.precipRange} mm en précipitations et {data.divergence.windRange} km/h en vent.</p>,
+      status: hasTrace && data.modelsUsed > 1 ? "complete" : "partial",
+    },
+    {
+      id: "confidence",
+      title: "Confiance et stabilité",
+      summary: hasSnapshot ? `Confiance ${Math.round(data.confidenceScore)}/100 · stabilité ${Math.round(data.stabilityScore)}/100.` : "Aucun score n’est présenté sans snapshot de fusion.",
+      detail: <p>La confiance combine l’accord, la performance historique qualifiée lorsqu’elle existe, la cohérence des stations physiques lorsqu’elle existe et l’échéance. La stabilité mesure la dispersion des températures et précipitations entre contributeurs.</p>,
+      status: hasSnapshot ? "complete" : "waiting",
+    },
+    {
+      id: "official-result",
+      title: "Résultat officiel",
+      summary: hasSnapshot ? `Prévision fusionnée : ${data.officialForecast.tempMax ?? "—"}° max · ${data.officialForecast.tempMin ?? "—"}° min · ${data.officialForecast.precipitation ?? "—"} mm.` : "Aucun résultat officiel n’est disponible pour ce snapshot.",
+      detail: <p>Ce résultat est une prévision fusionnée. Les stations locales présentées ensuite restent des observations de contexte distinctes.</p>,
+      status: hasSnapshot ? "complete" : "waiting",
+    },
+  ];
 
   return <main className="weather-page-sky min-h-screen mx-auto max-w-2xl space-y-3 px-3 py-3 pb-24 sm:px-6 sm:py-6" style={pageSkyStyle}>
     <header className="flex items-center justify-between gap-2">
@@ -193,11 +291,15 @@ export default function WeatherAILab() {
 
     <AILabGlossary />
 
+    <FusionSimulation steps={simulationSteps} snapshotLabel={snapshotLabel} />
+
     <section className="grid grid-cols-3 gap-2"><Stat label="Confiance prévision" value={hasSnapshot ? `${Math.round(data.confidenceScore)}%` : "—"} tone={hasSnapshot ? confidenceTone : "text-slate-500"} help={<IndicatorHelp title="Confiance prévision"><p>Valeur affichée : <strong>{hasSnapshot ? `${Math.round(data.confidenceScore)}/100` : "indisponible"}</strong>.</p><HelpDetail label="Formule">40 % accord des modèles, 30 % performance historique qualifiée si disponible, 20 % cohérence de stations physiques si disponible et 10 % échéance.</HelpDetail><HelpDetail label="Accord observé">Écarts du snapshot : {data.divergence.tempRange} °C en température, {data.divergence.precipRange} mm en pluie et {data.divergence.windRange} km/h en vent ; le score d’accord le plus contraignant lisible ici est {agreementScore}/100.</HelpDetail><HelpDetail label="Échéance">Le calcul de ce snapshot utilise la tranche 6–24 h, notée 85/100.</HelpDetail><p className="border-t border-slate-700/80 pt-2 text-slate-400">Lorsque seules certaines preuves existent, les poids disponibles sont renormalisés. L’absence de preuve historique ou physique peut plafonner le score afin de ne pas simuler une précision non mesurée.</p></IndicatorHelp>} /><Stat label="Stabilité modèles" value={hasSnapshot ? `${Math.round(data.stabilityScore)}%` : "—"} tone={hasSnapshot ? "text-sky-300" : "text-slate-500"} help={<IndicatorHelp title="Stabilité modèles"><p>Valeur affichée : <strong>{hasSnapshot ? `${Math.round(data.stabilityScore)}/100` : "indisponible"}</strong>.</p><HelpDetail label="Formule">60 % de stabilité des températures maximales et 40 % de stabilité des précipitations. Chaque partie diminue lorsque la dispersion entre modèles augmente.</HelpDetail><HelpDetail label="Pourquoi ce résultat">Dans ce snapshot, l’écart entre contributeurs est de {data.divergence.tempRange} °C pour la température et de {data.divergence.precipRange} mm pour la pluie.</HelpDetail><p className="border-t border-slate-700/80 pt-2 text-slate-400">Cet indice mesure l’accord interne des modèles, pas la certitude que la météo sera calme ou exacte.</p></IndicatorHelp>} /><Stat label="Modèles appliqués" value={hasTrace ? String(data.modelsUsed) : "—"} tone={hasTrace ? "text-violet-300" : "text-slate-500"} help={<IndicatorHelp title="Modèles appliqués"><p>Valeur affichée : <strong>{hasTrace ? `${data.modelsUsed} contributeur${data.modelsUsed > 1 ? "s" : ""}` : "trace indisponible"}</strong>.</p><HelpDetail label="Règle">Le compteur retient uniquement les modèles ayant un poids final strictement positif pour la température, la pluie ou le vent dans la trace de fusion.</HelpDetail>{contributors.length > 0 ? <div className="border-t border-slate-700/80 pt-2"><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-200/80">Contributeurs de ce snapshot</p>{contributors.map((model) => <p key={model.name} className="flex justify-between gap-3"><span className="truncate">{model.name}</span><span className="shrink-0 text-violet-200">poids moyen {Math.round(model.averageWeight * 100)} %</span></p>)}</div> : <p className="border-t border-slate-700/80 pt-2 text-slate-400">Aucun modèle n’est présenté sans trace de poids réellement appliquée.</p>}<p className="text-slate-400">Un modèle candidat ou seulement archivé ne compte pas tant qu’il ne contribue pas à la fusion.</p></IndicatorHelp>} /></section>
 
     <section className="rounded-2xl border border-sky-400/25 bg-gradient-to-br from-sky-500/[0.08] via-[#0d131d] to-[#0d131d] p-4"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" /><div><h2 className="text-sm font-semibold text-slate-100">{isArchivedSnapshot ? "Dernière fusion archivée" : isLiveSnapshot ? "Fusion live de la position" : "Fusion officielle actuelle"}</h2><p className="mt-1 text-xs leading-relaxed text-slate-400">{isArchivedSnapshot ? `La fusion du ${snapshotDateLabel ?? "dernier jour disponible"} est affichée pour transparence. Elle ne pilote pas la prévision actuelle tant que la collecte du jour n’a pas produit de snapshot.` : isLiveSnapshot ? "Cette position ne correspond pas exactement à un lieu collecté à 05h00. Les modèles sont donc relevés maintenant et la confiance reste plafonnée tant qu’aucune preuve historique locale qualifiée n’est disponible." : hasTrace ? "Cette section explique les mêmes pondérations que celles utilisées pour la prévision officielle actuelle." : "Aucune trace de pondération n’est disponible pour ce snapshot. Aucun modèle n’est présenté comme dominant."}</p></div></div>
       {hasTrace && <><div className="mt-3 grid grid-cols-3 gap-1.5 text-center"><div className="rounded-xl border border-slate-700 bg-black/20 px-2 py-2"><p className="text-[10px] uppercase tracking-wide text-slate-500">Modèle principal</p><p className="mt-0.5 text-sm font-bold text-sky-200">{data.modelIndicator?.primaryModel ?? "—"}</p></div><div className="rounded-xl border border-slate-700 bg-black/20 px-2 py-2"><p className="text-[10px] uppercase tracking-wide text-slate-500">Poids appliqué</p><p className="mt-0.5 text-sm font-bold text-blue-200">{data.modelIndicator?.primaryWeight == null ? "—" : `${Math.round(data.modelIndicator.primaryWeight * 100)}%`}</p></div><div className="rounded-xl border border-slate-700 bg-black/20 px-2 py-2"><p className="text-[10px] uppercase tracking-wide text-slate-500">Contributeurs</p><p className="mt-0.5 text-sm font-bold text-violet-200">{data.modelIndicator?.modelCount ?? 0}</p></div></div><div className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/35 p-2.5"><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Méthode de fusion</p><p className="mt-1 text-xs leading-relaxed text-slate-300">{(data.trace as any)?.method ?? "Trace détaillée indisponible."} Le pourcentage affiché est un poids appliqué à la prévision, jamais une mesure de station.</p></div>{fusionParameters.some((parameter) => parameter.sources.length > 0) && <div className="mt-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Sources appliquées par paramètre</p><div className="mt-1.5 grid gap-1.5">{fusionParameters.filter((parameter) => parameter.sources.length > 0).map((parameter) => <div key={parameter.key} className={`rounded-lg ${parameter.background} px-2.5 py-2 text-[11px]`}><span className={`font-semibold ${parameter.tone}`}>{parameter.label}</span><span className="text-slate-300"> · {parameter.sources.map((source) => `${source.name} ${Math.round(source.finalWeight * 100)}%`).join(" · ")}</span></div>)}</div></div>}<div className="mt-3 space-y-2">{data.appliedModelWeights.map((model) => <div key={model.name} className="rounded-xl border border-slate-800 bg-black/15 p-2.5"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold text-slate-100">{model.name}</span><span className="text-xs font-semibold text-blue-300">moyenne {Math.round(model.averageWeight * 100)}%</span></div><div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[10px]"><span className="rounded-md bg-orange-400/10 py-1 text-orange-200">T° {model.temperature == null ? "—" : `${Math.round(model.temperature * 100)}%`}</span><span className="rounded-md bg-blue-400/10 py-1 text-blue-200">Pluie {model.precipitation == null ? "—" : `${Math.round(model.precipitation * 100)}%`}</span><span className="rounded-md bg-cyan-400/10 py-1 text-cyan-200">Vent {model.wind == null ? "—" : `${Math.round(model.wind * 100)}%`}</span></div></div>)}</div></>}
     </section>
+
+    <section className="rounded-2xl border border-emerald-400/25 bg-[linear-gradient(135deg,rgba(5,150,105,0.10),rgba(13,19,29,0.98)_48%)] p-4" aria-labelledby="local-stations-title"><div className="flex items-start gap-2"><MapPinned className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" /><div><h2 id="local-stations-title" className="text-sm font-semibold text-slate-100">Résultat final · contexte des stations locales</h2><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Observations physiques distinctes de la prévision fusionnée. Elles décrivent le contexte local et peuvent servir de preuve lorsque leur qualité le permet.</p></div></div>{stationsLoading ? <div className="mt-3 h-28 animate-pulse rounded-xl bg-slate-800/80" /> : stationsError ? <p className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-3 text-[11px] leading-relaxed text-amber-100">Les stations locales ne sont pas disponibles pour le moment. La prévision officielle reste affichée séparément, sans observation de remplacement.</p> : <><div className="mt-3 grid grid-cols-3 gap-1.5 text-center"><div className="rounded-xl border border-emerald-400/15 bg-black/20 px-2 py-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Actives</p><p className="mt-0.5 text-sm font-bold text-emerald-200">{activePhysicalStations.length}</p></div><div className="rounded-xl border border-emerald-400/15 bg-black/20 px-2 py-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Température locale</p><p className="mt-0.5 text-sm font-bold text-emerald-200">{stationContext?.temperature == null ? "—" : `${Number(stationContext.temperature).toFixed(1)}°`}</p></div><div className="rounded-xl border border-emerald-400/15 bg-black/20 px-2 py-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Confiance locale</p><p className="mt-0.5 text-sm font-bold text-emerald-200">{stationContext?.confidenceScore == null ? "—" : `${Math.round(stationContext.confidenceScore)}/100`}</p></div></div>{activePhysicalStations.length ? <div className="mt-3 space-y-2">{activePhysicalStations.slice(0, 6).map((station) => { const contribution = stationContext?.stationsUsed.find((item) => item.stationId === station.stationId); return <article key={station.stationId} className="rounded-xl border border-emerald-400/15 bg-black/15 px-3 py-2.5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-100">{station.name}</p><p className="mt-0.5 text-[10px] text-slate-400">{station.source} · {stationFreshnessLabel(station.updatedAt)}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold ${contribution ? "bg-emerald-400/10 text-emerald-200" : "bg-slate-700/60 text-slate-300"}`}>{contribution ? "Contexte retenu" : "Observation active"}</span></div><div className="mt-2 grid grid-cols-3 gap-1.5 text-[10px]"><span className="rounded-md bg-slate-900/70 px-1.5 py-1 text-slate-300">{Number(station.distanceKm).toFixed(1)} km</span><span className="rounded-md bg-slate-900/70 px-1.5 py-1 text-slate-300">T° {station.temperature == null ? "—" : `${Number(station.temperature).toFixed(1)}°`}</span><span className="rounded-md bg-slate-900/70 px-1.5 py-1 text-slate-300">{contribution ? `part ${Math.round(contribution.weight * 100)} %` : "sans part locale"}</span></div></article>; })}</div> : <p className="mt-3 rounded-xl border border-dashed border-emerald-400/20 p-3 text-[11px] leading-relaxed text-slate-400">Aucune station physique locale active n’est disponible dans le rayon interrogé. Aucun résultat local n’est donc substitué à la prévision officielle.</p>}<p className="mt-3 rounded-xl border border-slate-700/70 bg-slate-950/30 p-2.5 text-[10px] leading-relaxed text-slate-400"><SlidersHorizontal className="mr-1 inline h-3.5 w-3.5 text-emerald-300" />La synthèse locale repose sur distance, fraîcheur et qualité des mesures disponibles. Elle reste un contexte observé : elle ne transforme pas la prévision fusionnée en relevé réel.</p></>}</section>
 
     {validationSource && <section className="rounded-2xl border border-dashed border-violet-400/35 bg-violet-400/[0.045] p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><div className="flex items-start gap-2"><FlaskConical className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" /><div><h2 className="text-sm font-semibold text-slate-100">Modèles en validation</h2><p className="mt-1 text-xs leading-relaxed text-slate-400">Collectés séparément à 05h00 lorsqu’ils sont disponibles. Ils n’influencent ni la prévision officielle, ni les poids, ni les compteurs des modèles actifs.</p></div></div></div><WeatherStatusBadge compact className="w-[104px]" tone="lab" label="Validation" value="Hors fusion" description="Ces modèles sont archivés pour une validation historique. Ils restent hors fusion et n’influencent ni la prévision officielle ni ses poids." /></div><div className="mt-3 flex flex-wrap gap-1.5">{validationSource.models.map((model) => <WeatherStatusBadge key={model} compact tone="lab" label={model} description="Ce modèle candidat est archivé pour la validation historique. Il reste hors fusion officielle tant qu’un gain de fiabilité n’est pas mesuré." />)}</div></section>}
 
