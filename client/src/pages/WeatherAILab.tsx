@@ -8,6 +8,7 @@ import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getValidationModelSource } from "@/lib/validationModelSource";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
+import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 function IndicatorHelp({ title, children }: { title: string; children: ReactNode }) {
@@ -187,6 +188,7 @@ export default function WeatherAILab() {
   const { style: pageSkyStyle } = usePageWeatherSky();
   const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: true });
+  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: false });
   const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
   const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 60_000, refetchOnWindowFocus: true });
   const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { staleTime: 60_000, refetchOnWindowFocus: true });
@@ -324,6 +326,8 @@ export default function WeatherAILab() {
       <div className="flex min-w-0 items-center gap-2"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15"><FlaskConical className="h-5 w-5 text-blue-300" /></div><div className="min-w-0"><h1 className="text-base font-bold text-slate-100">AI Lab · traçabilité</h1><p className="truncate text-xs text-slate-500">{activeLocation?.name ?? "Lieu actif"}{updatedAt ? isArchivedSnapshot ? ` · dernière fusion du ${snapshotDateLabel} à ${updatedAt}` : ` · calcul à ${updatedAt}` : " · snapshot indisponible"}</p></div></div>
       <div className="flex shrink-0 gap-1">{activeLocation?.favoriteId ? <button onClick={() => refreshFusion.mutate({ favoriteId: activeLocation.favoriteId! })} disabled={refreshFusion.isPending || isFetching} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 text-xs font-semibold text-emerald-100 disabled:opacity-60"><RefreshCw className={`h-3.5 w-3.5 ${refreshFusion.isPending ? "animate-spin" : ""}`} />{refreshFusion.isPending ? "Fusion…" : "Relancer"}</button> : null}</div>
     </header>
+
+    <ForecastProvenanceBadge data={forecastProvenance} />
 
     {refreshFusion.isError && <p className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-100">La relance n’a pas abouti : {refreshFusion.error.message}</p>}
     {refreshFusion.data?.status === "cooldown" && <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">Une fusion vient déjà d’être calculée. Réessayez dans environ {refreshFusion.data.retryAfterSeconds} s.</p>}

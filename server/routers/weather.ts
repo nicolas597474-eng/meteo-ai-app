@@ -55,6 +55,7 @@ import { getApparentAstronomyPosition, getEnvironmentalSnapshot, getTerrainHoriz
 import { refreshManualFusionForFavorite } from "../manualFusion";
 import { getLocalEclipseCircumstances } from "../eclipseVisibility";
 import { getWeatherProviderDiagnostics } from "../weatherFetch";
+import { buildWeatherProvenance } from "../weatherProvenance";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -587,6 +588,25 @@ export const weatherRouter = router({
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
       return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
+    }),
+
+  /** Provenance commune : horaires, repli quotidien réel ou indisponibilité explicite. */
+  getForecastProvenance: publicProcedure
+    .input(optionalCoordinatesSchema.optional())
+    .query(async ({ input }) => {
+      const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
+      const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+      const currentFusion = snapshot.hourly.length === 0
+        ? await getMeteoAIForecastByDate(snapshot.weatherDate, locationKey)
+        : null;
+      const latestFusion = snapshot.hourly.length === 0 && !currentFusion
+        ? (await getLatestMeteoAIForecasts(1, locationKey))[0] ?? null
+        : null;
+      const dailyFallback = snapshot.hourly.length === 0
+        ? buildDatedDailyFusionFallback(currentFusion ?? latestFusion)
+        : null;
+      return buildWeatherProvenance(snapshot, dailyFallback);
     }),
 
   /** Diagnostics éphémères des appels fournisseurs, sans persistance en base. */

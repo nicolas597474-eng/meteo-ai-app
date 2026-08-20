@@ -16,6 +16,7 @@ import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
+import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -245,6 +246,9 @@ export default function Dashboard() {
   );
   const { data: regimeCatalogue = [] } = trpc.weather.getRegimeCatalogue.useQuery(
     undefined, { staleTime: 60 * 60 * 1000 }
+  );
+  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
+    coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
   );
   const utils = trpc.useUtils();
   const { data: personalObservationState, refetch: refetchPersonalObservationState } = trpc.personalObservations.dashboardState.useQuery(
@@ -492,6 +496,8 @@ export default function Dashboard() {
           prefetchedWeather={prefetchedWeather}
           activeWeather={activeFavoriteWeather}
         />
+
+        <ForecastProvenanceBadge data={forecastProvenance} />
 
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">

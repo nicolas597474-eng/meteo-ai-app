@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
+import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
@@ -111,6 +112,9 @@ export default function ReliabilityLaboratory() {
     horizon,
   }), [activeLocation?.lat, activeLocation?.lon, period, horizon]);
   const { data, isLoading, isError } = trpc.weather.getReliabilityLaboratory.useQuery(input, { staleTime: 2 * 60 * 1000 });
+  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
+    { lat: input.lat, lon: input.lon }, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
+  );
 
   const models = useMemo(() => {
     const rows = [...(data?.models ?? [])] as any[];
@@ -165,6 +169,8 @@ export default function ReliabilityLaboratory() {
             {SECTIONS.map((section) => <button key={section} type="button" onClick={() => selectSection(section)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium ${activeSection === section ? "border-sky-400/60 bg-sky-500/15 text-sky-100" : "border-slate-700 bg-[#0a0e16] text-slate-400"}`}>{section}</button>)}
           </nav>
         </header>
+
+        <ForecastProvenanceBadge data={forecastProvenance} className="mb-4" />
 
         <MeteoSurface tone="lab" className="mb-4 rounded-2xl p-3 sm:p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

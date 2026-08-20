@@ -2693,6 +2693,9 @@
 - [x] Instrumenter en mémoire les appels fournisseur, sans persister de diagnostics en base.
 - [x] Exposer la dernière mesure réelle et l’état d’indisponibilité sans valeur par défaut.
 - [x] Couvrir les mesures de succès, erreur et nouvelle tentative par des tests unitaires.
-- [ ] Harmoniser provenance, couverture et motifs de repli entre les pages.
+- [x] Harmoniser provenance, couverture et motifs de repli entre les pages.
+- [x] Créer un contrat de provenance commun, calculé uniquement depuis le snapshot officiel et la dernière fusion quotidienne réelle.
+- [x] Afficher le même indicateur compact dans Dashboard, Prévisions, Fiabilité, Stations et AI Lab.
+- [x] Tester les provenances horaire, quotidienne de repli et indisponible sans donnée fictive.
 - [ ] Consolider les garde-fous de confiance et les tests Ultra-local par variable.
 - [ ] Valider TypeScript, Vitest, rendu et invariants de données avant publication.

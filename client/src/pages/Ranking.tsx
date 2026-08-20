@@ -12,6 +12,7 @@ import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
+import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { Clock3, X } from "lucide-react";
 
 type ComparisonPoint = {
@@ -137,6 +138,9 @@ export default function Ranking() {
     { staleTime: 5 * 60 * 1000 },
   );
   const { data: rankingCriteria } = trpc.weather.getStationRankingCriteria.useQuery();
+  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
+    coords, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
+  );
   const updateFavorite = trpc.favorites.update.useMutation({
     onSuccess: () => {
       utils.weather.getStationReliabilityOverview.invalidate();
@@ -190,6 +194,8 @@ export default function Ranking() {
             Auto · 05h00 Paris
           </span>
         </header>
+
+        <ForecastProvenanceBadge data={forecastProvenance} className="mb-4" />
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
           <div className="grid grid-cols-3 gap-2">
