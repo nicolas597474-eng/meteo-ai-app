@@ -2591,3 +2591,8 @@
 - [x] Reformuler clairement la définition de snapshot pour un utilisateur novice.
 - [x] Retirer uniquement la section « Dernière fusion archivée » sans modifier les autres contenus AI Lab.
 - [x] Vérifier le rendu mobile, TypeScript et Vitest avant publication.
+
+## AI Lab — aide débutant sur le snapshot
+- [x] Ajouter une illustration simple de la photo du calcul à partir des données réellement présentes.
+- [x] Rendre visibles la date, l’heure et le fuseau du snapshot dans la simulation.
+- [x] Ajouter un parcours débutant dans le lexique et vérifier TypeScript, Vitest et le rendu mobile.
