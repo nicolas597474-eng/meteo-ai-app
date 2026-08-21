@@ -66,5 +66,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("temperatureMae");
     expect(source).toContain("precipitationMae");
     expect(source).toContain("windMae");
+    expect(source).toContain("getReliabilityLaboratory.useQuery");
+    expect(source).toContain("bestForecastModel");
+    expect(source).toContain("Meilleur modèle");
+    expect(source).toContain("normalizedScore");
   });
 });

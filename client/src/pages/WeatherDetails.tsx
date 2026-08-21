@@ -171,6 +171,14 @@ export default function WeatherDetails() {
 
   const { data, isLoading } = trpc.weather.getDetailedForecast.useQuery(coordsInput);
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
+  const reliabilityInput = useMemo(() => ({
+    lat: activeLocation?.lat ?? 50.7567,
+    lon: activeLocation?.lon ?? 2.5204,
+    period: "7d" as const,
+    horizon: "6-24h" as const,
+  }), [activeLocation?.lat, activeLocation?.lon]);
+  const { data: reliabilityLaboratory } = trpc.weather.getReliabilityLaboratory.useQuery(reliabilityInput, { staleTime: 2 * 60 * 1000 });
+  const bestForecastModel = reliabilityLaboratory?.bestModel as { name?: string; normalizedScore?: number | null } | undefined;
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const hourlyRef = useRef<HTMLDivElement>(null);
 
@@ -228,7 +236,7 @@ export default function WeatherDetails() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10"><MeteoIcon name="refresh" size={18} /></span>
-              <div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/55">Déroulé temporel</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Heure par heure</h2></div>
+              <div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/55">Déroulé temporel</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Heure par heure</h2>{bestForecastModel?.name && bestForecastModel.normalizedScore != null ? <span aria-label={`Meilleur modèle : ${bestForecastModel.name}`} className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300/45 bg-amber-300/10 px-1.5 py-0.5 text-[8px] font-bold text-amber-100"><span>Meilleur modèle</span><span className="text-white">{bestForecastModel.name}</span><span className="text-amber-100/75">{Math.round(bestForecastModel.normalizedScore)} /100</span></span> : null}</div>
             </div>
             <span className="rounded-full border border-sky-200/20 bg-sky-300/10 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-sky-100">48 h</span>
           </div>

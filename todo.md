@@ -2810,3 +2810,4 @@
 - [x] Afficher un badge Meilleur modèle sur la première carte classée de score global.
 - [x] Placer les scores globaux par modèle avant les tendances provisoires.
 - [x] Déplacer la section Fiabilité en bref sous les tendances provisoires.
+- [x] Mettre en évidence le meilleur modèle réellement classé dans la section Prévisions.
