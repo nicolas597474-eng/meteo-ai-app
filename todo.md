@@ -2835,3 +2835,4 @@
 - [x] Retirer la commande Vue réelle intégrée, agrandir la carte des stations et déplacer son bouton d’agrandissement sous la carte.
 - [x] Ajouter un bouton de zoom qui recentre la carte des stations sur le lieu actif.
 - [x] Ajouter une action permettant de revenir au cadrage normal de la carte après le zoom.
+- [x] Ajouter dans la carte agrandie des boutons + et − espacés de la fermeture et des commandes natives, sans chevauchement.

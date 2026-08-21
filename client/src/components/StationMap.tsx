@@ -74,16 +74,25 @@ export function StationMap({
     setIsFocusedOnLocation(true);
   }, [center.lat, center.lon]);
 
-  const restoreNormalView = useCallback(() => {
+const restoreNormalView = useCallback(() => {
+  const map = mapRef.current;
+  if (!map) return;
+  streetViewRef.current?.setVisible(false);
+  map.panTo({ lat: center.lat, lng: center.lon });
+  map.setZoom(normalZoom);
+  setIsFocusedOnLocation(false);
+}, [center.lat, center.lon, normalZoom]);
+
+  const adjustExpandedZoom = useCallback((delta: number) => {
     const map = mapRef.current;
     if (!map) return;
     streetViewRef.current?.setVisible(false);
-    map.panTo({ lat: center.lat, lng: center.lon });
-    map.setZoom(normalZoom);
+    const currentZoom = map.getZoom() ?? normalZoom;
+    map.setZoom(Math.max(2, Math.min(20, currentZoom + delta)));
     setIsFocusedOnLocation(false);
-  }, [center.lat, center.lon, normalZoom]);
+  }, [normalZoom]);
 
-  const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
+const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
     if (!mapRef.current) return;
     const panorama = streetViewRef.current ?? mapRef.current.getStreetView();
     streetViewRef.current = panorama;
@@ -138,14 +147,16 @@ export function StationMap({
     if (!map) return;
     map.setOptions({
       mapTypeControl: isExpanded,
-      mapTypeControlOptions: isExpanded ? {
-        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-        mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE],
-      } : undefined,
-      fullscreenControl: false,
-      zoomControl: false,
-      streetViewControl: isExpanded,
-      rotateControl: false,
+mapTypeControlOptions: isExpanded ? {
+  style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+  mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE],
+        position: google.maps.ControlPosition.TOP_LEFT,
+} : undefined,
+fullscreenControl: false,
+zoomControl: false,
+streetViewControl: isExpanded,
+      streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined,
+rotateControl: false,
     });
     window.setTimeout(() => google.maps.event.trigger(map, "resize"), 0);
   }, [isExpanded]);
@@ -194,6 +205,26 @@ export function StationMap({
           >
             ✕ Fermer la carte
           </button>
+        )}
+        {isExpanded && mapReady && (
+          <div className="absolute right-3 top-16 z-10 flex flex-col gap-2" aria-label="Zoom manuel de la carte">
+            <button
+              type="button"
+              onClick={() => adjustExpandedZoom(1)}
+              aria-label="Zoomer"
+              className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustExpandedZoom(-1)}
+              aria-label="Dézoomer"
+              className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              −
+            </button>
+          </div>
         )}
         {!mapReady && (
           <div className="absolute inset-0 grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.16),transparent_34%),linear-gradient(rgba(30,41,59,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(30,41,59,0.32)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px]">
