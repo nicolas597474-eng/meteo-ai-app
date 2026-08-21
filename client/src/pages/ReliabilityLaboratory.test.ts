@@ -33,10 +33,12 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("Pluie");
     expect(source).toContain("Vent");
     expect(source).toContain("Humidité");
-    expect(source).toContain("Évolution des performances d’humidité");
-    expect(source).toContain("HUMIDITY_MODEL_PALETTES");
+    expect(source).toContain("Scores globaux par modèle");
+    expect(source).toContain("GLOBAL_SCORE_MODEL_PALETTES");
     expect(source).toContain("palette.bar");
-    expect(source).toContain("Aucune MAE d’humidité qualifiée");
+    expect(source).toContain("formatFrenchDayMonth");
+    expect(source).toContain("normalizedScore");
+    expect(source).toContain("Scores globaux indisponibles");
     expect(source).toContain("ProvisionalTrendCard");
   });
 

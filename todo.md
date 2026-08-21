@@ -2804,3 +2804,5 @@
 - [x] Afficher les panneaux Prévision horaire officielle et Deux indicateurs différents ouverts au-dessus des autres cartes du Dashboard.
 - [x] Uniformiser les pastilles Note par modèle afin que leur texte reste sur une ligne sur mobile.
 - [x] Attribuer une couleur distinctive à chaque diagramme de modèle dans l’évolution d’humidité.
+- [x] Remplacer les diagrammes d’évolution d’humidité par les scores globaux réellement archivés par modèle.
+- [x] Agrandir les valeurs de score global et afficher les dates au format français long dans les diagrammes.
