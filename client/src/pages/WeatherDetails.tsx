@@ -350,12 +350,12 @@ export default function WeatherDetails() {
                   {isExpanded && (
                     <div className="space-y-3 border-t border-white/8 p-3">
                       {/* Day details grid */}
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <DetailCell label="Ressenti" value={`${day.feelsLikeMin?.toFixed(0) ?? "?"}° / ${day.feelsLikeMax?.toFixed(0) ?? "?"}°`} />
                         <DetailCell label="Lever" value={day.sunrise ?? "—"} />
                         <DetailCell label="Coucher" value={day.sunset ?? "—"} />
                         <DetailCell label="Humidité" value={`${day.humidity?.toFixed(0) ?? "—"}%`} />
-                        <DetailCell label="Vent" value={`${day.windSpeed?.toFixed(0) ?? "—"} km/h${day.windGust != null ? ` · raf. ${day.windGust.toFixed(0)}` : ""}`} />
+                        <DetailCell className="col-span-2" label="Vent" value={`${day.windSpeed?.toFixed(0) ?? "—"} km/h${day.windGust != null ? ` · raf. ${day.windGust.toFixed(0)}` : ""}`} />
                         <DetailCell label="Précip." value={`${day.precipitation?.toFixed(1) ?? "0"} mm`} />
                         <DetailCell label="UV" value={`${(day as any).uvIndex?.toFixed(0) ?? "—"}`} />
                       </div>
@@ -405,11 +405,11 @@ export default function WeatherDetails() {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-function DetailCell({ label, value }: { label: string; value: string }) {
+function DetailCell({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
-    <div className="bg-slate-800/30 rounded-lg p-2 text-center">
+    <div className={`flex min-h-[52px] flex-col justify-center rounded-xl bg-slate-800/30 px-2.5 py-2 text-center ${className}`}>
       <p className="text-[8px] text-slate-500">{label}</p>
-      <p className="text-xs text-white font-medium">{value}</p>
+      <p className="mt-0.5 text-xs font-medium leading-tight text-white">{value}</p>
     </div>
   );
 }

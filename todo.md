@@ -2786,3 +2786,4 @@
 - [x] Retirer Visibilité et Rayonnement des détails de conditions des cartes horaires.
 - [x] Afficher la direction cardinale du vent avec la vitesse et les rafales dans chaque carte horaire.
 - [x] Harmoniser le libellé et l’unité des rafales dans les cartes quotidiennes avec les cartes horaires.
+- [x] Rééquilibrer l’espacement interne de la grille des détails quotidiens après le regroupement Vent et rafales.
