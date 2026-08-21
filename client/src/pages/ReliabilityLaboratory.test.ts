@@ -38,6 +38,8 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("palette.bar");
     expect(source).toContain("formatFrenchDayMonth");
     expect(source).toContain("normalizedScore");
+    expect(source).toContain("averageScore");
+    expect(source).toContain("right.averageScore - left.averageScore");
     expect(source).toContain("Scores globaux indisponibles");
     expect(source).toContain("ProvisionalTrendCard");
   });

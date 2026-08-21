@@ -2806,3 +2806,4 @@
 - [x] Attribuer une couleur distinctive à chaque diagramme de modèle dans l’évolution d’humidité.
 - [x] Remplacer les diagrammes d’évolution d’humidité par les scores globaux réellement archivés par modèle.
 - [x] Agrandir les valeurs de score global et afficher les dates au format français long dans les diagrammes.
+- [x] Trier les diagrammes de score global du meilleur modèle au moins bon selon leur moyenne réellement archivée.

@@ -306,13 +306,19 @@ function GlobalScoreTimelineFigure({ points }: { points: any[] }) {
   if (usable.length === 0) return <EmptyFigure title="Scores globaux indisponibles" reason="Aucun score global normalisé n’est encore archivé avec toutes les variables nécessaires." />;
   const grouped = new Map<string, any[]>();
   usable.forEach((point) => grouped.set(point.serviceName, [...(grouped.get(point.serviceName) ?? []), point]));
-  const seriesByModel = Array.from(grouped.entries()).sort(([left], [right]) => left.localeCompare(right));
+  const seriesByModel = Array.from(grouped.entries())
+    .map(([name, series]) => ({
+      name,
+      series,
+      averageScore: series.reduce((total, point) => total + Number(point.normalizedScore), 0) / series.length,
+    }))
+    .sort((left, right) => right.averageScore - left.averageScore || left.name.localeCompare(right.name));
   return <section className="rounded-xl border border-violet-500/25 bg-violet-500/[0.045] p-3" aria-label="Évolution des scores globaux par modèle">
     <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-violet-100">Scores globaux par modèle</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">Score normalisé réellement archivé sur 100 : plus la barre est haute, plus le score global est élevé. Il est affiché uniquement lorsque toutes les composantes requises sont disponibles.</p></div><span className="shrink-0 rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-[9px] font-semibold text-violet-100">{usable.length} point(s)</span></div>
-    <div className="mt-3 space-y-2">{seriesByModel.map(([name, series], modelIndex) => {
+    <div className="mt-3 space-y-2">{seriesByModel.map(({ name, series, averageScore }, modelIndex) => {
       const palette = GLOBAL_SCORE_MODEL_PALETTES[modelIndex % GLOBAL_SCORE_MODEL_PALETTES.length];
       return <article key={name} className={`rounded-lg border bg-slate-950/25 p-2.5 ${palette.border}`}>
-        <div className="flex items-center justify-between gap-2"><p className={`truncate text-xs font-semibold ${palette.text}`}>{name}</p><p className="text-[10px] text-slate-400">{series.length} mesure(s)</p></div>
+        <div className="flex items-center justify-between gap-2"><p className={`truncate text-xs font-semibold ${palette.text}`}>{name}</p><p className="text-[10px] text-slate-400">Moy. {Math.round(averageScore)} % · {series.length} mesure(s)</p></div>
         <div className="mt-2 flex items-end gap-1" aria-label={`Évolution du score global pour ${name}`}>{[...series].sort((left, right) => String(left.date).localeCompare(String(right.date))).map((point) => { const score = Math.max(0, Math.min(100, Number(point.normalizedScore))); const height = Math.max(10, Math.round((score / 100) * 56)); return <div key={`${point.date}-${point.serviceName}`} className="flex min-w-0 flex-1 flex-col items-center gap-1"><span className={`text-[13px] font-bold leading-none ${palette.text}`}>{Math.round(score)} %</span><div className={`w-full rounded-t ${palette.bar}`} style={{ height }} title={`${formatFrenchDayMonth(point.date)} · score global ${Math.round(score)}/100 · ${point.comparisons ?? 0} comparaison(s)`} /><span className="truncate text-[10px] leading-tight text-slate-400">{formatFrenchDayMonth(point.date)}</span></div>; })}</div>
       </article>;
     })}</div>
