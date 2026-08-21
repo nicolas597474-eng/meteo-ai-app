@@ -11,7 +11,15 @@ describe("carte des stations", () => {
     expect(source).not.toContain("Vue réelle ici");
     expect(source).toContain('fixed inset-0 z-[200] bg-[#070b13]');
     expect(source).toContain('h-72 rounded-xl border border-slate-800 sm:h-80');
-    expect(source).toContain('mt-2 flex min-h-11 w-full items-center justify-center');
+    expect(source).toContain('mt-2 grid grid-cols-2 gap-2');
+    expect(source).toContain("const focusCurrentLocation = useCallback");
+    expect(source).toContain("map.panTo({ lat: center.lat, lng: center.lon })");
+    expect(source).toContain("map.setZoom(14)");
+    expect(source).toContain("Zoom sur le lieu");
+    expect(source).toContain("const restoreNormalView = useCallback");
+    expect(source).toContain("map.setZoom(normalZoom)");
+    expect(source).toContain("Vue normale");
+    expect(source).toContain("Revenir au cadrage normal de la carte");
     expect(source).toContain("streetViewControl={false}");
     expect(source).toContain("rotateControl={false}");
     expect(source).toContain("mapTypeControl: isExpanded");

@@ -63,6 +63,25 @@ export function StationMap({
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isFocusedOnLocation, setIsFocusedOnLocation] = useState(false);
+  const normalZoom = stations.length > 0 ? 11 : 10;
+
+  const focusCurrentLocation = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.panTo({ lat: center.lat, lng: center.lon });
+    map.setZoom(14);
+    setIsFocusedOnLocation(true);
+  }, [center.lat, center.lon]);
+
+  const restoreNormalView = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    streetViewRef.current?.setVisible(false);
+    map.panTo({ lat: center.lat, lng: center.lon });
+    map.setZoom(normalZoom);
+    setIsFocusedOnLocation(false);
+  }, [center.lat, center.lon, normalZoom]);
 
   const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
     if (!mapRef.current) return;
@@ -149,7 +168,7 @@ export function StationMap({
         <MapView
           className="h-full w-full"
           initialCenter={{ lat: center.lat, lng: center.lon }}
-          initialZoom={stations.length > 0 ? 11 : 10}
+          initialZoom={normalZoom}
           mapTypeId="satellite"
           mapTypeControl={false}
           fullscreenControl={false}
@@ -186,14 +205,24 @@ export function StationMap({
         )}
       </div>
       {mapReady && !isExpanded && (
-        <button
-          type="button"
-          onClick={() => setIsExpanded(true)}
-          aria-label="Agrandir la carte"
-          className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-sky-300/70 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-        >
-          Agrandir la carte
-        </button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={isFocusedOnLocation ? restoreNormalView : focusCurrentLocation}
+            aria-label={isFocusedOnLocation ? "Revenir au cadrage normal de la carte" : "Recentrer et zoomer sur le lieu actuel"}
+            className="flex min-h-11 items-center justify-center rounded-xl border border-slate-600 bg-[#0b1524] px-3 text-xs font-semibold text-slate-100 transition-colors hover:border-sky-300/70 hover:bg-sky-500/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          >
+            {isFocusedOnLocation ? "Vue normale" : "Zoom sur le lieu"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            aria-label="Agrandir la carte"
+            className="flex min-h-11 items-center justify-center rounded-xl border border-sky-300/70 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          >
+            Agrandir la carte
+          </button>
+        </div>
       )}
     </div>
   );
