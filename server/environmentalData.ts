@@ -398,6 +398,8 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
         daylightDurations: dailyDaylightDurations,
         cloudCoverMeans: dailyCloudCoverMeans,
         today: dailyDates[0] ?? altitudeCalculatedAt.toISOString().slice(0, 10),
+        referenceInstant: altitudeCalculatedAt,
+        timeZone: timezone,
       }),
       coordinates: { lat: coords.lat, lon: coords.lon },
     } : null,

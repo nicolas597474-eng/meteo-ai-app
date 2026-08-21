@@ -1,5 +1,10 @@
 import { getEclipseVisibilityLayers, type EclipseMapLayer } from "./eclipseVisibility";
 
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const Astronomy = require("astronomy-engine") as typeof import("astronomy-engine");
+
 export type MoonMilestone = {
   id: "new_moon" | "first_quarter" | "full_moon" | "last_quarter";
   label: string;
@@ -182,14 +187,16 @@ function moonIllumination(phase: number | null) {
   return phase == null || !Number.isFinite(phase) ? null : Math.round(50 * (1 - Math.cos(Math.PI * 2 * phase)));
 }
 
-function calculateMoonMilestones(today: string, currentPhase: number | null) {
-  if (currentPhase == null || !Number.isFinite(currentPhase)) return [];
-  const phase = ((currentPhase % 1) + 1) % 1;
-  const start = new Date(`${today}T12:00:00Z`);
-  return MOON_TARGETS.map((target) => {
-    const cycleFraction = (target.phase - phase + 1) % 1;
-    const date = new Date(start.getTime() + cycleFraction * 29.530588 * 86_400_000);
-    return { id: target.id, label: target.label, date: date.toISOString().slice(0, 10) } satisfies MoonMilestone;
+function formatDateInTimeZone(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(value);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function calculateMoonMilestones(referenceInstant: Date, timeZone: string) {
+  return MOON_TARGETS.flatMap((target) => {
+    const instant = Astronomy.SearchMoonPhase(target.phase * 360, referenceInstant, 40)?.date;
+    return instant ? [{ id: target.id, label: target.label, date: formatDateInTimeZone(instant, timeZone) } satisfies MoonMilestone] : [];
   }).sort((left, right) => left.date.localeCompare(right.date));
 }
 
@@ -199,8 +206,12 @@ export function buildAstronomyOutlook(input: {
   daylightDurations: Array<number | null>;
   cloudCoverMeans: Array<number | null>;
   today: string;
+  referenceInstant?: Date;
+  timeZone?: string;
 }): AstronomyOutlook {
-  const moonMilestones = calculateMoonMilestones(input.today, input.moonPhases[0] ?? null);
+  const timeZone = input.timeZone ?? "UTC";
+  const referenceInstant = input.referenceInstant ?? new Date(`${input.today}T00:00:00.000Z`);
+  const moonMilestones = calculateMoonMilestones(referenceInstant, timeZone);
   const nextSolarMilestone = SOLAR_MILESTONES.find((milestone) => milestone.date >= input.today) ?? null;
   const daylightChangeTomorrowSeconds = input.daylightDurations[0] != null && input.daylightDurations[1] != null
     ? Math.round(input.daylightDurations[1]! - input.daylightDurations[0]!)

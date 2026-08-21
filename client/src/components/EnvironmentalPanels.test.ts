@@ -198,6 +198,7 @@ describe("EnvironmentalPanels", () => {
     expect(temporalSunMoonSource).toContain("position.lunar");
     expect(temporalSunMoonSource).toContain("brightLimbAngleDeg");
     expect(temporalSunMoonSource).toContain("illuminationPct");
+    expect(temporalSunMoonSource).toContain("displayTimeInZone(value, astronomy.timezone)");
     expect(temporalSunMoonSource).toContain("<RealisticMoon phase={moonPhase}");
     expect(source).toContain("rotate(${phase.brightLimbAngleDeg}deg)");
     expect(temporalSunMoonSource).toContain("moon: { label: position.lunar.label");

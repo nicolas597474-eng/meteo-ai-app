@@ -2685,6 +2685,10 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Vérifier les conversions UTC/Europe-Paris des horaires de Soleil, de Lune et de l’horodatage astronomique.
+- [x] Vérifier les dates de prochaines phases lunaires contre le moteur astronomique et une source de référence.
+- [x] Corriger uniquement les anomalies prouvées sans modifier les données météo historiques.
+- [x] Couvrir les horaires d’été, d’hiver et les jalons de phase par des tests de régression.
 - [x] Adapter l’intensité de la lueur lunaire à la nébulosité réelle disponible pour le lieu actif.
 - [x] Préserver une lueur neutre et signaler implicitement l’absence de nébulosité plutôt que d’inventer une couverture.
 - [x] Tester les niveaux de lueur sous ciel clair, partiellement nuageux, couvert et sans donnée.
