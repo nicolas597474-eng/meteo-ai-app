@@ -16,7 +16,7 @@ describe("ReliabilityLaboratory", () => {
   });
 
   it("retire les cartes de métriques secondaires du résumé mobile", () => {
-    expect(source).not.toContain("RMSE");
+    expect(source).not.toContain('MiniBar label="RMSE"');
     expect(source).not.toContain("MiniBar label=\"Précipitations\"");
     expect(source).not.toContain("SectionHeading title=\"Évolution des scores\"");
   });
@@ -55,6 +55,12 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("Le biais indique le sens");
     expect(source).toContain("un biais positif signifie une prévision trop chaude en moyenne");
     expect(source).toContain("un biais négatif, trop froide");
+    expect(source).toContain("Le RMSE détecte les gros écarts");
+    expect(source).toContain("Un RMSE nettement supérieur à la MAE");
+    expect(source).toContain("temperatureBiasTrend");
+    expect(source).toContain("Plutôt chaud");
+    expect(source).toContain("Plutôt froid");
+    expect(source).toContain("model.metrics?.temperature?.bias");
     expect(source).toContain("DialogContent");
     expect(source).toContain("!h-[100dvh]");
     expect(source).toContain("showCloseButton={false}");

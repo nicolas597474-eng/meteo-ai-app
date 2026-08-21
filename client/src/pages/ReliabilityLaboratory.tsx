@@ -42,6 +42,17 @@ function metric(value: number | null | undefined, unit = "", digits = 1) {
   return value === null || value === undefined ? "—" : `${Number(value).toFixed(digits)}${unit}`;
 }
 
+type TemperatureBiasTrend = { label: string; value: string; className: string };
+
+function temperatureBiasTrend(value: unknown): TemperatureBiasTrend | null {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+  const bias = Number(value);
+  const formatted = `${bias > 0 ? "+" : ""}${bias.toFixed(2)} °C`;
+  if (bias > 0.005) return { label: "Plutôt chaud", value: formatted, className: "border-rose-400/30 bg-rose-400/10 text-rose-200" };
+  if (bias < -0.005) return { label: "Plutôt froid", value: formatted, className: "border-sky-400/30 bg-sky-400/10 text-sky-100" };
+  return { label: "Biais neutre", value: formatted, className: "border-slate-500/30 bg-slate-500/10 text-slate-300" };
+}
+
 function confidenceClass(tone: string | undefined) {
   if (tone === "green") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
   if (tone === "yellow") return "border-sky-500/30 bg-sky-500/10 text-sky-100";
@@ -202,6 +213,7 @@ export default function ReliabilityLaboratory() {
                   models={provisionalTrends.temperature}
                   value={(model) => metric(model.metrics.temperature.mae, " °C", 2)}
                   accent="text-orange-200"
+                  trend={(model) => temperatureBiasTrend(model.metrics?.temperature?.bias)}
                   helpId="mae-temperature-help"
                   isHelpOpen={isTemperatureHelpOpen}
                   onHelpToggle={() => setIsTemperatureHelpOpen((open) => !open)}
@@ -214,6 +226,7 @@ export default function ReliabilityLaboratory() {
                       ["Plus la MAE est basse", "plus le modèle a été précis sur la température."],
                       ["0,81 °C", "signifie un écart moyen de 0,81 degré. La MAE mesure l’ampleur de l’erreur, pas son sens."],
                       ["Le biais indique le sens", "un biais positif signifie une prévision trop chaude en moyenne ; un biais négatif, trop froide. Un biais proche de zéro ne montre pas de tendance systématique."],
+                      ["Le RMSE détecte les gros écarts", "Il donne davantage de poids aux erreurs importantes. Un RMSE nettement supérieur à la MAE signale que certains créneaux ont connu des écarts de température plus marqués."],
                       ["Ce n’est pas", "la température actuelle ni la température prévue pour le prochain créneau."],
                     ],
                   }}
@@ -319,15 +332,16 @@ function ModelCard({ model }: { model: any }) {
   return <article className="rounded-xl border border-slate-800 bg-[#090d14] p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[10px] font-bold ${model.rank ? "bg-sky-500/15 text-sky-200" : "bg-slate-800 text-slate-400"}`}>{model.rank ? `#${model.rank}` : "—"}</span><p className="truncate text-sm font-semibold text-white">{model.name}</p></div><p className="mt-1 text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) qualifiée(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p></div><div className="text-right"><p className="text-xl font-bold text-white">{metric(model.normalizedScore, "/100", 0)}</p><p className="text-[10px] text-slate-500">score mesuré</p></div></div><p className={`mt-3 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${confidenceClass(confidence.tone)}`}>{confidence.label ?? "Données insuffisantes"}</p></article>;
 }
 
-function ProvisionalTrendCard({ title, detail, models, value, accent, help, helpId, isHelpOpen = false, onHelpToggle, onHelpClose }: { title: string; detail: string; models: any[]; value: (model: any) => string; accent: string; help?: { title: string; description: string; closeLabel: string; items: [string, string][] }; helpId?: string; isHelpOpen?: boolean; onHelpToggle?: () => void; onHelpClose?: () => void }) {
+function ProvisionalTrendCard({ title, detail, models, value, accent, trend, help, helpId, isHelpOpen = false, onHelpToggle, onHelpClose }: { title: string; detail: string; models: any[]; value: (model: any) => string; accent: string; trend?: (model: any) => TemperatureBiasTrend | null; help?: { title: string; description: string; closeLabel: string; items: [string, string][] }; helpId?: string; isHelpOpen?: boolean; onHelpToggle?: () => void; onHelpClose?: () => void }) {
   return <article className="rounded-xl border border-sky-500/25 bg-[#09111d]/85 p-3">
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0"><p className="text-sm font-semibold text-slate-100">{title}</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">{detail}</p></div>
       {help ? <button type="button" onClick={onHelpToggle} aria-expanded={isHelpOpen} aria-controls={helpId} aria-haspopup="dialog" className="shrink-0 rounded-full border border-sky-400/35 bg-sky-400/10 px-2 py-1 text-[9px] font-semibold text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">Comprendre</button> : null}
     </div>
     {models.length ? <div className="mt-3 space-y-2">{models.slice(0, 3).map((model) => {
+      const modelTrend = trend?.(model);
       return <div key={model.name} className="flex items-center justify-between gap-3 border-t border-slate-800 pt-2 first:border-0 first:pt-0">
-        <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-200">{model.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p></div>
+        <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-200">{model.name}</p><div className="mt-0.5 flex flex-wrap items-center gap-1.5"><p className="text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p>{modelTrend ? <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${modelTrend.className}`}>{modelTrend.label} · {modelTrend.value}</span> : null}</div></div>
         <div className="shrink-0 text-right"><p className={`text-sm font-bold ${accent}`}>{value(model)}</p></div>
       </div>;
     })}</div> : <p className="mt-3 text-[11px] leading-relaxed text-slate-500">Aucune mesure qualifiée disponible pour ce paramètre sur la période sélectionnée.</p>}
