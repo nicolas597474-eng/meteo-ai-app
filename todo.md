@@ -2779,3 +2779,5 @@
 - [x] Couvrir température, humidité, précipitations, vent et rafales avec stations propres, manquantes ou écartées.
 - [x] Vérifier que l’absence d’une variable n’affecte pas les poids ni les confiances des autres variables.
 - [x] Valider TypeScript, Vitest, rendu et invariants de données avant publication.
+- [x] Retirer la ligne Accord pluie des cartes de prévisions heure par heure.
+- [x] Réduire légèrement la hauteur de la pastille Accord global des cartes heure par heure.

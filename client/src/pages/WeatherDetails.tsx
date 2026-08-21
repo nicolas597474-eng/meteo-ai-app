@@ -108,7 +108,7 @@ function SlotConfidenceBadge({ details, historicalModels = [] }: { details: Agre
       : "border-amber-300/25 bg-amber-300/10 text-amber-100";
   const level = value >= 75 ? "élevé" : value >= 55 ? "modéré" : "faible";
   return <span className="relative inline-block">
-    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold ${tone}`}>Accord {value}% · {level}</button>
+    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`rounded-full border px-1.5 py-[2px] text-[8px] font-semibold leading-3 ${tone}`}>Accord {value}% · {level}</button>
     {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
       <span className="mb-1 block text-slate-300">Accord par paramètre</span>
       {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.value}%</span></span>)}
@@ -229,21 +229,8 @@ export default function WeatherDetails() {
                     <div className="mb-3 border-b border-white/12 pb-3">
                       <span className={`text-[36px] font-semibold leading-none tracking-[-0.075em] ${hourlyTemperatureTone(h.temp)}`}>{h.temp?.toFixed(1) ?? "—"}°</span>
                       <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
-                      <div className="mt-1.5"><SlotConfidenceBadge details={getSlotAgreementDetails(h, historicalPerformance)} historicalModels={historicalPerformance?.models ?? []} /></div>
+                      <div className="mt-1"><SlotConfidenceBadge details={getSlotAgreementDetails(h, historicalPerformance)} historicalModels={historicalPerformance?.models ?? []} /></div>
                     </div>
-                    
-                    {/* Precipitation */}
-                    <div className="mb-2.5 flex items-center gap-1.5 rounded-xl border border-sky-100/20 bg-sky-100/[0.08] px-2 py-1.5">
-                      <MeteoIcon name="precipitation" size={14} />
-                      <span className="text-[11px] font-semibold text-slate-50">Accord pluie {h.precipAgreement ?? 0}%</span>
-                      {(h.precipitation ?? 0) > 0 && (
-                        <span className="text-[11px] font-semibold text-sky-100">{h.precipitation?.toFixed(1)} mm</span>
-                      )}
-                      {h.precipType && <span className="text-[9px] text-sky-50/75">{h.precipType === "snow" ? "neige" : h.precipType === "freezing_rain" ? "verglas" : "pluie"}</span>}
-                    </div>
-                    {h.precipIntensity && (
-                      <span className="-mt-1 mb-2 block text-[9px] text-slate-200">Intensité {h.precipIntensity === "heavy" ? "forte" : h.precipIntensity === "moderate" ? "modérée" : "faible"}</span>
-                    )}
 
                     <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                       <HourlyMetric icon="humidity" label="Humidité" value={`${h.humidity ?? "—"}%`} detail={h.dewPoint != null ? `Rosée ${h.dewPoint.toFixed(0)}°` : undefined} />

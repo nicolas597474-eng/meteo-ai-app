@@ -32,6 +32,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Détail horaire non disponible pour cette journée.");
     expect(source).toContain("getSlotAgreementConfidence");
     expect(source).toContain("Accord {value}%");
+    expect(source).toContain("py-[2px] text-[8px] font-semibold leading-3");
+    expect(source).not.toContain("Accord pluie {h.precipAgreement ?? 0}%");
     expect(source).toContain("windSpeedSpread");
     expect(source).toContain("humiditySpread");
     expect(source).toContain("cloudCoverSpread");
