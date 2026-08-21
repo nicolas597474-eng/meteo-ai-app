@@ -224,9 +224,9 @@ rotateControl: false,
                 setIsExpanded(false);
               }}
               aria-label="Fermer la carte agrandie"
-              className="absolute right-3 top-3 z-10 grid h-16 w-16 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#606060] shadow-[0_2px_8px_rgba(15,23,42,0.18)] transition-transform hover:bg-[#f7f7f7] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+              className="absolute right-3 top-3 z-10 grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#606060] shadow-[0_2px_8px_rgba(15,23,42,0.18)] transition-transform hover:bg-[#f7f7f7] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 fill-none stroke-current" strokeWidth="1.9" strokeLinecap="round">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.9" strokeLinecap="round">
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
@@ -235,9 +235,9 @@ rotateControl: false,
                 type="button"
                 onClick={focusCurrentLocation}
                 aria-label="Centrer la carte sur le lieu actif"
-                className="grid h-16 w-16 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                className="grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 fill-none stroke-current" strokeWidth="2.6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="2.6">
                   <circle cx="12" cy="12" r="6.2" />
                   <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
                   <path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3" strokeLinecap="round" />
@@ -248,9 +248,9 @@ rotateControl: false,
                   type="button"
                   onClick={() => adjustExpandedZoom(1)}
                   aria-label="Zoomer"
-                  className="grid h-20 w-16 place-items-center border-b border-[#e8e8e8] text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                  className="grid h-14 w-12 place-items-center border-b border-[#e8e8e8] text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
                 >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-9 w-9 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round">
                     <path d="M12 3.5v17M3.5 12h17" />
                   </svg>
                 </button>
@@ -258,9 +258,9 @@ rotateControl: false,
                   type="button"
                   onClick={() => adjustExpandedZoom(-1)}
                   aria-label="Dézoomer"
-                  className="grid h-20 w-16 place-items-center text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                  className="grid h-14 w-12 place-items-center text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
                 >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-9 w-9 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round">
                     <path d="M3.5 12h17" />
                   </svg>
                 </button>
