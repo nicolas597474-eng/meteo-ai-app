@@ -33,7 +33,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("getSlotAgreementConfidence");
     expect(source).toContain("Accord {value}%");
     expect(source).toContain("py-px text-[8px] font-semibold leading-[10px]");
-    expect(source).toContain('border px-3 pb-3 pt-3 transition-colors');
+    expect(source).toContain('border px-3 pb-4 pt-3 transition-colors');
     expect(source).toContain('px-3 pb-1 scrollbar-hide snap-x');
     expect(source).toContain('mt-1 text-center text-[10px] text-slate-500');
     expect(source).toContain('<div className="mb-2 pb-2">');

@@ -2794,3 +2794,4 @@
 - [x] Réduire la hauteur excédentaire entre les couches nuageuses et la bordure basse des cartes horaires.
 - [x] Agrandir légèrement les cartes du carrousel heure par heure.
 - [x] Rapprocher l’indication de défilement sous les cartes horaires.
+- [x] Agrandir encore légèrement la zone interne des cartes horaires.
