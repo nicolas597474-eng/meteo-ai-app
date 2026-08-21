@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Retirer les panneaux Prévision horaire officielle et Deux indicateurs différents de Prévisions, Fiabilité, Stations et AI Lab.
+- [x] Préserver les composants métier, données de provenance et contenus propres à chacune des quatre pages.
+- [x] Vérifier les quatre pages après simplification sur mobile et desktop.
 - [x] Placer une flèche de divulgation à droite de Confiance prévision.
 - [x] Masquer initialement les panneaux Prévision horaire officielle et Deux indicateurs différents.
 - [x] Ouvrir les deux panneaux ensemble avec la flèche et les fermer avec une croix tactile accessible.

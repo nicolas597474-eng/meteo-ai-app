@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-const pageFiles = [
+const dashboardPageFiles = [
   "Dashboard.tsx",
+];
+
+const simplifiedPageFiles = [
   "WeatherDetails.tsx",
   "ReliabilityLaboratory.tsx",
   "Ranking.tsx",
@@ -10,11 +13,19 @@ const pageFiles = [
 ];
 
 describe("provenance unifiée des pages météo", () => {
-  it("raccorde chaque page principale au contrat et au badge communs", () => {
-    for (const filename of pageFiles) {
+  it("conserve le contrat et les panneaux repliables sur le Dashboard", () => {
+    for (const filename of dashboardPageFiles) {
       const source = readFileSync(new URL(`./${filename}`, import.meta.url), "utf8");
       expect(source).toContain("ForecastProvenanceBadge");
       expect(source).toContain("weather.getForecastProvenance.useQuery");
+    }
+  });
+
+  it("retire les deux panneaux des pages volontairement simplifiées", () => {
+    for (const filename of simplifiedPageFiles) {
+      const source = readFileSync(new URL(`./${filename}`, import.meta.url), "utf8");
+      expect(source).not.toContain("<ForecastProvenanceBadge");
+      expect(source).not.toContain("<ForecastMetricDefinitions");
     }
   });
 });

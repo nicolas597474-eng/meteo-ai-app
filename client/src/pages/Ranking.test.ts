@@ -59,7 +59,7 @@ describe("page Fiabilité", () => {
     expect(source).toContain("Historique des prévisions");
     expect(source).toContain('href="/history"');
     expect(source).toContain("graphiques complets, les observations archivées et les comparaisons par modèle");
-    expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("<ForecastProvenanceBadge"));
+    expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("Rayon de recherche"));
     expect(source).toContain("border-emerald-400/60");
   });
 
