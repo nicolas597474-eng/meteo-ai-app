@@ -65,8 +65,12 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("nord géographique");
     expect(source).toContain("Localisation en cours");
     expect(source).toContain("eclipse-user-location-marker");
-    expect(source).toContain("Me localiser dans la carte agrandie");
-    expect(source).toContain("right-3 top-[116px]");
+    expect(source).toContain("Centrer la carte sur ma position");
+    expect(source).toContain('absolute right-3 top-3 z-20 grid h-12 w-12');
+    expect(source).toContain('absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4');
+    expect(source).toContain("Zoom manuel de la carte");
+    expect(source).toContain("adjustExpandedZoom");
+    expect(source).toContain("zoomControl={!isExpanded}");
     expect(source).toContain("bottom-[112px] right-3");
     expect(source).toContain("bottom-full right-0 mb-3 w-60");
     expect(source).not.toContain("flex flex-col items-end gap-3");
@@ -87,6 +91,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Repère de rose");
     expect(source).toContain("Détails de la boussole");
     expect(source).toContain("Ouvrir les détails de la boussole");
+    expect(source).toContain("map-control-cluster absolute left-3 top-3 z-20");
     expect(source).toContain("isCompassDetailsOpen");
     expect(source).toContain("Comment lire la boussole");
     expect(source).not.toContain("Recentrer sur la zone initiale de l’éclipse");

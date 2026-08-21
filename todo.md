@@ -2845,3 +2845,5 @@
 - [x] Reproduire fidèlement le style de la référence pour le centrage et le contrôle de zoom, sans changer leurs positions.
 - [x] Reproduire fidèlement le contrôle + / − et le bouton de fermeture selon la géométrie de la référence, à position constante.
 - [x] Réduire uniformément les commandes de centrage, zoom et fermeture à droite de la carte agrandie sans modifier leurs positions.
+- [x] Reproduire dans la carte de visibilité d’éclipse agrandie les mêmes commandes et emplacements que la carte des stations.
+- [x] Conserver strictement les positions actuelles de la boussole et du bouton d’opacité de la carte d’éclipse.
