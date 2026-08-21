@@ -2843,3 +2843,4 @@
 - [x] Aligner les commandes de centrage et de zoom de la carte agrandie dans une colonne de référence sur le côté droit.
 - [x] Conserver la position actuelle des commandes et appliquer le design clair de la référence aux boutons de centrage et de zoom.
 - [x] Reproduire fidèlement le style de la référence pour le centrage et le contrôle de zoom, sans changer leurs positions.
+- [x] Reproduire fidèlement le contrôle + / − et le bouton de fermeture selon la géométrie de la référence, à position constante.
