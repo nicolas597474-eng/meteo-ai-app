@@ -2803,3 +2803,4 @@
 - [x] Augmenter de nouveau la hauteur des pastilles Accord tout en conservant leur centrage et leur détail tactile.
 - [x] Afficher les panneaux Prévision horaire officielle et Deux indicateurs différents ouverts au-dessus des autres cartes du Dashboard.
 - [x] Uniformiser les pastilles Note par modèle afin que leur texte reste sur une ligne sur mobile.
+- [x] Attribuer une couleur distinctive à chaque diagramme de modèle dans l’évolution d’humidité.

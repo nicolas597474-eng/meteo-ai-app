@@ -280,13 +280,34 @@ function MetricEvidenceFigure({ points }: { points: any[] }) {
   return <div className="space-y-2">{usable.slice(0, 8).map((point, index) => <div key={`${point.date}-${point.serviceName}-${index}`} className="rounded-lg border border-slate-800 bg-[#090d14] p-2.5"><div className="flex items-center justify-between gap-3 text-[10px]"><span className="truncate text-slate-300">{point.serviceName} · {point.date}</span><span className="font-semibold text-white">MAE {metric(point.maeTemp, " °C", 2)}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.min(100, (Number(point.maeTemp) / highest) * 100)}%` }} /></div></div>)}</div>;
 }
 
+const HUMIDITY_MODEL_PALETTES = [
+  { bar: "bg-cyan-400/80", border: "border-cyan-400/25", text: "text-cyan-100" },
+  { bar: "bg-orange-400/80", border: "border-orange-400/25", text: "text-orange-100" },
+  { bar: "bg-emerald-400/80", border: "border-emerald-400/25", text: "text-emerald-100" },
+  { bar: "bg-violet-400/80", border: "border-violet-400/25", text: "text-violet-100" },
+  { bar: "bg-rose-400/80", border: "border-rose-400/25", text: "text-rose-100" },
+  { bar: "bg-amber-400/80", border: "border-amber-400/25", text: "text-amber-100" },
+  { bar: "bg-sky-400/80", border: "border-sky-400/25", text: "text-sky-100" },
+  { bar: "bg-teal-400/80", border: "border-teal-400/25", text: "text-teal-100" },
+] as const;
+
 function HumidityTimelineFigure({ points }: { points: any[] }) {
   const usable = points.filter((point) => point.humidityMae !== null && point.humidityMae !== undefined);
   if (usable.length === 0) return <EmptyFigure title="Évolution humidité" reason="Aucune MAE d’humidité qualifiée n’est archivée sur cette période." />;
   const highest = Math.max(...usable.map((point) => Number(point.humidityMae)), 0.1);
   const grouped = new Map<string, any[]>();
   usable.forEach((point) => grouped.set(point.serviceName, [...(grouped.get(point.serviceName) ?? []), point]));
-  return <section className="rounded-xl border border-violet-500/25 bg-violet-500/[0.045] p-3" aria-label="Évolution des performances d’humidité"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-violet-100">Évolution des performances d’humidité</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">MAE quotidienne qualifiée par modèle : plus la barre est courte, plus l’écart moyen d’humidité est faible.</p></div><span className="shrink-0 rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-[9px] font-semibold text-violet-100">{usable.length} point(s)</span></div><div className="mt-3 space-y-2">{Array.from(grouped.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([name, series]) => <article key={name} className="rounded-lg border border-violet-400/15 bg-slate-950/25 p-2.5"><div className="flex items-center justify-between gap-2"><p className="truncate text-xs font-semibold text-slate-200">{name}</p><p className="text-[10px] text-slate-400">{series.length} mesure(s)</p></div><div className="mt-2 flex items-end gap-1" aria-label={`Évolution de la MAE d’humidité pour ${name}`}>{[...series].sort((left, right) => String(left.date).localeCompare(String(right.date))).map((point) => { const height = Math.max(8, Math.round((Number(point.humidityMae) / highest) * 44)); return <div key={`${point.date}-${point.serviceName}`} className="flex min-w-0 flex-1 flex-col items-center gap-1"><span className="text-[9px] font-semibold text-violet-100">{Number(point.humidityMae).toFixed(1)}%</span><div className="w-full rounded-t bg-violet-400/75" style={{ height }} title={`${point.date} · MAE ${Number(point.humidityMae).toFixed(2)} % · score ${point.humidityScore == null ? "—" : `${Math.round(Number(point.humidityScore))}/100`}`} /><span className="truncate text-[8px] text-slate-500">{String(point.date).slice(5)}</span></div>; })}</div></article>)}</div></section>;
+  const seriesByModel = Array.from(grouped.entries()).sort(([left], [right]) => left.localeCompare(right));
+  return <section className="rounded-xl border border-violet-500/25 bg-violet-500/[0.045] p-3" aria-label="Évolution des performances d’humidité">
+    <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-violet-100">Évolution des performances d’humidité</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">MAE quotidienne qualifiée par modèle : plus la barre est courte, plus l’écart moyen d’humidité est faible.</p></div><span className="shrink-0 rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-[9px] font-semibold text-violet-100">{usable.length} point(s)</span></div>
+    <div className="mt-3 space-y-2">{seriesByModel.map(([name, series], modelIndex) => {
+      const palette = HUMIDITY_MODEL_PALETTES[modelIndex % HUMIDITY_MODEL_PALETTES.length];
+      return <article key={name} className={`rounded-lg border bg-slate-950/25 p-2.5 ${palette.border}`}>
+        <div className="flex items-center justify-between gap-2"><p className={`truncate text-xs font-semibold ${palette.text}`}>{name}</p><p className="text-[10px] text-slate-400">{series.length} mesure(s)</p></div>
+        <div className="mt-2 flex items-end gap-1" aria-label={`Évolution de la MAE d’humidité pour ${name}`}>{[...series].sort((left, right) => String(left.date).localeCompare(String(right.date))).map((point) => { const height = Math.max(8, Math.round((Number(point.humidityMae) / highest) * 44)); return <div key={`${point.date}-${point.serviceName}`} className="flex min-w-0 flex-1 flex-col items-center gap-1"><span className={`text-[9px] font-semibold ${palette.text}`}>{Number(point.humidityMae).toFixed(1)}%</span><div className={`w-full rounded-t ${palette.bar}`} style={{ height }} title={`${point.date} · MAE ${Number(point.humidityMae).toFixed(2)} % · score ${point.humidityScore == null ? "—" : `${Math.round(Number(point.humidityScore))}/100`}`} /><span className="truncate text-[8px] text-slate-500">{String(point.date).slice(5)}</span></div>; })}</div>
+      </article>;
+    })}</div>
+  </section>;
 }
 
 function KeyValue({ label, value }: { label: string; value: string }) { return <div><p className="text-[10px] text-slate-500">{label}</p><p className="mt-0.5 text-xs font-medium text-slate-200">{value}</p></div>; }
