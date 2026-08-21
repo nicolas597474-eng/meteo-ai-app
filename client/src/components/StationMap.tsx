@@ -215,50 +215,50 @@ rotateControl: false,
             setMapReady(true);
           }}
         />
-        {isExpanded && (
-          <button
-            type="button"
-            onClick={() => {
-              streetViewRef.current?.setVisible(false);
-              setIsExpanded(false);
-            }}
-            aria-label="Fermer la carte agrandie"
-            className="absolute right-3 top-3 z-10 min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-sm font-semibold text-sky-100 shadow-none"
-          >
-            ✕ Fermer la carte
-          </button>
-        )}
         {isExpanded && mapReady && (
-          <button
-            type="button"
-            onClick={focusCurrentLocation}
-            aria-label="Centrer la carte sur le lieu actif"
-            className="absolute left-3 top-16 z-10 min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-xs font-semibold text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          >
-            Centrer
-          </button>
-        )}
-        {isExpanded && mapReady && (
-          <div className="absolute right-3 top-16 z-10 flex flex-col gap-2" aria-label="Zoom manuel de la carte">
+          <div className="absolute bottom-16 right-3 z-10 flex flex-col items-end gap-2" aria-label="Commandes de la carte">
+            {isExpanded && (
+              <button
+                type="button"
+                onClick={() => {
+                  streetViewRef.current?.setVisible(false);
+                  setIsExpanded(false);
+                }}
+                aria-label="Fermer la carte agrandie"
+                className="min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-sm font-semibold text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              >
+                ✕ Fermer la carte
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => adjustExpandedZoom(1)}
-              aria-label="Zoomer"
-              className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              onClick={focusCurrentLocation}
+              aria-label="Centrer la carte sur le lieu actif"
+              className="min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-xs font-semibold text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
             >
-              +
+              Centrer
             </button>
-            <div aria-live="polite" className="grid h-8 w-10 place-items-center rounded-md border border-slate-600 bg-[#071018]/95 text-[10px] font-semibold text-slate-200">
-              Zoom {zoomLevel}
+            <div className="flex flex-col items-end gap-2" aria-label="Zoom manuel de la carte">
+              <button
+                type="button"
+                onClick={() => adjustExpandedZoom(1)}
+                aria-label="Zoomer"
+                className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              >
+                +
+              </button>
+              <div aria-live="polite" className="grid h-8 w-10 place-items-center rounded-md border border-slate-600 bg-[#071018]/95 text-[10px] font-semibold text-slate-200">
+                Zoom {zoomLevel}
+              </div>
+              <button
+                type="button"
+                onClick={() => adjustExpandedZoom(-1)}
+                aria-label="Dézoomer"
+                className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              >
+                −
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => adjustExpandedZoom(-1)}
-              aria-label="Dézoomer"
-              className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-            >
-              −
-            </button>
           </div>
         )}
         {!mapReady && (

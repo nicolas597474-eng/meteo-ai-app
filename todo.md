@@ -2837,3 +2837,5 @@
 - [x] Ajouter une action permettant de revenir au cadrage normal de la carte après le zoom.
 - [x] Ajouter dans la carte agrandie des boutons + et − espacés de la fermeture et des commandes natives, sans chevauchement.
 - [x] Ajouter un bouton de centrage dans la carte agrandie, afficher le niveau de zoom et permettre le choix Satellite/Plan dans la vue compacte.
+- [x] Repositionner les commandes personnalisées de la carte agrandie en bas à droite, avec des espaces réguliers entre chaque bouton.
+- [x] Conserver uniquement les commandes Plan et Satellite en haut de la carte agrandie.

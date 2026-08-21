@@ -24,7 +24,11 @@ describe("carte des stations", () => {
     expect(source).toContain("Revenir au cadrage normal de la carte");
     expect(source).toContain("const adjustExpandedZoom = useCallback");
     expect(source).toContain("map.setZoom(Math.max(2, Math.min(20, currentZoom + delta)))");
-    expect(source).toContain('absolute right-3 top-16 z-10 flex flex-col gap-2');
+    expect(source).toContain('absolute bottom-16 right-3 z-10 flex flex-col items-end gap-2');
+    expect(source).toContain('flex flex-col items-end gap-2');
+    expect(source).not.toContain('absolute right-3 top-3 z-10 min-h-10');
+    expect(source).not.toContain('absolute left-3 top-16 z-10');
+    expect((source.match(/aria-label="Fermer la carte agrandie"/g) ?? []).length).toBe(1);
     expect(source).toContain('aria-label="Zoomer"');
     expect(source).toContain('aria-label="Dézoomer"');
     expect(source).toContain("streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER }");
