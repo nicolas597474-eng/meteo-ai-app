@@ -64,6 +64,11 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('Évolution · {nextRegimeChange');
     expect(source).toContain('text-white">{displayedCondition');
     expect(source).toContain('text-white">{nextRegimeChange ? nextRegimeChange.label');
+    expect(source).toContain("Confiance prévision");
+    expect(source).toContain("isForecastInfoOpen");
+    expect(source).toContain('aria-controls="forecast-information-panel"');
+    expect(source).toContain('id="forecast-information-panel"');
+    expect(source).toContain("Fermer les informations de prévision et de confiance");
     expect(source).toContain("Créneaux horaires indisponibles");
     expect(source).toContain("Dernière fusion quotidienne réelle");
     expect(source).toContain('isDailyFallback ? "Tendance quotidienne · " : "Phénomène actuel · "');

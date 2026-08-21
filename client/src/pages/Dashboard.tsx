@@ -241,6 +241,7 @@ export default function Dashboard() {
   const [personalCondition, setPersonalCondition] = useState<(typeof PERSONAL_CONDITION_OPTIONS)[number]["id"]>("partly_cloudy");
   const [personalSubmitResult, setPersonalSubmitResult] = useState<{ notice: string; topModel?: { modelName: string; overallScore: number } } | null>(null);
   const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
+  const [isForecastInfoOpen, setIsForecastInfoOpen] = useState(false);
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
   const [editingPersonalObservation, setEditingPersonalObservation] = useState<{ id: number; temperature: string; windSpeed: string; precipitation: string; condition: (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] } | null>(null);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
@@ -603,9 +604,6 @@ export default function Dashboard() {
           activeWeather={activeFavoriteWeather}
         />
 
-        <ForecastProvenanceBadge data={forecastProvenance} />
-        <ForecastMetricDefinitions className="mt-3" />
-
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">
           {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
@@ -881,8 +879,18 @@ export default function Dashboard() {
                 <p className="text-sm font-semibold sm:text-lg">{currentCloudCover ?? "—"}%</p>
               </div>
               <div className="text-center">
-                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
+                  <p className="mb-0 flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                     <Activity className="h-3 w-3" />Confiance prévision
+                    <button
+                      type="button"
+                      onClick={() => setIsForecastInfoOpen((open) => !open)}
+                      aria-expanded={isForecastInfoOpen}
+                      aria-controls="forecast-information-panel"
+                      aria-label={isForecastInfoOpen ? "Masquer les informations de confiance" : "Afficher les informations de confiance"}
+                      className="inline-flex size-5 items-center justify-center rounded-full text-sky-200 transition-colors hover:bg-sky-400/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    >
+                      {isForecastInfoOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                    </button>
                   </p>
                 <p className={`text-sm font-semibold sm:text-lg ${stabilityColor(forecastConfidence)}`}>
                   {Math.round(forecastConfidence)}%
@@ -892,6 +900,24 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {isForecastInfoOpen && (
+          <section id="forecast-information-panel" className="relative" aria-label="Informations de prévision et de confiance">
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsForecastInfoOpen(false)}
+                aria-label="Fermer les informations de prévision et de confiance"
+                title="Fermer"
+                className="inline-flex size-8 items-center justify-center rounded-full border border-slate-600 bg-slate-900/90 text-slate-200 transition-colors hover:border-sky-300/65 hover:bg-sky-400/15 hover:text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <ForecastProvenanceBadge data={forecastProvenance} />
+            <ForecastMetricDefinitions className="mt-3" />
+          </section>
+        )}
 
         <div className="dashboard-sky-card flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />

@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Placer une flèche de divulgation à droite de Confiance prévision.
+- [x] Masquer initialement les panneaux Prévision horaire officielle et Deux indicateurs différents.
+- [x] Ouvrir les deux panneaux ensemble avec la flèche et les fermer avec une croix tactile accessible.
 - [x] Rétablir le régime dominant dans la carte météo principale au-dessus de la température.
 - [x] Retirer le panneau de régime intermédiaire entre Contexte et Mes observations.
 - [x] Vérifier que les détails et probabilités du régime restent inchangés.
