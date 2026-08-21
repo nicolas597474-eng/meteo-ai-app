@@ -233,16 +233,20 @@ rotateControl: false,
                 type="button"
                 onClick={focusCurrentLocation}
                 aria-label="Centrer la carte sur le lieu actif"
-                className="grid h-14 w-14 place-items-center rounded-full border border-[#d8e1e8] bg-white text-3xl font-medium leading-none text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                className="grid h-16 w-16 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
               >
-                ⊙
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 fill-none stroke-current" strokeWidth="2.6">
+                  <circle cx="12" cy="12" r="6.2" />
+                  <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
+                  <path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3" strokeLinecap="round" />
+                </svg>
               </button>
-              <div className="overflow-hidden rounded-sm border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.22)]" aria-label="Zoom manuel de la carte">
+              <div className="overflow-hidden rounded-none border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.22)]" aria-label="Zoom manuel de la carte">
                 <button
                   type="button"
                   onClick={() => adjustExpandedZoom(1)}
                   aria-label="Zoomer"
-                  className="grid h-14 w-14 place-items-center border-b border-[#e0e6eb] text-5xl font-extralight leading-none text-slate-600 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                  className="grid h-16 w-16 place-items-center border-b border-[#e8e8e8] text-5xl font-extralight leading-none text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
                 >
                   +
                 </button>
@@ -250,7 +254,7 @@ rotateControl: false,
                   type="button"
                   onClick={() => adjustExpandedZoom(-1)}
                   aria-label="Dézoomer"
-                  className="grid h-14 w-14 place-items-center text-5xl font-extralight leading-none text-slate-600 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                  className="grid h-16 w-16 place-items-center text-5xl font-extralight leading-none text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
                 >
                   −
                 </button>

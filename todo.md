@@ -2842,3 +2842,4 @@
 - [x] Ajouter une légende repliable expliquant les marqueurs du lieu de référence et des stations selon la fraîcheur de leur relevé.
 - [x] Aligner les commandes de centrage et de zoom de la carte agrandie dans une colonne de référence sur le côté droit.
 - [x] Conserver la position actuelle des commandes et appliquer le design clair de la référence aux boutons de centrage et de zoom.
+- [x] Reproduire fidèlement le style de la référence pour le centrage et le contrôle de zoom, sans changer leurs positions.
