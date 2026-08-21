@@ -87,7 +87,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('px-3 pb-3 pt-1 sm:p-6');
     expect(source).not.toContain('mb-0.5 flex justify-center sm:mb-3');
     expect(source).toContain('mb-1 flex justify-center sm:mb-1.5');
-    expect(source).toContain('Régime de prévision dominant</p>');
+    expect(source).toContain("État du ciel</p>");
+    expect(source).toContain("Phénomène actuel");
     expect(source).toContain('{panelDate}');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');
     expect(source).not.toContain('aria-label="Actualiser la météo maintenant"');

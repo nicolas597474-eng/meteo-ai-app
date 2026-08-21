@@ -169,7 +169,7 @@ function DominantRegimePanel({
         >
           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-950/35 text-sm sm:h-7 sm:w-7 sm:text-base">{regime.emoji}</span>
           <div className="min-w-0">
-            <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">Régime de prévision dominant</p>
+            <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">État du ciel</p>
             <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
             <p className="hidden text-xs leading-tight text-muted-foreground sm:block">{regime.description}</p>
             <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>
@@ -637,7 +637,7 @@ export default function Dashboard() {
                   >
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-950/35 text-sm sm:h-7 sm:w-7 sm:text-base">{regime?.emoji}</span>
                     <div className="min-w-0">
-                      <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">Régime de prévision dominant</p>
+                      <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">État du ciel</p>
                       <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime?.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime?.description}</p>
                       <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>

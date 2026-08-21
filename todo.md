@@ -2813,3 +2813,4 @@
 - [x] Mettre en évidence le meilleur modèle réellement classé dans la section Prévisions.
 - [x] Ajouter en tête du lexique une présentation claire de la philosophie et de l’objectif de MeteoAI.
 - [x] Ajouter des conditions observées plus précises, notamment Très nuageux et Quelques gouttes, avec leurs correspondances de comparaison.
+- [x] Renommer le libellé de nébulosité en État du ciel pour le distinguer du phénomène actuel.
