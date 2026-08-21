@@ -355,8 +355,7 @@ export default function WeatherDetails() {
                         <DetailCell label="Lever" value={day.sunrise ?? "—"} />
                         <DetailCell label="Coucher" value={day.sunset ?? "—"} />
                         <DetailCell label="Humidité" value={`${day.humidity?.toFixed(0) ?? "—"}%`} />
-                        <DetailCell label="Vent" value={`${day.windSpeed?.toFixed(0) ?? "—"} km/h`} />
-                        <DetailCell label="Rafales" value={`${day.windGust?.toFixed(0) ?? "—"} km/h`} />
+                        <DetailCell label="Vent" value={`${day.windSpeed?.toFixed(0) ?? "—"} km/h${day.windGust != null ? ` · raf. ${day.windGust.toFixed(0)}` : ""}`} />
                         <DetailCell label="Précip." value={`${day.precipitation?.toFixed(1) ?? "0"} mm`} />
                         <DetailCell label="UV" value={`${(day as any).uvIndex?.toFixed(0) ?? "—"}`} />
                       </div>

@@ -2785,3 +2785,4 @@
 - [x] Afficher des détails de conditions météorologiques uniquement lorsqu’ils sont disponibles dans chaque créneau horaire.
 - [x] Retirer Visibilité et Rayonnement des détails de conditions des cartes horaires.
 - [x] Afficher la direction cardinale du vent avec la vitesse et les rafales dans chaque carte horaire.
+- [x] Harmoniser le libellé et l’unité des rafales dans les cartes quotidiennes avec les cartes horaires.

@@ -41,6 +41,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).not.toContain("Rayonnement ${hour.solarRadiation.toFixed(0)} W/m²");
     expect(source).toContain("windDirectionText(h.windDirection)");
     expect(source).toContain("Nord-nord-est");
+    expect(source).toContain('DetailCell label="Vent" value={`${day.windSpeed?.toFixed(0) ?? "—"} km/h${day.windGust != null ? ` · raf. ${day.windGust.toFixed(0)}` : ""}`}');
+    expect(source).not.toContain('DetailCell label="Rafales" value={`${day.windGust?.toFixed(0) ?? "—"} km/h`}');
     expect(source).toContain("windSpeedSpread");
     expect(source).toContain("humiditySpread");
     expect(source).toContain("cloudCoverSpread");
