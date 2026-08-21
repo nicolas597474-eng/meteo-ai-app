@@ -238,6 +238,10 @@ img.moon-3d-first-crescent {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .eclipse-visibility-live {
+    animation: meteoai-eclipse-pulse 1.8s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  }
+
   .realistic-moon-glow {
     animation: meteoai-lunar-glow 4.8s cubic-bezier(0.23, 1, 0.32, 1) infinite alternate;
   }
@@ -250,6 +254,11 @@ img.moon-3d-first-crescent {
       filter: brightness(1.08);
     }
   }
+}
+
+@keyframes meteoai-eclipse-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(125 211 252 / 0); }
+  50% { box-shadow: 0 0 0 5px rgb(125 211 252 / 0.15), 0 0 18px rgb(125 211 252 / 0.22); }
 }
 
 /* Surfaces MeteoAI : dégradés minéraux sombres, lisibles sur mobile et cohérents entre les pages. */

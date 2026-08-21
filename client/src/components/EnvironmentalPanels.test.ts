@@ -201,6 +201,8 @@ describe("EnvironmentalPanels", () => {
     expect(temporalSunMoonSource).toContain("displayTimeInZone(value, astronomy.timezone)");
     expect(source).toContain("Visibilité locale");
     expect(source).toContain("getEclipseCircumstances.useQuery");
+    expect(source).toContain("isEclipseInProgress");
+    expect(source).toContain("eclipse-visibility-live");
     expect(temporalSunMoonSource).toContain("<RealisticMoon phase={moonPhase}");
     expect(source).toContain("rotate(${phase.brightLimbAngleDeg}deg)");
     expect(temporalSunMoonSource).toContain("moon: { label: position.lunar.label");

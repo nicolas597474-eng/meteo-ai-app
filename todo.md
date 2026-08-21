@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Déterminer l’état « éclipse en cours » exclusivement depuis les circonstances locales début/fin.
+- [x] Ajouter un clignotement discret seulement dans cette fenêtre, avec respect de prefers-reduced-motion.
+- [x] Tester les états avant, pendant et après l’éclipse sans animation hors fenêtre.
 - [x] Identifier les circonstances locales d’éclipse déjà calculées pour le lieu actif.
 - [x] Afficher un indicateur de visibilité locale accompagné d’une infobulle accessible.
 - [x] Couvrir les états visible, partielle et indisponible sans valeur fictive.
