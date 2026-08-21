@@ -2685,6 +2685,8 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Descendre l’indication sous l’horizon tout en conservant une grille d’espacement identique avec l’arche et les horaires.
+- [x] Vérifier l’alignement régulier sur mobile et desktop avant publication.
 - [x] Placer l’indication Soleil/Lune sous l’horizon dans une zone distincte de l’arche.
 - [x] Réserver un espacement clair avant les horaires Lever/Coucher et Soleil/Lune.
 - [x] Vérifier l’absence de chevauchement sur mobile et desktop.
