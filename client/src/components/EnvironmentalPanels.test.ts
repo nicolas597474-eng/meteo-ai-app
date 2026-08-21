@@ -203,6 +203,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("getEclipseCircumstances.useQuery");
     expect(source).toContain("isEclipseInProgress");
     expect(source).toContain("eclipse-visibility-live");
+    expect(source).toContain("Suivi plein écran");
+    expect(source).toContain("Quitter le plein écran");
     expect(temporalSunMoonSource).toContain("<RealisticMoon phase={moonPhase}");
     expect(source).toContain("rotate(${phase.brightLimbAngleDeg}deg)");
     expect(temporalSunMoonSource).toContain("moon: { label: position.lunar.label");

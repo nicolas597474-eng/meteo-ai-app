@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Ajouter un bouton de mode plein écran au suivi de l’éclipse et de ses circonstances locales.
+- [x] Prévoir une sortie accessible, la touche Échap et un repli lorsque le navigateur refuse le plein écran.
+- [x] Vérifier le mode immersif sur mobile sans masquer les informations de visibilité locale.
 - [x] Déterminer l’état « éclipse en cours » exclusivement depuis les circonstances locales début/fin.
 - [x] Ajouter un clignotement discret seulement dans cette fenêtre, avec respect de prefers-reduced-motion.
 - [x] Tester les états avant, pendant et après l’éclipse sans animation hors fenêtre.
