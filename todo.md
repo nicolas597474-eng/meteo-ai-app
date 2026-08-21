@@ -2839,3 +2839,4 @@
 - [x] Ajouter un bouton de centrage dans la carte agrandie, afficher le niveau de zoom et permettre le choix Satellite/Plan dans la vue compacte.
 - [x] Repositionner les commandes personnalisées de la carte agrandie en bas à droite, avec des espaces réguliers entre chaque bouton.
 - [x] Conserver uniquement les commandes Plan et Satellite en haut de la carte agrandie.
+- [x] Ajouter une légende repliable expliquant les marqueurs du lieu de référence et des stations selon la fraîcheur de leur relevé.

@@ -39,6 +39,11 @@ describe("carte des stations", () => {
     expect(source).toContain("Plan");
     expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
     expect(source).toContain("Zoom {zoomLevel}");
+    expect(source).toContain("Légende des marqueurs");
+    expect(source).toContain("Bleu</strong> — lieu de référence");
+    expect(source).toContain("Vert</strong> — station avec relevé de moins de 90 min");
+    expect(source).toContain("Ambre</strong> — station avec relevé de plus de 90 min");
+    expect(source).toContain("group-open:rotate-180");
     expect(source).toContain("streetViewControl={false}");
     expect(source).toContain("rotateControl={false}");
     expect(source).toContain("mapTypeControl: isExpanded");

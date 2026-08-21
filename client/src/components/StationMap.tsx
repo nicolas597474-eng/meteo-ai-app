@@ -294,6 +294,17 @@ rotateControl: false,
               Agrandir la carte
             </button>
           </div>
+          <details className="group rounded-xl border border-slate-700 bg-[#0b1524]">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-xs font-semibold text-slate-200 [&::-webkit-details-marker]:hidden">
+              <span>Légende des marqueurs</span>
+              <span aria-hidden="true" className="text-sky-300 transition-transform duration-200 group-open:rotate-180">⌄</span>
+            </summary>
+            <div className="grid gap-2 border-t border-slate-700 px-3 py-3 text-[11px] text-slate-300">
+              <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-blue-100 bg-blue-600" /><span><strong className="text-slate-100">Bleu</strong> — lieu de référence.</span></div>
+              <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-emerald-400" /><span><strong className="text-slate-100">Vert</strong> — station avec relevé de moins de 90 min.</span></div>
+              <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-amber-400" /><span><strong className="text-slate-100">Ambre</strong> — station avec relevé de plus de 90 min.</span></div>
+            </div>
+          </details>
         </div>
       )}
     </div>
