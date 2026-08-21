@@ -2801,3 +2801,4 @@
 - [x] Augmenter encore légèrement la hauteur des pastilles Accord en conservant le centrage du texte.
 - [x] Augmenter la hauteur et l’espacement interne de la pastille Couches nuageuses des cartes horaires.
 - [x] Augmenter de nouveau la hauteur des pastilles Accord tout en conservant leur centrage et leur détail tactile.
+- [x] Afficher les panneaux Prévision horaire officielle et Deux indicateurs différents ouverts au-dessus des autres cartes du Dashboard.

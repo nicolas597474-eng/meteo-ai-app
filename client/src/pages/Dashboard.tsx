@@ -901,23 +901,33 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {isForecastInfoOpen && (
-          <section id="forecast-information-panel" className="relative" aria-label="Informations de prévision et de confiance">
-            <div className="mb-2 flex justify-end">
+        <Dialog open={isForecastInfoOpen} onOpenChange={setIsForecastInfoOpen}>
+          <DialogContent
+            id="forecast-information-panel"
+            showCloseButton={false}
+            aria-label="Informations de prévision et de confiance"
+            className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto border-sky-300/35 bg-[#08131f]/[0.98] p-3 text-slate-100 shadow-2xl sm:max-w-xl"
+          >
+            <div className="flex items-center justify-between gap-3 pr-0">
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-base font-semibold text-slate-50">Informations de prévision</DialogTitle>
+              </DialogHeader>
               <button
                 type="button"
                 onClick={() => setIsForecastInfoOpen(false)}
                 aria-label="Fermer les informations de prévision et de confiance"
                 title="Fermer"
-                className="inline-flex size-8 items-center justify-center rounded-full border border-slate-600 bg-slate-900/90 text-slate-200 transition-colors hover:border-sky-300/65 hover:bg-sky-400/15 hover:text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/90 text-slate-200 transition-colors hover:border-sky-300/65 hover:bg-sky-400/15 hover:text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95"
               >
                 <X className="size-4" />
               </button>
             </div>
-            <ForecastProvenanceBadge data={forecastProvenance} />
-            <ForecastMetricDefinitions className="mt-3" />
-          </section>
-        )}
+            <div className="space-y-3">
+              <ForecastProvenanceBadge data={forecastProvenance} />
+              <ForecastMetricDefinitions />
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="dashboard-sky-card flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />

@@ -68,6 +68,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("isForecastInfoOpen");
     expect(source).toContain('aria-controls="forecast-information-panel"');
     expect(source).toContain('id="forecast-information-panel"');
+    expect(source).toContain('Dialog open={isForecastInfoOpen} onOpenChange={setIsForecastInfoOpen}');
+    expect(source).toContain('showCloseButton={false}');
+    expect(source).toContain('max-h-[calc(100dvh-1rem)]');
     expect(source).toContain("Fermer les informations de prévision et de confiance");
     expect(source).toContain("Créneaux horaires indisponibles");
     expect(source).toContain("Dernière fusion quotidienne réelle");
