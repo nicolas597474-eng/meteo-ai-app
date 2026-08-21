@@ -55,6 +55,7 @@ import {
   insertStationCollectionSnapshot,
   getQualifiedObservationSnapshotsForDate,
   getStoredHourlyForecasts,
+  getStationEvidenceSummary,
 } from "./db";
 
 /**
@@ -646,6 +647,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       hourly: ReturnType<typeof getModelCoverage>;
       physicalStationCount: number;
       stationCollectionDeferred: boolean;
+      stations: Awaited<ReturnType<typeof getStationEvidenceSummary>>;
     }> = [];
 
     // Deux lieux sont traités en parallèle. À l'heure actuelle, cela permet
@@ -659,6 +661,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
         // Compute locationKey for this favorite
         const locKey = makeLocationKey(fav.lat, fav.lon);
+        const stationEvidence = await getStationEvidenceSummary(locKey, fav.lat, fav.lon);
 
         // Collect physical station evidence once per unique location. Proxy
         // networks/model grid points are deliberately excluded from persistence
@@ -1059,6 +1062,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           hourly: hourlyCoverage,
           physicalStationCount,
           stationCollectionDeferred,
+          stations: stationEvidence,
         });
 
         if (!stationCollectionDeferred) {

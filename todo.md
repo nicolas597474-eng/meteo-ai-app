@@ -2685,6 +2685,12 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Intégrer au compte rendu 05h00 la fraîcheur et le statut des derniers snapshots de stations existants.
+- [x] Distinguer les stations physiques validées, candidates et indisponibles sans générer de nouveau relevé.
+- [x] Tester le bilan de stations sans modifier la cadence de collecte horaire ni l’historique.
+- [x] Auditer la couverture 05h00 des huit modèles, des favoris et des stations disponibles sans modifier la collecte.
+- [x] Présenter les options de couverture ou de rapport de collecte avant toute modification des prévisions futures.
+- [x] Valider toute correction de collecte sans réécrire l’historique météo.
 - [x] Ajouter une croix tactile et accessible pour fermer le panneau d’observation détaillé de l’Historique.
 - [x] Vérifier que la fermeture ne désélectionne ni ne modifie les données du graphique.
 - [x] Déplacer complètement le libellé Soleil/Lune sous l’arche graphique dans le flux normal de la carte.

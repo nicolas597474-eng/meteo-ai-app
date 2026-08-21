@@ -69,6 +69,8 @@ describe("collecte horaire de 05h00", () => {
     const source = readFileSync(new URL("./scheduledHandlers.ts", import.meta.url), "utf8");
     expect(source).toContain("const stationCollectionDeferred = true");
     expect(source).toContain("relevés physiques confiés à la collecte horaire dédiée");
+    expect(source).toContain("getStationEvidenceSummary");
+    expect(source).toContain("stations: stationEvidence");
   });
 });
 

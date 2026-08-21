@@ -785,8 +785,39 @@ export async function getQualifiedEvidenceStatus(locationKey: string) {
     date,
     coverageHours: snapshots.length,
     lastCollectedAt: latest[0].collectedAt,
+    latestQualifiedStationCount: latest[0].stationCount,
     qualifiedScoreCount: scores.length,
     lastQualifiedScoreAt: scores.reduce<Date | null>((current, score) => !current || score.computedAt > current ? score.computedAt : current, null),
+  };
+}
+
+/** Read only the latest persisted station evidence for a forecast-collection report. */
+export async function getStationEvidenceSummary(locationKey: string, refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      validatedStationCount: 0,
+      candidateStationCount: 0,
+      excludedStationCount: 0,
+      evidence: await getQualifiedEvidenceStatus(locationKey),
+    };
+  }
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  const stations = await db.select({
+    isActive: weatherStations.isActive,
+    qualificationStatus: weatherStations.qualificationStatus,
+  }).from(weatherStations).where(and(
+    gte(weatherStations.refLat, latBounds.min),
+    lte(weatherStations.refLat, latBounds.max),
+    gte(weatherStations.refLon, lonBounds.min),
+    lte(weatherStations.refLon, lonBounds.max),
+  ));
+  return {
+    validatedStationCount: stations.filter((station) => station.isActive === 1 && station.qualificationStatus === "validated").length,
+    candidateStationCount: stations.filter((station) => station.qualificationStatus === "candidate").length,
+    excludedStationCount: stations.filter((station) => station.isActive !== 1 || station.qualificationStatus === "excluded").length,
+    evidence: await getQualifiedEvidenceStatus(locationKey),
   };
 }
 
