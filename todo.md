@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Placer l’indication Soleil/Lune sous l’horizon dans une zone distincte de l’arche.
+- [x] Réserver un espacement clair avant les horaires Lever/Coucher et Soleil/Lune.
+- [x] Vérifier l’absence de chevauchement sur mobile et desktop.
 - [x] Ajouter des commandes séparées d’alerte visuelle et sonore, désactivées par défaut, pour le début local d’éclipse.
 - [x] Déclencher l’alerte une seule fois après activation explicite et seulement dans la fenêtre calculée.
 - [x] Préserver les permissions du navigateur et un repli silencieux lorsqu’elles sont refusées ou indisponibles.

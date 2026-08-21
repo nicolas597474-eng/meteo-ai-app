@@ -171,14 +171,14 @@
    y compris sur les écrans mobiles étroits. Un ratio 2:1 évite le sommet aplati
    produit par une ellipse trop basse. */
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 {
-  height: 12rem !important;
+  height: 13.6rem !important;
   overflow: visible !important;
 }
 
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > div:first-child {
   height: auto !important;
   aspect-ratio: 2 / 1;
-  bottom: 1rem !important;
+  bottom: 2.35rem !important;
 }
 
 /* Les astres restent lisibles par leur forme ; leurs textes ne se superposent plus à l’arche. */
@@ -191,7 +191,7 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
    sortis de leur flux afin d’apparaître clairement sous la ligne. */
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0.left-0,
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0.right-0 {
-  bottom: 1.15rem !important;
+  bottom: 2.5rem !important;
 }
 
 section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0 > small {
@@ -649,6 +649,8 @@ img.moon-3d-first-crescent {
 }
 
 .celestial-below-horizon-label {
+  bottom: 0.3rem !important;
+  display: block;
   font-size: 0.68rem;
   line-height: 1.1;
   padding: 0.18rem 0.45rem;

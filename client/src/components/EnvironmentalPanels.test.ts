@@ -132,10 +132,11 @@ describe("EnvironmentalPanels", () => {
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
     expect(source).toContain("rounded-t-full");
     expect(styles).toContain("Qualité de l’air, soleil et lune");
-    expect(styles).toContain("height: 12rem !important");
+    expect(styles).toContain("height: 13.6rem !important");
     expect(styles).toContain("aspect-ratio: 2 / 1");
     expect(styles).toContain("ratio 2:1 évite le sommet aplati");
-    expect(styles).toContain("bottom: 1.15rem !important");
+    expect(styles).toContain("bottom: 2.5rem !important");
+    expect(styles).toContain("bottom: 0.3rem !important");
     expect(styles).toContain("top: calc(100% + 0.75rem)");
     expect(styles).toContain("text-amber-100");
     expect(styles).toContain("text-indigo-100");
