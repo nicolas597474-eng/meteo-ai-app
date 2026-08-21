@@ -29,8 +29,9 @@ const HORIZONS: Array<{ id: HorizonId; label: string }> = [
   { id: "11-15d", label: "11–15 jours" },
 ];
 
-const SECTIONS = ["Vue générale", "Tendances provisoires", "Modèles"] as const;
+const SECTIONS = ["Scores globaux", "Tendances provisoires", "Vue générale", "Modèles"] as const;
 const SECTION_IDS: Record<(typeof SECTIONS)[number], string> = {
+  "Scores globaux": "scores-globaux",
   "Vue générale": "vue-generale",
   "Tendances provisoires": "tendances-provisoires",
   "Modèles": "modeles",
@@ -101,7 +102,7 @@ export default function ReliabilityLaboratory() {
   const { style: pageSkyStyle } = usePageWeatherSky();
   const [period, setPeriod] = useState<PeriodId>("7d");
   const [horizon, setHorizon] = useState<HorizonId>("6-24h");
-  const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]>("Vue générale");
+  const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]>("Scores globaux");
   const [sortBy, setSortBy] = useState<SortId>("score");
   const locationName = activeLocation?.name ?? "Hondeghem";
   const input = useMemo(() => ({
@@ -183,6 +184,22 @@ export default function ReliabilityLaboratory() {
         </MeteoSurface>
 
         {isLoading ? <div className="space-y-4"><div className="h-32 animate-pulse rounded-2xl bg-slate-900" /><div className="h-64 animate-pulse rounded-2xl bg-slate-900" /><div className="h-64 animate-pulse rounded-2xl bg-slate-900" /></div> : isError || !data ? <MeteoSurface tone="lab" className="rounded-2xl p-5"><Insufficient title="Laboratoire indisponible" detail="La lecture des données de fiabilité a échoué. Aucun résultat n’est affiché tant que les données réelles ne sont pas accessibles." /></MeteoSurface> : <>
+          <section className="mb-4 scroll-mt-20" id="scores-globaux">
+            <GlobalScoreTimelineFigure points={scoreTimeline} />
+          </section>
+          <section className="mb-4 scroll-mt-20" id="tendances-provisoires">
+            <MeteoSurface tone="lab" className="rounded-2xl p-4">
+              <SectionHeading title="Tendances provisoires" description="Ces indicateurs montrent les mesures déjà disponibles par paramètre. Leur note décrit la couverture des preuves, pas une fiabilité prédictive validée ni une performance par condition météo." icon="trending" />
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <ProvisionalTrendCard title="Température" detail="MAE la plus faible observée" models={provisionalTrends.temperature} value={(model) => metric(model.metrics.temperature.mae, " °C", 2)} accent="text-orange-200" />
+                <ProvisionalTrendCard title="Pluie" detail="Score de précipitation le plus élevé observé" models={provisionalTrends.precipitation} value={(model) => metric(model.metrics.precipitation.score, "/100", 0)} accent="text-sky-200" />
+                <ProvisionalTrendCard title="Vent" detail="MAE la plus faible observée" models={provisionalTrends.wind} value={(model) => metric(model.metrics.wind.mae, " km/h", 2)} accent="text-cyan-200" />
+                <ProvisionalTrendCard title="Humidité" detail="MAE la plus faible observée" models={provisionalTrends.humidity} value={(model) => metric(model.metrics.humidity.mae, " %", 2)} accent="text-violet-200" />
+              </div>
+              <p className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-[11px] leading-relaxed text-sky-100">Note de preuve provisoire : elle compare le volume réellement archivé à 72 comparaisons et 7 jours. Elle mesure la solidité de l’échantillon, pas la performance future du modèle. Le classement officiel reste masqué tant que le score normalisé complet et les régimes météorologiques ne sont pas archivés.</p>
+            </MeteoSurface>
+          </section>
+
           <MeteoSurface tone="lab" className="mb-4 scroll-mt-20 rounded-2xl p-4" id="vue-generale">
             <SectionHeading title="Fiabilité en bref" description="Voici uniquement ce qui est actuellement mesuré et utilisable pour ce lieu, cette période et cette échéance." icon="confidence" />
             <div className="grid grid-cols-2 gap-y-4 sm:grid-cols-4">
@@ -193,20 +210,6 @@ export default function ReliabilityLaboratory() {
             </div>
             <div className={`mt-4 rounded-xl border px-3 py-3 ${hasClassifiableEvidence ? "border-emerald-500/25 bg-emerald-500/[0.05]" : "border-sky-500/30 bg-sky-500/[0.06]"}`}><p className="text-sm font-semibold text-slate-100">{hasClassifiableEvidence ? "Le classement est utilisable" : "Classement en préparation"}</p><p className="mt-1 text-xs leading-relaxed text-slate-400">{hasClassifiableEvidence ? "Les scores affichés reposent sur des comparaisons complètes. Les détails secondaires restent volontairement masqués pour faciliter la lecture." : "Les relevés commencent à être archivés, mais les comparaisons ne sont pas encore assez nombreuses ou complètes pour classer les modèles sans risque d’interprétation."}</p></div>
           </MeteoSurface>
-
-          <section className="mb-4 scroll-mt-20" id="tendances-provisoires">
-            <MeteoSurface tone="lab" className="rounded-2xl p-4">
-              <SectionHeading title="Tendances provisoires" description="Ces indicateurs montrent les mesures déjà disponibles par paramètre. Leur note décrit la couverture des preuves, pas une fiabilité prédictive validée ni une performance par condition météo." icon="trending" />
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <ProvisionalTrendCard title="Température" detail="MAE la plus faible observée" models={provisionalTrends.temperature} value={(model) => metric(model.metrics.temperature.mae, " °C", 2)} accent="text-orange-200" />
-                <ProvisionalTrendCard title="Pluie" detail="Score de précipitation le plus élevé observé" models={provisionalTrends.precipitation} value={(model) => metric(model.metrics.precipitation.score, "/100", 0)} accent="text-sky-200" />
-                <ProvisionalTrendCard title="Vent" detail="MAE la plus faible observée" models={provisionalTrends.wind} value={(model) => metric(model.metrics.wind.mae, " km/h", 2)} accent="text-cyan-200" />
-                <ProvisionalTrendCard title="Humidité" detail="MAE la plus faible observée" models={provisionalTrends.humidity} value={(model) => metric(model.metrics.humidity.mae, " %", 2)} accent="text-violet-200" />
-              </div>
-              <div className="mt-3"><GlobalScoreTimelineFigure points={scoreTimeline} /></div>
-              <p className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-[11px] leading-relaxed text-sky-100">Note de preuve provisoire : elle compare le volume réellement archivé à 72 comparaisons et 7 jours. Elle mesure la solidité de l’échantillon, pas la performance future du modèle. Le classement officiel reste masqué tant que le score normalisé complet et les régimes météorologiques ne sont pas archivés.</p>
-            </MeteoSurface>
-          </section>
 
           <section className="mb-4" id="modeles">
             <MeteoSurface tone="lab" className="rounded-2xl p-4">
@@ -318,7 +321,7 @@ function GlobalScoreTimelineFigure({ points }: { points: any[] }) {
     <div className="mt-3 space-y-2">{seriesByModel.map(({ name, series, averageScore }, modelIndex) => {
       const palette = GLOBAL_SCORE_MODEL_PALETTES[modelIndex % GLOBAL_SCORE_MODEL_PALETTES.length];
       return <article key={name} className={`rounded-lg border bg-slate-950/25 p-2.5 ${palette.border}`}>
-        <div className="flex items-center justify-between gap-2"><p className={`truncate text-xs font-semibold ${palette.text}`}>{name}</p><p className="text-[10px] text-slate-400">Moy. {Math.round(averageScore)} % · {series.length} mesure(s)</p></div>
+        <div className="flex items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-1.5"><p className={`truncate text-xs font-semibold ${palette.text}`}>{name}</p>{modelIndex === 0 ? <span className="shrink-0 rounded-full border border-amber-300/45 bg-amber-300/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-100">Meilleur modèle</span> : null}</div><p className="shrink-0 text-[10px] text-slate-400">Moy. {Math.round(averageScore)} % · {series.length} mesure(s)</p></div>
         <div className="mt-2 flex items-end gap-1" aria-label={`Évolution du score global pour ${name}`}>{[...series].sort((left, right) => String(left.date).localeCompare(String(right.date))).map((point) => { const score = Math.max(0, Math.min(100, Number(point.normalizedScore))); const height = Math.max(10, Math.round((score / 100) * 56)); return <div key={`${point.date}-${point.serviceName}`} className="flex min-w-0 flex-1 flex-col items-center gap-1"><span className={`text-[13px] font-bold leading-none ${palette.text}`}>{Math.round(score)} %</span><div className={`w-full rounded-t ${palette.bar}`} style={{ height }} title={`${formatFrenchDayMonth(point.date)} · score global ${Math.round(score)}/100 · ${point.comparisons ?? 0} comparaison(s)`} /><span className="truncate text-[10px] leading-tight text-slate-400">{formatFrenchDayMonth(point.date)}</span></div>; })}</div>
       </article>;
     })}</div>

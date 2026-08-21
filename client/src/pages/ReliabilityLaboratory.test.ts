@@ -40,6 +40,9 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("normalizedScore");
     expect(source).toContain("averageScore");
     expect(source).toContain("right.averageScore - left.averageScore");
+    expect(source).toContain("Meilleur modèle");
+    expect(source.indexOf('id="scores-globaux"')).toBeLessThan(source.indexOf('id="tendances-provisoires"'));
+    expect(source.indexOf('id="tendances-provisoires"')).toBeLessThan(source.indexOf('id="vue-generale"'));
     expect(source).toContain("Scores globaux indisponibles");
     expect(source).toContain("ProvisionalTrendCard");
   });

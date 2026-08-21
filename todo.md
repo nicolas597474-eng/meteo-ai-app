@@ -2807,3 +2807,6 @@
 - [x] Remplacer les diagrammes d’évolution d’humidité par les scores globaux réellement archivés par modèle.
 - [x] Agrandir les valeurs de score global et afficher les dates au format français long dans les diagrammes.
 - [x] Trier les diagrammes de score global du meilleur modèle au moins bon selon leur moyenne réellement archivée.
+- [x] Afficher un badge Meilleur modèle sur la première carte classée de score global.
+- [x] Placer les scores globaux par modèle avant les tendances provisoires.
+- [x] Déplacer la section Fiabilité en bref sous les tendances provisoires.
