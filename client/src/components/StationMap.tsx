@@ -65,6 +65,8 @@ export function StationMap({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFocusedOnLocation, setIsFocusedOnLocation] = useState(false);
   const normalZoom = stations.length > 0 ? 11 : 10;
+  const [zoomLevel, setZoomLevel] = useState(normalZoom);
+  const [mapType, setMapType] = useState<"satellite" | "roadmap">("satellite");
 
   const focusCurrentLocation = useCallback(() => {
     const map = mapRef.current;
@@ -91,6 +93,11 @@ const restoreNormalView = useCallback(() => {
     map.setZoom(Math.max(2, Math.min(20, currentZoom + delta)));
     setIsFocusedOnLocation(false);
   }, [normalZoom]);
+
+  const changeMapType = useCallback((nextType: "satellite" | "roadmap") => {
+    mapRef.current?.setMapTypeId(nextType);
+    setMapType(nextType);
+  }, []);
 
 const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
     if (!mapRef.current) return;
@@ -162,6 +169,21 @@ rotateControl: false,
   }, [isExpanded]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    setZoomLevel(map.getZoom() ?? normalZoom);
+    const zoomListener = map.addListener("zoom_changed", () => setZoomLevel(map.getZoom() ?? normalZoom));
+    const typeListener = map.addListener("maptypeid_changed", () => {
+      const activeType = map.getMapTypeId();
+      if (activeType === "satellite" || activeType === "roadmap") setMapType(activeType);
+    });
+    return () => {
+      zoomListener.remove();
+      typeListener.remove();
+    };
+  }, [mapReady, normalZoom]);
+
+  useEffect(() => {
     if (!isExpanded) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -180,7 +202,7 @@ rotateControl: false,
           className="h-full w-full"
           initialCenter={{ lat: center.lat, lng: center.lon }}
           initialZoom={normalZoom}
-          mapTypeId="satellite"
+          mapTypeId={mapType}
           mapTypeControl={false}
           fullscreenControl={false}
           zoomControl={false}
@@ -207,6 +229,16 @@ rotateControl: false,
           </button>
         )}
         {isExpanded && mapReady && (
+          <button
+            type="button"
+            onClick={focusCurrentLocation}
+            aria-label="Centrer la carte sur le lieu actif"
+            className="absolute left-3 top-16 z-10 min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-xs font-semibold text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          >
+            Centrer
+          </button>
+        )}
+        {isExpanded && mapReady && (
           <div className="absolute right-3 top-16 z-10 flex flex-col gap-2" aria-label="Zoom manuel de la carte">
             <button
               type="button"
@@ -216,6 +248,9 @@ rotateControl: false,
             >
               +
             </button>
+            <div aria-live="polite" className="grid h-8 w-10 place-items-center rounded-md border border-slate-600 bg-[#071018]/95 text-[10px] font-semibold text-slate-200">
+              Zoom {zoomLevel}
+            </div>
             <button
               type="button"
               onClick={() => adjustExpandedZoom(-1)}
@@ -236,23 +271,29 @@ rotateControl: false,
         )}
       </div>
       {mapReady && !isExpanded && (
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={isFocusedOnLocation ? restoreNormalView : focusCurrentLocation}
-            aria-label={isFocusedOnLocation ? "Revenir au cadrage normal de la carte" : "Recentrer et zoomer sur le lieu actuel"}
-            className="flex min-h-11 items-center justify-center rounded-xl border border-slate-600 bg-[#0b1524] px-3 text-xs font-semibold text-slate-100 transition-colors hover:border-sky-300/70 hover:bg-sky-500/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          >
-            {isFocusedOnLocation ? "Vue normale" : "Zoom sur le lieu"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsExpanded(true)}
-            aria-label="Agrandir la carte"
-            className="flex min-h-11 items-center justify-center rounded-xl border border-sky-300/70 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          >
-            Agrandir la carte
-          </button>
+        <div className="mt-2 space-y-2">
+          <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-[#0b1524] p-1" aria-label="Type de carte">
+            <button type="button" onClick={() => changeMapType("satellite")} aria-pressed={mapType === "satellite"} className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-colors ${mapType === "satellite" ? "bg-sky-500/15 text-sky-100" : "text-slate-400 hover:text-slate-100"}`}>Satellite</button>
+            <button type="button" onClick={() => changeMapType("roadmap")} aria-pressed={mapType === "roadmap"} className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-colors ${mapType === "roadmap" ? "bg-sky-500/15 text-sky-100" : "text-slate-400 hover:text-slate-100"}`}>Plan</button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={isFocusedOnLocation ? restoreNormalView : focusCurrentLocation}
+              aria-label={isFocusedOnLocation ? "Revenir au cadrage normal de la carte" : "Recentrer et zoomer sur le lieu actuel"}
+              className="flex min-h-11 items-center justify-center rounded-xl border border-slate-600 bg-[#0b1524] px-3 text-xs font-semibold text-slate-100 transition-colors hover:border-sky-300/70 hover:bg-sky-500/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              {isFocusedOnLocation ? "Vue normale" : "Zoom sur le lieu"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsExpanded(true)}
+              aria-label="Agrandir la carte"
+              className="flex min-h-11 items-center justify-center rounded-xl border border-sky-300/70 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              Agrandir la carte
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -2836,3 +2836,4 @@
 - [x] Ajouter un bouton de zoom qui recentre la carte des stations sur le lieu actif.
 - [x] Ajouter une action permettant de revenir au cadrage normal de la carte après le zoom.
 - [x] Ajouter dans la carte agrandie des boutons + et − espacés de la fermeture et des commandes natives, sans chevauchement.
+- [x] Ajouter un bouton de centrage dans la carte agrandie, afficher le niveau de zoom et permettre le choix Satellite/Plan dans la vue compacte.

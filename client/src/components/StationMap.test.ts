@@ -4,14 +4,16 @@ import { describe, expect, it } from "vitest";
 describe("carte des stations", () => {
   it("démarre en satellite et conserve la vue réelle uniquement sur le marqueur de référence", () => {
     const source = readFileSync(new URL("./StationMap.tsx", import.meta.url), "utf8");
-    expect(source).toContain('mapTypeId="satellite"');
+    expect(source).toContain('useState<"satellite" | "roadmap">("satellite")');
+    expect(source).toContain("mapTypeId={mapType}");
     expect(source).toContain("panorama.setPosition(position)");
     expect(source).toContain("marker.addListener(\"click\"");
     expect(source).not.toContain("Satellite · touchez un point pour la vue réelle");
     expect(source).not.toContain("Vue réelle ici");
     expect(source).toContain('fixed inset-0 z-[200] bg-[#070b13]');
     expect(source).toContain('h-72 rounded-xl border border-slate-800 sm:h-80');
-    expect(source).toContain('mt-2 grid grid-cols-2 gap-2');
+    expect(source).toContain('mt-2 space-y-2');
+    expect(source).toContain('grid grid-cols-2 gap-2 rounded-xl border border-slate-700');
     expect(source).toContain("const focusCurrentLocation = useCallback");
     expect(source).toContain("map.panTo({ lat: center.lat, lng: center.lon })");
     expect(source).toContain("map.setZoom(14)");
@@ -26,6 +28,13 @@ describe("carte des stations", () => {
     expect(source).toContain('aria-label="Zoomer"');
     expect(source).toContain('aria-label="Dézoomer"');
     expect(source).toContain("streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER }");
+    expect(source).toContain("const changeMapType = useCallback");
+    expect(source).toContain("mapRef.current?.setMapTypeId(nextType)");
+    expect(source).toContain('aria-label="Type de carte"');
+    expect(source).toContain("Satellite");
+    expect(source).toContain("Plan");
+    expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
+    expect(source).toContain("Zoom {zoomLevel}");
     expect(source).toContain("streetViewControl={false}");
     expect(source).toContain("rotateControl={false}");
     expect(source).toContain("mapTypeControl: isExpanded");
