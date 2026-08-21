@@ -9,10 +9,9 @@ import { getPreviousReadings, recordStationReadings } from "./stationReadingsCac
  *   - Ultra-local: extreme proximity bias with concentric radius bands
  *
  * Ultra-local radius bands:
- *   < 2 km  → 65% weight
- *   2-5 km  → 20% weight
+ *   < 2 km  → 60% weight
+ *   2-5 km  → 28% weight
  *   5-10 km → 10% weight
- *   10-20 km → 3% weight
  *   Models (numerical) → 2% weight
  *
  * Quality verification before using a station:
@@ -126,11 +125,12 @@ const MODE_CONFIG: Record<LocalMode, {
   },
   local: {
     radiusBands: [
-      { minKm: 0, maxKm: 5, weight: 0.55, label: "0-5 km" },
+      { minKm: 0, maxKm: 5, weight: 0.45, label: "0-5 km" },
       { minKm: 5, maxKm: 10, weight: 0.25, label: "5-10 km" },
-      { minKm: 10, maxKm: 20, weight: 0.10, label: "10-20 km" },
+      { minKm: 10, maxKm: 20, weight: 0.18, label: "10-20 km" },
+      { minKm: 20, maxKm: 30, weight: 0.05, label: "20-30 km" },
     ],
-    modelWeight: 0.10,
+    modelWeight: 0.07,
     maxFreshnessMin: 60,
     maxTempDeviation: 6,
     minReliability: 40,
@@ -139,10 +139,9 @@ const MODE_CONFIG: Record<LocalMode, {
   },
   "ultra-local": {
     radiusBands: [
-      { minKm: 0, maxKm: 2, weight: 0.65, label: "< 2 km" },
-      { minKm: 2, maxKm: 5, weight: 0.20, label: "2-5 km" },
+      { minKm: 0, maxKm: 2, weight: 0.60, label: "< 2 km" },
+      { minKm: 2, maxKm: 5, weight: 0.28, label: "2-5 km" },
       { minKm: 5, maxKm: 10, weight: 0.10, label: "5-10 km" },
-      { minKm: 10, maxKm: 20, weight: 0.03, label: "10-20 km" },
     ],
     modelWeight: 0.02,
     maxFreshnessMin: 30,
@@ -183,11 +182,12 @@ function verifyStationQuality(
 
   // 2. Coherence with neighbors
   if (station.temperature != null) {
+    const maxModeRadiusKm = Math.max(...config.radiusBands.map((band) => band.maxKm));
     const neighbors = allStations.filter(
       s => s.stationId !== station.stationId &&
         s.temperature != null &&
         s.isActive &&
-        s.distanceKm < 20
+        s.distanceKm < maxModeRadiusKm
     );
     if (neighbors.length > 0) {
       const avgNeighborTemp = neighbors.reduce((sum, s) => sum + (s.temperature ?? 0), 0) / neighbors.length;
@@ -597,7 +597,9 @@ export function calculateUltraLocal(
     bandBreakdown,
     microclimateAdjustment: Math.round(microAdjustment * 10) / 10,
     microclimateFactors: microFactors,
-    stationCount: activeStations.length,
+    stationCount: contributions.filter(
+      (contribution) => contribution.adjustedTemperature != null || contribution.temperature != null
+    ).length,
     confidenceScore,
     confidenceByParameter,
     explanation,
@@ -660,9 +662,9 @@ export function getUltraLocalConfig(mode: LocalMode) {
     mode,
     config: MODE_CONFIG[mode],
     description: mode === "ultra-local"
-      ? "Privilégie fortement les stations les plus proches (< 2 km = 65%). Vérification stricte de la qualité et fraîcheur des données. Détection des microclimats."
+      ? "Utilise uniquement les stations situées dans les 10 km, avec priorité aux moins de 2 km (60%). Vérification stricte de la qualité et fraîcheur des données."
       : mode === "local"
-        ? "Pondération renforcée pour les stations proches (< 5 km = 55%). Correction d'altitude activée."
+        ? "Utilise les stations situées dans les 30 km, avec priorité aux moins de 5 km (45%). Correction d'altitude activée."
         : "Pondération équilibrée entre distance, qualité et fraîcheur. Rayon de 20 km.",
   };
 }

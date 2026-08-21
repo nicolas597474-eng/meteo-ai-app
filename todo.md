@@ -2822,3 +2822,6 @@
 - [x] Ajouter un panneau déroulant expliquant le score de précipitation, avec une croix de fermeture rapide.
 - [x] Ajouter des panneaux déroulants explicatifs pour la MAE de température, le vent et l’humidité, avec des croix de fermeture rapide.
 - [x] Afficher les explications de tendance dans des fenêtres plein écran avec fermeture rapide.
+- [x] Vérifier et différencier les rayons de stations des modes Local et Ultra-local sans altérer les données historiques.
+- [x] Définir un Ultra-local 0–10 km et un mode Local élargi avec des repli explicites, après confirmation.
+- [x] Appliquer les rayons et pondérations confirmés aux calculs futurs sans recalculer l’historique.

@@ -253,8 +253,13 @@ export const favoritesRouter = router({
     .query(async ({ ctx, input }) => {
       const { lat, lon, radiusKm, localMode } = input;
 
-      // For ultra-local, always search at least 20km to find all potential stations
-      const searchRadius = localMode === "ultra-local" ? Math.max(radiusKm, 20) : radiusKm;
+      // Les deux modes ont des rayons explicites : Ultra-local ne mélange jamais
+      // de station au-delà de 10 km, tandis que Local décrit le secteur élargi.
+      const searchRadius = localMode === "ultra-local"
+        ? 10
+        : localMode === "local"
+          ? 30
+          : radiusKm;
 
       // Parallel fetch: 15-day, hourly, stations
       const todayDate = getParisDate();
@@ -492,7 +497,7 @@ export const favoritesRouter = router({
           // trace de contrôle de fusion avancée.
           confidenceScore,
           explanation: localModeTemperature.usesModelFallback
-            ? `Aucune station physique validée dans le rayon. Repli sur la fusion officielle de ${modelFallback?.modelCount ?? 0} modèles, pondérée par la trace de température appliquée ; aucun micro-ajustement local n’est appliqué.`
+            ? `Aucune station physique validée dans le rayon ${localMode === "ultra-local" ? "Ultra-local de 10 km" : localMode === "local" ? "Local de 30 km" : "recherché"}. Repli sur la fusion officielle de ${modelFallback?.modelCount ?? 0} modèles, pondérée par la trace de température appliquée ; aucun micro-ajustement local n’est appliqué.`
             : localModeTemperature.usesOfficialFallback
             ? "Aucune station physique validée dans le rayon de recherche. Les modes Local et Ultra-local reprennent exactement la prévision officielle ; aucun micro-ajustement ni poids local n’est appliqué."
             : `${ultraLocalResult.explanation} ${advancedFusion.validationNote}`,

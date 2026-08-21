@@ -98,4 +98,24 @@ describe("calculateUltraLocal", () => {
     expect(result.confidenceByParameter.windSpeed).not.toBeNull();
     expect(result.confidenceByParameter.windGust).not.toBeNull();
   });
+
+  it("limite strictement l’Ultra-local aux stations situées dans les 10 km", () => {
+    const result = calculateUltraLocal([
+      station({ stationId: "outside-ultra", distanceKm: 12, temperature: 21 }),
+    ], "ultra-local", 50.75, 2.52, 40, null);
+
+    expect(result.stationsUsed).toHaveLength(0);
+    expect(result.stationCount).toBe(0);
+    expect(result.bandBreakdown.map((band) => band.band)).toEqual(["< 2 km", "2-5 km", "5-10 km"]);
+  });
+
+  it("inclut la bande 20-30 km dans le calcul Local élargi", () => {
+    const result = calculateUltraLocal([
+      station({ stationId: "local-sector", distanceKm: 25, temperature: 19 }),
+    ], "local", 50.75, 2.52, 40, null);
+
+    expect(result.stationsUsed.map((item) => item.stationId)).toContain("local-sector");
+    expect(result.bandBreakdown.find((band) => band.band === "20-30 km")?.stationCount).toBe(1);
+    expect(result.stationCount).toBe(1);
+  });
 });
