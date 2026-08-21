@@ -52,6 +52,9 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("Fermer l’explication de la MAE de température");
     expect(source).toContain("Fermer l’explication de la MAE de vent");
     expect(source).toContain("Fermer l’explication de la MAE d’humidité");
+    expect(source).toContain("Le biais indique le sens");
+    expect(source).toContain("un biais positif signifie une prévision trop chaude en moyenne");
+    expect(source).toContain("un biais négatif, trop froide");
     expect(source).toContain("DialogContent");
     expect(source).toContain("!h-[100dvh]");
     expect(source).toContain("showCloseButton={false}");

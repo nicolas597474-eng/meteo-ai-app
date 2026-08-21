@@ -2850,3 +2850,4 @@
 - [x] Retirer le bouton d’alerte sonore de la carte d’éclipse agrandie et réduire Plan/Satellite pour éviter tout chevauchement avec la fermeture.
 - [x] Agrandir la carte compacte d’éclipse, empêcher son défilement et maintenir le repère du lieu actif visible.
 - [x] Permettre le défilement vertical de la page sur la carte compacte fixe sans réactiver les gestes cartographiques.
+- [x] Indiquer dans l’aide de température que le biais mesure une tendance plus chaude ou plus froide, distincte de la MAE.

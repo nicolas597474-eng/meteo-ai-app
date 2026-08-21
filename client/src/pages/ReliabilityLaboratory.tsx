@@ -212,7 +212,8 @@ export default function ReliabilityLaboratory() {
                     closeLabel: "Fermer l’explication de la MAE de température",
                     items: [
                       ["Plus la MAE est basse", "plus le modèle a été précis sur la température."],
-                      ["0,81 °C", "signifie un écart moyen de 0,81 degré, sans indiquer si le modèle était trop chaud ou trop froid."],
+                      ["0,81 °C", "signifie un écart moyen de 0,81 degré. La MAE mesure l’ampleur de l’erreur, pas son sens."],
+                      ["Le biais indique le sens", "un biais positif signifie une prévision trop chaude en moyenne ; un biais négatif, trop froide. Un biais proche de zéro ne montre pas de tendance systématique."],
                       ["Ce n’est pas", "la température actuelle ni la température prévue pour le prochain créneau."],
                     ],
                   }}
