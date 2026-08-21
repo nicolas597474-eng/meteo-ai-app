@@ -37,8 +37,10 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("getHourlyConditionDetails");
     expect(source).toContain("Conditions du créneau");
     expect(source).toContain("hour?.precipitation != null");
-    expect(source).toContain("Visibilité ${hour.visibility.toFixed(0)} km");
-    expect(source).toContain("Rayonnement ${hour.solarRadiation.toFixed(0)} W/m²");
+    expect(source).not.toContain("Visibilité ${hour.visibility.toFixed(0)} km");
+    expect(source).not.toContain("Rayonnement ${hour.solarRadiation.toFixed(0)} W/m²");
+    expect(source).toContain("windDirectionText(h.windDirection)");
+    expect(source).toContain("Nord-nord-est");
     expect(source).toContain("windSpeedSpread");
     expect(source).toContain("humiditySpread");
     expect(source).toContain("cloudCoverSpread");

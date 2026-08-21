@@ -2783,3 +2783,5 @@
 - [x] Réduire légèrement la hauteur de la pastille Accord global des cartes heure par heure.
 - [x] Compacter encore légèrement la pastille Accord global dans les cartes heure par heure.
 - [x] Afficher des détails de conditions météorologiques uniquement lorsqu’ils sont disponibles dans chaque créneau horaire.
+- [x] Retirer Visibilité et Rayonnement des détails de conditions des cartes horaires.
+- [x] Afficher la direction cardinale du vent avec la vitesse et les rafales dans chaque carte horaire.

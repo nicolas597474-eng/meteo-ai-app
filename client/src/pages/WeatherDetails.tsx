@@ -20,6 +20,12 @@ function windDirectionLabel(deg: number | null | undefined): string {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
+function windDirectionText(deg: number | null | undefined): string {
+  if (deg == null) return "Direction indisponible";
+  const dirs = ["Nord", "Nord-nord-est", "Nord-est", "Est-nord-est", "Est", "Est-sud-est", "Sud-est", "Sud-sud-est", "Sud", "Sud-sud-ouest", "Sud-ouest", "Ouest-sud-ouest", "Ouest", "Ouest-nord-ouest", "Nord-ouest", "Nord-nord-ouest"];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
 function pressureTrend(hours: any[], currentIdx: number): "rising" | "falling" | "stable" {
   if (currentIdx < 2) return "stable";
   const prev = hours[currentIdx - 2]?.pressure;
@@ -120,14 +126,8 @@ function getHourlyConditionDetails(hour: any): HourlyConditionDetail[] {
     hour?.precipitation != null
       ? { icon: "precipitation", label: `${hour.precipitation.toFixed(1)} mm`, detail: precipitationDetail }
       : null,
-    hour?.visibility != null
-      ? { icon: "visibility", label: `Visibilité ${hour.visibility.toFixed(0)} km` }
-      : null,
     hour?.uvIndex != null && hour.uvIndex > 0
       ? { icon: "sunny", label: `UV ${hour.uvIndex.toFixed(0)}` }
-      : null,
-    hour?.solarRadiation != null && hour.solarRadiation > 0
-      ? { icon: "sunny", label: `Rayonnement ${hour.solarRadiation.toFixed(0)} W/m²` }
       : null,
     cloudLayers ? { icon: "cloud_cover", label: "Couches nuageuses", detail: cloudLayers } : null,
   ].filter((detail): detail is HourlyConditionDetail => detail !== null);
@@ -271,7 +271,7 @@ export default function WeatherDetails() {
 
                     <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                       <HourlyMetric icon="humidity" label="Humidité" value={`${h.humidity ?? "—"}%`} detail={h.dewPoint != null ? `Rosée ${h.dewPoint.toFixed(0)}°` : undefined} />
-                      <HourlyMetric icon="wind_param" label="Vent" value={`${h.windSpeed?.toFixed(0) ?? "—"} km/h`} detail={`${windDirectionLabel(h.windDirection)}${h.windGust != null ? ` · raf. ${h.windGust.toFixed(0)}` : ""}`} />
+                      <HourlyMetric icon="wind_param" label="Vent" value={`${h.windSpeed?.toFixed(0) ?? "—"} km/h`} detail={`${windDirectionText(h.windDirection)}${h.windGust != null ? ` · raf. ${h.windGust.toFixed(0)}` : ""}`} />
                       <HourlyMetric icon="pressure" label="Pression" value={`${h.pressure?.toFixed(0) ?? "—"} hPa`} detail={pTrend === "rising" ? "En hausse" : pTrend === "falling" ? "En baisse" : "Stable"} />
                       <HourlyMetric icon="cloud_cover" label="Nuages" value={`${h.cloudCover ?? "—"}%`} />
                     </div>
