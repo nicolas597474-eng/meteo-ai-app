@@ -2685,6 +2685,8 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Ajouter une croix tactile et accessible pour fermer le panneau d’observation détaillé de l’Historique.
+- [x] Vérifier que la fermeture ne désélectionne ni ne modifie les données du graphique.
 - [x] Déplacer complètement le libellé Soleil/Lune sous l’arche graphique dans le flux normal de la carte.
 - [x] Préserver un espacement distinct avant la ligne d’horaires.
 - [x] Vérifier l’absence de positionnement absolu du libellé dans la zone de l’arche.

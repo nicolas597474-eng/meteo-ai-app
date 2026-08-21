@@ -32,6 +32,8 @@ describe("History", () => {
     expect(source).toContain("HistoryChartTooltip");
     expect(source).toContain('role="tooltip"');
     expect(source).toContain("Écart MeteoAI / observation");
+    expect(source).toContain("Fermer le détail d’observation");
+    expect(source).toContain("dismissedLabel");
     expect(source).toContain("activeDot");
     expect(source).toContain("cursor={{ stroke");
   });
