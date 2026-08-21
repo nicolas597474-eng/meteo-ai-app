@@ -2,14 +2,16 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("carte des stations", () => {
-  it("démarre en satellite et ouvre la vue réelle aux coordonnées du point choisi", () => {
+  it("démarre en satellite et conserve la vue réelle uniquement sur le marqueur de référence", () => {
     const source = readFileSync(new URL("./StationMap.tsx", import.meta.url), "utf8");
     expect(source).toContain('mapTypeId="satellite"');
     expect(source).toContain("panorama.setPosition(position)");
     expect(source).toContain("marker.addListener(\"click\"");
-    expect(source).toContain("Satellite · touchez un point pour la vue réelle");
+    expect(source).not.toContain("Satellite · touchez un point pour la vue réelle");
+    expect(source).not.toContain("Vue réelle ici");
     expect(source).toContain('fixed inset-0 z-[200] bg-[#070b13]');
-    expect(source).toContain('absolute right-2 top-2 min-h-9');
+    expect(source).toContain('h-72 rounded-xl border border-slate-800 sm:h-80');
+    expect(source).toContain('mt-2 flex min-h-11 w-full items-center justify-center');
     expect(source).toContain("streetViewControl={false}");
     expect(source).toContain("rotateControl={false}");
     expect(source).toContain("mapTypeControl: isExpanded");

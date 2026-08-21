@@ -2832,3 +2832,4 @@
 - [x] Finaliser le périmètre fonctionnel, les sources et les limites de la carte météo multi-couches de la page Prévisions.
 - [x] Ajouter au lexique AI Lab l’explication de la collecte, qualification et analyse nocturne des observations réelles.
 - [x] Ajouter dans l’Historique, pour chaque soir, la couverture obtenue, les stations utilisées et le motif d’exclusion éventuel.
+- [x] Retirer la commande Vue réelle intégrée, agrandir la carte des stations et déplacer son bouton d’agrandissement sous la carte.

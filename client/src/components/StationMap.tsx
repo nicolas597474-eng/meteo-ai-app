@@ -145,7 +145,7 @@ export function StationMap({
 
   return (
     <div className={isExpanded ? "fixed inset-0 z-[200] bg-[#070b13]" : "space-y-2"}>
-      <div className={`relative overflow-hidden bg-[#090b10] ${isExpanded ? "h-[100dvh] border-0" : "h-52 rounded-xl border border-slate-800"}`}>
+      <div className={`relative overflow-hidden bg-[#090b10] ${isExpanded ? "h-[100dvh] border-0" : "h-72 rounded-xl border border-slate-800 sm:h-80"}`}>
         <MapView
           className="h-full w-full"
           initialCenter={{ lat: center.lat, lng: center.lon }}
@@ -163,16 +163,6 @@ export function StationMap({
             setMapReady(true);
           }}
         />
-        {mapReady && !isExpanded && (
-          <button
-            type="button"
-            onClick={() => setIsExpanded(true)}
-            aria-label="Agrandir la carte"
-            className="absolute right-2 top-2 min-h-9 rounded-md border border-sky-300/80 bg-[#071018]/95 px-2.5 text-[11px] font-semibold text-sky-100 shadow-none"
-          >
-            Agrandir la carte
-          </button>
-        )}
         {isExpanded && (
           <button
             type="button"
@@ -196,17 +186,14 @@ export function StationMap({
         )}
       </div>
       {mapReady && !isExpanded && (
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090b10] px-2.5 py-1.5">
-          <p className="text-[10px] text-slate-400">Satellite · touchez un point pour la vue réelle</p>
-          <button
-            type="button"
-            aria-label="Vue réelle du lieu"
-            onClick={() => showStreetViewAt({ lat: center.lat, lng: center.lon }, "Lieu de référence")}
-            className="min-h-9 shrink-0 rounded-md border border-sky-300/70 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          >
-            Vue réelle ici
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          aria-label="Agrandir la carte"
+          className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-sky-300/70 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+        >
+          Agrandir la carte
+        </button>
       )}
     </div>
   );
