@@ -15,6 +15,7 @@ import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/we
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { Clock3, X } from "lucide-react";
+import { Link } from "wouter";
 
 type ComparisonPoint = {
   hour?: number;
@@ -204,6 +205,18 @@ export default function Ranking() {
             <Metric label="Stations actives" value={String(stations.length)} icon="stations" color="text-emerald-400" />
             <Metric label="Confiance synthèse locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
             <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
+          </div>
+        </section>
+
+        <section className="mb-4 rounded-2xl border border-sky-400/25 bg-sky-400/5 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-semibold text-white">Historique des prévisions</h2>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Retrouvez les graphiques complets, les observations archivées et les comparaisons par modèle.</p>
+            </div>
+            <Link href="/history" className="shrink-0 rounded-xl border border-sky-400/40 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-400/20 active:scale-[0.97]">
+              Ouvrir <span aria-hidden="true">→</span>
+            </Link>
           </div>
         </section>
 

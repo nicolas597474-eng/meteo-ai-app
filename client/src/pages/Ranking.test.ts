@@ -53,6 +53,14 @@ describe("page Fiabilité", () => {
     expect(source).toContain('label="Dernière synthèse"');
   });
 
+  it("donne accès à l’Historique complet depuis la page Stations", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain('import { Link } from "wouter"');
+    expect(source).toContain("Historique des prévisions");
+    expect(source).toContain('href="/history"');
+    expect(source).toContain("graphiques complets, les observations archivées et les comparaisons par modèle");
+  });
+
   it("affiche une seule station locale puis propose de développer les autres", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("showAdditionalLocalStations");

@@ -9,7 +9,6 @@ import Dashboard from "./pages/Dashboard";
 import {
   LayoutDashboard,
   Trophy,
-  Calendar,
   FileText,
   Activity,
   FlaskConical,
@@ -36,7 +35,6 @@ const navItems = [
   { path: "/details", label: "Prévisions", icon: FileText },
   { path: "/laboratoire", label: "Fiabilité", icon: ChartNoAxesCombined },
   { path: "/ranking", label: "Stations", icon: Trophy },
-  { path: "/history", label: "Historique", icon: Calendar },
   { path: "/ai-lab", label: "AI Lab", icon: FlaskConical },
 ];
 

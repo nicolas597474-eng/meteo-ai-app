@@ -13,6 +13,12 @@ describe("navigation MeteoAI", () => {
     expect(source).not.toContain("backdrop-blur-xl");
   });
 
+  it("conserve la route Historique sans l’exposer dans la navigation principale", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    expect(source).toContain('<Route path="/history" component={History} />');
+    expect(source).not.toContain('{ path: "/history", label: "Historique"');
+  });
+
   it("réinitialise la position et affiche un vrai squelette pendant le chargement d’une page", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     expect(source).toContain("ScrollToTopOnRouteChange");

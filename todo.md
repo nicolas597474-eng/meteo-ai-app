@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Ajouter dans Stations une section ouvrant la page Historique complète.
+- [x] Retirer l’icône Historique de la navigation principale sans supprimer la route ni son contenu.
+- [x] Vérifier que tous les détails, graphiques et interactions de l’Historique restent accessibles depuis Stations.
 - [x] Corriger la croix de fermeture du panneau d’observation Historique pour les gestes tactiles.
 - [x] Vérifier que la fermeture masque le tooltip sans modifier la sélection ou les données du graphique.
 - [x] Remonter Confiance prévision, Stabilité modèles et Modèles appliqués en tête de l’AI Lab.
