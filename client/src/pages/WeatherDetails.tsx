@@ -235,7 +235,7 @@ export default function WeatherDetails() {
           
           {/* Horizontal scrollable hourly cards */}
           <div ref={hourlyRef} className="-mx-3 overflow-x-auto overscroll-x-contain px-3 pb-2 scrollbar-hide snap-x snap-mandatory scroll-px-3">
-            <div className="flex gap-2.5">
+            <div className="flex items-start gap-2.5">
               {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
                 const pTrend = pressureTrend(hours, i);

@@ -2791,3 +2791,4 @@
 - [x] Réduire l’espace inférieur des cartes horaires sous les couches nuageuses.
 - [x] Harmoniser les espaces entre les pastilles de conditions horaires.
 - [x] Décaler légèrement la pastille Couches nuageuses sous les autres pastilles.
+- [x] Réduire la hauteur excédentaire entre les couches nuageuses et la bordure basse des cartes horaires.
