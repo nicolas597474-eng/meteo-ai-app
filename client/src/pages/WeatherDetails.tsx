@@ -244,7 +244,7 @@ export default function WeatherDetails() {
                   <div
                     key={h.hour}
                     data-hour-index={i}
-                    className={`w-[calc((100%-10px)/2)] shrink-0 snap-start rounded-[22px] border p-3 transition-colors ${
+                    className={`w-[calc((100%-10px)/2)] shrink-0 snap-start rounded-[22px] border px-3 pb-2 pt-3 transition-colors ${
                       isNow
                         ? "border-sky-200/65 bg-[linear-gradient(160deg,rgba(44,128,181,0.30),rgba(10,35,60,0.34))]"
                         : "border-white/20 bg-[linear-gradient(160deg,rgba(77,105,132,0.20),rgba(16,36,56,0.28))]"
@@ -263,7 +263,7 @@ export default function WeatherDetails() {
                     </div>
                     
                     {/* Temperature */}
-                    <div className="mb-3 border-b border-white/12 pb-3">
+                    <div className="mb-2 pb-2">
                       <span className={`text-[36px] font-semibold leading-none tracking-[-0.075em] ${hourlyTemperatureTone(h.temp)}`}>{h.temp?.toFixed(1) ?? "—"}°</span>
                       <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
                       <div className="mt-1"><SlotConfidenceBadge details={getSlotAgreementDetails(h, historicalPerformance)} historicalModels={historicalPerformance?.models ?? []} /></div>

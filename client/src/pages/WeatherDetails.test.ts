@@ -33,6 +33,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("getSlotAgreementConfidence");
     expect(source).toContain("Accord {value}%");
     expect(source).toContain("py-px text-[8px] font-semibold leading-[10px]");
+    expect(source).toContain('border px-3 pb-2 pt-3 transition-colors');
+    expect(source).toContain('<div className="mb-2 pb-2">');
+    expect(source).not.toContain('<div className="mb-3 border-b border-white/12 pb-3">');
     expect(source).not.toContain("Accord pluie {h.precipAgreement ?? 0}%");
     expect(source).toContain("getHourlyConditionDetails");
     expect(source).toContain("Conditions du créneau");
