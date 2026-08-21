@@ -25,6 +25,12 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("hasMaterialLocalDelta");
     expect(source).toContain("La température principale reste la prévision au point du lieu.");
     expect(source).toContain("Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée.");
+    expect(source).toContain("Couverture locale");
+    expect(source).toContain("Stations contributrices");
+    expect(source).toContain("localCoverageBands");
+    expect(source).toContain("band.effectiveWeight");
+    expect(source).toContain("Aucune station contributrice n’est disponible dans ce rayon.");
+    expect(source).toContain("showAllLocalContributors");
     expect(source).toContain('localMode: loc.localMode ?? "standard"');
     expect(source).toContain("Tous les régimes");
     expect(source).not.toContain("Comment est calculée la fusion officielle ?");

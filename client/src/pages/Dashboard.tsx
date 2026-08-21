@@ -248,6 +248,7 @@ export default function Dashboard() {
   const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
   const [isForecastInfoOpen, setIsForecastInfoOpen] = useState(false);
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
+  const [showAllLocalContributors, setShowAllLocalContributors] = useState(false);
   const [editingPersonalObservation, setEditingPersonalObservation] = useState<{ id: number; temperature: string; windSpeed: string; precipitation: string; condition: (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] } | null>(null);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
   // alors strictement les mêmes coordonnées pour la prévision officielle.
@@ -590,6 +591,11 @@ export default function Dashboard() {
     : null;
   const localOfficialDelta = localObservation?.deltaFromOfficialC ?? null;
   const hasMaterialLocalDelta = localOfficialDelta !== null && Math.abs(localOfficialDelta) >= 2;
+  const localCoverageBands = locationWeather?.ultraLocal?.bandBreakdown ?? [];
+  const localContributors = locationWeather?.ultraLocal?.stationsUsed ?? [];
+  const localModeLabel = localMode === "ultra-local" ? "Ultra-local" : "Local";
+  const localRadiusKm = localMode === "ultra-local" ? 10 : 30;
+  const visibleLocalContributors = showAllLocalContributors ? localContributors : localContributors.slice(0, 6);
 
   return (
     <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>
@@ -1015,19 +1021,58 @@ export default function Dashboard() {
                 <div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-amber-100">Écart observé avec la prévision officielle</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">Les stations locales et le modèle officiel ne décrivent pas la même source. La température principale reste la prévision au point du lieu.</p></div><span className="shrink-0 text-sm font-bold text-amber-200">{localOfficialDelta > 0 ? "+" : ""}{localOfficialDelta.toFixed(1)}°</span></div>
                 <p className="mt-1.5 text-[10px] text-slate-400">Modèle officiel : {officialCurrentTemp == null ? "—" : `${officialCurrentTemp.toFixed(1)}°C`} · synthèse station : {localObservation?.temperature.toFixed(1)}°C{localObservation?.observedAt ? ` · relevé le ${new Date(localObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}` : ""}.</p>
               </div> : null}
-              {locationWeather.ultraLocal.stationsUsed.length > 0 ? (
-                <div className="mt-3 space-y-1.5 border-t border-emerald-500/15 pt-2">
-                  {locationWeather.ultraLocal.stationsUsed.slice(0, 4).map((station: any) => (
-                    <div key={station.stationId} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
-                      <span className="min-w-0 truncate">{station.name} · {station.distanceKm.toFixed(1)} km</span>
-                      <span className="shrink-0 text-emerald-200">{station.adjustedTemperature?.toFixed(1) ?? "—"}° · {Math.round(station.weight * 100)}%</span>
+              <div className="mt-3 border-t border-emerald-500/15 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-semibold text-emerald-100">Couverture locale</p>
+                    <p className="mt-0.5 text-[10px] text-slate-400">{localModeLabel} · rayon maximum {localRadiusKm} km</p>
+                  </div>
+                  <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold text-emerald-200">{localCoverageBands.reduce((total: number, band: any) => total + band.stationCount, 0)} station{localCoverageBands.reduce((total: number, band: any) => total + band.stationCount, 0) > 1 ? "s" : ""}</span>
+                </div>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {localCoverageBands.map((band: any) => {
+                    const hasContributors = band.stationCount > 0;
+                    return (
+                      <div key={band.band} className={`rounded-lg border px-2 py-1.5 ${hasContributors ? "border-emerald-400/25 bg-emerald-400/10" : "border-slate-700/70 bg-slate-950/25"}`}>
+                        <div className="flex items-center justify-between gap-2 text-[10px]">
+                          <span className={hasContributors ? "font-semibold text-emerald-100" : "font-semibold text-slate-300"}>{band.band}</span>
+                          <span className={hasContributors ? "text-emerald-200" : "text-slate-500"}>{band.stationCount} station{band.stationCount > 1 ? "s" : ""}</span>
+                        </div>
+                        <p className="mt-0.5 text-[9px] text-slate-400">{hasContributors ? `Poids réellement utilisé : ${Math.round(Number(band.effectiveWeight) * 100)} %` : "Aucune station contributrice dans cette bande"}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {localContributors.length > 0 ? (
+                <div className="mt-3 border-t border-emerald-500/15 pt-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-semibold text-emerald-100">Stations contributrices</p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">Seules les stations admises par les contrôles apparaissent ici.</p>
                     </div>
-                  ))}
-                  <p className="pt-1 text-[10px] leading-relaxed text-slate-400">Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée. La stabilité longue durée exige un historique et n’est pas déduite de ce seul affichage.</p>
+                    <span className="text-[10px] font-medium text-emerald-200">{localContributors.length}</span>
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    {visibleLocalContributors.map((station: any) => (
+                      <div key={station.stationId} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                        <span className="min-w-0 truncate">{station.name} · {station.band} · {station.distanceKm.toFixed(1)} km</span>
+                        <span className="shrink-0 text-emerald-200">{station.adjustedTemperature?.toFixed(1) ?? "—"}° · {Math.round(station.weight * 100)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  {localContributors.length > 6 ? (
+                    <button type="button" onClick={() => setShowAllLocalContributors((open) => !open)} className="mt-2 min-h-8 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2.5 text-[10px] font-semibold text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300">
+                      {showAllLocalContributors ? "Réduire les stations" : `Afficher les ${localContributors.length - 6} autres stations`}
+                    </button>
+                  ) : null}
+                  <p className="pt-2 text-[10px] leading-relaxed text-slate-400">Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée. La stabilité longue durée exige un historique et n’est pas déduite de ce seul affichage.</p>
                 </div>
               ) : modelFallbackContributors.length > 0 ? (
-                <p className="mt-3 border-t border-emerald-500/15 pt-2 text-[10px] leading-relaxed text-slate-400">Contributeurs de repli : {modelFallbackContributors.map((model: any) => `${model.name} ${Math.round(Number(model.weight) * 100)}%`).join(" · ")}. Aucun modèle n’est présenté comme station.</p>
-              ) : null}
+                <p className="mt-3 border-t border-emerald-500/15 pt-2 text-[10px] leading-relaxed text-slate-400">Aucune station contributrice n’est disponible dans ce rayon. Contributeurs de repli : {modelFallbackContributors.map((model: any) => `${model.name} ${Math.round(Number(model.weight) * 100)}%`).join(" · ")}. Aucun modèle n’est présenté comme station.</p>
+              ) : (
+                <p className="mt-3 border-t border-emerald-500/15 pt-2 text-[10px] leading-relaxed text-slate-400">Aucune station contributrice n’est disponible dans ce rayon. Le mode local reste explicite et ne remplace pas la prévision officielle.</p>
+              )}
               <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{netatmoStatusLabel[locationWeather.netatmo?.status ?? "not_connected"]}</p>
             </div>
             <LocalOfficialDeltaChart points={localOfficialHistory} />

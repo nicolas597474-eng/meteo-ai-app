@@ -2825,3 +2825,8 @@
 - [x] Vérifier et différencier les rayons de stations des modes Local et Ultra-local sans altérer les données historiques.
 - [x] Définir un Ultra-local 0–10 km et un mode Local élargi avec des repli explicites, après confirmation.
 - [x] Appliquer les rayons et pondérations confirmés aux calculs futurs sans recalculer l’historique.
+
+## Dashboard — transparence locale et carte météo multi-couches
+- [x] Réafficher les bandes de couverture et les stations réellement contributrices dans les blocs Local et Ultra-local du Dashboard.
+- [x] Vérifier que les informations de couverture et de contribution suivent exactement le rayon actif, sans modifier les données historiques.
+- [x] Finaliser le périmètre fonctionnel, les sources et les limites de la carte météo multi-couches de la page Prévisions.
