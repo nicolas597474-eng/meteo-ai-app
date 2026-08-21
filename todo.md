@@ -2796,3 +2796,4 @@
 - [x] Rapprocher l’indication de défilement sous les cartes horaires.
 - [x] Agrandir encore légèrement la zone interne des cartes horaires.
 - [x] Réduire la hauteur des pastilles Accord des cartes horaires en préservant leur libellé et leur action tactile.
+- [x] Compacter encore la hauteur des pastilles Accord sans réduire leur libellé.
