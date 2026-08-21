@@ -162,7 +162,7 @@ mapTypeControlOptions: isExpanded ? {
 fullscreenControl: false,
 zoomControl: false,
 streetViewControl: isExpanded,
-      streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined,
+      streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined,
 rotateControl: false,
     });
     window.setTimeout(() => google.maps.event.trigger(map, "resize"), 0);
@@ -216,50 +216,48 @@ rotateControl: false,
           }}
         />
         {isExpanded && mapReady && (
-          <div className="absolute bottom-16 right-3 z-10 flex flex-col items-end gap-2" aria-label="Commandes de la carte">
-            {isExpanded && (
-              <button
-                type="button"
-                onClick={() => {
-                  streetViewRef.current?.setVisible(false);
-                  setIsExpanded(false);
-                }}
-                aria-label="Fermer la carte agrandie"
-                className="min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-sm font-semibold text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              >
-                ✕ Fermer la carte
-              </button>
-            )}
+          <>
             <button
               type="button"
-              onClick={focusCurrentLocation}
-              aria-label="Centrer la carte sur le lieu actif"
-              className="min-h-10 rounded-lg border border-sky-300 bg-[#071018]/95 px-3 text-xs font-semibold text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              onClick={() => {
+                streetViewRef.current?.setVisible(false);
+                setIsExpanded(false);
+              }}
+              aria-label="Fermer la carte agrandie"
+              className="absolute right-3 top-3 z-10 grid h-12 w-12 place-items-center rounded-full border border-slate-200 bg-white text-xl font-semibold text-slate-800 shadow-lg transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             >
-              Centrer
+              ×
             </button>
-            <div className="flex flex-col items-end gap-2" aria-label="Zoom manuel de la carte">
+            <div className="absolute right-3 top-[28%] z-10 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
               <button
                 type="button"
-                onClick={() => adjustExpandedZoom(1)}
-                aria-label="Zoomer"
-                className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                onClick={focusCurrentLocation}
+                aria-label="Centrer la carte sur le lieu actif"
+                className="grid h-12 w-12 place-items-center rounded-full border border-slate-200 bg-white text-2xl font-semibold leading-none text-slate-800 shadow-lg transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
               >
-                +
+                ⊙
               </button>
-              <div aria-live="polite" className="grid h-8 w-10 place-items-center rounded-md border border-slate-600 bg-[#071018]/95 text-[10px] font-semibold text-slate-200">
-                Zoom {zoomLevel}
+              <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg" aria-label="Zoom manuel de la carte">
+                <button
+                  type="button"
+                  onClick={() => adjustExpandedZoom(1)}
+                  aria-label="Zoomer"
+                  className="grid h-12 w-12 place-items-center border-b border-slate-200 text-4xl font-light leading-none text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustExpandedZoom(-1)}
+                  aria-label="Dézoomer"
+                  className="grid h-12 w-12 place-items-center text-4xl font-light leading-none text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                >
+                  −
+                </button>
+                <span className="sr-only" aria-live="polite">Niveau de zoom : {zoomLevel}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => adjustExpandedZoom(-1)}
-                aria-label="Dézoomer"
-                className="grid h-10 w-10 place-items-center rounded-lg border border-sky-300 bg-[#071018]/95 text-xl font-semibold leading-none text-sky-100 shadow-none transition-colors hover:bg-sky-500/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              >
-                −
-              </button>
             </div>
-          </div>
+          </>
         )}
         {!mapReady && (
           <div className="absolute inset-0 grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.16),transparent_34%),linear-gradient(rgba(30,41,59,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(30,41,59,0.32)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px]">

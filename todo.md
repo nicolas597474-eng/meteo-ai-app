@@ -2840,3 +2840,4 @@
 - [x] Repositionner les commandes personnalisées de la carte agrandie en bas à droite, avec des espaces réguliers entre chaque bouton.
 - [x] Conserver uniquement les commandes Plan et Satellite en haut de la carte agrandie.
 - [x] Ajouter une légende repliable expliquant les marqueurs du lieu de référence et des stations selon la fraîcheur de leur relevé.
+- [x] Aligner les commandes de centrage et de zoom de la carte agrandie dans une colonne de référence sur le côté droit.
