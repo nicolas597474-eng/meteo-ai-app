@@ -25,6 +25,8 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("Tendances provisoires");
     expect(source).toContain("Note de preuve provisoire");
     expect(source).toContain("Notes par modèle");
+    expect(source).toContain("shrink-0 whitespace-nowrap rounded-full");
+    expect(source).toContain("inline-flex whitespace-nowrap rounded-md");
     expect(source).toContain("Note {evidenceScore}/100");
     expect(source).toContain("Note de preuve de ${model.name}: ${evidenceScore}/100");
     expect(source).toContain("Température");
