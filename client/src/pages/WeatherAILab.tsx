@@ -175,6 +175,15 @@ function AILabGlossary() {
       <ChevronDown className="h-4 w-4 shrink-0 text-sky-200 transition-transform duration-200 group-open:rotate-180" />
     </summary>
     <div className="space-y-4 border-t border-sky-300/15 px-4 py-4">
+      <section className="rounded-xl border border-sky-300/20 bg-sky-300/[0.055] p-3" aria-label="La philosophie de MeteoAI">
+        <p className="text-xs font-semibold text-sky-100">MeteoAI en quelques mots</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-200">MeteoAI n’essaie pas de présenter une prévision comme une certitude. Son objectif est de rapprocher les prévisions de plusieurs modèles, les observations physiques disponibles et le contexte local pour rendre la météo plus compréhensible, plus traçable et progressivement mieux adaptée à chaque lieu.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-lg border border-white/8 bg-black/15 p-2.5"><p className="text-[10px] font-semibold text-sky-100">Comparer avant de privilégier</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">Les modèles sont confrontés aux observations archivées lorsqu’elles sont comparables ; un modèle n’est pas déclaré meilleur sans preuve qualifiée.</p></div>
+          <div className="rounded-lg border border-white/8 bg-black/15 p-2.5"><p className="text-[10px] font-semibold text-sky-100">Apprendre sans réécrire le passé</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">Les nouvelles observations enrichissent les performances futures. Les historiques fiables restent conservés et ne sont pas réécrits pour embellir un résultat.</p></div>
+          <div className="rounded-lg border border-white/8 bg-black/15 p-2.5"><p className="text-[10px] font-semibold text-sky-100">Expliquer les limites</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">Accord, stabilité, confiance et score global sont distingués. Lorsqu’une donnée ou une preuve manque, l’application l’indique au lieu d’inventer une valeur.</p></div>
+        </div>
+      </section>
       <p className="text-[11px] leading-relaxed text-slate-300">Les explications décrivent les calculs affichés pour le lieu et la trace en cours. Elles ne transforment jamais une prévision, une estimation ou une donnée manquante en observation réelle.</p>
       {AI_LAB_GLOSSARY.map((group) => <section key={group.title} className="rounded-xl border border-white/8 bg-black/15 p-3"><h2 className="text-xs font-semibold text-sky-100">{group.title}</h2><dl className="mt-2.5 space-y-2.5">{group.entries.map(([term, definition]) => <div key={term}><dt className="text-[11px] font-semibold text-slate-100">{term}</dt><dd className="mt-0.5 text-[10px] leading-relaxed text-slate-400">{definition}</dd></div>)}</dl></section>)}
       <p className="rounded-xl border border-amber-300/15 bg-amber-300/[0.045] p-3 text-[10px] leading-relaxed text-amber-100"><b>À retenir :</b> un modèle peut être présent dans un tableau sans être « meilleur », un poids n’est pas une probabilité, et un accord entre modèles ne remplace pas une validation par observation physique.</p>

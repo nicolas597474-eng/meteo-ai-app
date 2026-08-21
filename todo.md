@@ -2811,3 +2811,4 @@
 - [x] Placer les scores globaux par modèle avant les tendances provisoires.
 - [x] Déplacer la section Fiabilité en bref sous les tendances provisoires.
 - [x] Mettre en évidence le meilleur modèle réellement classé dans la section Prévisions.
+- [x] Ajouter en tête du lexique une présentation claire de la philosophie et de l’objectif de MeteoAI.

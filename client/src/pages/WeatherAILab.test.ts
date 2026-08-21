@@ -15,6 +15,10 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Le Dashboard indique séparément le phénomène immédiat");
     expect(source).toContain("Lexique, méthode et sources");
     expect(source).toContain("AI_LAB_GLOSSARY");
+    expect(source).toContain("MeteoAI en quelques mots");
+    expect(source).toContain("Comparer avant de privilégier");
+    expect(source).toContain("Apprendre sans réécrire le passé");
+    expect(source).toContain("Expliquer les limites");
     expect(source).toContain("Confiance");
     expect(source).toContain("Stabilité des modèles");
     expect(source).toContain("Données insuffisantes / —");
