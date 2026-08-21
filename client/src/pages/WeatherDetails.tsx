@@ -144,7 +144,7 @@ function SlotConfidenceBadge({ details, historicalModels = [] }: { details: Agre
       : "border-amber-300/25 bg-amber-300/10 text-amber-100";
   const level = value >= 75 ? "élevé" : value >= 55 ? "modéré" : "faible";
   return <span className="relative inline-block">
-    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`!min-h-[16px] inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px] ${tone}`}>Accord {value}% · {level}</button>
+    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px] ${tone}`}>Accord {value}% · {level}</button>
     {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
       <span className="mb-1 block text-slate-300">Accord par paramètre</span>
       {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.value}%</span></span>)}
