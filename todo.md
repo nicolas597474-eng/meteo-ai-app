@@ -2848,3 +2848,4 @@
 - [x] Reproduire dans la carte de visibilité d’éclipse agrandie les mêmes commandes et emplacements que la carte des stations.
 - [x] Conserver strictement les positions actuelles de la boussole et du bouton d’opacité de la carte d’éclipse.
 - [x] Retirer le bouton d’alerte sonore de la carte d’éclipse agrandie et réduire Plan/Satellite pour éviter tout chevauchement avec la fermeture.
+- [x] Agrandir la carte compacte d’éclipse, empêcher son défilement et maintenir le repère du lieu actif visible.

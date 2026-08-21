@@ -57,7 +57,13 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("isMapOpeningRef");
     expect(source).toContain('google.maps.event.trigger(map, "resize")');
     expect(styles).toContain("map-opacity-control");
-    expect(source).toContain('gestureHandling: "greedy"');
+    expect(source).toContain('gestureHandling: isExpanded ? "greedy" : "none"');
+    expect(source).toContain("draggable: isExpanded");
+    expect(source).toContain("scrollwheel: isExpanded");
+    expect(source).toContain("map.setCenter(localPosition)");
+    expect(source).toContain("map.setZoom(5)");
+    expect(source).toContain('localMarkerContent.className = "eclipse-user-location-marker"');
+    expect(source).toContain('mapContent("compact", "h-[280px]")');
     expect(source).toContain("Me localiser");
     expect(source).toContain("getEclipseCircumstances");
     expect(source).toContain("Cliquez sur une zone de visibilité");
@@ -83,7 +89,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Maximize2");
     expect(source).toContain("LocateFixed");
     expect(source).toContain("streetViewControl={isExpanded}");
-    expect(source).toContain('gestureHandling: "greedy"');
+    expect(source).not.toContain('gestureHandling: "greedy"');
     expect(source).toContain("utilisez les contrôles de zoom et la flèche de direction");
     expect(source).toContain("Rose des vents complète, nord géographique");
     expect(source).toContain("COMPASS_ROSE_POINTS");
