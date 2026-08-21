@@ -44,6 +44,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('mt-1 flex flex-wrap gap-1.5');
     expect(source).toContain('detail.label === "Couches nuageuses"');
     expect(source).toContain('mt-0.5 basis-full');
+    expect(source).toContain('isCloudLayers ? "min-h-8 py-1" : "min-h-5 py-0.5"');
     expect(source).toContain('flex items-start gap-2.5');
     expect(source).toContain("hour?.precipitation != null");
     expect(source).not.toContain("Visibilité ${hour.visibility.toFixed(0)} km");

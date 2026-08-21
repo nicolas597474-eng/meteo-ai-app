@@ -281,7 +281,7 @@ export default function WeatherDetails() {
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {conditionDetails.map((detail) => {
                             const isCloudLayers = detail.label === "Couches nuageuses";
-                            const pill = <span className="inline-flex min-h-5 items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] px-1.5 py-0.5 text-[8px] leading-tight text-slate-200">
+                            const pill = <span className={`inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] px-1.5 text-[8px] leading-tight text-slate-200 ${isCloudLayers ? "min-h-8 py-1" : "min-h-5 py-0.5"}`}>
                               <MeteoIcon name={detail.icon} size={11} />
                               <span>{detail.label}</span>
                               {detail.detail && <span className="text-slate-400">· {detail.detail}</span>}
