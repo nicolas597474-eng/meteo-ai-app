@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Remonter la carte Historique des prévisions juste sous l’en-tête de la page Stations.
+- [x] Renforcer le contour de la carte Historique avec un vert distinct et accessible.
+- [x] Vérifier le rendu mobile sans modifier l’accès à la page Historique.
 - [x] Ajouter dans Stations une section ouvrant la page Historique complète.
 - [x] Retirer l’icône Historique de la navigation principale sans supprimer la route ni son contenu.
 - [x] Vérifier que tous les détails, graphiques et interactions de l’Historique restent accessibles depuis Stations.

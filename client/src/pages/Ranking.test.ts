@@ -59,6 +59,8 @@ describe("page Fiabilité", () => {
     expect(source).toContain("Historique des prévisions");
     expect(source).toContain('href="/history"');
     expect(source).toContain("graphiques complets, les observations archivées et les comparaisons par modèle");
+    expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("<ForecastProvenanceBadge"));
+    expect(source).toContain("border-emerald-400/60");
   });
 
   it("affiche une seule station locale puis propose de développer les autres", () => {
