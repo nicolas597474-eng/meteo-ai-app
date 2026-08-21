@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Identifier les circonstances locales d’éclipse déjà calculées pour le lieu actif.
+- [x] Afficher un indicateur de visibilité locale accompagné d’une infobulle accessible.
+- [x] Couvrir les états visible, partielle et indisponible sans valeur fictive.
 - [x] Vérifier les conversions UTC/Europe-Paris des horaires de Soleil, de Lune et de l’horodatage astronomique.
 - [x] Vérifier les dates de prochaines phases lunaires contre le moteur astronomique et une source de référence.
 - [x] Corriger uniquement les anomalies prouvées sans modifier les données météo historiques.
