@@ -27,6 +27,12 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("MAE");
     expect(source).toContain("RMSE");
     expect(source).toContain("Seuils de décision");
+    expect(source).toContain("Observations réelles et analyse nocturne");
+    expect(source).toContain("Prévisions de référence · 05 h 00");
+    expect(source).toContain("Analyse de nuit · 00 h 30");
+    expect(source).toContain("Journée qualifiée");
+    expect(source).toContain("Comparaison et scores");
+    expect(source).toContain("ce n’est donc pas un score immédiat affiché au soir");
     expect(source).toContain("Correction de biais");
     expect(source).toContain("Maille et microclimat");
     expect(source).toContain("Sources, provenance et cartes");

@@ -100,6 +100,16 @@ const AI_LAB_GLOSSARY = [
     ],
   },
   {
+    title: "Observations réelles et analyse nocturne",
+    entries: [
+      ["Prévisions de référence · 05 h 00", "Chaque matin, MeteoAI archive les prévisions horaires réellement reçues des modèles pour chaque lieu favori. Elles deviennent la référence horodatée à laquelle les observations réelles seront comparées."],
+      ["Relevés physiques de la journée", "Des snapshots horodatés conservent les relevés de stations physiques qualifiées. Les stations personnelles ne proviennent que de Netatmo après autorisation et contrôles de fraîcheur, distance et qualité."],
+      ["Analyse de nuit · 00 h 30", "À 00 h 30, heure de Paris, MeteoAI examine la journée précédente une fois terminée. Ce décalage évite de noter une prévision sur une journée encore incomplète ; ce n’est donc pas un score immédiat affiché au soir."],
+      ["Journée qualifiée", "Les snapshots doivent couvrir suffisamment d’heures physiques comparables. Si la couverture ou l’alignement manque, la journée est explicitement exclue du score opérationnel au lieu d’être complétée avec une valeur estimée."],
+      ["Comparaison et scores", "Pour chaque modèle et chaque créneau aligné, MeteoAI compare la prévision archivée au relevé physique du même lieu. Il calcule les erreurs MAE, RMSE et biais ; les scores de température, pluie, vent, humidité et pression ne sont mis à jour que lorsque les données nécessaires sont qualifiées."],
+    ],
+  },
+  {
     title: "Fiabilité, erreurs et horizons",
     entries: [
       ["Horizon de prévision", "Délai entre le calcul et l’heure ou le jour prévus. L’indice de confiance applique un facteur de 95 pour 0–6 h, 85 pour 6–24 h, 75 pour 1–3 jours, 60 pour 4–7 jours et 45 pour 8–15 jours : plus l’échéance est lointaine, plus l’incertitude compte."],

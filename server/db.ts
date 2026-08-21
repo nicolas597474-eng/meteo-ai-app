@@ -765,7 +765,16 @@ export async function getQualifiedObservationSnapshotsForDate(locationKey: strin
     eq(qualifiedObservationSnapshots.date, date),
   )).orderBy(qualifiedObservationSnapshots.hour);
 }
-
+/** Read qualified physical snapshots over a bounded date range for historical evidence. */
+export async function getQualifiedObservationSnapshotsByDateRange(locationKey: string, startDate: string, endDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(qualifiedObservationSnapshots).where(and(
+    eq(qualifiedObservationSnapshots.locationKey, locationKey),
+    gte(qualifiedObservationSnapshots.date, startDate),
+    lte(qualifiedObservationSnapshots.date, endDate),
+  )).orderBy(desc(qualifiedObservationSnapshots.date), qualifiedObservationSnapshots.hour);
+}
 export async function getQualifiedEvidenceStatus(locationKey: string) {
   const db = await getDb();
   if (!db) return { date: null, coverageHours: 0, lastCollectedAt: null, qualifiedScoreCount: 0, lastQualifiedScoreAt: null };
@@ -928,7 +937,16 @@ export async function getStationCollectionSnapshots(locationKey: string, limit =
     .orderBy(desc(stationCollectionSnapshots.collectedAt))
     .limit(limit);
 }
-
+/** Read station-collection traces over the selected history period. */
+export async function getStationCollectionSnapshotsByDateRange(locationKey: string, startDate: string, endDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(stationCollectionSnapshots).where(and(
+    eq(stationCollectionSnapshots.locationKey, locationKey),
+    gte(stationCollectionSnapshots.date, startDate),
+    lte(stationCollectionSnapshots.date, endDate),
+  )).orderBy(desc(stationCollectionSnapshots.date));
+}
 // ─── Netatmo OAuth tokens ───────────────────────────────────────────────────
 
 export async function upsertNetatmoOAuthToken(userId: number, encryptedRefreshToken: string, scopes = "read_station") {

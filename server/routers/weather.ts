@@ -27,6 +27,8 @@ import {
   getPhysicalStationHistory,
   getStoredHourlyForecasts,
   getStationCollectionSnapshots,
+  getQualifiedObservationSnapshotsByDateRange,
+  getStationCollectionSnapshotsByDateRange,
   getQualifiedEvidenceStatus,
   getStationQualityProfiles,
   getFavoriteLocations,
@@ -56,6 +58,7 @@ import { refreshManualFusionForFavorite } from "../manualFusion";
 import { getLocalEclipseCircumstances } from "../eclipseVisibility";
 import { getWeatherProviderDiagnostics } from "../weatherFetch";
 import { buildWeatherProvenance } from "../weatherProvenance";
+import { buildEveningEvidence } from "../historyEvidence";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -457,6 +460,10 @@ export const weatherRouter = router({
       const meteoAIForecasts = await getLatestMeteoAIForecasts(input.days, locKey);
       const scoreTimeSeries = await getHistoricalScoreTimeSeries(input.days, locKey);
       const leadTimeScoresData = await getQualifiedLeadTimeScoresForLocation(locKey, input.days);
+      const [physicalSnapshots, collectionSnapshots] = await Promise.all([
+        getQualifiedObservationSnapshotsByDateRange(locKey, startStr, endDate),
+        getStationCollectionSnapshotsByDateRange(locKey, startStr, endDate),
+      ]);
 
       return {
         forecasts,
@@ -464,6 +471,7 @@ export const weatherRouter = router({
         meteoAIForecasts,
         scoreTimeSeries,
         leadTimeScores: leadTimeScoresData,
+        eveningEvidence: buildEveningEvidence(physicalSnapshots, collectionSnapshots),
         startDate: startStr,
         endDate,
       };

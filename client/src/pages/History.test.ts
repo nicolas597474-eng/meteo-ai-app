@@ -28,6 +28,16 @@ describe("History", () => {
     expect(source).toContain("Données par échéance insuffisantes");
   });
 
+  it("affiche les preuves réellement collectées chaque soir sans inventer de couverture", () => {
+    expect(source).toContain("EveningEvidence");
+    expect(source).toContain("Preuves collectées chaque soir");
+    expect(source).toContain("Couverture réelle");
+    expect(source).toContain("Stations contributrices");
+    expect(source).toContain("Motif d’exclusion");
+    expect(source).toContain("Score non mis à jour");
+    expect(source).toContain("data?.eveningEvidence ?? []");
+  });
+
   it("fournit des infobulles interactives contextualisées pour chaque graphique", () => {
     expect(source).toContain("HistoryChartTooltip");
     expect(source).toContain('role="tooltip"');
