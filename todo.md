@@ -2853,3 +2853,4 @@
 - [x] Indiquer dans l’aide de température que le biais mesure une tendance plus chaude ou plus froide, distincte de la MAE.
 - [x] Afficher le biais thermique réel par modèle et une pastille plutôt chaud ou plutôt froid uniquement lorsque le biais est mesuré.
 - [x] Ajouter au panneau d’aide de température une explication claire du RMSE et de son rôle pour les écarts importants.
+- [x] Réaliser un audit complet non destructif des calculs, données, collectes, résilience serveur et interfaces MeteoAI.
