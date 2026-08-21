@@ -52,10 +52,11 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("candidate?.weights");
     expect(source).toContain("Régime de prévision dominant");
     const contextIndex = source.indexOf('aria-label="Mode de contexte local"');
-    const movedRegimeIndex = source.lastIndexOf("<DominantRegimePanel");
+    const heroRegimeIndex = source.indexOf("/* ── Regime badge ── */");
     const observationsIndex = source.indexOf('aria-labelledby="personal-observation-title"');
-    expect(movedRegimeIndex).toBeGreaterThan(contextIndex);
-    expect(observationsIndex).toBeGreaterThan(movedRegimeIndex);
+    expect(heroRegimeIndex).toBeLessThan(contextIndex);
+    expect(observationsIndex).toBeGreaterThan(contextIndex);
+    expect(source).not.toContain("{regime && (\n          <DominantRegimePanel");
     expect(source).toContain("Phénomène actuel");
     expect(source).toContain("Synthèse horaire · {regimeFreshnessLabel}");
     expect(source).toContain("whitespace-nowrap text-[15px] font-medium leading-tight");

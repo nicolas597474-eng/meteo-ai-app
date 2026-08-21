@@ -617,7 +617,7 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* ── Regime badge ── */}
-            {regime && false && (
+            {regime && (
               <div className="mb-1 rounded-xl border border-slate-600/50 bg-slate-800/60 px-2.5 py-1 sm:mb-2 sm:px-3 sm:py-1.5">
                 <div className="mb-1 flex justify-center sm:mb-1.5">
                   <p className="text-lg font-bold tracking-tight text-slate-50 sm:text-xl">
@@ -908,23 +908,6 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-
-        {regime && (
-          <DominantRegimePanel
-            regime={regime}
-            panelDate={panelDate}
-            regimeFreshnessLabel={regimeFreshnessLabel}
-            regimeSourceUpdatedAt={regimeSourceUpdatedAt}
-            showRegimeMenu={showRegimeMenu}
-            setShowRegimeMenu={setShowRegimeMenu}
-            regimeCatalogue={regimeCatalogue}
-            allRegimeIds={allRegimeIds}
-            allRegimesExpanded={allRegimesExpanded}
-            expandedRegimeIds={expandedRegimeIds}
-            setExpandedRegimeIds={setExpandedRegimeIds}
-            primaryRegimeId={primaryRegimeId}
-          />
-        )}
 
         <section className="dashboard-sky-card rounded-xl border border-sky-400/25 bg-sky-400/5" aria-labelledby="personal-observation-title">
           <button type="button" aria-expanded={isPersonalObservationOpen} onClick={() => setIsPersonalObservationOpen((open) => !open)} className="flex min-h-12 w-full items-center gap-2 px-3 text-left">
