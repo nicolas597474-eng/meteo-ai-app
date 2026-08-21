@@ -1,5 +1,5 @@
 export const PERSONAL_CONDITIONS = [
-  "sunny", "few_clouds", "partly_cloudy", "overcast", "fog", "drizzle", "rain", "showers", "storm", "snow",
+  "sunny", "few_clouds", "partly_cloudy", "very_cloudy", "overcast", "fog", "few_drops", "drizzle", "light_rain", "rain", "heavy_rain", "showers", "storm", "snow",
 ] as const;
 
 export type PersonalCondition = (typeof PERSONAL_CONDITIONS)[number];
@@ -8,10 +8,14 @@ export const PERSONAL_CONDITION_LABELS: Record<PersonalCondition, string> = {
   sunny: "Ensoleillé",
   few_clouds: "Quelques nuages",
   partly_cloudy: "Partiellement nuageux",
+  very_cloudy: "Très nuageux",
   overcast: "Ciel couvert",
   fog: "Brouillard",
+  few_drops: "Quelques gouttes",
   drizzle: "Bruine",
+  light_rain: "Pluie faible",
   rain: "Pluie",
+  heavy_rain: "Forte pluie",
   showers: "Averses",
   storm: "Orage",
   snow: "Neige",
@@ -49,14 +53,18 @@ export function personalConditionFromForecast(weatherCode: number | null, cloudC
   if (weatherCode === 0) return "sunny";
   if (weatherCode === 1) return "few_clouds";
   if (weatherCode === 2) return "partly_cloudy";
-  if (weatherCode === 3) return "overcast";
+  if (weatherCode === 3) return (cloudCover ?? 100) >= 90 ? "overcast" : "very_cloudy";
   if (weatherCode != null && weatherCode <= 49) return "fog";
-  if (weatherCode != null && weatherCode <= 59) return "drizzle";
-  if (weatherCode != null && weatherCode <= 69) return "rain";
+  if (weatherCode === 51) return "few_drops";
+  if (weatherCode != null && weatherCode <= 55) return "drizzle";
+  if (weatherCode != null && weatherCode <= 59) return "light_rain";
+  if (weatherCode != null && weatherCode <= 63) return "rain";
+  if (weatherCode != null && weatherCode <= 69) return "heavy_rain";
   if (weatherCode != null && weatherCode <= 79) return "snow";
   if (weatherCode != null && weatherCode <= 84) return "showers";
   if (weatherCode != null) return "storm";
   if ((cloudCover ?? 0) > 80) return "overcast";
+  if ((cloudCover ?? 0) > 65) return "very_cloudy";
   if ((cloudCover ?? 0) > 50) return "partly_cloudy";
   if ((cloudCover ?? 0) > 20) return "few_clouds";
   return "sunny";
@@ -64,8 +72,8 @@ export function personalConditionFromForecast(weatherCode: number | null, cloudC
 
 export function conditionAgreementScore(observed: PersonalCondition, forecast: PersonalCondition): number {
   if (observed === forecast) return 100;
-  const sky = ["sunny", "few_clouds", "partly_cloudy", "overcast"];
-  const precipitation = ["drizzle", "rain", "showers", "storm"];
+  const sky = ["sunny", "few_clouds", "partly_cloudy", "very_cloudy", "overcast"];
+  const precipitation = ["few_drops", "drizzle", "light_rain", "rain", "heavy_rain", "showers", "storm"];
   if (sky.includes(observed) && sky.includes(forecast)) return 60;
   if (precipitation.includes(observed) && precipitation.includes(forecast)) return 60;
   return 0;

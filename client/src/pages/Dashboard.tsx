@@ -111,15 +111,20 @@ const PERSONAL_CONDITION_OPTIONS = [
   { id: "sunny", label: "Ensoleillé" },
   { id: "few_clouds", label: "Quelques nuages" },
   { id: "partly_cloudy", label: "Partiellement nuageux" },
+  { id: "very_cloudy", label: "Très nuageux" },
   { id: "overcast", label: "Ciel couvert" },
   { id: "fog", label: "Brouillard" },
+  { id: "few_drops", label: "Quelques gouttes" },
   { id: "drizzle", label: "Bruine" },
+  { id: "light_rain", label: "Pluie faible" },
   { id: "rain", label: "Pluie" },
+  { id: "heavy_rain", label: "Forte pluie" },
   { id: "showers", label: "Averses" },
   { id: "storm", label: "Orage" },
+  { id: "snow", label: "Neige" },
 ] as const;
 
-const PERSONAL_PRECIPITATION_CONDITIONS = new Set(["drizzle", "rain", "showers", "storm"]);
+const PERSONAL_PRECIPITATION_CONDITIONS = new Set(["few_drops", "drizzle", "light_rain", "rain", "heavy_rain", "showers", "storm"]);
 const acceptsPersonalPrecipitation = (condition: string) => PERSONAL_PRECIPITATION_CONDITIONS.has(condition);
 
 function DominantRegimePanel({

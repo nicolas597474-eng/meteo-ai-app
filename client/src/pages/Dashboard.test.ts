@@ -11,6 +11,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('MeteoIcon name="humidity" size={16}');
     expect(source).toContain("Précipitations observées (mm)");
     expect(source).toContain("acceptsPersonalPrecipitation");
+    expect(source).toContain("Très nuageux");
+    expect(source).toContain("Quelques gouttes");
+    expect(source).toContain("Forte pluie");
     expect(source).toContain("Enregistrer et comparer aux modèles");
     expect(source).toContain("personalObservations.submit.useMutation");
     expect(source).toContain("Données insuffisantes");

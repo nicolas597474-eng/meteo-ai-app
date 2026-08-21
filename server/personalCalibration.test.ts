@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scorePersonalModelObservation, updatePersonalCalibration } from "./personalCalibration";
+import { personalConditionFromForecast, scorePersonalModelObservation, updatePersonalCalibration } from "./personalCalibration";
 
 describe("calibration par observation personnelle", () => {
   it("favorise le modèle dont la température et la condition correspondent", () => {
@@ -16,6 +16,14 @@ describe("calibration par observation personnelle", () => {
     const lointain = scorePersonalModelObservation(observation, { temperature: null, windSpeed: null, precipitation: 0, weatherCode: 61, cloudCover: 100 });
     expect(proche.precipitationScore).toBeGreaterThan(lointain.precipitationScore ?? 0);
     expect(proche.overallScore).toBeGreaterThan(lointain.overallScore);
+  });
+
+  it("distingue les niveaux fins de ciel couvert et de précipitation", () => {
+    expect(personalConditionFromForecast(3, 75)).toBe("very_cloudy");
+    expect(personalConditionFromForecast(3, 100)).toBe("overcast");
+    expect(personalConditionFromForecast(51, 90)).toBe("few_drops");
+    expect(personalConditionFromForecast(57, 100)).toBe("light_rain");
+    expect(personalConditionFromForecast(65, 100)).toBe("heavy_rain");
   });
 
   it("n’accorde aucune influence opérationnelle avant le seuil de preuve", () => {
