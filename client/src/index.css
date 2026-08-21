@@ -233,7 +233,8 @@ img.moon-3d-first-crescent {
 
 /* Lueur lunaire légère : elle souligne la texture sans altérer la phase ou son orientation. */
 .realistic-moon-glow {
-  box-shadow: 0 0 7px rgba(220, 232, 255, 0.26), 0 0 15px rgba(148, 163, 255, 0.14);
+  --moon-glow-opacity: 0.22;
+  box-shadow: 0 0 7px rgb(220 232 255 / var(--moon-glow-opacity)), 0 0 15px rgb(148 163 255 / var(--moon-glow-opacity));
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -243,10 +244,10 @@ img.moon-3d-first-crescent {
 
   @keyframes meteoai-lunar-glow {
     from {
-      box-shadow: 0 0 6px rgba(220, 232, 255, 0.20), 0 0 13px rgba(148, 163, 255, 0.10);
+      filter: brightness(0.94);
     }
     to {
-      box-shadow: 0 0 11px rgba(231, 239, 255, 0.42), 0 0 24px rgba(148, 163, 255, 0.24);
+      filter: brightness(1.08);
     }
   }
 }

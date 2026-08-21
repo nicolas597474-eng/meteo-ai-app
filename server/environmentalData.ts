@@ -301,6 +301,7 @@ export type EnvironmentalSnapshot = {
     moonAboveHorizon: boolean;
     altitudeCalculatedAt: string;
     timezone: string;
+    cloudCover: number | null;
     outlook: AstronomyOutlook;
     coordinates: { lat: number; lon: number };
   } | null;
@@ -320,6 +321,7 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
     latitude: String(coords.lat),
     longitude: String(coords.lon),
     daily: "sunrise,sunset,daylight_duration,moonrise,moonset,moon_phase,cloud_cover_mean",
+    current: "cloud_cover",
     forecast_days: "16",
     timezone: "auto",
   }).toString();
@@ -389,6 +391,7 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
       moonAboveHorizon: apparentPosition.moon.aboveHorizon,
       altitudeCalculatedAt: altitudeCalculatedAt.toISOString(),
       timezone,
+      cloudCover: asNumber(weather?.current?.cloud_cover),
       outlook: buildAstronomyOutlook({
         dates: dailyDates,
         moonPhases: dailyMoonPhases,

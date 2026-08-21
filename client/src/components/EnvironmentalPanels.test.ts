@@ -216,6 +216,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("realistic-moon-glow");
     expect(styles).toContain("@media (prefers-reduced-motion: no-preference)");
     expect(styles).toContain("meteoai-lunar-glow");
-    expect(styles).toContain("box-shadow: 0 0 11px");
+    expect(styles).toContain("--moon-glow-opacity");
+    expect(styles).toContain("filter: brightness(1.08)");
   });
 });
