@@ -278,14 +278,18 @@ export default function WeatherDetails() {
                     {conditionDetails.length > 0 && (
                       <div className="mt-2 border-t border-white/12 pt-2">
                         <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-100/55">Conditions du créneau</p>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {conditionDetails.map((detail) => (
-                            <span key={`${detail.icon}-${detail.label}`} className="inline-flex min-h-5 items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] px-1.5 py-0.5 text-[8px] leading-tight text-slate-200">
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {conditionDetails.map((detail) => {
+                            const isCloudLayers = detail.label === "Couches nuageuses";
+                            const pill = <span className="inline-flex min-h-5 items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] px-1.5 py-0.5 text-[8px] leading-tight text-slate-200">
                               <MeteoIcon name={detail.icon} size={11} />
                               <span>{detail.label}</span>
                               {detail.detail && <span className="text-slate-400">· {detail.detail}</span>}
-                            </span>
-                          ))}
+                            </span>;
+                            return isCloudLayers
+                              ? <div key={`${detail.icon}-${detail.label}`} className="mt-0.5 basis-full">{pill}</div>
+                              : <span key={`${detail.icon}-${detail.label}`}>{pill}</span>;
+                          })}
                         </div>
                       </div>
                     )}

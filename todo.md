@@ -2789,3 +2789,5 @@
 - [x] Rééquilibrer l’espacement interne de la grille des détails quotidiens après le regroupement Vent et rafales.
 - [x] Retirer le séparateur entre la pastille Accord et les métriques Humidité/Vent des cartes horaires.
 - [x] Réduire l’espace inférieur des cartes horaires sous les couches nuageuses.
+- [x] Harmoniser les espaces entre les pastilles de conditions horaires.
+- [x] Décaler légèrement la pastille Couches nuageuses sous les autres pastilles.

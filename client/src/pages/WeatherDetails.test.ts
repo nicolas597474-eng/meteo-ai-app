@@ -39,6 +39,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).not.toContain("Accord pluie {h.precipAgreement ?? 0}%");
     expect(source).toContain("getHourlyConditionDetails");
     expect(source).toContain("Conditions du créneau");
+    expect(source).toContain('mt-1 flex flex-wrap gap-1.5');
+    expect(source).toContain('detail.label === "Couches nuageuses"');
+    expect(source).toContain('mt-0.5 basis-full');
     expect(source).toContain("hour?.precipitation != null");
     expect(source).not.toContain("Visibilité ${hour.visibility.toFixed(0)} km");
     expect(source).not.toContain("Rayonnement ${hour.solarRadiation.toFixed(0)} W/m²");
