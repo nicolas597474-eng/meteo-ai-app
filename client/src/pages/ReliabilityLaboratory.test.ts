@@ -43,11 +43,14 @@ describe("ReliabilityLaboratory", () => {
     expect(source.indexOf('id="tendances-provisoires"')).toBeLessThan(source.indexOf('id="vue-generale"'));
     expect(source).toContain("Scores globaux indisponibles");
     expect(source).toContain("ProvisionalTrendCard");
+    expect(source).toContain("Comprendre le score de pluie");
+    expect(source).toContain("score-precipitation-help");
+    expect(source).toContain("Fermer l’explication du score de précipitation");
   });
 
   it("utilise des accents bleu-vert pour les états de préparation et provisoires", () => {
     expect(source).toContain("border-sky-500/30");
-    expect(source).not.toContain("border-sky-400/35");
+    expect(source).toContain("border-sky-400/35");
     expect(source).not.toContain("amber-500");
   });
 });
