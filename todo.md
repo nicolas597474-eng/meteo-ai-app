@@ -2798,3 +2798,4 @@
 - [x] Réduire la hauteur des pastilles Accord des cartes horaires en préservant leur libellé et leur action tactile.
 - [x] Compacter encore la hauteur des pastilles Accord sans réduire leur libellé.
 - [x] Augmenter très légèrement la hauteur des pastilles Accord tout en conservant le format compact.
+- [x] Augmenter encore légèrement la hauteur des pastilles Accord en conservant le centrage du texte.

@@ -32,7 +32,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Détail horaire non disponible pour cette journée.");
     expect(source).toContain("getSlotAgreementConfidence");
     expect(source).toContain("Accord {value}%");
-    expect(source).toContain("!min-h-[14px] inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px]");
+    expect(source).toContain("!min-h-[16px] inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px]");
     expect(source).toContain('border px-3 pb-4 pt-3 transition-colors');
     expect(source).toContain('px-3 pb-1 scrollbar-hide snap-x');
     expect(source).toContain('mt-1 text-center text-[10px] text-slate-500');
