@@ -2685,6 +2685,8 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Corriger la croix de fermeture du panneau d’observation Historique pour les gestes tactiles.
+- [x] Vérifier que la fermeture masque le tooltip sans modifier la sélection ou les données du graphique.
 - [x] Remonter Confiance prévision, Stabilité modèles et Modèles appliqués en tête de l’AI Lab.
 - [x] Conserver les aides, valeurs et la grille à trois cartes sur mobile.
 - [x] Vérifier que la frise des observations physiques reste sous les indicateurs.

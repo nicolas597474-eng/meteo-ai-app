@@ -34,6 +34,9 @@ describe("History", () => {
     expect(source).toContain("Écart MeteoAI / observation");
     expect(source).toContain("Fermer le détail d’observation");
     expect(source).toContain("dismissedLabel");
+    expect(source).toContain('style={{ pointerEvents: "auto" }}');
+    expect(source).toContain("onPointerDown={dismissTooltip}");
+    expect(source).toContain('touchAction: "manipulation"');
     expect(source).toContain("activeDot");
     expect(source).toContain("cursor={{ stroke");
   });

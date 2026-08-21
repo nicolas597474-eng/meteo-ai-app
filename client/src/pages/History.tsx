@@ -58,8 +58,13 @@ function HistoryChartTooltip({ active, payload, label, unit = "" }: any) {
   const observation = entries.find((entry: any) => String(entry.name).toLowerCase().includes("observation") || String(entry.name).toLowerCase().includes("observé"));
   const meteoAI = entries.find((entry: any) => String(entry.name).toLowerCase().includes("meteoai"));
   const gap = observation?.value != null && meteoAI?.value != null ? Number(meteoAI.value) - Number(observation.value) : null;
-  return <div role="tooltip" className="min-w-48 rounded-xl border border-slate-500/90 bg-[#070b12] p-3 text-left ring-1 ring-black/45">
-    <div className="flex items-start justify-between gap-3 border-b border-slate-700/80 pb-2"><p className="text-xs font-semibold text-white">{shortDate(tooltipLabel)}</p><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setDismissedLabel(tooltipLabel); }} aria-label="Fermer le détail d’observation" title="Fermer" className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-300 transition-colors hover:bg-slate-800 hover:text-white active:scale-95"><X size={14} strokeWidth={2.5} aria-hidden="true" /></button></div>
+  const dismissTooltip = (event: React.SyntheticEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDismissedLabel(tooltipLabel);
+  };
+  return <div role="tooltip" style={{ pointerEvents: "auto" }} className="min-w-48 rounded-xl border border-slate-500/90 bg-[#070b12] p-3 text-left ring-1 ring-black/45">
+    <div className="flex items-start justify-between gap-3 border-b border-slate-700/80 pb-2"><p className="text-xs font-semibold text-white">{shortDate(tooltipLabel)}</p><button type="button" onPointerDown={dismissTooltip} onClick={dismissTooltip} aria-label="Fermer le détail d’observation" title="Fermer" style={{ touchAction: "manipulation" }} className="-mr-1 -mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-300 transition-colors hover:bg-slate-800 hover:text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X size={16} strokeWidth={2.5} aria-hidden="true" /></button></div>
     <div className="space-y-1.5 pt-2">{entries.map((entry: any) => <div key={`${entry.dataKey}-${entry.name}`} className="flex items-center justify-between gap-5 text-[11px]"><span className="flex min-w-0 items-center gap-1.5 text-slate-300"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color ?? "#94a3b8" }} /> <span className="truncate">{entry.name}</span></span><strong className="shrink-0 font-mono text-slate-100">{number(entry.value, unit, unit === "/100" ? 0 : 1)}</strong></div>)}</div>
     {gap != null ? <p className={`mt-2 rounded-lg border px-2 py-1.5 text-[10px] ${Math.abs(gap) <= 1 ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-amber-400/20 bg-amber-400/5 text-amber-100"}`}>Écart MeteoAI / observation : {gap > 0 ? "+" : ""}{gap.toFixed(1)}{unit}</p> : null}
   </div>;
