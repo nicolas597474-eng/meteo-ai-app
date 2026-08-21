@@ -23,12 +23,10 @@ describe("ReliabilityLaboratory", () => {
 
   it("affiche les tendances mesurées sans les présenter comme un classement validé", () => {
     expect(source).toContain("Tendances provisoires");
-    expect(source).toContain("Note de preuve provisoire");
-    expect(source).toContain("Notes par modèle");
-    expect(source).toContain("shrink-0 whitespace-nowrap rounded-full");
-    expect(source).toContain("inline-flex whitespace-nowrap rounded-md");
-    expect(source).toContain("Note {evidenceScore}/100");
-    expect(source).toContain("Note de preuve de ${model.name}: ${evidenceScore}/100");
+    expect(source).toContain("Couverture provisoire des preuves");
+    expect(source).not.toContain("Notes par modèle");
+    expect(source).not.toContain("Note {evidenceScore}/100");
+    expect(source).not.toContain("Note de preuve de ${model.name}: ${evidenceScore}/100");
     expect(source).toContain("Température");
     expect(source).toContain("Pluie");
     expect(source).toContain("Vent");
@@ -49,7 +47,7 @@ describe("ReliabilityLaboratory", () => {
 
   it("utilise des accents bleu-vert pour les états de préparation et provisoires", () => {
     expect(source).toContain("border-sky-500/30");
-    expect(source).toContain("border-sky-400/35");
+    expect(source).not.toContain("border-sky-400/35");
     expect(source).not.toContain("amber-500");
   });
 });

@@ -189,14 +189,14 @@ export default function ReliabilityLaboratory() {
           </section>
           <section className="mb-4 scroll-mt-20" id="tendances-provisoires">
             <MeteoSurface tone="lab" className="rounded-2xl p-4">
-              <SectionHeading title="Tendances provisoires" description="Ces indicateurs montrent les mesures déjà disponibles par paramètre. Leur note décrit la couverture des preuves, pas une fiabilité prédictive validée ni une performance par condition météo." icon="trending" />
+              <SectionHeading title="Tendances provisoires" description="Ces indicateurs montrent les mesures déjà disponibles par paramètre. Le volume de preuves figure sous chaque modèle, sans constituer une fiabilité prédictive validée ni une performance par condition météo." icon="trending" />
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <ProvisionalTrendCard title="Température" detail="MAE la plus faible observée" models={provisionalTrends.temperature} value={(model) => metric(model.metrics.temperature.mae, " °C", 2)} accent="text-orange-200" />
                 <ProvisionalTrendCard title="Pluie" detail="Score de précipitation le plus élevé observé" models={provisionalTrends.precipitation} value={(model) => metric(model.metrics.precipitation.score, "/100", 0)} accent="text-sky-200" />
                 <ProvisionalTrendCard title="Vent" detail="MAE la plus faible observée" models={provisionalTrends.wind} value={(model) => metric(model.metrics.wind.mae, " km/h", 2)} accent="text-cyan-200" />
                 <ProvisionalTrendCard title="Humidité" detail="MAE la plus faible observée" models={provisionalTrends.humidity} value={(model) => metric(model.metrics.humidity.mae, " %", 2)} accent="text-violet-200" />
               </div>
-              <p className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-[11px] leading-relaxed text-sky-100">Note de preuve provisoire : elle compare le volume réellement archivé à 72 comparaisons et 7 jours. Elle mesure la solidité de l’échantillon, pas la performance future du modèle. Le classement officiel reste masqué tant que le score normalisé complet et les régimes météorologiques ne sont pas archivés.</p>
+              <p className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-[11px] leading-relaxed text-sky-100">Couverture provisoire des preuves : les comparaisons et les jours archivés sous chaque modèle indiquent la maturité de l’échantillon, sans constituer une performance future. Le classement officiel reste masqué tant que le score normalisé complet et les régimes météorologiques ne sont pas archivés.</p>
             </MeteoSurface>
           </section>
 
@@ -237,13 +237,11 @@ function ProvisionalTrendCard({ title, detail, models, value, accent }: { title:
   return <article className="rounded-xl border border-sky-500/25 bg-[#09111d]/85 p-3">
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0"><p className="text-sm font-semibold text-slate-100">{title}</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">{detail}</p></div>
-      <span className="shrink-0 whitespace-nowrap rounded-full border border-sky-400/35 bg-sky-400/10 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-sky-100">Notes par modèle</span>
     </div>
     {models.length ? <div className="mt-3 space-y-2">{models.slice(0, 3).map((model) => {
-      const evidenceScore = Number(model.confidence?.evidenceScore ?? 0);
       return <div key={model.name} className="flex items-center justify-between gap-3 border-t border-slate-800 pt-2 first:border-0 first:pt-0">
         <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-200">{model.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p></div>
-        <div className="shrink-0 text-right"><span aria-label={`Note de preuve de ${model.name}: ${evidenceScore}/100`} className="inline-flex whitespace-nowrap rounded-md border border-sky-400/40 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-bold text-sky-100">Note {evidenceScore}/100</span><p className={`mt-1 text-sm font-bold ${accent}`}>{value(model)}</p></div>
+        <div className="shrink-0 text-right"><p className={`text-sm font-bold ${accent}`}>{value(model)}</p></div>
       </div>;
     })}</div> : <p className="mt-3 text-[11px] leading-relaxed text-slate-500">Aucune mesure qualifiée disponible pour ce paramètre sur la période sélectionnée.</p>}
   </article>;

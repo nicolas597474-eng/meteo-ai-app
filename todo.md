@@ -2814,3 +2814,8 @@
 - [x] Ajouter en tête du lexique une présentation claire de la philosophie et de l’objectif de MeteoAI.
 - [x] Ajouter des conditions observées plus précises, notamment Très nuageux et Quelques gouttes, avec leurs correspondances de comparaison.
 - [x] Renommer le libellé de nébulosité en État du ciel pour le distinguer du phénomène actuel.
+- [ ] Vérifier les couches nationales françaises réutilisables gratuitement pour une carte météo multi-couches.
+- [ ] Proposer une carte Prévisions avec couches précipitations, température, vent, humidité, nuages et pression selon les données confirmées.
+- [ ] Diagnostiquer l’absence apparente des bandes de couverture et des stations locales dans les modes Local et Ultra-local.
+- [ ] Diagnostiquer pourquoi la note de preuve est identique pour plusieurs modèles et paramètres malgré des performances différentes.
+- [x] Masquer les notes de couverture comme 29/100 dans les sections de tendances du Laboratoire.
