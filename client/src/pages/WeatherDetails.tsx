@@ -234,7 +234,7 @@ export default function WeatherDetails() {
           </div>
           
           {/* Horizontal scrollable hourly cards */}
-          <div ref={hourlyRef} className="-mx-3 overflow-x-auto overscroll-x-contain px-3 pb-2 scrollbar-hide snap-x snap-mandatory scroll-px-3">
+          <div ref={hourlyRef} className="-mx-3 overflow-x-auto overscroll-x-contain px-3 pb-1 scrollbar-hide snap-x snap-mandatory scroll-px-3">
             <div className="flex items-start gap-2.5">
               {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
@@ -244,7 +244,7 @@ export default function WeatherDetails() {
                   <div
                     key={h.hour}
                     data-hour-index={i}
-                    className={`w-[calc((100%-10px)/2)] shrink-0 snap-start rounded-[22px] border px-3 pb-2 pt-3 transition-colors ${
+                    className={`w-[calc((100%-10px)/2)] shrink-0 snap-start rounded-[22px] border px-3 pb-3 pt-3 transition-colors ${
                       isNow
                         ? "border-sky-200/65 bg-[linear-gradient(160deg,rgba(44,128,181,0.30),rgba(10,35,60,0.34))]"
                         : "border-white/20 bg-[linear-gradient(160deg,rgba(77,105,132,0.20),rgba(16,36,56,0.28))]"
@@ -308,7 +308,7 @@ export default function WeatherDetails() {
               })}
             </div>
           </div>
-          <p className="mt-2 text-center text-[10px] text-slate-500">← Glissez pour voir les heures suivantes →</p>
+          <p className="mt-1 text-center text-[10px] text-slate-500">← Glissez pour voir les heures suivantes →</p>
         </MeteoSurface>
 
         {/* ═══ SECTION 2: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
