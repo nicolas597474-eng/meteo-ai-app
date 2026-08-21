@@ -122,6 +122,111 @@ const PERSONAL_CONDITION_OPTIONS = [
 const PERSONAL_PRECIPITATION_CONDITIONS = new Set(["drizzle", "rain", "showers", "storm"]);
 const acceptsPersonalPrecipitation = (condition: string) => PERSONAL_PRECIPITATION_CONDITIONS.has(condition);
 
+function DominantRegimePanel({
+  regime,
+  panelDate,
+  regimeFreshnessLabel,
+  regimeSourceUpdatedAt,
+  showRegimeMenu,
+  setShowRegimeMenu,
+  regimeCatalogue,
+  allRegimeIds,
+  allRegimesExpanded,
+  expandedRegimeIds,
+  setExpandedRegimeIds,
+  primaryRegimeId,
+}: {
+  regime: any;
+  panelDate: string;
+  regimeFreshnessLabel: string;
+  regimeSourceUpdatedAt: string | null;
+  showRegimeMenu: boolean;
+  setShowRegimeMenu: any;
+  regimeCatalogue: any[];
+  allRegimeIds: string[];
+  allRegimesExpanded: boolean;
+  expandedRegimeIds: string[];
+  setExpandedRegimeIds: any;
+  primaryRegimeId: string;
+}) {
+  return (
+    <section className="dashboard-sky-card rounded-xl border border-slate-600/50 bg-slate-900/65 px-2.5 py-1 sm:px-3 sm:py-1.5" aria-label="Régime de prévision dominant">
+      <div className="mb-1 flex justify-center sm:mb-1.5">
+        <p className="text-lg font-bold tracking-tight text-slate-50 sm:text-xl">{panelDate}</p>
+      </div>
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        <button
+          type="button"
+          onClick={() => setShowRegimeMenu((open: boolean) => !open)}
+          aria-expanded={showRegimeMenu}
+          aria-controls="regime-catalogue"
+          className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+        >
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-950/35 text-sm sm:h-7 sm:w-7 sm:text-base">{regime.emoji}</span>
+          <div className="min-w-0">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">Régime de prévision dominant</p>
+            <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
+            <p className="hidden text-xs leading-tight text-muted-foreground sm:block">{regime.description}</p>
+            <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>
+            <span className="sr-only">Voir les 20 régimes</span>
+          </div>
+        </button>
+      </div>
+      <div className="mt-0.5 flex flex-wrap gap-1 sm:mt-1">
+        <span className="rounded-full border border-orange-500/30 bg-orange-500/20 px-1.5 py-px text-[11px] font-medium text-orange-300 sm:px-2 sm:py-0.5 sm:text-xs">🌡 {Math.round(regime.weights.temp * 100)}%</span>
+        <span className="rounded-full border border-blue-500/30 bg-blue-500/20 px-1.5 py-px text-[11px] font-medium text-blue-300 sm:px-2 sm:py-0.5 sm:text-xs">🌧 {Math.round(regime.weights.precip * 100)}%</span>
+        <span className="rounded-full border border-cyan-500/30 bg-cyan-500/20 px-1.5 py-px text-[11px] font-medium text-cyan-300 sm:px-2 sm:py-0.5 sm:text-xs">💨 {Math.round(regime.weights.wind * 100)}%</span>
+        <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-1.5 py-px text-[11px] font-medium text-purple-300 sm:px-2 sm:py-0.5 sm:text-xs">☁ {Math.round(regime.weights.condition * 100)}%</span>
+      </div>
+      {showRegimeMenu && (
+        <div id="regime-catalogue" className="mt-2 rounded-lg border border-slate-600/35 bg-slate-950/30 p-2" aria-label="Tous les régimes météo possibles">
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">Tous les régimes</p>
+            <div className="flex items-center gap-1.5">
+              <button type="button" onClick={() => setExpandedRegimeIds(allRegimesExpanded ? [] : allRegimeIds)} aria-label={allRegimesExpanded ? "Tout réduire les régimes" : "Tout développer les régimes"} className="min-h-7 rounded-md border border-primary/30 bg-primary/10 px-2 text-[9px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                {allRegimesExpanded ? "Tout réduire" : "Tout développer"}
+              </button>
+              <span className="rounded-full border border-slate-600/50 bg-slate-900/60 px-1.5 py-0.5 text-[9px] text-slate-400">{regimeCatalogue.length || 20}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
+            {regimeCatalogue.map((candidate: any) => {
+              const isActive = candidate.id === primaryRegimeId;
+              const isExpanded = expandedRegimeIds.includes(candidate.id);
+              const detailsId = `regime-weights-${candidate.id}`;
+              const weights = candidate?.weights && typeof candidate.weights === "object" ? candidate.weights : null;
+              const weightRows = [
+                { label: "Temp.", value: weights?.temp, color: "bg-orange-400" },
+                { label: "Pluie", value: weights?.precip, color: "bg-blue-400" },
+                { label: "Vent", value: weights?.wind, color: "bg-cyan-400" },
+                { label: "Cond.", value: weights?.condition, color: "bg-violet-400" },
+              ];
+              return (
+                <div key={candidate.id} className={`min-w-0 rounded-md text-[10px] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/25" : "bg-slate-900/25 text-slate-300"}`}>
+                  <button type="button" onClick={() => setExpandedRegimeIds((current: string[]) => current.includes(candidate.id) ? current.filter((id) => id !== candidate.id) : [...current, candidate.id])} aria-expanded={isExpanded} aria-controls={detailsId} aria-label={`${isExpanded ? "Replier" : "Afficher"} les pondérations de ${candidate.label}`} className="flex w-full min-w-0 items-start gap-1.5 px-1.5 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                    <span className="pt-px">{candidate.emoji}</span>
+                    <span className="min-w-0 flex-1"><strong className="block truncate">{candidate.label}{isActive ? " · actif" : ""}</strong><span className="mt-0.5 hidden leading-snug text-slate-400 sm:block">{candidate.description}</span></span>
+                    {isExpanded ? <ChevronUp className="mt-px h-3 w-3 shrink-0" aria-hidden="true" /> : <ChevronDown className="mt-px h-3 w-3 shrink-0 text-slate-500" aria-hidden="true" />}
+                  </button>
+                  {isExpanded && (
+                    <div id={detailsId} className="mx-1.5 mb-1.5 grid grid-cols-2 gap-x-2 gap-y-1.5 border-t border-slate-700/40 pt-1.5 text-[8px] leading-tight text-slate-400">
+                      {weightRows.map((weight) => {
+                        const percent = typeof weight.value === "number" && Number.isFinite(weight.value) ? Math.max(0, Math.min(100, Math.round(weight.value * 100))) : 0;
+                        return <div key={weight.label} className="min-w-0"><div className="mb-0.5 flex items-center justify-between gap-1"><span>{weight.label}</span><span className="font-medium text-slate-300">{formatRegimeWeight(weight.value)}</span></div><div className="h-1 overflow-hidden rounded-full bg-slate-700/70" role="progressbar" aria-label={`Poids ${weight.label}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><div className={`h-full rounded-full ${weight.color}`} style={{ width: `${percent}%` }} /></div></div>;
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
@@ -512,7 +617,7 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* ── Regime badge ── */}
-            {regime && (
+            {regime && false && (
               <div className="mb-1 rounded-xl border border-slate-600/50 bg-slate-800/60 px-2.5 py-1 sm:mb-2 sm:px-3 sm:py-1.5">
                 <div className="mb-1 flex justify-center sm:mb-1.5">
                   <p className="text-lg font-bold tracking-tight text-slate-50 sm:text-xl">
@@ -527,11 +632,11 @@ export default function Dashboard() {
                     aria-controls="regime-catalogue"
                     className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-950/35 text-sm sm:h-7 sm:w-7 sm:text-base">{regime.emoji}</span>
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-950/35 text-sm sm:h-7 sm:w-7 sm:text-base">{regime?.emoji}</span>
                     <div className="min-w-0">
                       <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">Régime de prévision dominant</p>
-                      <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
-                      <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime.description}</p>
+                      <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime?.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
+                      <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime?.description}</p>
                       <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>
                       <span className="sr-only">Voir les 20 régimes</span>
                     </div>
@@ -540,16 +645,16 @@ export default function Dashboard() {
                 {/* Weight pills */}
                 <div className="mt-0.5 flex flex-wrap gap-1 sm:mt-1">
                   <span className="rounded-full border border-orange-500/30 bg-orange-500/20 px-1.5 py-px text-[11px] font-medium text-orange-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    🌡 {Math.round(regime.weights.temp * 100)}%
+                    🌡 {Math.round((regime?.weights?.temp ?? 0) * 100)}%
                   </span>
                   <span className="rounded-full border border-blue-500/30 bg-blue-500/20 px-1.5 py-px text-[11px] font-medium text-blue-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    🌧 {Math.round(regime.weights.precip * 100)}%
+                    🌧 {Math.round((regime?.weights?.precip ?? 0) * 100)}%
                   </span>
                   <span className="rounded-full border border-cyan-500/30 bg-cyan-500/20 px-1.5 py-px text-[11px] font-medium text-cyan-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    💨 {Math.round(regime.weights.wind * 100)}%
+                    💨 {Math.round((regime?.weights?.wind ?? 0) * 100)}%
                   </span>
                   <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-1.5 py-px text-[11px] font-medium text-purple-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    ☁ {Math.round(regime.weights.condition * 100)}%
+                    ☁ {Math.round((regime?.weights?.condition ?? 0) * 100)}%
                   </span>
                 </div>
                 {showRegimeMenu && (
@@ -803,6 +908,23 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+
+        {regime && (
+          <DominantRegimePanel
+            regime={regime}
+            panelDate={panelDate}
+            regimeFreshnessLabel={regimeFreshnessLabel}
+            regimeSourceUpdatedAt={regimeSourceUpdatedAt}
+            showRegimeMenu={showRegimeMenu}
+            setShowRegimeMenu={setShowRegimeMenu}
+            regimeCatalogue={regimeCatalogue}
+            allRegimeIds={allRegimeIds}
+            allRegimesExpanded={allRegimesExpanded}
+            expandedRegimeIds={expandedRegimeIds}
+            setExpandedRegimeIds={setExpandedRegimeIds}
+            primaryRegimeId={primaryRegimeId}
+          />
+        )}
 
         <section className="dashboard-sky-card rounded-xl border border-sky-400/25 bg-sky-400/5" aria-labelledby="personal-observation-title">
           <button type="button" aria-expanded={isPersonalObservationOpen} onClick={() => setIsPersonalObservationOpen((open) => !open)} className="flex min-h-12 w-full items-center gap-2 px-3 text-left">

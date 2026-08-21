@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Déplacer le régime dominant entre les modes Officiel/Local/Ultra-local et Mes observations.
+- [x] Conserver les détails, probabilités et données du régime sans modification.
+- [x] Vérifier le nouvel ordre sur mobile et desktop.
 - [x] Remonter la carte Historique des prévisions juste sous l’en-tête de la page Stations.
 - [x] Renforcer le contour de la carte Historique avec un vert distinct et accessible.
 - [x] Vérifier le rendu mobile sans modifier l’accès à la page Historique.
