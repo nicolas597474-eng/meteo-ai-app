@@ -2781,3 +2781,5 @@
 - [x] Valider TypeScript, Vitest, rendu et invariants de données avant publication.
 - [x] Retirer la ligne Accord pluie des cartes de prévisions heure par heure.
 - [x] Réduire légèrement la hauteur de la pastille Accord global des cartes heure par heure.
+- [x] Compacter encore légèrement la pastille Accord global dans les cartes heure par heure.
+- [x] Afficher des détails de conditions météorologiques uniquement lorsqu’ils sont disponibles dans chaque créneau horaire.

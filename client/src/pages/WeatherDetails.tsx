@@ -75,6 +75,7 @@ const PERIOD_LABELS: Record<Period, { label: string; emoji: string }> = {
  * reproduire le score officiel de confiance, qui reste présenté séparément.
  */
 type AgreementDetail = { label: string; value: number };
+type HourlyConditionDetail = { icon: string; label: string; detail?: string };
 
 function getSlotAgreementDetails(hour: any, historical: any = null): AgreementDetail[] {
   const bound = (value: number) => Math.max(0, Math.min(100, value));
@@ -97,6 +98,41 @@ function getSlotAgreementConfidence(hour: any, historical: any = null): number |
   return details.length > 0 ? Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length) : null;
 }
 
+function getHourlyConditionDetails(hour: any): HourlyConditionDetail[] {
+  const precipitationDetail = hour?.precipIntensity === "heavy"
+    ? "intensité forte"
+    : hour?.precipIntensity === "moderate"
+      ? "intensité modérée"
+      : hour?.precipIntensity === "light"
+        ? "intensité faible"
+        : hour?.precipType === "snow"
+          ? "neige"
+          : hour?.precipType === "freezing_rain"
+            ? "verglas"
+            : undefined;
+  const cloudLayers = [
+    hour?.cloudLow != null ? `bas ${hour.cloudLow}%` : null,
+    hour?.cloudMid != null ? `moy. ${hour.cloudMid}%` : null,
+    hour?.cloudHigh != null ? `haut ${hour.cloudHigh}%` : null,
+  ].filter((value): value is string => value !== null).join(" · ");
+
+  return [
+    hour?.precipitation != null
+      ? { icon: "precipitation", label: `${hour.precipitation.toFixed(1)} mm`, detail: precipitationDetail }
+      : null,
+    hour?.visibility != null
+      ? { icon: "visibility", label: `Visibilité ${hour.visibility.toFixed(0)} km` }
+      : null,
+    hour?.uvIndex != null && hour.uvIndex > 0
+      ? { icon: "sunny", label: `UV ${hour.uvIndex.toFixed(0)}` }
+      : null,
+    hour?.solarRadiation != null && hour.solarRadiation > 0
+      ? { icon: "sunny", label: `Rayonnement ${hour.solarRadiation.toFixed(0)} W/m²` }
+      : null,
+    cloudLayers ? { icon: "cloud_cover", label: "Couches nuageuses", detail: cloudLayers } : null,
+  ].filter((detail): detail is HourlyConditionDetail => detail !== null);
+}
+
 function SlotConfidenceBadge({ details, historicalModels = [] }: { details: AgreementDetail[]; historicalModels?: Array<{ name: string; score: number; comparisons: number; temperatureMae?: number | null; precipitationMae?: number | null; windMae?: number | null }> }) {
   const [open, setOpen] = useState(false);
   if (details.length === 0) return null;
@@ -108,7 +144,7 @@ function SlotConfidenceBadge({ details, historicalModels = [] }: { details: Agre
       : "border-amber-300/25 bg-amber-300/10 text-amber-100";
   const level = value >= 75 ? "élevé" : value >= 55 ? "modéré" : "faible";
   return <span className="relative inline-block">
-    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`rounded-full border px-1.5 py-[2px] text-[8px] font-semibold leading-3 ${tone}`}>Accord {value}% · {level}</button>
+    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`rounded-full border px-1.5 py-px text-[8px] font-semibold leading-[10px] ${tone}`}>Accord {value}% · {level}</button>
     {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
       <span className="mb-1 block text-slate-300">Accord par paramètre</span>
       {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.value}%</span></span>)}
@@ -203,6 +239,7 @@ export default function WeatherDetails() {
               {hours.map((h: any, i: number) => {
                 const isNow = i === currentHourIdx;
                 const pTrend = pressureTrend(hours, i);
+                const conditionDetails = getHourlyConditionDetails(h);
                 return (
                   <div
                     key={h.hour}
@@ -238,27 +275,19 @@ export default function WeatherDetails() {
                       <HourlyMetric icon="pressure" label="Pression" value={`${h.pressure?.toFixed(0) ?? "—"} hPa`} detail={pTrend === "rising" ? "En hausse" : pTrend === "falling" ? "En baisse" : "Stable"} />
                       <HourlyMetric icon="cloud_cover" label="Nuages" value={`${h.cloudCover ?? "—"}%`} />
                     </div>
-                    {(h.cloudLow != null || h.cloudMid != null || h.cloudHigh != null) && (
-                      <div className="mt-2 hidden gap-1.5 text-[10px] text-slate-300 md:flex">
-                        {h.cloudLow != null && <span>Bas {h.cloudLow}%</span>}
-                        {h.cloudMid != null && <span>Moy {h.cloudMid}%</span>}
-                        {h.cloudHigh != null && <span>Haut {h.cloudHigh}%</span>}
+                    {conditionDetails.length > 0 && (
+                      <div className="mt-2 border-t border-white/12 pt-2">
+                        <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-100/55">Conditions du créneau</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {conditionDetails.map((detail) => (
+                            <span key={`${detail.icon}-${detail.label}`} className="inline-flex min-h-5 items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] px-1.5 py-0.5 text-[8px] leading-tight text-slate-200">
+                              <MeteoIcon name={detail.icon} size={11} />
+                              <span>{detail.label}</span>
+                              {detail.detail && <span className="text-slate-400">· {detail.detail}</span>}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    )}
-                    
-                    {/* Visibility */}
-                    {h.visibility != null && (
-                      <div className="mt-2 hidden text-[10px] text-slate-300 md:block">Visibilité {h.visibility} km</div>
-                    )}
-                    
-                    {/* UV */}
-                    {h.uvIndex != null && h.uvIndex > 0 && (
-                      <div className="mt-1 hidden text-[10px] text-slate-300 md:block">UV {h.uvIndex.toFixed(0)}</div>
-                    )}
-                    
-                    {/* Solar radiation */}
-                    {h.solarRadiation != null && h.solarRadiation > 0 && (
-                      <div className="mt-1 hidden text-[10px] text-slate-300 md:block">Rayonnement {h.solarRadiation.toFixed(0)} W/m²</div>
                     )}
                     
                     {/* Régime opérationnel partagé */}
