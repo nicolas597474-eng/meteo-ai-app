@@ -60,6 +60,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain('gestureHandling: isExpanded ? "greedy" : "none"');
     expect(source).toContain("draggable: isExpanded");
     expect(source).toContain("scrollwheel: isExpanded");
+    expect(source).toContain("allowPageScroll={!isExpanded}");
     expect(source).toContain("map.setCenter(localPosition)");
     expect(source).toContain("map.setZoom(5)");
     expect(source).toContain('localMarkerContent.className = "eclipse-user-location-marker"');

@@ -17,6 +17,9 @@ describe("repli de cartographie", () => {
     expect(source).toContain("cameraControl = false");
     expect(source).toContain("isFractionalZoomEnabled?: boolean");
     expect(source).toContain("isFractionalZoomEnabled = true");
+    expect(source).toContain("allowPageScroll?: boolean");
+    expect(source).toContain("allowPageScroll = false");
+    expect(source).toContain('allowPageScroll ? "touch-pan-y" : "touch-none"');
     expect(source).toContain("isFractionalZoomEnabled: isFractionalZoomEnabled && !prefersReducedMotion");
     expect(source).toContain("prefers-reduced-motion: reduce");
     expect(source).toContain("touchGestureActive");

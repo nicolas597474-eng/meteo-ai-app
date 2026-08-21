@@ -130,6 +130,7 @@ interface MapViewProps {
   rotateControl?: boolean;
   cameraControl?: boolean;
   isFractionalZoomEnabled?: boolean;
+  allowPageScroll?: boolean;
   children?: ReactNode;
   onMapReady?: (map: google.maps.Map) => void;
   onFullscreenChange?: (isFullscreen: boolean, map: google.maps.Map | null) => void;
@@ -147,6 +148,7 @@ export function MapView({
   rotateControl = true,
   cameraControl = false,
   isFractionalZoomEnabled = true,
+  allowPageScroll = false,
   children,
   onMapReady,
   onFullscreenChange,
@@ -236,7 +238,7 @@ export function MapView({
   return (
     <div data-swipe-exclude data-swipe-ignore className={cn("relative h-[500px] w-full", className)}>
       {isLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Chargement de la carte…</div>}
-      <div ref={mapContainer} className="h-full w-full touch-none [will-change:transform]" onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
+      <div ref={mapContainer} className={cn("h-full w-full [will-change:transform]", allowPageScroll ? "touch-pan-y" : "touch-none")} onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
       {children}
     </div>
   );
