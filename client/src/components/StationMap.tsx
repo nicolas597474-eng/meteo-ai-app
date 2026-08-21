@@ -224,7 +224,7 @@ rotateControl: false,
                 setIsExpanded(false);
               }}
               aria-label="Fermer la carte agrandie"
-              className="absolute right-3 top-3 z-10 grid h-12 w-12 place-items-center rounded-full border border-slate-200 bg-white text-xl font-semibold text-slate-800 shadow-lg transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+              className="absolute right-3 top-3 z-10 grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-xl font-semibold text-slate-800 shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             >
               ×
             </button>
@@ -233,16 +233,16 @@ rotateControl: false,
                 type="button"
                 onClick={focusCurrentLocation}
                 aria-label="Centrer la carte sur le lieu actif"
-                className="grid h-12 w-12 place-items-center rounded-full border border-slate-200 bg-white text-2xl font-semibold leading-none text-slate-800 shadow-lg transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                className="grid h-14 w-14 place-items-center rounded-full border border-[#d8e1e8] bg-white text-3xl font-medium leading-none text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
               >
                 ⊙
               </button>
-              <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg" aria-label="Zoom manuel de la carte">
+              <div className="overflow-hidden rounded-sm border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.22)]" aria-label="Zoom manuel de la carte">
                 <button
                   type="button"
                   onClick={() => adjustExpandedZoom(1)}
                   aria-label="Zoomer"
-                  className="grid h-12 w-12 place-items-center border-b border-slate-200 text-4xl font-light leading-none text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                  className="grid h-14 w-14 place-items-center border-b border-[#e0e6eb] text-5xl font-extralight leading-none text-slate-600 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
                 >
                   +
                 </button>
@@ -250,7 +250,7 @@ rotateControl: false,
                   type="button"
                   onClick={() => adjustExpandedZoom(-1)}
                   aria-label="Dézoomer"
-                  className="grid h-12 w-12 place-items-center text-4xl font-light leading-none text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+                  className="grid h-14 w-14 place-items-center text-5xl font-extralight leading-none text-slate-600 transition-colors hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
                 >
                   −
                 </button>

@@ -2841,3 +2841,4 @@
 - [x] Conserver uniquement les commandes Plan et Satellite en haut de la carte agrandie.
 - [x] Ajouter une légende repliable expliquant les marqueurs du lieu de référence et des stations selon la fraîcheur de leur relevé.
 - [x] Aligner les commandes de centrage et de zoom de la carte agrandie dans une colonne de référence sur le côté droit.
+- [x] Conserver la position actuelle des commandes et appliquer le design clair de la référence aux boutons de centrage et de zoom.

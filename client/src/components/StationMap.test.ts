@@ -26,7 +26,10 @@ describe("carte des stations", () => {
     expect(source).toContain("map.setZoom(Math.max(2, Math.min(20, currentZoom + delta)))");
     expect(source).toContain('absolute right-3 top-[28%] z-10 flex flex-col items-center gap-4');
     expect(source).toContain('absolute right-3 top-3 z-10 grid h-12 w-12');
-    expect(source).toContain('overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg');
+    expect(source).toContain('grid h-14 w-14 place-items-center rounded-full border border-[#d8e1e8] bg-white');
+    expect(source).toContain('text-[#0c74bc]');
+    expect(source).toContain('overflow-hidden rounded-sm border border-[#d8e1e8] bg-white');
+    expect(source).toContain('grid h-14 w-14 place-items-center border-b border-[#e0e6eb]');
     expect(source).not.toContain('absolute bottom-16 right-3 z-10');
     expect(source).not.toContain('absolute left-3 top-16 z-10');
     expect((source.match(/aria-label="Fermer la carte agrandie"/g) ?? []).length).toBe(1);
