@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Déplacer complètement le libellé Soleil/Lune sous l’arche graphique dans le flux normal de la carte.
+- [x] Préserver un espacement distinct avant la ligne d’horaires.
+- [x] Vérifier l’absence de positionnement absolu du libellé dans la zone de l’arche.
 - [x] Descendre l’indication sous l’horizon tout en conservant une grille d’espacement identique avec l’arche et les horaires.
 - [x] Vérifier l’alignement régulier sur mobile et desktop avant publication.
 - [x] Placer l’indication Soleil/Lune sous l’horizon dans une zone distincte de l’arche.
