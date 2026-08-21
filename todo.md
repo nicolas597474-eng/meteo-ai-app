@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Remonter Confiance prévision, Stabilité modèles et Modèles appliqués en tête de l’AI Lab.
+- [x] Conserver les aides, valeurs et la grille à trois cartes sur mobile.
+- [x] Vérifier que la frise des observations physiques reste sous les indicateurs.
 - [x] Intégrer au compte rendu 05h00 la fraîcheur et le statut des derniers snapshots de stations existants.
 - [x] Distinguer les stations physiques validées, candidates et indisponibles sans générer de nouveau relevé.
 - [x] Tester le bilan de stations sans modifier la cadence de collecte horaire ni l’historique.

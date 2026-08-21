@@ -56,6 +56,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("getEvidenceStatus");
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
     expect(source).toContain("<BackToTopButton />");
+    expect(source).toContain('className="order-[-1] grid grid-cols-3 gap-2"');
+    expect(source).toContain('className="order-[-2] flex items-center justify-between gap-2"');
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {
