@@ -6,6 +6,7 @@ import { MapView } from "@/components/Map";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { isNightAtLocalMinutes } from "@/lib/celestialNight";
 import { isEclipseInProgress } from "@/lib/eclipseStatus";
+import { isEclipseStartDue } from "@/lib/eclipseStartAlert";
 import { getLunarGlowStrength } from "@/lib/lunarGlow";
 import { trpc } from "@/lib/trpc";
 
@@ -520,6 +521,11 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
 
 function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["astronomy"] }) {
   const [isEventFullscreen, setIsEventFullscreen] = useState(false);
+  const [visualEclipseAlertEnabled, setVisualEclipseAlertEnabled] = useState(false);
+  const [soundEclipseAlertEnabled, setSoundEclipseAlertEnabled] = useState(false);
+  const [isEclipseStartAlertVisible, setIsEclipseStartAlertVisible] = useState(false);
+  const eclipseStartAlertFiredRef = useRef<string | null>(null);
+  const eclipseSoundContextRef = useRef<AudioContext | null>(null);
   const outlook = astronomy?.outlook;
   if (!astronomy || !outlook) return null;
   const fullMoon = outlook.moonMilestones.find((milestone) => milestone.id === "full_moon") ?? null;
@@ -536,6 +542,49 @@ function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["as
     return () => window.clearInterval(interval);
   }, [localEclipse?.startAt, localEclipse?.endAt]);
   const eclipseInProgress = isEclipseInProgress(localEclipse?.startAt, localEclipse?.endAt, eclipseClock);
+  const triggerEclipseTone = useCallback(() => {
+    const context = eclipseSoundContextRef.current;
+    if (!context) return;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(660, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(880, context.currentTime + 0.18);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.045, context.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.42);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.44);
+  }, []);
+  const toggleEclipseSoundAlert = () => {
+    if (soundEclipseAlertEnabled) {
+      setSoundEclipseAlertEnabled(false);
+      return;
+    }
+    if (typeof AudioContext === "undefined") return;
+    const context = eclipseSoundContextRef.current ?? new AudioContext();
+    eclipseSoundContextRef.current = context;
+    void context.resume();
+    setSoundEclipseAlertEnabled(true);
+  };
+  useEffect(() => () => { void eclipseSoundContextRef.current?.close(); }, []);
+  useEffect(() => {
+    const startAt = localEclipse?.startAt;
+    const endAt = localEclipse?.endAt;
+    const eventKey = startAt && endAt ? `${startAt}:${endAt}` : null;
+    if (!startAt || !endAt || !eventKey || (!visualEclipseAlertEnabled && !soundEclipseAlertEnabled)) return;
+    const fire = () => {
+      if (eclipseStartAlertFiredRef.current === eventKey || !isEclipseStartDue(startAt, endAt)) return;
+      if (visualEclipseAlertEnabled) setIsEclipseStartAlertVisible(true);
+      if (soundEclipseAlertEnabled) triggerEclipseTone();
+      eclipseStartAlertFiredRef.current = eventKey;
+    };
+    const delay = Math.max(0, Date.parse(startAt) - Date.now());
+    const timer = window.setTimeout(fire, delay);
+    fire();
+    return () => window.clearTimeout(timer);
+  }, [localEclipse?.startAt, localEclipse?.endAt, visualEclipseAlertEnabled, soundEclipseAlertEnabled, triggerEclipseTone]);
   const localVisibility = localEclipseQuery.isLoading ? { label: "Calcul local en cours", tone: "text-slate-300 border-slate-500/40 bg-slate-800/45", detail: "Les circonstances sont calculées depuis les coordonnées du lieu actif." }
     : localEclipseQuery.error || !localEclipse ? { label: "Visibilité locale indisponible", tone: "text-slate-300 border-slate-500/40 bg-slate-800/45", detail: "Aucune estimation n’est affichée tant que les circonstances locales ne sont pas disponibles." }
       : localEclipse.visibility === "full_event" ? { label: eclipseInProgress ? "Éclipse en cours · visible intégralement" : "Visible intégralement", tone: "text-emerald-100 border-emerald-300/35 bg-emerald-400/[0.10]", detail: `${localEclipse.label} : astre au-dessus de l’horizon pendant toute la phase calculée. Maximum à ${displayTimeInZone(localEclipse.peakAt, astronomy.timezone)}.` }
@@ -558,6 +607,8 @@ function AstronomyOutlookPanel({ astronomy }: { astronomy: EnvironmentalData["as
     {quarterMilestones.length > 0 && <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Autres phases : {quarterMilestones.map((milestone) => `${milestone.label} · ${displayAstronomyDate(milestone.date)}`).join(" · ")}.</p>}
     <div className="mt-2 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2.5"><p className="text-[10px] font-semibold uppercase tracking-wide text-amber-100">Soleil</p><p className="mt-1 text-xs font-semibold text-slate-100">{outlook.nextSolarMilestone ? `${outlook.nextSolarMilestone.label} · ${displayAstronomyDate(outlook.nextSolarMilestone.date)}` : "Prochain jalon solaire indisponible"}</p><p className="mt-1 text-[10px] text-slate-400">{daylightTrend}</p></div>
     {primaryEclipse && <div role="status" className={`mt-2 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${localVisibility.tone} ${eclipseInProgress ? "eclipse-visibility-live" : ""}`}><div><p className="text-[9px] font-semibold uppercase tracking-wide">Visibilité locale</p><p className="mt-0.5 text-xs font-semibold">{localVisibility.label}</p></div><span tabIndex={0} role="img" aria-label={`Informations sur la visibilité locale : ${localVisibility.detail}`} title={localVisibility.detail} className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-current/35 text-sm font-bold outline-none transition-transform focus-visible:scale-110">i</span></div>}
+    {primaryEclipse && <div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setVisualEclipseAlertEnabled((enabled) => !enabled)} aria-pressed={visualEclipseAlertEnabled} className={`min-h-9 rounded-xl border px-2 text-[10px] font-semibold transition-colors ${visualEclipseAlertEnabled ? "border-sky-300/55 bg-sky-400/15 text-sky-100" : "border-slate-600/70 bg-slate-900/50 text-slate-300"}`}>Alerte visuelle</button><button type="button" onClick={toggleEclipseSoundAlert} aria-pressed={soundEclipseAlertEnabled} className={`min-h-9 rounded-xl border px-2 text-[10px] font-semibold transition-colors ${soundEclipseAlertEnabled ? "border-amber-300/55 bg-amber-400/15 text-amber-100" : "border-slate-600/70 bg-slate-900/50 text-slate-300"}`}>Alerte sonore</button></div>}
+    {isEclipseStartAlertVisible && <div role="alert" className="eclipse-start-alert mt-2 rounded-xl border border-sky-200/55 bg-sky-400/15 p-3 text-sky-50"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold">L’éclipse commence maintenant</p><p className="mt-1 text-[10px] leading-relaxed text-sky-100/85">{primaryEclipse?.title} · vérifiez l’horizon et les conditions locales d’observation.</p></div><button type="button" onClick={() => setIsEclipseStartAlertVisible(false)} aria-label="Fermer l’alerte de début d’éclipse" className="shrink-0 rounded-full border border-sky-100/35 px-2 py-1 text-[10px] font-semibold">Fermer</button></div></div>}
     {primaryEclipse && <button type="button" onClick={() => setIsEventFullscreen(true)} aria-haspopup="dialog" aria-label="Ouvrir le suivi plein écran de l’éclipse" className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl border border-sky-300/35 bg-sky-400/[0.10] px-3 text-[10px] font-semibold text-sky-100 transition-transform active:scale-[0.98]"><Maximize2 size={15} aria-hidden="true" />Suivi plein écran</button>}
     {primaryEclipse && <div className="mt-3 rounded-xl border border-sky-300/25 bg-sky-400/[0.08] p-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-base" aria-hidden="true">◐</span><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Alerte astronomique</p><p className="mt-1 text-sm font-semibold text-slate-100">{primaryEclipse.title}</p><p className="mt-0.5 text-[11px] text-slate-300">{displayAstronomyDate(primaryEclipse.date)} · dans {daysUntil(primaryEclipse.date)} jours</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">{primaryEclipse.visibility}{primaryEclipse.skyOutlook ? ` · ${primaryEclipse.skyOutlook.label} (${primaryEclipse.skyOutlook.cloudCoverMean}% de nuages prévus)` : " · Prévision de ciel trop lointaine ou indisponible"}</p>{primaryEclipse.safetyNote && <p className="mt-2 text-[10px] leading-relaxed text-amber-100">{primaryEclipse.safetyNote}</p>}<p className="mt-2 text-[9px] text-slate-500">Visibilité à confirmer selon l’horizon local · Événement astronomique, distinct des alertes météo · {primaryEclipse.sourceLabel}</p></div></div></div>}
     {outlook.upcomingEclipses.slice(1).length > 0 && <p className="mt-3 text-[10px] leading-relaxed text-slate-400">Autres éclipses référencées : {outlook.upcomingEclipses.slice(1).map((event) => `${event.title} (${displayAstronomyDate(event.date)})`).join(" · ")}.</p>}

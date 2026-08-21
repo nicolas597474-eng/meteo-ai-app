@@ -2685,6 +2685,9 @@
 - [x] Autoriser uniquement les ajouts horodatés normaux de relevés physiques pendant les validations.
 
 ## Fiabilisation nécessaire — ordre validé
+- [x] Ajouter des commandes séparées d’alerte visuelle et sonore, désactivées par défaut, pour le début local d’éclipse.
+- [x] Déclencher l’alerte une seule fois après activation explicite et seulement dans la fenêtre calculée.
+- [x] Préserver les permissions du navigateur et un repli silencieux lorsqu’elles sont refusées ou indisponibles.
 - [x] Ajouter un bouton de mode plein écran au suivi de l’éclipse et de ses circonstances locales.
 - [x] Prévoir une sortie accessible, la touche Échap et un repli lorsque le navigateur refuse le plein écran.
 - [x] Vérifier le mode immersif sur mobile sans masquer les informations de visibilité locale.
