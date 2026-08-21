@@ -3,6 +3,7 @@ import { MeteoIcon } from "@/components/MeteoIcon";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { BackToTopButton } from "@/components/BackToTopButton";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { trpc } from "@/lib/trpc";
@@ -105,6 +106,9 @@ export default function ReliabilityLaboratory() {
   const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]>("Scores globaux");
   const [sortBy, setSortBy] = useState<SortId>("score");
   const [isPrecipitationHelpOpen, setIsPrecipitationHelpOpen] = useState(false);
+  const [isTemperatureHelpOpen, setIsTemperatureHelpOpen] = useState(false);
+  const [isWindHelpOpen, setIsWindHelpOpen] = useState(false);
+  const [isHumidityHelpOpen, setIsHumidityHelpOpen] = useState(false);
   const locationName = activeLocation?.name ?? "Hondeghem";
   const input = useMemo(() => ({
     lat: activeLocation?.lat ?? 50.7567,
@@ -192,7 +196,27 @@ export default function ReliabilityLaboratory() {
             <MeteoSurface tone="lab" className="rounded-2xl p-4">
               <SectionHeading title="Tendances provisoires" description="Ces indicateurs montrent les mesures déjà disponibles par paramètre. Le volume de preuves figure sous chaque modèle, sans constituer une fiabilité prédictive validée ni une performance par condition météo." icon="trending" />
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <ProvisionalTrendCard title="Température" detail="MAE la plus faible observée" models={provisionalTrends.temperature} value={(model) => metric(model.metrics.temperature.mae, " °C", 2)} accent="text-orange-200" />
+                <ProvisionalTrendCard
+                  title="Température"
+                  detail="MAE la plus faible observée"
+                  models={provisionalTrends.temperature}
+                  value={(model) => metric(model.metrics.temperature.mae, " °C", 2)}
+                  accent="text-orange-200"
+                  helpId="mae-temperature-help"
+                  isHelpOpen={isTemperatureHelpOpen}
+                  onHelpToggle={() => setIsTemperatureHelpOpen((open) => !open)}
+                  onHelpClose={() => setIsTemperatureHelpOpen(false)}
+                  help={{
+                    title: "Comprendre la MAE de température",
+                    description: "La MAE est l’écart moyen absolu entre les températures prévues et les observations archivées.",
+                    closeLabel: "Fermer l’explication de la MAE de température",
+                    items: [
+                      ["Plus la MAE est basse", "plus le modèle a été précis sur la température."],
+                      ["0,81 °C", "signifie un écart moyen de 0,81 degré, sans indiquer si le modèle était trop chaud ou trop froid."],
+                      ["Ce n’est pas", "la température actuelle ni la température prévue pour le prochain créneau."],
+                    ],
+                  }}
+                />
                 <ProvisionalTrendCard
                   title="Pluie"
                   detail="Score de précipitation le plus élevé observé"
@@ -206,6 +230,7 @@ export default function ReliabilityLaboratory() {
                   help={{
                     title: "Comprendre le score de pluie",
                     description: "Ce score mesure la concordance observée entre les précipitations prévues et archivées.",
+                    closeLabel: "Fermer l’explication du score de précipitation",
                     items: [
                       ["Plus le score est élevé", "meilleure est la concordance mesurée."],
                       ["85/100", "ne signifie ni 85 mm, ni 85 % de risque de pluie."],
@@ -213,8 +238,48 @@ export default function ReliabilityLaboratory() {
                     ],
                   }}
                 />
-                <ProvisionalTrendCard title="Vent" detail="MAE la plus faible observée" models={provisionalTrends.wind} value={(model) => metric(model.metrics.wind.mae, " km/h", 2)} accent="text-cyan-200" />
-                <ProvisionalTrendCard title="Humidité" detail="MAE la plus faible observée" models={provisionalTrends.humidity} value={(model) => metric(model.metrics.humidity.mae, " %", 2)} accent="text-violet-200" />
+                <ProvisionalTrendCard
+                  title="Vent"
+                  detail="MAE la plus faible observée"
+                  models={provisionalTrends.wind}
+                  value={(model) => metric(model.metrics.wind.mae, " km/h", 2)}
+                  accent="text-cyan-200"
+                  helpId="mae-vent-help"
+                  isHelpOpen={isWindHelpOpen}
+                  onHelpToggle={() => setIsWindHelpOpen((open) => !open)}
+                  onHelpClose={() => setIsWindHelpOpen(false)}
+                  help={{
+                    title: "Comprendre la MAE de vent",
+                    description: "La MAE de vent mesure l’écart moyen entre la vitesse prévue et la vitesse observée.",
+                    closeLabel: "Fermer l’explication de la MAE de vent",
+                    items: [
+                      ["Plus la MAE est basse", "plus la vitesse du vent a été correctement estimée."],
+                      ["8,71 km/h", "signifie un écart moyen de 8,71 km/h entre prévision et observation."],
+                      ["Cette mesure", "ne remplace pas le détail des rafales ni la direction du vent affichés dans les prévisions."],
+                    ],
+                  }}
+                />
+                <ProvisionalTrendCard
+                  title="Humidité"
+                  detail="MAE la plus faible observée"
+                  models={provisionalTrends.humidity}
+                  value={(model) => metric(model.metrics.humidity.mae, " %", 2)}
+                  accent="text-violet-200"
+                  helpId="mae-humidite-help"
+                  isHelpOpen={isHumidityHelpOpen}
+                  onHelpToggle={() => setIsHumidityHelpOpen((open) => !open)}
+                  onHelpClose={() => setIsHumidityHelpOpen(false)}
+                  help={{
+                    title: "Comprendre la MAE d’humidité",
+                    description: "La MAE d’humidité mesure l’écart moyen absolu entre l’humidité prévue et l’humidité observée.",
+                    closeLabel: "Fermer l’explication de la MAE d’humidité",
+                    items: [
+                      ["Plus la MAE est basse", "plus l’humidité relative a été correctement estimée."],
+                      ["6 %", "signifie un écart moyen de 6 points d’humidité relative, pas une probabilité."],
+                      ["Ce score", "ne décrit pas le niveau d’humidité actuel du lieu."],
+                    ],
+                  }}
+                />
               </div>
               <p className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-[11px] leading-relaxed text-sky-100">Couverture provisoire des preuves : les comparaisons et les jours archivés sous chaque modèle indiquent la maturité de l’échantillon, sans constituer une performance future. Le classement officiel reste masqué tant que le score normalisé complet et les régimes météorologiques ne sont pas archivés.</p>
             </MeteoSurface>
@@ -253,11 +318,11 @@ function ModelCard({ model }: { model: any }) {
   return <article className="rounded-xl border border-slate-800 bg-[#090d14] p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[10px] font-bold ${model.rank ? "bg-sky-500/15 text-sky-200" : "bg-slate-800 text-slate-400"}`}>{model.rank ? `#${model.rank}` : "—"}</span><p className="truncate text-sm font-semibold text-white">{model.name}</p></div><p className="mt-1 text-[10px] text-slate-500">{model.evidence?.comparisons ?? 0} comparaison(s) qualifiée(s) · {model.evidence?.evaluatedDays ?? 0} jour(s)</p></div><div className="text-right"><p className="text-xl font-bold text-white">{metric(model.normalizedScore, "/100", 0)}</p><p className="text-[10px] text-slate-500">score mesuré</p></div></div><p className={`mt-3 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${confidenceClass(confidence.tone)}`}>{confidence.label ?? "Données insuffisantes"}</p></article>;
 }
 
-function ProvisionalTrendCard({ title, detail, models, value, accent, help, helpId, isHelpOpen = false, onHelpToggle, onHelpClose }: { title: string; detail: string; models: any[]; value: (model: any) => string; accent: string; help?: { title: string; description: string; items: [string, string][] }; helpId?: string; isHelpOpen?: boolean; onHelpToggle?: () => void; onHelpClose?: () => void }) {
+function ProvisionalTrendCard({ title, detail, models, value, accent, help, helpId, isHelpOpen = false, onHelpToggle, onHelpClose }: { title: string; detail: string; models: any[]; value: (model: any) => string; accent: string; help?: { title: string; description: string; closeLabel: string; items: [string, string][] }; helpId?: string; isHelpOpen?: boolean; onHelpToggle?: () => void; onHelpClose?: () => void }) {
   return <article className="rounded-xl border border-sky-500/25 bg-[#09111d]/85 p-3">
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0"><p className="text-sm font-semibold text-slate-100">{title}</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">{detail}</p></div>
-      {help ? <button type="button" onClick={onHelpToggle} aria-expanded={isHelpOpen} aria-controls={helpId} className="shrink-0 rounded-full border border-sky-400/35 bg-sky-400/10 px-2 py-1 text-[9px] font-semibold text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">{isHelpOpen ? "Réduire" : "Comprendre"}</button> : null}
+      {help ? <button type="button" onClick={onHelpToggle} aria-expanded={isHelpOpen} aria-controls={helpId} aria-haspopup="dialog" className="shrink-0 rounded-full border border-sky-400/35 bg-sky-400/10 px-2 py-1 text-[9px] font-semibold text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">Comprendre</button> : null}
     </div>
     {models.length ? <div className="mt-3 space-y-2">{models.slice(0, 3).map((model) => {
       return <div key={model.name} className="flex items-center justify-between gap-3 border-t border-slate-800 pt-2 first:border-0 first:pt-0">
@@ -265,10 +330,18 @@ function ProvisionalTrendCard({ title, detail, models, value, accent, help, help
         <div className="shrink-0 text-right"><p className={`text-sm font-bold ${accent}`}>{value(model)}</p></div>
       </div>;
     })}</div> : <p className="mt-3 text-[11px] leading-relaxed text-slate-500">Aucune mesure qualifiée disponible pour ce paramètre sur la période sélectionnée.</p>}
-    {help && isHelpOpen ? <div id={helpId} className="mt-3 rounded-xl border border-sky-400/30 bg-sky-400/[0.08] p-3" role="region" aria-label={help.title}>
-      <div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-sky-100">{help.title}</p><p className="mt-1 text-[10px] leading-relaxed text-slate-300">{help.description}</p></div><button type="button" onClick={onHelpClose} aria-label="Fermer l’explication du score de précipitation" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-sky-300/45 bg-slate-950/45 text-base leading-none text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">×</button></div>
-      <div className="mt-3 space-y-2 border-t border-sky-300/15 pt-2">{help.items.map(([label, explanation]) => <div key={label} className="grid grid-cols-[max-content_1fr] gap-x-2 text-[10px] leading-relaxed"><span className="font-semibold text-sky-100">{label}</span><span className="text-slate-300">{explanation}</span></div>)}</div>
-    </div> : null}
+    {help ? <Dialog open={isHelpOpen} onOpenChange={(open) => { if (!open) onHelpClose?.(); }}>
+      <DialogContent showCloseButton={false} className="!inset-0 !h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-y-auto rounded-none border-0 bg-[#080d16] p-0 shadow-none">
+        <div id={helpId} className="mx-auto flex min-h-full w-full max-w-xl flex-col px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+          <div className="flex items-start justify-between gap-4">
+            <DialogHeader className="text-left"><DialogTitle className="text-xl text-white">{help.title}</DialogTitle><DialogDescription className="mt-2 text-sm leading-relaxed text-slate-300">{help.description}</DialogDescription></DialogHeader>
+            <button type="button" onClick={onHelpClose} aria-label={help.closeLabel} className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-sky-300/45 bg-slate-950/55 text-2xl leading-none text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">×</button>
+          </div>
+          <div className="mt-7 space-y-3">{help.items.map(([label, explanation]) => <article key={label} className="rounded-2xl border border-sky-400/25 bg-sky-400/[0.08] p-4"><p className="text-sm font-semibold text-sky-100">{label}</p><p className="mt-2 text-sm leading-relaxed text-slate-200">{explanation}</p></article>)}</div>
+          <div className="mt-auto pt-8"><button type="button" onClick={onHelpClose} className="min-h-12 w-full rounded-xl border border-sky-300/45 bg-sky-500/15 px-4 text-sm font-semibold text-sky-50 transition-colors hover:bg-sky-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">Fermer l’explication</button></div>
+        </div>
+      </DialogContent>
+    </Dialog> : null}
   </article>;
 }
 

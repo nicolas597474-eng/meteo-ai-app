@@ -46,6 +46,16 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("Comprendre le score de pluie");
     expect(source).toContain("score-precipitation-help");
     expect(source).toContain("Fermer l’explication du score de précipitation");
+    expect(source).toContain("mae-temperature-help");
+    expect(source).toContain("mae-vent-help");
+    expect(source).toContain("mae-humidite-help");
+    expect(source).toContain("Fermer l’explication de la MAE de température");
+    expect(source).toContain("Fermer l’explication de la MAE de vent");
+    expect(source).toContain("Fermer l’explication de la MAE d’humidité");
+    expect(source).toContain("DialogContent");
+    expect(source).toContain("!h-[100dvh]");
+    expect(source).toContain("showCloseButton={false}");
+    expect(source).toContain('aria-haspopup="dialog"');
   });
 
   it("utilise des accents bleu-vert pour les états de préparation et provisoires", () => {

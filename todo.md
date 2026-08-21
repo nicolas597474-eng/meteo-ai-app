@@ -2820,3 +2820,5 @@
 - [x] Diagnostiquer pourquoi la note de preuve est identique pour plusieurs modèles et paramètres malgré des performances différentes.
 - [x] Masquer les notes de couverture comme 29/100 dans les sections de tendances du Laboratoire.
 - [x] Ajouter un panneau déroulant expliquant le score de précipitation, avec une croix de fermeture rapide.
+- [x] Ajouter des panneaux déroulants explicatifs pour la MAE de température, le vent et l’humidité, avec des croix de fermeture rapide.
+- [x] Afficher les explications de tendance dans des fenêtres plein écran avec fermeture rapide.
