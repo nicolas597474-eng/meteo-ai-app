@@ -65,6 +65,11 @@ describe("ReliabilityLaboratory", () => {
     expect(source).toContain("!h-[100dvh]");
     expect(source).toContain("showCloseButton={false}");
     expect(source).toContain('aria-haspopup="dialog"');
+    expect(source).toContain("closeHelpAndReturnToProvisionalTrends");
+    expect(source).toContain("tendances-provisoires");
+    expect(source).toContain("scrollIntoView({ behavior: \"smooth\", block: \"start\" })");
+    expect(source).toContain("sticky top-0");
+    expect(source).toContain("leading-7 text-slate-200");
   });
 
   it("utilise des accents bleu-vert pour les états de préparation et provisoires", () => {

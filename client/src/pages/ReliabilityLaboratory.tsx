@@ -162,6 +162,12 @@ export default function ReliabilityLaboratory() {
     wind: activeModels.filter((model) => model.metrics?.wind?.mae !== null && model.metrics?.wind?.mae !== undefined).sort((left, right) => Number(left.metrics.wind.mae) - Number(right.metrics.wind.mae)),
     humidity: activeModels.filter((model) => model.metrics?.humidity?.mae !== null && model.metrics?.humidity?.mae !== undefined).sort((left, right) => Number(left.metrics.humidity.mae) - Number(right.metrics.humidity.mae)),
   }), [activeModels]);
+  const closeHelpAndReturnToProvisionalTrends = (close: (open: boolean) => void) => {
+    close(false);
+    window.setTimeout(() => {
+      document.getElementById("tendances-provisoires")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  };
   const selectSection = (section: (typeof SECTIONS)[number]) => {
     setActiveSection(section);
     document.getElementById(SECTION_IDS[section])?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -217,7 +223,7 @@ export default function ReliabilityLaboratory() {
                   helpId="mae-temperature-help"
                   isHelpOpen={isTemperatureHelpOpen}
                   onHelpToggle={() => setIsTemperatureHelpOpen((open) => !open)}
-                  onHelpClose={() => setIsTemperatureHelpOpen(false)}
+                  onHelpClose={() => closeHelpAndReturnToProvisionalTrends(setIsTemperatureHelpOpen)}
                   help={{
                     title: "Comprendre la MAE de température",
                     description: "La MAE est l’écart moyen absolu entre les températures prévues et les observations archivées.",
@@ -240,7 +246,7 @@ export default function ReliabilityLaboratory() {
                   helpId="score-precipitation-help"
                   isHelpOpen={isPrecipitationHelpOpen}
                   onHelpToggle={() => setIsPrecipitationHelpOpen((open) => !open)}
-                  onHelpClose={() => setIsPrecipitationHelpOpen(false)}
+                  onHelpClose={() => closeHelpAndReturnToProvisionalTrends(setIsPrecipitationHelpOpen)}
                   help={{
                     title: "Comprendre le score de pluie",
                     description: "Ce score mesure la concordance observée entre les précipitations prévues et archivées.",
@@ -261,7 +267,7 @@ export default function ReliabilityLaboratory() {
                   helpId="mae-vent-help"
                   isHelpOpen={isWindHelpOpen}
                   onHelpToggle={() => setIsWindHelpOpen((open) => !open)}
-                  onHelpClose={() => setIsWindHelpOpen(false)}
+                  onHelpClose={() => closeHelpAndReturnToProvisionalTrends(setIsWindHelpOpen)}
                   help={{
                     title: "Comprendre la MAE de vent",
                     description: "La MAE de vent mesure l’écart moyen entre la vitesse prévue et la vitesse observée.",
@@ -282,7 +288,7 @@ export default function ReliabilityLaboratory() {
                   helpId="mae-humidite-help"
                   isHelpOpen={isHumidityHelpOpen}
                   onHelpToggle={() => setIsHumidityHelpOpen((open) => !open)}
-                  onHelpClose={() => setIsHumidityHelpOpen(false)}
+                  onHelpClose={() => closeHelpAndReturnToProvisionalTrends(setIsHumidityHelpOpen)}
                   help={{
                     title: "Comprendre la MAE d’humidité",
                     description: "La MAE d’humidité mesure l’écart moyen absolu entre l’humidité prévue et l’humidité observée.",
@@ -347,12 +353,17 @@ function ProvisionalTrendCard({ title, detail, models, value, accent, trend, hel
     })}</div> : <p className="mt-3 text-[11px] leading-relaxed text-slate-500">Aucune mesure qualifiée disponible pour ce paramètre sur la période sélectionnée.</p>}
     {help ? <Dialog open={isHelpOpen} onOpenChange={(open) => { if (!open) onHelpClose?.(); }}>
       <DialogContent showCloseButton={false} className="!inset-0 !h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-y-auto rounded-none border-0 bg-[#080d16] p-0 shadow-none">
-        <div id={helpId} className="mx-auto flex min-h-full w-full max-w-xl flex-col px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
-          <div className="flex items-start justify-between gap-4">
-            <DialogHeader className="text-left"><DialogTitle className="text-xl text-white">{help.title}</DialogTitle><DialogDescription className="mt-2 text-sm leading-relaxed text-slate-300">{help.description}</DialogDescription></DialogHeader>
-            <button type="button" onClick={onHelpClose} aria-label={help.closeLabel} className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-sky-300/45 bg-slate-950/55 text-2xl leading-none text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">×</button>
+        <div id={helpId} className="mx-auto flex min-h-full w-full max-w-xl flex-col px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.75rem,env(safe-area-inset-top))]">
+          <div className="sticky top-0 z-10 -mx-5 border-b border-sky-300/15 bg-[#080d16]/95 px-5 pb-4 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <DialogHeader className="min-w-0 flex-1 space-y-2 text-left">
+                <DialogTitle className="pr-2 text-2xl font-semibold leading-tight text-white">{help.title}</DialogTitle>
+                <DialogDescription className="text-sm leading-6 text-slate-300">{help.description}</DialogDescription>
+              </DialogHeader>
+              <button type="button" onClick={onHelpClose} aria-label={help.closeLabel} className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-sky-300/45 bg-slate-950/70 text-2xl leading-none text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">×</button>
+            </div>
           </div>
-          <div className="mt-7 space-y-3">{help.items.map(([label, explanation]) => <article key={label} className="rounded-2xl border border-sky-400/25 bg-sky-400/[0.08] p-4"><p className="text-sm font-semibold text-sky-100">{label}</p><p className="mt-2 text-sm leading-relaxed text-slate-200">{explanation}</p></article>)}</div>
+          <div className="space-y-4 pt-5">{help.items.map(([label, explanation]) => <article key={label} className="rounded-2xl border border-sky-400/25 bg-sky-400/[0.08] p-4"><p className="text-base font-semibold leading-snug text-sky-100">{label}</p><p className="mt-2 text-sm leading-7 text-slate-200">{explanation}</p></article>)}</div>
           <div className="mt-auto pt-8"><button type="button" onClick={onHelpClose} className="min-h-12 w-full rounded-xl border border-sky-300/45 bg-sky-500/15 px-4 text-sm font-semibold text-sky-50 transition-colors hover:bg-sky-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">Fermer l’explication</button></div>
         </div>
       </DialogContent>
