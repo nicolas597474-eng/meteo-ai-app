@@ -2857,4 +2857,5 @@
 - [x] Afficher le bilan réel de la collecte de 05 h 00 des huit modèles, distinct des observations de stations et sans modifier la planification.
 - [x] Corriger le cache HTTP afin de ne jamais réutiliser une réponse consommée.
 - [x] Ajouter des états de délai, d’erreur et de réessai contrôlé dans Prévisions et AI Lab.
-- [ ] Préparer l’isolement des erreurs de collecte horaire par favori sans le déployer sans confirmation explicite.
+- [x] Préparer l’isolement des erreurs de collecte horaire par favori sans le déployer sans confirmation explicite.
+- [x] Appliquer l’isolement confirmé des erreurs par favori dans la collecte horaire, avec statut partiel explicite.
