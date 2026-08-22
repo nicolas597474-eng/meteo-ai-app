@@ -130,15 +130,15 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   if (isFullscreen) {
     return (
       <div
-        className="fixed inset-0 z-[200] flex flex-col bg-[#080a0f] px-2 pt-2"
-        style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom, 0px))" }}
+        className="fixed inset-0 z-[200] flex flex-col bg-[#080a0f] px-1.5 pt-1.5"
+        style={{ paddingBottom: "max(6px, env(safe-area-inset-bottom, 0px))" }}
       >
         {/* En-tête plein écran */}
-        <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="mb-1 flex h-8 shrink-0 items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-base">🌍</span>
+            <span className="text-sm">🌍</span>
             <h2 className="text-xs font-semibold text-slate-100">
-              Carte météo · {activeLayerInfo.label}
+              Carte · {activeLayerInfo.label}
             </h2>
           </div>
           <button
@@ -165,7 +165,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         </div>
 
         {/* Sélecteur sous la carte en plein écran */}
-        <div className="mt-1 shrink-0">
+        <div className="mt-1 max-h-8 shrink-0 overflow-hidden">
           <LayerSelector activeLayer={activeLayer} onSelect={handleLayerChange} compact />
         </div>
       </div>

@@ -2869,3 +2869,4 @@
 - [x] Page Prévisions : afficher clairement le repère du lieu actif en vue compacte Windy, tout en conservant le contrôle horaire visible uniquement en plein écran.
 - [x] Page Prévisions : faire fermer la carte Windy plein écran avec le bouton retour du téléphone ou du navigateur pour revenir à la carte compacte.
 - [x] Page Prévisions : faire revenir le bouton de fermeture de la carte Windy plein écran vers la carte compacte, sans quitter la page Prévisions.
+- [x] Page Prévisions : rendre le bouton de lecture/défilement horaire Windy visible en mode plein écran, sans réafficher le tableau horaire en vue compacte.
