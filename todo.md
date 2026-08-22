@@ -2884,3 +2884,4 @@
 - [x] Page Prévisions : en mode plein écran Windy, masquer le tableau horaire détaillé tout en gardant visible le bouton lecture permettant de faire avancer les heures automatiquement.
 - [x] Page Prévisions : corriger l’interaction de la carte Windy compacte pour éviter le bug du geste à deux doigts et rendre le bouton lecture/défilement automatique utilisable directement en mode compact.
 - [x] Page Prévisions : conserver un repère de localisation MeteoAI visible sur la carte Windy en vue compacte et en mode plein écran, sans modifier les données météo ni les calculs.
+- [x] Planification : créer une nouvelle tâche horaire v2 pour la collecte des snapshots physiques et désactiver l’ancienne tâche bloquée, sans toucher aux snapshots, observations, stations, scores ni historiques.
