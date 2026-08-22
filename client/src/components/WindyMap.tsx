@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, type TouchEvent } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 
 type WindyLayer = {
@@ -81,33 +81,11 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
-  const [isCompactMapInteractive, setIsCompactMapInteractive] = useState(false);
   const fullscreenHistoryPushed = useRef(false);
-  const compactInteractionTimeout = useRef<number | null>(null);
 
   const handleLayerChange = useCallback((layerId: string) => {
     setActiveLayer(layerId);
     setIframeKey((prev) => prev + 1);
-  }, []);
-
-  const enableCompactMapInteraction = useCallback(() => {
-    setIsCompactMapInteractive(true);
-    if (typeof window === "undefined") return;
-    if (compactInteractionTimeout.current !== null) window.clearTimeout(compactInteractionTimeout.current);
-    compactInteractionTimeout.current = window.setTimeout(() => {
-      setIsCompactMapInteractive(false);
-      compactInteractionTimeout.current = null;
-    }, 3_500);
-  }, []);
-
-  const handleCompactTouchStart = useCallback((event: TouchEvent<HTMLDivElement>) => {
-    if (event.touches.length >= 2) enableCompactMapInteraction();
-  }, [enableCompactMapInteraction]);
-
-  useEffect(() => () => {
-    if (typeof window !== "undefined" && compactInteractionTimeout.current !== null) {
-      window.clearTimeout(compactInteractionTimeout.current);
-    }
   }, []);
 
   const openFullscreen = useCallback(() => {
@@ -218,21 +196,23 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   return (
     <div className="flex flex-col gap-0">
       {/* Carte compacte */}
-      <div
-        className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10"
-        onTouchStart={handleCompactTouchStart}
-      >
+      <div className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10">
         <iframe
           key={iframeKey}
           src={windyUrlCompact}
           title={`Carte météo Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
-          className={`h-full w-full border-0 ${isCompactMapInteractive ? "pointer-events-auto" : "pointer-events-none"}`}
+          className="h-full w-full border-0"
           loading="lazy"
           allow="geolocation"
           referrerPolicy="no-referrer-when-downgrade"
         />
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 z-10 touch-pan-y"
+          style={{ bottom: "72px" }}
+        />
         <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
-          {isCompactMapInteractive ? "Interaction carte active" : "Carte fixe · 2 doigts pour déplacer"}
+          Carte fixe · lecture horaire accessible
         </div>
         <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
           <span className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-sky-300/35" />

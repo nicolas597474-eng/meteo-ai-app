@@ -2882,3 +2882,4 @@
 - [x] Priorité audit P2 : optimiser les requêtes météo lentes ou leur chargement initial afin de réduire les squelettes prolongés sans modifier les calculs ni les données.
 - [x] Extension additive confirmée : créer une table de traces horaires physiques futures par lieu, heure, statut, tentatives et motif, puis l’exposer dans l’Historique sans modifier les anciennes données.
 - [x] Page Prévisions : en mode plein écran Windy, masquer le tableau horaire détaillé tout en gardant visible le bouton lecture permettant de faire avancer les heures automatiquement.
+- [x] Page Prévisions : corriger l’interaction de la carte Windy compacte pour éviter le bug du geste à deux doigts et rendre le bouton lecture/défilement automatique utilisable directement en mode compact.
