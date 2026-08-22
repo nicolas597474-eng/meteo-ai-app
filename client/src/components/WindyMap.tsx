@@ -76,6 +76,20 @@ function LayerSelector({
   );
 }
 
+function LocationMarker() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+    >
+      <span className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-sky-300/35" />
+      <span className="relative grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.9)]">
+        <span className="h-2 w-2 rounded-full bg-white" />
+      </span>
+    </div>
+  );
+}
+
 export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [activeLayer, setActiveLayer] = useState<string>("rain");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -183,6 +197,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             allow="geolocation"
             referrerPolicy="no-referrer-when-downgrade"
           />
+          <LocationMarker />
         </div>
 
         {/* Sélecteur sous la carte en plein écran */}
@@ -214,12 +229,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
           Carte fixe · lecture horaire accessible
         </div>
-        <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
-          <span className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-sky-300/35" />
-          <span className="relative grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.9)]">
-            <span className="h-2 w-2 rounded-full bg-white" />
-          </span>
-        </div>
+        <LocationMarker />
         {/* Bouton plein écran */}
         <button
           type="button"

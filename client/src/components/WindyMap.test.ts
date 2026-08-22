@@ -18,4 +18,10 @@ describe("WindyMap", () => {
     expect(source).toContain("windyUrlCompact");
     expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)");
   });
+
+  it("conserve le repère de localisation en vue compacte et en plein écran", () => {
+    expect(source).toContain("function LocationMarker()");
+    expect(source.match(/<LocationMarker \/>/g)?.length).toBe(2);
+    expect(source).toContain("shadow-[0_0_18px_rgba(56,189,248,0.9)]");
+  });
 });
