@@ -7,6 +7,7 @@
 import type { Request, Response } from "express";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
+import { notifyOwner } from "./_core/notification";
 import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
 import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
@@ -1206,6 +1207,16 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
     const allLocationsFailed = results.length > 0 && collectionErrors.length === results.length;
     if (allLocationsFailed) {
       console.error("[MeteoAI] Physical snapshot collection failed for all favorite locations");
+      const parisTime = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
+      const failedList = collectionErrors.map((e) => `• ${e.locationKey} — ${e.reason ?? "raison inconnue"} (${e.attempts} tentative${e.attempts > 1 ? "s" : ""})`).join("\n");
+      try {
+        await notifyOwner({
+          title: "MeteoAI · Collecte horaire en échec total",
+          content: `Toutes les tentatives de collecte de snapshots physiques ont échoué à ${parisTime} (heure de Paris).\n\nLieux concernés :\n${failedList}\n\nLes prévisions affichées proviennent du dernier snapshot archivé disponible. Aucune donnée n'a été inventée.`,
+        });
+      } catch (notifError) {
+        console.warn("[MeteoAI] Owner notification failed after total collection failure:", notifError);
+      }
     }
     // date/hour are deliberately Paris business time: raw station observedAt stays UTC milliseconds.
     res.json({

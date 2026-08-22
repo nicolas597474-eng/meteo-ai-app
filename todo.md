@@ -2862,3 +2862,4 @@
 - [x] Relancer automatiquement une fois les seuls favoris en échec lors de la collecte horaire, sans réécrire les snapshots existants.
 - [x] Déplacer le bilan de collecte des prévisions du Dashboard vers l’AI Lab sans modifier les données ni le contrat serveur.
 - [x] AI Lab: ouvrir une fiche explicative sourcée au clic sur chaque modèle de la section « Collecte de prévisions », sans modifier le lexique, les calculs ni les données.
+- [x] Notification propriétaire : alerter le propriétaire si toutes les tentatives de collecte horaire (initiale + relance) échouent pour tous les lieux favoris, sans modifier les données ni les calculs.
