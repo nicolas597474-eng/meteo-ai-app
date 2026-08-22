@@ -110,7 +110,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
 
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-[#080a0f] p-3">
+      <div className="fixed inset-0 z-[200] flex flex-col bg-[#080a0f] p-3" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))" }}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-base">🌍</span>
