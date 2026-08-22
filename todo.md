@@ -2865,3 +2865,5 @@
 - [x] Notification propriétaire : alerter le propriétaire si toutes les tentatives de collecte horaire (initiale + relance) échouent pour tous les lieux favoris, sans modifier les données ni les calculs.
 - [x] Page Prévisions : intégrer la carte météo animée Windy.com (iframe embed) centrée sur le lieu actif, avec sélecteur de couches (pluie, vent, nuages, température) et bouton plein écran.
 - [x] Page Prévisions : déplacer les boutons de couches Windy sous la carte météo, en conservant le plein écran et le centrage sur le lieu actif.
+- [x] Page Prévisions : rendre visible le bouton lecture/défilement horaire Windy lorsque la carte météo est ouverte en plein écran, sans réafficher le tableau horaire en vue compacte.
+- [x] Page Prévisions : afficher clairement le repère du lieu actif en vue compacte Windy, tout en conservant le contrôle horaire visible uniquement en plein écran.

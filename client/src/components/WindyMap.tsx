@@ -48,19 +48,21 @@ type WindyMapProps = {
 function LayerSelector({
   activeLayer,
   onSelect,
+  compact = false,
 }: {
   activeLayer: string;
   onSelect: (id: string) => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className={`${compact ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"} flex gap-1.5 scrollbar-hide`}>
       {WINDY_LAYERS.map((layer) => (
         <button
           key={layer.id}
           type="button"
           onClick={() => onSelect(layer.id)}
           aria-pressed={activeLayer === layer.id}
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
             activeLayer === layer.id
               ? "border-sky-400/60 bg-sky-400/20 text-sky-100"
               : "border-white/10 bg-slate-950/40 text-slate-400 hover:border-slate-600 hover:text-slate-200"
@@ -91,14 +93,14 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   if (isFullscreen) {
     return (
       <div
-        className="fixed inset-0 z-[200] flex flex-col bg-[#080a0f] p-3"
-        style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))" }}
+        className="fixed inset-0 z-[200] flex flex-col bg-[#080a0f] px-2 pt-2"
+        style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom, 0px))" }}
       >
         {/* En-tête plein écran */}
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-base">🌍</span>
-            <h2 className="text-sm font-semibold text-slate-100">
+            <h2 className="text-xs font-semibold text-slate-100">
               Carte météo · {activeLayerInfo.label}
             </h2>
           </div>
@@ -106,14 +108,14 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             type="button"
             onClick={() => setIsFullscreen(false)}
             aria-label="Fermer la carte plein écran"
-            className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
+            className="grid h-8 w-8 place-items-center rounded-xl border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
           >
             <Minimize2 className="h-4 w-4" />
           </button>
         </div>
 
         {/* Carte plein écran */}
-        <div className="relative flex-1 overflow-hidden rounded-2xl border border-white/10">
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10">
           <iframe
             key={iframeKey}
             src={windyUrlFullscreen}
@@ -126,8 +128,8 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         </div>
 
         {/* Sélecteur sous la carte en plein écran */}
-        <div className="mt-2">
-          <LayerSelector activeLayer={activeLayer} onSelect={handleLayerChange} />
+        <div className="mt-1 shrink-0">
+          <LayerSelector activeLayer={activeLayer} onSelect={handleLayerChange} compact />
         </div>
       </div>
     );
@@ -146,6 +148,12 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           allow="geolocation"
           referrerPolicy="no-referrer-when-downgrade"
         />
+        <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+          <span className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-sky-300/35" />
+          <span className="relative grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.9)]">
+            <span className="h-2 w-2 rounded-full bg-white" />
+          </span>
+        </div>
         {/* Bouton plein écran */}
         <button
           type="button"
