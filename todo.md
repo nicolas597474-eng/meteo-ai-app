@@ -2881,3 +2881,4 @@
 - [x] Priorité audit P2 : renforcer le chargement Google Maps en ajoutant le chargement asynchrone recommandé et en conservant le fallback existant.
 - [x] Priorité audit P2 : optimiser les requêtes météo lentes ou leur chargement initial afin de réduire les squelettes prolongés sans modifier les calculs ni les données.
 - [x] Extension additive confirmée : créer une table de traces horaires physiques futures par lieu, heure, statut, tentatives et motif, puis l’exposer dans l’Historique sans modifier les anciennes données.
+- [x] Page Prévisions : en mode plein écran Windy, masquer le tableau horaire détaillé tout en gardant visible le bouton lecture permettant de faire avancer les heures automatiquement.

@@ -14,9 +14,10 @@ describe("WindyMap", () => {
     expect(source).toContain("Interaction carte active");
   });
 
-  it("conserve les interactions complètes en plein écran", () => {
+  it("masque le tableau détaillé Windy tout en conservant la vue plein écran", () => {
     expect(source).toContain("windyUrlFullscreen");
-    expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, true)");
+    expect(source).toContain("barre temporelle native et son bouton lecture");
+    expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)");
     expect(source).toContain("windyUrlCompact");
     expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)");
   });

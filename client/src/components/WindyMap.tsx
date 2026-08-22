@@ -162,7 +162,9 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
   const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
-  const windyUrlFullscreen = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, true);
+  // En plein écran, on conserve la barre temporelle native et son bouton lecture,
+  // mais on désactive le panneau détaillé Windy qui affiche le tableau horaire.
+  const windyUrlFullscreen = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
 
   if (isFullscreen) {
     return (
