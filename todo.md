@@ -2863,3 +2863,4 @@
 - [x] Déplacer le bilan de collecte des prévisions du Dashboard vers l’AI Lab sans modifier les données ni le contrat serveur.
 - [x] AI Lab: ouvrir une fiche explicative sourcée au clic sur chaque modèle de la section « Collecte de prévisions », sans modifier le lexique, les calculs ni les données.
 - [x] Notification propriétaire : alerter le propriétaire si toutes les tentatives de collecte horaire (initiale + relance) échouent pour tous les lieux favoris, sans modifier les données ni les calculs.
+- [x] Page Prévisions : intégrer la carte météo animée Windy.com (iframe embed) centrée sur le lieu actif, avec sélecteur de couches (pluie, vent, nuages, température) et bouton plein écran.
