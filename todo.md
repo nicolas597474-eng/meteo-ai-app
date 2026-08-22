@@ -2874,3 +2874,10 @@
 - [x] Page Prévisions : remonter la section Carte météorologique Windy entre les cartes heure par heure et la section de tendance étendue des prochains jours, sans modifier son comportement.
 - [x] Fiabilité : corriger le panneau d’aide plein écran MAE de température pour éviter le chevauchement du contenu, fermer proprement avec la croix et revenir à la section Tendance provisoire.
 - [x] Page Prévisions : garder la carte Windy fixe en vue compacte pour permettre le défilement de page à un doigt, et n’autoriser l’interaction carte compacte qu’avec deux doigts.
+- [x] Audit : réaliser un audit ultra complet et non destructif de MeteoAI couvrant collectes, calculs, fiabilité, données, tâches planifiées, journaux, interface mobile et priorités de correction, sans modifier les données ni les configurations.
+- [x] Priorité audit P0 : restaurer ou renouveler la tâche horaire de snapshots physiques pour qu’elle reprenne les collectes horaires sans modifier les snapshots, observations ou scores historiques existants.
+- [x] Priorité audit P1 : afficher dans la page Historique les statuts partiels, le nombre de tentatives et les motifs d’échec par lieu pour les collectes de snapshots physiques.
+- [x] Priorité audit P1 : corriger les clés React dupliquées des cartes heure par heure dans la page Prévisions avec une clé unique date/heure/index, sans modifier les données horaires.
+- [x] Priorité audit P2 : renforcer le chargement Google Maps en ajoutant le chargement asynchrone recommandé et en conservant le fallback existant.
+- [x] Priorité audit P2 : optimiser les requêtes météo lentes ou leur chargement initial afin de réduire les squelettes prolongés sans modifier les calculs ni les données.
+- [x] Extension additive confirmée : créer une table de traces horaires physiques futures par lieu, heure, statut, tentatives et motif, puis l’exposer dans l’Historique sans modifier les anciennes données.

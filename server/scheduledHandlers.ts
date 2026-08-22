@@ -54,6 +54,7 @@ import {
   upsertGroundTruthSnapshot,
   upsertQualifiedObservationSnapshot,
   insertStationCollectionSnapshot,
+  upsertPhysicalSnapshotCollectionTrace,
   getQualifiedObservationSnapshotsForDate,
   getStoredHourlyForecasts,
   getStationEvidenceSummary,
@@ -1129,9 +1130,10 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
     const results: Array<{ locationKey: string; stationCount: number; stored: boolean; attempts: number; reason?: string }> = [];
     for (const favorite of Array.from(unique.values())) {
       const locationKey = makeLocationKey(favorite.lat, favorite.lon);
+      const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
+      let locationResult: { locationKey: string; stationCount: number; stored: boolean; attempts: number; reason?: string } | null = null;
       for (let attempt = 0; attempt < HOURLY_SNAPSHOT_MAX_ATTEMPTS; attempt++) {
         try {
-          const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
           const discovered = await collectNearbyStations(favorite.lat, favorite.lon, radiusKm, favorite.customName ?? favorite.name, { netatmoUserId: favorite.userId });
           const physical = getPhysicalActiveStations(discovered);
           for (const station of physical) {
@@ -1172,7 +1174,8 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
           await refreshStationQualityProfiles(physical.map((station) => station.stationId));
           const synthesis = calculateGroundTruth(physical);
           if (synthesis.stationCount < 1 || synthesis.temperature == null) {
-            results.push({ locationKey, stationCount: synthesis.stationCount, stored: false, attempts: attempt + 1, reason: "Aucune station physique qualifiée" });
+            locationResult = { locationKey, stationCount: synthesis.stationCount, stored: false, attempts: attempt + 1, reason: "Aucune station physique qualifiée" };
+            results.push(locationResult);
             break;
           }
           await upsertQualifiedObservationSnapshot({
@@ -1189,7 +1192,8 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
             precipitation: synthesis.precipitation,
             stationsUsed: synthesis.stationsUsed as any,
           });
-          results.push({ locationKey, stationCount: synthesis.stationCount, stored: true, attempts: attempt + 1 });
+          locationResult = { locationKey, stationCount: synthesis.stationCount, stored: true, attempts: attempt + 1 };
+          results.push(locationResult);
           break;
         } catch (error: any) {
           const message = error instanceof Error ? error.message : "Erreur de collecte inconnue";
@@ -1199,8 +1203,22 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
             continue;
           }
           console.error(`[MeteoAI] Physical snapshot collection failed after retry for ${favorite.customName ?? favorite.name}:`, message);
-          results.push({ locationKey, stationCount: 0, stored: false, attempts: attempt + 1, reason: `Erreur de collecte après relance : ${message}` });
+          locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, reason: `Erreur de collecte après relance : ${message}` };
+          results.push(locationResult);
         }
+      }
+      if (locationResult) {
+        await upsertPhysicalSnapshotCollectionTrace({
+          locationKey,
+          locationName: favorite.customName ?? favorite.name,
+          date,
+          hour,
+          radiusKm,
+          status: locationResult.stored ? "stored" : locationResult.reason?.startsWith("Erreur de collecte") ? "failed" : "no_station",
+          attempts: locationResult.attempts,
+          stationCount: locationResult.stationCount,
+          reason: locationResult.reason ?? null,
+        });
       }
     }
     const collectionErrors = results.filter((result) => result.reason?.startsWith("Erreur de collecte"));

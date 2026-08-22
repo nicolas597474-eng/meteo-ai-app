@@ -366,6 +366,30 @@ export type StationCollectionSnapshot = typeof stationCollectionSnapshots.$infer
 export type InsertStationCollectionSnapshot = typeof stationCollectionSnapshots.$inferInsert;
 
 /**
+ * Per-location, per-hour execution trace for the physical-station snapshot
+ * collector. This additive table keeps future collection attempts explainable
+ * without rewriting historical snapshots, observations, stations or scores.
+ */
+export const physicalSnapshotCollectionTraces = mysqlTable("physical_snapshot_collection_traces", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  locationName: varchar("locationName", { length: 256 }),
+  date: varchar("date", { length: 10 }).notNull(),
+  hour: int("hour").notNull(),
+  radiusKm: int("radiusKm").notNull(),
+  status: mysqlEnum("status", ["stored", "no_station", "failed"]).notNull(),
+  attempts: int("attempts").notNull(),
+  stationCount: int("stationCount").notNull(),
+  reason: text("reason"),
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("physical_snapshot_trace_location_date_hour_unique").on(table.locationKey, table.date, table.hour),
+]);
+
+export type PhysicalSnapshotCollectionTrace = typeof physicalSnapshotCollectionTraces.$inferSelect;
+export type InsertPhysicalSnapshotCollectionTrace = typeof physicalSnapshotCollectionTraces.$inferInsert;
+
+/**
  * OAuth Netatmo connection for a MeteoAI user. Only the refresh token is
  * retained, encrypted at rest; each access token is renewed server-side.
  */

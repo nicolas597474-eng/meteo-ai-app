@@ -60,6 +60,10 @@ function hourlyTemperatureTone(temperature: number | null | undefined): string {
   return "text-red-300";
 }
 
+function hourlyCardKey(hour: any, index: number): string {
+  return `${hour?.date ?? "date-inconnue"}-${hour?.hour ?? "heure-inconnue"}-${index}`;
+}
+
 // Period splitting for a day
 type Period = "matin" | "apres_midi" | "soir" | "nuit";
 function getPeriod(hour: string): Period {
@@ -272,7 +276,7 @@ export default function WeatherDetails() {
                 const conditionDetails = getHourlyConditionDetails(h);
                 return (
                   <div
-                    key={h.hour}
+                    key={hourlyCardKey(h, i)}
                     data-hour-index={i}
                     className={`w-[calc((100%-10px)/2)] shrink-0 snap-start rounded-[22px] border px-3 pb-4 pt-3 transition-colors ${
                       isNow

@@ -214,16 +214,16 @@ export default function WeatherAILab() {
   const { style: pageSkyStyle } = usePageWeatherSky();
   const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, {
-    staleTime: 60_000,
-    refetchOnWindowFocus: true,
+    staleTime: 2 * 60_000,
+    refetchOnWindowFocus: false,
     retry: shouldRetryWeatherQuery,
     retryDelay: weatherRetryDelay,
   });
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: false });
   const { data: forecastCollectionReport } = trpc.weather.getForecastCollectionReport.useQuery(input, { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false });
   const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
-  const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 60_000, refetchOnWindowFocus: true });
-  const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { staleTime: 60_000, refetchOnWindowFocus: true });
+  const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
   const refreshFusion = trpc.weather.refreshManualFusion.useMutation({
     onSuccess: async () => { await refetch(); },
   });

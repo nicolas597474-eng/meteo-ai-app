@@ -38,6 +38,15 @@ describe("History", () => {
     expect(source).toContain("data?.eveningEvidence ?? []");
   });
 
+  it("explique les collectes horaires physiques futures avec statuts, tentatives et motifs", () => {
+    expect(source).toContain("Statut de collecte horaire");
+    expect(source).toContain("collectionTraces");
+    expect(source).toContain("tentative");
+    expect(source).toContain("Le détail par lieu, heure, tentative et motif sera disponible pour les collectes futures");
+    expect(source).toContain("Aucune station qualifiée");
+    expect(source).toContain("Échec après relance");
+  });
+
   it("fournit des infobulles interactives contextualisées pour chaque graphique", () => {
     expect(source).toContain("HistoryChartTooltip");
     expect(source).toContain('role="tooltip"');

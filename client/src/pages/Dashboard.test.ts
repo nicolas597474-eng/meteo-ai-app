@@ -48,13 +48,14 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('onClick={() => handleModeChange("standard")}');
     expect(source).toContain('aria-label="Fermer le contexte local et revenir au mode Officiel"');
     expect(source).toContain("Données horaires temporairement indisponibles.");
-    expect(source).toContain("trpc.weather.getHourlyForecast.useQuery");
-    expect(source).toContain('refetchOnReconnect: "always"');
-    expect(source).toContain("refetchInterval: (query) => (query.state.data?.hours?.length ? 5 * 60 * 1000 : 30 * 1000)");
+    expect(source).toContain("includeExtendedPeriods: false");
+    expect(source).not.toContain("trpc.weather.getHourlyForecast.useQuery");
+    expect(source).not.toContain('refetchOnReconnect: "always"');
+    expect(source).not.toContain("refetchInterval: (query) => (query.state.data?.hours?.length ? 5 * 60 * 1000 : 30 * 1000)");
     expect(source).toContain('disabled={hourlyFetching}');
     expect(source).toContain('"Relance en cours…"');
     expect(source).toContain("const isLoading = officialLoading && hourlyLoading");
-    expect(source).toContain("refetchHourlySnapshot()");
+    expect(source).not.toContain("refetchHourlySnapshot()");
     expect(source).toContain("BackToTopButton");
     expect(source).not.toContain("Hondeghem, Nord");
     expect(source).not.toContain("MapPin");

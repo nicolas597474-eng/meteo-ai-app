@@ -29,6 +29,7 @@ import {
   getStationCollectionSnapshots,
   getQualifiedObservationSnapshotsByDateRange,
   getStationCollectionSnapshotsByDateRange,
+  getPhysicalSnapshotCollectionTracesByDateRange,
   getQualifiedEvidenceStatus,
   getStationQualityProfiles,
   getFavoriteLocations,
@@ -158,6 +159,15 @@ function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
     excludedSources: [],
   };
 }
+
+const detailedForecastInputSchema = z.object({
+  lat: latitudeSchema.optional(),
+  lon: longitudeSchema.optional(),
+  includeExtendedPeriods: z.boolean().optional(),
+}).refine(
+  ({ lat, lon }) => (lat === undefined) === (lon === undefined),
+  { message: "Les coordonnées latitude et longitude doivent être fournies ensemble." },
+);
 
 export const weatherRouter = router({
   /** Catalogue descriptif des régimes : il n’altère jamais le régime détecté. */
@@ -460,9 +470,10 @@ export const weatherRouter = router({
       const meteoAIForecasts = await getLatestMeteoAIForecasts(input.days, locKey);
       const scoreTimeSeries = await getHistoricalScoreTimeSeries(input.days, locKey);
       const leadTimeScoresData = await getQualifiedLeadTimeScoresForLocation(locKey, input.days);
-      const [physicalSnapshots, collectionSnapshots] = await Promise.all([
+      const [physicalSnapshots, collectionSnapshots, physicalCollectionTraces] = await Promise.all([
         getQualifiedObservationSnapshotsByDateRange(locKey, startStr, endDate),
         getStationCollectionSnapshotsByDateRange(locKey, startStr, endDate),
+        getPhysicalSnapshotCollectionTracesByDateRange(locKey, startStr, endDate),
       ]);
 
       return {
@@ -471,7 +482,7 @@ export const weatherRouter = router({
         meteoAIForecasts,
         scoreTimeSeries,
         leadTimeScores: leadTimeScoresData,
-        eveningEvidence: buildEveningEvidence(physicalSnapshots, collectionSnapshots),
+        eveningEvidence: buildEveningEvidence(physicalSnapshots, collectionSnapshots, physicalCollectionTraces),
         startDate: startStr,
         endDate,
       };
@@ -675,7 +686,7 @@ export const weatherRouter = router({
    * Detailed forecast page: 48h hourly + 15-day daily + regime + confidence
    */
   getDetailedForecast: publicProcedure
-    .input(optionalCoordinatesSchema.optional())
+    .input(detailedForecastInputSchema.optional())
     .query(async ({ input }) => {
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
@@ -683,7 +694,8 @@ export const weatherRouter = router({
 
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
       const hours = snapshot.hourly;
-      const periodHours = await collectHourlyForecast(today, coords, 16);
+      const includeExtendedPeriods = input?.includeExtendedPeriods !== false;
+      const periodHours = includeExtendedPeriods ? await collectHourlyForecast(today, coords, 16) : hours;
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
 
@@ -1041,7 +1053,8 @@ export const weatherRouter = router({
     // 1. Régime opérationnel partagé avec le Dashboard. Une observation ne peut
     // remplacer la fusion officielle que si elle est plus récente, fraîche et
     // couvre notamment la nébulosité.
-    const liveHours = await collectHourlyForecast(today, coords ?? undefined);
+    const officialSnapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+    const liveHours = officialSnapshot.hourly;
     const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours));
     const regime = operationalRegime.primary.id;
     const regimeDef = operationalRegime.primary;

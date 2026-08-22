@@ -31,4 +31,25 @@ describe("buildEveningEvidence", () => {
     expect(evidence[0]).toMatchObject({ snapshotHours: 0, coverageHours: 0, isQualified: false, stations: [], collectionStatus: "partial" });
     expect(evidence[0]?.exclusionReason).toBe("Aucun snapshot physique qualifié n’a été archivé pour cette journée.");
   });
+
+  it("expose les traces horaires physiques futures sans modifier la qualification historique", () => {
+    const evidence = buildEveningEvidence([], [], [{
+      date: "2026-08-21",
+      hour: 9,
+      locationKey: "50.781,2.544",
+      locationName: "Hondeghem",
+      status: "failed",
+      attempts: 2,
+      stationCount: 0,
+      reason: "Erreur de collecte après relance : timeout",
+    }]);
+
+    expect(evidence[0]).toMatchObject({
+      date: "2026-08-21",
+      snapshotHours: 0,
+      coverageHours: 0,
+      isQualified: false,
+      collectionTraces: [{ status: "failed", attempts: 2, reason: "Erreur de collecte après relance : timeout" }],
+    });
+  });
 });

@@ -31,7 +31,11 @@ describe("repli de cartographie", () => {
     expect(source).toContain("window.cancelAnimationFrame");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
-    expect(source).toContain("ResizeObserver");
-    expect(source).toContain('window.google.maps.event.trigger(mapInstance, "resize")');
-  });
+	    expect(source).toContain("ResizeObserver");
+	    expect(source).toContain('window.google.maps.event.trigger(mapInstance, "resize")');
+	    expect(source).toContain('loading: "async"');
+	    expect(source).toContain("GOOGLE_MAPS_SCRIPT_ID");
+	    expect(source).toContain("script.defer = true");
+	    expect(source).toContain("document.getElementById(GOOGLE_MAPS_SCRIPT_ID)");
+	  });
 });

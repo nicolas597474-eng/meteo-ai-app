@@ -329,7 +329,7 @@ export default function Dashboard() {
   // Réponse officielle consolidée : la même source alimente désormais Dashboard
   // et Détails pour les heures, les jours et les indices de confiance.
   const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast, dataUpdatedAt: officialDataUpdatedAt } = trpc.weather.getDetailedForecast.useQuery(
-    coordsInput,
+    { ...coordsInput, includeExtendedPeriods: false },
     {
       staleTime: 60 * 1000,
       refetchInterval: 5 * 60 * 1000,
@@ -338,18 +338,10 @@ export default function Dashboard() {
       retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     }
   );
-  const { data: hourlySnapshot, isLoading: hourlyLoading, isError: hourlyError, isFetching: hourlyFetching, refetch: refetchHourlySnapshot } = trpc.weather.getHourlyForecast.useQuery(
-    coordsInput,
-    {
-      staleTime: 2 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: "always",
-      refetchOnMount: "always",
-      refetchInterval: (query) => (query.state.data?.hours?.length ? 5 * 60 * 1000 : 30 * 1000),
-      retry: 3,
-      retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
-    }
-  );
+  const hourlySnapshot = officialForecast ? { hours: officialForecast.hours } : null;
+  const hourlyLoading = officialLoading;
+  const hourlyError = officialError;
+  const hourlyFetching = officialFetching;
   const { data: environmentalData, isFetching: environmentalFetching } = trpc.weather.getEnvironmentalSnapshot.useQuery(
     coordsInput,
     { staleTime: 10 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 }
@@ -421,7 +413,7 @@ export default function Dashboard() {
   const isError = officialError && hourlyError;
   const refreshCurrentWeather = async () => {
     setHasWaitTimedOut(false);
-    await Promise.all([refetchDashboard(), refetchOfficialForecast(), refetchHourlySnapshot()]);
+    await Promise.all([refetchDashboard(), refetchOfficialForecast()]);
   };
 
   useEffect(() => {
@@ -1090,7 +1082,7 @@ export default function Dashboard() {
             <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-5 text-center">
               <p className="text-sm font-medium text-blue-100">Données horaires temporairement indisponibles.</p>
               <p className="mt-1 text-xs text-muted-foreground">La dernière prévision officielle n’a pas encore répondu. Aucune donnée n’est inventée.</p>
-              <button type="button" disabled={hourlyFetching} onClick={() => void refetchHourlySnapshot()} className="mt-3 min-h-10 rounded-md border border-primary/50 px-3 text-xs font-semibold text-primary disabled:cursor-wait disabled:opacity-60">{hourlyFetching ? "Relance en cours…" : "Réessayer les heures"}</button>
+              <button type="button" disabled={hourlyFetching} onClick={() => void refetchOfficialForecast()} className="mt-3 min-h-10 rounded-md border border-primary/50 px-3 text-xs font-semibold text-primary disabled:cursor-wait disabled:opacity-60">{hourlyFetching ? "Relance en cours…" : "Réessayer les heures"}</button>
             </div>
           )}
         </div>

@@ -92,6 +92,17 @@ const FORGE_BASE_URL =
   "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 export const MAP_UNAVAILABLE_MESSAGE = "Carte indisponible. Les stations restent accessibles dans la liste ci-dessous.";
+const GOOGLE_MAPS_SCRIPT_ID = "meteoai-google-maps-proxy-script";
+
+function buildMapsScriptUrl(): string {
+  const params = new URLSearchParams({
+    key: API_KEY,
+    v: "weekly",
+    libraries: "marker,places,geocoding,geometry",
+    loading: "async",
+  });
+  return `${MAPS_PROXY_URL}/maps/api/js?${params.toString()}`;
+}
 
 let mapScriptPromise: Promise<void> | null = null;
 
@@ -100,9 +111,22 @@ function loadMapScript(): Promise<void> {
   if (mapScriptPromise) return mapScriptPromise;
 
   mapScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => {
+        existing.remove();
+        mapScriptPromise = null;
+        reject(new Error("Le service de cartographie est momentanément indisponible."));
+      }, { once: true });
+      return;
+    }
+
     const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
+    script.id = GOOGLE_MAPS_SCRIPT_ID;
+    script.src = buildMapsScriptUrl();
     script.async = true;
+    script.defer = true;
     script.crossOrigin = "anonymous";
     script.onload = () => {
       resolve();

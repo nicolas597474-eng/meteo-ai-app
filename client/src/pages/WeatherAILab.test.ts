@@ -65,6 +65,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Preuve qualifiée");
     expect(source).toContain("getEvidenceStatus");
     expect(source).toContain("getForecastCollectionReport");
+    expect(source).toContain("staleTime: 2 * 60_000");
+    expect(source).toContain("staleTime: 5 * 60_000");
     expect(source).toContain("Collecte de prévisions");
     expect(source).toContain("Relevé de {forecastCollectionReport?.scheduledAt");
     expect(source).toContain("Les stations physiques relèvent d’un flux d’observations séparé.");

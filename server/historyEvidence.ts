@@ -30,6 +30,18 @@ export type HistoricalCollectionSnapshot = {
   status: "completed" | "partial" | "failed";
 };
 
+export type HistoricalPhysicalCollectionTrace = {
+  date: string;
+  hour: number;
+  locationKey: string;
+  locationName?: string | null;
+  status: "stored" | "no_station" | "failed";
+  attempts: number;
+  stationCount: number;
+  reason?: string | null;
+  collectedAt?: Date | string | null;
+};
+
 function toStation(value: unknown): HistoricalStation | null {
   if (!value || typeof value !== "object") return null;
   const station = value as SnapshotStation;
@@ -65,6 +77,7 @@ function stationList(snapshots: HistoricalPhysicalSnapshot[]) {
 export function buildEveningEvidence(
   snapshots: HistoricalPhysicalSnapshot[],
   collectionSnapshots: HistoricalCollectionSnapshot[],
+  collectionTraces: HistoricalPhysicalCollectionTrace[] = [],
 ) {
   const snapshotsByDate = new Map<string, HistoricalPhysicalSnapshot[]>();
   for (const snapshot of snapshots) {
@@ -73,12 +86,19 @@ export function buildEveningEvidence(
     snapshotsByDate.set(snapshot.date, current);
   }
   const collectionByDate = new Map(collectionSnapshots.map((snapshot) => [snapshot.date, snapshot]));
-  const dates = new Set([...Array.from(snapshotsByDate.keys()), ...Array.from(collectionByDate.keys())]);
+  const tracesByDate = new Map<string, HistoricalPhysicalCollectionTrace[]>();
+  for (const trace of collectionTraces) {
+    const current = tracesByDate.get(trace.date) ?? [];
+    current.push(trace);
+    tracesByDate.set(trace.date, current);
+  }
+  const dates = new Set([...Array.from(snapshotsByDate.keys()), ...Array.from(collectionByDate.keys()), ...Array.from(tracesByDate.keys())]);
 
   return Array.from(dates).sort((left, right) => right.localeCompare(left)).map((date) => {
     const daySnapshots = snapshotsByDate.get(date) ?? [];
     const daily = buildQualifiedDailyObservation(daySnapshots);
     const collection = collectionByDate.get(date) ?? null;
+    const traces = (tracesByDate.get(date) ?? []).sort((left, right) => right.hour - left.hour);
     const hasSnapshots = daySnapshots.length > 0;
     return {
       date,
@@ -91,6 +111,7 @@ export function buildEveningEvidence(
         : "Aucun snapshot physique qualifié n’a été archivé pour cette journée.",
       stations: stationList(daySnapshots),
       collectionStatus: collection?.status ?? null,
+      collectionTraces: traces,
     };
   });
 }

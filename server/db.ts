@@ -28,6 +28,7 @@ import {
   stationQualityProfiles,
   groundTruth,
   stationCollectionSnapshots,
+  physicalSnapshotCollectionTraces,
   qualifiedObservationSnapshots,
   netatmoOAuthTokens,
   netatmoOAuthStates,
@@ -39,6 +40,7 @@ import {
   InsertStationQualityProfile,
   InsertGroundTruth,
   InsertStationCollectionSnapshot,
+  InsertPhysicalSnapshotCollectionTrace,
   InsertQualifiedObservationSnapshot,
   InsertPersonalWeatherObservation,
   InsertPersonalModelObservationScore,
@@ -946,6 +948,26 @@ export async function getStationCollectionSnapshotsByDateRange(locationKey: stri
     gte(stationCollectionSnapshots.date, startDate),
     lte(stationCollectionSnapshots.date, endDate),
   )).orderBy(desc(stationCollectionSnapshots.date));
+}
+
+/** Persist one per-location hourly collection trace for future auditability. */
+export async function upsertPhysicalSnapshotCollectionTrace(data: InsertPhysicalSnapshotCollectionTrace): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(physicalSnapshotCollectionTraces).values(data).onDuplicateKeyUpdate({
+    set: { ...data, collectedAt: new Date() },
+  });
+}
+
+/** Read per-hour physical snapshot collection traces over the selected history period. */
+export async function getPhysicalSnapshotCollectionTracesByDateRange(locationKey: string, startDate: string, endDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(physicalSnapshotCollectionTraces).where(and(
+    eq(physicalSnapshotCollectionTraces.locationKey, locationKey),
+    gte(physicalSnapshotCollectionTraces.date, startDate),
+    lte(physicalSnapshotCollectionTraces.date, endDate),
+  )).orderBy(desc(physicalSnapshotCollectionTraces.date), desc(physicalSnapshotCollectionTraces.hour));
 }
 // ─── Netatmo OAuth tokens ───────────────────────────────────────────────────
 

@@ -13,6 +13,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('w-[calc((100%-10px)/2)]');
     expect(source).toContain('snap-x snap-mandatory');
     expect(source).toContain('data-hour-index={i}');
+    expect(source).toContain("function hourlyCardKey");
+    expect(source).toContain("key={hourlyCardKey(h, i)}");
+    expect(source).not.toContain("key={h.hour}");
     expect(source).toContain("text-[36px] font-semibold leading-none");
     expect(source).toContain("MAINTENANT");
     expect(source).toContain('currentCard?.offsetLeft');
