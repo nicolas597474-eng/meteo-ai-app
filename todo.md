@@ -2854,3 +2854,4 @@
 - [x] Afficher le biais thermique réel par modèle et une pastille plutôt chaud ou plutôt froid uniquement lorsque le biais est mesuré.
 - [x] Ajouter au panneau d’aide de température une explication claire du RMSE et de son rôle pour les écarts importants.
 - [x] Réaliser un audit complet non destructif des calculs, données, collectes, résilience serveur et interfaces MeteoAI.
+- [x] Afficher le bilan réel de la collecte de 05 h 00 des huit modèles, distinct des observations de stations et sans modifier la planification.

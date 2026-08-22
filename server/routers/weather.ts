@@ -617,6 +617,32 @@ export const weatherRouter = router({
       return buildWeatherProvenance(snapshot, dailyFallback);
     }),
 
+  /** Bilan archivé de la collecte de 05 h : modèles de prévision, jamais stations physiques. */
+  getForecastCollectionReport: publicProcedure
+    .input(optionalCoordinatesSchema.optional())
+    .query(async ({ input }) => {
+      const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
+      const latestCollection = (await getStationCollectionSnapshots(locationKey, 1))[0] ?? null;
+      const expectedModels = WEATHER_SERVICES.expert.map((model) => model.name);
+      const dailyMissingModels = latestCollection ? getMissingModelNames(latestCollection.dailyMissingModels) : [];
+      const hourlyMissingModels = latestCollection ? getMissingModelNames(latestCollection.hourlyMissingModels) : [];
+
+      return {
+        scheduledAt: "05:00",
+        expectedModels,
+        snapshot: latestCollection ? {
+          status: latestCollection.status,
+          collectedAt: latestCollection.collectedAt,
+          dailyModelCount: latestCollection.dailyModelCount,
+          hourlyModelCount: latestCollection.hourlyModelCount,
+          dailyCollectedModels: getCollectedModelNames(expectedModels, dailyMissingModels),
+          hourlyCollectedModels: getCollectedModelNames(expectedModels, hourlyMissingModels),
+          dailyMissingModels,
+          hourlyMissingModels,
+        } : null,
+      };
+    }),
+
   /** Diagnostics éphémères des appels fournisseurs, sans persistance en base. */
   getProviderDiagnostics: publicProcedure
     .query(() => getWeatherProviderDiagnostics()),
