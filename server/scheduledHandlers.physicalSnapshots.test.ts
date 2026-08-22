@@ -7,7 +7,9 @@ describe("collecte horaire des snapshots physiques", () => {
     const source = readFileSync(resolve(process.cwd(), "server/scheduledHandlers.ts"), "utf8");
 
     expect(source).toContain("Physical snapshot collection failed for");
-    expect(source).toContain("Erreur de collecte : ${message}");
+    expect(source).toContain("Physical snapshot collection failed after retry for");
+    expect(source).toContain("Erreur de collecte après relance : ${message}");
+    expect(source).toContain("retrying once:");
     expect(source).toContain('status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed"');
     expect(source).toContain("Physical snapshot collection failed for all favorite locations");
     expect(source).toContain("for (const favorite of Array.from(unique.values()))");

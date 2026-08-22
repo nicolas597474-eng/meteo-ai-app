@@ -2859,3 +2859,4 @@
 - [x] Ajouter des états de délai, d’erreur et de réessai contrôlé dans Prévisions et AI Lab.
 - [x] Préparer l’isolement des erreurs de collecte horaire par favori sans le déployer sans confirmation explicite.
 - [x] Appliquer l’isolement confirmé des erreurs par favori dans la collecte horaire, avec statut partiel explicite.
+- [x] Relancer automatiquement une fois les seuls favoris en échec lors de la collecte horaire, sans réécrire les snapshots existants.
