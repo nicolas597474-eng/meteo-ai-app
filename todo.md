@@ -2860,3 +2860,4 @@
 - [x] Préparer l’isolement des erreurs de collecte horaire par favori sans le déployer sans confirmation explicite.
 - [x] Appliquer l’isolement confirmé des erreurs par favori dans la collecte horaire, avec statut partiel explicite.
 - [x] Relancer automatiquement une fois les seuls favoris en échec lors de la collecte horaire, sans réécrire les snapshots existants.
+- [x] Déplacer le bilan de collecte des prévisions du Dashboard vers l’AI Lab sans modifier les données ni le contrat serveur.

@@ -114,10 +114,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('temp: pf.forecast.tempCurrent ?? null');
     expect(source).toContain("const activeFavoriteWeather = {");
     expect(source).toContain("activeWeather={activeFavoriteWeather}");
-    expect(source).toContain("trpc.weather.getForecastCollectionReport.useQuery");
-    expect(source).toContain("Relevé de {forecastCollectionReport?.scheduledAt");
-    expect(source).toContain("Les stations physiques restent des relevés observés séparés.");
-    expect(source).toContain("dailyCollectedModels.map");
+    expect(source).not.toContain("Collecte de prévisions");
+    expect(source).not.toContain("forecast-collection-title");
     const ventMaxIndex = source.indexOf("Vent max");
     const confidenceIndex = source.indexOf("Confiance prévision");
     expect(ventMaxIndex).toBeGreaterThan(-1);

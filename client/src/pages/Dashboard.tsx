@@ -363,9 +363,6 @@ export default function Dashboard() {
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
     coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
   );
-  const { data: forecastCollectionReport } = trpc.weather.getForecastCollectionReport.useQuery(
-    coordsInput, { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
-  );
   const utils = trpc.useUtils();
   const { data: personalObservationState, refetch: refetchPersonalObservationState } = trpc.personalObservations.dashboardState.useQuery(
     coordsInput,
@@ -599,13 +596,6 @@ export default function Dashboard() {
   const localModeLabel = localMode === "ultra-local" ? "Ultra-local" : "Local";
   const localRadiusKm = localMode === "ultra-local" ? 10 : 30;
   const visibleLocalContributors = showAllLocalContributors ? localContributors : localContributors.slice(0, 6);
-  const collectionSnapshot = forecastCollectionReport?.snapshot ?? null;
-  const collectionTimeLabel = collectionSnapshot?.collectedAt
-    ? new Date(collectionSnapshot.collectedAt).toLocaleString("fr-FR", {
-        day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris",
-      })
-    : null;
-
   return (
     <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>
       <div className="mx-auto max-w-2xl space-y-2 px-3 pb-3 pt-1 sm:space-y-6 sm:px-6 sm:py-8">
@@ -623,33 +613,6 @@ export default function Dashboard() {
           prefetchedWeather={prefetchedWeather}
           activeWeather={activeFavoriteWeather}
         />
-
-        <section className="dashboard-sky-card rounded-xl border border-sky-400/20 bg-sky-400/[0.045] px-3 py-2.5" aria-labelledby="forecast-collection-title">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10"><Clock className="h-4 w-4 text-sky-200" /></span>
-              <div className="min-w-0">
-                <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Collecte de prévisions</p>
-                <h2 id="forecast-collection-title" className="text-sm font-semibold text-slate-100">Relevé de {forecastCollectionReport?.scheduledAt ?? "05:00"} · modèles</h2>
-              </div>
-            </div>
-            {collectionSnapshot && <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold ${collectionSnapshot.status === "completed" ? "bg-emerald-400/10 text-emerald-200" : "bg-amber-400/10 text-amber-100"}`}>{collectionSnapshot.dailyModelCount}/{forecastCollectionReport?.expectedModels.length ?? 8}</span>}
-          </div>
-
-          {collectionSnapshot ? (
-            <>
-              <p className="mt-2 text-[11px] leading-relaxed text-slate-300">Prévisions quotidiennes et horaires archivées le {collectionTimeLabel ?? "—"}. Les stations physiques restent des relevés observés séparés.</p>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
-                <div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Quotidien</span><p className="mt-0.5 font-semibold text-slate-100">{collectionSnapshot.dailyModelCount}/{forecastCollectionReport?.expectedModels.length ?? 8} modèles</p></div>
-                <div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Horaire</span><p className="mt-0.5 font-semibold text-slate-100">{collectionSnapshot.hourlyModelCount}/{forecastCollectionReport?.expectedModels.length ?? 8} modèles</p></div>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1" aria-label="Modèles quotidiens réellement collectés">
-                {collectionSnapshot.dailyCollectedModels.map((model) => <span key={model} className="rounded-full border border-sky-300/20 bg-sky-300/[0.08] px-1.5 py-0.5 text-[9px] font-medium text-sky-100">{model}</span>)}
-                {collectionSnapshot.dailyMissingModels.map((model) => <span key={model} className="rounded-full border border-amber-300/20 bg-amber-300/[0.08] px-1.5 py-0.5 text-[9px] font-medium text-amber-100">{model} indisponible</span>)}
-              </div>
-            </>
-          ) : <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Aucun relevé de 05:00 n’est encore archivé pour ce lieu. Aucune station ou prévision n’est substituée.</p>}
-        </section>
 
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">

@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { Link } from "wouter";
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDashed, CircleHelp, ClipboardCheck, Database, FlaskConical, Lightbulb, ListTree, MapPinned, MapPin, RefreshCw, SlidersHorizontal, X, Zap } from "lucide-react";
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDashed, CircleHelp, ClipboardCheck, Clock, Database, FlaskConical, Lightbulb, ListTree, MapPinned, MapPin, RefreshCw, SlidersHorizontal, X, Zap } from "lucide-react";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getValidationModelSource } from "@/lib/validationModelSource";
@@ -213,6 +213,7 @@ export default function WeatherAILab() {
     retryDelay: weatherRetryDelay,
   });
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: false });
+  const { data: forecastCollectionReport } = trpc.weather.getForecastCollectionReport.useQuery(input, { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false });
   const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
   const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 60_000, refetchOnWindowFocus: true });
   const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { staleTime: 60_000, refetchOnWindowFocus: true });
@@ -241,6 +242,10 @@ export default function WeatherAILab() {
   const updatedAt = data.calculatedAt ? new Date(data.calculatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }) : null;
   const snapshotDateLabel = data.snapshotDate ? new Date(`${data.snapshotDate}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" }) : null;
   const collection = data.latestStationCollection;
+  const forecastCollectionSnapshot = forecastCollectionReport?.snapshot ?? null;
+  const forecastCollectionTimeLabel = forecastCollectionSnapshot?.collectedAt
+    ? new Date(forecastCollectionSnapshot.collectedAt).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
+    : null;
   const validationSource = getValidationModelSource(data.sources);
   const fusionParameters = [
     { key: "temperature", label: "Température", tone: "text-orange-200", background: "bg-orange-400/10" },
@@ -365,6 +370,11 @@ export default function WeatherAILab() {
     {refreshFusion.isError && <p className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-100">La relance n’a pas abouti : {refreshFusion.error.message}</p>}
     {refreshFusion.data?.status === "cooldown" && <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">Une fusion vient déjà d’être calculée. Réessayez dans environ {refreshFusion.data.retryAfterSeconds} s.</p>}
     {refreshFusion.data?.status === "refreshed" && <p className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-100">Fusion relancée avec {refreshFusion.data.modelCount} modèles ; la trace vient d’être actualisée.</p>}
+
+    <section className="rounded-2xl border border-sky-400/25 bg-sky-400/[0.055] p-4" aria-labelledby="forecast-collection-title">
+      <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10"><Clock className="h-4 w-4 text-sky-200" /></span><div className="min-w-0"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Collecte de prévisions</p><h2 id="forecast-collection-title" className="text-sm font-semibold text-slate-100">Relevé de {forecastCollectionReport?.scheduledAt ?? "05:00"} · modèles</h2></div></div>{forecastCollectionSnapshot && <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold ${forecastCollectionSnapshot.status === "completed" ? "bg-emerald-400/10 text-emerald-200" : "bg-amber-400/10 text-amber-100"}`}>{forecastCollectionSnapshot.dailyModelCount}/{forecastCollectionReport?.expectedModels.length ?? 8}</span>}</div>
+      {forecastCollectionSnapshot ? <><p className="mt-2 text-[11px] leading-relaxed text-slate-300">Prévisions quotidiennes et horaires archivées le {forecastCollectionTimeLabel ?? "—"}. Les stations physiques relèvent d’un flux d’observations séparé.</p><div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Quotidien</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.dailyModelCount}/{forecastCollectionReport?.expectedModels.length ?? 8} modèles</p></div><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Horaire</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.hourlyModelCount}/{forecastCollectionReport?.expectedModels.length ?? 8} modèles</p></div></div><div className="mt-2 flex flex-wrap gap-1" aria-label="Modèles quotidiens réellement collectés">{forecastCollectionSnapshot.dailyCollectedModels.map((model) => <span key={model} className="rounded-full border border-sky-300/20 bg-sky-300/[0.08] px-1.5 py-0.5 text-[9px] font-medium text-sky-100">{model}</span>)}{forecastCollectionSnapshot.dailyMissingModels.map((model) => <span key={model} className="rounded-full border border-amber-300/20 bg-amber-300/[0.08] px-1.5 py-0.5 text-[9px] font-medium text-amber-100">{model} indisponible</span>)}</div></> : <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Aucun relevé de 05:00 n’est encore archivé pour ce lieu. Aucune station ou prévision n’est substituée.</p>}
+    </section>
 
     <AILabGlossary />
 
