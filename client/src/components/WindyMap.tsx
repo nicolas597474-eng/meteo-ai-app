@@ -18,6 +18,10 @@ const WINDY_LAYERS: WindyLayer[] = [
 ];
 
 function buildWindyUrl(lat: number, lon: number, layer: string, zoom: number = 8): string {
+  return buildWindyUrlWithDetail(lat, lon, layer, zoom, false);
+}
+
+function buildWindyUrlWithDetail(lat: number, lon: number, layer: string, zoom: number = 8, detail: boolean = false): string {
   const params = new URLSearchParams({
     v: "2",
     zoom: String(zoom),
@@ -25,7 +29,7 @@ function buildWindyUrl(lat: number, lon: number, layer: string, zoom: number = 8
     lon: lon.toFixed(4),
     detailLat: lat.toFixed(4),
     detailLon: lon.toFixed(4),
-    detail: "true",
+    detail: detail ? "true" : "false",
     overlay: layer,
     product: "ecmwf",
     level: "surface",
@@ -81,7 +85,8 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, []);
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
-  const windyUrl = buildWindyUrl(lat, lon, activeLayerInfo.windyParam);
+  const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
+  const windyUrlFullscreen = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, true);
 
   if (isFullscreen) {
     return (
@@ -111,7 +116,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         <div className="relative flex-1 overflow-hidden rounded-2xl border border-white/10">
           <iframe
             key={iframeKey}
-            src={windyUrl}
+            src={windyUrlFullscreen}
             title={`Carte météo Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
             className="h-full w-full border-0"
             loading="lazy"
@@ -134,7 +139,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
       <div className="relative h-[340px] overflow-hidden rounded-2xl border border-white/10">
         <iframe
           key={iframeKey}
-          src={windyUrl}
+          src={windyUrlCompact}
           title={`Carte météo Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
           className="h-full w-full border-0"
           loading="lazy"
