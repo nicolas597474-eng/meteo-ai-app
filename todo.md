@@ -2871,3 +2871,4 @@
 - [x] Page Prévisions : faire revenir le bouton de fermeture de la carte Windy plein écran vers la carte compacte, sans quitter la page Prévisions.
 - [x] Page Prévisions : rendre le bouton de lecture/défilement horaire Windy visible en mode plein écran, sans réafficher le tableau horaire en vue compacte.
 - [x] Page Prévisions : corriger le plein écran Windy pour que les boutons de couches en bas restent entièrement visibles au-dessus des barres du navigateur et du téléphone.
+- [x] Page Prévisions : remonter la section Carte météorologique Windy entre les cartes heure par heure et la section de tendance étendue des prochains jours, sans modifier son comportement.

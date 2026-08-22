@@ -341,6 +341,22 @@ export default function WeatherDetails() {
           <p className="mt-1 text-center text-[10px] text-slate-500">← Glissez pour voir les heures suivantes →</p>
         </MeteoSurface>
 
+        {/* ═══ SECTION : CARTE MÉTÉO ANIMÉE ═══ */}
+        <MeteoSurface as="section" tone="default" className="rounded-[26px] border border-white/10 bg-[rgba(26,48,70,0.56)] p-4">
+          <div className="mb-3 flex items-center gap-2.5">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10 text-lg">🌍</span>
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/55">Temps réel</p>
+              <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Carte météorologique</h2>
+            </div>
+          </div>
+          {activeLocation ? (
+            <WindyMap lat={activeLocation.lat} lon={activeLocation.lon} locationName={activeLocation.name} />
+          ) : (
+            <p className="text-xs text-slate-400">Sélectionnez un lieu favori pour afficher la carte météo.</p>
+          )}
+        </MeteoSurface>
+
         {/* ═══ SECTION 2: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
         <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-white/10 bg-[rgba(11,17,28,0.86)] p-4">
           <div className="mb-3 flex items-center gap-2.5">
@@ -429,22 +445,6 @@ export default function WeatherDetails() {
             </h2>
             <ConfidenceSection confidence={confidence} regime={regime} />
           </div>
-        </MeteoSurface>
-
-        {/* ═══ SECTION : CARTE MÉTÉO ANIMÉE ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-[26px] border border-white/10 bg-[rgba(26,48,70,0.56)] p-4">
-          <div className="mb-3 flex items-center gap-2.5">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10 text-lg">🌍</span>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/55">Temps réel</p>
-              <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Carte météorologique</h2>
-            </div>
-          </div>
-          {activeLocation ? (
-            <WindyMap lat={activeLocation.lat} lon={activeLocation.lon} locationName={activeLocation.name} />
-          ) : (
-            <p className="text-xs text-slate-400">Sélectionnez un lieu favori pour afficher la carte météo.</p>
-          )}
         </MeteoSurface>
 
       </div>
