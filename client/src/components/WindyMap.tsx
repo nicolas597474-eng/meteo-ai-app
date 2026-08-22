@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 
 type WindyLayer = {
@@ -80,11 +80,48 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [activeLayer, setActiveLayer] = useState<string>("rain");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
+  const fullscreenHistoryPushed = useRef(false);
 
   const handleLayerChange = useCallback((layerId: string) => {
     setActiveLayer(layerId);
     setIframeKey((prev) => prev + 1);
   }, []);
+
+  const openFullscreen = useCallback(() => {
+    if (typeof window !== "undefined" && !isFullscreen) {
+      window.history.pushState(
+        { ...(window.history.state ?? {}), windyMapFullscreen: true },
+        "",
+        window.location.href,
+      );
+      fullscreenHistoryPushed.current = true;
+    }
+    setIsFullscreen(true);
+  }, [isFullscreen]);
+
+  const closeFullscreen = useCallback(() => {
+    setIsFullscreen(false);
+    if (
+      typeof window !== "undefined" &&
+      fullscreenHistoryPushed.current &&
+      window.history.state?.windyMapFullscreen
+    ) {
+      fullscreenHistoryPushed.current = false;
+      window.history.back();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isFullscreen || typeof window === "undefined") return;
+
+    const handlePopState = () => {
+      fullscreenHistoryPushed.current = false;
+      setIsFullscreen(false);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isFullscreen]);
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
   const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
@@ -106,7 +143,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           </div>
           <button
             type="button"
-            onClick={() => setIsFullscreen(false)}
+            onClick={closeFullscreen}
             aria-label="Fermer la carte plein écran"
             className="grid h-8 w-8 place-items-center rounded-xl border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
           >
@@ -157,7 +194,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         {/* Bouton plein écran */}
         <button
           type="button"
-          onClick={() => setIsFullscreen(true)}
+          onClick={openFullscreen}
           aria-label="Agrandir la carte"
           className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         >
