@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
@@ -8,6 +8,7 @@ import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getValidationModelSource } from "@/lib/validationModelSource";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
+import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 function IndicatorHelp({ title, children }: { title: string; children: ReactNode }) {
@@ -205,7 +206,12 @@ export default function WeatherAILab() {
   const { activeLocation } = useLocation();
   const { style: pageSkyStyle } = usePageWeatherSky();
   const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
-  const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: true });
+  const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, {
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+    retry: shouldRetryWeatherQuery,
+    retryDelay: weatherRetryDelay,
+  });
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: false });
   const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
   const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 60_000, refetchOnWindowFocus: true });
@@ -213,9 +219,19 @@ export default function WeatherAILab() {
   const refreshFusion = trpc.weather.refreshManualFusion.useMutation({
     onSuccess: async () => { await refetch(); },
   });
+  const [slowLoad, setSlowLoad] = useState(false);
 
-  if (isLoading) return <div className="mx-auto max-w-2xl space-y-3 px-3 py-4">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-800" />)}</div>;
-  if (error || !data) return <div className="mx-auto max-w-2xl px-3 py-5"><div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-center"><AlertTriangle className="mx-auto h-6 w-6 text-red-300" /><p className="mt-2 text-sm text-red-100">Impossible de charger la traçabilité de cette prévision.</p><button onClick={() => refetch()} className="mt-3 text-xs font-semibold text-red-200 underline">Réessayer</button></div></div>;
+  useEffect(() => {
+    if (!isLoading && !isFetching) {
+      setSlowLoad(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setSlowLoad(true), WEATHER_QUERY_SLOW_MS);
+    return () => window.clearTimeout(timeout);
+  }, [isLoading, isFetching]);
+
+  if (isLoading) return <div className="mx-auto max-w-2xl space-y-3 px-3 py-4">{slowLoad && <div role="status" className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-100">La traçabilité prend plus de temps que prévu. Les erreurs temporaires sont réessayées automatiquement.</div>}{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-800" />)}</div>;
+  if (error || !data) return <div className="mx-auto max-w-2xl px-3 py-5"><div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-center"><AlertTriangle className="mx-auto h-6 w-6 text-red-300" /><p className="mt-2 text-sm text-red-100">Impossible de charger la traçabilité de cette prévision.</p><p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-slate-300">{/(timeout|délai|aborted)/i.test(error?.message ?? "") ? "Le délai de la source a été dépassé après les réessais autorisés." : "Aucune trace n’est remplacée par une valeur estimée."}</p><button type="button" onClick={() => void refetch()} disabled={isFetching} className="mt-3 text-xs font-semibold text-red-200 underline disabled:opacity-50">{isFetching ? "Nouvel essai…" : "Réessayer"}</button></div></div>;
 
   const hasTrace = data.appliedModelWeights.length > 0;
   const hasSnapshot = Boolean(data.calculatedAt);

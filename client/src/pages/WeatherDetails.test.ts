@@ -70,5 +70,9 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("bestForecastModel");
     expect(source).toContain("Meilleur modèle");
     expect(source).toContain("normalizedScore");
+    expect(source).toContain("shouldRetryWeatherQuery");
+    expect(source).toContain("WEATHER_QUERY_SLOW_MS");
+    expect(source).toContain("Prévisions temporairement indisponibles");
+    expect(source).toContain("MeteoAI réessaie uniquement les erreurs temporaires.");
   });
 });

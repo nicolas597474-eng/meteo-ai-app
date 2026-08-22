@@ -6,7 +6,13 @@ type WeatherFetchOptions = {
   cacheTtlMs?: number;
 };
 
-type CachedWeatherResponse = { expiresAt: number; response: Response };
+type CachedWeatherResponse = {
+  expiresAt: number;
+  status: number;
+  statusText: string;
+  headers: Array<[string, string]>;
+  body: ArrayBuffer;
+};
 
 export type WeatherProviderDiagnostic = {
   provider: string;
@@ -43,6 +49,25 @@ function providerName(input: RequestInfo | URL): string {
   } catch {
     return "source-inconnue";
   }
+}
+
+function responseFromCache(cached: CachedWeatherResponse): Response {
+  return new Response(cached.body.slice(0), {
+    status: cached.status,
+    statusText: cached.statusText,
+    headers: cached.headers,
+  });
+}
+
+async function makeCachedWeatherResponse(response: Response, expiresAt: number): Promise<CachedWeatherResponse> {
+  const snapshot = response.clone();
+  return {
+    expiresAt,
+    status: snapshot.status,
+    statusText: snapshot.statusText,
+    headers: Array.from(snapshot.headers.entries()),
+    body: await snapshot.arrayBuffer(),
+  };
 }
 
 function recordProviderDiagnostic(diagnostic: ProviderDiagnosticState) {
@@ -101,7 +126,7 @@ export async function fetchWeather(
       lastAttempts: 0,
       lastRetries: 0,
     });
-    return cached.response.clone();
+    return responseFromCache(cached);
   }
   if (key) {
     responseCache.delete(key);
@@ -117,7 +142,14 @@ export async function fetchWeather(
       const response = await fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
       if (response.ok) {
         if (key && cacheTtlMs > 0) {
-          responseCache.set(key, { expiresAt: Date.now() + cacheTtlMs, response: response.clone() });
+          try {
+            const expiresAt = Date.now() + cacheTtlMs;
+            responseCache.set(key, await makeCachedWeatherResponse(response, expiresAt));
+          } catch {
+            // La réponse réseau reste rendue à l’appel courant, sans conserver
+            // un flux potentiellement consommé pour un appel ultérieur.
+            responseCache.delete(key);
+          }
         }
         const completedAt = Date.now();
         recordProviderDiagnostic({

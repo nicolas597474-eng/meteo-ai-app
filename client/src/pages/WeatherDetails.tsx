@@ -11,6 +11,7 @@ import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getCenteredHourScrollLeft, getHourCenterX, getNearestCenteredHourIndex, getNearestHourIndex } from "@/lib/hourlyScrollSync";
+import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -169,7 +170,11 @@ export default function WeatherDetails() {
     ? { lat: activeLocation.lat, lon: activeLocation.lon }
     : undefined, [activeLocation?.lat, activeLocation?.lon]);
 
-  const { data, isLoading } = trpc.weather.getDetailedForecast.useQuery(coordsInput);
+  const { data, isLoading, isFetching, isError, error, refetch } = trpc.weather.getDetailedForecast.useQuery(coordsInput, {
+    retry: shouldRetryWeatherQuery,
+    retryDelay: weatherRetryDelay,
+    refetchOnWindowFocus: false,
+  });
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
   const reliabilityInput = useMemo(() => ({
     lat: activeLocation?.lat ?? 50.7567,
@@ -181,6 +186,16 @@ export default function WeatherDetails() {
   const bestForecastModel = reliabilityLaboratory?.bestModel as { name?: string; normalizedScore?: number | null } | undefined;
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const hourlyRef = useRef<HTMLDivElement>(null);
+  const [slowLoad, setSlowLoad] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && !isFetching) {
+      setSlowLoad(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setSlowLoad(true), WEATHER_QUERY_SLOW_MS);
+    return () => window.clearTimeout(timeout);
+  }, [isLoading, isFetching]);
 
   // Current hour index
   const currentHourStr = useMemo(() => {
@@ -212,6 +227,7 @@ export default function WeatherDetails() {
       <div className="weather-page-sky min-h-screen bg-[#0d1117]" style={pageSkyStyle}>
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4">
           <Skeleton className="h-10 w-48" />
+          {slowLoad && <div role="status" className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-100">La source météo met plus de temps que prévu. MeteoAI réessaie uniquement les erreurs temporaires.</div>}
           <Skeleton className="h-64 w-full rounded-2xl" />
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -220,7 +236,12 @@ export default function WeatherDetails() {
     );
   }
 
-  const hours = data?.hours ?? [];
+  if (isError || !data) {
+    const isTimeout = /timeout|délai|aborted/i.test(error?.message ?? "");
+    return <div className="weather-page-sky min-h-screen bg-[#0d1117]" style={pageSkyStyle}><div className="mx-auto max-w-2xl px-3 py-5"><MeteoSurface tone="default" className="rounded-[24px] border border-amber-300/25 bg-amber-300/[0.06] p-5 text-center"><MeteoIcon name="refresh" size={26} /><h1 className="mt-3 text-base font-semibold text-white">Prévisions temporairement indisponibles</h1><p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-slate-300">{isTimeout ? "Le délai de la source météo a été dépassé après les réessais autorisés." : "La prévision ne peut pas être chargée pour le moment. Aucune donnée n’est remplacée ou inventée."}</p><button type="button" onClick={() => void refetch()} disabled={isFetching} className="mt-4 min-h-10 rounded-xl border border-sky-300/40 bg-sky-300/10 px-4 text-xs font-semibold text-sky-100 disabled:opacity-50">{isFetching ? "Nouvel essai…" : "Réessayer"}</button></MeteoSurface></div><BackToTopButton /></div>;
+  }
+
+  const hours = data.hours ?? [];
   const periodHours = data?.periodHours ?? hours;
   const days = data?.days ?? [];
   const regime = data?.regime;

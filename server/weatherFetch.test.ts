@@ -27,16 +27,19 @@ describe("reprises des sources météo", () => {
     expect(getWeatherFetchCacheMetrics()).toMatchObject({ entries: 1, hits: 1, misses: 1 });
   });
 
-  it("conserve une réponse en cache lisible après consommation de la première réponse", async () => {
+  it("reconstruit une réponse distincte à chaque lecture du cache après consommation", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ hourly: [1, 2] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const first = await fetchWeather("https://api.example.test/hourly", {}, { cacheTtlMs: 10_000 });
     expect(await first.json()).toEqual({ hourly: [1, 2] });
     const cached = await fetchWeather("https://api.example.test/hourly", {}, { cacheTtlMs: 10_000 });
-
     expect(await cached.json()).toEqual({ hourly: [1, 2] });
+    const cachedAgain = await fetchWeather("https://api.example.test/hourly", {}, { cacheTtlMs: 10_000 });
+
+    expect(await cachedAgain.json()).toEqual({ hourly: [1, 2] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(getWeatherFetchCacheMetrics()).toMatchObject({ entries: 1, hits: 2, misses: 1 });
   });
 
   it("mesure un succès fournisseur avec le nombre réel de reprises", async () => {
