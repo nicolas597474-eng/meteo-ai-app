@@ -55,14 +55,14 @@ function LayerSelector({
   compact?: boolean;
 }) {
   return (
-    <div className={`${compact ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"} flex gap-1.5 scrollbar-hide`}>
+    <div className={compact ? "grid grid-cols-3 gap-1.5" : "flex flex-wrap gap-1.5"}>
       {WINDY_LAYERS.map((layer) => (
         <button
           key={layer.id}
           type="button"
           onClick={() => onSelect(layer.id)}
           aria-pressed={activeLayer === layer.id}
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+          className={`inline-flex min-w-0 shrink-0 items-center justify-center gap-1 rounded-full border font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${compact ? "px-1.5 py-1 text-[9px]" : "px-2.5 py-1 text-[10px]"} ${
             activeLayer === layer.id
               ? "border-sky-400/60 bg-sky-400/20 text-sky-100"
               : "border-white/10 bg-slate-950/40 text-slate-400 hover:border-slate-600 hover:text-slate-200"
@@ -80,6 +80,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [activeLayer, setActiveLayer] = useState<string>("rain");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
+  const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
   const fullscreenHistoryPushed = useRef(false);
 
   const handleLayerChange = useCallback((layerId: string) => {
@@ -114,13 +115,27 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   useEffect(() => {
     if (!isFullscreen || typeof window === "undefined") return;
 
+    const updateViewportHeight = () => {
+      const height = window.visualViewport?.height ?? window.innerHeight;
+      setFullscreenHeight(Math.max(420, Math.floor(height)));
+    };
+
     const handlePopState = () => {
       fullscreenHistoryPushed.current = false;
       setIsFullscreen(false);
     };
 
+    updateViewportHeight();
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.visualViewport?.addEventListener("resize", updateViewportHeight);
+    window.visualViewport?.addEventListener("scroll", updateViewportHeight);
+    window.addEventListener("orientationchange", updateViewportHeight);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.visualViewport?.removeEventListener("resize", updateViewportHeight);
+      window.visualViewport?.removeEventListener("scroll", updateViewportHeight);
+      window.removeEventListener("orientationchange", updateViewportHeight);
+    };
   }, [isFullscreen]);
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
@@ -130,8 +145,12 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   if (isFullscreen) {
     return (
       <div
-        className="fixed inset-0 z-[200] flex flex-col bg-[#080a0f] px-1.5 pt-1.5"
-        style={{ paddingBottom: "max(6px, env(safe-area-inset-bottom, 0px))" }}
+        className="fixed left-0 top-0 z-[200] flex w-screen flex-col overflow-hidden bg-[#080a0f] px-1.5 pt-1.5"
+        style={{
+          height: fullscreenHeight ? `${fullscreenHeight}px` : "100dvh",
+          maxHeight: fullscreenHeight ? `${fullscreenHeight}px` : "100dvh",
+          paddingBottom: "max(8px, env(safe-area-inset-bottom, 0px))",
+        }}
       >
         {/* En-tête plein écran */}
         <div className="mb-1 flex h-8 shrink-0 items-center justify-between gap-2">
@@ -165,7 +184,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         </div>
 
         {/* Sélecteur sous la carte en plein écran */}
-        <div className="mt-1 max-h-8 shrink-0 overflow-hidden">
+        <div className="mt-1.5 shrink-0 rounded-2xl border border-white/10 bg-[#080a0f]/95 p-1.5 shadow-[0_-10px_30px_rgba(0,0,0,0.28)]">
           <LayerSelector activeLayer={activeLayer} onSelect={handleLayerChange} compact />
         </div>
       </div>
