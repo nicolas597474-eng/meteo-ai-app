@@ -69,6 +69,13 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Relevé de {forecastCollectionReport?.scheduledAt");
     expect(source).toContain("Les stations physiques relèvent d’un flux d’observations séparé.");
     expect(source).toContain("dailyCollectedModels.map");
+    expect(source).toContain("getForecastModelGuide");
+    expect(source).toContain("Ouvrir la fiche du modèle");
+    expect(source).toContain("Comprendre le modèle");
+    expect(source).toContain("Comment il fonctionne");
+    expect(source).toContain("Ce que MeteoAI en fait");
+    expect(source).toContain("Limite à connaître");
+    expect(source).toContain("Touchez un nom de modèle");
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
     expect(source).toContain("<BackToTopButton />");
     expect(source).toContain('className="order-[-1] grid grid-cols-3 gap-2"');
