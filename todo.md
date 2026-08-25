@@ -2926,3 +2926,14 @@
 - [x] Windy : ancrer le repère bleu aux coordonnées réelles du lieu actif plutôt qu’au centre visuel de l’iframe.
 - [x] Windy : afficher le vent et les rafales en km/h dans l’embed, sans convertir ni inventer de mesures.
 - [x] Windy : valider le déplacement de la carte, les unités, TypeScript et Vitest.
+
+## Relance manuelle des snapshots physiques depuis l’application
+- [x] Backend: Ajouter une procédure protégée de relance ponctuelle du collecteur de snapshots physiques pour le lieu actif, sans modifier les données historiques.
+- [x] Garde-fous: Empêcher les relances concurrentes et conserver l’idempotence des écritures ainsi que la provenance de l’exécution.
+- [x] Interface: Ajouter un bouton « Relancer la collecte des stations » avec états chargement, succès partiel, indisponibilité et erreur explicite.
+- [x] Tests: Couvrir autorisation, relance, absence de station, reprise partielle et non-réécriture des snapshots existants.
+- [x] Validation: Vérifier mobile, TypeScript, Vitest et les journaux de collecte avant publication.
+
+## Validation opérationnelle des tâches planifiées
+- [ ] Confirmer le premier passage HTTP 200 de la tâche prévisions v7 et la mise à jour du bilan AI Lab.
+- [ ] Confirmer le premier passage HTTP 200 de la tâche snapshots physiques v3 et l’archivage des relevés réellement retournés.

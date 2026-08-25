@@ -118,4 +118,13 @@ describe("page Fiabilité", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source.indexOf("const liveStationsById = useMemo")).toBeLessThan(source.indexOf("if (isLoading)"));
   });
+
+  it("propose une relance physique explicite sans présenter la collecte comme une prévision", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("refreshPhysicalStationSnapshots.useMutation");
+    expect(source).toContain("Relancer les relevés");
+    expect(source).toContain("Les données déjà archivées pour ce créneau restent intactes.");
+    expect(source).toContain("Ce créneau est déjà archivé. Aucune donnée existante n’a été modifiée.");
+    expect(source).toContain("Aucun relevé physique qualifié n’a été retourné par les stations.");
+  });
 });

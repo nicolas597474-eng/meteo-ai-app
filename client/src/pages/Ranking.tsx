@@ -12,7 +12,7 @@ import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
-import { ChevronDown, Clock3, X } from "lucide-react";
+import { ChevronDown, Clock3, RefreshCw, X } from "lucide-react";
 import { Link } from "wouter";
 
 type ComparisonPoint = {
@@ -136,6 +136,7 @@ export default function Ranking() {
   const [periodDays, setPeriodDays] = useState<1 | 7>(1);
   const [radiusKm, setRadiusKm] = useState(activeLocation?.radiusKm ?? 20);
   const [selectedSource, setSelectedSource] = useState<SourceSelection | null>(null);
+  const [physicalCollectionMessage, setPhysicalCollectionMessage] = useState<{ tone: "success" | "warning" | "danger" | "info"; text: string } | null>(null);
   const coords = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const utils = trpc.useUtils();
   const overviewInput = useMemo(() => ({ ...(coords ?? {}), periodDays, radiusKm }), [coords?.lat, coords?.lon, periodDays, radiusKm]);
@@ -157,6 +158,27 @@ export default function Ranking() {
     onSuccess: () => {
       utils.weather.getStationReliabilityOverview.invalidate();
       utils.favorites.list.invalidate();
+    },
+  });
+  const refreshPhysicalSnapshots = trpc.weather.refreshPhysicalStationSnapshots.useMutation({
+    onSuccess: (result) => {
+      const location = result.locations[0];
+      if (!location) {
+        setPhysicalCollectionMessage({ tone: "warning", text: "Aucun lieu favori n’a pu être traité." });
+        return;
+      }
+      if (location.skipped) {
+        setPhysicalCollectionMessage({ tone: "info", text: location.reason ?? "Ce créneau est déjà archivé. Aucune donnée existante n’a été modifiée." });
+      } else if (location.stored) {
+        setPhysicalCollectionMessage({ tone: "success", text: `${location.stationCount} station${location.stationCount > 1 ? "s" : ""} physique${location.stationCount > 1 ? "s" : ""} qualifiée${location.stationCount > 1 ? "s" : ""} archivée${location.stationCount > 1 ? "s" : ""} pour ce créneau.` });
+      } else {
+        setPhysicalCollectionMessage({ tone: result.status === "failed" ? "danger" : "warning", text: location.reason ?? "Aucun relevé physique qualifié n’a été retourné par les stations." });
+      }
+      utils.weather.getStationReliabilityOverview.invalidate();
+      utils.weather.searchStations.invalidate();
+    },
+    onError: (error) => {
+      setPhysicalCollectionMessage({ tone: "danger", text: error.message || "La relance n’a pas pu être effectuée. Les relevés archivés restent inchangés." });
     },
   });
 
@@ -221,6 +243,31 @@ export default function Ranking() {
             </div>
           </details>
           <p className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/20 px-3 py-2 text-[11px] leading-relaxed text-slate-400">La synthèse locale complète la prévision officielle. Elle ne la remplace pas et aucun relevé absent n’est inventé.</p>
+        </section>
+
+        <section className="mb-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.055] p-3" aria-labelledby="physical-refresh-title">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h2 id="physical-refresh-title" className="text-sm font-semibold text-emerald-50">Relevés des stations</h2>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-300">Lance une seule collecte pour {locationName}. Les données déjà archivées pour ce créneau restent intactes.</p>
+            </div>
+            <button
+              type="button"
+              disabled={!activeLocation?.favoriteId || refreshPhysicalSnapshots.isPending}
+              onClick={() => {
+                if (!activeLocation?.favoriteId) return;
+                setPhysicalCollectionMessage(null);
+                refreshPhysicalSnapshots.mutate({ favoriteId: activeLocation.favoriteId });
+              }}
+              className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-300/55 bg-emerald-400/15 px-3 text-xs font-semibold text-emerald-50 transition-colors hover:bg-emerald-400/25 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              aria-describedby="physical-refresh-note"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshPhysicalSnapshots.isPending ? "animate-spin" : ""}`} aria-hidden="true" />
+              {refreshPhysicalSnapshots.isPending ? "Collecte en cours…" : "Relancer les relevés"}
+            </button>
+          </div>
+          <p id="physical-refresh-note" className="mt-2 text-[10px] leading-relaxed text-slate-400">La recherche est limitée au rayon actif. Les stations absentes ou non qualifiées sont signalées, jamais remplacées par des valeurs estimées.</p>
+          {physicalCollectionMessage ? <div role="status" className={`mt-3 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${physicalCollectionMessage.tone === "success" ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100" : physicalCollectionMessage.tone === "danger" ? "border-rose-300/30 bg-rose-400/10 text-rose-100" : physicalCollectionMessage.tone === "warning" ? "border-amber-300/30 bg-amber-400/10 text-amber-100" : "border-sky-300/30 bg-sky-400/10 text-sky-100"}`}>{physicalCollectionMessage.text}</div> : null}
         </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">

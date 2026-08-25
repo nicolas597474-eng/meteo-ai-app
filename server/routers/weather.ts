@@ -60,6 +60,7 @@ import { getLocalEclipseCircumstances } from "../eclipseVisibility";
 import { getWeatherProviderDiagnostics } from "../weatherFetch";
 import { buildWeatherProvenance } from "../weatherProvenance";
 import { buildEveningEvidence } from "../historyEvidence";
+import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHandlers";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -1010,6 +1011,15 @@ export const weatherRouter = router({
       const favorite = (await getFavoriteLocations(ctx.user.id)).find((entry) => entry.id === input.favoriteId);
       if (!favorite) throw new Error("Ce lieu favori est introuvable ou ne vous appartient pas.");
       return refreshManualFusionForFavorite(favorite);
+    }),
+
+  /** Relance ponctuelle et additive des relevés physiques du lieu possédé par l’utilisateur. */
+  refreshPhysicalStationSnapshots: protectedProcedure
+    .input(z.object({ favoriteId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const favorite = (await getFavoriteLocations(ctx.user.id)).find((entry) => entry.id === input.favoriteId);
+      if (!favorite) throw new Error("Ce lieu favori est introuvable ou ne vous appartient pas.");
+      return collectPhysicalObservationSnapshotsForFavorites([favorite], "manual");
     }),
 
   /**

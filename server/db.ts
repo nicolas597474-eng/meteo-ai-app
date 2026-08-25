@@ -671,6 +671,27 @@ export async function upsertStationObservation(data: InsertStationObservation): 
 }
 
 /**
+ * Écriture strictement additive pour une relance manuelle. Lorsqu'une station a
+ * déjà livré une mesure pour le même instant, celle-ci demeure intacte : la
+ * relance ne peut donc ni modifier ni réécrire le relevé déjà archivé.
+ */
+export async function insertStationObservationIfMissing(data: InsertStationObservation): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const existing = await db
+    .select({ id: stationObservations.id })
+    .from(stationObservations)
+    .where(and(
+      eq(stationObservations.stationId, data.stationId),
+      eq(stationObservations.observedAt, data.observedAt),
+    ))
+    .limit(1);
+  if (existing[0]) return false;
+  await db.insert(stationObservations).values(data);
+  return true;
+}
+
+/**
  * Rebuild quality metadata from archived observations. The profile is evidence
  * only: it never writes reliabilityScore, qualificationStatus or isActive.
  */
@@ -757,6 +778,28 @@ export async function upsertQualifiedObservationSnapshot(data: InsertQualifiedOb
     return;
   }
   await db.insert(qualifiedObservationSnapshots).values(data);
+}
+
+/**
+ * Conserve le premier snapshot qualifié d'un lieu pour une heure de Paris.
+ * Utilisé lors d'une relance manuelle afin de préserver sans exception les
+ * snapshots précédemment archivés.
+ */
+export async function insertQualifiedObservationSnapshotIfMissing(data: InsertQualifiedObservationSnapshot): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const existing = await db
+    .select({ id: qualifiedObservationSnapshots.id })
+    .from(qualifiedObservationSnapshots)
+    .where(and(
+      eq(qualifiedObservationSnapshots.locationKey, data.locationKey),
+      eq(qualifiedObservationSnapshots.date, data.date),
+      eq(qualifiedObservationSnapshots.hour, data.hour),
+    ))
+    .limit(1);
+  if (existing[0]) return false;
+  await db.insert(qualifiedObservationSnapshots).values(data);
+  return true;
 }
 
 export async function getQualifiedObservationSnapshotsForDate(locationKey: string, date: string) {
@@ -957,6 +1000,24 @@ export async function upsertPhysicalSnapshotCollectionTrace(data: InsertPhysical
   await db.insert(physicalSnapshotCollectionTraces).values(data).onDuplicateKeyUpdate({
     set: { ...data, collectedAt: new Date() },
   });
+}
+
+/** Insère une trace seulement si ce créneau n’est pas déjà documenté. */
+export async function insertPhysicalSnapshotCollectionTraceIfMissing(data: InsertPhysicalSnapshotCollectionTrace): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const existing = await db
+    .select({ id: physicalSnapshotCollectionTraces.id })
+    .from(physicalSnapshotCollectionTraces)
+    .where(and(
+      eq(physicalSnapshotCollectionTraces.locationKey, data.locationKey),
+      eq(physicalSnapshotCollectionTraces.date, data.date),
+      eq(physicalSnapshotCollectionTraces.hour, data.hour),
+    ))
+    .limit(1);
+  if (existing[0]) return false;
+  await db.insert(physicalSnapshotCollectionTraces).values(data);
+  return true;
 }
 
 /** Read per-hour physical snapshot collection traces over the selected history period. */

@@ -50,12 +50,16 @@ import {
   getQualifiedLeadTimeScoresForLocation,
   upsertWeatherStation,
   upsertStationObservation,
+  insertStationObservationIfMissing,
   refreshStationQualityProfiles,
   upsertGroundTruthSnapshot,
   upsertQualifiedObservationSnapshot,
+  insertQualifiedObservationSnapshotIfMissing,
   insertStationCollectionSnapshot,
   upsertPhysicalSnapshotCollectionTrace,
+  insertPhysicalSnapshotCollectionTraceIfMissing,
   getQualifiedObservationSnapshotsForDate,
+  getPhysicalSnapshotCollectionTracesByDateRange,
   getStoredHourlyForecasts,
   getStationEvidenceSummary,
 } from "./db";
@@ -116,6 +120,202 @@ export const HOURLY_SNAPSHOT_RETRY_DELAY_MS = 1_200;
 
 export function shouldRetryHourlyFavorite(attempt: number): boolean {
   return attempt + 1 < HOURLY_SNAPSHOT_MAX_ATTEMPTS;
+}
+
+type PhysicalSnapshotFavorite = Awaited<ReturnType<typeof getAllFavoriteLocations>>[number];
+
+export type PhysicalSnapshotCollectionTrigger = "scheduled" | "manual";
+
+export type PhysicalSnapshotCollectionLocationResult = {
+  locationKey: string;
+  stationCount: number;
+  stored: boolean;
+  attempts: number;
+  skipped?: boolean;
+  reason?: string;
+};
+
+/**
+ * Collecte les observations physiques pour un ensemble de favoris. Le mode
+ * manuel reste strictement additif : un relevé, snapshot ou trace déjà
+ * archivé pour l’heure de Paris en cours n’est jamais réécrit.
+ */
+export async function collectPhysicalObservationSnapshotsForFavorites(
+  favorites: readonly PhysicalSnapshotFavorite[],
+  trigger: PhysicalSnapshotCollectionTrigger,
+) {
+  const unique = new Map<string, PhysicalSnapshotFavorite>();
+  for (const favorite of favorites) unique.set(makeLocationKey(favorite.lat, favorite.lon), favorite);
+
+  const date = getTodayParis();
+  const hour = getParisHour();
+  const results: PhysicalSnapshotCollectionLocationResult[] = [];
+  const preserveArchivedEvidence = trigger === "manual";
+
+  for (const favorite of Array.from(unique.values())) {
+    const locationKey = makeLocationKey(favorite.lat, favorite.lon);
+    const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
+
+    if (preserveArchivedEvidence) {
+      const [snapshots, traces] = await Promise.all([
+        getQualifiedObservationSnapshotsForDate(locationKey, date),
+        getPhysicalSnapshotCollectionTracesByDateRange(locationKey, date, date),
+      ]);
+      if (snapshots.some((snapshot) => snapshot.hour === hour) || traces.some((trace) => trace.hour === hour)) {
+        results.push({
+          locationKey,
+          stationCount: 0,
+          stored: false,
+          skipped: true,
+          attempts: 0,
+          reason: "Ce créneau est déjà archivé ; aucune réécriture n’a été effectuée.",
+        });
+        continue;
+      }
+    }
+
+    let locationResult: PhysicalSnapshotCollectionLocationResult | null = null;
+    for (let attempt = 0; attempt < HOURLY_SNAPSHOT_MAX_ATTEMPTS; attempt++) {
+      try {
+        const discovered = await collectNearbyStations(
+          favorite.lat,
+          favorite.lon,
+          radiusKm,
+          favorite.customName ?? favorite.name,
+          { netatmoUserId: favorite.userId },
+        );
+        const physical = getPhysicalActiveStations(discovered);
+        for (const station of physical) {
+          await upsertWeatherStation({
+            stationId: station.stationId,
+            source: station.source,
+            name: station.name,
+            lat: station.lat,
+            lon: station.lon,
+            altitude: station.altitude,
+            refLat: favorite.lat,
+            refLon: favorite.lon,
+            distanceKm: station.distanceKm,
+            reliabilityScore: station.reliabilityScore,
+            updateFrequencyMin: station.updateFrequencyMin,
+            dataAvailability: station.dataAvailability,
+            isActive: station.isActive ? 1 : 0,
+            exclusionReason: station.exclusionReason ?? null,
+            qualificationStatus: station.qualificationStatus ?? "validated",
+            sourceTier: station.sourceTier ?? null,
+          });
+          const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
+          if (!Number.isFinite(observedAt)) continue;
+          const observation = {
+            stationId: station.stationId,
+            observedAt,
+            temperature: station.temperature,
+            humidity: station.humidity,
+            pressure: station.pressure,
+            windSpeed: station.windSpeed,
+            windGust: station.windGust,
+            windDirection: station.windDirection,
+            precipitation: station.precipitation,
+          };
+          if (preserveArchivedEvidence) await insertStationObservationIfMissing(observation);
+          else await upsertStationObservation(observation);
+        }
+
+        await refreshStationQualityProfiles(physical.map((station) => station.stationId));
+        const synthesis = calculateGroundTruth(physical);
+        if (synthesis.stationCount < 1 || synthesis.temperature == null) {
+          locationResult = {
+            locationKey,
+            stationCount: synthesis.stationCount,
+            stored: false,
+            attempts: attempt + 1,
+            reason: "Aucune station physique qualifiée",
+          };
+          results.push(locationResult);
+          break;
+        }
+
+        const snapshot = {
+          locationKey,
+          date,
+          hour,
+          stationCount: synthesis.stationCount,
+          confidenceScore: synthesis.confidenceScore,
+          temperature: synthesis.temperature,
+          humidity: synthesis.humidity,
+          pressure: synthesis.pressure,
+          windSpeed: synthesis.windSpeed,
+          windGust: synthesis.windGust,
+          precipitation: synthesis.precipitation,
+          stationsUsed: synthesis.stationsUsed as any,
+        };
+        if (preserveArchivedEvidence) await insertQualifiedObservationSnapshotIfMissing(snapshot);
+        else await upsertQualifiedObservationSnapshot(snapshot);
+        locationResult = { locationKey, stationCount: synthesis.stationCount, stored: true, attempts: attempt + 1 };
+        results.push(locationResult);
+        break;
+      } catch (error: any) {
+        const message = error instanceof Error ? error.message : "Erreur de collecte inconnue";
+        if (shouldRetryHourlyFavorite(attempt)) {
+          console.warn(`[MeteoAI] Physical snapshot collection failed for ${favorite.customName ?? favorite.name}; retrying once:`, message);
+          await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));
+          continue;
+        }
+        console.error(`[MeteoAI] Physical snapshot collection failed after retry for ${favorite.customName ?? favorite.name}:`, message);
+        locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, reason: `Erreur de collecte après relance : ${message}` };
+        results.push(locationResult);
+      }
+    }
+
+    if (locationResult) {
+      const status: "stored" | "failed" | "no_station" = locationResult.stored
+        ? "stored"
+        : locationResult.reason?.startsWith("Erreur de collecte")
+          ? "failed"
+          : "no_station";
+      const trace = {
+        locationKey,
+        locationName: favorite.customName ?? favorite.name,
+        date,
+        hour,
+        radiusKm,
+        status,
+        attempts: locationResult.attempts,
+        stationCount: locationResult.stationCount,
+        reason: locationResult.reason ?? null,
+      };
+      if (preserveArchivedEvidence) await insertPhysicalSnapshotCollectionTraceIfMissing(trace);
+      else await upsertPhysicalSnapshotCollectionTrace(trace);
+    }
+  }
+
+  const collectionErrors = results.filter((result) => result.reason?.startsWith("Erreur de collecte"));
+  const collectedResults = results.filter((result) => !result.skipped);
+  const allLocationsFailed = collectedResults.length > 0 && collectionErrors.length === collectedResults.length;
+  if (trigger === "scheduled" && allLocationsFailed) {
+    console.error("[MeteoAI] Physical snapshot collection failed for all favorite locations");
+    const parisTime = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
+    const failedList = collectionErrors.map((e) => `• ${e.locationKey} — ${e.reason ?? "raison inconnue"} (${e.attempts} tentative${e.attempts > 1 ? "s" : ""})`).join("\n");
+    try {
+      await notifyOwner({
+        title: "MeteoAI · Collecte horaire en échec total",
+        content: `Toutes les tentatives de collecte de snapshots physiques ont échoué à ${parisTime} (heure de Paris).\n\nLieux concernés :\n${failedList}\n\nLes prévisions affichées proviennent du dernier snapshot archivé disponible. Aucune donnée n'a été inventée.`,
+      });
+    } catch (notifError) {
+      console.warn("[MeteoAI] Owner notification failed after total collection failure:", notifError);
+    }
+  }
+
+  return {
+    ok: !allLocationsFailed,
+    status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed",
+    trigger,
+    date,
+    hour,
+    timeZone: "Europe/Paris",
+    locations: results,
+    errors: collectionErrors.length > 0 ? collectionErrors.map((result) => ({ locationKey: result.locationKey, attempts: result.attempts, reason: result.reason })) : undefined,
+  };
 }
 
 /**
@@ -1120,132 +1320,8 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
   try {
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-
     const favorites = await getAllFavoriteLocations();
-    const unique = new Map<string, typeof favorites[number]>();
-    for (const favorite of favorites) unique.set(makeLocationKey(favorite.lat, favorite.lon), favorite);
-
-    const date = getTodayParis();
-    const hour = getParisHour();
-    const results: Array<{ locationKey: string; stationCount: number; stored: boolean; attempts: number; reason?: string }> = [];
-    for (const favorite of Array.from(unique.values())) {
-      const locationKey = makeLocationKey(favorite.lat, favorite.lon);
-      const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
-      let locationResult: { locationKey: string; stationCount: number; stored: boolean; attempts: number; reason?: string } | null = null;
-      for (let attempt = 0; attempt < HOURLY_SNAPSHOT_MAX_ATTEMPTS; attempt++) {
-        try {
-          const discovered = await collectNearbyStations(favorite.lat, favorite.lon, radiusKm, favorite.customName ?? favorite.name, { netatmoUserId: favorite.userId });
-          const physical = getPhysicalActiveStations(discovered);
-          for (const station of physical) {
-            await upsertWeatherStation({
-              stationId: station.stationId,
-              source: station.source,
-              name: station.name,
-              lat: station.lat,
-              lon: station.lon,
-              altitude: station.altitude,
-              refLat: favorite.lat,
-              refLon: favorite.lon,
-              distanceKm: station.distanceKm,
-              reliabilityScore: station.reliabilityScore,
-              updateFrequencyMin: station.updateFrequencyMin,
-              dataAvailability: station.dataAvailability,
-              isActive: station.isActive ? 1 : 0,
-              exclusionReason: station.exclusionReason ?? null,
-              qualificationStatus: station.qualificationStatus ?? "validated",
-              sourceTier: station.sourceTier ?? null,
-            });
-            const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
-            if (!Number.isFinite(observedAt)) continue;
-            await upsertStationObservation({
-              stationId: station.stationId,
-              observedAt,
-              temperature: station.temperature,
-              humidity: station.humidity,
-              pressure: station.pressure,
-              windSpeed: station.windSpeed,
-              windGust: station.windGust,
-              windDirection: station.windDirection,
-              precipitation: station.precipitation,
-            });
-          }
-          // Evidence-only metadata: profile status does not change the active
-          // station list or its operational weight in this collection cycle.
-          await refreshStationQualityProfiles(physical.map((station) => station.stationId));
-          const synthesis = calculateGroundTruth(physical);
-          if (synthesis.stationCount < 1 || synthesis.temperature == null) {
-            locationResult = { locationKey, stationCount: synthesis.stationCount, stored: false, attempts: attempt + 1, reason: "Aucune station physique qualifiée" };
-            results.push(locationResult);
-            break;
-          }
-          await upsertQualifiedObservationSnapshot({
-            locationKey,
-            date,
-            hour,
-            stationCount: synthesis.stationCount,
-            confidenceScore: synthesis.confidenceScore,
-            temperature: synthesis.temperature,
-            humidity: synthesis.humidity,
-            pressure: synthesis.pressure,
-            windSpeed: synthesis.windSpeed,
-            windGust: synthesis.windGust,
-            precipitation: synthesis.precipitation,
-            stationsUsed: synthesis.stationsUsed as any,
-          });
-          locationResult = { locationKey, stationCount: synthesis.stationCount, stored: true, attempts: attempt + 1 };
-          results.push(locationResult);
-          break;
-        } catch (error: any) {
-          const message = error instanceof Error ? error.message : "Erreur de collecte inconnue";
-          if (shouldRetryHourlyFavorite(attempt)) {
-            console.warn(`[MeteoAI] Physical snapshot collection failed for ${favorite.customName ?? favorite.name}; retrying once:`, message);
-            await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));
-            continue;
-          }
-          console.error(`[MeteoAI] Physical snapshot collection failed after retry for ${favorite.customName ?? favorite.name}:`, message);
-          locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, reason: `Erreur de collecte après relance : ${message}` };
-          results.push(locationResult);
-        }
-      }
-      if (locationResult) {
-        await upsertPhysicalSnapshotCollectionTrace({
-          locationKey,
-          locationName: favorite.customName ?? favorite.name,
-          date,
-          hour,
-          radiusKm,
-          status: locationResult.stored ? "stored" : locationResult.reason?.startsWith("Erreur de collecte") ? "failed" : "no_station",
-          attempts: locationResult.attempts,
-          stationCount: locationResult.stationCount,
-          reason: locationResult.reason ?? null,
-        });
-      }
-    }
-    const collectionErrors = results.filter((result) => result.reason?.startsWith("Erreur de collecte"));
-    const allLocationsFailed = results.length > 0 && collectionErrors.length === results.length;
-    if (allLocationsFailed) {
-      console.error("[MeteoAI] Physical snapshot collection failed for all favorite locations");
-      const parisTime = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
-      const failedList = collectionErrors.map((e) => `• ${e.locationKey} — ${e.reason ?? "raison inconnue"} (${e.attempts} tentative${e.attempts > 1 ? "s" : ""})`).join("\n");
-      try {
-        await notifyOwner({
-          title: "MeteoAI · Collecte horaire en échec total",
-          content: `Toutes les tentatives de collecte de snapshots physiques ont échoué à ${parisTime} (heure de Paris).\n\nLieux concernés :\n${failedList}\n\nLes prévisions affichées proviennent du dernier snapshot archivé disponible. Aucune donnée n'a été inventée.`,
-        });
-      } catch (notifError) {
-        console.warn("[MeteoAI] Owner notification failed after total collection failure:", notifError);
-      }
-    }
-    // date/hour are deliberately Paris business time: raw station observedAt stays UTC milliseconds.
-    res.json({
-      ok: !allLocationsFailed,
-      status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed",
-      date,
-      hour,
-      timeZone: "Europe/Paris",
-      locations: results,
-      errors: collectionErrors.length > 0 ? collectionErrors.map((result) => ({ locationKey: result.locationKey, attempts: result.attempts, reason: result.reason })) : undefined,
-    });
+    res.json(await collectPhysicalObservationSnapshotsForFavorites(favorites, "scheduled"));
   } catch (error: any) {
     console.error("[MeteoAI] Physical snapshot collection error:", error);
     res.status(500).json({ error: error.message, stack: error.stack, context: { url: req.url }, timestamp: new Date().toISOString() });
