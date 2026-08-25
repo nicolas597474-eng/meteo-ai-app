@@ -148,6 +148,11 @@ export default function Ranking() {
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
     coords, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
   );
+  const currentSources = liveStationData?.stations ?? [];
+  const liveStationsById = useMemo(
+    () => new Map(currentSources.map((station) => [station.stationId, station])),
+    [currentSources],
+  );
   const updateFavorite = trpc.favorites.update.useMutation({
     onSuccess: () => {
       utils.weather.getStationReliabilityOverview.invalidate();
@@ -176,13 +181,8 @@ export default function Ranking() {
   const latest = data?.latestGroundTruth;
   const locationName = activeLocation?.name ?? "Hondeghem";
   const instantDeltaC = data?.instantDeltaC ?? null;
-  const currentSources = liveStationData?.stations ?? [];
   const modelReferences = liveStationData?.modelReferences ?? [];
   const realLocalStations = currentSources.filter((station) => station.isActive && station.sourceKind === "physical");
-  const liveStationsById = useMemo(
-    () => new Map(currentSources.map((station) => [station.stationId, station])),
-    [currentSources],
-  );
   const candidateSources = currentSources.filter((station) => station.qualificationStatus === "candidate");
   const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate");
   const physicalStationExplanation = explainPhysicalStationAvailability(

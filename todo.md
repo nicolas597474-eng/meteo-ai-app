@@ -2909,6 +2909,8 @@
 - [x] AI Lab : supprimer définitivement le panneau visuel « Dernière collecte vérifiable » encore visible dans la version servie, sans toucher au lexique ni aux données.
 - [x] AI Lab : contrôler la version publiée, le rendu mobile, TypeScript et Vitest après le correctif.
 - [x] Analyse Stations : vérifier la répartition est-ouest des stations autour du lieu actif et l’absence de filtre géographique involontaire.
-- [ ] Stations : diagnostiquer puis corriger l’affichage « Aucun relevé » lorsque des mesures physiques réelles sont disponibles, sans inventer température, vent, rafales ou pluie.
-- [ ] Stations : renouveler la tâche horaire des snapshots physiques qui renvoie 404, puis désactiver l’ancienne tâche afin de relancer l’archivage réel.
+- [x] Stations : diagnostiquer puis corriger l’affichage « Aucun relevé » lorsque des mesures physiques réelles sont disponibles, sans inventer température, vent, rafales ou pluie.
+- [x] Stations : renouveler la tâche horaire des snapshots physiques qui renvoie 404, puis désactiver l’ancienne tâche afin de relancer l’archivage réel.
 - [ ] Stations : valider les relevés affichés, le rendu mobile, TypeScript et Vitest après le correctif.
+- [x] Bug Stations : corriger l’erreur React #310 de hooks instables qui bloque le chargement de la page en production.
+- [x] Bug Stations : valider le chargement production, le rendu mobile, TypeScript et Vitest après correction.

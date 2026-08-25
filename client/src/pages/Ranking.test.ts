@@ -113,4 +113,9 @@ describe("page Fiabilité", () => {
     expect(source).toContain("Relevé actuel direct : pas encore archivé sur 24 h.");
     expect(source).toContain("Aucun relevé archivé ou direct disponible.");
   });
+
+  it("garde les hooks de stations avant le retour de chargement", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source.indexOf("const liveStationsById = useMemo")).toBeLessThan(source.indexOf("if (isLoading)"));
+  });
 });
