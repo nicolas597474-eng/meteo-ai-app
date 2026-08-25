@@ -12,7 +12,7 @@ import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
-import { Clock3, X } from "lucide-react";
+import { ChevronDown, Clock3, X } from "lucide-react";
 import { Link } from "wouter";
 
 type ComparisonPoint = {
@@ -195,35 +195,26 @@ export default function Ranking() {
           </span>
         </header>
 
-        <section className="mb-4 rounded-2xl border border-emerald-400/60 bg-emerald-400/[0.07] p-4 shadow-[0_0_24px_rgba(52,211,153,0.14)]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="font-semibold text-white">Historique des prévisions</h2>
-              <p className="mt-1 text-xs leading-relaxed text-slate-300">Retrouvez les graphiques complets, les observations archivées et les comparaisons par modèle.</p>
-            </div>
-            <Link href="/history" className="shrink-0 rounded-xl border border-emerald-300/70 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-400/20 active:scale-[0.97]">
-              Ouvrir <span aria-hidden="true">→</span>
-            </Link>
-          </div>
+        <section className="mb-4 rounded-2xl border border-emerald-400/60 bg-emerald-400/[0.07] p-3 shadow-[0_0_24px_rgba(52,211,153,0.14)]">
+          <div className="flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="font-semibold text-white">Historique des prévisions</h2><p className="mt-1 text-[11px] leading-relaxed text-slate-300">Graphiques, observations archivées et comparaisons par modèle.</p></div><Link href="/history" className="shrink-0 rounded-xl border border-emerald-300/70 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-400/20 active:scale-[0.97]">Ouvrir <span aria-hidden="true">→</span></Link></div>
         </section>
 
-        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
-          <div className="grid grid-cols-3 gap-2">
-            <Metric label="Stations actives" value={String(stations.length)} icon="stations" color="text-emerald-400" />
-            <Metric label="Confiance synthèse locale" value={latest?.confidenceScore !== null && latest?.confidenceScore !== undefined ? `${Math.round(latest.confidenceScore)}%` : "—"} icon="confidence" color="text-blue-400" />
-            <Metric label="Dernière synthèse" value={latest?.computedAt ? new Date(latest.computedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"} icon="refresh" color="text-slate-300" />
-          </div>
+        <section className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-400/[0.06] p-4">
+          <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Votre situation locale</h2><p className="mt-1 text-xs leading-relaxed text-slate-300">Les stations les plus proches et les plus fraîches décrivent le contexte observé autour de {locationName}.</p></div><WeatherStatusBadge className="w-[132px]" tone="info" label="Confiance locale" value={liveStationData?.groundTruth?.confidenceScore == null ? "—" : `${Math.round(liveStationData.groundTruth.confidenceScore)}/100`} description="Indice de couverture et d’accord des observations locales. Il ne remplace pas la prévision officielle." /></div>
+          <div className="mt-3 grid grid-cols-3 gap-2"><Metric label="Stations utilisées" value={String(stations.length)} icon="stations" color="text-emerald-400" /><Metric label="Température" value={liveStationData?.groundTruth?.temperature == null ? "—" : `${Number(liveStationData.groundTruth.temperature).toFixed(1)}°C`} icon="temperature" color="text-amber-300" /><Metric label="Dernier relevé" value={latest?.computedAt ? formatAge(Math.max(0, Math.round((Date.now() - new Date(latest.computedAt).getTime()) / 60000))) : "—"} icon="refresh" color="text-slate-300" /></div>
+          <p className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/20 px-3 py-2 text-[11px] leading-relaxed text-slate-400">La synthèse locale complète la prévision officielle. Elle ne la remplace pas et aucun relevé absent n’est inventé.</p>
         </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
-          <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Rayon de recherche</h2><p className="text-xs text-slate-500">Utilisé à la prochaine collecte de stations physiques.</p></div><MeteoIcon name="location" size={20} className="text-blue-400" /></div>
-          <div className="flex flex-wrap gap-2">{[5, 10, 20, 30, 50].map((radius) => <button key={radius} type="button" disabled={updateFavorite.isPending} onClick={() => changeRadius(radius)} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${radiusKm === radius ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-[#090b10] text-slate-300"}`}>{radius} km</button>)}</div>
-          <p className="mt-3 text-[11px] text-slate-600">{activeLocation?.favoriteId ? "Le rayon est enregistré pour ce lieu favori." : "Le rayon est utilisé pour cette consultation ; enregistrez ce lieu pour le conserver."}</p>
-        </section>
-
-        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
-          <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Vue satellite · bleu : lieu de référence · vert : relevé récent · ambre : relevé ancien.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
+          <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Vert : utilisée · ambre : à vérifier · bleu : lieu sélectionné.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
           <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />Utilisée</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-300" />À vérifier</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-400" />Lieu actif</span></div>
+        </section>
+
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Rayon de recherche</h2><p className="text-xs text-slate-500">Choisissez jusqu’où rechercher les stations physiques.</p></div><MeteoIcon name="location" size={20} className="text-blue-400" /></div>
+          <div className="flex flex-wrap gap-2">{[5, 10, 20, 30, 50].map((radius) => <button key={radius} type="button" disabled={updateFavorite.isPending} onClick={() => changeRadius(radius)} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${radiusKm === radius ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-[#090b10] text-slate-300"}`}>{radius} km</button>)}</div>
+          <p className="mt-3 text-[11px] text-slate-500">{activeLocation?.favoriteId ? "Ce choix est enregistré pour ce lieu favori." : "Ce choix reste valable pour cette consultation."}</p>
         </section>
 
         <LiveSourceSummary
@@ -238,9 +229,15 @@ export default function Ranking() {
           onOpenDetails={(source, kind) => setSelectedSource({ source, kind })}
         />
 
-        <FilteredStationDirectory sources={currentSources as any[]} isLoading={liveStationsLoading} onOpenDetails={(source) => setSelectedSource({ source, kind: "station" })} />
+        <details className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden"><span>Voir les autres sources disponibles</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform details-open:rotate-180" /></summary>
+          <div className="mt-3"><FilteredStationDirectory sources={currentSources as any[]} isLoading={liveStationsLoading} onOpenDetails={(source) => setSelectedSource({ source, kind: "station" })} /></div>
+        </details>
 
-        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+        <details className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden"><span>Voir les relevés et comparaisons détaillés</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /></summary>
+          <div className="mt-3">
+          <section className="rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-white">Relevés des stations</h2><p className="text-xs text-slate-500">Stations physiques validées autour du lieu.</p></div><MeteoIcon name="stations" size={22} /></div>
           {stations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-500">Aucune station physique n’est encore archivée pour ce lieu. La première collecte est prévue à 05h00.</div>
@@ -257,11 +254,13 @@ export default function Ranking() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <section className="mt-3 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Stations vs prévision officielle</h2><p className="text-xs text-slate-500">Température — heures de Paris.</p></div><div className="flex rounded-lg border border-slate-700 bg-[#090b10] p-0.5"><button type="button" onClick={() => setPeriodDays(1)} className={`rounded-md px-2.5 py-1 text-xs ${periodDays === 1 ? "bg-blue-600 text-white" : "text-slate-400"}`}>24 h</button><button type="button" onClick={() => setPeriodDays(7)} className={`rounded-md px-2.5 py-1 text-xs ${periodDays === 7 ? "bg-blue-600 text-white" : "text-slate-400"}`}>7 jours</button></div></div>
           <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-800 bg-[#090b10] px-3 py-2"><span className="text-xs text-slate-400">Écart instantané station / prévision</span><span className={`text-sm font-bold ${instantDeltaC === null ? "text-slate-400" : instantDeltaC > 0 ? "text-amber-300" : instantDeltaC < 0 ? "text-sky-300" : "text-emerald-400"}`}>{instantDeltaC === null ? "—" : `${instantDeltaC > 0 ? "+" : ""}${instantDeltaC.toFixed(1)} °C`}</span></div>
           <TemperatureComparison points={comparison} periodDays={periodDays} />
-        </section>
+          </section>
+          </div>
+        </details>
       </div>
       <SourceDetailsDialog selection={selectedSource} groundTruth={liveStationData?.groundTruth} onOpenChange={(open) => { if (!open) setSelectedSource(null); }} />
       <BackToTopButton />
@@ -338,8 +337,13 @@ function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, ca
     ["Précip.", groundTruth?.precipitation === null || groundTruth?.precipitation === undefined ? "—" : `${Number(groundTruth.precipitation).toFixed(1)} mm`],
   ];
   return <section className="mb-4 space-y-4">
-    <div className="rounded-2xl border border-sky-500/25 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Synthèse multi-source</h2><p className="text-xs text-slate-500">Références de modèle et observations disponibles, distinguées ci-dessous.</p></div><WeatherStatusBadge className="w-[142px]" tone="info" label="Confiance synthèse" value={`${groundTruth?.confidenceScore ?? "—"}/100`} description="Cet indice de 0 à 100 décrit l’accord des sources et la couverture des observations actives. Il concerne la synthèse locale et ne remplace pas la confiance de la prévision officielle." /></div><div className="grid grid-cols-3 gap-2">{values.map(([label, value]) => <div key={label} className="rounded-lg bg-[#090b10] px-2 py-2 text-center"><p className="text-sm font-bold text-white">{value}</p><p className="mt-0.5 text-[10px] text-slate-500">{label}</p></div>)}</div><p className="mt-3 text-[11px] text-slate-500">Cette confiance mesure l’accord et le nombre des stations actives ; elle ne remplace pas la confiance de prévision officielle.</p></div>
-    <div className="grid grid-cols-4 gap-2 rounded-2xl border border-slate-800 bg-[#10131a] p-3"><Metric label="Locales réelles" value={String(realLocalStations.length)} icon="stations" color="text-emerald-400" /><Metric label="Modèles" value={String(modelReferences.length)} icon="confidence" color="text-violet-300" /><Metric label="Candidates" value={String(candidateSources.length)} icon="location" color="text-amber-300" /><Metric label="Écartées" value={String(ignoredCount)} icon="refresh" color="text-slate-300" /></div>
+    <details className="rounded-2xl border border-slate-800 bg-[#10131a] p-3">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden"><span>Voir le détail de la synthèse locale</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /></summary>
+      <div className="mt-3 space-y-3">
+        <div className="rounded-2xl border border-sky-500/25 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Synthèse multi-source</h2><p className="text-xs text-slate-500">Références de modèle et observations disponibles, distinguées ci-dessous.</p></div><WeatherStatusBadge className="w-[142px]" tone="info" label="Confiance synthèse" value={`${groundTruth?.confidenceScore ?? "—"}/100`} description="Cet indice de 0 à 100 décrit l’accord des sources et la couverture des observations actives. Il concerne la synthèse locale et ne remplace pas la confiance de la prévision officielle." /></div><div className="grid grid-cols-3 gap-2">{values.map(([label, value]) => <div key={label} className="rounded-lg bg-[#090b10] px-2 py-2 text-center"><p className="text-sm font-bold text-white">{value}</p><p className="mt-0.5 text-[10px] text-slate-500">{label}</p></div>)}</div><p className="mt-3 text-[11px] text-slate-500">Cette confiance mesure l’accord et le nombre des stations actives ; elle ne remplace pas la confiance de prévision officielle.</p></div>
+        <div className="grid grid-cols-4 gap-2 rounded-2xl border border-slate-800 bg-[#10131a] p-3"><Metric label="Locales réelles" value={String(realLocalStations.length)} icon="stations" color="text-emerald-400" /><Metric label="Modèles" value={String(modelReferences.length)} icon="confidence" color="text-violet-300" /><Metric label="Candidates" value={String(candidateSources.length)} icon="location" color="text-amber-300" /><Metric label="Écartées" value={String(ignoredCount)} icon="refresh" color="text-slate-300" /></div>
+      </div>
+    </details>
     <div className="rounded-2xl border border-emerald-500/20 bg-[#10131a] p-4">
       <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Stations locales réelles</h2><p className="text-xs text-slate-500">Observations physiques identifiées et compatibles avec la collecte officielle.</p></div><WeatherStatusBadge compact tone="success" label="Stations Netatmo" value={netatmoCount > 0 ? String(netatmoCount) : "Authentifiées"} pulse={netatmoCount > 0} /></div>
       {isLoading ? <div className="h-20 animate-pulse rounded-xl bg-slate-800" /> : realLocalStations.length > 0 ? <div className="space-y-2">
@@ -353,7 +357,9 @@ function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, ca
         </> : null}
       </div> : <div className="rounded-xl border border-dashed border-emerald-500/20 px-4 py-5 text-center"><p className="text-sm font-semibold text-emerald-100">Modèles disponibles, relevés physiques insuffisants</p><p className="mt-2 text-xs leading-relaxed text-slate-400">{physicalStationExplanation}</p></div>}
     </div>
-    <div className="rounded-2xl border border-violet-500/20 bg-[#10131a] p-4">
+    <details className="rounded-2xl border border-slate-800 bg-[#10131a] p-3">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden"><span>Comprendre les modèles, candidats et critères</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /></summary>
+      <div className="mt-3 rounded-2xl border border-violet-500/20 bg-[#10131a] p-4">
       <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Références de modèles — non stations</h2><p className="text-xs text-slate-500">Prévisions au point du lieu, comparées aux observations physiques quand elles existent.</p></div><WeatherStatusBadge compact tone="lab" label="Références" value={String(modelReferences.length)} /></div>
       <p className="mb-3 rounded-xl border border-violet-500/15 bg-violet-500/5 px-3 py-2 text-[11px] leading-relaxed text-slate-400">Le coefficient de cohérence compare le modèle à la station locale validée et au consensus des modèles. Il sert à lire l’accord instantané ; il ne modifie pas la température locale avant une validation historique mesurée.</p>
       {isLoading ? <div className="h-20 animate-pulse rounded-xl bg-slate-800" /> : modelReferences.length > 0 ? <div className="space-y-2">
@@ -369,6 +375,7 @@ function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, ca
     </div>
     <div className="rounded-2xl border border-amber-500/20 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Capteurs citoyens en validation</h2><p className="text-xs text-slate-500">Observations réelles archivées pour contrôle qualité ; elles n’influencent pas encore la température locale.</p></div><div className="flex shrink-0 items-center gap-2"><Popover><PopoverTrigger asChild><button type="button" aria-label="Comprendre le statut capteur en validation" className="min-h-8 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 text-[10px] font-semibold text-amber-100 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">Comprendre</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-amber-500/30 bg-[#17130b] px-3 py-3 text-left text-[11px] leading-relaxed text-amber-50 shadow-xl"><div className="flex items-start justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-200/75">À propos de ce statut</p><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-amber-100/70 hover:bg-amber-500/15 hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><p className="mt-1.5">Ce capteur est archivé pour vérifier sa fraîcheur, sa cohérence et sa précision historique. Il reste hors de la température locale tant qu’un gain de fiabilité n’est pas mesuré.</p></PopoverContent></Popover><WeatherStatusBadge compact tone="warning" label="Capteurs" value={String(candidateSources.length)} /></div></div>{isLoading ? <div className="h-20 animate-pulse rounded-xl bg-slate-800" /> : candidateSources.length > 0 ? <div className="space-y-2">{candidateSources.map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical={false} onOpenDetails={(source) => onOpenDetails(source, "station")} />)}</div> : <div className="rounded-xl border border-dashed border-amber-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucun capteur citoyen extérieur récent trouvé dans le rayon actuel.</div>}</div>
     {criteria && <div className="rounded-2xl border border-slate-800 bg-[#10131a] p-4"><h2 className="mb-3 font-semibold text-white">Critères de classement</h2><div className="grid grid-cols-2 gap-2">{criteria.criteria.map((criterion: any) => <div key={criterion.name} className="flex items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-bold text-blue-300">{criterion.weight}%</span><span><span className="block text-xs font-medium text-slate-200">{criterion.name}</span><span className="block text-[10px] leading-tight text-slate-500">{criterion.description}</span></span></div>)}</div></div>}
+    </details>
   </section>;
 }
 

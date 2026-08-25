@@ -2889,3 +2889,9 @@
 - [x] Correctif : enregistrer le bilan de collecte des modèles même lorsque les snapshots physiques sont délégués à la tâche horaire dédiée.
 - [x] Correctif : renouveler la tâche planifiée des prévisions après déploiement et désactiver la tâche v6 qui renvoie 404.
 - [x] Validation technique : contrôler les dates forecasts, forecast_runs, hourly_forecasts et station_collection_snapshots sans supprimer l’historique ; TypeScript et Vitest validés. Le premier passage opérationnel de v7 reste à surveiller lors du prochain créneau 05:00 Paris.
+- [x] Sécurité : auditer l’origine de l’alerte de contenu potentiellement non fiable ; aucune instruction suspecte n’a été trouvée dans les sources applicatives, et aucune instruction externe n’est exécutée par les collectes ou l’interface.
+- [ ] Validation opérationnelle : confirmer le premier passage du cron v7 et la mise à jour du bilan AI Lab après son prochain créneau planifié.
+- [x] Refonte Stations : afficher d’abord un résumé local lisible, une carte centrale et les stations réellement utilisées.
+- [x] Refonte Stations : déplacer les critères, filtres, sources candidates et détails techniques dans des sections repliables sans supprimer les données.
+- [x] Refonte Stations : clarifier les statuts, la fraîcheur des relevés, la couverture et le lien vers l’Historique.
+- [x] Validation Stations : vérifier rendu mobile, accessibilité, TypeScript et Vitest avant checkpoint.

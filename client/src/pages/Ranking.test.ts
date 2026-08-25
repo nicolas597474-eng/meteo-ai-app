@@ -49,8 +49,8 @@ describe("page Fiabilité", () => {
     expect(source).not.toContain("Détails de calcul de la synthèse");
     expect(source).not.toContain("GroundTruthDetailDialog");
     expect(source).not.toContain("Méthode de pondération");
-    expect(source).toContain('label="Confiance synthèse locale"');
-    expect(source).toContain('label="Dernière synthèse"');
+    expect(source).toContain('label="Stations utilisées"');
+    expect(source).toContain('label="Dernier relevé"');
   });
 
   it("donne accès à l’Historique complet depuis la page Stations", () => {
@@ -58,7 +58,7 @@ describe("page Fiabilité", () => {
     expect(source).toContain('import { Link } from "wouter"');
     expect(source).toContain("Historique des prévisions");
     expect(source).toContain('href="/history"');
-    expect(source).toContain("graphiques complets, les observations archivées et les comparaisons par modèle");
+    expect(source).toContain("Graphiques, observations archivées et comparaisons par modèle.");
     expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("Rayon de recherche"));
     expect(source).toContain("border-emerald-400/60");
   });
@@ -91,8 +91,8 @@ describe("page Fiabilité", () => {
 
   it("retire les trois bilans techniques demandés après la carte des stations", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
-    expect(source.indexOf("Rayon de recherche")).toBeLessThan(source.indexOf("Carte des stations"));
-    expect(source).toContain("Vue satellite");
+    expect(source.indexOf("Carte des stations")).toBeLessThan(source.indexOf("Rayon de recherche"));
+    expect(source).toContain("Vert : utilisée");
     expect(source).not.toContain("Dernier bilan de collecte");
     expect(source).not.toContain("Disponibilité des stations");
     expect(source).not.toContain("Preuves physiques pour le scoring");
