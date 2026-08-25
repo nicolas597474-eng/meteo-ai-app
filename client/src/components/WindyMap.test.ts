@@ -24,4 +24,14 @@ describe("WindyMap", () => {
     expect(source.match(/<LocationMarker \/>/g)?.length).toBe(2);
     expect(source).toContain("shadow-[0_0_18px_rgba(56,189,248,0.9)]");
   });
+
+  it("harmonise les contrôles plein écran avec la carte des stations", () => {
+    expect(source).toContain('aria-label="Type de fond de carte"');
+    expect(source).toContain("Plan\n            </button>");
+    expect(source).toContain("Satellite\n            </button>");
+    expect(source).toContain('aria-label="Fermer la carte plein écran"');
+    expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
+    expect(source).toContain('aria-label="Zoom manuel de la carte"');
+    expect(source).toContain("fullscreenZoom");
+  });
 });

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 
 type WindyLayer = {
   id: string;
@@ -21,7 +21,14 @@ function buildWindyUrl(lat: number, lon: number, layer: string, zoom: number = 8
   return buildWindyUrlWithDetail(lat, lon, layer, zoom, false);
 }
 
-function buildWindyUrlWithDetail(lat: number, lon: number, layer: string, zoom: number = 8, detail: boolean = false): string {
+function buildWindyUrlWithDetail(
+  lat: number,
+  lon: number,
+  layer: string,
+  zoom: number = 8,
+  detail: boolean = false,
+  baseMap?: "streets" | "satellite",
+): string {
   const params = new URLSearchParams({
     v: "2",
     zoom: String(zoom),
@@ -36,6 +43,7 @@ function buildWindyUrlWithDetail(lat: number, lon: number, layer: string, zoom: 
     acTime: "now",
     message: "true",
   });
+  if (baseMap) params.set("map", baseMap);
   return `https://embed.windy.com/embed2.html?${params.toString()}`;
 }
 
@@ -95,6 +103,8 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
+  const [fullscreenZoom, setFullscreenZoom] = useState(8);
+  const [fullscreenBaseMap, setFullscreenBaseMap] = useState<"streets" | "satellite">("streets");
   const fullscreenHistoryPushed = useRef(false);
 
   const handleLayerChange = useCallback((layerId: string) => {
@@ -111,8 +121,19 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
       );
       fullscreenHistoryPushed.current = true;
     }
+    setFullscreenZoom(8);
     setIsFullscreen(true);
   }, [isFullscreen]);
+
+  const adjustFullscreenZoom = useCallback((delta: number) => {
+    setFullscreenZoom((current) => Math.max(3, Math.min(14, current + delta)));
+    setIframeKey((current) => current + 1);
+  }, []);
+
+  const recenterFullscreenMap = useCallback(() => {
+    setFullscreenZoom(8);
+    setIframeKey((current) => current + 1);
+  }, []);
 
   const closeFullscreen = useCallback(() => {
     setIsFullscreen(false);
@@ -156,7 +177,14 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
   // En plein écran, on conserve la barre temporelle native et son bouton lecture,
   // mais on désactive le panneau détaillé Windy qui affiche le tableau horaire.
-  const windyUrlFullscreen = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
+  const windyUrlFullscreen = buildWindyUrlWithDetail(
+    lat,
+    lon,
+    activeLayerInfo.windyParam,
+    fullscreenZoom,
+    false,
+    fullscreenBaseMap,
+  );
 
   if (isFullscreen) {
     return (
@@ -168,24 +196,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           paddingBottom: "max(8px, env(safe-area-inset-bottom, 0px))",
         }}
       >
-        {/* En-tête plein écran */}
-        <div className="mb-1 flex h-8 shrink-0 items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">🌍</span>
-            <h2 className="text-xs font-semibold text-slate-100">
-              Carte · {activeLayerInfo.label}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={closeFullscreen}
-            aria-label="Fermer la carte plein écran"
-            className="grid h-8 w-8 place-items-center rounded-xl border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
-          >
-            <Minimize2 className="h-4 w-4" />
-          </button>
-        </div>
-
         {/* Carte plein écran */}
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10">
           <iframe
@@ -198,6 +208,63 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             referrerPolicy="no-referrer-when-downgrade"
           />
           <LocationMarker />
+          <div className="absolute left-3 top-3 z-20 flex overflow-hidden rounded-lg border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.18)]" aria-label="Type de fond de carte">
+            <button
+              type="button"
+              onClick={() => {
+                setFullscreenBaseMap("streets");
+                setIframeKey((current) => current + 1);
+              }}
+              aria-pressed={fullscreenBaseMap === "streets"}
+              className={`min-h-12 min-w-24 px-4 text-sm font-semibold transition-colors ${fullscreenBaseMap === "streets" ? "bg-white text-[#606060]" : "bg-slate-50 text-slate-500 hover:bg-white"}`}
+            >
+              Plan
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFullscreenBaseMap("satellite");
+                setIframeKey((current) => current + 1);
+              }}
+              aria-pressed={fullscreenBaseMap === "satellite"}
+              className={`min-h-12 min-w-28 border-l border-[#e8e8e8] px-4 text-sm font-semibold transition-colors ${fullscreenBaseMap === "satellite" ? "bg-white text-[#202020]" : "bg-slate-50 text-slate-500 hover:bg-white"}`}
+            >
+              Satellite
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={closeFullscreen}
+            aria-label="Fermer la carte plein écran"
+            className="absolute right-3 top-3 z-20 grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#606060] shadow-[0_2px_8px_rgba(15,23,42,0.18)] transition-transform hover:bg-[#f7f7f7] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.9" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+          <div className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
+            <button
+              type="button"
+              onClick={recenterFullscreenMap}
+              aria-label="Centrer la carte sur le lieu actif"
+              className="grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="2.6">
+                <circle cx="12" cy="12" r="6.2" />
+                <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
+                <path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3" strokeLinecap="round" />
+              </svg>
+            </button>
+            <div className="overflow-hidden rounded-none border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.22)]" aria-label="Zoom manuel de la carte">
+              <button type="button" onClick={() => adjustFullscreenZoom(1)} aria-label="Zoomer" className="grid h-14 w-12 place-items-center border-b border-[#e8e8e8] text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round"><path d="M12 3.5v17M3.5 12h17" /></svg>
+              </button>
+              <button type="button" onClick={() => adjustFullscreenZoom(-1)} aria-label="Dézoomer" className="grid h-14 w-12 place-items-center text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round"><path d="M3.5 12h17" /></svg>
+              </button>
+              <span className="sr-only" aria-live="polite">Niveau de zoom : {fullscreenZoom}</span>
+            </div>
+          </div>
         </div>
 
         {/* Sélecteur sous la carte en plein écran */}
