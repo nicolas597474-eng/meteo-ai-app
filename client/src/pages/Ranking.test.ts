@@ -105,4 +105,12 @@ describe("page Fiabilité", () => {
     expect(source).toContain("La source Netatmo a répondu, mais aucune station physique n’a été renvoyée");
     expect(source).toContain("station physique n’a été trouvée dans le rayon");
   });
+
+  it("affiche le relevé direct réel lorsqu’il n’est pas encore archivé", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("liveStationsById");
+    expect(source).toContain("const displayedLatest = station.latest ??");
+    expect(source).toContain("Relevé actuel direct : pas encore archivé sur 24 h.");
+    expect(source).toContain("Aucun relevé archivé ou direct disponible.");
+  });
 });

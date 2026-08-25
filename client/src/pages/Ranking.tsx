@@ -38,6 +38,13 @@ function value(value: number | null | undefined, unit = "") {
   return value === null || value === undefined ? "—" : `${value.toFixed(1)}${unit}`;
 }
 
+function minutesSince(updatedAt: Date | string | null | undefined) {
+  if (!updatedAt) return null;
+  const timestamp = new Date(updatedAt).getTime();
+  if (!Number.isFinite(timestamp)) return null;
+  return Math.max(0, Math.round((Date.now() - timestamp) / 60_000));
+}
+
 type PhysicalStationDiagnostics = {
   netatmoStatus?: "not_connected" | "temporarily_unavailable" | "fresh_cache" | "live" | "connected_empty";
   discoveredCount?: number;
@@ -172,6 +179,10 @@ export default function Ranking() {
   const currentSources = liveStationData?.stations ?? [];
   const modelReferences = liveStationData?.modelReferences ?? [];
   const realLocalStations = currentSources.filter((station) => station.isActive && station.sourceKind === "physical");
+  const liveStationsById = useMemo(
+    () => new Map(currentSources.map((station) => [station.stationId, station])),
+    [currentSources],
+  );
   const candidateSources = currentSources.filter((station) => station.qualificationStatus === "candidate");
   const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate");
   const physicalStationExplanation = explainPhysicalStationAvailability(
@@ -250,13 +261,23 @@ export default function Ranking() {
             <div className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-500">Aucune station physique n’est encore archivée pour ce lieu. La première collecte est prévue à 05h00.</div>
           ) : (
             <div className="space-y-2">
-              {stations.map((station: any) => (
-                <article key={station.stationId} className="rounded-xl border border-slate-800 bg-[#090b10] p-3">
-                  <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-sm text-white">{station.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{station.source} · {station.distanceKm.toFixed(1)} km · fiabilité {Math.round(station.reliabilityScore)}%</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${station.ageMinutes !== null && station.ageMinutes <= 90 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"}`}>{formatAge(station.ageMinutes)}</span></div>
-                  <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-800 pt-3 text-center"><Reading label="Temp." value={value(station.latest?.temperature, "°")} /><Reading label="Vent" value={value(station.latest?.windSpeed, " km/h")} /><Reading label="Rafales" value={value(station.latest?.windGust, " km/h")} /><Reading label="Pluie" value={value(station.latest?.precipitation, " mm")} /></div>
-                  <p className="mt-3 text-[11px] text-slate-600">{station.readings.length} relevé(s) conservé(s) sur les dernières 24 h.</p>
-                </article>
-              ))}
+              {stations.map((station: any) => {
+                const liveStation = liveStationsById.get(station.stationId);
+                const displayedLatest = station.latest ?? (liveStation ? {
+                  temperature: liveStation.temperature,
+                  windSpeed: liveStation.windSpeed,
+                  windGust: liveStation.windGust,
+                  precipitation: liveStation.precipitation,
+                } : null);
+                const displayedAgeMinutes = station.ageMinutes ?? minutesSince(liveStation?.updatedAt);
+                const hasDirectReading = Boolean(displayedLatest && Object.values(displayedLatest).some((reading) => reading !== null && reading !== undefined));
+
+                return <article key={station.stationId} className="rounded-xl border border-slate-800 bg-[#090b10] p-3">
+                  <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-sm text-white">{station.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{station.source} · {station.distanceKm.toFixed(1)} km · fiabilité {Math.round(station.reliabilityScore)}%</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${displayedAgeMinutes !== null && displayedAgeMinutes <= 90 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"}`}>{formatAge(displayedAgeMinutes)}</span></div>
+                  <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-800 pt-3 text-center"><Reading label="Temp." value={value(displayedLatest?.temperature, "°")} /><Reading label="Vent" value={value(displayedLatest?.windSpeed, " km/h")} /><Reading label="Rafales" value={value(displayedLatest?.windGust, " km/h")} /><Reading label="Pluie" value={value(displayedLatest?.precipitation, " mm")} /></div>
+                  <p className="mt-3 text-[11px] text-slate-600">{station.readings.length > 0 ? `${station.readings.length} relevé(s) conservé(s) sur les dernières 24 h.` : hasDirectReading ? "Relevé actuel direct : pas encore archivé sur 24 h." : "Aucun relevé archivé ou direct disponible."}</p>
+                </article>;
+              })}
             </div>
           )}
         </section>
