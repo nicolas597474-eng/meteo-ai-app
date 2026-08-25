@@ -2906,3 +2906,5 @@
 - [x] AI Lab : valider que les autres sections, la navigation, TypeScript et Vitest restent fonctionnels.
 - [x] AI Lab : supprimer uniquement la section « Dernière collecte vérifiable », sans supprimer les données sous-jacentes.
 - [x] AI Lab : valider les autres sections, la navigation, TypeScript et Vitest après suppression.
+- [x] AI Lab : supprimer définitivement le panneau visuel « Dernière collecte vérifiable » encore visible dans la version servie, sans toucher au lexique ni aux données.
+- [x] AI Lab : contrôler la version publiée, le rendu mobile, TypeScript et Vitest après le correctif.
