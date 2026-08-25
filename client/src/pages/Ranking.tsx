@@ -167,8 +167,16 @@ export default function Ranking() {
         setPhysicalCollectionMessage({ tone: "warning", text: "Aucun lieu favori n’a pu être traité." });
         return;
       }
-      if (location.skipped) {
-        setPhysicalCollectionMessage({ tone: "info", text: location.reason ?? "Ce créneau est déjà archivé. Aucune donnée existante n’a été modifiée." });
+      if (location.snapshotPreserved) {
+        const count = location.directReadingsAdded ?? 0;
+        setPhysicalCollectionMessage({
+          tone: count > 0 ? "success" : "info",
+          text: count > 0
+            ? `${count} nouveau${count > 1 ? "x" : ""} relevé${count > 1 ? "s" : ""} direct${count > 1 ? "s" : ""} ajouté${count > 1 ? "s" : ""}. ${location.reason ?? "Le snapshot horaire existant reste conservé."}`
+            : location.reason ?? "Aucun nouveau relevé direct n’était disponible. Le snapshot horaire existant reste conservé.",
+        });
+      } else if (location.skipped) {
+        setPhysicalCollectionMessage({ tone: "info", text: location.reason ?? "Aucune donnée existante n’a été modifiée." });
       } else if (location.stored) {
         setPhysicalCollectionMessage({ tone: "success", text: `${location.stationCount} station${location.stationCount > 1 ? "s" : ""} physique${location.stationCount > 1 ? "s" : ""} qualifiée${location.stationCount > 1 ? "s" : ""} archivée${location.stationCount > 1 ? "s" : ""} pour ce créneau.` });
       } else {
@@ -249,7 +257,7 @@ export default function Ranking() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <h2 id="physical-refresh-title" className="text-sm font-semibold text-emerald-50">Relevés des stations</h2>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-300">Lance une seule collecte pour {locationName}. Les données déjà archivées pour ce créneau restent intactes.</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-300">Interroge les stations pour {locationName}. Les nouveaux relevés directs sont ajoutés, sans remplacer le snapshot déjà archivé.</p>
             </div>
             <button
               type="button"
@@ -266,7 +274,7 @@ export default function Ranking() {
               {refreshPhysicalSnapshots.isPending ? "Collecte en cours…" : "Relancer les relevés"}
             </button>
           </div>
-          <p id="physical-refresh-note" className="mt-2 text-[10px] leading-relaxed text-slate-400">La recherche est limitée au rayon actif. Les stations absentes ou non qualifiées sont signalées, jamais remplacées par des valeurs estimées.</p>
+          <p id="physical-refresh-note" className="mt-2 text-[10px] leading-relaxed text-slate-400">La recherche est limitée au rayon actif. Même si un snapshot existe déjà pour cette heure, les mesures directes plus récentes peuvent être ajoutées ; le snapshot et sa trace restent inchangés.</p>
           {physicalCollectionMessage ? <div role="status" className={`mt-3 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${physicalCollectionMessage.tone === "success" ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100" : physicalCollectionMessage.tone === "danger" ? "border-rose-300/30 bg-rose-400/10 text-rose-100" : physicalCollectionMessage.tone === "warning" ? "border-amber-300/30 bg-amber-400/10 text-amber-100" : "border-sky-300/30 bg-sky-400/10 text-sky-100"}`}>{physicalCollectionMessage.text}</div> : null}
         </section>
 

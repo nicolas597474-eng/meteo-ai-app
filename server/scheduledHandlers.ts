@@ -132,6 +132,8 @@ export type PhysicalSnapshotCollectionLocationResult = {
   stored: boolean;
   attempts: number;
   skipped?: boolean;
+  directReadingsAdded?: number;
+  snapshotPreserved?: boolean;
   reason?: string;
 };
 
@@ -155,26 +157,20 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
   for (const favorite of Array.from(unique.values())) {
     const locationKey = makeLocationKey(favorite.lat, favorite.lon);
     const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
+    let snapshotAlreadyArchived = false;
+    let traceAlreadyArchived = false;
 
     if (preserveArchivedEvidence) {
       const [snapshots, traces] = await Promise.all([
         getQualifiedObservationSnapshotsForDate(locationKey, date),
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, date, date),
       ]);
-      if (snapshots.some((snapshot) => snapshot.hour === hour) || traces.some((trace) => trace.hour === hour)) {
-        results.push({
-          locationKey,
-          stationCount: 0,
-          stored: false,
-          skipped: true,
-          attempts: 0,
-          reason: "Ce créneau est déjà archivé ; aucune réécriture n’a été effectuée.",
-        });
-        continue;
-      }
+      snapshotAlreadyArchived = snapshots.some((snapshot) => snapshot.hour === hour);
+      traceAlreadyArchived = traces.some((trace) => trace.hour === hour);
     }
 
     let locationResult: PhysicalSnapshotCollectionLocationResult | null = null;
+    let directReadingsAdded = 0;
     for (let attempt = 0; attempt < HOURLY_SNAPSHOT_MAX_ATTEMPTS; attempt++) {
       try {
         const discovered = await collectNearbyStations(
@@ -217,18 +213,35 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
             windDirection: station.windDirection,
             precipitation: station.precipitation,
           };
-          if (preserveArchivedEvidence) await insertStationObservationIfMissing(observation);
-          else await upsertStationObservation(observation);
+          if (preserveArchivedEvidence) {
+            if (await insertStationObservationIfMissing(observation)) directReadingsAdded++;
+          } else {
+            await upsertStationObservation(observation);
+          }
         }
 
         await refreshStationQualityProfiles(physical.map((station) => station.stationId));
         const synthesis = calculateGroundTruth(physical);
+        if (preserveArchivedEvidence && (snapshotAlreadyArchived || traceAlreadyArchived)) {
+          locationResult = {
+            locationKey,
+            stationCount: synthesis.stationCount,
+            stored: false,
+            attempts: attempt + 1,
+            directReadingsAdded,
+            snapshotPreserved: true,
+            reason: "Le snapshot horaire déjà archivé est conservé ; seuls les nouveaux relevés directs ont été ajoutés.",
+          };
+          results.push(locationResult);
+          break;
+        }
         if (synthesis.stationCount < 1 || synthesis.temperature == null) {
           locationResult = {
             locationKey,
             stationCount: synthesis.stationCount,
             stored: false,
             attempts: attempt + 1,
+            directReadingsAdded,
             reason: "Aucune station physique qualifiée",
           };
           results.push(locationResult);
@@ -249,9 +262,20 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           precipitation: synthesis.precipitation,
           stationsUsed: synthesis.stationsUsed as any,
         };
-        if (preserveArchivedEvidence) await insertQualifiedObservationSnapshotIfMissing(snapshot);
-        else await upsertQualifiedObservationSnapshot(snapshot);
-        locationResult = { locationKey, stationCount: synthesis.stationCount, stored: true, attempts: attempt + 1 };
+        const snapshotCreated = preserveArchivedEvidence
+          ? await insertQualifiedObservationSnapshotIfMissing(snapshot)
+          : (await upsertQualifiedObservationSnapshot(snapshot), true);
+        locationResult = snapshotCreated
+          ? { locationKey, stationCount: synthesis.stationCount, stored: true, attempts: attempt + 1, directReadingsAdded }
+          : {
+              locationKey,
+              stationCount: synthesis.stationCount,
+              stored: false,
+              attempts: attempt + 1,
+              directReadingsAdded,
+              snapshotPreserved: true,
+              reason: "Le snapshot horaire a été archivé entre-temps ; les nouveaux relevés directs ont été conservés sans le remplacer.",
+            };
         results.push(locationResult);
         break;
       } catch (error: any) {
@@ -262,7 +286,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           continue;
         }
         console.error(`[MeteoAI] Physical snapshot collection failed after retry for ${favorite.customName ?? favorite.name}:`, message);
-        locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, reason: `Erreur de collecte après relance : ${message}` };
+        locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, directReadingsAdded, reason: `Erreur de collecte après relance : ${message}` };
         results.push(locationResult);
       }
     }
@@ -284,8 +308,11 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         stationCount: locationResult.stationCount,
         reason: locationResult.reason ?? null,
       };
-      if (preserveArchivedEvidence) await insertPhysicalSnapshotCollectionTraceIfMissing(trace);
-      else await upsertPhysicalSnapshotCollectionTrace(trace);
+      if (preserveArchivedEvidence) {
+        if (!traceAlreadyArchived) await insertPhysicalSnapshotCollectionTraceIfMissing(trace);
+      } else {
+        await upsertPhysicalSnapshotCollectionTrace(trace);
+      }
     }
   }
 

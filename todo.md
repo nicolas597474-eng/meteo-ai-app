@@ -2933,6 +2933,9 @@
 - [x] Interface: Ajouter un bouton « Relancer la collecte des stations » avec états chargement, succès partiel, indisponibilité et erreur explicite.
 - [x] Tests: Couvrir autorisation, relance, absence de station, reprise partielle et non-réécriture des snapshots existants.
 - [x] Validation: Vérifier mobile, TypeScript, Vitest et les journaux de collecte avant publication.
+- [x] Correctif: Lors d’une relance manuelle, interroger toujours les stations et ajouter les nouveaux relevés directs, même si un snapshot horaire existe déjà ; préserver le snapshot et la trace existants.
+- [x] Interface: Distinguer le message de nouveaux relevés directs ajoutés du message indiquant que le snapshot horaire est déjà conservé.
+- [x] Validation: Vérifier TypeScript, Vitest et le rendu mobile de la relance additive.
 
 ## Validation opérationnelle des tâches planifiées
 - [ ] Confirmer le premier passage HTTP 200 de la tâche prévisions v7 et la mise à jour du bilan AI Lab.

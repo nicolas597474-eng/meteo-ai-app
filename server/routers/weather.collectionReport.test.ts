@@ -39,7 +39,9 @@ describe("relance manuelle des snapshots physiques", () => {
     expect(routerSource).toContain("collectPhysicalObservationSnapshotsForFavorites([favorite], \"manual\")");
     expect(handlerSource).toContain("trigger: PhysicalSnapshotCollectionTrigger");
     expect(handlerSource).toContain('const preserveArchivedEvidence = trigger === "manual"');
-    expect(handlerSource).toContain("Ce créneau est déjà archivé ; aucune réécriture n’a été effectuée.");
+    expect(handlerSource).toContain("directReadingsAdded");
+    expect(handlerSource).toContain("snapshotPreserved: true");
+    expect(handlerSource).toContain("seuls les nouveaux relevés directs ont été ajoutés");
     expect(handlerSource).toContain("insertStationObservationIfMissing");
     expect(handlerSource).toContain("insertQualifiedObservationSnapshotIfMissing");
     expect(handlerSource).toContain("insertPhysicalSnapshotCollectionTraceIfMissing");
