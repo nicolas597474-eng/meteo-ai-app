@@ -25,13 +25,18 @@ describe("WindyMap", () => {
     expect(source).toContain("shadow-[0_0_18px_rgba(56,189,248,0.9)]");
   });
 
-  it("harmonise les contrôles plein écran avec la carte des stations", () => {
-    expect(source).toContain('aria-label="Type de fond de carte"');
-    expect(source).toContain("Plan\n            </button>");
-    expect(source).toContain("Satellite\n            </button>");
+  it("ne conserve que la fermeture parmi les contrôles externes du plein écran", () => {
     expect(source).toContain('aria-label="Fermer la carte plein écran"');
-    expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
-    expect(source).toContain('aria-label="Zoom manuel de la carte"');
-    expect(source).toContain("fullscreenZoom");
+    expect(source).not.toContain('aria-label="Type de fond de carte"');
+    expect(source).not.toContain('aria-label="Centrer la carte sur le lieu actif"');
+    expect(source).not.toContain('aria-label="Zoom manuel de la carte"');
+    expect(source).not.toContain("fullscreenZoom");
+  });
+
+  it("masque uniquement la gouttière des contrôles natifs Windy sans supprimer la timeline", () => {
+    expect(source).toContain("FULLSCREEN_NATIVE_CONTROL_GUTTER_PX = 72");
+    expect(source).toContain("right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px`");
+    expect(source).toContain("width: `calc(100% + ${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px)`");
+    expect(source).toContain("barre temporelle native et son bouton lecture");
   });
 });
