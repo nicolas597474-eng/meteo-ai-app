@@ -2899,3 +2899,5 @@
 - [x] Stations : valider le rendu mobile, l’accessibilité, TypeScript et Vitest après la fusion.
 - [x] Stations : placer « Détails de la synthèse locale » au-dessus du texte explicatif « La synthèse locale complète la prévision officielle… ».
 - [x] Stations : valider l’ordre visuel sur mobile, TypeScript et Vitest.
+- [x] Carte Stations : corriger le fond cartographique indisponible tout en conservant le repère local, les marqueurs et les données.
+- [x] Carte Stations : valider le chargement, les états de secours, TypeScript, Vitest et le rendu mobile.

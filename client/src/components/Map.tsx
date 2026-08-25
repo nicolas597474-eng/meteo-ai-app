@@ -83,6 +83,7 @@ import { cn } from "@/lib/utils";
 declare global {
   interface Window {
     google?: typeof google;
+    __meteoaiGoogleMapsReady?: () => void;
   }
 }
 
@@ -100,20 +101,35 @@ function buildMapsScriptUrl(): string {
     v: "weekly",
     libraries: "marker,places,geocoding,geometry",
     loading: "async",
+    callback: "__meteoaiGoogleMapsReady",
   });
   return `${MAPS_PROXY_URL}/maps/api/js?${params.toString()}`;
 }
 
 let mapScriptPromise: Promise<void> | null = null;
 
+function isMapsReady() {
+  const maps = window.google?.maps;
+  return Boolean(maps && (typeof maps.importLibrary === "function" || typeof maps.Map === "function"));
+}
+
 function loadMapScript(): Promise<void> {
-  if (window.google?.maps) return Promise.resolve();
+  if (isMapsReady()) return Promise.resolve();
   if (mapScriptPromise) return mapScriptPromise;
 
   mapScriptPromise = new Promise<void>((resolve, reject) => {
+    const finishIfReady = () => {
+      if (isMapsReady()) resolve();
+    };
+    window.__meteoaiGoogleMapsReady = finishIfReady;
     const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
+      if (isMapsReady()) {
+        resolve();
+        return;
+      }
+      existing.remove();
+      existing.addEventListener("load", finishIfReady, { once: true });
       existing.addEventListener("error", () => {
         existing.remove();
         mapScriptPromise = null;
@@ -128,11 +144,10 @@ function loadMapScript(): Promise<void> {
     script.async = true;
     script.defer = true;
     script.crossOrigin = "anonymous";
-    script.onload = () => {
-      resolve();
-    };
+    script.onload = finishIfReady;
     script.onerror = () => {
       script.remove();
+      window.__meteoaiGoogleMapsReady = undefined;
       mapScriptPromise = null;
       reject(new Error("Le service de cartographie est momentanément indisponible."));
     };
@@ -194,7 +209,14 @@ export function MapView({
         throw new Error("La carte ne peut pas être initialisée.");
       }
       const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-      map.current = new window.google.maps.Map(mapContainer.current, {
+      const mapsLibrary = typeof window.google.maps.importLibrary === "function"
+        ? await window.google.maps.importLibrary("maps") as google.maps.MapsLibrary
+        : null;
+      const MapConstructor = mapsLibrary?.Map ?? window.google.maps.Map;
+      if (typeof MapConstructor !== "function") {
+        throw new Error("Le constructeur cartographique Google Maps est indisponible.");
+      }
+      map.current = new MapConstructor(mapContainer.current, {
         zoom: initialZoom,
         center: initialCenter,
         mapTypeId,

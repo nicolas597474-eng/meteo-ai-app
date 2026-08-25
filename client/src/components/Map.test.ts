@@ -34,8 +34,11 @@ describe("repli de cartographie", () => {
 	    expect(source).toContain("ResizeObserver");
 	    expect(source).toContain('window.google.maps.event.trigger(mapInstance, "resize")');
 	    expect(source).toContain('loading: "async"');
-	    expect(source).toContain("GOOGLE_MAPS_SCRIPT_ID");
-	    expect(source).toContain("script.defer = true");
+	    expect(source).toContain("document.getElementById(GOOGLE_MAPS_SCRIPT_ID)");
+    expect(source).toContain("isMapsReady");
+    expect(source).toContain('window.google.maps.importLibrary("maps")');
+    expect(source).toContain("const MapConstructor");
+    expect(source).toContain("script.defer = true");
 	    expect(source).toContain("document.getElementById(GOOGLE_MAPS_SCRIPT_ID)");
 	  });
 });
