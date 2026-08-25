@@ -2940,3 +2940,9 @@
 ## Validation opérationnelle des tâches planifiées
 - [ ] Confirmer le premier passage HTTP 200 de la tâche prévisions v7 et la mise à jour du bilan AI Lab.
 - [ ] Confirmer le premier passage HTTP 200 de la tâche snapshots physiques v3 et l’archivage des relevés réellement retournés.
+- [ ] Planification: Réinitialiser sans modification de données la prochaine exécution de v3 si son horaire reste figé dans le passé.
+- [ ] Validation: Contrôler les journaux de v3 et v7, les traces physiques et le bilan AI Lab après leurs premiers passages automatiques.
+
+## Synthèse locale directement visible
+- [x] Stations : remplacer le panneau déroulant « Détails de la synthèse locale » par un bloc toujours visible, sans retirer les mesures ni les compteurs.
+- [x] Stations : mettre à jour les tests puis valider le rendu mobile, TypeScript et Vitest.
