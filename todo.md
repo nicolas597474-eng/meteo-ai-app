@@ -2914,10 +2914,12 @@
 - [ ] Stations : valider les relevés affichés, le rendu mobile, TypeScript et Vitest après le correctif.
 - [x] Bug Stations : corriger l’erreur React #310 de hooks instables qui bloque le chargement de la page en production.
 - [x] Bug Stations : valider le chargement production, le rendu mobile, TypeScript et Vitest après correction.
-- [ ] Déploiement : faire écouter le serveur strictement sur le port fourni par la plateforme afin que le bundle corrigé soit réellement servi en production.
+- [x] Déploiement : faire écouter le serveur strictement sur le port fourni par la plateforme afin que le bundle corrigé soit réellement servi en production.
 - [x] Windy : reproduire en plein écran les boutons de la carte des stations — Plan, Satellite, fermeture, centrage et zoom +/− — aux mêmes emplacements.
 - [x] Windy : conserver les contrôles temporels et de couches météo sans chevauchement ; valider le rendu mobile, TypeScript et Vitest.
 - [x] Windy : retirer en plein écran les contrôles externes de centrage et de zoom +/− pour ne conserver que la fermeture.
 - [x] Windy : valider le rendu mobile, TypeScript et Vitest après simplification.
 - [x] Windy : masquer uniquement les boutons natifs de zoom +/− visibles sous la croix de fermeture dans l’iframe plein écran.
 - [x] Windy : préserver les contrôles externes et la lecture temporelle ; valider TypeScript et Vitest.
+- [x] Windy : rétablir les contrôles externes Plan, Satellite, centrage et zoom +/− aux positions montrées sur la référence.
+- [x] Windy : conserver le masquage des boutons natifs sous la croix ; valider TypeScript et Vitest.
