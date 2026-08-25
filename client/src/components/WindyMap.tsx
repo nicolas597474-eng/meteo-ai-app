@@ -32,7 +32,6 @@ function buildWindyUrlWithDetail(
   layer: string,
   zoom: number = 8,
   detail: boolean = false,
-  baseMap?: "streets" | "satellite",
 ): string {
   const params = new URLSearchParams({
     v: "2",
@@ -53,7 +52,6 @@ function buildWindyUrlWithDetail(
     // Valeur officielle de l'embed Windy pour afficher vent et rafales en km/h.
     metricWind: "km/h",
   });
-  if (baseMap) params.set("map", baseMap);
   return `https://embed.windy.com/embed2.html?${params.toString()}`;
 }
 
@@ -100,7 +98,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [iframeKey, setIframeKey] = useState(0);
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
   const [fullscreenZoom, setFullscreenZoom] = useState(8);
-  const [fullscreenBaseMap, setFullscreenBaseMap] = useState<"streets" | "satellite">("streets");
   const fullscreenHistoryPushed = useRef(false);
 
   const handleLayerChange = useCallback((layerId: string) => {
@@ -179,7 +176,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
     activeLayerInfo.windyParam,
     fullscreenZoom,
     false,
-    fullscreenBaseMap,
   );
 
   if (isFullscreen) {
@@ -209,30 +205,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
-          <div className="absolute left-3 top-3 z-20 flex overflow-hidden rounded-lg border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.18)]" aria-label="Type de fond de carte">
-            <button
-              type="button"
-              onClick={() => {
-                setFullscreenBaseMap("streets");
-                setIframeKey((current) => current + 1);
-              }}
-              aria-pressed={fullscreenBaseMap === "streets"}
-              className={`min-h-12 min-w-24 px-4 text-sm font-semibold transition-colors ${fullscreenBaseMap === "streets" ? "bg-white text-[#606060]" : "bg-slate-50 text-slate-500 hover:bg-white"}`}
-            >
-              Plan
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFullscreenBaseMap("satellite");
-                setIframeKey((current) => current + 1);
-              }}
-              aria-pressed={fullscreenBaseMap === "satellite"}
-              className={`min-h-12 min-w-28 border-l border-[#e8e8e8] px-4 text-sm font-semibold transition-colors ${fullscreenBaseMap === "satellite" ? "bg-white text-[#202020]" : "bg-slate-50 text-slate-500 hover:bg-white"}`}
-            >
-              Satellite
-            </button>
-          </div>
           <button
             type="button"
             onClick={closeFullscreen}
@@ -243,7 +215,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
-          <div className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
+          <div className="absolute bottom-[142px] right-3 z-20 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
             <button
               type="button"
               onClick={recenterFullscreenMap}

@@ -31,12 +31,25 @@ describe("WindyMap", () => {
     expect(source).toContain('metricWind: "km/h"');
   });
 
-  it("rétablit les contrôles externes du plein écran", () => {
+  it("conserve les contrôles externes utiles du plein écran", () => {
     expect(source).toContain('aria-label="Fermer la carte plein écran"');
-    expect(source).toContain('aria-label="Type de fond de carte"');
     expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
     expect(source).toContain('aria-label="Zoom manuel de la carte"');
     expect(source).toContain("fullscreenZoom");
+    expect(source).not.toContain('aria-label="Type de fond de carte"');
+    expect(source).not.toContain('>\n              Plan\n            </button>');
+    expect(source).not.toContain('>\n              Satellite\n            </button>');
+  });
+
+  it("descend centrage et zoom sans masquer les informations météo natives", () => {
+    expect(source).toContain('className="absolute bottom-[142px] right-3 z-20 flex flex-col items-center gap-4"');
+    expect(source).not.toContain('className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4"');
+  });
+
+  it("conserve la couche météo sans basculement de fond non fiable", () => {
+    expect(source).toContain("overlay: layer");
+    expect(source).not.toContain('params.set("map", baseMap)');
+    expect(source).not.toContain("fullscreenBaseMap");
   });
 
   it("masque uniquement la gouttière des contrôles natifs Windy sans supprimer la timeline", () => {

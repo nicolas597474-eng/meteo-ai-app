@@ -2957,3 +2957,12 @@
 - [x] Stations : retirer le panneau « Historique des prévisions » de l’en-tête de la page Stations.
 - [x] Prévisions : ajouter ce même accès à l’Historique immédiatement après « Tendance étendue · Prochains jours ».
 - [x] Prévisions : valider l’ordre mobile, TypeScript et Vitest après le déplacement.
+
+## Commandes Windy sans recouvrement des informations natives
+- [x] Windy : descendre les commandes externes de centrage et zoom + / − en plein écran afin de ne plus cacher le panneau pluie, vent et couches météo.
+- [x] Windy : conserver Plan, Satellite, fermeture, timeline et panneau natif ; valider le rendu mobile, TypeScript et Vitest. Remplacé à la demande par la suppression des boutons Plan et Satellite non fiables.
+- [x] Windy : faire basculer effectivement le fond affiché entre Plan et Satellite lors du clic, sans supprimer la couche météo ni le repère du lieu actif. Écarté à la demande : l’embed public Windy ne garantissait pas le changement de fond sans altérer la couche météo.
+
+## Carte Windy simplifiée
+- [x] Windy : retirer les boutons Plan et Satellite non fiables de la vue plein écran.
+- [x] Windy : conserver la fermeture, le centrage, le zoom, la timeline et les couches météo ; valider le rendu mobile, TypeScript et Vitest.
