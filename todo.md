@@ -2885,7 +2885,7 @@
 - [x] Page Prévisions : corriger l’interaction de la carte Windy compacte pour éviter le bug du geste à deux doigts et rendre le bouton lecture/défilement automatique utilisable directement en mode compact.
 - [x] Page Prévisions : conserver un repère de localisation MeteoAI visible sur la carte Windy en vue compacte et en mode plein écran, sans modifier les données météo ni les calculs.
 - [x] Planification : créer une nouvelle tâche horaire v2 pour la collecte des snapshots physiques et désactiver l’ancienne tâche bloquée, sans toucher aux snapshots, observations, stations, scores ni historiques.
-- [ ] Audit : expliquer pourquoi les prévisions quotidiennes et horaires archivées restent affichées au 19 août malgré la reprise des snapshots physiques ; contrôler tâche 05h00, archives et bilan AI Lab sans supprimer ni réécrire l’historique.
-- [ ] Correctif : enregistrer le bilan de collecte des modèles même lorsque les snapshots physiques sont délégués à la tâche horaire dédiée.
-- [ ] Correctif : renouveler la tâche planifiée des prévisions après déploiement et désactiver la tâche v6 qui renvoie 404.
-- [ ] Validation : contrôler les dates forecasts, forecast_runs, hourly_forecasts et station_collection_snapshots sans supprimer l’historique ; exécuter TSC et Vitest.
+- [x] Audit : expliquer pourquoi les prévisions quotidiennes et horaires archivées restent affichées au 19 août malgré la reprise des snapshots physiques ; contrôler tâche 05h00, archives et bilan AI Lab sans supprimer ni réécrire l’historique.
+- [x] Correctif : enregistrer le bilan de collecte des modèles même lorsque les snapshots physiques sont délégués à la tâche horaire dédiée.
+- [x] Correctif : renouveler la tâche planifiée des prévisions après déploiement et désactiver la tâche v6 qui renvoie 404.
+- [x] Validation technique : contrôler les dates forecasts, forecast_runs, hourly_forecasts et station_collection_snapshots sans supprimer l’historique ; TypeScript et Vitest validés. Le premier passage opérationnel de v7 reste à surveiller lors du prochain créneau 05:00 Paris.
