@@ -2895,3 +2895,5 @@
 - [x] Refonte Stations : déplacer les critères, filtres, sources candidates et détails techniques dans des sections repliables sans supprimer les données.
 - [x] Refonte Stations : clarifier les statuts, la fraîcheur des relevés, la couverture et le lien vers l’Historique.
 - [x] Validation Stations : vérifier rendu mobile, accessibilité, TypeScript et Vitest avant checkpoint.
+- [x] Stations : intégrer le détail de la synthèse locale dans « Votre situation locale » et supprimer le panneau séparé, sans perdre les mesures ni les explications.
+- [x] Stations : valider le rendu mobile, l’accessibilité, TypeScript et Vitest après la fusion.

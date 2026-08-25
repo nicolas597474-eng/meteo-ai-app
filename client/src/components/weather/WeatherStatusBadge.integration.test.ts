@@ -5,7 +5,7 @@ const readPage = (path: string) => readFileSync(new URL(path, import.meta.url), 
 
 describe("harmonisation des badges météo", () => {
   it("réutilise la primitive sur les écrans de synthèse et de fiabilité", () => {
-    expect(readPage("../../pages/Ranking.tsx")).toContain("Confiance synthèse");
+    expect(readPage("../../pages/Ranking.tsx")).toContain("Confiance locale");
     expect(readPage("../../pages/Ranking.tsx")).toContain("WeatherStatusBadge");
     expect(readPage("../../pages/Dashboard.tsx")).toContain("Confiance locale");
     expect(readPage("../../pages/ReliabilityLaboratory.tsx")).toContain("Fiabilité en bref");
