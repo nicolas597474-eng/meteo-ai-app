@@ -2952,3 +2952,8 @@
 ## Carte des stations sous la synthèse locale
 - [x] Stations : déplacer la carte des stations, sa légende et ses contrôles immédiatement après « Votre situation locale », avant la relance des relevés.
 - [x] Stations : vérifier l’ordre mobile, TypeScript et Vitest après le déplacement.
+
+## Historique des prévisions sous la tendance étendue
+- [x] Stations : retirer le panneau « Historique des prévisions » de l’en-tête de la page Stations.
+- [x] Prévisions : ajouter ce même accès à l’Historique immédiatement après « Tendance étendue · Prochains jours ».
+- [x] Prévisions : valider l’ordre mobile, TypeScript et Vitest après le déplacement.

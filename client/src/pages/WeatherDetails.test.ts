@@ -78,4 +78,12 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Prévisions temporairement indisponibles");
     expect(source).toContain("MeteoAI réessaie uniquement les erreurs temporaires.");
   });
+
+  it("place l’accès à l’Historique juste après la tendance étendue", () => {
+    expect(source).toContain('import { Link } from "wouter"');
+    expect(source).toContain("Historique des prévisions");
+    expect(source).toContain('href="/history"');
+    expect(source.indexOf("Historique des prévisions")).toBeGreaterThan(source.indexOf("Prochains jours"));
+    expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("/* ═══ SECTION 5: TENDANCES ═══ */"));
+  });
 });

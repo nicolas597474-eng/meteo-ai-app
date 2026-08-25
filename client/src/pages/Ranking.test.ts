@@ -53,14 +53,11 @@ describe("page Fiabilité", () => {
     expect(source).toContain('label="Dernier relevé"');
   });
 
-  it("donne accès à l’Historique complet depuis la page Stations", () => {
+  it("retire l’accès à l’Historique de la page Stations", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
-    expect(source).toContain('import { Link } from "wouter"');
-    expect(source).toContain("Historique des prévisions");
-    expect(source).toContain('href="/history"');
-    expect(source).toContain("Graphiques, observations archivées et comparaisons par modèle.");
-    expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("Rayon de recherche"));
-    expect(source).toContain("border-emerald-400/60");
+    expect(source).not.toContain('import { Link } from "wouter"');
+    expect(source).not.toContain("Historique des prévisions");
+    expect(source).not.toContain('href="/history"');
   });
 
   it("affiche une seule station locale puis propose de développer les autres", () => {

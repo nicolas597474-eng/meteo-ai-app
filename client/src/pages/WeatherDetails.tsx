@@ -13,6 +13,7 @@ import { BackToTopButton } from "@/components/BackToTopButton";
 import { getCenteredHourScrollLeft, getHourCenterX, getNearestCenteredHourIndex, getNearestHourIndex } from "@/lib/hourlyScrollSync";
 import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
 import { WindyMap } from "@/components/WindyMap";
+import { Link } from "wouter";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -429,6 +430,16 @@ export default function WeatherDetails() {
                 </div>
               );
             })}
+          </div>
+        </MeteoSurface>
+
+        <MeteoSurface as="section" tone="default" className="rounded-[24px] border border-emerald-400/35 bg-emerald-400/[0.06] p-3 shadow-[0_0_24px_rgba(52,211,153,0.08)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-full border border-emerald-300/25 bg-emerald-400/10"><MeteoIcon name="calendar" size={15} /></span><h2 className="text-sm font-semibold text-white">Historique des prévisions</h2></div>
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-300">Graphiques, observations archivées et comparaisons par modèle.</p>
+            </div>
+            <Link href="/history" className="shrink-0 rounded-xl border border-emerald-300/70 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-400/20 active:scale-[0.97]">Ouvrir <span aria-hidden="true">→</span></Link>
           </div>
         </MeteoSurface>
 
