@@ -2901,3 +2901,6 @@
 - [x] Stations : valider l’ordre visuel sur mobile, TypeScript et Vitest.
 - [x] Carte Stations : corriger le fond cartographique indisponible tout en conservant le repère local, les marqueurs et les données.
 - [x] Carte Stations : valider le chargement, les états de secours, TypeScript, Vitest et le rendu mobile.
+- [x] AI Lab : supprimer uniquement « Résultat final · contexte des stations locales ».
+- [x] AI Lab : supprimer uniquement « Régime de prévision dominant ».
+- [x] AI Lab : valider que les autres sections, la navigation, TypeScript et Vitest restent fonctionnels.

@@ -11,8 +11,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Aucune trace disponible.");
     expect(source).toContain("Résultat officiel");
     expect(source).toContain("Données exploitables");
-    expect(source).toContain("Régime de prévision dominant");
-    expect(source).toContain("Le Dashboard indique séparément le phénomène immédiat");
+    expect(source).not.toContain("Régime de prévision dominant");
+    expect(source).not.toContain("Le Dashboard indique séparément le phénomène immédiat");
     expect(source).toContain("Lexique, méthode et sources");
     expect(source).toContain("AI_LAB_GLOSSARY");
     expect(source).toContain("MeteoAI en quelques mots");
@@ -53,8 +53,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Collecte des modèles");
     expect(source).toContain("Pondération finale");
     expect(source).toContain("Résultat officiel");
-    expect(source).toContain("Résultat final · contexte des stations locales");
-    expect(source).toContain("Aucune station physique locale active");
+    expect(source).not.toContain("Résultat final · contexte des stations locales");
+    expect(source).not.toContain("Aucune station physique locale active");
     expect(source).toContain("grid-cols-[minmax(90px,0.72fr)_minmax(0,1.5fr)]");
     expect(source).toContain("before:bg-sky-300/20");
     expect(source).toContain("Étape {activeStep + 1} sur {steps.length}");
