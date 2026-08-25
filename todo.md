@@ -2904,3 +2904,5 @@
 - [x] AI Lab : supprimer uniquement « Résultat final · contexte des stations locales ».
 - [x] AI Lab : supprimer uniquement « Régime de prévision dominant ».
 - [x] AI Lab : valider que les autres sections, la navigation, TypeScript et Vitest restent fonctionnels.
+- [x] AI Lab : supprimer uniquement la section « Dernière collecte vérifiable », sans supprimer les données sous-jacentes.
+- [x] AI Lab : valider les autres sections, la navigation, TypeScript et Vitest après suppression.
