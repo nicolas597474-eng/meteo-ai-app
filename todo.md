@@ -2897,3 +2897,5 @@
 - [x] Validation Stations : vérifier rendu mobile, accessibilité, TypeScript et Vitest avant checkpoint.
 - [x] Stations : intégrer le détail de la synthèse locale dans « Votre situation locale » et supprimer le panneau séparé, sans perdre les mesures ni les explications.
 - [x] Stations : valider le rendu mobile, l’accessibilité, TypeScript et Vitest après la fusion.
+- [x] Stations : placer « Détails de la synthèse locale » au-dessus du texte explicatif « La synthèse locale complète la prévision officielle… ».
+- [x] Stations : valider l’ordre visuel sur mobile, TypeScript et Vitest.

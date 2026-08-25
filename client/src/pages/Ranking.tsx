@@ -202,7 +202,6 @@ export default function Ranking() {
         <section className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-400/[0.06] p-4">
           <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Votre situation locale</h2><p className="mt-1 text-xs leading-relaxed text-slate-300">Les stations les plus proches et les plus fraîches décrivent le contexte observé autour de {locationName}.</p></div><WeatherStatusBadge className="w-[132px]" tone="info" label="Confiance locale" value={liveStationData?.groundTruth?.confidenceScore == null ? "—" : `${Math.round(liveStationData.groundTruth.confidenceScore)}/100`} description="Indice de couverture et d’accord des observations locales. Il ne remplace pas la prévision officielle." /></div>
           <div className="mt-3 grid grid-cols-3 gap-2"><Metric label="Stations utilisées" value={String(stations.length)} icon="stations" color="text-emerald-400" /><Metric label="Température" value={liveStationData?.groundTruth?.temperature == null ? "—" : `${Number(liveStationData.groundTruth.temperature).toFixed(1)}°C`} icon="temperature" color="text-amber-300" /><Metric label="Dernier relevé" value={latest?.computedAt ? formatAge(Math.max(0, Math.round((Date.now() - new Date(latest.computedAt).getTime()) / 60000))) : "—"} icon="refresh" color="text-slate-300" /></div>
-          <p className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/20 px-3 py-2 text-[11px] leading-relaxed text-slate-400">La synthèse locale complète la prévision officielle. Elle ne la remplace pas et aucun relevé absent n’est inventé.</p>
           <details className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/15 p-3">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-sky-100 [&::-webkit-details-marker]:hidden"><span>Détails de la synthèse locale</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /></summary>
             <div className="mt-3 space-y-3">
@@ -210,6 +209,7 @@ export default function Ranking() {
               <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-[#10131a] p-3"><Metric label="Locales réelles" value={String(realLocalStations.length)} icon="stations" color="text-emerald-400" /><Metric label="Modèles" value={String(modelReferences.length)} icon="confidence" color="text-violet-300" /><Metric label="Candidates" value={String(candidateSources.length)} icon="location" color="text-amber-300" /><Metric label="Écartées" value={String(ignoredSources.length)} icon="refresh" color="text-slate-300" /></div>
             </div>
           </details>
+          <p className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/20 px-3 py-2 text-[11px] leading-relaxed text-slate-400">La synthèse locale complète la prévision officielle. Elle ne la remplace pas et aucun relevé absent n’est inventé.</p>
         </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
