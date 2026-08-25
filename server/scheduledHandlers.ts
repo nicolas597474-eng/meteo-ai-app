@@ -1074,16 +1074,16 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           stations: stationEvidence,
         });
 
-        if (!stationCollectionDeferred) {
-          await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
-            locationKey: locKey,
-            date: today,
-            radiusKm,
-            physicalStationCount,
-            daily: dailyCoverage,
-            hourly: hourlyCoverage,
-          }));
-        }
+        // Le bilan des modèles doit être écrit même lorsque les snapshots physiques
+        // sont collectés par la tâche horaire dédiée. Les deux flux restent séparés.
+        await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
+          locationKey: locKey,
+          date: today,
+          radiusKm,
+          physicalStationCount,
+          daily: dailyCoverage,
+          hourly: hourlyCoverage,
+        }));
 
         locationsProcessed++;
 
