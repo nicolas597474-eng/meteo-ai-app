@@ -251,6 +251,12 @@ export default function Ranking() {
           <p className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/20 px-3 py-2 text-[11px] leading-relaxed text-slate-400">La synthèse locale complète la prévision officielle. Elle ne la remplace pas et aucun relevé absent n’est inventé.</p>
         </section>
 
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
+          <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Vert : utilisée · ambre : à vérifier · bleu : lieu sélectionné.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
+          <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />Utilisée</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-300" />À vérifier</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-400" />Lieu actif</span></div>
+        </section>
+
         <section className="mb-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.055] p-3" aria-labelledby="physical-refresh-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
@@ -274,12 +280,6 @@ export default function Ranking() {
           </div>
           <p id="physical-refresh-note" className="mt-2 text-[10px] leading-relaxed text-slate-400">La recherche est limitée au rayon actif. Même si un snapshot existe déjà pour cette heure, les mesures directes plus récentes peuvent être ajoutées ; le snapshot et sa trace restent inchangés.</p>
           {physicalCollectionMessage ? <div role="status" className={`mt-3 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${physicalCollectionMessage.tone === "success" ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100" : physicalCollectionMessage.tone === "danger" ? "border-rose-300/30 bg-rose-400/10 text-rose-100" : physicalCollectionMessage.tone === "warning" ? "border-amber-300/30 bg-amber-400/10 text-amber-100" : "border-sky-300/30 bg-sky-400/10 text-sky-100"}`}>{physicalCollectionMessage.text}</div> : null}
-        </section>
-
-        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
-          <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Vert : utilisée · ambre : à vérifier · bleu : lieu sélectionné.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
-          <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
-          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />Utilisée</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-300" />À vérifier</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-400" />Lieu actif</span></div>
         </section>
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">

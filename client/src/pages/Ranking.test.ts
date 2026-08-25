@@ -126,6 +126,12 @@ describe("page Fiabilité", () => {
     expect(source).not.toContain('cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-sky-100');
   });
 
+  it("place la carte des stations directement après la situation locale", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source.indexOf("Carte des stations")).toBeGreaterThan(source.indexOf("Votre situation locale"));
+    expect(source.indexOf("Carte des stations")).toBeLessThan(source.indexOf("Relevés des stations"));
+  });
+
   it("propose une relance physique explicite sans présenter la collecte comme une prévision", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("refreshPhysicalStationSnapshots.useMutation");

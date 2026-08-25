@@ -2942,7 +2942,13 @@
 - [ ] Confirmer le premier passage HTTP 200 de la tâche snapshots physiques v3 et l’archivage des relevés réellement retournés.
 - [ ] Planification: Réinitialiser sans modification de données la prochaine exécution de v3 si son horaire reste figé dans le passé.
 - [ ] Validation: Contrôler les journaux de v3 et v7, les traces physiques et le bilan AI Lab après leurs premiers passages automatiques.
+- [x] Planification: Créer v4 (`EjJsJFYrUWij9BeGD6GHze`) à la même route de collecte, planifiée chaque heure à xx:20 UTC, puis mettre v3 en pause afin d’éviter les doublons.
+- [ ] Validation: Confirmer le premier passage HTTP 200 de v4 et les archives physiques réellement écrites, sans réécriture des snapshots existants.
 
 ## Synthèse locale directement visible
 - [x] Stations : remplacer le panneau déroulant « Détails de la synthèse locale » par un bloc toujours visible, sans retirer les mesures ni les compteurs.
 - [x] Stations : mettre à jour les tests puis valider le rendu mobile, TypeScript et Vitest.
+
+## Carte des stations sous la synthèse locale
+- [x] Stations : déplacer la carte des stations, sa légende et ses contrôles immédiatement après « Votre situation locale », avant la relance des relevés.
+- [x] Stations : vérifier l’ordre mobile, TypeScript et Vitest après le déplacement.
