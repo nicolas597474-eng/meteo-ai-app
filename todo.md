@@ -2923,3 +2923,6 @@
 - [x] Windy : préserver les contrôles externes et la lecture temporelle ; valider TypeScript et Vitest.
 - [x] Windy : rétablir les contrôles externes Plan, Satellite, centrage et zoom +/− aux positions montrées sur la référence.
 - [x] Windy : conserver le masquage des boutons natifs sous la croix ; valider TypeScript et Vitest.
+- [x] Windy : ancrer le repère bleu aux coordonnées réelles du lieu actif plutôt qu’au centre visuel de l’iframe.
+- [x] Windy : afficher le vent et les rafales en km/h dans l’embed, sans convertir ni inventer de mesures.
+- [x] Windy : valider le déplacement de la carte, les unités, TypeScript et Vitest.

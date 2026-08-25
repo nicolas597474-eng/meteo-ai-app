@@ -19,10 +19,16 @@ describe("WindyMap", () => {
     expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)");
   });
 
-  it("conserve le repère de localisation en vue compacte et en plein écran", () => {
-    expect(source).toContain("function LocationMarker()");
-    expect(source.match(/<LocationMarker \/>/g)?.length).toBe(2);
-    expect(source).toContain("shadow-[0_0_18px_rgba(56,189,248,0.9)]");
+  it("ancre le repère de localisation aux coordonnées Windy plutôt qu’au centre visuel", () => {
+    expect(source).toContain('marker: "true"');
+    expect(source).toContain("detailLat: lat.toFixed(4)");
+    expect(source).toContain("detailLon: lon.toFixed(4)");
+    expect(source).not.toContain("function LocationMarker()");
+    expect(source).not.toContain("<LocationMarker />");
+  });
+
+  it("demande à Windy les vents et rafales en kilomètres par heure", () => {
+    expect(source).toContain('metricWind: "km/h"');
   });
 
   it("rétablit les contrôles externes du plein écran", () => {
