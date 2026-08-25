@@ -2914,3 +2914,4 @@
 - [ ] Stations : valider les relevés affichés, le rendu mobile, TypeScript et Vitest après le correctif.
 - [x] Bug Stations : corriger l’erreur React #310 de hooks instables qui bloque le chargement de la page en production.
 - [x] Bug Stations : valider le chargement production, le rendu mobile, TypeScript et Vitest après correction.
+- [ ] Déploiement : faire écouter le serveur strictement sur le port fourni par la plateforme afin que le bundle corrigé soit réellement servi en production.
