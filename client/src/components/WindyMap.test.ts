@@ -70,7 +70,8 @@ describe("WindyMap", () => {
     expect(source).toContain("<Crosshair aria-hidden");
     expect(source).toContain("<Plus aria-hidden");
     expect(source).toContain("<Minus aria-hidden");
-    expect(source).toContain("bg-[#06131f]/92");
+    expect(source).toContain("bg-[#0d1117]/85");
+    expect(source).toContain('className="grid h-10 w-14 place-items-center border-b border-white/10');
     expect(source).toContain("fullscreenZoom");
     expect(source).not.toContain('aria-label="Type de fond de carte"');
     expect(source).not.toContain('>\n              Plan\n            </button>');

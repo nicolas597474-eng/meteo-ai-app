@@ -247,7 +247,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             type="button"
             onClick={closeFullscreen}
             aria-label="Fermer la carte plein écran"
-            className="absolute right-3 top-3 z-20 grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/45 bg-[#06131f]/92 text-cyan-50 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_30px_rgba(2,8,23,0.45)] backdrop-blur-md transition-[transform,background-color,border-color] hover:border-cyan-100 hover:bg-[#0a2030]/96 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+            className="absolute right-3 top-3 z-20 grid h-11 w-12 place-items-center rounded-2xl border border-white/20 bg-[#0d1117]/85 text-slate-100 shadow-lg backdrop-blur-sm transition-[transform,background-color] hover:bg-[#0d1117] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           >
             <X aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
           </button>
@@ -256,15 +256,15 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
               type="button"
               onClick={recenterFullscreenMap}
               aria-label="Centrer la carte sur le lieu actif"
-              className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/45 bg-[#06131f]/92 text-cyan-200 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_30px_rgba(2,8,23,0.45)] backdrop-blur-md transition-[transform,background-color,border-color] hover:border-cyan-100 hover:bg-[#0a2030]/96 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+              className="grid h-11 w-12 place-items-center rounded-2xl border border-white/20 bg-[#0d1117]/85 text-slate-100 shadow-lg backdrop-blur-sm transition-[transform,background-color] hover:bg-[#0d1117] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
             >
               <Crosshair aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />
             </button>
-            <div className="overflow-hidden rounded-2xl border border-cyan-300/45 bg-[#06131f]/92 text-cyan-50 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_30px_rgba(2,8,23,0.45)] backdrop-blur-md" aria-label="Zoom manuel de la carte">
-              <button type="button" onClick={() => adjustFullscreenZoom(1)} aria-label="Zoomer" className="grid h-14 w-12 place-items-center border-b border-cyan-300/25 transition-colors hover:bg-[#0a2030]/96 active:bg-[#103146] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300">
+            <div className="overflow-hidden rounded-2xl border border-white/20 bg-[#0d1117]/85 text-slate-100 shadow-lg backdrop-blur-sm" aria-label="Zoom manuel de la carte">
+              <button type="button" onClick={() => adjustFullscreenZoom(1)} aria-label="Zoomer" className="grid h-10 w-14 place-items-center border-b border-white/10 transition-colors hover:bg-white/10 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
                 <Plus aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
               </button>
-              <button type="button" onClick={() => adjustFullscreenZoom(-1)} aria-label="Dézoomer" className="grid h-14 w-12 place-items-center transition-colors hover:bg-[#0a2030]/96 active:bg-[#103146] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300">
+              <button type="button" onClick={() => adjustFullscreenZoom(-1)} aria-label="Dézoomer" className="grid h-10 w-14 place-items-center transition-colors hover:bg-white/10 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
                 <Minus aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
               </button>
               <span className="sr-only" aria-live="polite">Niveau de zoom : {fullscreenZoom}</span>

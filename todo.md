@@ -3123,3 +3123,7 @@
 - [x] Windy : masquer le panneau natif de pluie/conditions en haut à droite et retirer le bouton « Voir l’animation » sous la carte compacte.
 - [x] Windy : élargir légèrement le groupe central + / − tout en réduisant un peu sa hauteur, sans déplacer les commandes ni supprimer l’accès au plein écran.
 - [x] Windy : valider TypeScript, Vitest complet et le rendu mobile avant publication. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Harmonisation des commandes Windy plein écran
+- [x] Windy : appliquer aux boutons de fermeture, recentrage et zoom plein écran la surface sombre, les bordures et les proportions de la vue compacte.
+- [x] Windy : conserver les actions, positions, contrastes, navigation clavier et rendre les commandes vérifiables par TypeScript, Vitest complet et contrôle mobile. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.
