@@ -2999,8 +2999,25 @@
 - [x] Validation : vérifier le rendu mobile, TypeScript et Vitest avant publication.
 
 ## Contrôle complet des collectes et snapshots
-- [ ] Audit : vérifier les journaux HTTP et l’état actif des tâches de prévisions, snapshots physiques et observations nocturnes.
-- [ ] Audit : contrôler en lecture seule la fraîcheur et la cohérence des archives de prévisions, snapshots physiques et traces associées.
+- [x] Audit : vérifier les journaux HTTP et l’état actif des tâches de prévisions, snapshots physiques et observations nocturnes. v4 et le cycle nocturne ont des HTTP 200 observés ; v8 reste active mais sans journal.
+- [x] Audit : contrôler en lecture seule la fraîcheur et la cohérence des archives de prévisions, snapshots physiques et traces associées. Les traces physiques ont été écrites jusqu’à 04:31 UTC ; les archives de prévisions restent à 17:04 UTC le 25 août.
 - [ ] Correctif : résoudre uniquement les erreurs confirmées, sans supprimer, réécrire ou fabriquer de données météo.
 - [x] Correctif snapshots : traiter au plus deux favoris simultanément dans le callback physique afin de réduire les délais HTTP observés, sans modifier l’idempotence ni les archives existantes. TypeScript et 383 tests validés.
+- [x] Validation snapshots : le callback v4 optimisé a répondu HTTP 200 le 26 août à 06:31 UTC, après 17,4 s, avec 141 puis 232 stations qualifiées pour les deux favoris et aucune écriture directe ajoutée ; les archives existantes sont préservées.
+- [ ] Anomalie infrastructure : v4 n’a produit aucun nouveau journal après son créneau affiché de 05:20 UTC, tandis que v8 n’a aucun journal ; ne pas conclure à un bon fonctionnement avant une exécution HTTP 200 réelle.
 - [ ] Validation : confirmer les passages HTTP 200 et les archives réellement créées avant toute déclaration de bon fonctionnement.
+- [ ] Exécution ponctuelle autorisée : lancer une fois v4 et v8 depuis la gestion des tâches, puis contrôler les journaux HTTP et les écritures additives.
+
+## Contrôle de santé des services
+- [x] Santé : contrôler les processus, les ports, le serveur et les dépendances associées au projet.
+- [x] Santé : examiner les erreurs récentes des journaux sans confondre les délais de fournisseurs et les pannes de l’application.
+- [x] Rapport : présenter le statut actuel des services et les anomalies confirmées.
+
+## Analyse des créneaux de collecte irréguliers
+- [x] Analyse : comparer les expressions cron, les prochains passages annoncés et tous les journaux d’exécution disponibles.
+- [x] Analyse : séparer les créneaux non déclenchés, les refus d’autorisation, les délais de callback et les réussites HTTP 200.
+- [x] Rapport : expliquer les causes confirmées sans modifier les tâches ni les données.
+
+## Correspondance « Collecte du matin » / v8
+- [x] Recherche : comparer directement l’identifiant et les paramètres de « Collecte du matin » avec v8. La tâche Manus agent est `4uYDhvW3nCHvm4MzDmj6JR`, active, dernière exécution 03:04:40 UTC ; v8 est séparée (`YSVnbPqUuQkAB3y96C6WF3`) et appelle `/api/scheduled/collect-favorites-forecasts`.
+- [x] Décision : éviter toute suppression tant que la tâche Heartbeat v8 n’est pas identifiée avec certitude. La tâche agent ne doit pas être supprimée avant une preuve HTTP 200 de v8.
