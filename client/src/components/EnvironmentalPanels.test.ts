@@ -87,8 +87,16 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("DeviceOrientationEvent");
     expect(source).toContain("webkitCompassHeading");
     expect(source).toContain("requestPermission");
+    expect(source).toContain("deviceorientationabsolute");
+    expect(source).toContain("window.screen.orientation?.angle");
+    expect(source).toContain("headingSource");
+    expect(source).toContain("Bougez le téléphone");
+    expect(source).toContain("Capteur refusé");
+    expect(source).toContain("Capteur indisponible");
+    expect(source).toContain("Cap ${Math.round(compassHeading)}°");
+    expect(source).toContain("Désactiver la boussole du téléphone");
     expect(source).toContain("Activer la boussole du téléphone");
-    expect(source).toContain("Boussole du téléphone active");
+    expect(source).toContain("Désactiver la boussole du téléphone");
     expect(source).toContain("Cap du téléphone");
     expect(source).toContain("orientationStatus !== \"tracking\"");
     expect(source).not.toContain("bottom-[112px] right-3");

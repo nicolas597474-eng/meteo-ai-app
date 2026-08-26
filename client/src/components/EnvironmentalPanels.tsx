@@ -337,6 +337,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const [isMapOpening, setIsMapOpening] = useState(false);
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "tracking" | "denied" | "unsupported">("idle");
+  const [headingSource, setHeadingSource] = useState<"none" | "absolute" | "relative">("none");
   const mapRef = useRef<google.maps.Map | null>(null);
   const compactMapRef = useRef<google.maps.Map | null>(null);
   const expandedMapRef = useRef<google.maps.Map | null>(null);
@@ -381,14 +382,24 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   }, [visibilityOpacity]);
   useEffect(() => {
     if (!isMapExpanded || orientationStatus !== "tracking" || typeof window === "undefined") return;
-    const onDeviceOrientation = (event: DeviceOrientationEvent) => {
-      const safariHeading = (event as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
+    const onDeviceOrientation = (event: DeviceOrientationEvent, absoluteEvent = false) => {
+      const compassEvent = event as DeviceOrientationEvent & { webkitCompassHeading?: number; webkitCompassAccuracy?: number };
+      const safariHeading = compassEvent.webkitCompassHeading;
+      const hasAbsoluteHeading = typeof safariHeading === "number" || absoluteEvent || event.absolute === true;
       const rawHeading = typeof safariHeading === "number" ? safariHeading : event.alpha == null ? null : 360 - event.alpha;
       if (rawHeading == null || !Number.isFinite(rawHeading)) return;
-      setDeviceHeading((rawHeading % 360 + 360) % 360);
+      const screenAngle = window.screen.orientation?.angle ?? (window as Window & { orientation?: number }).orientation ?? 0;
+      const correctedHeading = (rawHeading + screenAngle) % 360;
+      setDeviceHeading((correctedHeading + 360) % 360);
+      setHeadingSource(hasAbsoluteHeading ? "absolute" : "relative");
     };
+    const onAbsoluteOrientation = (event: Event) => onDeviceOrientation(event as DeviceOrientationEvent, true);
     window.addEventListener("deviceorientation", onDeviceOrientation, true);
-    return () => window.removeEventListener("deviceorientation", onDeviceOrientation, true);
+    window.addEventListener("deviceorientationabsolute", onAbsoluteOrientation, true);
+    return () => {
+      window.removeEventListener("deviceorientation", onDeviceOrientation, true);
+      window.removeEventListener("deviceorientationabsolute", onAbsoluteOrientation, true);
+    };
   }, [isMapExpanded, orientationStatus]);
 
   const onMapReady = (map: google.maps.Map, isExpanded: boolean) => {
@@ -562,6 +573,8 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
           return;
         }
       }
+      setDeviceHeading(null);
+      setHeadingSource("none");
       setOrientationStatus("tracking");
     } catch {
       setOrientationStatus("denied");
@@ -573,8 +586,8 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
       {!isExpanded && <div className="absolute right-3 top-3 z-20 flex flex-col gap-2" data-swipe-exclude><MapControlButton shape="square" onClick={openExpandedMap} disabled={isMapOpening} aria-label={isMapOpening ? "Ouverture de la carte" : "Agrandir la carte"} title={isMapOpening ? "Ouverture de la carte…" : "Agrandir la carte"} aria-busy={isMapOpening} className="h-11 w-11"><Maximize2 size={21} strokeWidth={2.35} aria-hidden="true" /></MapControlButton><MapControlButton onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Me localiser"} title={isLocating ? "Localisation en cours" : "Me localiser"} aria-busy={isLocating} className="h-11 w-11 text-sky-200"><LocateFixed size={21} strokeWidth={2.25} aria-hidden="true" /></MapControlButton></div>}
       {!isExpanded && <div className="absolute bottom-3 right-3 z-20" data-swipe-exclude><MapZoomControl onZoomIn={() => { const map = compactMapRef.current; if (map) map.setZoom(Math.min(20, (map.getZoom() ?? 3) + 1)); }} onZoomOut={() => { const map = compactMapRef.current; if (map) map.setZoom(Math.max(2, (map.getZoom() ?? 3) - 1)); }} /></div>}
       {isExpanded && opacityControl}
-      {isExpanded && <div className="map-control-cluster absolute left-3 top-3 z-20" data-swipe-exclude><MapControlButton onClick={() => setIsCompassDetailsOpen(true)} aria-label={`Rose des vents complète, nord géographique. Ouvrir les détails de la boussole. ${isDeviceCompassActive ? `Cap du téléphone ${Math.round(compassHeading)} degrés.` : `Orientation de la carte ${Math.round(expandedHeading)} degrés.`} ${astronomicalAzimuthLabel}.${highlightedCompassPoint ? ` Repère mis en évidence : ${highlightedCompassPoint.label}.` : ""}`} aria-haspopup="dialog" aria-expanded={isCompassDetailsOpen} title={isDeviceCompassActive ? "Boussole orientée par le téléphone" : "Détails de la boussole"} shape="circle" active={isDeviceCompassActive} className="relative h-[78px] w-[78px]"><span className="absolute inset-[8px] rounded-full border border-white/20" aria-hidden="true" />{COMPASS_ROSE_POINTS.map((point) => { const isAstroDirection = highlightedCompassPoint?.label === point.label; return <span key={point.label} aria-hidden="true" className={`absolute left-1/2 top-1/2 text-[8px] leading-none ${isAstroDirection ? "rounded-full bg-amber-300 px-1 font-black text-amber-950 shadow-sm" : point.cardinal ? "font-black text-slate-200" : "font-semibold text-slate-400"} ${point.label === "N" && !isAstroDirection ? "text-rose-300" : ""}`} style={{ transform: `translate(-50%, -50%) rotate(${point.angle - compassHeading}deg) translateY(-29px) rotate(${compassHeading - point.angle}deg)` }}>{point.label}</span>; })}<Compass size={30} strokeWidth={2.15} aria-hidden="true" style={{ transform: `rotate(${-compassHeading}deg)` }} />{astronomicalAzimuth != null && <Navigation className="absolute text-amber-300" size={17} fill="currentColor" aria-hidden="true" style={{ transform: `rotate(${astronomicalAzimuth - compassHeading}deg) translateY(-13px)` }} />}<span className="absolute -bottom-3 rounded bg-[#111c2b]/95 px-1.5 py-0.5 text-[8px] font-bold leading-none text-slate-100">{astronomicalAzimuth == null ? "Az. —" : `${astronomicalAzimuth}° ${astronomicalDirection ?? ""}`}</span></MapControlButton></div>}
-      {isExpanded && <div className="absolute left-3 top-[96px] z-20" data-swipe-exclude><MapControlButton onClick={() => void enableDeviceCompass()} aria-label={isDeviceCompassActive ? "Boussole du téléphone active" : "Activer la boussole du téléphone"} title={isDeviceCompassActive ? "Boussole du téléphone active" : "Activer la boussole du téléphone"} active={isDeviceCompassActive}><Navigation aria-hidden="true" className="h-5 w-5" strokeWidth={2.25} /></MapControlButton></div>}
+      {isExpanded && <div className="map-control-cluster absolute left-3 top-3 z-20" data-swipe-exclude><MapControlButton onClick={() => setIsCompassDetailsOpen(true)} aria-label={`Rose des vents complète, nord géographique. Ouvrir les détails de la boussole. ${isDeviceCompassActive && deviceHeading != null ? `Cap du téléphone ${Math.round(compassHeading)} degrés.` : `Orientation de la carte ${Math.round(expandedHeading)} degrés.`} ${astronomicalAzimuthLabel}.${highlightedCompassPoint ? ` Repère mis en évidence : ${highlightedCompassPoint.label}.` : ""}`} aria-haspopup="dialog" aria-expanded={isCompassDetailsOpen} title={isDeviceCompassActive ? "Boussole orientée par le téléphone" : "Détails de la boussole"} shape="circle" active={isDeviceCompassActive && deviceHeading != null} className="relative h-[78px] w-[78px]"><span className="absolute inset-[8px] rounded-full border border-white/20" aria-hidden="true" />{COMPASS_ROSE_POINTS.map((point) => { const isAstroDirection = highlightedCompassPoint?.label === point.label; return <span key={point.label} aria-hidden="true" className={`absolute left-1/2 top-1/2 text-[8px] leading-none ${isAstroDirection ? "rounded-full bg-amber-300 px-1 font-black text-amber-950 shadow-sm" : point.cardinal ? "font-black text-slate-200" : "font-semibold text-slate-400"} ${point.label === "N" && !isAstroDirection ? "text-rose-300" : ""}`} style={{ transform: `translate(-50%, -50%) rotate(${point.angle - compassHeading}deg) translateY(-29px) rotate(${compassHeading - point.angle}deg)` }}>{point.label}</span>; })}<Compass size={30} strokeWidth={2.15} aria-hidden="true" style={{ transform: `rotate(${-compassHeading}deg)` }} />{astronomicalAzimuth != null && <Navigation className="absolute text-amber-300" size={17} fill="currentColor" aria-hidden="true" style={{ transform: `rotate(${astronomicalAzimuth - compassHeading}deg) translateY(-13px)` }} />}<span className="absolute -bottom-3 rounded bg-[#111c2b]/95 px-1.5 py-0.5 text-[8px] font-bold leading-none text-slate-100">{astronomicalAzimuth == null ? "Az. —" : `${astronomicalAzimuth}° ${astronomicalDirection ?? ""}`}</span></MapControlButton></div>}
+      {isExpanded && <div className="absolute left-3 top-[96px] z-20 flex flex-col items-start gap-1" data-swipe-exclude><MapControlButton onClick={() => { if (isDeviceCompassActive) { setOrientationStatus("idle"); setDeviceHeading(null); setHeadingSource("none"); } else { void enableDeviceCompass(); } }} aria-label={isDeviceCompassActive ? "Désactiver la boussole du téléphone" : "Activer la boussole du téléphone"} title={isDeviceCompassActive ? "Désactiver la boussole du téléphone" : "Activer la boussole du téléphone"} active={isDeviceCompassActive && deviceHeading != null}><Navigation aria-hidden="true" className="h-5 w-5" strokeWidth={2.25} /></MapControlButton><span className="max-w-[84px] rounded bg-[#111c2b]/95 px-1.5 py-1 text-center text-[8px] font-semibold leading-tight text-slate-100">{orientationStatus === "denied" ? "Capteur refusé" : orientationStatus === "unsupported" ? "Capteur indisponible" : isDeviceCompassActive && deviceHeading == null ? "Bougez le téléphone" : isDeviceCompassActive ? `Cap ${Math.round(compassHeading)}°${headingSource === "relative" ? " relatif" : ""}` : "Orienter le téléphone"}</span></div>}
       {isExpanded && <div className="absolute left-[96px] top-3 z-20" data-swipe-exclude><MapTypeToggle value={expandedMapType} onChange={(value) => { setExpandedMapType(value); expandedMapRef.current?.setMapTypeId(value); }} /></div>}
       {isExpanded && <MapControlButton onClick={closeExpandedMap} aria-label="Fermer la carte agrandie" title="Fermer la carte" className="absolute right-3 top-3 z-20"><X aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} /></MapControlButton>}
       {isExpanded && <div className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4" data-swipe-exclude><MapControlButton onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Centrer la carte sur ma position"} title={isLocating ? "Localisation en cours…" : "Centrer sur ma position"} aria-busy={isLocating} className="text-sky-200"><LocateFixed aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} /></MapControlButton><MapZoomControl onZoomIn={() => adjustExpandedZoom(1)} onZoomOut={() => adjustExpandedZoom(-1)} /></div>}

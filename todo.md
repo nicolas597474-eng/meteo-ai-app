@@ -3165,3 +3165,8 @@
 - [x] Ajouter une activation explicite du capteur d’orientation de l’appareil mobile pour la boussole de visibilité d’éclipse.
 - [x] Faire tourner la boussole selon le cap du téléphone tout en gardant visible la direction calculée du Soleil ou de la Lune.
 - [x] Prévoir un repli non intrusif lorsque le capteur est indisponible, refusé ou imprécis, puis valider les tests et le rendu mobile.
+
+## Correctif de rotation de la boussole mobile
+- [x] Diagnostiquer les valeurs d’orientation disponibles selon les navigateurs mobiles et leur permission.
+- [x] Utiliser le cap absolu lorsque disponible, puis un repli correctement corrigé par l’orientation d’écran.
+- [x] Afficher le cap réellement reçu et un état explicite si aucun cap exploitable n’est reçu, puis valider le correctif.
