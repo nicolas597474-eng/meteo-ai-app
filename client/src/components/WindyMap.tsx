@@ -297,12 +297,12 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
-        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
-          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-9 w-9 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
-            <span aria-hidden="true" className="text-xl leading-none">+</span>
+        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-2xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
+          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-12 w-12 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+            <span aria-hidden="true" className="text-2xl leading-none">+</span>
           </button>
-          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-9 w-9 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
-            <span aria-hidden="true" className="text-xl leading-none">−</span>
+          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-12 w-12 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+            <span aria-hidden="true" className="text-2xl leading-none">−</span>
           </button>
         </div>
         {/* Bouton plein écran */}

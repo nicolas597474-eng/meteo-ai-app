@@ -18,6 +18,7 @@ describe("WindyMap", () => {
     expect(source).toContain('className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2');
     expect(source).toContain('aria-label="Zoomer l’aperçu"');
     expect(source).toContain('aria-label="Dézoomer l’aperçu"');
+    expect(source).toContain('className="grid h-12 w-12 place-items-center');
     expect(source).not.toContain("Aperçu fixe · animation en plein écran");
     expect(source).toContain('activeLayerInfo.windyParam, compactZoom, false');
     expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-9 w-9');

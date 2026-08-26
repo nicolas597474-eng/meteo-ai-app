@@ -3071,3 +3071,7 @@
 ## Retour des boutons de zoom centrés en compact
 - [x] Windy : rétablir les boutons + / − externes au centre bas de la carte compacte, sans restaurer le bouton de recentrage.
 - [x] Windy : conserver masqués les boutons natifs de l’iframe en haut à droite et le libellé compact, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Confort tactile des boutons de zoom Windy compacts
+- [x] Windy : agrandir les zones tactiles et les symboles + / − au centre de la carte compacte, sans modifier leur position.
+- [x] Windy : valider TypeScript, Vitest et le rendu mobile après l’agrandissement. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
