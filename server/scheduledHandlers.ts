@@ -4,9 +4,7 @@
  * - /api/scheduled/collect-observations: Runs at 20h00 Paris time
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Request, Response } from "express";
-import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -119,15 +117,6 @@ export function buildStationCollectionSnapshot(input: {
 
 export const HOURLY_SNAPSHOT_MAX_ATTEMPTS = 2;
 export const HOURLY_SNAPSHOT_RETRY_DELAY_MS = 1_200;
-
-const PHYSICAL_SNAPSHOT_CAPABILITY_SCOPE = "meteoai:physical-observation-snapshots:hourly";
-
-function hasPhysicalSnapshotCapability(req: Request): boolean {
-  const provided = typeof req.body?.snapshotCapability === "string" ? req.body.snapshotCapability : "";
-  if (!provided || !ENV.cookieSecret) return false;
-  const expected = createHmac("sha256", ENV.cookieSecret).update(PHYSICAL_SNAPSHOT_CAPABILITY_SCOPE).digest("base64url");
-  return provided.length === expected.length && timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-}
 
 export function shouldRetryHourlyFavorite(attempt: number): boolean {
   return attempt + 1 < HOURLY_SNAPSHOT_MAX_ATTEMPTS;
@@ -1367,15 +1356,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
  */
 export async function collectPhysicalObservationSnapshotsHandler(req: Request, res: Response) {
   try {
-    let authorizedByCron = false;
-    try {
-      const user = await sdk.authenticateRequest(req);
-      authorizedByCron = Boolean(user.isCron && user.taskUid);
-    } catch (error) {
-      if (!hasPhysicalSnapshotCapability(req)) throw error;
-      console.warn("[MeteoAI] Cron cookie unavailable; using the scoped physical snapshot capability.");
-    }
-    if (!authorizedByCron && !hasPhysicalSnapshotCapability(req)) return res.status(403).json({ error: "cron-only" });
+    const user = await sdk.authenticateRequest(req);
+    if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
     const favorites = await getAllFavoriteLocations();
     res.json(await collectPhysicalObservationSnapshotsForFavorites(favorites, "scheduled"));
   } catch (error: any) {

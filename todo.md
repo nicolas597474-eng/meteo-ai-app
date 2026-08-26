@@ -3180,3 +3180,8 @@
 - [x] Autoriser la tâche planifiée de snapshots par une capacité cryptographique dédiée lorsque le cookie cron est absent ou invalide.
 - [ ] Configurer la tâche active avec cette capacité et conserver sa cadence à xx:20 UTC.
 - [ ] Vérifier un journal HTTP 200 et une trace de snapshot après le prochain passage automatique.
+
+## Refonte futuriste de la boussole astronomique
+- [x] Recomposer la rose des vents avec une esthétique futuriste sombre, cyan et ambrée cohérente avec la carte d’éclipse.
+- [x] Mettre en évidence séparément le cap du téléphone et l’azimut calculé de l’astre sans simuler de cap absent.
+- [x] Ajouter une aide concise de calibration lorsque le navigateur ne transmet aucun cap, puis valider les tests et le rendu mobile.

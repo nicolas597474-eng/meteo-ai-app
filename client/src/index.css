@@ -808,6 +808,36 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   gap: 0.5rem;
 }
 
+/* Rose des vents astronomique : surface radar sombre, anneaux lumineux et lisibilité en extérieur. */
+.map-control-cluster > button {
+  overflow: visible;
+  border-color: rgb(125 211 252 / 0.64) !important;
+  background:
+    radial-gradient(circle at 50% 50%, rgb(15 23 42 / 0.2) 0 24%, transparent 25% 40%, rgb(14 116 144 / 0.22) 41% 43%, transparent 44%),
+    radial-gradient(circle at 34% 28%, rgb(56 189 248 / 0.28), transparent 48%),
+    linear-gradient(145deg, rgb(15 23 42 / 0.98), rgb(3 7 18 / 0.98)) !important;
+  box-shadow: 0 0 0 1px rgb(14 165 233 / 0.18), 0 0 24px rgb(14 165 233 / 0.24), inset 0 0 20px rgb(14 165 233 / 0.13) !important;
+}
+
+.map-control-cluster > button > span:not(.absolute) {
+  text-shadow: 0 0 9px rgb(186 230 253 / 0.7);
+}
+
+.map-control-cluster > button svg {
+  filter: drop-shadow(0 0 7px rgb(125 211 252 / 0.62));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .map-control-cluster > button {
+    animation: eclipse-compass-radar 4.8s linear infinite;
+  }
+}
+
+@keyframes eclipse-compass-radar {
+  0%, 100% { box-shadow: 0 0 0 1px rgb(14 165 233 / 0.18), 0 0 22px rgb(14 165 233 / 0.20), inset 0 0 18px rgb(14 165 233 / 0.11); }
+  50% { box-shadow: 0 0 0 1px rgb(251 191 36 / 0.36), 0 0 30px rgb(14 165 233 / 0.32), inset 0 0 25px rgb(251 191 36 / 0.10); }
+}
+
 .map-control-button {
   display: flex;
   width: 3rem;
