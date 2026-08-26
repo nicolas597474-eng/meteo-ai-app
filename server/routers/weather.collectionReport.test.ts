@@ -50,3 +50,12 @@ describe("relance manuelle des snapshots physiques", () => {
     expect(dbSource).toContain("export async function insertPhysicalSnapshotCollectionTraceIfMissing");
   });
 });
+
+describe("cadence affichée des snapshots physiques", () => {
+  it("reflète la minute de déclenchement de la tâche v4", () => {
+    const routerSource = readFileSync(new URL("./weather.ts", import.meta.url), "utf8");
+
+    expect(routerSource).toContain('snapshotCadence: "Chaque heure à :20 UTC"');
+    expect(routerSource).not.toContain('snapshotCadence: "Chaque heure à :05 UTC"');
+  });
+});

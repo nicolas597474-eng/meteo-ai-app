@@ -3109,3 +3109,7 @@
 - [x] Snapshots : effectuer une seconde recherche courte et ciblée lorsque le premier passage ne trouve aucune station physique qualifiée.
 - [x] Snapshots : conserver l’idempotence, les snapshots existants, les traces et les données archivées ; ne modifier ni scores, ni pondérations, ni moteur météo.
 - [x] Snapshots : ajouter des tests couvrant la relance après absence, l’absence persistante et l’archive préexistante, puis valider TypeScript, Vitest complet et mobile. TypeScript sans erreur ; 385 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Correction de la cadence affichée des snapshots
+- [x] Snapshots : afficher la cadence réelle v4 « Chaque heure à :20 UTC », sans modifier la tâche, les données ni les collectes.
+- [x] Snapshots : couvrir le libellé, valider TypeScript, Vitest complet et le rendu mobile avant publication. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.
