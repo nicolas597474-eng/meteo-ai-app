@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, Play } from "lucide-react";
 
 type WindyLayer = {
   id: string;
@@ -320,6 +320,19 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         >
           <Maximize2 className="h-4 w-4" />
         </button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2 px-0.5">
+        <button
+          type="button"
+          onClick={openFullscreen}
+          className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          aria-label="Ouvrir l’animation météo Windy en plein écran"
+        >
+          <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+          Voir l’animation
+        </button>
+        <span className="text-right text-[9px] leading-tight text-slate-500">Lecture et timeline<br />en plein écran</span>
       </div>
 
       {/* Sélecteur de couches sous la carte */}

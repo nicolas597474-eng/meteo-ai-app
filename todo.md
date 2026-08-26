@@ -3051,3 +3051,7 @@
 - [x] Remplacer l’iframe compacte par un aperçu non déplaçable, car les gestes internes de l’iframe restent actifs sur mobile.
 - [x] Conserver les couches et l’accès au plein écran depuis des commandes applicatives séparées.
 - [x] Valider mobile, TypeScript et Vitest avant publication. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Accès explicite à l’animation Windy depuis l’aperçu compact
+- [x] Windy : ajouter une commande compacte claire qui ouvre la carte complète et sa lecture native, sans rendre l’aperçu déplaçable.
+- [x] Windy : valider TypeScript, Vitest et le rendu mobile sans recouvrement des commandes. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.

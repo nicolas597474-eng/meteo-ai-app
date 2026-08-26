@@ -17,6 +17,9 @@ describe("WindyMap", () => {
     expect(source).toContain('aria-label="Zoomer l’aperçu"');
     expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-9 w-9');
     expect(source).toContain('onClick={() => onSelect(layer.id)}');
+    expect(source).toContain('aria-label="Ouvrir l’animation météo Windy en plein écran"');
+    expect(source).toContain("Voir l’animation");
+    expect(source).toContain("Lecture et timeline");
   });
 
   it("anime l’ouverture et la fermeture sans perturber les contrôles", () => {
