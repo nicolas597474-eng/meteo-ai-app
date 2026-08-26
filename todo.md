@@ -3089,11 +3089,11 @@
 - [x] Windy : conserver actions, positions, contrastes et accessibilité, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
 
 ## Garde-fous non négociables — future Carte MeteoAI
-- [ ] Migration : interdire toute modification du moteur météo existant, y compris les collecteurs, les modèles actifs et les règles de fusion.
-- [ ] Migration : interdire toute modification des scores, métriques de fiabilité, calculs de confiance et classements existants.
-- [ ] Migration : interdire toute suppression, réécriture ou mutation des archives de prévisions, observations, snapshots, stations et traces de collecte.
-- [ ] Migration : interdire toute modification des pondérations des stations, de la fusion locale et du mode Ultra Local.
-- [ ] Migration : valider par revue des diffs et tests de non-régression que les changements restent limités à la carte et à ses adaptateurs en lecture seule.
+- [x] Migration : interdire toute modification du moteur météo existant, y compris les collecteurs, les modèles actifs et les règles de fusion. Respecté pour la refonte cartographique ; à reconduire lors de la migration native.
+- [x] Migration : interdire toute modification des scores, métriques de fiabilité, calculs de confiance et classements existants. Respecté pour la refonte cartographique ; à reconduire lors de la migration native.
+- [x] Migration : interdire toute suppression, réécriture ou mutation des archives de prévisions, observations, snapshots, stations et traces de collecte. Respecté pour la refonte cartographique ; à reconduire lors de la migration native.
+- [x] Migration : interdire toute modification des pondérations des stations, de la fusion locale et du mode Ultra Local. Respecté pour la refonte cartographique ; à reconduire lors de la migration native.
+- [x] Migration : valider par revue des diffs et tests de non-régression que les changements restent limités à la carte et à ses adaptateurs en lecture seule. Revue effectuée pour la refonte cartographique.
 
 ## Investigation en lecture seule — couverture des snapshots physiques
 - [x] Snapshots : vérifier les exécutions de la tâche v4 et les traces par heure afin d’expliquer la couverture inférieure à 18 créneaux, sans lancer, modifier, supprimer ni réécrire de collecte ou de donnée.
