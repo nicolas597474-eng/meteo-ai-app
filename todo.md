@@ -3127,3 +3127,7 @@
 ## Harmonisation des commandes Windy plein écran
 - [x] Windy : appliquer aux boutons de fermeture, recentrage et zoom plein écran la surface sombre, les bordures et les proportions de la vue compacte.
 - [x] Windy : conserver les actions, positions, contrastes, navigation clavier et rendre les commandes vérifiables par TypeScript, Vitest complet et contrôle mobile. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Repositionnement du zoom Windy plein écran
+- [x] Windy : descendre le groupe + / − en bas à droite, juste au-dessus de la ligne de progression des heures, avec un espace sans chevauchement.
+- [x] Windy : conserver le mode compact inchangé et valider TypeScript, Vitest complet et le rendu mobile avant publication.

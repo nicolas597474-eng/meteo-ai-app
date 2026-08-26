@@ -79,7 +79,7 @@ describe("WindyMap", () => {
   });
 
   it("descend centrage et zoom sans masquer les informations météo natives", () => {
-    expect(source).toContain('className="absolute bottom-[142px] right-3 z-20 flex flex-col items-center gap-4"');
+    expect(source).toContain('className="absolute bottom-[88px] right-3 z-20 flex flex-col items-center gap-4"');
     expect(source).not.toContain('className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4"');
   });
 
