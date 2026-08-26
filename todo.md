@@ -3170,3 +3170,8 @@
 - [x] Diagnostiquer les valeurs d’orientation disponibles selon les navigateurs mobiles et leur permission.
 - [x] Utiliser le cap absolu lorsque disponible, puis un repli correctement corrigé par l’orientation d’écran.
 - [x] Afficher le cap réellement reçu et un état explicite si aucun cap exploitable n’est reçu, puis valider le correctif.
+
+## Activation effective de la boussole mobile
+- [x] Déclencher l’autorisation et la mise en écoute directement depuis la rose des vents de la carte agrandie.
+- [x] Ne considérer la boussole comme active qu’après réception d’une mesure de cap exploitable.
+- [x] Ajouter un diagnostic visible et un repli clair lorsque le navigateur ne transmet aucun événement d’orientation.
