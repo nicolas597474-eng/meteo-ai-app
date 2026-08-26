@@ -3036,3 +3036,8 @@
 - [x] Ajouter une transition fluide et courte à l’ouverture et à la fermeture du plein écran.
 - [x] Respecter prefers-reduced-motion et conserver les contrôles ainsi que le verrouillage tactile compact.
 - [x] Valider mobile, TypeScript et Vitest avant publication. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Correction tactile Windy — verrouillage complet
+- [x] Remplacer le bouclier partiel par une surface compacte entièrement non interactive afin d’empêcher tout panoramique de l’iframe.
+- [x] Recréer les commandes compactes accessibles hors iframe pour conserver couches, lecture, zoom et plein écran. Le sélecteur de couches et le bouton plein écran restent placés hors de l’iframe ; les commandes natives plein écran restent inchangées.
+- [x] Valider le défilement vertical, mobile, TypeScript et Vitest avant publication. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
