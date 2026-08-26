@@ -3059,3 +3059,7 @@
 ## Position centrale des commandes de zoom Windy compactes
 - [x] Windy : déplacer les boutons + et − au centre de la carte compacte, en conservant le recentrage à gauche et le plein écran à droite.
 - [x] Windy : valider TypeScript, Vitest et le rendu mobile après le repositionnement. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile structurel effectué.
+
+## Simplification finale des commandes Windy compactes
+- [x] Windy : retirer le bouton de recentrage à gauche et les boutons + / − externes de la vue compacte.
+- [x] Windy : conserver la carte fixe, les couches et le plein écran, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.

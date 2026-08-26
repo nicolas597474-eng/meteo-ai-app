@@ -13,10 +13,11 @@ describe("WindyMap", () => {
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Aperçu météo fixe en mode compact");
     expect(source).toContain('aria-label="Boutons de couches météo"');
-    expect(source).toContain('aria-label="Zoom de l’aperçu fixe"');
-    expect(source).toContain('className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2');
-    expect(source).toContain('className="absolute bottom-3 left-3 z-20 grid h-9 w-9');
-    expect(source).toContain('aria-label="Zoomer l’aperçu"');
+    expect(source).not.toContain('aria-label="Zoom de l’aperçu fixe"');
+    expect(source).not.toContain('aria-label="Recentrer l’aperçu"');
+    expect(source).not.toContain('aria-label="Zoomer l’aperçu"');
+    expect(source).not.toContain('aria-label="Dézoomer l’aperçu"');
+    expect(source).toContain('buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)');
     expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-9 w-9');
     expect(source).toContain('onClick={() => onSelect(layer.id)}');
     expect(source).toContain('aria-label="Ouvrir l’animation météo Windy en plein écran"');
@@ -38,7 +39,7 @@ describe("WindyMap", () => {
     expect(source).toContain("barre temporelle native et son bouton lecture");
     expect(source).toContain("const windyUrlFullscreen = buildWindyUrlWithDetail(");
     expect(source).toContain("windyUrlCompact");
-    expect(source).toContain("activeLayerInfo.windyParam, compactZoom, false");
+    expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)");
   });
 
   it("ancre le repère de localisation aux coordonnées Windy plutôt qu’au centre visuel", () => {
