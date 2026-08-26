@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LocateFixed, Maximize2, Undo2, X } from "lucide-react";
+import { MapControlButton, MapTypeToggle, MapZoomControl, mapActionButtonClass } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
 
 type StationMarker = {
@@ -153,13 +155,9 @@ const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title
     const map = mapRef.current;
     if (!map) return;
     map.setOptions({
-      mapTypeControl: isExpanded,
-mapTypeControlOptions: isExpanded ? {
-  style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-  mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE],
-        position: google.maps.ControlPosition.TOP_LEFT,
-} : undefined,
-fullscreenControl: false,
+            mapTypeControl: false,
+      fullscreenControl: false,
+
 zoomControl: false,
 streetViewControl: isExpanded,
       streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined,
@@ -217,55 +215,25 @@ rotateControl: false,
         />
         {isExpanded && mapReady && (
           <>
-            <button
-              type="button"
+            <MapControlButton
               onClick={() => {
                 streetViewRef.current?.setVisible(false);
                 setIsExpanded(false);
               }}
               aria-label="Fermer la carte agrandie"
-              className="absolute right-3 top-3 z-10 grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#606060] shadow-[0_2px_8px_rgba(15,23,42,0.18)] transition-transform hover:bg-[#f7f7f7] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+              className="absolute right-3 top-3 z-10"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.9" strokeLinecap="round">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
+              <X aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />
+            </MapControlButton>
+            <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
+              <MapTypeToggle value={mapType} onChange={changeMapType} />
+            </div>
             <div className="absolute right-3 top-[28%] z-10 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
-              <button
-                type="button"
-                onClick={focusCurrentLocation}
-                aria-label="Centrer la carte sur le lieu actif"
-                className="grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-              >
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="2.6">
-                  <circle cx="12" cy="12" r="6.2" />
-                  <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
-                  <path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3" strokeLinecap="round" />
-                </svg>
-              </button>
-              <div className="overflow-hidden rounded-none border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.22)]" aria-label="Zoom manuel de la carte">
-                <button
-                  type="button"
-                  onClick={() => adjustExpandedZoom(1)}
-                  aria-label="Zoomer"
-                  className="grid h-14 w-12 place-items-center border-b border-[#e8e8e8] text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round">
-                    <path d="M12 3.5v17M3.5 12h17" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => adjustExpandedZoom(-1)}
-                  aria-label="Dézoomer"
-                  className="grid h-14 w-12 place-items-center text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round">
-                    <path d="M3.5 12h17" />
-                  </svg>
-                </button>
-                <span className="sr-only" aria-live="polite">Niveau de zoom : {zoomLevel}</span>
-              </div>
+              <MapControlButton onClick={focusCurrentLocation} aria-label="Centrer la carte sur le lieu actif">
+                <LocateFixed aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
+              </MapControlButton>
+              <MapZoomControl onZoomIn={() => adjustExpandedZoom(1)} onZoomOut={() => adjustExpandedZoom(-1)} />
+              <span className="sr-only" aria-live="polite">Niveau de zoom : {zoomLevel}</span>
             </div>
           </>
         )}
@@ -280,25 +248,24 @@ rotateControl: false,
       </div>
       {mapReady && !isExpanded && (
         <div className="mt-2 space-y-2">
-          <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-[#0b1524] p-1" aria-label="Type de carte">
-            <button type="button" onClick={() => changeMapType("satellite")} aria-pressed={mapType === "satellite"} className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-colors ${mapType === "satellite" ? "bg-sky-500/15 text-sky-100" : "text-slate-400 hover:text-slate-100"}`}>Satellite</button>
-            <button type="button" onClick={() => changeMapType("roadmap")} aria-pressed={mapType === "roadmap"} className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-colors ${mapType === "roadmap" ? "bg-sky-500/15 text-sky-100" : "text-slate-400 hover:text-slate-100"}`}>Plan</button>
-          </div>
+          <MapTypeToggle value={mapType} onChange={changeMapType} />
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={isFocusedOnLocation ? restoreNormalView : focusCurrentLocation}
               aria-label={isFocusedOnLocation ? "Revenir au cadrage normal de la carte" : "Recentrer et zoomer sur le lieu actuel"}
-              className="flex min-h-11 items-center justify-center rounded-xl border border-slate-600 bg-[#0b1524] px-3 text-xs font-semibold text-slate-100 transition-colors hover:border-sky-300/70 hover:bg-sky-500/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              className={`${mapActionButtonClass} ${isFocusedOnLocation ? "border-sky-300/80 bg-sky-400/20 text-sky-100" : "text-slate-100"}`}
             >
+              {isFocusedOnLocation ? <Undo2 aria-hidden="true" className="h-4 w-4" /> : <LocateFixed aria-hidden="true" className="h-4 w-4 text-sky-300" />}
               {isFocusedOnLocation ? "Vue normale" : "Zoom sur le lieu"}
             </button>
             <button
               type="button"
               onClick={() => setIsExpanded(true)}
               aria-label="Agrandir la carte"
-              className="flex min-h-11 items-center justify-center rounded-xl border border-sky-300/70 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/15 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              className={`${mapActionButtonClass} border-sky-300/70 bg-sky-400/15 text-sky-100`}
             >
+              <Maximize2 aria-hidden="true" className="h-4 w-4" />
               Agrandir la carte
             </button>
           </div>

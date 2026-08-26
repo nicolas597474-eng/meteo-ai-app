@@ -3140,3 +3140,13 @@
 - [x] Windy : mémoriser et restaurer la dernière couche météo choisie pour chaque lieu favori.
 - [x] Windy : mémoriser et restaurer les niveaux de zoom compact et plein écran pour chaque lieu favori.
 - [x] Windy : couvrir la persistance au changement de lieu, les valeurs par défaut, TypeScript, Vitest et le rendu mobile sans modifier les données météo.
+
+## Harmonisation des icônes des cartes météo
+- [x] Auditer les cartes météo et les cartes de stations/événements pour identifier leurs contrôles et pictogrammes actuels.
+- [x] Harmoniser les pictogrammes des couches météo et des contrôles cartographiques avec le style de la référence, sans modifier leurs actions.
+- [x] Vérifier les états actif/inactif, l’accessibilité, l’affichage mobile et la suite de tests avant publication.
+
+## Refonte des cartes stations et visibilité d’éclipse
+- [x] Harmoniser les icônes et boutons de la carte des stations avec le design de la référence.
+- [x] Harmoniser les icônes et boutons de la carte de visibilité d’éclipse avec le même design.
+- [x] Préserver les actions existantes, l’accessibilité, le rendu mobile et valider les tests avant publication.
