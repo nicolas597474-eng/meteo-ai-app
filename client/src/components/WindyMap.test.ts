@@ -10,8 +10,10 @@ describe("WindyMap", () => {
     expect(source).toContain("iframe est strictement visuelle ici");
     expect(source).toContain('className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"');
     expect(source).toContain("COMPACT_NATIVE_PLAY_GUTTER_PX = 96");
+    expect(source).toContain("COMPACT_NATIVE_DETAIL_GUTTER_PX = 172");
     expect(source).toContain("COMPACT_NATIVE_TIMELINE_GUTTER_PX = 78");
     expect(source).toContain("bottom: `-${COMPACT_NATIVE_TIMELINE_GUTTER_PX}px`");
+    expect(source).toContain("right: `-${COMPACT_NATIVE_DETAIL_GUTTER_PX}px`");
     expect(source).toContain('className="pointer-events-none h-full w-full border-0"');
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Aperçu météo fixe en mode compact");
@@ -21,14 +23,14 @@ describe("WindyMap", () => {
     expect(source).toContain('className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2');
     expect(source).toContain('aria-label="Zoomer l’aperçu"');
     expect(source).toContain('aria-label="Dézoomer l’aperçu"');
-    expect(source).toContain('className="grid h-11 w-12 place-items-center');
+    expect(source).toContain('className="grid h-10 w-14 place-items-center');
     expect(source).not.toContain("Aperçu fixe · animation en plein écran");
     expect(source).toContain('activeLayerInfo.windyParam, compactZoom, false');
     expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-11 w-12');
     expect(source).toContain('onClick={() => onSelect(layer.id)}');
-    expect(source).toContain('aria-label="Ouvrir l’animation météo Windy en plein écran"');
-    expect(source).toContain("Voir l’animation");
-    expect(source).toContain("Lecture et timeline");
+    expect(source).not.toContain('aria-label="Ouvrir l’animation météo Windy en plein écran"');
+    expect(source).not.toContain("Voir l’animation");
+    expect(source).not.toContain("Lecture et timeline");
   });
 
   it("anime l’ouverture et la fermeture sans perturber les contrôles", () => {

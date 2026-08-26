@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Crosshair, Maximize2, Minus, Play, Plus, X } from "lucide-react";
+import { Crosshair, Maximize2, Minus, Plus, X } from "lucide-react";
 
 type WindyLayer = {
   id: string;
@@ -25,6 +25,10 @@ const FULLSCREEN_NATIVE_CONTROL_GUTTER_PX = 72;
 // Cette gouttière est aussi cadrée hors écran : la lecture complète reste
 // accessible uniquement après ouverture du plein écran.
 const COMPACT_NATIVE_PLAY_GUTTER_PX = 96;
+// Le panneau natif de pluie/conditions occupe le haut droit de l’embed. Une
+// gouttière plus large le décale hors de l’aperçu compact, sans altérer le
+// plein écran où les informations natives restent disponibles.
+const COMPACT_NATIVE_DETAIL_GUTTER_PX = 172;
 // La date et la barre de lecture natives sont uniquement utiles en plein écran.
 // On prolonge l’embed sous le cadre compact afin de les cadrer hors de la vue,
 // tout en conservant la carte complète et ses commandes MeteoAI externes.
@@ -287,7 +291,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           style={{
             bottom: `-${COMPACT_NATIVE_TIMELINE_GUTTER_PX}px`,
             left: `-${COMPACT_NATIVE_PLAY_GUTTER_PX}px`,
-            right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px`,
+            right: `-${COMPACT_NATIVE_DETAIL_GUTTER_PX}px`,
           }}
           aria-hidden="true"
         >
@@ -303,10 +307,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           />
         </div>
         <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-2xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
-          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-11 w-12 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-10 w-14 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
             <span aria-hidden="true" className="text-2xl leading-none">+</span>
           </button>
-          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-11 w-12 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-10 w-14 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
             <span aria-hidden="true" className="text-2xl leading-none">−</span>
           </button>
         </div>
@@ -319,19 +323,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         >
           <Maximize2 className="h-5 w-5" />
         </button>
-      </div>
-
-      <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2 px-0.5">
-        <button
-          type="button"
-          onClick={openFullscreen}
-          className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          aria-label="Ouvrir l’animation météo Windy en plein écran"
-        >
-          <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-          Voir l’animation
-        </button>
-        <span className="text-right text-[9px] leading-tight text-slate-500">Lecture et timeline<br />en plein écran</span>
       </div>
 
       {/* Sélecteur de couches sous la carte */}

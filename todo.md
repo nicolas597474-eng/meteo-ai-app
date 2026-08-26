@@ -3118,3 +3118,8 @@
 - [x] Windy : masquer le libellé de date à gauche et la barre native de progression des heures en vue compacte.
 - [x] Windy : réduire légèrement la hauteur des boutons + / − centrés et du bouton plein écran, sans modifier leur position ni les rendre difficiles à utiliser.
 - [x] Windy : valider TypeScript, Vitest complet et le rendu mobile avant publication. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Simplification supplémentaire de Windy compact
+- [x] Windy : masquer le panneau natif de pluie/conditions en haut à droite et retirer le bouton « Voir l’animation » sous la carte compacte.
+- [x] Windy : élargir légèrement le groupe central + / − tout en réduisant un peu sa hauteur, sans déplacer les commandes ni supprimer l’accès au plein écran.
+- [x] Windy : valider TypeScript, Vitest complet et le rendu mobile avant publication. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.
