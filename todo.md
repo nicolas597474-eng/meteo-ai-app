@@ -3079,3 +3079,7 @@
 ## Audit des modèles visibles dans la capture
 - [x] Audit : comparer ICON, GFS, ECMWF, GEM, ALADIN, AROME, HARMONIE-EU, ICON-DE et ICON-EU aux sources MeteoAI effectivement collectées, sans modifier les données ni les intégrations.
 - [x] Rapport : expliquer les modèles non intégrés et la contrainte vérifiable associée.
+
+## Commandes compactes Windy — lecture et plein écran
+- [x] Windy : masquer le bouton natif de lecture/avancement des heures en vue compacte, sans toucher à la timeline plein écran.
+- [x] Windy : agrandir le bouton plein écran compact à la même taille que les boutons + / −, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.

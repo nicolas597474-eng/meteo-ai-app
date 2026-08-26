@@ -8,8 +8,9 @@ describe("WindyMap", () => {
     expect(source).not.toContain("isCompactMapInteractive");
     expect(source).not.toContain("event.touches.length >= 2");
     expect(source).toContain("iframe est strictement visuelle ici");
-    expect(source).toContain('className="pointer-events-none absolute inset-y-0 left-0 overflow-hidden"');
-    expect(source).toContain('className="pointer-events-none h-full border-0"');
+    expect(source).toContain('className="pointer-events-none absolute inset-y-0 overflow-hidden"');
+    expect(source).toContain("COMPACT_NATIVE_PLAY_GUTTER_PX = 96");
+    expect(source).toContain('className="pointer-events-none h-full w-full border-0"');
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Aperçu météo fixe en mode compact");
     expect(source).toContain('aria-label="Boutons de couches météo"');
@@ -21,7 +22,7 @@ describe("WindyMap", () => {
     expect(source).toContain('className="grid h-12 w-12 place-items-center');
     expect(source).not.toContain("Aperçu fixe · animation en plein écran");
     expect(source).toContain('activeLayerInfo.windyParam, compactZoom, false');
-    expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-9 w-9');
+    expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-12 w-12');
     expect(source).toContain('onClick={() => onSelect(layer.id)}');
     expect(source).toContain('aria-label="Ouvrir l’animation météo Windy en plein écran"');
     expect(source).toContain("Voir l’animation");

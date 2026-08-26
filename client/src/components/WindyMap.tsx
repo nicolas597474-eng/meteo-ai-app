@@ -21,6 +21,10 @@ const WINDY_LAYERS: WindyLayer[] = [
 // être ciblés par le CSS de l’application. On décale sa gouttière de contrôles
 // hors de la zone visible, sans toucher à la timeline en plein écran.
 const FULLSCREEN_NATIVE_CONTROL_GUTTER_PX = 72;
+// En vue compacte, la lecture native se trouve en bas à gauche de l’embed.
+// Cette gouttière est aussi cadrée hors écran : la lecture complète reste
+// accessible uniquement après ouverture du plein écran.
+const COMPACT_NATIVE_PLAY_GUTTER_PX = 96;
 // Le panneau natif Windy (pluie, vent, etc.) s’ouvre à droite du repère. On
 // centre donc légèrement la carte à l’est du lieu pour garder ce panneau dans
 // le cadre, sans déplacer le repère géographique de la position réelle.
@@ -281,16 +285,18 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         {/* L’iframe est strictement visuelle ici : son contenu ne reçoit aucun geste.
             Les commandes compactes sont rendues par l’application, hors iframe. */}
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 overflow-hidden"
-          style={{ right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px` }}
+          className="pointer-events-none absolute inset-y-0 overflow-hidden"
+          style={{
+            left: `-${COMPACT_NATIVE_PLAY_GUTTER_PX}px`,
+            right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px`,
+          }}
           aria-hidden="true"
         >
           <iframe
             key={iframeKey}
             src={windyUrlCompact}
             title={`Aperçu fixe Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
-            className="pointer-events-none h-full border-0"
-            style={{ width: `calc(100% + ${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px)` }}
+            className="pointer-events-none h-full w-full border-0"
             tabIndex={-1}
             loading="lazy"
             allow="geolocation"
@@ -310,9 +316,9 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           type="button"
           onClick={openFullscreen}
           aria-label="Agrandir la carte"
-          className="absolute bottom-3 right-3 z-20 grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          className="absolute bottom-3 right-3 z-20 grid h-12 w-12 place-items-center rounded-2xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         >
-          <Maximize2 className="h-4 w-4" />
+          <Maximize2 className="h-5 w-5" />
         </button>
       </div>
 
