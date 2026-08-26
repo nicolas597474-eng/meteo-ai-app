@@ -3026,3 +3026,8 @@
 - [x] Carte compacte : empêcher le déplacement tactile de la carte tout en conservant les boutons météo et les contrôles utilisables.
 - [x] Carte compacte : préserver le défilement vertical de la page autour de la carte.
 - [x] Validation : vérifier mobile, TypeScript, Vitest et absence de régression en plein écran. TypeScript sans erreur ; 383 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Correction tactile Windy — second passage
+- [x] Diagnostiquer pourquoi le déplacement reste possible malgré le verrouillage compact publié. Le style sur l’iframe ne suffisait pas à intercepter le geste interne ; un bouclier central est nécessaire.
+- [x] Bloquer le panoramique de l’iframe compacte sans empêcher les clics sur ses boutons ni le défilement de la page. Le bouclier central laisse libres les zones de commandes Windy et le bouton plein écran.
+- [x] Valider mobile, TypeScript, Vitest et plein écran avant publication. TypeScript sans erreur ; suite complète 383 tests réussis et 2 ignorés ; rendu mobile contrôlé.

@@ -259,16 +259,21 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   return (
     <div className="flex flex-col gap-0">
       {/* Carte compacte */}
-      <div className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10">
+      <div className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10" aria-label="Carte météo fixe en mode compact">
         <iframe
           key={iframeKey}
           src={windyUrlCompact}
           title={`Carte météo Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
-            className="h-full w-full border-0"
-              style={{ touchAction: "none" }}
+          className="h-full w-full border-0"
           loading="lazy"
           allow="geolocation"
           referrerPolicy="no-referrer-when-downgrade"
+        />
+        {/* Bouclier central : il bloque le panoramique sans recouvrir les commandes
+            Windy placées sur les bords (couches, lecture, zoom et plein écran). */}
+        <div
+          aria-hidden="true"
+          className="absolute bottom-[72px] left-0 right-[88px] top-[92px] z-10 touch-pan-y bg-transparent"
         />
         <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
           Carte fixe · lecture horaire accessible
@@ -278,14 +283,14 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           type="button"
           onClick={openFullscreen}
           aria-label="Agrandir la carte"
-          className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          className="absolute bottom-3 right-3 z-20 grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         >
           <Maximize2 className="h-4 w-4" />
         </button>
       </div>
 
       {/* Sélecteur de couches sous la carte */}
-      <div className="mt-2 px-0.5">
+      <div className="mt-2 px-0.5" aria-label="Boutons de couches météo">
         <LayerSelector activeLayer={activeLayer} onSelect={handleLayerChange} />
       </div>
 

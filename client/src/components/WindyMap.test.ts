@@ -7,9 +7,11 @@ describe("WindyMap", () => {
   it("verrouille le déplacement compact tout en laissant les boutons et la page accessibles", () => {
     expect(source).not.toContain("isCompactMapInteractive");
     expect(source).not.toContain("event.touches.length >= 2");
-    expect(source).toContain('style={{ touchAction: "none" }}');
+    expect(source).toContain("Bouclier central");
+    expect(source).toContain('className="absolute bottom-[72px] left-0 right-[88px] top-[92px] z-10 touch-pan-y bg-transparent"');
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
-    expect(source).toContain("Carte fixe · lecture horaire accessible");
+    expect(source).toContain("Carte météo fixe en mode compact");
+    expect(source).toContain('aria-label="Boutons de couches météo"');
     expect(source).toContain('onClick={() => onSelect(layer.id)}');
   });
 
