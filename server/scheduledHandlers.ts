@@ -239,6 +239,14 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           break;
         }
         if (synthesis.stationCount < 1 || synthesis.temperature == null) {
+          if (shouldRetryHourlyFavorite(attempt)) {
+            console.warn(
+              `[MeteoAI] No qualified physical station for ${favorite.customName ?? favorite.name}; retrying once:`,
+              { stationCount: synthesis.stationCount, hasTemperature: synthesis.temperature != null },
+            );
+            await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));
+            continue;
+          }
           locationResult = {
             locationKey,
             stationCount: synthesis.stationCount,

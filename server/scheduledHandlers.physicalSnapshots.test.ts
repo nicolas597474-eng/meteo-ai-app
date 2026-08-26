@@ -14,4 +14,13 @@ describe("collecte horaire des snapshots physiques", () => {
     expect(source).toContain("Physical snapshot collection failed for all favorite locations");
     expect(source).toContain("await processWithConcurrency(Array.from(unique.values()), 2");
   });
+
+  it("relance une fois la recherche lorsqu’aucune station physique qualifiée n’est disponible", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/scheduledHandlers.ts"), "utf8");
+
+    expect(source).toContain("No qualified physical station for");
+    expect(source).toContain("hasTemperature: synthesis.temperature != null");
+    expect(source).toContain("if (synthesis.stationCount < 1 || synthesis.temperature == null)");
+    expect(source).toContain("await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));");
+  });
 });
