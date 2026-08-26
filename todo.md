@@ -3113,3 +3113,8 @@
 ## Correction de la cadence affichée des snapshots
 - [x] Snapshots : afficher la cadence réelle v4 « Chaque heure à :20 UTC », sans modifier la tâche, les données ni les collectes.
 - [x] Snapshots : couvrir le libellé, valider TypeScript, Vitest complet et le rendu mobile avant publication. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Épuration des commandes Windy compactes
+- [x] Windy : masquer le libellé de date à gauche et la barre native de progression des heures en vue compacte.
+- [x] Windy : réduire légèrement la hauteur des boutons + / − centrés et du bouton plein écran, sans modifier leur position ni les rendre difficiles à utiliser.
+- [x] Windy : valider TypeScript, Vitest complet et le rendu mobile avant publication. TypeScript sans erreur ; 386 tests réussis et 2 ignorés ; contrôle mobile effectué.

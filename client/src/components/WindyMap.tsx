@@ -25,6 +25,10 @@ const FULLSCREEN_NATIVE_CONTROL_GUTTER_PX = 72;
 // Cette gouttière est aussi cadrée hors écran : la lecture complète reste
 // accessible uniquement après ouverture du plein écran.
 const COMPACT_NATIVE_PLAY_GUTTER_PX = 96;
+// La date et la barre de lecture natives sont uniquement utiles en plein écran.
+// On prolonge l’embed sous le cadre compact afin de les cadrer hors de la vue,
+// tout en conservant la carte complète et ses commandes MeteoAI externes.
+const COMPACT_NATIVE_TIMELINE_GUTTER_PX = 78;
 // Le panneau natif Windy (pluie, vent, etc.) s’ouvre à droite du repère. On
 // centre donc légèrement la carte à l’est du lieu pour garder ce panneau dans
 // le cadre, sans déplacer le repère géographique de la position réelle.
@@ -279,8 +283,9 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         {/* L’iframe est strictement visuelle ici : son contenu ne reçoit aucun geste.
             Les commandes compactes sont rendues par l’application, hors iframe. */}
         <div
-          className="pointer-events-none absolute inset-y-0 overflow-hidden"
+          className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
           style={{
+            bottom: `-${COMPACT_NATIVE_TIMELINE_GUTTER_PX}px`,
             left: `-${COMPACT_NATIVE_PLAY_GUTTER_PX}px`,
             right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px`,
           }}
@@ -298,10 +303,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           />
         </div>
         <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-2xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
-          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-12 w-12 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-11 w-12 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
             <span aria-hidden="true" className="text-2xl leading-none">+</span>
           </button>
-          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-12 w-12 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-11 w-12 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
             <span aria-hidden="true" className="text-2xl leading-none">−</span>
           </button>
         </div>
@@ -310,7 +315,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           type="button"
           onClick={openFullscreen}
           aria-label="Agrandir la carte"
-          className="absolute bottom-3 right-3 z-20 grid h-12 w-12 place-items-center rounded-2xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          className="absolute bottom-3 right-3 z-20 grid h-11 w-12 place-items-center rounded-2xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         >
           <Maximize2 className="h-5 w-5" />
         </button>
