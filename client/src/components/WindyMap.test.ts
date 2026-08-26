@@ -62,6 +62,11 @@ describe("WindyMap", () => {
     expect(source).toContain('aria-label="Fermer la carte plein écran"');
     expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
     expect(source).toContain('aria-label="Zoom manuel de la carte"');
+    expect(source).toContain("<X aria-hidden");
+    expect(source).toContain("<Crosshair aria-hidden");
+    expect(source).toContain("<Plus aria-hidden");
+    expect(source).toContain("<Minus aria-hidden");
+    expect(source).toContain("bg-[#06131f]/92");
     expect(source).toContain("fullscreenZoom");
     expect(source).not.toContain('aria-label="Type de fond de carte"');
     expect(source).not.toContain('>\n              Plan\n            </button>');

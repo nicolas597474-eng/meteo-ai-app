@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Maximize2, Play } from "lucide-react";
+import { Crosshair, Maximize2, Minus, Play, Plus, X } from "lucide-react";
 
 type WindyLayer = {
   id: string;
@@ -239,31 +239,25 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             type="button"
             onClick={closeFullscreen}
             aria-label="Fermer la carte plein écran"
-            className="absolute right-3 top-3 z-20 grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#606060] shadow-[0_2px_8px_rgba(15,23,42,0.18)] transition-transform hover:bg-[#f7f7f7] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            className="absolute right-3 top-3 z-20 grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/45 bg-[#06131f]/92 text-cyan-50 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_30px_rgba(2,8,23,0.45)] backdrop-blur-md transition-[transform,background-color,border-color] hover:border-cyan-100 hover:bg-[#0a2030]/96 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.9" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+            <X aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
           </button>
           <div className="absolute bottom-[142px] right-3 z-20 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
             <button
               type="button"
               onClick={recenterFullscreenMap}
               aria-label="Centrer la carte sur le lieu actif"
-              className="grid h-12 w-12 place-items-center rounded-full border border-[#d8e1e8] bg-white text-[#0c74bc] shadow-[0_2px_8px_rgba(15,23,42,0.22)] transition-transform hover:bg-slate-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+              className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/45 bg-[#06131f]/92 text-cyan-200 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_30px_rgba(2,8,23,0.45)] backdrop-blur-md transition-[transform,background-color,border-color] hover:border-cyan-100 hover:bg-[#0a2030]/96 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="2.6">
-                <circle cx="12" cy="12" r="6.2" />
-                <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
-                <path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3" strokeLinecap="round" />
-              </svg>
+              <Crosshair aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />
             </button>
-            <div className="overflow-hidden rounded-none border border-[#d8e1e8] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.22)]" aria-label="Zoom manuel de la carte">
-              <button type="button" onClick={() => adjustFullscreenZoom(1)} aria-label="Zoomer" className="grid h-14 w-12 place-items-center border-b border-[#e8e8e8] text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500">
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round"><path d="M12 3.5v17M3.5 12h17" /></svg>
+            <div className="overflow-hidden rounded-2xl border border-cyan-300/45 bg-[#06131f]/92 text-cyan-50 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_30px_rgba(2,8,23,0.45)] backdrop-blur-md" aria-label="Zoom manuel de la carte">
+              <button type="button" onClick={() => adjustFullscreenZoom(1)} aria-label="Zoomer" className="grid h-14 w-12 place-items-center border-b border-cyan-300/25 transition-colors hover:bg-[#0a2030]/96 active:bg-[#103146] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300">
+                <Plus aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
               </button>
-              <button type="button" onClick={() => adjustFullscreenZoom(-1)} aria-label="Dézoomer" className="grid h-14 w-12 place-items-center text-[#606060] transition-colors hover:bg-[#f7f7f7] active:bg-[#eeeeee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500">
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.55" strokeLinecap="round"><path d="M3.5 12h17" /></svg>
+              <button type="button" onClick={() => adjustFullscreenZoom(-1)} aria-label="Dézoomer" className="grid h-14 w-12 place-items-center transition-colors hover:bg-[#0a2030]/96 active:bg-[#103146] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300">
+                <Minus aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
               </button>
               <span className="sr-only" aria-live="polite">Niveau de zoom : {fullscreenZoom}</span>
             </div>

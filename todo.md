@@ -3083,3 +3083,7 @@
 ## Commandes compactes Windy — lecture et plein écran
 - [x] Windy : masquer le bouton natif de lecture/avancement des heures en vue compacte, sans toucher à la timeline plein écran.
 - [x] Windy : agrandir le bouton plein écran compact à la même taille que les boutons + / −, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Refonte visuelle des commandes Windy plein écran
+- [x] Windy : moderniser les icônes et surfaces des commandes à droite (fermeture, recentrage, zoom + / −) avec une signature cohérente et futuriste.
+- [x] Windy : conserver actions, positions, contrastes et accessibilité, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
