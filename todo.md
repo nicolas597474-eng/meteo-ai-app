@@ -3175,3 +3175,8 @@
 - [x] Déclencher l’autorisation et la mise en écoute directement depuis la rose des vents de la carte agrandie.
 - [x] Ne considérer la boussole comme active qu’après réception d’une mesure de cap exploitable.
 - [x] Ajouter un diagnostic visible et un repli clair lorsque le navigateur ne transmet aucun événement d’orientation.
+
+## Collecte horaire automatique sécurisée
+- [x] Autoriser la tâche planifiée de snapshots par une capacité cryptographique dédiée lorsque le cookie cron est absent ou invalide.
+- [ ] Configurer la tâche active avec cette capacité et conserver sa cadence à xx:20 UTC.
+- [ ] Vérifier un journal HTTP 200 et une trace de snapshot après le prochain passage automatique.
