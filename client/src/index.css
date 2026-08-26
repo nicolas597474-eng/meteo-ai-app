@@ -862,6 +862,31 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   box-shadow: 0 8px 18px rgb(2 6 23 / 0.42);
 }
 
+/* Carte d’éclipse immersive : seul le canevas et ses commandes restent visibles. */
+[role="dialog"]:has(> [data-swipe-exclude] .map-control-cluster) {
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+}
+
+[role="dialog"]:has(> [data-swipe-exclude] .map-control-cluster) > :not([data-swipe-exclude]) {
+  display: none;
+}
+
+[role="dialog"]:has(> [data-swipe-exclude] .map-control-cluster) > [data-swipe-exclude],
+[role="dialog"]:has(> [data-swipe-exclude] .map-control-cluster) > [data-swipe-exclude] > * {
+  height: 100dvh !important;
+  padding: 0 !important;
+}
+
 .map-control-button {
   display: flex;
   width: 3rem;

@@ -3195,3 +3195,8 @@
 - [x] Distinguer un cap absolu d’un cap relatif et appliquer la correction d’orientation d’écran appropriée, en empêchant une mesure relative ultérieure d’écraser un cap absolu.
 - [x] Ajouter une calibration utilisateur lorsque le navigateur ne peut pas fournir un nord magnétique de manière fiable.
 - [x] Vérifier les calculs de rotation et les tests de régression avant publication, sans simuler de cap. La validation sur rotation physique complète reste à confirmer sur le téléphone de l’utilisateur.
+
+## Carte d’éclipse en plein écran
+- [x] Ouvrir la carte agrandie sur toute la surface disponible de l’écran mobile.
+- [x] Supprimer l’en-tête descriptif et le bouton inférieur « Fermer la carte » de cette vue.
+- [x] Préserver la croix ainsi que tous les contrôles cartographiques, puis valider le rendu mobile et les tests. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
