@@ -2946,7 +2946,7 @@
 - [x] Validation: Confirmer le premier passage HTTP 200 de v4 et les archives physiques réellement écrites, sans réécriture des snapshots existants. Contrôle du 26 août : huit journaux existent, dont les passages 00:29, 01:29 et 02:21 UTC avec HTTP 200 ; les traces horaires stockées sont présentes pour les deux favoris.
 - [x] Anomalie planificateur: v7 (`QXZR4pt2HTGfXmKNXyFb8j`) a finalement échoué en HTTP 403 à 03:10:55 UTC le 26 août (« permission error for cron cookie »), sans écriture de prévisions ; elle est mise en pause.
 - [x] Correctif v7 : renouveler l’autorisation cron via v8 (`YSVnbPqUuQkAB3y96C6WF3`) sur le callback `/api/scheduled/collect-favorites-forecasts`, sans modifier les archives de prévisions existantes.
-- [ ] Validation v8 : confirmer son premier passage HTTP 200 et des archives prévisions horodatées cohérentes avant de déclarer la collecte 05:00 opérationnelle.
+- [ ] Validation v8 : confirmer son premier passage HTTP 200 et des archives prévisions horodatées cohérentes avant de déclarer la collecte 05:00 opérationnelle. Contrôles à 04:11 puis 04:31 UTC le 26 août : aucun journal n’est présent, y compris après un créneau technique temporaire à 04:20 UTC ; aucune exécution n’est donc présumée. Le planning quotidien a été rétabli avec prochaine exécution annoncée le 27 août à 03:00 UTC (05:00 Paris).
 
 ## Synthèse locale directement visible
 - [x] Stations : remplacer le panneau déroulant « Détails de la synthèse locale » par un bloc toujours visible, sans retirer les mesures ni les compteurs.
