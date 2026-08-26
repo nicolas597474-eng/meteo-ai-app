@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Crosshair, Maximize2, Minus, Plus, X } from "lucide-react";
+import { Crosshair, Maximize2, X } from "lucide-react";
+import { MapZoomControl } from "@/components/MapControls";
 import { getWindyMapPreferences, makeWindyMapLocationKey, type WindyMapPreferences, writeWindyMapPreferences } from "./windyMapPreferences";
 
 type WindyLayer = {
@@ -281,15 +282,8 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             >
               <Crosshair aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />
             </button>
-            <div className="overflow-hidden rounded-2xl border border-white/20 bg-[#0d1117]/85 text-slate-100 shadow-lg backdrop-blur-sm" aria-label="Zoom manuel de la carte">
-              <button type="button" onClick={() => adjustFullscreenZoom(1)} aria-label="Zoomer" className="grid h-10 w-14 place-items-center border-b border-white/10 transition-colors hover:bg-white/10 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
-                <Plus aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
-              </button>
-              <button type="button" onClick={() => adjustFullscreenZoom(-1)} aria-label="Dézoomer" className="grid h-10 w-14 place-items-center transition-colors hover:bg-white/10 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
-                <Minus aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
-              </button>
-              <span className="sr-only" aria-live="polite">Niveau de zoom : {fullscreenZoom}</span>
-            </div>
+            <MapZoomControl onZoomIn={() => adjustFullscreenZoom(1)} onZoomOut={() => adjustFullscreenZoom(-1)} />
+            <span className="sr-only" aria-live="polite">Niveau de zoom : {fullscreenZoom}</span>
           </div>
         </div>
 
@@ -327,14 +321,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
-        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-2xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
-          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-10 w-14 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
-            <span aria-hidden="true" className="text-2xl leading-none">+</span>
-          </button>
-          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-10 w-14 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
-            <span aria-hidden="true" className="text-2xl leading-none">−</span>
-          </button>
-        </div>
+        <MapZoomControl ariaLabel="Zoom de l’aperçu fixe" className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2" onZoomIn={() => adjustCompactZoom(1)} onZoomOut={() => adjustCompactZoom(-1)} />
         {/* Bouton plein écran */}
         <button
           type="button"

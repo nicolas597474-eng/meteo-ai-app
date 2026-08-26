@@ -30,18 +30,20 @@ export function MapZoomControl({
   onZoomIn,
   onZoomOut,
   className = "",
+  ariaLabel = "Zoom manuel de la carte",
 }: {
   onZoomIn: () => void;
   onZoomOut: () => void;
   className?: string;
+  ariaLabel?: string;
 }) {
   return (
-    <div className={`${CONTROL_SURFACE} overflow-hidden rounded-2xl ${className}`} aria-label="Zoom manuel de la carte">
+    <div className={`${CONTROL_SURFACE} overflow-hidden rounded-2xl ${className}`} aria-label={ariaLabel}>
       <button
         type="button"
         onClick={onZoomIn}
         aria-label="Zoomer"
-        className={`grid h-14 w-14 place-items-center border-b border-white/10 text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
+        className={`grid h-14 w-12 place-items-center border-b border-white/10 text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
       >
         <Plus aria-hidden="true" className="h-7 w-7" strokeWidth={2.15} />
       </button>
@@ -49,7 +51,7 @@ export function MapZoomControl({
         type="button"
         onClick={onZoomOut}
         aria-label="Dézoomer"
-        className={`grid h-14 w-14 place-items-center text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
+        className={`grid h-14 w-12 place-items-center text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
       >
         <Minus aria-hidden="true" className="h-7 w-7" strokeWidth={2.15} />
       </button>

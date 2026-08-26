@@ -3150,3 +3150,8 @@
 - [x] Harmoniser les icônes et boutons de la carte des stations avec le design de la référence.
 - [x] Harmoniser les icônes et boutons de la carte de visibilité d’éclipse avec le même design.
 - [x] Préserver les actions existantes, l’accessibilité, le rendu mobile et valider les tests avant publication.
+
+## Réduction de largeur des boutons de zoom
+- [x] Réduire la largeur visuelle des groupes + / − sur la carte Windy compacte, la carte des stations et la carte d’éclipse.
+- [x] Conserver des zones tactiles adaptées, les actions existantes et le style partagé sombre/cyan.
+- [x] Mettre à jour les tests, valider TypeScript, Vitest et le rendu mobile avant publication.

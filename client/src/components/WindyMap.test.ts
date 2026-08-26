@@ -18,12 +18,13 @@ describe("WindyMap", () => {
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Aperçu météo fixe en mode compact");
     expect(source).toContain('aria-label="Boutons de couches météo"');
-    expect(source).toContain('aria-label="Zoom de l’aperçu fixe"');
+    expect(source).toContain('ariaLabel="Zoom de l’aperçu fixe"');
     expect(source).not.toContain('aria-label="Recentrer l’aperçu"');
-    expect(source).toContain('className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2');
-    expect(source).toContain('aria-label="Zoomer l’aperçu"');
-    expect(source).toContain('aria-label="Dézoomer l’aperçu"');
-    expect(source).toContain('className="grid h-10 w-14 place-items-center');
+    expect(source).toContain('className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2"');
+    expect(source).toContain('ariaLabel="Zoom de l’aperçu fixe"');
+    expect(source).toContain('className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2"');
+    expect(source).toContain("MapZoomControl");
+    expect(source).not.toContain("h-10 w-14");
     expect(source).not.toContain("Aperçu fixe · animation en plein écran");
     expect(source).toContain('activeLayerInfo.windyParam, compactZoom, false');
     expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-11 w-12');
@@ -65,13 +66,12 @@ describe("WindyMap", () => {
   it("conserve les contrôles externes utiles du plein écran", () => {
     expect(source).toContain('aria-label="Fermer la carte plein écran"');
     expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
-    expect(source).toContain('aria-label="Zoom manuel de la carte"');
+    expect(source).toContain("MapZoomControl");
     expect(source).toContain("<X aria-hidden");
     expect(source).toContain("<Crosshair aria-hidden");
-    expect(source).toContain("<Plus aria-hidden");
-    expect(source).toContain("<Minus aria-hidden");
+    expect(source).toContain("<MapZoomControl onZoomIn={() => adjustFullscreenZoom(1)} onZoomOut={() => adjustFullscreenZoom(-1)} />");
     expect(source).toContain("bg-[#0d1117]/85");
-    expect(source).toContain('className="grid h-10 w-14 place-items-center border-b border-white/10');
+    expect(source).toContain("MapZoomControl");
     expect(source).toContain("fullscreenZoom");
     expect(source).not.toContain('aria-label="Type de fond de carte"');
     expect(source).not.toContain('>\n              Plan\n            </button>');

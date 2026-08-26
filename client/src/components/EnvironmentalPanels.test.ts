@@ -79,7 +79,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain('absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4');
     expect(source).toContain("MapZoomControl onZoomIn={() => adjustExpandedZoom(1)}");
     expect(source).toContain("adjustExpandedZoom");
-    expect(source).toContain("zoomControl={!isExpanded}");
+    expect(source).toContain("zoomControl={false}");
+    expect(source).toContain('absolute bottom-3 right-3 z-20');
+    expect(source).toContain("MapZoomControl onZoomIn={() => { const map = compactMapRef.current;");
     expect(source).not.toContain("bottom-[112px] right-3");
     expect(source).toContain('absolute left-[96px] top-3 z-20');
     expect(source).toContain("MapTypeToggle value={expandedMapType}");
