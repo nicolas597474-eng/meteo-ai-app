@@ -3155,3 +3155,13 @@
 - [x] Réduire la largeur visuelle des groupes + / − sur la carte Windy compacte, la carte des stations et la carte d’éclipse.
 - [x] Conserver des zones tactiles adaptées, les actions existantes et le style partagé sombre/cyan.
 - [x] Mettre à jour les tests, valider TypeScript, Vitest et le rendu mobile avant publication.
+
+## Rétablissement des snapshots horaires
+- [x] Corriger le refus d’autorisation de l’ancienne tâche v4 sans modifier les snapshots ni les archives existants. v4 est en pause ; v5 (`RuT5SN5kPbD3eAAwb92mqz`) est active sur la même route et conserve une cadence horaire à xx:20 UTC.
+- [ ] Vérifier que la tâche v5 active se déclenche chaque heure à xx:20 UTC et produit un journal HTTP 200.
+- [ ] Contrôler les traces horaires créées après le prochain passage et documenter les créneaux sans station qualifiée séparément des erreurs d’exécution.
+
+## Boussole astronomique orientée par le téléphone
+- [x] Ajouter une activation explicite du capteur d’orientation de l’appareil mobile pour la boussole de visibilité d’éclipse.
+- [x] Faire tourner la boussole selon le cap du téléphone tout en gardant visible la direction calculée du Soleil ou de la Lune.
+- [x] Prévoir un repli non intrusif lorsque le capteur est indisponible, refusé ou imprécis, puis valider les tests et le rendu mobile.

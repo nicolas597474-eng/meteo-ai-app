@@ -82,6 +82,15 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("zoomControl={false}");
     expect(source).toContain('absolute bottom-3 right-3 z-20');
     expect(source).toContain("MapZoomControl onZoomIn={() => { const map = compactMapRef.current;");
+    expect(source).toContain("deviceHeading");
+    expect(source).toContain("orientationStatus");
+    expect(source).toContain("DeviceOrientationEvent");
+    expect(source).toContain("webkitCompassHeading");
+    expect(source).toContain("requestPermission");
+    expect(source).toContain("Activer la boussole du téléphone");
+    expect(source).toContain("Boussole du téléphone active");
+    expect(source).toContain("Cap du téléphone");
+    expect(source).toContain("orientationStatus !== \"tracking\"");
     expect(source).not.toContain("bottom-[112px] right-3");
     expect(source).toContain('absolute left-[96px] top-3 z-20');
     expect(source).toContain("MapTypeToggle value={expandedMapType}");
