@@ -27,6 +27,13 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Pourquoi plusieurs modèles ont le même poids moyen");
     expect(source).toContain("Ce n’est ni une note, ni une chance qu’il ait raison");
     expect(source).toContain("ce n’est pas un classement ni une probabilité");
+    expect(source).toContain("AI_LAB_GLOSSARY_EXAMPLES");
+    expect(source).toContain("Sources appliquées par paramètre");
+    expect(source).toContain("AROME peut aider pour la température");
+    expect(source).toContain("Si les modèles prévoient entre 19 et 20 °C");
+    expect(source).toContain("Exemple simple ·");
+    expect(source).toContain("Fermer le Lexique");
+    expect(source).toContain("setIsOpen(false)");
     expect(source).toContain("Stabilité des modèles");
     expect(source).toContain("Données insuffisantes / —");
     expect(source).toContain("group-open:rotate-180");

@@ -2976,3 +2976,8 @@
 - [x] Lexique : expliquer comment le poids moyen d’un modèle résume ses contributions par paramètre dans la fusion.
 - [x] Lexique : expliquer pourquoi plusieurs modèles peuvent afficher le même poids moyen quand leurs contributions sont équivalentes ou renormalisées.
 - [x] AI Lab : relier l’étape « Données exploitables » à cette explication, puis valider mobile, TypeScript et Vitest.
+
+## Lexique : exemples et fermeture rapide
+- [x] Lexique : ajouter un exemple simple à chaque notion explicative, sans inventer de données observées ou de résultats météo.
+- [x] Lexique : ajouter une croix accessible pour replier immédiatement le Lexique lorsqu’il est ouvert.
+- [x] Lexique : valider la structure, le mobile, TypeScript et Vitest après l’enrichissement.

@@ -188,13 +188,76 @@ const AI_LAB_GLOSSARY = [
   },
 ] as const;
 
+const AI_LAB_GLOSSARY_EXAMPLES: Record<string, string> = {
+  "Fusion officielle": "Si trois modèles prévoient une température proche, MeteoAI les combine dans une même prévision plutôt que d’afficher trois résultats séparés.",
+  "Snapshot": "La prévision collectée à 05 h est conservée telle quelle ; demain, elle pourra être comparée aux relevés réellement archivés.",
+  "Confiance": "Une confiance de 80/100 signifie que les preuves disponibles concordent assez bien ; elle ne garantit pas que la prévision sera exacte.",
+  "Stabilité des modèles": "Si les modèles prévoient 20, 21 et 21 °C, leur stabilité est meilleure que s’ils prévoient 16, 21 et 27 °C.",
+  "Modèles appliqués": "Huit modèles reçus ne sont comptés ici que si chacun a réellement contribué à au moins un paramètre de la fusion.",
+  "Poids appliqué": "Pour la température, un modèle peut recevoir 20 % du calcul tandis qu’un autre reçoit 10 % ; ce sont des parts de calcul, pas leurs chances d’avoir raison.",
+  "Sources appliquées par paramètre": "AROME peut aider pour la température, tandis qu’ECMWF aide aussi pour le vent : leurs contributions sont donc lues séparément.",
+  "Poids moyen d’un modèle": "Un modèle qui a reçu 10 % pour la température et 20 % pour le vent affiche un poids moyen de 15 % sur ces deux contributions.",
+  "Pourquoi plusieurs modèles ont le même poids moyen": "Avec huit modèles qui contribuent de façon comparable, la part disponible peut être répartie presque également, autour de 13 % chacun.",
+  "Poids du régime, en clair": "Pour un ciel couvert, les nuages peuvent compter plus que le vent dans la description du scénario ; cela ne dit pas quel modèle est meilleur.",
+  "Exemple : Ciel couvert": "Si les nuages sont très présents mais qu’il n’y a ni pluie marquée ni vent fort, le scénario peut être Ciel couvert.",
+  "Accord des modèles": "Si les modèles prévoient entre 19 et 20 °C, ils sont assez proches ; entre 15 et 24 °C, leur accord est faible.",
+  "Prévisions quotidiennes des contributeurs": "Le tableau peut afficher AROME à 21 °C et ICON à 22 °C : ce sont leurs prévisions du jour, pas des températures mesurées.",
+  "Dernière collecte vérifiable": "Si un modèle ne répond pas lors du cycle, le bilan le signale comme indisponible au lieu de lui attribuer une valeur de remplacement.",
+  "Modèles en validation": "Un nouveau modèle peut être collecté et comparé pendant plusieurs jours sans modifier la prévision officielle.",
+  "Données insuffisantes / —": "S’il manque les relevés physiques comparables, l’application affiche — plutôt que d’inventer une note de fiabilité.",
+  "Prévisions de référence · 05 h 00": "La prévision reçue le matin pour 14 h reste la référence archivée, même si une nouvelle consultation affiche ensuite une mise à jour.",
+  "Relevés physiques de la journée": "Un relevé de station reçu à 14 h est gardé avec son horaire afin de pouvoir le comparer à la prévision de 14 h.",
+  "Analyse de nuit · 00 h 30": "La journée de mardi est analysée après minuit, quand toutes ses heures sont terminées et comparables.",
+  "Journée qualifiée": "Avec seulement une heure réellement observée sur dix-huit, la journée reste non qualifiée et aucun score complet n’est produit.",
+  "Comparaison et scores": "Si un modèle prévoyait 20 °C et la station 18 °C au même créneau, cet écart sert à calculer ses erreurs.",
+  "Horizon de prévision": "Une prévision pour cet après-midi est moins lointaine qu’une prévision à dix jours ; la seconde reçoit donc davantage d’incertitude.",
+  "MAE": "Des écarts de 1, 2 et 3 °C donnent une MAE de 2 °C : on regarde la taille moyenne de l’erreur sans son sens.",
+  "RMSE": "Une très grande erreur ponctuelle compte davantage dans le RMSE que dans la MAE, ce qui aide à repérer les ratés importants.",
+  "Biais": "Si un modèle prévoit souvent 1 °C de trop, son biais moyen est positif ; s’il prévoit trop froid, il est négatif.",
+  "Taille d’échantillon": "Un bilan fondé sur 50 comparaisons est plus informatif qu’un bilan fondé sur seulement 2 comparaisons.",
+  "Seuils de décision": "Avant le seuil requis, un modèle peut être observé, mais il ne reçoit pas encore de classement public comme s’il était suffisamment évalué.",
+  "Station physique": "Une station qui mesure réellement température et vent près du lieu peut aider à vérifier une prévision, si ses données sont assez fraîches.",
+  "Fraîcheur, distance et continuité": "Une station à 2 km mise à jour il y a 5 minutes est généralement plus utile qu’une station lointaine sans mise à jour récente.",
+  "Correction de biais": "Si un biais chaud est répété et mesuré, la correction peut réduire légèrement la température fusionnée, sans effacer l’historique d’origine.",
+  "Dispersion": "Des prévisions de pluie de 0, 2 et 8 mm montrent une grande dispersion : les modèles ne décrivent pas la même situation.",
+  "Source active ou en validation": "Un modèle actif influence la fusion ; un modèle en validation est observé à côté jusqu’à ce que les preuves soient suffisantes.",
+  "Maille et microclimat": "Un modèle peut décrire la région autour de Hondeghem sans représenter exactement la température de chaque jardin ou rue.",
+  "Prévisions des modèles": "Si ICON ne répond pas au cycle, il est absent de la trace ; MeteoAI ne fabrique pas sa prévision à partir d’un autre modèle.",
+  "Qualité de l’air": "Un indice de qualité de l’air peut être affiché à côté de la météo, mais il ne sert pas à choisir la température ou la pluie fusionnée.",
+  "Stations locales": "Une station personnelle trop ancienne ou trop éloignée reste visible comme information possible, mais elle n’est pas utilisée comme preuve qualifiée.",
+  "Cartes interactives": "Déplacer la carte change seulement le point de vue ; cela ne modifie ni les modèles ni les calculs de prévision.",
+  "Soleil, Lune et phases": "L’application peut afficher le coucher du Soleil et la phase de Lune du lieu choisi sans les confondre avec une prévision météo.",
+  "Éclipses et essaims": "Pour une éclipse, la page renvoie vers la source officielle de l’événement au lieu d’affirmer une visibilité non vérifiée.",
+  "Visibilité d’éclipse": "Une zone peut être géométriquement concernée par une éclipse, mais des nuages locaux peuvent encore empêcher de la voir.",
+  "Limites de source": "Le nom d’un service dans une comparaison ne signifie pas qu’il contribue à la fusion du jour ; seule la trace le confirme.",
+  "Coordonnées topocentriques": "Depuis Hondeghem, la Lune peut être au sud-est ; depuis une autre ville, son angle affiché n’est pas exactement le même.",
+  "Trajectoire apparente": "La courbe du Soleil monte après le lever, atteint son point haut, puis descend jusqu’au coucher pour le lieu sélectionné.",
+  "Phase lunaire géométrique": "Une Lune éclairée à moitié peut être un Premier quartier ou un Dernier quartier selon le sens de son évolution.",
+  "Éclairage lunaire": "Deux nuits peuvent afficher 50 % d’éclairage, même si le nom précis de la phase n’est pas le même.",
+  "Lever, culmination et coucher": "La culmination correspond au moment où l’astre est le plus haut dans le ciel local, entre son lever et son coucher.",
+  "Horizon astronomique et relief local": "Une Lune proche de l’horizon peut être masquée par une colline ou un bâtiment, même si son calcul indique qu’elle est au-dessus de 0°.",
+  "Simulation 24 h": "L’animation fait défiler des positions déjà calculées pour la journée ; elle ne prédit pas une nouvelle trajectoire.",
+  "Phénomène actuel": "Une averse maintenant peut être affichée même si la tendance de la journée reste globalement nuageuse.",
+  "Prévision officielle": "La prévision officielle résume la fusion des modèles ; elle ne devient pas un relevé réel même si une station est proche.",
+  "Modes Local et Ultra-local": "Le mode Ultra-local privilégie les stations proches disponibles ; s’il n’y en a pas, il indique la limite plutôt que d’inventer une mesure.",
+  "Moyenne locale pondérée": "Deux stations proches et fraîches peuvent compter davantage qu’une station lointaine, pour décrire le contexte local observé.",
+  "Prochain changement": "Si le ciel est couvert à 10 h et des averses sont prévues à 14 h, ce créneau est affiché comme prochain changement.",
+  "Prévision contre observation": "La prévision de 15 h est comparée uniquement à un relevé physique disponible autour de 15 h, pas à celui du matin.",
+  "Score qualifié": "Sans assez de comparaisons fiables, l’application attend avant d’afficher un score plutôt que de donner un faux classement.",
+  "Fenêtre d’analyse": "Sur 24 heures, on lit les écarts récents ; sur 30 jours, on observe une tendance plus longue avec davantage de comparaisons.",
+  "Écart station–prévision": "Si la synthèse locale donne 18 °C et la prévision officielle 20 °C au même créneau, l’écart affiché est de 2 °C.",
+  "Rayon de recherche": "Passer de 5 à 20 km peut trouver plus de stations, mais elles décrivent parfois moins précisément le quartier du lieu actif.",
+};
+
 function AILabGlossary() {
-  return <details className="group rounded-2xl border border-sky-400/25 bg-sky-400/[0.055]">
+  const [isOpen, setIsOpen] = useState(false);
+  return <details open={isOpen} onToggle={(event) => setIsOpen(event.currentTarget.open)} className="group rounded-2xl border border-sky-400/25 bg-sky-400/[0.055]">
     <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
       <span className="flex min-w-0 items-center gap-2"><BookOpen className="h-4 w-4 shrink-0 text-sky-200" /><span className="min-w-0"><span className="block text-sm font-semibold text-slate-100">Lexique, méthode et sources</span><span className="mt-0.5 block text-[10px] leading-relaxed text-slate-400">Comprendre les indicateurs, les poids, les collectes, les sources et les limites de l’AI Lab.</span></span></span>
       <ChevronDown className="h-4 w-4 shrink-0 text-sky-200 transition-transform duration-200 group-open:rotate-180" />
     </summary>
     <div className="space-y-4 border-t border-sky-300/15 px-4 py-4">
+      <div className="sticky top-2 z-20 flex justify-end"><button type="button" onClick={() => setIsOpen(false)} aria-label="Fermer le Lexique" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sky-300/30 bg-[#101722]/95 px-2.5 text-[10px] font-semibold text-sky-100 shadow-lg backdrop-blur hover:bg-sky-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-3.5 w-3.5" />Fermer</button></div>
       <section className="rounded-xl border border-sky-300/20 bg-sky-300/[0.055] p-3" aria-label="La philosophie de MeteoAI">
         <p className="text-xs font-semibold text-sky-100">MeteoAI en quelques mots</p>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-200">MeteoAI n’essaie pas de présenter une prévision comme une certitude. Son objectif est de rapprocher les prévisions de plusieurs modèles, les observations physiques disponibles et le contexte local pour rendre la météo plus compréhensible, plus traçable et progressivement mieux adaptée à chaque lieu.</p>
@@ -205,7 +268,7 @@ function AILabGlossary() {
         </div>
       </section>
       <p className="text-[11px] leading-relaxed text-slate-300">Les explications décrivent les calculs affichés pour le lieu et la trace en cours. Elles ne transforment jamais une prévision, une estimation ou une donnée manquante en observation réelle.</p>
-      {AI_LAB_GLOSSARY.map((group) => <section key={group.title} className="rounded-xl border border-white/8 bg-black/15 p-3"><h2 className="text-xs font-semibold text-sky-100">{group.title}</h2><dl className="mt-2.5 space-y-2.5">{group.entries.map(([term, definition]) => <div key={term}><dt className="text-[11px] font-semibold text-slate-100">{term}</dt><dd className="mt-0.5 text-[10px] leading-relaxed text-slate-400">{definition}</dd></div>)}</dl></section>)}
+      {AI_LAB_GLOSSARY.map((group) => <section key={group.title} className="rounded-xl border border-white/8 bg-black/15 p-3"><h2 className="text-xs font-semibold text-sky-100">{group.title}</h2><dl className="mt-2.5 space-y-2.5">{group.entries.map(([term, definition]) => <div key={term}><dt className="text-[11px] font-semibold text-slate-100">{term}</dt><dd className="mt-0.5 text-[10px] leading-relaxed text-slate-400">{definition}</dd><dd className="mt-1 rounded-lg border border-sky-300/10 bg-sky-300/[0.04] px-2 py-1.5 text-[10px] leading-relaxed text-sky-100"><span className="font-semibold">Exemple simple · </span>{AI_LAB_GLOSSARY_EXAMPLES[term] ?? `Pour « ${term} », MeteoAI affiche une explication à partir des données disponibles, sans transformer une donnée manquante en résultat réel.`}</dd></div>)}</dl></section>)}
       <p className="rounded-xl border border-amber-300/15 bg-amber-300/[0.045] p-3 text-[10px] leading-relaxed text-amber-100"><b>À retenir :</b> un modèle peut être présent dans un tableau sans être « meilleur », un poids n’est pas une probabilité, et un accord entre modèles ne remplace pas une validation par observation physique.</p>
     </div>
   </details>;
