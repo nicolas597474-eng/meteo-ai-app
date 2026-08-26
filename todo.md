@@ -2966,3 +2966,8 @@
 ## Carte Windy simplifiée
 - [x] Windy : retirer les boutons Plan et Satellite non fiables de la vue plein écran.
 - [x] Windy : conserver la fermeture, le centrage, le zoom, la timeline et les couches météo ; valider le rendu mobile, TypeScript et Vitest.
+
+## Lexique : explication simple des poids de régimes
+- [x] Lexique : expliquer en termes simples ce que représentent les poids température, pluie, vent et état du ciel, avec un exemple Ciel couvert.
+- [x] Lexique : préciser clairement qu’un poids n’est ni une probabilité ni une couverture nuageuse.
+- [x] Lexique : valider le rendu mobile, TypeScript et Vitest après ajout.

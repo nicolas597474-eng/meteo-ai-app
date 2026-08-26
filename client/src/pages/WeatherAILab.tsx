@@ -93,7 +93,8 @@ const AI_LAB_GLOSSARY = [
     entries: [
       ["Poids appliqué", "Part attribuée à un modèle pour un paramètre donné dans la fusion. Les poids sont des coefficients de calcul ; ils ne sont ni une probabilité ni une observation de station."],
       ["Sources appliquées par paramètre", "Liste distincte pour température, précipitations et vent. Un modèle peut contribuer différemment selon le paramètre si ses données ou ses preuves disponibles diffèrent."],
-      ["Pastilles T°, Pluie, Vent, Nuages", "Importance relative des paramètres pour le régime actuel. Elles ne sont pas les poids des modèles et servent à lire la priorité du scénario."],
+      ["Poids du régime, en clair", "Les pastilles T°, Pluie, Vent et Nuages indiquent ce qui compte le plus pour décrire le scénario météo du moment. Elles ne sont ni une probabilité ni un pourcentage de nuages."],
+      ["Exemple : Ciel couvert", "Si le ciel est prévu très nuageux, la pastille Nuages peut compter davantage. Par exemple, Nuages 30 % ne veut pas dire 30 % de nuages : cela signifie seulement que l’état du ciel est important pour ce régime. Si la pluie ou le vent devient plus marqué, le résultat peut devenir Averses, Pluie ou Vent fort."],
     ],
   },
   {
