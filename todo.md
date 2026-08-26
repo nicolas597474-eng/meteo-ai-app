@@ -2997,3 +2997,10 @@
 - [x] AI Lab : distinguer clairement la collecte de prévisions de 05h00 pour tous les modèles des relevés physiques de stations.
 - [x] AI Lab : n’afficher comme réussite 05h00 que les collectes réellement journalisées et conserver un statut explicite lorsqu’une tâche planifiée ne s’est pas déclenchée.
 - [x] Validation : vérifier le rendu mobile, TypeScript et Vitest avant publication.
+
+## Contrôle complet des collectes et snapshots
+- [ ] Audit : vérifier les journaux HTTP et l’état actif des tâches de prévisions, snapshots physiques et observations nocturnes.
+- [ ] Audit : contrôler en lecture seule la fraîcheur et la cohérence des archives de prévisions, snapshots physiques et traces associées.
+- [ ] Correctif : résoudre uniquement les erreurs confirmées, sans supprimer, réécrire ou fabriquer de données météo.
+- [x] Correctif snapshots : traiter au plus deux favoris simultanément dans le callback physique afin de réduire les délais HTTP observés, sans modifier l’idempotence ni les archives existantes. TypeScript et 383 tests validés.
+- [ ] Validation : confirmer les passages HTTP 200 et les archives réellement créées avant toute déclaration de bon fonctionnement.

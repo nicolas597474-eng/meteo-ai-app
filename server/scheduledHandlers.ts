@@ -154,7 +154,10 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
   const results: PhysicalSnapshotCollectionLocationResult[] = [];
   const preserveArchivedEvidence = trigger === "manual";
 
-  for (const favorite of Array.from(unique.values())) {
+  // Deux lieux sont collectés en parallèle, comme la collecte de prévisions.
+  // Cela conserve les écritures indépendantes par lieu tout en évitant que deux
+  // appels fournisseurs successifs dépassent le délai du callback Heartbeat.
+  await processWithConcurrency(Array.from(unique.values()), 2, async (favorite) => {
     const locationKey = makeLocationKey(favorite.lat, favorite.lon);
     const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
     let snapshotAlreadyArchived = false;
@@ -314,7 +317,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         await upsertPhysicalSnapshotCollectionTrace(trace);
       }
     }
-  }
+  });
 
   const collectionErrors = results.filter((result) => result.reason?.startsWith("Erreur de collecte"));
   const collectedResults = results.filter((result) => !result.skipped);

@@ -12,6 +12,6 @@ describe("collecte horaire des snapshots physiques", () => {
     expect(source).toContain("retrying once:");
     expect(source).toContain('status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed"');
     expect(source).toContain("Physical snapshot collection failed for all favorite locations");
-    expect(source).toContain("for (const favorite of Array.from(unique.values()))");
+    expect(source).toContain("await processWithConcurrency(Array.from(unique.values()), 2");
   });
 });

@@ -72,6 +72,16 @@ describe("collecte horaire de 05h00", () => {
     expect(source).toContain("getStationEvidenceSummary");
     expect(source).toContain("stations: stationEvidence");
   });
+
+  it("borne aussi à deux lieux simultanés la collecte dédiée de snapshots physiques", () => {
+    const source = readFileSync(new URL("./scheduledHandlers.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export async function collectPhysicalObservationSnapshotsForFavorites");
+    const end = source.indexOf("export async function collectPhysicalObservationSnapshotsHandler", start);
+    const physicalCollector = source.slice(start, end);
+
+    expect(physicalCollector).toContain("await processWithConcurrency(Array.from(unique.values()), 2");
+    expect(physicalCollector).toContain("async (favorite) =>");
+  });
 });
 
 describe("buildStationCollectionSnapshot", () => {
