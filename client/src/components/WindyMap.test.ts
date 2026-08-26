@@ -78,8 +78,8 @@ describe("WindyMap", () => {
     expect(source).not.toContain('>\n              Satellite\n            </button>');
   });
 
-  it("descend centrage et zoom sans masquer les informations météo natives", () => {
-    expect(source).toContain('className="absolute bottom-[88px] right-3 z-20 flex flex-col items-center gap-4"');
+  it("place centrage et zoom en bas à droite sans masquer la timeline native", () => {
+    expect(source).toContain('className="absolute bottom-[72px] right-3 z-20 flex flex-col items-center gap-4"');
     expect(source).not.toContain('className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4"');
   });
 

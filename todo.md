@@ -3131,3 +3131,7 @@
 ## Repositionnement du zoom Windy plein écran
 - [x] Windy : descendre le groupe + / − en bas à droite, juste au-dessus de la ligne de progression des heures, avec un espace sans chevauchement.
 - [x] Windy : conserver le mode compact inchangé et valider TypeScript, Vitest complet et le rendu mobile avant publication.
+
+## Descente supplémentaire du zoom Windy plein écran
+- [x] Windy : descendre encore le groupe + / − dans la colonne droite, aligné avec la croix de fermeture et sans chevaucher la ligne de lecture.
+- [x] Windy : préserver le mode compact, mettre à jour le test de position et valider TypeScript, Vitest et le rendu mobile.

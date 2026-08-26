@@ -251,7 +251,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           >
             <X aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
           </button>
-          <div className="absolute bottom-[88px] right-3 z-20 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
+          <div className="absolute bottom-[72px] right-3 z-20 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
             <button
               type="button"
               onClick={recenterFullscreenMap}
