@@ -14,6 +14,8 @@ describe("WindyMap", () => {
     expect(source).toContain("Aperçu météo fixe en mode compact");
     expect(source).toContain('aria-label="Boutons de couches météo"');
     expect(source).toContain('aria-label="Zoom de l’aperçu fixe"');
+    expect(source).toContain('className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2');
+    expect(source).toContain('className="absolute bottom-3 left-3 z-20 grid h-9 w-9');
     expect(source).toContain('aria-label="Zoomer l’aperçu"');
     expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-9 w-9');
     expect(source).toContain('onClick={() => onSelect(layer.id)}');

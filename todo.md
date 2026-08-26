@@ -3055,3 +3055,7 @@
 ## Accès explicite à l’animation Windy depuis l’aperçu compact
 - [x] Windy : ajouter une commande compacte claire qui ouvre la carte complète et sa lecture native, sans rendre l’aperçu déplaçable.
 - [x] Windy : valider TypeScript, Vitest et le rendu mobile sans recouvrement des commandes. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Position centrale des commandes de zoom Windy compactes
+- [x] Windy : déplacer les boutons + et − au centre de la carte compacte, en conservant le recentrage à gauche et le plein écran à droite.
+- [x] Windy : valider TypeScript, Vitest et le rendu mobile après le repositionnement. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile structurel effectué.

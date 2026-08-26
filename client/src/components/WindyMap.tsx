@@ -300,10 +300,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
           Aperçu fixe · animation en plein écran
         </div>
-        <div className="absolute bottom-3 left-3 z-20 flex items-center overflow-hidden rounded-xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
-          <button type="button" onClick={recenterCompactMap} aria-label="Recentrer l’aperçu" className="grid h-9 w-9 place-items-center border-r border-white/10 text-sky-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
-            <span aria-hidden="true" className="text-base">◎</span>
-          </button>
+        <button type="button" onClick={recenterCompactMap} aria-label="Recentrer l’aperçu" className="absolute bottom-3 left-3 z-20 grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-[#0d1117]/85 text-sky-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+          <span aria-hidden="true" className="text-base">◎</span>
+        </button>
+        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
           <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-9 w-9 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
             <span aria-hidden="true" className="text-xl leading-none">+</span>
           </button>
