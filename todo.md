@@ -3075,3 +3075,7 @@
 ## Confort tactile des boutons de zoom Windy compacts
 - [x] Windy : agrandir les zones tactiles et les symboles + / − au centre de la carte compacte, sans modifier leur position.
 - [x] Windy : valider TypeScript, Vitest et le rendu mobile après l’agrandissement. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Audit des modèles visibles dans la capture
+- [x] Audit : comparer ICON, GFS, ECMWF, GEM, ALADIN, AROME, HARMONIE-EU, ICON-DE et ICON-EU aux sources MeteoAI effectivement collectées, sans modifier les données ni les intégrations.
+- [x] Rapport : expliquer les modèles non intégrés et la contrainte vérifiable associée.
