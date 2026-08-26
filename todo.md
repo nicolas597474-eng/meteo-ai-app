@@ -3031,3 +3031,8 @@
 - [x] Diagnostiquer pourquoi le déplacement reste possible malgré le verrouillage compact publié. Le style sur l’iframe ne suffisait pas à intercepter le geste interne ; un bouclier central est nécessaire.
 - [x] Bloquer le panoramique de l’iframe compacte sans empêcher les clics sur ses boutons ni le défilement de la page. Le bouclier central laisse libres les zones de commandes Windy et le bouton plein écran.
 - [x] Valider mobile, TypeScript, Vitest et plein écran avant publication. TypeScript sans erreur ; suite complète 383 tests réussis et 2 ignorés ; rendu mobile contrôlé.
+
+## Transition carte compacte / plein écran
+- [x] Ajouter une transition fluide et courte à l’ouverture et à la fermeture du plein écran.
+- [x] Respecter prefers-reduced-motion et conserver les contrôles ainsi que le verrouillage tactile compact.
+- [x] Valider mobile, TypeScript et Vitest avant publication. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.

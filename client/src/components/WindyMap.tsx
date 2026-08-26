@@ -107,6 +107,8 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
   const [fullscreenZoom, setFullscreenZoom] = useState(8);
   const fullscreenHistoryPushed = useRef(false);
+  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isFullscreenTransitioning, setIsFullscreenTransitioning] = useState(false);
 
   const handleLayerChange = useCallback((layerId: string) => {
     setActiveLayer(layerId);
@@ -123,7 +125,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
       fullscreenHistoryPushed.current = true;
     }
     setFullscreenZoom(8);
+    if (transitionTimer.current) clearTimeout(transitionTimer.current);
+    setIsFullscreenTransitioning(true);
     setIsFullscreen(true);
+    transitionTimer.current = setTimeout(() => setIsFullscreenTransitioning(false), 260);
   }, [isFullscreen]);
 
   const adjustFullscreenZoom = useCallback((delta: number) => {
@@ -137,7 +142,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, []);
 
   const closeFullscreen = useCallback(() => {
+    if (transitionTimer.current) clearTimeout(transitionTimer.current);
+    setIsFullscreenTransitioning(true);
     setIsFullscreen(false);
+    transitionTimer.current = setTimeout(() => setIsFullscreenTransitioning(false), 260);
     if (
       typeof window !== "undefined" &&
       fullscreenHistoryPushed.current &&
@@ -146,6 +154,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
       fullscreenHistoryPushed.current = false;
       window.history.back();
     }
+  }, []);
+
+  useEffect(() => () => {
+    if (transitionTimer.current) clearTimeout(transitionTimer.current);
   }, []);
 
   useEffect(() => {
@@ -189,7 +201,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   if (isFullscreen) {
     return (
       <div
-        className="fixed left-0 top-0 z-[200] flex w-screen flex-col overflow-hidden bg-[#080a0f] px-1.5 pt-1.5"
+        className={`fixed left-0 top-0 z-[200] flex w-screen flex-col overflow-hidden bg-[#080a0f] px-1.5 pt-1.5 transition-[opacity,transform] duration-250 ease-out motion-reduce:transition-none ${isFullscreenTransitioning ? "scale-[0.985] opacity-0" : "scale-100 opacity-100"}`}
         style={{
           height: fullscreenHeight ? `${fullscreenHeight}px` : "100dvh",
           maxHeight: fullscreenHeight ? `${fullscreenHeight}px` : "100dvh",
@@ -257,7 +269,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }
 
   return (
-    <div className="flex flex-col gap-0">
+      <div className={`flex flex-col gap-0 transition-[opacity,transform] duration-250 ease-out motion-reduce:transition-none ${isFullscreenTransitioning ? "scale-[0.99] opacity-0" : "scale-100 opacity-100"}`}>
       {/* Carte compacte */}
       <div className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10" aria-label="Carte météo fixe en mode compact">
         <iframe

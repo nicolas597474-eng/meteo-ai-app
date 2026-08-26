@@ -15,6 +15,15 @@ describe("WindyMap", () => {
     expect(source).toContain('onClick={() => onSelect(layer.id)}');
   });
 
+  it("anime l’ouverture et la fermeture sans perturber les contrôles", () => {
+    expect(source).toContain("isFullscreenTransitioning");
+    expect(source).toContain("transition-[opacity,transform]");
+    expect(source).toContain("duration-250");
+    expect(source).toContain("motion-reduce:transition-none");
+    expect(source).toContain("setIsFullscreenTransitioning(true)");
+    expect(source).toContain("setIsFullscreenTransitioning(false)");
+  });
+
   it("masque le tableau détaillé Windy tout en conservant la vue plein écran", () => {
     expect(source).toContain("windyUrlFullscreen");
     expect(source).toContain("barre temporelle native et son bouton lecture");
