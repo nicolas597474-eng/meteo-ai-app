@@ -106,6 +106,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [iframeKey, setIframeKey] = useState(0);
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
   const [fullscreenZoom, setFullscreenZoom] = useState(8);
+  const [compactZoom, setCompactZoom] = useState(8);
   const fullscreenHistoryPushed = useRef(false);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullscreenTransitioning, setIsFullscreenTransitioning] = useState(false);
@@ -133,6 +134,11 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
 
   const adjustFullscreenZoom = useCallback((delta: number) => {
     setFullscreenZoom((current) => Math.max(3, Math.min(14, current + delta)));
+    setIframeKey((current) => current + 1);
+  }, []);
+
+  const adjustCompactZoom = useCallback((delta: number) => {
+    setCompactZoom((current) => Math.max(5, Math.min(11, current + delta)));
     setIframeKey((current) => current + 1);
   }, []);
 
@@ -187,7 +193,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, [isFullscreen]);
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
-  const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
+  const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, compactZoom, false);
   // En plein écran, on conserve la barre temporelle native et son bouton lecture,
   // mais on désactive le panneau détaillé Windy qui affiche le tableau horaire.
   const windyUrlFullscreen = buildWindyUrlWithDetail(
@@ -290,6 +296,14 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             allow="geolocation"
             referrerPolicy="no-referrer-when-downgrade"
           />
+        </div>
+        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
+          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-9 w-9 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+            <span aria-hidden="true" className="text-xl leading-none">+</span>
+          </button>
+          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-9 w-9 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+            <span aria-hidden="true" className="text-xl leading-none">−</span>
+          </button>
         </div>
         {/* Bouton plein écran */}
         <button

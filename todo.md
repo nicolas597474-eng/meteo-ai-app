@@ -3067,3 +3067,7 @@
 ## Nettoyage des éléments visibles dans Windy compact
 - [x] Windy : masquer les boutons natifs + / − visibles dans l’iframe compacte, sans masquer le plein écran ni les couches.
 - [x] Windy : retirer le libellé « Aperçu fixe · animation en plein écran », puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Retour des boutons de zoom centrés en compact
+- [x] Windy : rétablir les boutons + / − externes au centre bas de la carte compacte, sans restaurer le bouton de recentrage.
+- [x] Windy : conserver masqués les boutons natifs de l’iframe en haut à droite et le libellé compact, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
