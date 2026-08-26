@@ -3021,3 +3021,8 @@
 ## Correspondance « Collecte du matin » / v8
 - [x] Recherche : comparer directement l’identifiant et les paramètres de « Collecte du matin » avec v8. La tâche Manus agent est `4uYDhvW3nCHvm4MzDmj6JR`, active, dernière exécution 03:04:40 UTC ; v8 est séparée (`YSVnbPqUuQkAB3y96C6WF3`) et appelle `/api/scheduled/collect-favorites-forecasts`.
 - [x] Décision : éviter toute suppression tant que la tâche Heartbeat v8 n’est pas identifiée avec certitude. La tâche agent ne doit pas être supprimée avant une preuve HTTP 200 de v8.
+
+## Carte météo fixe et interactive
+- [x] Carte compacte : empêcher le déplacement tactile de la carte tout en conservant les boutons météo et les contrôles utilisables.
+- [x] Carte compacte : préserver le défilement vertical de la page autour de la carte.
+- [x] Validation : vérifier mobile, TypeScript, Vitest et absence de régression en plein écran. TypeScript sans erreur ; 383 tests réussis et 2 ignorés ; contrôle mobile effectué.

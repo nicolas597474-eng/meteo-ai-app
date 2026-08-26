@@ -264,15 +264,11 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           key={iframeKey}
           src={windyUrlCompact}
           title={`Carte météo Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
-          className="h-full w-full border-0"
+            className="h-full w-full border-0"
+              style={{ touchAction: "none" }}
           loading="lazy"
           allow="geolocation"
           referrerPolicy="no-referrer-when-downgrade"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 z-10 touch-pan-y"
-          style={{ bottom: "72px" }}
         />
         <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
           Carte fixe · lecture horaire accessible

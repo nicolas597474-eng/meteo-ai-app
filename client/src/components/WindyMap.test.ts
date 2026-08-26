@@ -4,11 +4,13 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./WindyMap.tsx", import.meta.url), "utf8");
 
 describe("WindyMap", () => {
-  it("garde la carte compacte scrollable tout en laissant la lecture horaire accessible", () => {
+  it("verrouille le déplacement compact tout en laissant les boutons et la page accessibles", () => {
     expect(source).not.toContain("isCompactMapInteractive");
     expect(source).not.toContain("event.touches.length >= 2");
-    expect(source).toContain("bottom: \"72px\"");
+    expect(source).toContain('style={{ touchAction: "none" }}');
+    expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Carte fixe · lecture horaire accessible");
+    expect(source).toContain('onClick={() => onSelect(layer.id)}');
   });
 
   it("masque le tableau détaillé Windy tout en conservant la vue plein écran", () => {
