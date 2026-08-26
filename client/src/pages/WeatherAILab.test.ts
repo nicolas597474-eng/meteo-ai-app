@@ -82,10 +82,13 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("getForecastCollectionReport");
     expect(source).toContain("staleTime: 2 * 60_000");
     expect(source).toContain("staleTime: 5 * 60_000");
-    expect(source).toContain("Collecte de prévisions");
-    expect(source).toContain("Relevé de {forecastCollectionReport?.scheduledAt");
-    expect(source).toContain("Les stations physiques relèvent d’un flux d’observations séparé.");
-    expect(source).toContain("dailyCollectedModels.map");
+    expect(source).toContain("Prévisions · tous les modèles");
+    expect(source).toContain("Collecte prévue à {forecastCollectionReport?.scheduledAt");
+    expect(source).toContain("ce n’est pas une confirmation du passage de 05:00 du jour en cours");
+    expect(source).toContain("Stations météorologiques ·");
+    expect(source).toContain("leurs relevés physiques sont collectés par un flux horaire distinct");
+    expect(source).toContain("expectedForecastModels.map");
+    expect(source).toContain("Q = prévision quotidienne archivée ; H = prévision horaire archivée");
     expect(source).toContain("getForecastModelGuide");
     expect(source).toContain("Ouvrir la fiche du modèle");
     expect(source).toContain("Comprendre le modèle");

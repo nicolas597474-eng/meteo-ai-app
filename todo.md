@@ -2943,7 +2943,8 @@
 - [ ] Planification: Réinitialiser sans modification de données la prochaine exécution de v3 si son horaire reste figé dans le passé.
 - [ ] Validation: Contrôler les journaux de v3 et v7, les traces physiques et le bilan AI Lab après leurs premiers passages automatiques.
 - [x] Planification: Créer v4 (`EjJsJFYrUWij9BeGD6GHze`) à la même route de collecte, planifiée chaque heure à xx:20 UTC, puis mettre v3 en pause afin d’éviter les doublons.
-- [ ] Validation: Confirmer le premier passage HTTP 200 de v4 et les archives physiques réellement écrites, sans réécriture des snapshots existants.
+- [x] Validation: Confirmer le premier passage HTTP 200 de v4 et les archives physiques réellement écrites, sans réécriture des snapshots existants. Contrôle du 26 août : huit journaux existent, dont les passages 00:29, 01:29 et 02:21 UTC avec HTTP 200 ; les traces horaires stockées sont présentes pour les deux favoris.
+- [ ] Anomalie planificateur: v7 (`QXZR4pt2HTGfXmKNXyFb8j`) ne présente toujours aucun journal à 03:01 UTC le 26 août, après son créneau 05:00 Paris ; aucune archive prévisions n’a été ajoutée par cette tâche.
 
 ## Synthèse locale directement visible
 - [x] Stations : remplacer le panneau déroulant « Détails de la synthèse locale » par un bloc toujours visible, sans retirer les mesures ni les compteurs.
@@ -2989,3 +2990,8 @@
 ## Cadrage Windy et panneau météo natif
 - [x] Windy : ajuster le cadrage compact et plein écran afin que le panneau des conditions reste entièrement visible.
 - [x] Windy : conserver timeline, couches, fermeture, centrage et zoom ; valider mobile, TypeScript et Vitest.
+
+## Bilan 05h00 — modèles et stations
+- [x] AI Lab : distinguer clairement la collecte de prévisions de 05h00 pour tous les modèles des relevés physiques de stations.
+- [x] AI Lab : n’afficher comme réussite 05h00 que les collectes réellement journalisées et conserver un statut explicite lorsqu’une tâche planifiée ne s’est pas déclenchée.
+- [x] Validation : vérifier le rendu mobile, TypeScript et Vitest avant publication.
