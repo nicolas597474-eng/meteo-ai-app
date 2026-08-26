@@ -90,6 +90,14 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("deviceorientationabsolute");
     expect(source).toContain("window.screen.orientation?.angle");
     expect(source).toContain("headingSource");
+    expect(source).toContain("headingSourceRef");
+    expect(source).toContain('if (!hasAbsoluteHeading && headingSourceRef.current === "absolute") return;');
+    expect(source).toContain("Cap relatif détecté");
+    expect(source).toContain("Activez l’orientation absolue");
+    expect(source).toContain("relativeHeadingOffset");
+    expect(source).toContain("Calibrer le nord");
+    expect(source).toContain("Calibrer sur le nord");
+    expect(source).toContain("Boussole relative calibrée sur le nord");
     expect(source).toContain("Bougez le téléphone");
     expect(source).toContain("Capteur refusé");
     expect(source).toContain("Capteur indisponible");

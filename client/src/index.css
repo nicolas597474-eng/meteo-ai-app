@@ -838,6 +838,30 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   50% { box-shadow: 0 0 0 1px rgb(251 191 36 / 0.36), 0 0 30px rgb(14 165 233 / 0.32), inset 0 0 25px rgb(251 191 36 / 0.10); }
 }
 
+/* Aide affichée seulement tant que le bouton propose d’activer la boussole. */
+[data-swipe-exclude] button[aria-label="Activer la boussole du téléphone"] {
+  position: relative;
+}
+
+[data-swipe-exclude] button[aria-label="Activer la boussole du téléphone"]::after {
+  position: absolute;
+  top: calc(100% + 31px);
+  left: 50%;
+  width: 132px;
+  padding: 5px 7px;
+  border: 1px solid rgb(125 211 252 / 0.36);
+  border-radius: 8px;
+  background: rgb(2 6 23 / 0.94);
+  color: rgb(224 242 254 / 0.94);
+  content: "Autorisez Mouvement et orientation dans les réglages du navigateur.";
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  transform: translateX(-50%);
+  box-shadow: 0 8px 18px rgb(2 6 23 / 0.42);
+}
+
 .map-control-button {
   display: flex;
   width: 3rem;

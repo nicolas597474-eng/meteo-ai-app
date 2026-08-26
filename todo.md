@@ -3177,11 +3177,21 @@
 - [x] Ajouter un diagnostic visible et un repli clair lorsque le navigateur ne transmet aucun événement d’orientation.
 
 ## Collecte horaire automatique sécurisée
-- [x] Autoriser la tâche planifiée de snapshots par une capacité cryptographique dédiée lorsque le cookie cron est absent ou invalide.
-- [ ] Configurer la tâche active avec cette capacité et conserver sa cadence à xx:20 UTC.
+- [x] Évaluer une capacité cryptographique dédiée en repli lorsque le cookie cron est absent ou invalide, puis retirer cette tentative après confirmation que le refus 403 se produit à la passerelle avant le handler.
+- [ ] Faire corriger l’autorisation cron par la plateforme tout en conservant la tâche v5 à xx:20 UTC, sans exposer de secret ou contourner l’authentification.
 - [ ] Vérifier un journal HTTP 200 et une trace de snapshot après le prochain passage automatique.
 
 ## Refonte futuriste de la boussole astronomique
 - [x] Recomposer la rose des vents avec une esthétique futuriste sombre, cyan et ambrée cohérente avec la carte d’éclipse.
 - [x] Mettre en évidence séparément le cap du téléphone et l’azimut calculé de l’astre sans simuler de cap absent.
 - [x] Ajouter une aide concise de calibration lorsque le navigateur ne transmet aucun cap, puis valider les tests et le rendu mobile.
+
+## Aide d’autorisation du capteur de mouvement
+- [x] Informer l’utilisateur, uniquement en cas d’absence de cap, qu’il doit autoriser les capteurs de mouvement et d’orientation dans son navigateur.
+- [x] Conserver un message discret lorsque le cap est actif ou lorsque l’appareil ne prend pas ces capteurs en charge.
+- [x] Valider le texte, le repli et la suite de tests avant publication. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Calibration fiable de la boussole mobile
+- [x] Distinguer un cap absolu d’un cap relatif et appliquer la correction d’orientation d’écran appropriée, en empêchant une mesure relative ultérieure d’écraser un cap absolu.
+- [x] Ajouter une calibration utilisateur lorsque le navigateur ne peut pas fournir un nord magnétique de manière fiable.
+- [x] Vérifier les calculs de rotation et les tests de régression avant publication, sans simuler de cap. La validation sur rotation physique complète reste à confirmer sur le téléphone de l’utilisateur.
