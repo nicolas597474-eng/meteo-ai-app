@@ -2985,3 +2985,7 @@
 ## Lexique : libellé des exemples
 - [x] Lexique : remplacer uniformément « Exemple simple » par « Exemple », sans modifier les contenus.
 - [x] Lexique : valider TypeScript et Vitest après le changement de libellé.
+
+## Cadrage Windy et panneau météo natif
+- [x] Windy : ajuster le cadrage compact et plein écran afin que le panneau des conditions reste entièrement visible.
+- [x] Windy : conserver timeline, couches, fermeture, centrage et zoom ; valider mobile, TypeScript et Vitest.

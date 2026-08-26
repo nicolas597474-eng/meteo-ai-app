@@ -21,6 +21,10 @@ const WINDY_LAYERS: WindyLayer[] = [
 // être ciblés par le CSS de l’application. En plein écran, on décale seulement
 // sa gouttière de contrôles hors de la zone visible, sans toucher à la timeline.
 const FULLSCREEN_NATIVE_CONTROL_GUTTER_PX = 72;
+// Le panneau natif Windy (pluie, vent, etc.) s’ouvre à droite du repère. On
+// centre donc légèrement la carte à l’est du lieu pour garder ce panneau dans
+// le cadre, sans déplacer le repère géographique de la position réelle.
+const WEATHER_PANEL_CENTER_OFFSET_PX = 64;
 
 function buildWindyUrl(lat: number, lon: number, layer: string, zoom: number = 8): string {
   return buildWindyUrlWithDetail(lat, lon, layer, zoom, false);
@@ -33,11 +37,15 @@ function buildWindyUrlWithDetail(
   zoom: number = 8,
   detail: boolean = false,
 ): string {
+  // Le calcul maintient le même décalage visuel quelle que soit l’échelle.
+  const centerLonOffset =
+    (WEATHER_PANEL_CENTER_OFFSET_PX * 360) / (256 * 2 ** zoom);
+
   const params = new URLSearchParams({
     v: "2",
     zoom: String(zoom),
     lat: lat.toFixed(4),
-    lon: lon.toFixed(4),
+    lon: (lon + centerLonOffset).toFixed(4),
     detailLat: lat.toFixed(4),
     detailLon: lon.toFixed(4),
     detail: detail ? "true" : "false",

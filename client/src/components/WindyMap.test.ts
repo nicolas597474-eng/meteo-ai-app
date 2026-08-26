@@ -58,4 +58,11 @@ describe("WindyMap", () => {
     expect(source).toContain("width: `calc(100% + ${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px)`");
     expect(source).toContain("barre temporelle native et son bouton lecture");
   });
+
+  it("décale la vue des deux modes afin de laisser le panneau météo natif entièrement visible", () => {
+    expect(source).toContain("WEATHER_PANEL_CENTER_OFFSET_PX = 64");
+    expect(source).toContain("const centerLonOffset");
+    expect(source).toContain("lon: (lon + centerLonOffset).toFixed(4)");
+    expect(source).toContain("detailLon: lon.toFixed(4)");
+  });
 });
