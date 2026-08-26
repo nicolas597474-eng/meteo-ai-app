@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Crosshair, Maximize2, Minus, Plus, X } from "lucide-react";
+import { getWindyMapPreferences, makeWindyMapLocationKey, type WindyMapPreferences, writeWindyMapPreferences } from "./windyMapPreferences";
 
 type WindyLayer = {
   id: string;
@@ -113,20 +114,29 @@ function LayerSelector({
 }
 
 export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
-  const [activeLayer, setActiveLayer] = useState<string>("rain");
+  const preferenceLocationKey = makeWindyMapLocationKey(lat, lon);
+  const [preferences, setPreferences] = useState<WindyMapPreferences>(() => getWindyMapPreferences(preferenceLocationKey));
+  const { layer: activeLayer, compactZoom, fullscreenZoom } = preferences;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
-  const [fullscreenZoom, setFullscreenZoom] = useState(8);
-  const [compactZoom, setCompactZoom] = useState(8);
   const fullscreenHistoryPushed = useRef(false);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullscreenTransitioning, setIsFullscreenTransitioning] = useState(false);
 
+  useEffect(() => {
+    setPreferences(getWindyMapPreferences(preferenceLocationKey));
+    setIframeKey((current) => current + 1);
+  }, [preferenceLocationKey]);
+
   const handleLayerChange = useCallback((layerId: string) => {
-    setActiveLayer(layerId);
+    setPreferences((current) => {
+      const next = { ...current, layer: layerId };
+      writeWindyMapPreferences(preferenceLocationKey, next);
+      return next;
+    });
     setIframeKey((prev) => prev + 1);
-  }, []);
+  }, [preferenceLocationKey]);
 
   const openFullscreen = useCallback(() => {
     if (typeof window !== "undefined" && !isFullscreen) {
@@ -137,7 +147,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
       );
       fullscreenHistoryPushed.current = true;
     }
-    setFullscreenZoom(8);
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
     setIsFullscreenTransitioning(true);
     setIsFullscreen(true);
@@ -145,19 +154,31 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, [isFullscreen]);
 
   const adjustFullscreenZoom = useCallback((delta: number) => {
-    setFullscreenZoom((current) => Math.max(3, Math.min(14, current + delta)));
+    setPreferences((current) => {
+      const next = { ...current, fullscreenZoom: Math.max(3, Math.min(14, current.fullscreenZoom + delta)) };
+      writeWindyMapPreferences(preferenceLocationKey, next);
+      return next;
+    });
     setIframeKey((current) => current + 1);
-  }, []);
+  }, [preferenceLocationKey]);
 
   const adjustCompactZoom = useCallback((delta: number) => {
-    setCompactZoom((current) => Math.max(5, Math.min(11, current + delta)));
+    setPreferences((current) => {
+      const next = { ...current, compactZoom: Math.max(5, Math.min(11, current.compactZoom + delta)) };
+      writeWindyMapPreferences(preferenceLocationKey, next);
+      return next;
+    });
     setIframeKey((current) => current + 1);
-  }, []);
+  }, [preferenceLocationKey]);
 
   const recenterFullscreenMap = useCallback(() => {
-    setFullscreenZoom(8);
+    setPreferences((current) => {
+      const next = { ...current, fullscreenZoom: 8 };
+      writeWindyMapPreferences(preferenceLocationKey, next);
+      return next;
+    });
     setIframeKey((current) => current + 1);
-  }, []);
+  }, [preferenceLocationKey]);
 
   const closeFullscreen = useCallback(() => {
     if (transitionTimer.current) clearTimeout(transitionTimer.current);

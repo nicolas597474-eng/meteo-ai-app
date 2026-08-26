@@ -83,6 +83,14 @@ describe("WindyMap", () => {
     expect(source).not.toContain('className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4"');
   });
 
+  it("restaure la couche et les zooms selon le lieu actif", () => {
+    expect(source).toContain("makeWindyMapLocationKey(lat, lon)");
+    expect(source).toContain("getWindyMapPreferences(preferenceLocationKey)");
+    expect(source).toContain("writeWindyMapPreferences(preferenceLocationKey, next)");
+    expect(source).toContain("const { layer: activeLayer, compactZoom, fullscreenZoom } = preferences");
+    expect(source).toContain("setPreferences(getWindyMapPreferences(preferenceLocationKey))");
+  });
+
   it("conserve la couche météo sans basculement de fond non fiable", () => {
     expect(source).toContain("overlay: layer");
     expect(source).not.toContain('params.set("map", baseMap)');

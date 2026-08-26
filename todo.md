@@ -3135,3 +3135,8 @@
 ## Descente supplémentaire du zoom Windy plein écran
 - [x] Windy : descendre encore le groupe + / − dans la colonne droite, aligné avec la croix de fermeture et sans chevaucher la ligne de lecture.
 - [x] Windy : préserver le mode compact, mettre à jour le test de position et valider TypeScript, Vitest et le rendu mobile.
+
+## Préférences Windy persistantes par lieu
+- [x] Windy : mémoriser et restaurer la dernière couche météo choisie pour chaque lieu favori.
+- [x] Windy : mémoriser et restaurer les niveaux de zoom compact et plein écran pour chaque lieu favori.
+- [x] Windy : couvrir la persistance au changement de lieu, les valeurs par défaut, TypeScript, Vitest et le rendu mobile sans modifier les données météo.
