@@ -31,7 +31,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Sources appliquées par paramètre");
     expect(source).toContain("AROME peut aider pour la température");
     expect(source).toContain("Si les modèles prévoient entre 19 et 20 °C");
-    expect(source).toContain("Exemple simple ·");
+    expect(source).toContain("Exemple ·");
+    expect(source).not.toContain("Exemple simple ·");
     expect(source).toContain("Fermer le Lexique");
     expect(source).toContain("setIsOpen(false)");
     expect(source).toContain("Stabilité des modèles");

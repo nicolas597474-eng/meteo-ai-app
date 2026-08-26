@@ -2981,3 +2981,7 @@
 - [x] Lexique : ajouter un exemple simple à chaque notion explicative, sans inventer de données observées ou de résultats météo.
 - [x] Lexique : ajouter une croix accessible pour replier immédiatement le Lexique lorsqu’il est ouvert.
 - [x] Lexique : valider la structure, le mobile, TypeScript et Vitest après l’enrichissement.
+
+## Lexique : libellé des exemples
+- [x] Lexique : remplacer uniformément « Exemple simple » par « Exemple », sans modifier les contenus.
+- [x] Lexique : valider TypeScript et Vitest après le changement de libellé.
