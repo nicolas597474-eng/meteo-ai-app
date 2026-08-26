@@ -23,6 +23,10 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Poids du régime, en clair");
     expect(source).toContain("Exemple : Ciel couvert");
     expect(source).toContain("ne veut pas dire 30 % de nuages");
+    expect(source).toContain("Poids moyen d’un modèle");
+    expect(source).toContain("Pourquoi plusieurs modèles ont le même poids moyen");
+    expect(source).toContain("Ce n’est ni une note, ni une chance qu’il ait raison");
+    expect(source).toContain("ce n’est pas un classement ni une probabilité");
     expect(source).toContain("Stabilité des modèles");
     expect(source).toContain("Données insuffisantes / —");
     expect(source).toContain("group-open:rotate-180");

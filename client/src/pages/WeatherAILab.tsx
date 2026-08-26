@@ -93,6 +93,8 @@ const AI_LAB_GLOSSARY = [
     entries: [
       ["Poids appliqué", "Part attribuée à un modèle pour un paramètre donné dans la fusion. Les poids sont des coefficients de calcul ; ils ne sont ni une probabilité ni une observation de station."],
       ["Sources appliquées par paramètre", "Liste distincte pour température, précipitations et vent. Un modèle peut contribuer différemment selon le paramètre si ses données ou ses preuves disponibles diffèrent."],
+      ["Poids moyen d’un modèle", "C’est la moyenne des poids finaux réellement reçus par ce modèle pour les paramètres auxquels il a contribué : température, pluie, vent ou humidité. Ce n’est ni une note, ni une chance qu’il ait raison."],
+      ["Pourquoi plusieurs modèles ont le même poids moyen", "Lorsque plusieurs modèles apportent les mêmes paramètres avec des conditions comparables, la fusion partage le poids disponible entre eux. Avec 8 modèles équivalents, chacun peut donc afficher environ 13 %. Si un modèle contribue davantage à un paramètre ou possède une meilleure preuve disponible, son poids moyen peut devenir différent."],
       ["Poids du régime, en clair", "Les pastilles T°, Pluie, Vent et Nuages indiquent ce qui compte le plus pour décrire le scénario météo du moment. Elles ne sont ni une probabilité ni un pourcentage de nuages."],
       ["Exemple : Ciel couvert", "Si le ciel est prévu très nuageux, la pastille Nuages peut compter davantage. Par exemple, Nuages 30 % ne veut pas dire 30 % de nuages : cela signifie seulement que l’état du ciel est important pour ce régime. Si la pluie ou le vent devient plus marqué, le résultat peut devenir Averses, Pluie ou Vent fort."],
     ],
@@ -299,7 +301,7 @@ export default function WeatherAILab() {
       id: "contributors",
       title: "Données exploitables",
       summary: hasTrace ? `${data.modelsUsed} modèle(s) possèdent un poids final positif dans la trace.` : "Aucun contributeur n’est affiché sans trace de poids final.",
-      detail: contributors.length ? <div className="space-y-1">{contributors.map((model) => <p key={model.name}><span className="font-semibold text-violet-200">{model.name}</span> · poids moyen {Math.round(model.averageWeight * 100)} %.</p>)}</div> : <p>Les modèles reçus ne sont pas automatiquement considérés comme appliqués : une trace de contribution est requise.</p>,
+      detail: contributors.length ? <div className="space-y-2">{contributors.map((model) => <p key={model.name}><span className="font-semibold text-violet-200">{model.name}</span> · poids moyen {Math.round(model.averageWeight * 100)} %.</p>)}<p className="border-t border-slate-700/70 pt-2 text-slate-400">Le poids moyen résume les poids finaux de chaque paramètre auquel le modèle a réellement contribué. Des modèles avec les mêmes données et la même place dans la fusion peuvent donc afficher le même pourcentage ; ce n’est pas un classement ni une probabilité.</p></div> : <p>Les modèles reçus ne sont pas automatiquement considérés comme appliqués : une trace de contribution est requise.</p>,
       status: hasTrace ? "complete" : "waiting",
     },
     {

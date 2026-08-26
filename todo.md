@@ -2971,3 +2971,8 @@
 - [x] Lexique : expliquer en termes simples ce que représentent les poids température, pluie, vent et état du ciel, avec un exemple Ciel couvert.
 - [x] Lexique : préciser clairement qu’un poids n’est ni une probabilité ni une couverture nuageuse.
 - [x] Lexique : valider le rendu mobile, TypeScript et Vitest après ajout.
+
+## Lexique : explication du poids moyen des modèles
+- [x] Lexique : expliquer comment le poids moyen d’un modèle résume ses contributions par paramètre dans la fusion.
+- [x] Lexique : expliquer pourquoi plusieurs modèles peuvent afficher le même poids moyen quand leurs contributions sont équivalentes ou renormalisées.
+- [x] AI Lab : relier l’étape « Données exploitables » à cette explication, puis valider mobile, TypeScript et Vitest.
