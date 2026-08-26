@@ -106,6 +106,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const [iframeKey, setIframeKey] = useState(0);
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
   const [fullscreenZoom, setFullscreenZoom] = useState(8);
+  const [compactZoom, setCompactZoom] = useState(8);
   const fullscreenHistoryPushed = useRef(false);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullscreenTransitioning, setIsFullscreenTransitioning] = useState(false);
@@ -133,6 +134,16 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
 
   const adjustFullscreenZoom = useCallback((delta: number) => {
     setFullscreenZoom((current) => Math.max(3, Math.min(14, current + delta)));
+    setIframeKey((current) => current + 1);
+  }, []);
+
+  const adjustCompactZoom = useCallback((delta: number) => {
+    setCompactZoom((current) => Math.max(5, Math.min(11, current + delta)));
+    setIframeKey((current) => current + 1);
+  }, []);
+
+  const recenterCompactMap = useCallback(() => {
+    setCompactZoom(8);
     setIframeKey((current) => current + 1);
   }, []);
 
@@ -187,7 +198,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, [isFullscreen]);
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
-  const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false);
+  const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, compactZoom, false);
   // En plein écran, on conserve la barre temporelle native et son bouton lecture,
   // mais on désactive le panneau détaillé Windy qui affiche le tableau horaire.
   const windyUrlFullscreen = buildWindyUrlWithDetail(
@@ -271,24 +282,34 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   return (
       <div className={`flex flex-col gap-0 transition-[opacity,transform] duration-250 ease-out motion-reduce:transition-none ${isFullscreenTransitioning ? "scale-[0.99] opacity-0" : "scale-100 opacity-100"}`}>
       {/* Carte compacte */}
-      <div className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10" aria-label="Carte météo fixe en mode compact">
-        <iframe
-          key={iframeKey}
-          src={windyUrlCompact}
-          title={`Carte météo Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
-          className="h-full w-full border-0"
-          loading="lazy"
-          allow="geolocation"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
-        {/* La zone centrale bloque le panoramique ; les rails supérieur, droit et
-            inférieur restent ouverts aux commandes natives Windy. */}
-        <div
-          aria-hidden="true"
-          className="absolute bottom-[82px] left-0 right-[76px] top-[84px] z-10 touch-pan-y bg-transparent"
-        />
+      <div className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10" aria-label="Aperçu météo fixe en mode compact">
+        {/* L’iframe est strictement visuelle ici : son contenu ne reçoit aucun geste.
+            Les commandes compactes sont rendues par l’application, hors iframe. */}
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <iframe
+            key={iframeKey}
+            src={windyUrlCompact}
+            title={`Aperçu fixe Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
+            className="pointer-events-none h-full w-full border-0"
+            tabIndex={-1}
+            loading="lazy"
+            allow="geolocation"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
         <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
-          Carte fixe · lecture horaire accessible
+          Aperçu fixe · animation en plein écran
+        </div>
+        <div className="absolute bottom-3 left-3 z-20 flex items-center overflow-hidden rounded-xl border border-white/20 bg-[#0d1117]/85 shadow-lg backdrop-blur-sm" aria-label="Zoom de l’aperçu fixe">
+          <button type="button" onClick={recenterCompactMap} aria-label="Recentrer l’aperçu" className="grid h-9 w-9 place-items-center border-r border-white/10 text-sky-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+            <span aria-hidden="true" className="text-base">◎</span>
+          </button>
+          <button type="button" onClick={() => adjustCompactZoom(1)} aria-label="Zoomer l’aperçu" className="grid h-9 w-9 place-items-center border-r border-white/10 text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+            <span aria-hidden="true" className="text-xl leading-none">+</span>
+          </button>
+          <button type="button" onClick={() => adjustCompactZoom(-1)} aria-label="Dézoomer l’aperçu" className="grid h-9 w-9 place-items-center text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300">
+            <span aria-hidden="true" className="text-xl leading-none">−</span>
+          </button>
         </div>
         {/* Bouton plein écran */}
         <button

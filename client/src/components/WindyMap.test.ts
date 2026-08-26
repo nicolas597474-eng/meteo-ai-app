@@ -7,11 +7,14 @@ describe("WindyMap", () => {
   it("verrouille le déplacement compact tout en laissant les boutons et la page accessibles", () => {
     expect(source).not.toContain("isCompactMapInteractive");
     expect(source).not.toContain("event.touches.length >= 2");
-    expect(source).toContain("zone centrale bloque le panoramique");
-    expect(source).toContain('className="absolute bottom-[82px] left-0 right-[76px] top-[84px] z-10 touch-pan-y bg-transparent"');
+    expect(source).toContain("iframe est strictement visuelle ici");
+    expect(source).toContain('className="pointer-events-none absolute inset-0"');
+    expect(source).toContain('className="pointer-events-none h-full w-full border-0"');
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
-    expect(source).toContain("Carte météo fixe en mode compact");
+    expect(source).toContain("Aperçu météo fixe en mode compact");
     expect(source).toContain('aria-label="Boutons de couches météo"');
+    expect(source).toContain('aria-label="Zoom de l’aperçu fixe"');
+    expect(source).toContain('aria-label="Zoomer l’aperçu"');
     expect(source).toContain('className="absolute bottom-3 right-3 z-20 grid h-9 w-9');
     expect(source).toContain('onClick={() => onSelect(layer.id)}');
   });
@@ -28,9 +31,9 @@ describe("WindyMap", () => {
   it("masque le tableau détaillé Windy tout en conservant la vue plein écran", () => {
     expect(source).toContain("windyUrlFullscreen");
     expect(source).toContain("barre temporelle native et son bouton lecture");
-    expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)");
+    expect(source).toContain("const windyUrlFullscreen = buildWindyUrlWithDetail(");
     expect(source).toContain("windyUrlCompact");
-    expect(source).toContain("buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, 8, false)");
+    expect(source).toContain("activeLayerInfo.windyParam, compactZoom, false");
   });
 
   it("ancre le repère de localisation aux coordonnées Windy plutôt qu’au centre visuel", () => {

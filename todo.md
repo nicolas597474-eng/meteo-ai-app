@@ -3046,3 +3046,8 @@
 - [x] Découper la surface tactile fixe afin qu’elle ne recouvre plus les commandes de carte.
 - [x] Confirmer que les boutons compact, les couches et le plein écran sont utilisables sans panoramique.
 - [x] Valider mobile, TypeScript et Vitest avant publication. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Aperçu Windy compact réellement fixe
+- [x] Remplacer l’iframe compacte par un aperçu non déplaçable, car les gestes internes de l’iframe restent actifs sur mobile.
+- [x] Conserver les couches et l’accès au plein écran depuis des commandes applicatives séparées.
+- [x] Valider mobile, TypeScript et Vitest avant publication. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
