@@ -281,11 +281,11 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           allow="geolocation"
           referrerPolicy="no-referrer-when-downgrade"
         />
-        {/* Surface tactile complète : elle bloque tout panoramique de l’iframe.
-            Les commandes de l’application restent hors de cette surface. */}
+        {/* La zone centrale bloque le panoramique ; les rails supérieur, droit et
+            inférieur restent ouverts aux commandes natives Windy. */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 z-10 touch-pan-y bg-transparent"
+          className="absolute bottom-[82px] left-0 right-[76px] top-[84px] z-10 touch-pan-y bg-transparent"
         />
         <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
           Carte fixe · lecture horaire accessible

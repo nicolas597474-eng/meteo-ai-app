@@ -7,8 +7,8 @@ describe("WindyMap", () => {
   it("verrouille le déplacement compact tout en laissant les boutons et la page accessibles", () => {
     expect(source).not.toContain("isCompactMapInteractive");
     expect(source).not.toContain("event.touches.length >= 2");
-    expect(source).toContain("Surface tactile complète");
-    expect(source).toContain('className="absolute inset-0 z-10 touch-pan-y bg-transparent"');
+    expect(source).toContain("zone centrale bloque le panoramique");
+    expect(source).toContain('className="absolute bottom-[82px] left-0 right-[76px] top-[84px] z-10 touch-pan-y bg-transparent"');
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Carte météo fixe en mode compact");
     expect(source).toContain('aria-label="Boutons de couches météo"');
