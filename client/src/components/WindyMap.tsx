@@ -18,8 +18,8 @@ const WINDY_LAYERS: WindyLayer[] = [
 ];
 
 // L’embed Windy est isolé dans une iframe externe : ses boutons ne peuvent pas
-// être ciblés par le CSS de l’application. En plein écran, on décale seulement
-// sa gouttière de contrôles hors de la zone visible, sans toucher à la timeline.
+// être ciblés par le CSS de l’application. On décale sa gouttière de contrôles
+// hors de la zone visible, sans toucher à la timeline en plein écran.
 const FULLSCREEN_NATIVE_CONTROL_GUTTER_PX = 72;
 // Le panneau natif Windy (pluie, vent, etc.) s’ouvre à droite du repère. On
 // centre donc légèrement la carte à l’est du lieu pour garder ce panneau dans
@@ -274,20 +274,22 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
       <div className="relative h-[340px] touch-pan-y overflow-hidden rounded-2xl border border-white/10" aria-label="Aperçu météo fixe en mode compact">
         {/* L’iframe est strictement visuelle ici : son contenu ne reçoit aucun geste.
             Les commandes compactes sont rendues par l’application, hors iframe. */}
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 overflow-hidden"
+          style={{ right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px` }}
+          aria-hidden="true"
+        >
           <iframe
             key={iframeKey}
             src={windyUrlCompact}
             title={`Aperçu fixe Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
-            className="pointer-events-none h-full w-full border-0"
+            className="pointer-events-none h-full border-0"
+            style={{ width: `calc(100% + ${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px)` }}
             tabIndex={-1}
             loading="lazy"
             allow="geolocation"
             referrerPolicy="no-referrer-when-downgrade"
           />
-        </div>
-        <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-white/15 bg-[#0d1117]/80 px-2 py-1 text-[9px] font-semibold text-slate-200 shadow-lg backdrop-blur-sm">
-          Aperçu fixe · animation en plein écran
         </div>
         {/* Bouton plein écran */}
         <button

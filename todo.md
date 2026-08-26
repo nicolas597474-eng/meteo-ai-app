@@ -3063,3 +3063,7 @@
 ## Simplification finale des commandes Windy compactes
 - [x] Windy : retirer le bouton de recentrage à gauche et les boutons + / − externes de la vue compacte.
 - [x] Windy : conserver la carte fixe, les couches et le plein écran, puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
+
+## Nettoyage des éléments visibles dans Windy compact
+- [x] Windy : masquer les boutons natifs + / − visibles dans l’iframe compacte, sans masquer le plein écran ni les couches.
+- [x] Windy : retirer le libellé « Aperçu fixe · animation en plein écran », puis valider TypeScript, Vitest et le rendu mobile. TypeScript sans erreur ; 384 tests réussis et 2 ignorés ; contrôle mobile effectué.
