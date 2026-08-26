@@ -2944,7 +2944,9 @@
 - [ ] Validation: Contrôler les journaux de v3 et v7, les traces physiques et le bilan AI Lab après leurs premiers passages automatiques.
 - [x] Planification: Créer v4 (`EjJsJFYrUWij9BeGD6GHze`) à la même route de collecte, planifiée chaque heure à xx:20 UTC, puis mettre v3 en pause afin d’éviter les doublons.
 - [x] Validation: Confirmer le premier passage HTTP 200 de v4 et les archives physiques réellement écrites, sans réécriture des snapshots existants. Contrôle du 26 août : huit journaux existent, dont les passages 00:29, 01:29 et 02:21 UTC avec HTTP 200 ; les traces horaires stockées sont présentes pour les deux favoris.
-- [ ] Anomalie planificateur: v7 (`QXZR4pt2HTGfXmKNXyFb8j`) ne présente toujours aucun journal à 03:01 UTC le 26 août, après son créneau 05:00 Paris ; aucune archive prévisions n’a été ajoutée par cette tâche.
+- [x] Anomalie planificateur: v7 (`QXZR4pt2HTGfXmKNXyFb8j`) a finalement échoué en HTTP 403 à 03:10:55 UTC le 26 août (« permission error for cron cookie »), sans écriture de prévisions ; elle est mise en pause.
+- [x] Correctif v7 : renouveler l’autorisation cron via v8 (`YSVnbPqUuQkAB3y96C6WF3`) sur le callback `/api/scheduled/collect-favorites-forecasts`, sans modifier les archives de prévisions existantes.
+- [ ] Validation v8 : confirmer son premier passage HTTP 200 et des archives prévisions horodatées cohérentes avant de déclarer la collecte 05:00 opérationnelle.
 
 ## Synthèse locale directement visible
 - [x] Stations : remplacer le panneau déroulant « Détails de la synthèse locale » par un bloc toujours visible, sans retirer les mesures ni les compteurs.
