@@ -676,12 +676,6 @@ export default function Dashboard() {
 
         {/* ── Hero : Température actuelle + max/min ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">
-          {/* Fond de la grande carte : condition de l’heure courante, puis repli régime/données. */}
-          <img
-            src={dashboardSkyImage}
-            alt="Paysage météo"
-            className="absolute inset-0 h-full w-full object-cover opacity-70 pointer-events-none"
-          />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* ── Regime badge ── */}
@@ -840,9 +834,9 @@ export default function Dashboard() {
             {/* Main temperature row */}
             <div className="flex items-start gap-2 sm:gap-6">
               {/* The condition remains daily only when the hourly feed is unavailable. */}
-              <div className="w-12 shrink-0 pt-1 sm:w-auto sm:pt-0">
-                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={48} className="sm:hidden" />
-                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} className="hidden sm:block" />
+              <div className="w-[4.25rem] shrink-0 pt-0.5 sm:w-[5.25rem] sm:pt-0">
+                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} className="sm:hidden" />
+                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={80} className="hidden sm:block" />
               </div>
 
               <div className={dashboardTemperatureLayout.content}>

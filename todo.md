@@ -3428,3 +3428,8 @@
 - [x] Actualiser automatiquement la pastille et l’historique dès qu’un nouveau snapshot physique est réellement enregistré.
 - [x] Conserver la cadence horaire et distinguer les créneaux sans station des erreurs techniques.
 - [x] Tester le rafraîchissement et publier l’amélioration.
+
+## Icône météo principale du Dashboard
+- [x] Retirer le grand nuage décoratif sous la température principale.
+- [x] Agrandir l’unique icône météo située à gauche de la température, sans empiéter sur les valeurs maximale et minimale.
+- [x] Vérifier l’équilibre mobile et publier la simplification.
