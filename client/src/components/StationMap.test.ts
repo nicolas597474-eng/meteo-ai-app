@@ -61,6 +61,9 @@ describe("carte des stations", () => {
     expect(source).toContain("Fermer la carte");
     expect(source).not.toContain("MapTypeControlStyle.HORIZONTAL_BAR");
     expect(source).toContain("setIsExpanded(true)");
+    expect(source).toContain("const openImmersiveMap = useCallback");
+    expect(source).toContain("const closeImmersiveMap = useCallback");
+    expect(source).toContain("document.documentElement.requestFullscreen()");
     expect(source).toContain("background:#071018");
     expect(source).toContain("border:1px solid #38bdf8");
     expect(source).toContain("function stationFreshness");

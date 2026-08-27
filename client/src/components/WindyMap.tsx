@@ -152,6 +152,9 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
     setIsFullscreenTransitioning(true);
     setIsFullscreen(true);
+    if (typeof document !== "undefined" && !document.fullscreenElement) {
+      void document.documentElement.requestFullscreen().catch(() => undefined);
+    }
     transitionTimer.current = setTimeout(() => setIsFullscreenTransitioning(false), 260);
   }, [isFullscreen]);
 
@@ -186,6 +189,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
     setIsFullscreenTransitioning(true);
     setIsFullscreen(false);
+    if (typeof document !== "undefined" && document.fullscreenElement) void document.exitFullscreen();
     transitionTimer.current = setTimeout(() => setIsFullscreenTransitioning(false), 260);
     if (
       typeof window !== "undefined" &&

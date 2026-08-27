@@ -3348,6 +3348,11 @@
 - [x] Ajouter un cercle noir central qui sépare les secteurs en deux zones concentriques.
 - [x] Préserver les huit directions, le guidage réel et tester le mobile avant publication.
 
+## Ouverture immersive directe des cartes
+- [x] Faire ouvrir directement la carte d’éclipse dans sa vue immersive depuis le bouton d’agrandissement.
+- [x] Faire ouvrir directement la carte des stations et la carte météo dans leurs vues immersives.
+- [x] Préserver les contrôles, le retour à la vue compacte et la compatibilité mobile, puis valider.
+
 ## Informations lunaires en direct
 - [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
 - [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.

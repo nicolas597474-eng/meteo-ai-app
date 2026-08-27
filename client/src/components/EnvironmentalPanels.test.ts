@@ -59,6 +59,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("absolute bottom-16 left-3");
     expect(source).toContain("Régler l’opacité des zones de visibilité");
     expect(source).toContain("openExpandedMap");
+    expect(source).toContain("Le plein écran du navigateur n’est pas disponible");
+    expect(source).toContain("document.documentElement.requestFullscreen()");
     expect(source).toContain("isMapOpeningRef");
     expect(source).toContain('google.maps.event.trigger(map, "resize")');
     expect(styles).toContain("map-opacity-control");

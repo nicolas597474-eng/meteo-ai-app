@@ -622,9 +622,14 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     isMapOpeningRef.current = true;
     setIsMapOpening(true);
     setIsMapExpanded(true);
+    if (typeof document !== "undefined" && !document.fullscreenElement) {
+      void document.documentElement.requestFullscreen().catch(() => {
+        setLocationStatus("Le plein écran du navigateur n’est pas disponible. La carte reste ouverte en vue immersive intégrée.");
+      });
+    }
   };
   const closeExpandedMap = () => {
-    if (isLunarObservationFullscreen && document.fullscreenElement) void document.exitFullscreen();
+    if (typeof document !== "undefined" && document.fullscreenElement) void document.exitFullscreen();
     isMapOpeningRef.current = false;
     setIsMapOpening(false);
     setIsMapExpanded(false);

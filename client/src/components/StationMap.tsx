@@ -102,6 +102,19 @@ const restoreNormalView = useCallback(() => {
     setMapType(nextType);
   }, []);
 
+  const openImmersiveMap = useCallback(() => {
+    setIsExpanded(true);
+    if (typeof document !== "undefined" && !document.fullscreenElement) {
+      void document.documentElement.requestFullscreen().catch(() => undefined);
+    }
+  }, []);
+
+  const closeImmersiveMap = useCallback(() => {
+    streetViewRef.current?.setVisible(false);
+    if (typeof document !== "undefined" && document.fullscreenElement) void document.exitFullscreen();
+    setIsExpanded(false);
+  }, []);
+
 const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
     if (!mapRef.current) return;
     const panorama = streetViewRef.current ?? mapRef.current.getStreetView();
@@ -218,8 +231,7 @@ rotateControl: false,
           <>
             <MapControlButton
               onClick={() => {
-                streetViewRef.current?.setVisible(false);
-                setIsExpanded(false);
+                closeImmersiveMap();
               }}
               aria-label="Fermer la carte agrandie"
               className="absolute right-3 top-3 z-10"
@@ -262,7 +274,7 @@ rotateControl: false,
             </button>
             <button
               type="button"
-              onClick={() => setIsExpanded(true)}
+              onClick={openImmersiveMap}
               aria-label="Agrandir la carte"
               className={`${mapActionButtonClass} border-sky-300/70 bg-sky-400/15 text-sky-100`}
             >
