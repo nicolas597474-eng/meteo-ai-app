@@ -64,21 +64,65 @@ function getInlineAnimationClass(name: string) {
   return "";
 }
 
+type WeatherEffectKind = "sun" | "cloud" | "rain" | "storm" | "snow" | "fog" | "night" | "wind" | "humidity" | "none";
+
+function getWeatherEffectKind(name: string): WeatherEffectKind {
+  const key = name.toLowerCase();
+  if (["sunny", "stable", "summer_heat"].includes(key)) return "sun";
+  if (["few_clouds", "partly_cloudy", "overcast", "cloud_cover", "variable", "maritime", "urban_heat", "mountain"].includes(key)) return "cloud";
+  if (["showers", "rainy", "heavy_rain", "autumn_disturbed"].includes(key)) return "rain";
+  if (["thunderstorm", "storm"].includes(key)) return "storm";
+  if (["snow", "freezing_rain", "sleet", "frost", "deep_frost", "winter_anticyclonic"].includes(key)) return "snow";
+  if (key === "fog") return "fog";
+  if (key === "clear_night") return "night";
+  if (["wind_moderate", "windy", "wind_param"].includes(key)) return "wind";
+  if (["humidity", "precipitation"].includes(key)) return "humidity";
+  return "none";
+}
+
+function WeatherEffects({ name }: { name: string }) {
+  const kind = getWeatherEffectKind(name);
+  if (kind === "none") return null;
+  if (kind === "rain" || kind === "storm") {
+    return <span className={`meteo-icon-effect meteo-icon-effect-${kind}`} aria-hidden="true"><i /><i /><i />{kind === "storm" ? <b /> : null}</span>;
+  }
+  if (kind === "snow") return <span className="meteo-icon-effect meteo-icon-effect-snow" aria-hidden="true"><i /><i /><i /><i /></span>;
+  if (kind === "wind") return <span className="meteo-icon-effect meteo-icon-effect-wind" aria-hidden="true"><i /><i /><i /></span>;
+  if (kind === "fog") return <span className="meteo-icon-effect meteo-icon-effect-fog" aria-hidden="true"><i /><i /></span>;
+  if (kind === "night") return <span className="meteo-icon-effect meteo-icon-effect-night" aria-hidden="true"><i /><i /><i /></span>;
+  return <span className={`meteo-icon-effect meteo-icon-effect-${kind}`} aria-hidden="true"><i /></span>;
+}
+
+function hasExplicitSizeClass(className: string) {
+  return /(^|\s)(?:h|w)-[\w/.-]+/.test(className);
+}
+
 export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
   const pictorialIcon = PICTORIAL_WEATHER_ICONS[name.toLowerCase()];
   const animationClass = getPictorialAnimationClass(name);
   const inlineAnimationClass = getInlineAnimationClass(name);
+  const shellSizeStyle = hasExplicitSizeClass(className) ? undefined : { width: size, height: size };
+  const effectKind = getWeatherEffectKind(name);
   if (pictorialIcon) {
     return (
-      <img
-        src={pictorialIcon}
-        width={size}
-        height={size}
-        className={`meteo-icon-3d ${animationClass} object-contain transition-transform duration-200 hover:scale-[1.04] ${className}`}
-        alt={`Icône météo : ${name}`}
-        draggable={false}
-      />
+      <span
+        className={`meteo-icon-shell meteo-icon-3d ${className}`}
+        style={shellSizeStyle}
+        role="img"
+        aria-label={`Icône météo : ${name}`}
+        data-weather-icon={effectKind}
+      >
+        <img
+          src={pictorialIcon}
+          width={size}
+          height={size}
+          className={`absolute inset-0 h-full w-full ${animationClass} object-contain transition-transform duration-200 hover:scale-[1.04]`}
+          alt=""
+          draggable={false}
+        />
+        <WeatherEffects name={name} />
+      </span>
     );
   }
   const depthFilterId = `meteo-depth-${uniqueId}`;
@@ -91,15 +135,22 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
   const violetGradientId = `meteo-violet-${uniqueId}`;
   const showGlass = size >= 18;
   return (
+    <span
+      className={`meteo-icon-shell meteo-icon-3d ${className}`}
+      style={shellSizeStyle}
+      role="img"
+      aria-label={`Icône météo : ${name}`}
+      data-weather-icon={effectKind}
+    >
     <svg
       width={size}
       height={size}
       viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`meteo-icon-3d ${inlineAnimationClass} ${className}`}
-      role="img"
-      aria-label={`Icône météo : ${name}`}
+      className={`absolute inset-0 h-full w-full ${inlineAnimationClass}`}
+      role="presentation"
+      aria-hidden="true"
     >
       <defs>
         <filter id={depthFilterId} x="-35%" y="-35%" width="170%" height="185%" colorInterpolationFilters="sRGB">
@@ -150,6 +201,8 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
       <g filter={`url(#${depthFilterId})`}><FuturisticGlyph name={name} ids={{ cloud: cloudGradientId, sun: sunGradientId, rain: rainGradientId, cyan: cyanGradientId, violet: violetGradientId }} /></g>
       {showGlass ? <path d="M21 11c6-3 16-3.5 23-.7" stroke="#f8fafc" strokeOpacity="0.24" strokeWidth="1.25" strokeLinecap="round" /> : null}
     </svg>
+    <WeatherEffects name={name} />
+    </span>
   );
 }
 

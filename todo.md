@@ -3416,3 +3416,9 @@
 - [x] Corriger la couche Nuages afin que son unité et son échelle indiquent la couverture nuageuse en pourcentage, et non les précipitations en mm.
 - [x] Vérifier que la couche Pluie conserve son unité mm et que les autres couches restent inchangées.
 - [x] Valider le rendu mobile et publier le correctif de légende.
+
+## Animations des icônes météo dans toute l’application
+- [x] Inventorier et centraliser les icônes météo utilisées sur toutes les pages.
+- [x] Ajouter des effets contextuels pour pluie, orage, neige, soleil, nuages et vent dans un composant réutilisable.
+- [x] Remplacer les icônes météo existantes partout où nécessaire sans modifier les données ni les calculs.
+- [x] Vérifier le rendu mobile, l’accessibilité, la réduction des mouvements et publier.

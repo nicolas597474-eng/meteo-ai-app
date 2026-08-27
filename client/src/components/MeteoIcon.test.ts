@@ -19,5 +19,23 @@ describe("MeteoIcon", () => {
   it("conserve une description accessible à chaque icône météo", () => {
     expect(source).toContain("role=\"img\"");
     expect(source).toContain("Icône météo");
+    expect(source).toContain('aria-hidden=\"true\"');
+  });
+
+  it("centralise les effets contextuels sur toutes les familles météo", () => {
+    expect(source).toContain("type WeatherEffectKind");
+    expect(source).toContain("getWeatherEffectKind");
+    expect(source).toContain("meteo-icon-effect-${kind}");
+    expect(source).toContain('kind === "rain" || kind === "storm"');
+    expect(source).toContain('kind === "snow"');
+    expect(source).toContain('kind === "wind"');
+    expect(source).toContain('kind === "night"');
+    expect(source).toContain("WeatherEffects name={name}");
+  });
+
+  it("préserve les dimensions explicites des usages existants", () => {
+    expect(source).toContain("hasExplicitSizeClass");
+    expect(source).toContain("meteo-icon-shell");
+    expect(source).toContain("style={shellSizeStyle}");
   });
 });
