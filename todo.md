@@ -3205,3 +3205,8 @@
 - [x] Empêcher le décalage latéral et le débordement de la carte sur mobile.
 - [x] Masquer complètement le contenu de page sous-jacent pendant l’ouverture immersive.
 - [x] Vérifier le conteneur de dialogue réel, le typage et les tests avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Correctif de compatibilité du plein écran mobile
+- [x] Ajouter un ancrage de secours fondé sur la signature unique de la fenêtre de carte, sans dépendre de la prise en charge du sélecteur CSS contextuel par le navigateur.
+- [x] Forcer les quatre bords, les dimensions minimales de la fenêtre et l’absence de translation latérale.
+- [x] Valider TypeScript et la suite de régression complète avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.

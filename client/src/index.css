@@ -888,6 +888,35 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   padding: 0 !important;
 }
 
+/* Repli sans :has() : cette signature de classe ne concerne que le dialogue de la carte d’éclipse. */
+[data-slot="dialog-content"][class*="max-h-\[calc\(100dvh-1\.25rem\)\]"] {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  min-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+[data-slot="dialog-content"][class*="max-h-\[calc\(100dvh-1\.25rem\)\]"] > [data-swipe-exclude],
+[data-slot="dialog-content"][class*="max-h-\[calc\(100dvh-1\.25rem\)\]"] > [data-swipe-exclude] > * {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  padding: 0 !important;
+}
+
 .map-control-button {
   display: flex;
   width: 3rem;
