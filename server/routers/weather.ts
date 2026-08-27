@@ -634,14 +634,41 @@ export const weatherRouter = router({
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
-      const latestCollection = (await getStationCollectionSnapshots(locationKey, 1))[0] ?? null;
+      const [recentCollections, physicalTraces] = await Promise.all([
+        getStationCollectionSnapshots(locationKey, 8),
+        getPhysicalSnapshotCollectionTracesByDateRange(locationKey, getParisDateDaysAgo(1), getTodayParis()),
+      ]);
+      const latestCollection = recentCollections[0] ?? null;
+      const lastForecastSuccess = recentCollections.find((collection) => collection.status !== "failed") ?? null;
+      const lastPhysicalCollection = physicalTraces.find((trace) => trace.status !== "failed") ?? null;
+      const noQualifiedStationSlots = physicalTraces
+        .filter((trace) => trace.status === "no_station")
+        .slice(0, 3)
+        .map((trace) => ({ date: trace.date, hour: trace.hour, attempts: trace.attempts, reason: trace.reason }));
       const expectedModels = WEATHER_SERVICES.expert.map((model) => model.name);
       const dailyMissingModels = latestCollection ? getMissingModelNames(latestCollection.dailyMissingModels) : [];
       const hourlyMissingModels = latestCollection ? getMissingModelNames(latestCollection.hourlyMissingModels) : [];
 
       return {
         scheduledAt: "05:00",
+        scheduleTimeZone: "Europe/Paris",
+        scheduleCoverage: "Le déclencheur vérifie 03:00 et 04:00 UTC, puis collecte uniquement à 05:00 heure de Paris pour couvrir l’heure d’été et l’heure d’hiver.",
         expectedModels,
+        lastForecastSuccess: lastForecastSuccess ? {
+          status: lastForecastSuccess.status,
+          collectedAt: lastForecastSuccess.collectedAt,
+          dailyModelCount: lastForecastSuccess.dailyModelCount,
+          hourlyModelCount: lastForecastSuccess.hourlyModelCount,
+        } : null,
+        lastPhysicalCollection: lastPhysicalCollection ? {
+          status: lastPhysicalCollection.status,
+          date: lastPhysicalCollection.date,
+          hour: lastPhysicalCollection.hour,
+          attempts: lastPhysicalCollection.attempts,
+          stationCount: lastPhysicalCollection.stationCount,
+          reason: lastPhysicalCollection.reason,
+        } : null,
+        noQualifiedStationSlots,
         snapshot: latestCollection ? {
           status: latestCollection.status,
           collectedAt: latestCollection.collectedAt,

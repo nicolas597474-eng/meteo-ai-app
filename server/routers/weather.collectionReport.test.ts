@@ -8,7 +8,11 @@ describe("weather.getForecastCollectionReport", () => {
     expect(source).toContain('scheduledAt: "05:00"');
     expect(source).toContain("dailyCollectedModels");
     expect(source).toContain("hourlyCollectedModels");
-    expect(source).toContain("getStationCollectionSnapshots(locationKey, 1)");
+    expect(source).toContain("getStationCollectionSnapshots(locationKey, 8)");
+    expect(source).toContain("lastForecastSuccess");
+    expect(source).toContain("lastPhysicalCollection");
+    expect(source).toContain("noQualifiedStationSlots");
+    expect(source).toContain("scheduleCoverage");
     const procedure = source.slice(source.indexOf("getForecastCollectionReport:"), source.indexOf("getProviderDiagnostics:"));
     expect(procedure).not.toContain("collectExpertForecasts");
   });

@@ -3251,3 +3251,9 @@
 - [x] Contrôler la tâche active de collecte des prévisions et son dernier journal d’exécution : v8 est active et une première exécution HTTP 200 est maintenant disponible.
 - [x] Configurer la collecte des prévisions à 05:00 heure française d’été, soit 03:00 UTC, sans modifier les snapshots physiques horaires. La tâche v8 utilise désormais l’expression `0 0 3 * * *`.
 - [x] Vérifier une exécution réelle : v8 a répondu HTTP 200 le 27 août à 03:07 UTC, avec les huit modèles attendus et collectés (AROME, ARPEGE, ICON, ECMWF, GFS, GEM, UKMET et Open-Meteo), sans modèle manquant.
+
+## Suivi opérationnel des collectes
+- [x] Exposer dans l’AI Lab le dernier succès vérifiable de la collecte de prévisions et des snapshots physiques, avec leurs dates, horaires et volumes réels.
+- [x] Identifier et afficher explicitement les créneaux où aucune station physique n’a été qualifiée, sans les confondre avec une erreur de collecte.
+- [x] Maintenir 05:00 dans le fuseau Europe/Paris malgré le passage été/hiver : la tâche vérifie 03:00 et 04:00 UTC, tandis que le handler exécute un unique cycle uniquement lorsque l’heure locale est 05:00.
+- [x] Ajouter des tests de statut, de créneau sans station et de bascule saisonnière, puis valider l’interface et les tâches actives. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.

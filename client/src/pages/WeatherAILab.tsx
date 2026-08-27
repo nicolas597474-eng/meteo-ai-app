@@ -274,6 +274,39 @@ function AILabGlossary() {
   </details>;
 }
 
+type CollectionSuccess = {
+  status: string;
+  collectedAt?: Date | string | null;
+  dailyModelCount?: number | null;
+  hourlyModelCount?: number | null;
+  date?: string | null;
+  hour?: number | null;
+  attempts?: number | null;
+  stationCount?: number | null;
+  reason?: string | null;
+};
+
+type NoStationSlot = { date: string; hour: number; attempts: number; reason?: string | null };
+
+function collectionMomentLabel(collection: CollectionSuccess | null, kind: "forecast" | "physical") {
+  if (!collection) return "Aucun succès vérifiable";
+  if (kind === "forecast" && collection.collectedAt) {
+    const date = new Date(collection.collectedAt);
+    return Number.isNaN(date.getTime()) ? "Horodatage indisponible" : date.toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+  }
+  if (collection.date != null && collection.hour != null) return `${new Date(`${collection.date}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })} · ${String(collection.hour).padStart(2, "0")} h`;
+  return "Horodatage indisponible";
+}
+
+function CollectionOperations({ forecast, physical, noStationSlots, scheduleCoverage }: { forecast: CollectionSuccess | null; physical: CollectionSuccess | null; noStationSlots: NoStationSlot[]; scheduleCoverage?: string }) {
+  return <section className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.045] p-4" aria-labelledby="collection-operations-title">
+    <div className="flex items-start gap-2"><ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-200" /><div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-200/75">Suivi automatique</p><h2 id="collection-operations-title" className="text-sm font-semibold text-slate-100">Derniers succès de collecte</h2></div></div>
+    <div className="mt-3 grid gap-2 sm:grid-cols-2"><article className="rounded-xl border border-white/10 bg-slate-950/25 p-3"><div className="flex items-center gap-2"><Clock className="h-4 w-4 text-sky-200" /><p className="text-[11px] font-semibold text-slate-100">Prévisions · tous les modèles</p></div><p className="mt-2 text-[11px] text-slate-200">{collectionMomentLabel(forecast, "forecast")}</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">{forecast ? `${forecast.dailyModelCount ?? 0} modèle(s) quotidien(s) · ${forecast.hourlyModelCount ?? 0} horaire(s).` : "Aucun cycle vérifiable pour ce lieu."}</p></article><article className="rounded-xl border border-white/10 bg-slate-950/25 p-3"><div className="flex items-center gap-2"><MapPinned className="h-4 w-4 text-cyan-200" /><p className="text-[11px] font-semibold text-slate-100">Stations physiques · horaire</p></div><p className="mt-2 text-[11px] text-slate-200">{collectionMomentLabel(physical, "physical")}</p><p className="mt-1 text-[10px] leading-relaxed text-slate-400">{physical ? physical.status === "stored" ? `${physical.stationCount ?? 0} station(s) qualifiée(s) utilisée(s).` : "Passage réussi, mais aucune station qualifiée." : "Aucun passage vérifiable pour ce lieu."}</p></article></div>
+    <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/25 p-3"><p className="text-[11px] font-semibold text-slate-100">Créneaux sans station qualifiée</p>{noStationSlots.length ? <ul className="mt-2 space-y-1.5 text-[10px] leading-relaxed text-amber-100">{noStationSlots.map((slot) => <li key={`${slot.date}-${slot.hour}`}><span className="font-semibold">{new Date(`${slot.date}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" })} · {String(slot.hour).padStart(2, "0")} h</span> — aucune station physique qualifiée après {slot.attempts} tentative{slot.attempts > 1 ? "s" : ""}{slot.reason ? ` (${slot.reason})` : ""}.</li>)}</ul> : <p className="mt-2 text-[10px] leading-relaxed text-emerald-100">Aucun créneau sans station qualifiée n’est enregistré sur les dernières 48 heures.</p>}</div>
+    <p className="mt-3 text-[10px] leading-relaxed text-slate-400">{scheduleCoverage ?? "La collecte de prévisions est alignée sur 05:00, heure de Paris."}</p>
+  </section>;
+}
+
 export default function WeatherAILab() {
   const { activeLocation } = useLocation();
   const { style: pageSkyStyle } = usePageWeatherSky();
@@ -322,6 +355,9 @@ export default function WeatherAILab() {
   const forecastCollectionTimeLabel = forecastCollectionSnapshot?.collectedAt
     ? new Date(forecastCollectionSnapshot.collectedAt).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
     : null;
+  const lastForecastSuccess = forecastCollectionReport?.lastForecastSuccess ?? null;
+  const lastPhysicalCollection = forecastCollectionReport?.lastPhysicalCollection ?? null;
+  const noQualifiedStationSlots = forecastCollectionReport?.noQualifiedStationSlots ?? [];
   const validationSource = getValidationModelSource(data.sources);
   const fusionParameters = [
     { key: "temperature", label: "Température", tone: "text-orange-200", background: "bg-orange-400/10" },
@@ -451,6 +487,8 @@ export default function WeatherAILab() {
       <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10"><Clock className="h-4 w-4 text-sky-200" /></span><div className="min-w-0"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Prévisions · tous les modèles</p><h2 id="forecast-collection-title" className="text-sm font-semibold text-slate-100">Collecte prévue à {forecastCollectionReport?.scheduledAt ?? "05:00"}</h2></div></div>{forecastCollectionSnapshot && <span className="shrink-0 rounded-full bg-sky-300/10 px-2 py-1 text-[9px] font-semibold text-sky-100">Dernier bilan</span>}</div>
       {forecastCollectionSnapshot ? <><p className="mt-2 text-[11px] leading-relaxed text-slate-300"><span className="font-semibold text-sky-100">Prévisions des modèles · </span>dernier bilan archivé le {forecastCollectionTimeLabel ?? "—"}. Il liste les données quotidiennes et horaires effectivement archivées ; ce n’est pas une confirmation du passage de 05:00 du jour en cours.</p><div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Quotidien archivé</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.dailyModelCount}/{expectedForecastModels.length || 8} modèles</p></div><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Horaire archivé</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.hourlyModelCount}/{expectedForecastModels.length || 8} modèles</p></div></div><div className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] leading-relaxed text-slate-300"><span className="font-semibold text-emerald-100">Stations météorologiques · </span>leurs relevés physiques sont collectés par un flux horaire distinct. Ils ne sont ni des modèles ni inclus dans ces compteurs de prévisions.</div><p className="mt-2 text-[10px] text-slate-400">Pour chaque modèle : Q = prévision quotidienne archivée ; H = prévision horaire archivée. Touchez un nom de modèle pour connaître son rôle.</p><div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2" aria-label="Statut archivé de tous les modèles de prévision">{expectedForecastModels.map((model) => { const dailyCollected = dailyCollectedModelSet.has(model); const hourlyCollected = hourlyCollectedModelSet.has(model); return <button key={model} type="button" onClick={() => setSelectedCollectionModel(model)} aria-haspopup="dialog" aria-label={`Ouvrir la fiche du modèle ${model}. Quotidien ${dailyCollected ? "archivé" : "indisponible"}, horaire ${hourlyCollected ? "archivé" : "indisponible"}.`} className="flex min-h-9 items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-950/25 px-2.5 text-left text-[10px] transition-colors hover:border-sky-300/30 hover:bg-sky-300/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><span className="min-w-0 truncate font-semibold text-sky-100">{model}</span><span className="flex shrink-0 gap-1"><span className={dailyCollected ? "rounded bg-emerald-300/10 px-1.5 py-0.5 text-emerald-100" : "rounded bg-amber-300/10 px-1.5 py-0.5 text-amber-100"}>Q {dailyCollected ? "✓" : "—"}</span><span className={hourlyCollected ? "rounded bg-emerald-300/10 px-1.5 py-0.5 text-emerald-100" : "rounded bg-amber-300/10 px-1.5 py-0.5 text-amber-100"}>H {hourlyCollected ? "✓" : "—"}</span></span></button>; })}</div></> : <><p className="mt-2 text-[11px] leading-relaxed text-slate-400">Cycle prévu à 05:00. Aucun bilan de modèles n’est archivé pour ce lieu ; l’application ne présente donc aucun modèle comme collecté.</p><p className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] leading-relaxed text-slate-300"><span className="font-semibold text-emerald-100">Stations météorologiques · </span>les relevés physiques sont gérés séparément, à l’heure, et ne remplacent jamais une prévision manquante.</p></>}
     </section>
+
+    <CollectionOperations forecast={lastForecastSuccess} physical={lastPhysicalCollection} noStationSlots={noQualifiedStationSlots} scheduleCoverage={forecastCollectionReport?.scheduleCoverage} />
 
     <ForecastModelGuideDialog modelName={selectedCollectionModel} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
 
