@@ -27,6 +27,9 @@ describe("FifteenDayChart", () => {
     expect(source).not.toContain("getFeltLabelY");
     expect(source).toContain("TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE");
     expect(source).toContain("TEMPERATURE_LABEL_ABOVE_GAP");
+    expect(source).toContain("const maxLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP)");
+    expect(source).toContain('touchAction: "pan-x"');
+    expect(source).toContain('overscrollBehavior: "contain"');
     expect(source).toContain('ctx.strokeText(`${v.toFixed(1)}`, pt.x, minLabelY)');
     expect(source).not.toContain("ctx.shadowBlur = 10");
     expect(source).not.toContain("Ressenti °C");

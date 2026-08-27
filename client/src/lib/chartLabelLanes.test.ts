@@ -3,8 +3,8 @@ import { getFeltLabelY, getLabelAboveCurveY, getLabelBelowCurveY } from "./chart
 
 describe("chartLabelLanes", () => {
   it("conserve les libellés de maximum sous la zone d’en-tête lors de températures extrêmes", () => {
-    expect(getLabelAboveCurveY(86, 82)).toBe(98);
-    expect(getLabelAboveCurveY(150, 82)).toBe(130);
+    expect(getLabelAboveCurveY(86, 82)).toBe(100);
+    expect(getLabelAboveCurveY(150, 82)).toBe(122);
   });
 
   it("place le ressenti sous sa courbe avec une marge avant le vent", () => {

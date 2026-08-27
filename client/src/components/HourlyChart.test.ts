@@ -16,6 +16,8 @@ describe("HourlyChart", () => {
     expect(source).toContain("const temperatureLabel = `${v.toFixed(1)}°`");
     expect(source).toContain("ctx.fillText(temperatureLabel, pt.x, temperatureLabelY)");
     expect(source).toContain("getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP)");
+    expect(source).toContain('touchAction: "pan-x"');
+    expect(source).toContain('overscrollBehavior: "contain"');
     expect(source).not.toContain("ctx.shadowBlur = 10");
     expect(source).not.toContain("Ressenti immédiatement sous sa courbe bleue");
     expect(source).not.toContain("apparentLabelY");

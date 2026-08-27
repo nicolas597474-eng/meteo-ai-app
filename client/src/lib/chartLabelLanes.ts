@@ -1,9 +1,9 @@
-export const TEMPERATURE_LABEL_ABOVE_GAP = 20;
+export const TEMPERATURE_LABEL_ABOVE_GAP = 28;
 export const TEMPERATURE_LABEL_BELOW_GAP = 30;
 export const TEMPERATURE_WIND_CLEARANCE = 20;
 
 export function getLabelAboveCurveY(curveY: number, tempZoneTop: number, offset = TEMPERATURE_LABEL_ABOVE_GAP): number {
-  return Math.max(tempZoneTop + 16, curveY - offset);
+  return Math.max(tempZoneTop + 18, curveY - offset);
 }
 
 export function getLabelBelowCurveY(

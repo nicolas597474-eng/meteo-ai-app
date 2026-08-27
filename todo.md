@@ -3437,3 +3437,8 @@
 ## Correction du doublon d’icône principale
 - [x] Rétablir l’affichage exclusif des variantes mobile et bureau de l’icône météo principale.
 - [x] Vérifier qu’un seul pictogramme agrandi est rendu à chaque taille d’écran et publier le correctif.
+
+## Stabilité des graphiques météo
+- [x] Empêcher le défilement vertical à l’intérieur des graphiques horaire et quotidien tout en préservant la navigation horizontale.
+- [x] Garantir que les températures maximales affichées restent au-dessus de leur courbe.
+- [x] Valider les gestes tactiles et publier le correctif mobile.
