@@ -122,6 +122,14 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Une absence de station qualifiée n’est pas une erreur technique");
     expect(source).toContain("technicalFailureStreak");
     expect(source).toContain("hourlyCollectionHistory.length}/24");
+    expect(source).toContain("refetchInterval: 15_000");
+    expect(source).toContain("refetchIntervalInBackground: false");
+    expect(source).toContain("refetchOnWindowFocus: true");
+    expect(source).toContain("latestCollectionTraceKeyRef");
+    expect(source).toContain("collectionUpdateNotice");
+    expect(source).toContain("Actualisé · passage de");
+    expect(source).toContain("Nouveau snapshot détecté");
+    expect(source).toContain("ajouté à l’historique");
     expect(source).not.toContain("forecast-collection-title");
     const ventMaxIndex = source.indexOf("Vent max");
     const confidenceIndex = source.indexOf("Confiance prévision");

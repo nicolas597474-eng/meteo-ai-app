@@ -3422,3 +3422,9 @@
 - [x] Ajouter des effets contextuels pour pluie, orage, neige, soleil, nuages et vent dans un composant réutilisable.
 - [x] Remplacer les icônes météo existantes partout où nécessaire sans modifier les données ni les calculs.
 - [x] Vérifier le rendu mobile, l’accessibilité, la réduction des mouvements et publier.
+
+## Actualisation de Santé des collectes
+- [x] Vérifier en lecture seule le déclenchement et les traces du passage de 18 h.
+- [x] Actualiser automatiquement la pastille et l’historique dès qu’un nouveau snapshot physique est réellement enregistré.
+- [x] Conserver la cadence horaire et distinguer les créneaux sans station des erreurs techniques.
+- [x] Tester le rafraîchissement et publier l’amélioration.
