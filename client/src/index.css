@@ -989,6 +989,9 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   width: 100%;
   margin-top: 0.35rem;
   accent-color: #38bdf8;
+  touch-action: none;
+  pointer-events: auto;
+  cursor: ew-resize;
 }
 
 /* La fenêtre de carte garde toujours sa commande de fermeture dans le viewport. */

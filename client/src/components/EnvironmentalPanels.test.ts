@@ -48,6 +48,11 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("visibilityOpacity");
     expect(source).toContain("Opacité des zones de visibilité");
     expect(source).toContain("Opacité <span>{visibilityOpacity}%</span>");
+    expect(source).toContain('type="range" min="0" max="100" step="1"');
+    expect(source).toContain("onPointerMove={(event) => {");
+    expect(source).toContain("setPointerCapture(event.pointerId)");
+    expect(source).toContain("releasePointerCapture(event.pointerId)");
+    expect(styles).toContain("touch-action: none");
     expect(source).toContain("{isExpanded && opacityControl}");
     expect(source).toContain("SlidersHorizontal");
     expect(source).toContain("isOpacityPanelOpen");

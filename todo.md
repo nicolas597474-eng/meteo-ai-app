@@ -3241,3 +3241,13 @@
 - [x] Retirer le bouton séparé d’activation de la boussole, devenu redondant avec la rose des vents interactive.
 - [x] Conserver l’activation et les détails depuis la rose des vents, puis finaliser l’alignement des indications associées.
 - [x] Vérifier le code et les tests avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Curseur d’opacité tactile
+- [x] Identifier la couche ou le geste de carte qui intercepte le glissement du curseur d’opacité.
+- [x] Donner la priorité tactile au curseur pour permettre un réglage continu de 0 à 100.
+- [x] Vérifier le code et la suite de tests avant publication. La validation tactile finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Collecte quotidienne des prévisions à 05:00
+- [x] Contrôler la tâche active de collecte des prévisions et son dernier journal d’exécution : v8 est active, mais aucun journal d’exécution n’est encore disponible.
+- [x] Configurer la collecte des prévisions à 05:00 heure française d’été, soit 03:00 UTC, sans modifier les snapshots physiques horaires. La tâche v8 utilise désormais l’expression `0 0 3 * * *`.
+- [ ] Vérifier le prochain créneau planifié et attendre un journal HTTP 200 avant de considérer la collecte validée ; l’horodatage « prochain passage » renvoyé par la plateforme reste encore à 04:00 UTC après la mise à jour.
