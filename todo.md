@@ -3316,3 +3316,8 @@
 - [x] Ajouter une vibration haptique courte, unique et conditionnelle au verrouillage lunaire exact.
 - [x] Ajouter un mode plein écran immersif dédié à l’observation de la Lune.
 - [x] Tester les interactions, le mouvement réduit et le mobile avant publication.
+
+## Rose de référence à huit directions
+- [x] Reprendre les anneaux, segments radiaux et marqueurs lumineux de la référence sans afficher de degrés intermédiaires.
+- [x] Conserver seulement N, NE, E, SE, S, SO, O et NO autour du cadran.
+- [x] Préserver le guidage lunaire réel, tester le mobile et publier le nouveau cadran.
