@@ -3276,9 +3276,9 @@
 - [x] Présenter un bilan factuel de stabilité sans déclencher ni modifier les tâches. La collecte v8 conserve son dernier succès HTTP 200 du 27 août à 03:07 UTC ; son prochain cycle est quotidien.
 
 ## Confirmation du prochain passage horaire
-- [ ] Observer en lecture seule le prochain passage planifié de snapshots physiques v5.
-- [ ] Vérifier la réponse HTTP, la présence de traces par lieu et l’absence d’erreur technique.
-- [ ] Présenter le résultat de continuité sans modifier les tâches, les archives ni les collectes.
+- [x] Observer en lecture seule le prochain passage planifié de snapshots physiques v5 : passage observé à 12:30:26 UTC, terminé à 12:30:48 UTC.
+- [x] Vérifier la réponse HTTP, la présence de traces par lieu et l’absence d’erreur technique : HTTP 200, Erquinghem-Lys 220 et Hondeghem 147 stations stockées, une tentative par lieu.
+- [x] Présenter le résultat de continuité sans modifier les tâches, les archives ni les collectes : le rapport Hondeghem contient le créneau 14 h Europe/Paris et technicalFailureStreak reste à 0.
 
 ## Boussole astronomique modernisée et flèche de guidage
 - [x] Recomposer la rose des vents avec une finition plus futuriste, sans modifier les calculs astronomiques ni le cap réel.
