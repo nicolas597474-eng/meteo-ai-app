@@ -115,7 +115,13 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('temp: pf.forecast.tempCurrent ?? null');
     expect(source).toContain("const activeFavoriteWeather = {");
     expect(source).toContain("activeWeather={activeFavoriteWeather}");
-    expect(source).not.toContain("Collecte de prévisions");
+    expect(source).toContain("getForecastCollectionReport");
+    expect(source).toContain("Santé des collectes");
+    expect(source).toContain("collection-health-panel");
+    expect(source).toContain("Historique des 24 derniers passages horaires");
+    expect(source).toContain("Une absence de station qualifiée n’est pas une erreur technique");
+    expect(source).toContain("technicalFailureStreak");
+    expect(source).toContain("hourlyCollectionHistory.length}/24");
     expect(source).not.toContain("forecast-collection-title");
     const ventMaxIndex = source.indexOf("Vent max");
     const confidenceIndex = source.indexOf("Confiance prévision");

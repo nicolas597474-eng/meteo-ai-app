@@ -641,7 +641,22 @@ export const weatherRouter = router({
       const latestCollection = recentCollections[0] ?? null;
       const lastForecastSuccess = recentCollections.find((collection) => collection.status !== "failed") ?? null;
       const lastPhysicalCollection = physicalTraces.find((trace) => trace.status !== "failed") ?? null;
-      const noQualifiedStationSlots = physicalTraces
+      const hourlyHistory = physicalTraces
+        .slice(0, 24)
+        .map((trace) => ({
+          status: trace.status,
+          date: trace.date,
+          hour: trace.hour,
+          attempts: trace.attempts,
+          stationCount: trace.stationCount,
+          reason: trace.reason,
+        }));
+      const consecutiveTechnicalFailures = hourlyHistory.reduce((count, trace) => {
+        if (count === -1) return -1;
+        return trace.status === "failed" ? count + 1 : -1;
+      }, 0);
+      const technicalFailureStreak = consecutiveTechnicalFailures === -1 ? 0 : consecutiveTechnicalFailures;
+      const noQualifiedStationSlots = hourlyHistory
         .filter((trace) => trace.status === "no_station")
         .slice(0, 3)
         .map((trace) => ({ date: trace.date, hour: trace.hour, attempts: trace.attempts, reason: trace.reason }));
@@ -668,6 +683,8 @@ export const weatherRouter = router({
           stationCount: lastPhysicalCollection.stationCount,
           reason: lastPhysicalCollection.reason,
         } : null,
+        hourlyHistory,
+        technicalFailureStreak,
         noQualifiedStationSlots,
         snapshot: latestCollection ? {
           status: latestCollection.status,

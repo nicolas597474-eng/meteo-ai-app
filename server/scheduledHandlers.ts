@@ -117,9 +117,19 @@ export function buildStationCollectionSnapshot(input: {
 
 export const HOURLY_SNAPSHOT_MAX_ATTEMPTS = 2;
 export const HOURLY_SNAPSHOT_RETRY_DELAY_MS = 1_200;
+export const TECHNICAL_FAILURE_ALERT_THRESHOLD = 3;
 
 export function shouldRetryHourlyFavorite(attempt: number): boolean {
   return attempt + 1 < HOURLY_SNAPSHOT_MAX_ATTEMPTS;
+}
+
+export function countConsecutiveTechnicalFailures(traces: Array<{ status: string }>): number {
+  let count = 0;
+  for (const trace of traces) {
+    if (trace.status !== "failed") break;
+    count++;
+  }
+  return count;
 }
 
 type PhysicalSnapshotFavorite = Awaited<ReturnType<typeof getAllFavoriteLocations>>[number];
@@ -330,17 +340,24 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
   const collectionErrors = results.filter((result) => result.reason?.startsWith("Erreur de collecte"));
   const collectedResults = results.filter((result) => !result.skipped);
   const allLocationsFailed = collectedResults.length > 0 && collectionErrors.length === collectedResults.length;
-  if (trigger === "scheduled" && allLocationsFailed) {
-    console.error("[MeteoAI] Physical snapshot collection failed for all favorite locations");
+  if (trigger === "scheduled" && collectionErrors.length > 0) {
+    const thresholdBreaches = await Promise.all(collectionErrors.map(async (failure) => {
+      const traces = await getPhysicalSnapshotCollectionTracesByDateRange(failure.locationKey, getParisDateDaysAgo(1), getTodayParis());
+      const streak = countConsecutiveTechnicalFailures(traces);
+      return { ...failure, streak };
+    }));
+    const newlyAlertableFailures = thresholdBreaches.filter((failure) => failure.streak === TECHNICAL_FAILURE_ALERT_THRESHOLD);
+    if (newlyAlertableFailures.length > 0) {
     const parisTime = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
-    const failedList = collectionErrors.map((e) => `• ${e.locationKey} — ${e.reason ?? "raison inconnue"} (${e.attempts} tentative${e.attempts > 1 ? "s" : ""})`).join("\n");
+      const failedList = newlyAlertableFailures.map((failure) => `• ${failure.locationKey} — ${failure.reason ?? "raison inconnue"} (${failure.streak} échecs techniques consécutifs)`).join("\n");
     try {
       await notifyOwner({
-        title: "MeteoAI · Collecte horaire en échec total",
-        content: `Toutes les tentatives de collecte de snapshots physiques ont échoué à ${parisTime} (heure de Paris).\n\nLieux concernés :\n${failedList}\n\nLes prévisions affichées proviennent du dernier snapshot archivé disponible. Aucune donnée n'a été inventée.`,
+          title: "MeteoAI · Échecs techniques horaires répétés",
+          content: `Au moins ${TECHNICAL_FAILURE_ALERT_THRESHOLD} collectes physiques consécutives ont échoué à ${parisTime} (heure de Paris).\n\nLieux concernés :\n${failedList}\n\nLes créneaux « aucune station qualifiée » ne déclenchent pas cette alerte. Les prévisions et archives existantes ne sont pas modifiées.`,
       });
     } catch (notifError) {
-      console.warn("[MeteoAI] Owner notification failed after total collection failure:", notifError);
+        console.warn("[MeteoAI] Owner notification failed after repeated technical collection failures:", notifError);
+      }
     }
   }
 

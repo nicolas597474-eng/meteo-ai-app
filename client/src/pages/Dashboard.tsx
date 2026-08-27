@@ -127,6 +127,25 @@ const PERSONAL_CONDITION_OPTIONS = [
 const PERSONAL_PRECIPITATION_CONDITIONS = new Set(["few_drops", "drizzle", "light_rain", "rain", "heavy_rain", "showers", "storm"]);
 const acceptsPersonalPrecipitation = (condition: string) => PERSONAL_PRECIPITATION_CONDITIONS.has(condition);
 
+type HourlyCollectionTrace = {
+  status: "stored" | "no_station" | "failed";
+  date: string;
+  hour: number;
+  attempts: number;
+  stationCount: number;
+  reason?: string | null;
+};
+
+function hourlyCollectionPresentation(status: HourlyCollectionTrace["status"]) {
+  if (status === "stored") return { label: "Données archivées", className: "border-emerald-300/25 bg-emerald-300/10 text-emerald-100" };
+  if (status === "no_station") return { label: "Aucune station qualifiée", className: "border-amber-300/25 bg-amber-300/10 text-amber-100" };
+  return { label: "Erreur technique", className: "border-red-300/25 bg-red-300/10 text-red-100" };
+}
+
+function hourlyCollectionMoment(trace: HourlyCollectionTrace) {
+  return `${new Date(`${trace.date}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" })} · ${String(trace.hour).padStart(2, "0")} h`;
+}
+
 function DominantRegimePanel({
   regime,
   panelDate,
@@ -248,6 +267,7 @@ export default function Dashboard() {
   const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
   const [isForecastInfoOpen, setIsForecastInfoOpen] = useState(false);
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
+  const [isCollectionHealthOpen, setIsCollectionHealthOpen] = useState(false);
   const [showAllLocalContributors, setShowAllLocalContributors] = useState(false);
   const [editingPersonalObservation, setEditingPersonalObservation] = useState<{ id: number; temperature: string; windSpeed: string; precipitation: string; condition: (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] } | null>(null);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
@@ -354,6 +374,9 @@ export default function Dashboard() {
   );
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
     coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
+  );
+  const { data: collectionHealthReport } = trpc.weather.getForecastCollectionReport.useQuery(
+    coordsInput, { staleTime: 2 * 60 * 1000, refetchOnWindowFocus: false }
   );
   const utils = trpc.useUtils();
   const { data: personalObservationState, refetch: refetchPersonalObservationState } = trpc.personalObservations.dashboardState.useQuery(
@@ -574,6 +597,18 @@ export default function Dashboard() {
   const windDir = currentHour?.windDirection ?? null;
   const windSpeed = currentHour?.windSpeed ?? (isDailyFallback ? dailyFallback.windSpeed : today?.windSpeed ?? meteoAI?.windSpeed) ?? null;
   const currentCloudCover = currentHour?.cloudCover ?? today?.cloudCover ?? null;
+  const hourlyCollectionHistory = (collectionHealthReport?.hourlyHistory ?? []) as HourlyCollectionTrace[];
+  const technicalFailureStreak = collectionHealthReport?.technicalFailureStreak ?? 0;
+  const latestHourlyCollection = hourlyCollectionHistory[0] ?? null;
+  const collectionHealth = technicalFailureStreak >= 3
+    ? { label: "Échecs techniques répétés", detail: `${technicalFailureStreak} passages consécutifs à corriger`, tone: "border-red-300/35 bg-red-400/15 text-red-50", dot: "bg-red-300" }
+    : latestHourlyCollection?.status === "failed"
+      ? { label: "Incident à surveiller", detail: "Dernier passage en erreur technique", tone: "border-red-300/35 bg-red-400/15 text-red-50", dot: "bg-red-300" }
+      : latestHourlyCollection?.status === "no_station"
+        ? { label: "Aucune station qualifiée", detail: "Le passage a fonctionné, sans donnée physique exploitable", tone: "border-amber-300/35 bg-amber-400/15 text-amber-50", dot: "bg-amber-300" }
+        : latestHourlyCollection?.status === "stored"
+          ? { label: "Collectes opérationnelles", detail: "Dernier passage physique archivé", tone: "border-emerald-300/35 bg-emerald-400/15 text-emerald-50", dot: "bg-emerald-300" }
+          : { label: "En attente de trace", detail: "Aucun passage récent n’est disponible pour ce lieu", tone: "border-slate-500/40 bg-slate-900/45 text-slate-100", dot: "bg-slate-400" };
   const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentHour?.precipitation ?? (isDailyFallback ? dailyFallback.precipitation : (today as any)?.precipitation) ?? undefined, windSpeed: windSpeed ?? undefined });
   const dashboardSkyStyle = { "--dashboard-sky-image": `url("${dashboardSkyImage}")` } as CSSProperties;
   const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
@@ -739,6 +774,13 @@ export default function Dashboard() {
               </div>
             )}
 
+            <div className="mb-3">
+              <button type="button" onClick={() => setIsCollectionHealthOpen(true)} aria-haspopup="dialog" aria-expanded={isCollectionHealthOpen} aria-controls="collection-health-panel" aria-label={`Ouvrir l’historique des collectes : ${collectionHealth.detail}`} className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left shadow-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${collectionHealth.tone}`}>
+                <span className="flex min-w-0 items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${collectionHealth.dot}`} aria-hidden="true" /><span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-[0.12em] opacity-75">Santé des collectes</span><strong className="block truncate text-[11px]">{collectionHealth.label}</strong></span></span>
+                <span className="shrink-0 text-right text-[9px] leading-tight opacity-85">{hourlyCollectionHistory.length}/24<br />passages</span>
+              </button>
+            </div>
+
             {nextWeatherAlert && (
               <div className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 ${
                 nextWeatherAlert.kind === "thunderstorm"
@@ -902,6 +944,14 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <Dialog open={isCollectionHealthOpen} onOpenChange={setIsCollectionHealthOpen}>
+          <DialogContent id="collection-health-panel" showCloseButton={false} className="max-h-[calc(100dvh-1rem)] overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:max-w-xl" aria-label="Santé des collectes automatiques">
+            <DialogHeader><div className="flex items-start justify-between gap-3"><div><DialogTitle className="text-white">Santé des collectes</DialogTitle><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Les 24 derniers passages physiques enregistrés pour ce lieu. Une absence de station qualifiée n’est pas une erreur technique.</p></div><button type="button" onClick={() => setIsCollectionHealthOpen(false)} aria-label="Fermer l’historique des collectes" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-600 text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-4 w-4" /></button></div></DialogHeader>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-sky-200/75">Prévisions</p><p className="mt-1 text-sm font-semibold text-slate-100">{collectionHealthReport?.lastForecastSuccess?.collectedAt ? new Date(collectionHealthReport.lastForecastSuccess.collectedAt).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }) : "Aucun succès vérifiable"}</p><p className="mt-1 text-[10px] text-slate-400">Cycle quotidien à 05:00 Europe/Paris.</p></div><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-cyan-200/75">Stations physiques</p><p className="mt-1 text-sm font-semibold text-slate-100">{latestHourlyCollection ? hourlyCollectionMoment(latestHourlyCollection) : "Aucun passage vérifiable"}</p><p className="mt-1 text-[10px] text-slate-400">{technicalFailureStreak ? `${technicalFailureStreak} échec(s) technique(s) consécutif(s).` : "Aucune série d’échecs techniques."}</p></div></div>
+            <div className="mt-3 space-y-2" aria-label="Historique des 24 derniers passages horaires">{hourlyCollectionHistory.length ? hourlyCollectionHistory.map((trace) => { const presentation = hourlyCollectionPresentation(trace.status); return <article key={`${trace.date}-${trace.hour}`} className={`rounded-xl border p-3 ${presentation.className}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-semibold">{hourlyCollectionMoment(trace)} · {presentation.label}</p><p className="mt-1 text-[10px] leading-relaxed opacity-85">{trace.status === "stored" ? `${trace.stationCount} station(s) qualifiée(s) archivée(s).` : trace.status === "no_station" ? `Passage terminé après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""} ; aucune station qualifiée.` : `Échec après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.`}{trace.reason ? ` ${trace.reason}` : ""}</p></div><span className="shrink-0 text-[10px] font-semibold">{trace.status === "stored" ? "✓" : trace.status === "no_station" ? "—" : "!"}</span></div></article>; }) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-xs text-slate-400">Aucun passage horaire n’est encore archivé pour ce lieu.</p>}</div>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={isForecastInfoOpen} onOpenChange={setIsForecastInfoOpen}>
           <DialogContent

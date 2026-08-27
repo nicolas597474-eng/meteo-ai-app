@@ -11,7 +11,9 @@ describe("collecte horaire des snapshots physiques", () => {
     expect(source).toContain("Erreur de collecte après relance : ${message}");
     expect(source).toContain("retrying once:");
     expect(source).toContain('status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed"');
-    expect(source).toContain("Physical snapshot collection failed for all favorite locations");
+    expect(source).toContain("countConsecutiveTechnicalFailures");
+    expect(source).toContain("Échecs techniques horaires répétés");
+    expect(source).toContain("newlyAlertableFailures");
     expect(source).toContain("await processWithConcurrency(Array.from(unique.values()), 2");
   });
 

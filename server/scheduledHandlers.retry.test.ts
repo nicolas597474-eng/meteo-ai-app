@@ -11,11 +11,12 @@ describe("relance bornée des favoris de collecte horaire", () => {
     expect(shouldRetryHourlyFavorite(1)).toBe(false);
   });
 
-  it("le gestionnaire de collecte horaire notifie le propriétaire en cas d'échec total", () => {
+  it("le gestionnaire de collecte horaire notifie le propriétaire au seuil d’échecs techniques consécutifs", () => {
     const source = readFileSync(resolve(__dirname, "scheduledHandlers.ts"), "utf8");
     expect(source).toContain("allLocationsFailed");
     expect(source).toContain("notifyOwner");
-    expect(source).toContain("Collecte horaire en échec total");
-    expect(source).toContain("Toutes les tentatives de collecte");
+    expect(source).toContain("TECHNICAL_FAILURE_ALERT_THRESHOLD");
+    expect(source).toContain("Échecs techniques horaires répétés");
+    expect(source).toContain("Les créneaux « aucune station qualifiée » ne déclenchent pas cette alerte");
   });
 });

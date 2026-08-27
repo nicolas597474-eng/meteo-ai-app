@@ -3257,3 +3257,10 @@
 - [x] Identifier et afficher explicitement les créneaux où aucune station physique n’a été qualifiée, sans les confondre avec une erreur de collecte.
 - [x] Maintenir 05:00 dans le fuseau Europe/Paris malgré le passage été/hiver : la tâche vérifie 03:00 et 04:00 UTC, tandis que le handler exécute un unique cycle uniquement lorsque l’heure locale est 05:00.
 - [x] Ajouter des tests de statut, de créneau sans station et de bascule saisonnière, puis valider l’interface et les tâches actives. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Santé des collectes et alertes techniques
+- [x] Exposer un état de santé synthétique des collectes de prévisions et de stations physiques pour le lieu actif.
+- [x] Exposer les 24 derniers passages horaires avec un statut distinct pour les données stockées, les créneaux sans station qualifiée et les erreurs techniques.
+- [x] Ajouter une pastille de santé lisible dans le Dashboard, reliée uniquement à ces traces réelles.
+- [x] Déclencher une alerte propriétaire au troisième échec technique physique consécutif, sans alerter pour une absence de station qualifiée ni répéter l’alerte au quatrième passage.
+- [x] Couvrir les états, l’historique, le seuil d’alerte et le rendu mobile, puis publier après validation complète. TypeScript sans erreur ; 104 fichiers de test réussis, 395 tests réussis et 2 ignorés.

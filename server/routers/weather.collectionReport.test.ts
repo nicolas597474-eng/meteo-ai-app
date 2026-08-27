@@ -11,6 +11,9 @@ describe("weather.getForecastCollectionReport", () => {
     expect(source).toContain("getStationCollectionSnapshots(locationKey, 8)");
     expect(source).toContain("lastForecastSuccess");
     expect(source).toContain("lastPhysicalCollection");
+    expect(source).toContain("hourlyHistory");
+    expect(source).toContain("technicalFailureStreak");
+    expect(source).toContain("slice(0, 24)");
     expect(source).toContain("noQualifiedStationSlots");
     expect(source).toContain("scheduleCoverage");
     const procedure = source.slice(source.indexOf("getForecastCollectionReport:"), source.indexOf("getProviderDiagnostics:"));
