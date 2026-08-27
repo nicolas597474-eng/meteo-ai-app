@@ -4,6 +4,7 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, getLabelBelowCurveY, TEMPERATURE_LABEL_ABOVE_GAP, TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE } from "@/lib/chartLabelLanes";
+import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface DayData {
@@ -328,35 +329,23 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
     // ── Max curve (orange) ───────────────────────────────────────────────────
     const maxPts = displayDays.slice(0, visibleN).map((d, i) => ({ x: colX(i), y: tempToY(d.tempMax ?? 0) }));
-    if (maxPts.length > 1) {
-      ctx.beginPath();
-      ctx.moveTo(maxPts[0].x, maxPts[0].y);
-      for (let i = 1; i < maxPts.length; i++) {
-        const cpx = (maxPts[i - 1].x + maxPts[i].x) / 2;
-        ctx.bezierCurveTo(cpx, maxPts[i - 1].y, cpx, maxPts[i].y, maxPts[i].x, maxPts[i].y);
-      }
-      ctx.strokeStyle = "rgba(249, 115, 22, 0.38)";
-      ctx.lineWidth = 3.2;
-      ctx.stroke();
-      ctx.strokeStyle = "#fb923c";
-      ctx.lineWidth = 2.1;
-      ctx.stroke();
-    }
+    if (maxPts.length > 1) drawTemperatureCurveSegments(ctx, maxPts, displayDays.map((day) => day.tempMax), "maximum");
     // Points + values
     maxPts.forEach((pt, i) => {
       const v = displayDays[i].tempMax;
       if (v == null) return;
       const sel = selectedDay === i;
+      const tone = getTemperatureTone(v, "maximum");
       const r = sel ? 7 : 5;
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = "#fb923c";
+      ctx.fillStyle = tone.fill;
       ctx.fill();
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 2;
       ctx.stroke();
       // Value
-      ctx.fillStyle = "#fdba74";
+      ctx.fillStyle = tone.label;
       ctx.font = `bold ${sel ? 14 : 13}px system-ui`;
       ctx.textAlign = "center";
       const maxLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP);
@@ -368,30 +357,21 @@ export default function FifteenDayChart({ days, locationName }: Props) {
 
     // ── Min curve (blue) ─────────────────────────────────────────────────────
     const minPts = displayDays.slice(0, visibleN).map((d, i) => ({ x: colX(i), y: tempToY(d.tempMin ?? 0) }));
-    if (minPts.length > 1) {
-      ctx.beginPath();
-      ctx.moveTo(minPts[0].x, minPts[0].y);
-      for (let i = 1; i < minPts.length; i++) {
-        const cpx = (minPts[i - 1].x + minPts[i].x) / 2;
-        ctx.bezierCurveTo(cpx, minPts[i - 1].y, cpx, minPts[i].y, minPts[i].x, minPts[i].y);
-      }
-      ctx.strokeStyle = "#60a5fa";
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-    }
+    if (minPts.length > 1) drawTemperatureCurveSegments(ctx, minPts, displayDays.map((day) => day.tempMin), "minimum");
     minPts.forEach((pt, i) => {
       const v = displayDays[i].tempMin;
       if (v == null) return;
       const sel = selectedDay === i;
+      const tone = getTemperatureTone(v, "minimum");
       const r = sel ? 6 : 4;
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = "#60a5fa";
+      ctx.fillStyle = tone.fill;
       ctx.fill();
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = "#93c5fd";
+      ctx.fillStyle = tone.label;
       ctx.font = `bold ${sel ? 13 : 12}px system-ui`;
       ctx.textAlign = "center";
       const minLabelY = getLabelBelowCurveY(pt.y, tempZoneTop, windZoneTop, TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE);

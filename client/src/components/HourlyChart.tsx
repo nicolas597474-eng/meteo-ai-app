@@ -4,6 +4,7 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLabelLanes";
+import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -484,39 +485,28 @@ export default function HourlyChart({ hours, locationName }: Props) {
 
     // Temperature curve (orange gradient)
     const tempPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.temp ?? 0) }));
-    if (tempPts.length > 1) {
-      ctx.beginPath();
-      ctx.moveTo(tempPts[0].x, tempPts[0].y);
-      for (let i = 1; i < tempPts.length; i++) {
-        const cpx = (tempPts[i - 1].x + tempPts[i].x) / 2;
-        ctx.bezierCurveTo(cpx, tempPts[i - 1].y, cpx, tempPts[i].y, tempPts[i].x, tempPts[i].y);
-      }
-      ctx.strokeStyle = "rgba(249, 115, 22, 0.38)";
-      ctx.lineWidth = 3.2;
-      ctx.stroke();
-      ctx.strokeStyle = "#fb923c";
-      ctx.lineWidth = 2.1;
-      ctx.stroke();
-    }
+    if (tempPts.length > 1) drawTemperatureCurveSegments(ctx, tempPts, hours.map((hour) => hour.temp), "hourly");
     // Points + température affichée à chaque heure
     tempPts.forEach((pt, i) => {
       const v = hours[i].temp;
       if (v == null) return;
       const sel = selectedHour === i || nowHour === i;
+      const tone = getTemperatureTone(v, "hourly");
+      const isExtreme = tone.status !== "normal";
       const r = sel ? 5 : 3.5;
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = nowHour === i ? "#818cf8" : "#fb923c";
+      ctx.fillStyle = isExtreme ? tone.fill : nowHour === i ? "#818cf8" : tone.fill;
       ctx.fill();
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = nowHour === i ? "#dbeafe" : "#ffedd5";
+      ctx.fillStyle = isExtreme ? tone.label : nowHour === i ? "#dbeafe" : tone.label;
       ctx.font = `700 ${sel ? 14 : 12}px system-ui`;
       ctx.textAlign = "center";
       const temperatureLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP);
       const temperatureLabel = `${v.toFixed(1)}°`;
-      ctx.fillStyle = nowHour === i ? "#dbeafe" : "#ffedd5";
+      ctx.fillStyle = isExtreme ? tone.label : nowHour === i ? "#dbeafe" : tone.label;
       ctx.fillText(temperatureLabel, pt.x, temperatureLabelY);
     });
 

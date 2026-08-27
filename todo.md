@@ -3466,3 +3466,9 @@
 - [x] Simuler 42 °C dans un test isolé des graphiques, sans modifier les données affichées à l’utilisateur.
 - [x] Vérifier l’adaptation de l’échelle, le maintien du point dans la zone de courbe et l’espace du libellé au-dessus.
 - [x] Restituer le résultat de la simulation sans publier de données simulées.
+
+## Couleurs des températures extrêmes
+- [x] Appliquer une couleur d’alerte chaude aux segments, points et valeurs au-dessus de 35 °C.
+- [x] Appliquer une couleur de gel aux segments, points et valeurs sous 0 °C.
+- [x] Tester les seuils sur les deux graphiques sans modifier les échelles ni les données.
+- [x] Vérifier la lisibilité mobile et publier.
