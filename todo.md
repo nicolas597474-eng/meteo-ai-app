@@ -3220,3 +3220,9 @@
 - [x] Retirer le parent modal transformé du chemin de rendu de la carte agrandie.
 - [x] Monter la couche de carte directement à la racine du document lorsqu’elle est ouverte.
 - [x] Préserver les contrôles, valider la fermeture et publier après les tests de régression. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Harmonisation plein écran des cartes restantes
+- [x] Inventorier les vues agrandies de la carte des stations et de la carte de prévisions.
+- [x] Monter la carte des stations hors de tout conteneur qui pourrait la décaler sur mobile.
+- [x] Monter la carte de prévisions hors de tout conteneur qui pourrait la décaler sur mobile.
+- [x] Préserver tous les contrôles et comportements propres, puis valider par tests sans modifier les données ni les calculs météo. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { LocateFixed, Maximize2, Undo2, X } from "lucide-react";
 import { MapControlButton, MapTypeToggle, MapZoomControl, mapActionButtonClass } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
@@ -193,7 +194,7 @@ rotateControl: false,
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [isExpanded]);
 
-  return (
+  const mapShell = (
     <div className={isExpanded ? "fixed inset-0 z-[200] bg-[#070b13]" : "space-y-2"}>
       <div className={`relative overflow-hidden bg-[#090b10] ${isExpanded ? "h-[100dvh] border-0" : "h-72 rounded-xl border border-slate-800 sm:h-80"}`}>
         <MapView
@@ -284,4 +285,8 @@ rotateControl: false,
       )}
     </div>
   );
+
+  return isExpanded && typeof document !== "undefined"
+    ? createPortal(mapShell, document.body)
+    : mapShell;
 }

@@ -64,6 +64,8 @@ describe("WindyMap", () => {
   });
 
   it("conserve les contrôles externes utiles du plein écran", () => {
+    expect(source).toContain('import { createPortal } from "react-dom"');
+    expect(source).toContain("createPortal(fullscreenMap, document.body)");
     expect(source).toContain('aria-label="Fermer la carte plein écran"');
     expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
     expect(source).toContain("MapZoomControl");

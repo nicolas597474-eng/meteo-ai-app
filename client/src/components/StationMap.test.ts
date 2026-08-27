@@ -11,6 +11,9 @@ describe("carte des stations", () => {
     expect(source).not.toContain("Satellite · touchez un point pour la vue réelle");
     expect(source).not.toContain("Vue réelle ici");
     expect(source).toContain('fixed inset-0 z-[200] bg-[#070b13]');
+    expect(source).toContain('import { createPortal } from "react-dom"');
+    expect(source).toContain("createPortal(mapShell, document.body)");
+    expect(source).toContain("isExpanded && typeof document !== \"undefined\"");
     expect(source).toContain('h-72 rounded-xl border border-slate-800 sm:h-80');
     expect(source).toContain('mt-2 space-y-2');
     expect(source).toContain('MapTypeToggle value={mapType} onChange={changeMapType}');

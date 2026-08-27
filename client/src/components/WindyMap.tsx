@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Crosshair, Maximize2, X } from "lucide-react";
 import { MapZoomControl } from "@/components/MapControls";
 import { getWindyMapPreferences, makeWindyMapLocationKey, type WindyMapPreferences, writeWindyMapPreferences } from "./windyMapPreferences";
@@ -239,7 +240,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   );
 
   if (isFullscreen) {
-    return (
+    const fullscreenMap = (
       <div
         className={`fixed left-0 top-0 z-[200] flex w-screen flex-col overflow-hidden bg-[#080a0f] px-1.5 pt-1.5 transition-[opacity,transform] duration-250 ease-out motion-reduce:transition-none ${isFullscreenTransitioning ? "scale-[0.985] opacity-0" : "scale-100 opacity-100"}`}
         style={{
@@ -293,6 +294,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         </div>
       </div>
     );
+
+    return typeof document !== "undefined"
+      ? createPortal(fullscreenMap, document.body)
+      : fullscreenMap;
   }
 
   return (
