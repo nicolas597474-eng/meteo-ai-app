@@ -3200,3 +3200,8 @@
 - [x] Ouvrir la carte agrandie sur toute la surface disponible de l’écran mobile.
 - [x] Supprimer l’en-tête descriptif et le bouton inférieur « Fermer la carte » de cette vue.
 - [x] Préserver la croix ainsi que tous les contrôles cartographiques, puis valider le rendu mobile et les tests. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Correctif d’ancrage de la carte immersive
+- [x] Empêcher le décalage latéral et le débordement de la carte sur mobile.
+- [x] Masquer complètement le contenu de page sous-jacent pendant l’ouverture immersive.
+- [x] Vérifier le conteneur de dialogue réel, le typage et les tests avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.

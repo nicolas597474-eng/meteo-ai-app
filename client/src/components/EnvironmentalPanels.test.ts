@@ -77,7 +77,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("MapControlButton");
     expect(source).toContain("MapZoomControl");
     expect(styles).toContain("Carte d’éclipse immersive");
-    expect(styles).toContain('[role="dialog"]:has(> [data-swipe-exclude] .map-control-cluster)');
+    expect(styles).toContain('[data-slot="dialog-content"]:has([aria-label="Fermer la carte agrandie"])');
+    expect(styles).toContain("position: fixed !important");
+    expect(styles).toContain("translate: 0 0 !important");
     expect(styles).toContain("height: 100dvh !important");
     expect(styles).toContain("display: none");
     expect(source).toContain('absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4');
