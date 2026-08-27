@@ -3284,3 +3284,8 @@
 - [x] Recomposer la rose des vents avec une finition plus futuriste, sans modifier les calculs astronomiques ni le cap réel.
 - [x] Rendre la flèche de direction de l’astre plus longue, contrastée et explicitement orientée vers la zone à regarder.
 - [x] Préserver le repli lorsque le cap est absent, l’accessibilité et la lisibilité mobile, puis valider avant publication.
+
+## Rapprochement visuel de la boussole avec la référence fournie
+- [x] Recomposer la boussole en grande rose circulaire, avec anneau bleu lumineux, graduations et repères intermédiaires à 22,5°.
+- [x] Ajouter les quatre flèches cardinales et harmoniser les libellés autour de la rose sans simuler de cap.
+- [x] Renforcer la flèche de l’astre, préserver l’accessibilité et valider le rendu mobile avant publication.
