@@ -3391,3 +3391,8 @@
 - [x] Afficher « Lune alignée » au centre de la rose uniquement lorsque le cap et l’azimut lunaire réels sont alignés.
 - [x] Descendre le bloc de centrage et de zoom d’environ 1 cm en préservant son espacement interne.
 - [x] Vérifier les styles, les interactions et publier l’ajustement.
+
+## Retour du verrouillage lunaire
+- [x] Déclencher une vibration haptique brève et unique lorsque l’alignement réel avec la Lune est atteint.
+- [x] Décision utilisateur : ne pas ajouter de fondu au libellé central « Lune alignée ».
+- [x] Vérifier les garde-fous, les tests et publier l’amélioration.
