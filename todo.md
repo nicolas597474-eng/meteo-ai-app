@@ -3215,3 +3215,8 @@
 - [x] Retirer la dépendance de la carte agrandie au cadre visuel de la fenêtre modale, qui conservait une largeur latérale sur certains navigateurs mobiles.
 - [x] Afficher le canevas de carte agrandie dans une couche dédiée, fixe et directement ancrée à la fenêtre du navigateur.
 - [x] Préserver la croix et les contrôles de carte, puis vérifier le typage et la suite de tests avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Carte d’éclipse montée hors de la fenêtre modale
+- [x] Retirer le parent modal transformé du chemin de rendu de la carte agrandie.
+- [x] Monter la couche de carte directement à la racine du document lorsqu’elle est ouverte.
+- [x] Préserver les contrôles, valider la fermeture et publier après les tests de régression. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.

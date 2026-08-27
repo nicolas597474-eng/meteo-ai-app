@@ -29,6 +29,9 @@ describe("repli de cartographie", () => {
     expect(source).toContain("resizeFrame");
     expect(source).toContain("window.requestAnimationFrame");
     expect(source).toContain("window.cancelAnimationFrame");
+    expect(source).toContain("createPortal");
+    expect(source).toContain('className?.includes("eclipse-map-viewport")');
+    expect(source).toContain("createPortal(mapView, document.body)");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
 	    expect(source).toContain("ResizeObserver");

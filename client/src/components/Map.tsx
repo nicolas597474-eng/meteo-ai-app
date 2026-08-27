@@ -77,6 +77,7 @@
 /// <reference types="@types/google.maps" />
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { cn } from "@/lib/utils";
 
@@ -281,11 +282,15 @@ export function MapView({
     );
   }
 
-  return (
+  const mapView = (
     <div data-swipe-exclude data-swipe-ignore className={cn("relative h-[500px] w-full", className)}>
       {isLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Chargement de la carte…</div>}
       <div ref={mapContainer} className={cn("h-full w-full [will-change:transform]", allowPageScroll ? "touch-pan-y" : "touch-none")} onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
       {children}
     </div>
   );
+
+  return className?.includes("eclipse-map-viewport") && typeof document !== "undefined"
+    ? createPortal(mapView, document.body)
+    : mapView;
 }
