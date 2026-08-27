@@ -917,6 +917,19 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   padding: 0 !important;
 }
 
+/* Le canevas devient lui-même la couche de plein écran : aucun cadre modal ne peut alors le décaler. */
+.eclipse-map-viewport {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 60 !important;
+  width: 100vw !important;
+  min-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
 .map-control-button {
   display: flex;
   width: 3rem;

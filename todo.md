@@ -3210,3 +3210,8 @@
 - [x] Ajouter un ancrage de secours fondé sur la signature unique de la fenêtre de carte, sans dépendre de la prise en charge du sélecteur CSS contextuel par le navigateur.
 - [x] Forcer les quatre bords, les dimensions minimales de la fenêtre et l’absence de translation latérale.
 - [x] Valider TypeScript et la suite de régression complète avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Remplacement de la fenêtre de carte décalée
+- [x] Retirer la dépendance de la carte agrandie au cadre visuel de la fenêtre modale, qui conservait une largeur latérale sur certains navigateurs mobiles.
+- [x] Afficher le canevas de carte agrandie dans une couche dédiée, fixe et directement ancrée à la fenêtre du navigateur.
+- [x] Préserver la croix et les contrôles de carte, puis vérifier le typage et la suite de tests avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
