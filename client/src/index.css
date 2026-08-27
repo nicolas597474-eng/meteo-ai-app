@@ -473,6 +473,15 @@ img.moon-3d-first-crescent {
   overflow: visible;
 }
 
+/* Les variantes de taille mobile et bureau de MeteoIcon utilisent les
+   utilitaires Tailwind hidden / sm:block. Cette précision garde ces états
+   prioritaires sur l’affichage inline-block de l’enveloppe partagée. */
+.meteo-icon-shell.hidden { display: none; }
+
+@media (min-width: 640px) {
+  .meteo-icon-shell.sm\:block { display: block; }
+}
+
 .meteo-icon-shell > img,
 .meteo-icon-shell > svg {
   z-index: 1;

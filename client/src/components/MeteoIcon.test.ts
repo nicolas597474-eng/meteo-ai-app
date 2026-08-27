@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./MeteoIcon.tsx", import.meta.url), "utf8");
+const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 
 describe("MeteoIcon", () => {
   it("utilise le pack pictural 3D pour les principales conditions météo", () => {
@@ -37,5 +38,10 @@ describe("MeteoIcon", () => {
     expect(source).toContain("hasExplicitSizeClass");
     expect(source).toContain("meteo-icon-shell");
     expect(source).toContain("style={shellSizeStyle}");
+  });
+
+  it("respecte les variantes responsive cachées afin de ne jamais dupliquer une icône", () => {
+    expect(styles).toContain(".meteo-icon-shell.hidden { display: none; }");
+    expect(styles).toContain(".meteo-icon-shell.sm\\:block { display: block; }");
   });
 });

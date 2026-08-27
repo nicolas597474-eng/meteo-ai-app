@@ -386,6 +386,19 @@ export default function Dashboard() {
       refetchOnWindowFocus: true,
     }
   );
+  const hourlyCollectionHistory = (collectionHealthReport?.hourlyHistory ?? []) as HourlyCollectionTrace[];
+  const technicalFailureStreak = collectionHealthReport?.technicalFailureStreak ?? 0;
+  const latestHourlyCollection = hourlyCollectionHistory[0] ?? null;
+  const latestCollectionTraceKey = latestHourlyCollection
+    ? [
+        latestHourlyCollection.date,
+        latestHourlyCollection.hour,
+        latestHourlyCollection.status,
+        latestHourlyCollection.stationCount,
+        latestHourlyCollection.attempts,
+        latestHourlyCollection.reason ?? "",
+      ].join("|")
+    : null;
   const utils = trpc.useUtils();
   const { data: personalObservationState, refetch: refetchPersonalObservationState } = trpc.personalObservations.dashboardState.useQuery(
     coordsInput,
@@ -455,6 +468,20 @@ export default function Dashboard() {
     const timeoutId = window.setTimeout(() => setHasWaitTimedOut(true), DASHBOARD_LOAD_TIMEOUT_MS);
     return () => window.clearTimeout(timeoutId);
   }, [isLoading]);
+
+  useEffect(() => {
+    latestCollectionTraceKeyRef.current = null;
+    setCollectionUpdateNotice(null);
+  }, [coordsInput.lat, coordsInput.lon]);
+
+  useEffect(() => {
+    if (!latestCollectionTraceKey || !latestHourlyCollection) return;
+    const previousKey = latestCollectionTraceKeyRef.current;
+    latestCollectionTraceKeyRef.current = latestCollectionTraceKey;
+    if (previousKey && previousKey !== latestCollectionTraceKey) {
+      setCollectionUpdateNotice(latestHourlyCollection);
+    }
+  }, [latestCollectionTraceKey, latestHourlyCollection]);
 
   if (hasWaitTimedOut) {
     return (
@@ -605,19 +632,6 @@ export default function Dashboard() {
   const windDir = currentHour?.windDirection ?? null;
   const windSpeed = currentHour?.windSpeed ?? (isDailyFallback ? dailyFallback.windSpeed : today?.windSpeed ?? meteoAI?.windSpeed) ?? null;
   const currentCloudCover = currentHour?.cloudCover ?? today?.cloudCover ?? null;
-  const hourlyCollectionHistory = (collectionHealthReport?.hourlyHistory ?? []) as HourlyCollectionTrace[];
-  const technicalFailureStreak = collectionHealthReport?.technicalFailureStreak ?? 0;
-  const latestHourlyCollection = hourlyCollectionHistory[0] ?? null;
-  const latestCollectionTraceKey = latestHourlyCollection
-    ? [
-        latestHourlyCollection.date,
-        latestHourlyCollection.hour,
-        latestHourlyCollection.status,
-        latestHourlyCollection.stationCount,
-        latestHourlyCollection.attempts,
-        latestHourlyCollection.reason ?? "",
-      ].join("|")
-    : null;
   const collectionHealth = technicalFailureStreak >= 3
     ? { label: "Échecs techniques répétés", detail: `${technicalFailureStreak} passages consécutifs à corriger`, tone: "border-red-300/35 bg-red-400/15 text-red-50", dot: "bg-red-300" }
     : latestHourlyCollection?.status === "failed"
@@ -641,20 +655,6 @@ export default function Dashboard() {
   const localModeLabel = localMode === "ultra-local" ? "Ultra-local" : "Local";
   const localRadiusKm = localMode === "ultra-local" ? 10 : 30;
   const visibleLocalContributors = showAllLocalContributors ? localContributors : localContributors.slice(0, 6);
-
-  useEffect(() => {
-    latestCollectionTraceKeyRef.current = null;
-    setCollectionUpdateNotice(null);
-  }, [coordsInput.lat, coordsInput.lon]);
-
-  useEffect(() => {
-    if (!latestCollectionTraceKey || !latestHourlyCollection) return;
-    const previousKey = latestCollectionTraceKeyRef.current;
-    latestCollectionTraceKeyRef.current = latestCollectionTraceKey;
-    if (previousKey && previousKey !== latestCollectionTraceKey) {
-      setCollectionUpdateNotice(latestHourlyCollection);
-    }
-  }, [latestCollectionTraceKey, latestHourlyCollection]);
 
   return (
     <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>

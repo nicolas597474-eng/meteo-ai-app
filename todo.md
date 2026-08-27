@@ -3433,3 +3433,7 @@
 - [x] Retirer le grand nuage décoratif sous la température principale.
 - [x] Agrandir l’unique icône météo située à gauche de la température, sans empiéter sur les valeurs maximale et minimale.
 - [x] Vérifier l’équilibre mobile et publier la simplification.
+
+## Correction du doublon d’icône principale
+- [x] Rétablir l’affichage exclusif des variantes mobile et bureau de l’icône météo principale.
+- [x] Vérifier qu’un seul pictogramme agrandi est rendu à chaque taille d’écran et publier le correctif.
