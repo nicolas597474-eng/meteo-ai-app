@@ -827,15 +827,119 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   filter: drop-shadow(0 0 7px rgb(125 211 252 / 0.62));
 }
 
+/* Instrument de guidage astronomique : la rose reste une boussole, tandis que la flèche dorée
+   forme un relèvement long et explicite vers la zone du ciel à regarder. */
+.eclipse-compass-shell {
+  isolation: isolate;
+  overflow: visible !important;
+  border-color: rgb(186 230 253 / 0.78) !important;
+  background:
+    radial-gradient(circle at 50% 50%, rgb(226 232 240 / 0.15) 0 7%, transparent 8% 16%, rgb(56 189 248 / 0.12) 17% 19%, transparent 20% 31%, rgb(14 116 144 / 0.26) 32% 34%, transparent 35%),
+    conic-gradient(from 0deg, rgb(125 211 252 / 0.18), transparent 11%, rgb(14 165 233 / 0.10) 25%, transparent 38%, rgb(251 191 36 / 0.11) 50%, transparent 63%, rgb(14 165 233 / 0.12) 76%, transparent 88%, rgb(125 211 252 / 0.18)),
+    linear-gradient(145deg, rgb(15 23 42 / 0.98), rgb(3 7 18 / 0.99)) !important;
+  box-shadow: 0 0 0 1px rgb(125 211 252 / 0.22), 0 0 25px rgb(14 165 233 / 0.29), inset 0 0 20px rgb(14 165 233 / 0.16) !important;
+}
+
+.eclipse-compass-ring {
+  z-index: -1;
+  border: 1px solid rgb(186 230 253 / 0.42);
+  background: repeating-conic-gradient(from -1.5deg, rgb(226 232 240 / 0.86) 0deg 1deg, transparent 1.2deg 11.25deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 68%, #000 69%);
+  mask: radial-gradient(circle, transparent 0 68%, #000 69%);
+  opacity: 0.72;
+}
+
+.eclipse-compass-orbit {
+  z-index: -1;
+  border: 1px solid rgb(56 189 248 / 0.28);
+  box-shadow: inset 0 0 12px rgb(14 165 233 / 0.14);
+}
+
+.eclipse-compass-label {
+  z-index: 4;
+  text-shadow: 0 1px 5px rgb(2 6 23 / 0.92), 0 0 8px rgb(125 211 252 / 0.28);
+}
+
+.eclipse-compass-center {
+  z-index: 5;
+  border: 1px solid rgb(224 242 254 / 0.48);
+  background: radial-gradient(circle, rgb(30 41 59 / 0.97), rgb(8 47 73 / 0.84));
+  color: #e0f2fe;
+  box-shadow: 0 0 10px rgb(125 211 252 / 0.38), inset 0 1px 0 rgb(255 255 255 / 0.16);
+}
+
+.eclipse-astro-guidance-arrow {
+  z-index: 3;
+  width: calc(100% - 0.625rem);
+  height: calc(100% - 0.625rem);
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 0 3px rgb(251 191 36 / 0.8)) drop-shadow(0 0 8px rgb(245 158 11 / 0.48));
+}
+
+.eclipse-astro-guidance-arrow__beam {
+  stroke-width: 4.7;
+  stroke-linecap: round;
+}
+
+.eclipse-astro-guidance-arrow__head {
+  stroke: rgb(255 247 204 / 0.92);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+}
+
+.eclipse-astro-guidance-arrow__core {
+  fill: #fef3c7;
+  stroke: #f59e0b;
+  stroke-width: 1.7;
+}
+
+.eclipse-astro-bearing {
+  z-index: 7;
+  left: 50%;
+  display: inline-flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.22rem 0.38rem;
+  border: 1px solid rgb(251 191 36 / 0.55);
+  border-radius: 0.38rem;
+  background: rgb(9 18 32 / 0.96);
+  color: #fef3c7;
+  font-size: 0.5rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 12px rgb(2 6 23 / 0.52);
+}
+
+.eclipse-astro-bearing small {
+  color: rgb(186 230 253 / 0.9);
+  font-size: 0.45rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .map-control-cluster > button {
     animation: eclipse-compass-radar 4.8s linear infinite;
+  }
+
+  .eclipse-astro-guidance-arrow__head {
+    animation: eclipse-astro-guidance-pulse 2.1s cubic-bezier(0.23, 1, 0.32, 1) infinite alternate;
   }
 }
 
 @keyframes eclipse-compass-radar {
   0%, 100% { box-shadow: 0 0 0 1px rgb(14 165 233 / 0.18), 0 0 22px rgb(14 165 233 / 0.20), inset 0 0 18px rgb(14 165 233 / 0.11); }
   50% { box-shadow: 0 0 0 1px rgb(251 191 36 / 0.36), 0 0 30px rgb(14 165 233 / 0.32), inset 0 0 25px rgb(251 191 36 / 0.10); }
+}
+
+@keyframes eclipse-astro-guidance-pulse {
+  from { opacity: 0.78; }
+  to { opacity: 1; }
 }
 
 /* Aide affichée seulement tant que le bouton propose d’activer la boussole. */

@@ -150,6 +150,16 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Touchez la rose des vents");
     expect(source).toContain("nearestCompassRosePoint");
     expect(source).toContain("bg-amber-300");
+    expect(source).toContain("astronomicalBodyLabel");
+    expect(source).toContain("eclipse-compass-shell");
+    expect(source).toContain("eclipse-astro-guidance-arrow");
+    expect(source).toContain("eclipse-astro-guidance-arrow__beam");
+    expect(source).toContain("eclipse-astro-guidance-arrow__head");
+    expect(source).toContain("eclipse-astro-bearing");
+    expect(styles).toContain("Instrument de guidage astronomique");
+    expect(styles).toContain(".eclipse-astro-guidance-arrow");
+    expect(styles).toContain(".eclipse-astro-guidance-arrow__head");
+    expect(styles).toContain(".eclipse-astro-bearing");
     expect(source).toContain("Repère de rose");
     expect(source).toContain("Détails de la boussole");
     expect(source).toContain("Boussole du téléphone active. Cap");

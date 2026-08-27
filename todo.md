@@ -3271,6 +3271,16 @@
 - [x] Présenter le résultat du test sans modifier les tâches de collecte actives. Simulation ciblée réussie ; TypeScript sans erreur ; 104 fichiers de test réussis, 396 tests réussis et 2 ignorés.
 
 ## Surveillance de stabilité des collectes
-- [ ] Observer en lecture seule les prochains passages de snapshots physiques v5 et de prévisions v8.
-- [ ] Distinguer les réponses HTTP, les créneaux sans station qualifiée et les erreurs techniques éventuelles.
-- [ ] Présenter un bilan factuel de stabilité sans déclencher ni modifier les tâches.
+- [x] Observer en lecture seule les passages suivants de snapshots physiques v5 et vérifier le dernier succès de prévisions v8.
+- [x] Distinguer les réponses HTTP, les créneaux sans station qualifiée et les erreurs techniques éventuelles : six passages v5 consécutifs observés de 05:21 à 10:30 UTC le 27 août répondent tous HTTP 200 ; aucune erreur technique n’est présente dans cette fenêtre.
+- [x] Présenter un bilan factuel de stabilité sans déclencher ni modifier les tâches. La collecte v8 conserve son dernier succès HTTP 200 du 27 août à 03:07 UTC ; son prochain cycle est quotidien.
+
+## Confirmation du prochain passage horaire
+- [ ] Observer en lecture seule le prochain passage planifié de snapshots physiques v5.
+- [ ] Vérifier la réponse HTTP, la présence de traces par lieu et l’absence d’erreur technique.
+- [ ] Présenter le résultat de continuité sans modifier les tâches, les archives ni les collectes.
+
+## Boussole astronomique modernisée et flèche de guidage
+- [x] Recomposer la rose des vents avec une finition plus futuriste, sans modifier les calculs astronomiques ni le cap réel.
+- [x] Rendre la flèche de direction de l’astre plus longue, contrastée et explicitement orientée vers la zone à regarder.
+- [x] Préserver le repli lorsque le cap est absent, l’accessibilité et la lisibilité mobile, puis valider avant publication.
