@@ -9,6 +9,12 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Mes observations");
     expect(source).toContain('MeteoIcon name="wind_param" size={16}');
     expect(source).toContain('MeteoIcon name="humidity" size={16}');
+    expect(source).toContain('status: "stored" | "no_station" | "failed" | "missing"');
+    expect(source).toContain('label: "Créneau sans trace"');
+    expect(source).toContain('label: "Archivé via reprise"');
+    expect(source).toContain("missingSnapshotSlots");
+    expect(source).toContain("Créneau à rattraper");
+    expect(source).toContain("Le créneau est arrivé à échéance sans trace archivée");
     expect(source).toContain("Précipitations observées (mm)");
     expect(source).toContain("acceptsPersonalPrecipitation");
     expect(source).toContain("Très nuageux");
@@ -122,7 +128,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("getForecastCollectionReport");
     expect(source).toContain("Santé des collectes");
     expect(source).toContain("collection-health-panel");
-    expect(source).toContain("Historique des 24 derniers passages horaires");
+    expect(source).toContain("Historique des 24 derniers créneaux horaires");
     expect(source).toContain("Une absence de station qualifiée n’est pas une erreur technique");
     expect(source).toContain("technicalFailureStreak");
     expect(source).toContain("hourlyCollectionHistory.length}/24");

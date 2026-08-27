@@ -18,6 +18,14 @@ export function getParisHour(date = new Date()): number {
   return hour != null ? Number(hour) : 0;
 }
 
+export function getParisMinute(date = new Date()): number {
+  const minute = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: METEO_TIME_ZONE,
+    minute: "2-digit",
+  }).formatToParts(date).find((part) => part.type === "minute")?.value;
+  return minute != null ? Number(minute) : 0;
+}
+
 export function getParisDateDaysAgo(daysAgo: number, now = new Date()): string {
   return getParisDate(new Date(now.getTime() - daysAgo * 86_400_000));
 }

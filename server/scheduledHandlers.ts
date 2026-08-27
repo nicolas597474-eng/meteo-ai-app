@@ -309,7 +309,16 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           ? await insertQualifiedObservationSnapshotIfMissing(snapshot)
           : (await upsertQualifiedObservationSnapshot(snapshot), true);
         locationResult = snapshotCreated
-          ? { locationKey, stationCount: synthesis.stationCount, stored: true, attempts: attempt + 1, directReadingsAdded }
+          ? {
+              locationKey,
+              stationCount: synthesis.stationCount,
+              stored: true,
+              attempts: attempt + 1,
+              directReadingsAdded,
+              reason: trigger === "recovery"
+                ? "Archivé via la reprise automatique après l’absence de trace du passage principal."
+                : undefined,
+            }
           : {
               locationKey,
               stationCount: synthesis.stationCount,

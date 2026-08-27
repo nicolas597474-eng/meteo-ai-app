@@ -1,11 +1,26 @@
 # MeteoAI - Project TODO
 
+## Analyse des poids appliqués dans AI Lab
+- [x] Vérifier la trace de fusion et les critères de fiabilité utilisés pour les poids égaux à 12,5 %.
+- [x] Expliquer la cause à partir des données réelles, sans modifier le moteur de pondération.
+
+## Résilience complète des snapshots physiques
+- [x] Auditer les tâches planifiées actives, leurs autorisations et leurs derniers passages sans lancer de collecte manuelle.
+- [x] Éliminer les tâches obsolètes ou redondantes pouvant perturber la cadence horaire.
+- [x] Fiabiliser la reprise automatique et l’idempotence afin qu’un créneau manquant soit rattrapé sans réécrire une archive.
+- [x] Renforcer la gestion des échecs fournisseurs et la traçabilité de chaque tentative.
+- [x] Clarifier dans Santé des collectes les créneaux enregistrés, sans station, en reprise et en échec technique.
+- [x] Valider les protections automatisées puis publier la correction complète.
+
 ## Créneaux de snapshots physiques manquants
-- [ ] Examiner les passages et les traces horaires des créneaux 16 h, 18 h et 19 h signalés absents.
+- [x] Examiner les passages et les traces horaires des créneaux 16 h, 18 h et 19 h signalés absents.
 - [x] Vérifier la cadence active et les enregistrements réels, en distinguant absence de station et erreur technique.
-- [ ] Corriger uniquement la cause confirmée, puis valider la continuité de l’affichage.
-- [ ] Confirmer explicitement le statut des créneaux 16 h, 18 h et 19 h pour la date affichée, y compris les créneaux encore futurs.
-- [ ] Comparer les traces réelles à la logique de Santé des collectes afin d’écarter une omission purement visuelle.
+- [x] Corriger uniquement la cause confirmée, puis valider la continuité de l’affichage.
+- [x] Confirmer explicitement le statut des créneaux 16 h, 18 h et 19 h pour la date affichée, y compris les créneaux encore futurs.
+- [x] Comparer les traces réelles à la logique de Santé des collectes afin d’écarter une omission purement visuelle.
+- [x] Afficher explicitement lorsqu’un snapshot est archivé par la reprise automatique.
+- [x] Confirmer dans le bilan final les statuts réels des créneaux 16 h, 18 h et 19 h signalés.
+- [x] Publier les dernières corrections de résilience après validation complète.
 
 - [x] Database schema: forecasts, observations, reliability_scores, meteoai_forecasts tables
 - [x] API: tRPC router for weather data (forecasts, observations, scores)

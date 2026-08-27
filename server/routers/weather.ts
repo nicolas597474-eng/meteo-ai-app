@@ -40,6 +40,7 @@ import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "../weatherTime";
+import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
 import { conditionFromWeatherValues } from "../weatherConditionLabels";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { compareTraceWeights } from "../weightComparison";
@@ -641,16 +642,7 @@ export const weatherRouter = router({
       const latestCollection = recentCollections[0] ?? null;
       const lastForecastSuccess = recentCollections.find((collection) => collection.status !== "failed") ?? null;
       const lastPhysicalCollection = physicalTraces.find((trace) => trace.status !== "failed") ?? null;
-      const hourlyHistory = physicalTraces
-        .slice(0, 24)
-        .map((trace) => ({
-          status: trace.status,
-          date: trace.date,
-          hour: trace.hour,
-          attempts: trace.attempts,
-          stationCount: trace.stationCount,
-          reason: trace.reason,
-        }));
+      const hourlyHistory = buildRecentPhysicalSnapshotSlots(physicalTraces);
       const consecutiveTechnicalFailures = hourlyHistory.reduce((count, trace) => {
         if (count === -1) return -1;
         return trace.status === "failed" ? count + 1 : -1;
@@ -660,6 +652,7 @@ export const weatherRouter = router({
         .filter((trace) => trace.status === "no_station")
         .slice(0, 3)
         .map((trace) => ({ date: trace.date, hour: trace.hour, attempts: trace.attempts, reason: trace.reason }));
+      const missingSnapshotSlots = hourlyHistory.filter((trace) => trace.status === "missing").length;
       const expectedModels = WEATHER_SERVICES.expert.map((model) => model.name);
       const dailyMissingModels = latestCollection ? getMissingModelNames(latestCollection.dailyMissingModels) : [];
       const hourlyMissingModels = latestCollection ? getMissingModelNames(latestCollection.hourlyMissingModels) : [];
@@ -686,6 +679,7 @@ export const weatherRouter = router({
         hourlyHistory,
         technicalFailureStreak,
         noQualifiedStationSlots,
+        missingSnapshotSlots,
         snapshot: latestCollection ? {
           status: latestCollection.status,
           collectedAt: latestCollection.collectedAt,

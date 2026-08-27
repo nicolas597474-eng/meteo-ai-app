@@ -13,8 +13,9 @@ describe("weather.getForecastCollectionReport", () => {
     expect(source).toContain("lastPhysicalCollection");
     expect(source).toContain("hourlyHistory");
     expect(source).toContain("technicalFailureStreak");
-    expect(source).toContain("slice(0, 24)");
+    expect(source).toContain("buildRecentPhysicalSnapshotSlots(physicalTraces)");
     expect(source).toContain("noQualifiedStationSlots");
+    expect(source).toContain("missingSnapshotSlots");
     expect(source).toContain("scheduleCoverage");
     const procedure = source.slice(source.indexOf("getForecastCollectionReport:"), source.indexOf("getProviderDiagnostics:"));
     expect(procedure).not.toContain("collectExpertForecasts");
@@ -45,7 +46,7 @@ describe("relance manuelle des snapshots physiques", () => {
     expect(routerSource).toContain("Ce lieu favori est introuvable ou ne vous appartient pas.");
     expect(routerSource).toContain("collectPhysicalObservationSnapshotsForFavorites([favorite], \"manual\")");
     expect(handlerSource).toContain("trigger: PhysicalSnapshotCollectionTrigger");
-    expect(handlerSource).toContain('const preserveArchivedEvidence = trigger === "manual"');
+    expect(handlerSource).toContain('const preserveArchivedEvidence = trigger === "manual" || trigger === "recovery"');
     expect(handlerSource).toContain("directReadingsAdded");
     expect(handlerSource).toContain("snapshotPreserved: true");
     expect(handlerSource).toContain("seuls les nouveaux relevés directs ont été ajoutés");
@@ -66,6 +67,7 @@ describe("reprise programmée des snapshots physiques", () => {
     expect(handlerSource).toContain('const preserveArchivedEvidence = trigger === "manual" || trigger === "recovery"');
     expect(handlerSource).toContain('const recoveryOnly = trigger === "recovery"');
     expect(handlerSource).toContain("Créneau déjà archivé par le passage horaire principal ; reprise ignorée.");
+    expect(handlerSource).toContain("Archivé via la reprise automatique après l’absence de trace du passage principal.");
     expect(handlerSource).toContain('req.body?.snapshotMode === "recovery" ? "recovery" : "scheduled"');
     expect(handlerSource).not.toContain('collectPhysicalObservationSnapshotsForFavorites(favorites, "manual")');
   });
