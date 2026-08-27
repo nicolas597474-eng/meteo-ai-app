@@ -3451,3 +3451,8 @@
 - [x] Rétablir la légende basse dans le style visuel précédemment affiché sous la carte.
 - [x] Remplacer uniquement les graduations de pluie en mm par une échelle de couverture nuageuse en pourcentage cohérente avec la palette Windy.
 - [x] Vérifier la vue compacte et publier le correctif.
+
+## Gestes de défilement sur les graphiques
+- [x] Rétablir le défilement vertical de la page lorsque le geste commence sur le graphique horaire ou quotidien.
+- [x] Préserver le défilement horizontal des données et les gestes de sélection.
+- [x] Vérifier les interactions mobiles et publier le correctif.
