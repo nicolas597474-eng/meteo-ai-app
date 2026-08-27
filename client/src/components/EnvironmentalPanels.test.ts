@@ -199,6 +199,9 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain(".eclipse-astro-guidance-arrow");
     expect(styles).toContain(".eclipse-astro-guidance-arrow__head");
     expect(styles).toContain(".eclipse-compass-shell::after");
+    expect(styles).toContain("conic-gradient(from -22.5deg");
+    expect(styles).toContain("rgb(34 211 238 / 0.76)");
+    expect(styles).toContain(".eclipse-compass-cardinal-arrow");
     expect(styles).toContain("stroke-width: 1.2");
     expect(styles).toContain("transform: scaleX(0.56) scaleY(1.08)");
     expect(styles).toContain(".eclipse-astro-bearing");

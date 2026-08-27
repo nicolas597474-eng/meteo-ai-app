@@ -843,7 +843,7 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 .eclipse-compass-shell::after {
   position: absolute;
   z-index: 1;
-  inset: -0.3rem;
+  inset: 0.1rem;
   border: 1px solid transparent;
   border-radius: 999px;
   background: linear-gradient(135deg, rgb(56 189 248 / 0.98), rgb(59 130 246 / 0.46) 38%, rgb(168 85 247 / 0.72) 70%, rgb(34 211 238 / 0.96)) border-box;
@@ -885,15 +885,15 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 .eclipse-compass-orbit::before {
   inset: 8%;
   background:
-    conic-gradient(from -12deg,
-      transparent 0deg 12deg, rgb(30 64 175 / 0.72) 12deg 37deg, transparent 37deg 45deg,
-      transparent 45deg 58deg, rgb(14 165 233 / 0.76) 58deg 82deg, transparent 82deg 90deg,
-      transparent 90deg 104deg, rgb(37 99 235 / 0.64) 104deg 126deg, transparent 126deg 135deg,
-      transparent 135deg 149deg, rgb(56 189 248 / 0.46) 149deg 169deg, transparent 169deg 180deg,
-      transparent 180deg 193deg, rgb(99 102 241 / 0.62) 193deg 216deg, transparent 216deg 225deg,
-      transparent 225deg 239deg, rgb(139 92 246 / 0.68) 239deg 264deg, transparent 264deg 270deg,
-      transparent 270deg 283deg, rgb(168 85 247 / 0.74) 283deg 308deg, transparent 308deg 315deg,
-      transparent 315deg 329deg, rgb(79 70 229 / 0.60) 329deg 352deg, transparent 352deg 360deg);
+    conic-gradient(from -22.5deg,
+      rgb(37 99 235 / 0.74) 0deg 40deg, rgb(5 18 44 / 0.94) 40deg 45deg,
+      rgb(14 165 233 / 0.82) 45deg 85deg, rgb(5 18 44 / 0.94) 85deg 90deg,
+      rgb(34 211 238 / 0.76) 90deg 130deg, rgb(5 18 44 / 0.94) 130deg 135deg,
+      rgb(59 130 246 / 0.70) 135deg 175deg, rgb(5 18 44 / 0.94) 175deg 180deg,
+      rgb(79 70 229 / 0.68) 180deg 220deg, rgb(5 18 44 / 0.94) 220deg 225deg,
+      rgb(124 58 237 / 0.78) 225deg 265deg, rgb(5 18 44 / 0.94) 265deg 270deg,
+      rgb(168 85 247 / 0.76) 270deg 310deg, rgb(5 18 44 / 0.94) 310deg 315deg,
+      rgb(67 56 202 / 0.72) 315deg 355deg, rgb(5 18 44 / 0.94) 355deg 360deg);
   -webkit-mask: radial-gradient(circle, transparent 0 30%, #000 31% 67%, transparent 68%);
   mask: radial-gradient(circle, transparent 0 30%, #000 31% 67%, transparent 68%);
   opacity: 0.86;
@@ -937,12 +937,12 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 }
 
 .eclipse-compass-cardinal-arrow {
-  z-index: 4;
+  z-index: 2;
   width: 0;
   height: 0;
-  border-right: 4px solid transparent;
-  border-bottom: 8px solid rgb(165 243 252 / 0.98);
-  border-left: 4px solid transparent;
+  border-right: 2.5px solid transparent;
+  border-bottom: 5px solid rgb(165 243 252 / 0.98);
+  border-left: 2.5px solid transparent;
   filter: drop-shadow(0 0 3px rgb(34 211 238 / 0.95)) drop-shadow(0 0 7px rgb(99 102 241 / 0.36));
 }
 

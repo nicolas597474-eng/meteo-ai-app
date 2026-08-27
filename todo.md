@@ -3338,6 +3338,11 @@
 - [x] Allonger et affiner encore la flèche bleue de guidage réel.
 - [x] Valider le contraste mobile, les animations et publier l’ajustement final.
 
+## Marqueurs au bord et secteurs continus
+- [x] Replacer les flèches marqueurs sur l’anneau bleu sans dépasser ni chevaucher les directions.
+- [x] Remplir l’anneau interne avec des secteurs continus bleu, cyan et violet.
+- [x] Tester la lisibilité mobile et publier le cadran ajusté.
+
 ## Informations lunaires en direct
 - [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
 - [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.
