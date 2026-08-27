@@ -84,6 +84,7 @@ export function roundAltitudeDegrees(value: number | null | undefined) {
 export type ApparentBodyPosition = {
   altitudeDeg: number | null;
   azimuthDeg: number | null;
+  distanceKm: number | null;
   aboveHorizon: boolean;
 };
 
@@ -111,9 +112,11 @@ function getApparentBodyPosition(body: AstronomyBody, instant: Date, observer: A
   const horizon = Astronomy.Horizon(instant, observer, equator.ra, equator.dec, "normal");
   const altitudeDeg = roundAltitudeDegrees(horizon.altitude);
   const azimuthDeg = roundAltitudeDegrees(horizon.azimuth);
+  const distanceKm = Number.isFinite(equator.dist) ? Math.round(equator.dist * 149_597_870.7) : null;
   return {
     altitudeDeg,
     azimuthDeg,
+    distanceKm,
     aboveHorizon: Number.isFinite(horizon.altitude) && horizon.altitude > 0,
   };
 }

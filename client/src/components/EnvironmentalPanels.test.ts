@@ -173,6 +173,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("moonAlignmentHapticRef");
     expect(source).toContain("toggleLunarObservationFullscreen");
     expect(source).toContain("requestFullscreen");
+    expect(source).toContain("moonObservationQuery");
+    expect(source).toContain("Distance Terre–Lune");
+    expect(source).toContain("formatLunarDistance");
     expect(source).toContain("eclipse-moon-alignment-ring");
     expect(source).toContain("Lune alignée");
     expect(source).toContain("eclipse-astro-guidance-arrow");
@@ -198,6 +201,8 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("stroke-width: 1.55");
     expect(styles).toContain("transform: scaleX(0.64)");
     expect(styles).toContain(".eclipse-astro-bearing");
+    expect(styles).toContain(".lunar-live-panel");
+    expect(styles).toContain(".lunar-live-panel__metric");
     expect(source).toContain("Repère de rose");
     expect(source).toContain("Détails de la boussole");
     expect(source).toContain("Boussole du téléphone active. Cap");

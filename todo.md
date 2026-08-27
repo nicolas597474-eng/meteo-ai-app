@@ -3326,3 +3326,15 @@
 - [x] Renforcer avec mesure les accents bleu, cyan et violet sur le fond, les anneaux et les segments.
 - [x] Affiner la flèche astronomique bleue et améliorer son aspect lumineux élégant.
 - [x] Vérifier la lisibilité mobile, les animations et publier l’ajustement.
+
+## Panneau lunaire et palette renforcée
+- [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
+- [x] Actualiser le panneau sans créer de tâche planifiée supplémentaire.
+- [x] Composer un panneau lunaire discret et enrichir les accents bleu/cyan/violet sans surcharge.
+- [x] Affiner la flèche bleue, tester les données et le mobile, puis publier.
+
+## Informations lunaires en direct
+- [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
+- [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.
+- [x] Afficher phase, distance et heure de calcul dans un panneau discret de l’observation immersive.
+- [x] Tester les données réelles, l’accessibilité et le mobile avant publication.

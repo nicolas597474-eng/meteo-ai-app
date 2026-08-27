@@ -41,6 +41,8 @@ describe("environmentalData", () => {
     expect(night.sun.altitudeDeg).toBeLessThan(0);
     expect(day.moon.altitudeDeg).not.toBeNull();
     expect(day.moon.azimuthDeg).not.toBeNull();
+    expect(day.moon.distanceKm).toBeGreaterThan(350_000);
+    expect(day.moon.distanceKm).toBeLessThan(410_000);
     expect(day.moon.aboveHorizon).toBe(day.moon.altitudeDeg! > 0);
     expect(day.trajectory.sun).toHaveLength(49);
     expect(day.trajectory.moon).toHaveLength(49);
