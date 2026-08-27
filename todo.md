@@ -3477,3 +3477,8 @@
 - [x] Réduire légèrement l’icône météo principale du Dashboard.
 - [x] Conserver l’alignement avec la température et les indicateurs maximale/minimale.
 - [x] Vérifier la vue mobile et publier l’ajustement.
+
+## Retour de la couche Nuages au rendu Windy natif
+- [x] Retirer la légende personnalisée et le cadrage bas spécifique ajoutés à la couche Nuages.
+- [x] Rétablir la barre et la légende natives de Windy sans double affichage.
+- [x] Vérifier la vue compacte puis publier le retour au rendu d’origine.

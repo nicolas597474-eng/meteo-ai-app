@@ -115,24 +115,6 @@ function LayerSelector({
   );
 }
 
-function CloudCoverageLegend({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className={`pointer-events-none absolute inset-x-0 z-10 ${compact ? "bottom-12" : "bottom-0"}`} aria-label="Échelle de couverture nuageuse de 0 à 100 pour cent">
-      <div className="border-t border-white/20 bg-[#0a1018]/78 px-2 pb-1 pt-1.5 shadow-[0_-5px_12px_rgba(2,6,23,0.22)] backdrop-blur-sm">
-        <div aria-hidden="true" className="h-2.5 border border-white/20 bg-[linear-gradient(90deg,#c2ab62_0%,#a9b2a7_20%,#88aab9_40%,#68bac3_60%,#9acbd2_80%,#edf5f7_100%)]" />
-        <div className="mt-0.5 grid grid-cols-6 text-[8px] font-medium leading-none text-slate-100/90">
-          <span>0 %</span>
-          <span className="text-center">20 %</span>
-          <span className="text-center">40 %</span>
-          <span className="text-center">60 %</span>
-          <span className="text-center">80 %</span>
-          <span className="text-right">100 %</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const preferenceLocationKey = makeWindyMapLocationKey(lat, lon);
   const [preferences, setPreferences] = useState<WindyMapPreferences>(() => getWindyMapPreferences(preferenceLocationKey));
@@ -250,12 +232,10 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, [isFullscreen]);
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
-  // La couche Nuages de l’embed Windy affiche nativement une légende de précipitations (mm)
-  // au lieu de la couverture nuageuse (%). Pour éviter cette incohérence, on masque la légende
-  // native de cette couche spécifique en décalant le bas de l’iframe.
-  const hideNativeLegend = activeLayer === "clouds";
-  const fullscreenBottomGutter = hideNativeLegend ? 32 : 0;
-  const compactBottomGutter = COMPACT_NATIVE_TIMELINE_GUTTER_PX + (hideNativeLegend ? 32 : 0);
+  // La couche Nuages conserve le même cadrage que les autres couches afin que
+  // l’interface et la légende natives de Windy restent entièrement visibles.
+  const fullscreenBottomGutter = 0;
+  const compactBottomGutter = COMPACT_NATIVE_TIMELINE_GUTTER_PX;
 
   const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, compactZoom, false);
   // En plein écran, on conserve la barre temporelle native et son bouton lecture,
@@ -301,7 +281,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
-          {hideNativeLegend && <CloudCoverageLegend />}
           <button
             type="button"
             onClick={closeFullscreen}
@@ -356,14 +335,12 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             src={windyUrlCompact}
             title={`Aperçu fixe Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
             className="pointer-events-none h-full w-full border-0"
-            style={{ height: `calc(100% + ${hideNativeLegend ? 32 : 0}px)` }}
             tabIndex={-1}
             loading="lazy"
             allow="geolocation"
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
-        {hideNativeLegend && <CloudCoverageLegend compact />}
         <MapZoomControl orientation="horizontal" ariaLabel="Zoom de l’aperçu fixe" className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2" onZoomIn={() => adjustCompactZoom(1)} onZoomOut={() => adjustCompactZoom(-1)} />
         {/* Bouton plein écran */}
         <button
