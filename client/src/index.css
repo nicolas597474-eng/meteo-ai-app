@@ -964,8 +964,9 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   border-radius: 999px;
   background: radial-gradient(circle, rgb(186 230 253 / 0.16) 0 12%, rgb(56 189 248 / 0.10) 13% 39%, transparent 40%);
   box-shadow: 0 0 11px rgb(34 211 238 / 0.78), 0 0 27px rgb(56 189 248 / 0.38), 0 0 38px rgb(139 92 246 / 0.24);
+  opacity: var(--moon-guidance-opacity, 0.1);
   pointer-events: none;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--moon-guidance-scale, 0.84));
 }
 
 .eclipse-moon-alignment-label {
@@ -1032,7 +1033,7 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   }
 
   .eclipse-moon-alignment-ring {
-    animation: eclipse-moon-alignment-bloom 1.35s cubic-bezier(0.23, 1, 0.32, 1) infinite alternate;
+    transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
   }
 }
 
@@ -1049,11 +1050,6 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 @keyframes eclipse-compass-center-pulse {
   from { opacity: 0.36; transform: translate(-50%, -50%) scale(0.78); }
   to { opacity: 0.82; transform: translate(-50%, -50%) scale(1.12); }
-}
-
-@keyframes eclipse-moon-alignment-bloom {
-  from { opacity: 0.56; transform: translate(-50%, -50%) scale(0.9); }
-  to { opacity: 0.94; transform: translate(-50%, -50%) scale(1.08); }
 }
 
 /* Aide affichée seulement tant que le bouton propose d’activer la boussole. */

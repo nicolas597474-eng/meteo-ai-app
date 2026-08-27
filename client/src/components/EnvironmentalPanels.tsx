@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CSSProperties } from "react";
-import { Compass, LocateFixed, Maximize2, Navigation, SlidersHorizontal, Volume2, VolumeX, X } from "lucide-react";
+import { Compass, LocateFixed, Maximize2, Minimize2, Navigation, SlidersHorizontal, Volume2, VolumeX, X } from "lucide-react";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { MapControlButton, MapTypeToggle, MapZoomControl } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
@@ -341,6 +341,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const [isOpacityPanelOpen, setIsOpacityPanelOpen] = useState(false);
   const [isCompassDetailsOpen, setIsCompassDetailsOpen] = useState(false);
   const [isMapOpening, setIsMapOpening] = useState(false);
+  const [isLunarObservationFullscreen, setIsLunarObservationFullscreen] = useState(false);
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "waiting" | "tracking" | "no-data" | "denied" | "unsupported">("idle");
   const [headingSource, setHeadingSource] = useState<"none" | "absolute" | "relative">("none");
@@ -357,6 +358,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const observationAlertFiredRef = useRef(false);
   const isMapOpeningRef = useRef(false);
   const displayedArrowRotationRef = useRef(0);
+  const moonAlignmentHapticRef = useRef(false);
   const visibilityRectanglesRef = useRef<Array<{ rectangle: google.maps.Rectangle; baseOpacity: number }>>([]);
   const selectedLayer = layers.find((layer) => layer.eventId === selectedLayerId) ?? layers[0];
   if (!selectedLayer) return null;
@@ -526,7 +528,14 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const highlightedCompassPoint = nearestCompassRosePoint(astronomicalAzimuth);
   const hasReliableCompassHeading = isDeviceCompassActive && (headingSource === "absolute" || isRelativeHeadingCalibrated);
   const moonAlignmentDeltaDeg = selectedLayer.type === "lunar" && astronomicalAzimuth != null && hasReliableCompassHeading ? getAngularDistance(compassHeading, astronomicalAzimuth) : null;
+  const isMoonGuidanceActive = moonAlignmentDeltaDeg != null && moonAlignmentDeltaDeg < 42;
   const isMoonAligned = moonAlignmentDeltaDeg != null && moonAlignmentDeltaDeg <= MOON_ALIGNMENT_TOLERANCE_DEG;
+  const moonAlignmentProximity = moonAlignmentDeltaDeg == null ? 0 : Math.max(0, 1 - Math.min(moonAlignmentDeltaDeg, 42) / 42);
+  const moonAlignmentStyle = {
+    "--moon-alignment-proximity": moonAlignmentProximity.toFixed(3),
+    "--moon-guidance-opacity": (0.10 + moonAlignmentProximity * 0.82).toFixed(3),
+    "--moon-guidance-scale": (0.84 + moonAlignmentProximity * 0.16).toFixed(3),
+  } as CSSProperties;
   const isUsingAuthorizedPosition = selectedPoint?.label === "Ma position actuelle";
   const isAstronomicalWindowOpen = observationWindowStart != null && observationWindowEnd != null && currentTimestamp >= observationWindowStart && currentTimestamp <= observationWindowEnd;
   const isAstroObservableNow = isUsingAuthorizedPosition && circumstances?.visibility !== "not_visible" && circumstances?.altitudeDegrees != null && circumstances.altitudeDegrees > 0 && isAstronomicalWindowOpen;
@@ -548,6 +557,20 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     setSoundAlertEnabled(true);
   };
   useEffect(() => () => { void soundContextRef.current?.close(); }, []);
+  useEffect(() => {
+    if (!isMoonAligned) {
+      moonAlignmentHapticRef.current = false;
+      return;
+    }
+    if (moonAlignmentHapticRef.current || typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+    navigator.vibrate(18);
+    moonAlignmentHapticRef.current = true;
+  }, [isMoonAligned]);
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsLunarObservationFullscreen(document.fullscreenElement != null);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
   useEffect(() => {
     if (!isAstroObservableNow) {
       observationAlertFiredRef.current = false;
@@ -590,9 +613,18 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     setIsMapExpanded(true);
   };
   const closeExpandedMap = () => {
+    if (isLunarObservationFullscreen && document.fullscreenElement) void document.exitFullscreen();
     isMapOpeningRef.current = false;
     setIsMapOpening(false);
     setIsMapExpanded(false);
+  };
+  const toggleLunarObservationFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      setLocationStatus("Le plein écran n’est pas disponible dans ce navigateur. Vous pouvez continuer en carte agrandie.");
+    }
   };
   const compassButtonClassName = `eclipse-compass-shell relative h-[104px] w-[104px]${isMoonAligned ? " eclipse-moon-aligned" : ""}`;
   const compassButtonAriaLabel = isDeviceCompassActive
@@ -630,9 +662,10 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
       {!isExpanded && <div className="absolute right-3 top-3 z-20 flex flex-col gap-2" data-swipe-exclude><MapControlButton shape="square" onClick={openExpandedMap} disabled={isMapOpening} aria-label={isMapOpening ? "Ouverture de la carte" : "Agrandir la carte"} title={isMapOpening ? "Ouverture de la carte…" : "Agrandir la carte"} aria-busy={isMapOpening} className="h-11 w-11"><Maximize2 size={21} strokeWidth={2.35} aria-hidden="true" /></MapControlButton><MapControlButton onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Me localiser"} title={isLocating ? "Localisation en cours" : "Me localiser"} aria-busy={isLocating} className="h-11 w-11 text-sky-200"><LocateFixed size={21} strokeWidth={2.25} aria-hidden="true" /></MapControlButton></div>}
       {!isExpanded && <div className="absolute bottom-3 right-3 z-20" data-swipe-exclude><MapZoomControl onZoomIn={() => { const map = compactMapRef.current; if (map) map.setZoom(Math.min(20, (map.getZoom() ?? 3) + 1)); }} onZoomOut={() => { const map = compactMapRef.current; if (map) map.setZoom(Math.max(2, (map.getZoom() ?? 3) - 1)); }} /></div>}
       {isExpanded && opacityControl}
-      {isExpanded && <div className="map-control-cluster absolute left-3 top-3 z-20" data-swipe-exclude><MapControlButton onClick={() => { if (isDeviceCompassActive) setIsCompassDetailsOpen(true); else void enableDeviceCompass(); }} aria-label={compassButtonAriaLabel} aria-haspopup={isDeviceCompassActive ? "dialog" : undefined} aria-expanded={isDeviceCompassActive ? isCompassDetailsOpen : undefined} title={isMoonAligned ? "Lune dans l’axe de visée" : isDeviceCompassActive ? "Boussole orientée par le téléphone" : "Touchez pour orienter la boussole"} shape="circle" active={isDeviceCompassActive} className={compassButtonClassName} data-moon-aligned={isMoonAligned ? "true" : "false"}><span className="eclipse-compass-ring absolute inset-[5px] rounded-full" aria-hidden="true" /><span className="eclipse-compass-orbit absolute inset-[12px] rounded-full" aria-hidden="true" />{isMoonAligned && <span className="eclipse-moon-alignment-ring absolute left-1/2 top-1/2" aria-hidden="true" />}{[0, 90, 180, 270].map((angle) => <span key={`cardinal-arrow-${angle}`} className="eclipse-compass-cardinal-arrow absolute left-1/2 top-1/2" aria-hidden="true" style={{ transform: `translate(-50%, -50%) rotate(${angle - compassHeading}deg) translateY(-47px)` }} />)}{COMPASS_ROSE_POINTS.map((point) => { const isAstroDirection = highlightedCompassPoint?.label === point.label; return <span key={point.label} aria-hidden="true" className={`eclipse-compass-label ${point.cardinal ? "eclipse-compass-label--cardinal" : "eclipse-compass-label--intercardinal"} absolute left-1/2 top-1/2 leading-none ${isAstroDirection ? "rounded-full bg-amber-300 px-1 font-black text-amber-950 shadow-sm" : ""} ${point.label === "N" && !isAstroDirection ? "text-rose-300" : ""}`} style={{ transform: `translate(-50%, -50%) rotate(${point.angle - compassHeading}deg) translateY(-41px) rotate(${compassHeading - point.angle}deg)` }}>{point.label}</span>; })}{astronomicalAzimuth != null && <svg className="eclipse-astro-guidance-arrow absolute inset-[5px]" viewBox="0 0 100 100" aria-hidden="true" style={{ transform: `rotate(${displayedArrowRotation}deg)` }}><defs><linearGradient id={`eclipse-guidance-${suffix}`} x1="50" y1="62" x2="50" y2="10" gradientUnits="userSpaceOnUse"><stop stopColor="#1d4ed8" stopOpacity="0.22" /><stop offset="0.6" stopColor="#38bdf8" /><stop offset="1" stopColor="#dbeafe" /></linearGradient></defs><path className="eclipse-astro-guidance-arrow__beam" d="M50 63V28" stroke={`url(#eclipse-guidance-${suffix})`} /><path className="eclipse-astro-guidance-arrow__head" d="M50 9 L62 34 L50 29 L38 34 Z" fill={`url(#eclipse-guidance-${suffix})`} /><circle className="eclipse-astro-guidance-arrow__core" cx="50" cy="62" r="4.3" /></svg>}<span className="eclipse-compass-center-pulse absolute left-1/2 top-1/2" aria-hidden="true" /><span className="eclipse-compass-center absolute left-1/2 top-1/2 grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full" aria-hidden="true"><Compass size={18} strokeWidth={2.3} style={{ transform: `rotate(${-compassHeading}deg)` }} /></span>{isMoonAligned && <span className="eclipse-moon-alignment-label absolute -bottom-9" aria-hidden="true">Lune alignée</span>}<span className="eclipse-astro-bearing absolute -bottom-4" aria-hidden="true"><small>{astronomicalBodyLabel}</small><strong>{astronomicalAzimuth == null ? "Az. —" : `${astronomicalAzimuth}° ${astronomicalDirection ?? ""}`}</strong></span></MapControlButton></div>}
+      {isExpanded && <div className="map-control-cluster absolute left-3 top-3 z-20" data-swipe-exclude><MapControlButton onClick={() => { if (isDeviceCompassActive) setIsCompassDetailsOpen(true); else void enableDeviceCompass(); }} aria-label={compassButtonAriaLabel} aria-haspopup={isDeviceCompassActive ? "dialog" : undefined} aria-expanded={isDeviceCompassActive ? isCompassDetailsOpen : undefined} title={isMoonAligned ? "Lune dans l’axe de visée" : isDeviceCompassActive ? "Boussole orientée par le téléphone" : "Touchez pour orienter la boussole"} shape="circle" active={isDeviceCompassActive} className={compassButtonClassName} data-moon-aligned={isMoonAligned ? "true" : "false"}><span className="eclipse-compass-ring absolute inset-[5px] rounded-full" aria-hidden="true" /><span className="eclipse-compass-orbit absolute inset-[12px] rounded-full" aria-hidden="true" />{isMoonGuidanceActive && <span className="eclipse-moon-alignment-ring absolute left-1/2 top-1/2" aria-hidden="true" style={moonAlignmentStyle} />}{[0, 90, 180, 270].map((angle) => <span key={`cardinal-arrow-${angle}`} className="eclipse-compass-cardinal-arrow absolute left-1/2 top-1/2" aria-hidden="true" style={{ transform: `translate(-50%, -50%) rotate(${angle - compassHeading}deg) translateY(-47px)` }} />)}{COMPASS_ROSE_POINTS.map((point) => { const isAstroDirection = highlightedCompassPoint?.label === point.label; return <span key={point.label} aria-hidden="true" className={`eclipse-compass-label ${point.cardinal ? "eclipse-compass-label--cardinal" : "eclipse-compass-label--intercardinal"} absolute left-1/2 top-1/2 leading-none ${isAstroDirection ? "rounded-full bg-amber-300 px-1 font-black text-amber-950 shadow-sm" : ""} ${point.label === "N" && !isAstroDirection ? "text-rose-300" : ""}`} style={{ transform: `translate(-50%, -50%) rotate(${point.angle - compassHeading}deg) translateY(-41px) rotate(${compassHeading - point.angle}deg)` }}>{point.label}</span>; })}{astronomicalAzimuth != null && <svg className="eclipse-astro-guidance-arrow absolute inset-[5px]" viewBox="0 0 100 100" aria-hidden="true" style={{ transform: `rotate(${displayedArrowRotation}deg)` }}><defs><linearGradient id={`eclipse-guidance-${suffix}`} x1="50" y1="62" x2="50" y2="10" gradientUnits="userSpaceOnUse"><stop stopColor="#1d4ed8" stopOpacity="0.22" /><stop offset="0.6" stopColor="#38bdf8" /><stop offset="1" stopColor="#dbeafe" /></linearGradient></defs><path className="eclipse-astro-guidance-arrow__beam" d="M50 63V28" stroke={`url(#eclipse-guidance-${suffix})`} /><path className="eclipse-astro-guidance-arrow__head" d="M50 9 L62 34 L50 29 L38 34 Z" fill={`url(#eclipse-guidance-${suffix})`} /><circle className="eclipse-astro-guidance-arrow__core" cx="50" cy="62" r="4.3" /></svg>}<span className="eclipse-compass-center-pulse absolute left-1/2 top-1/2" aria-hidden="true" /><span className="eclipse-compass-center absolute left-1/2 top-1/2 grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full" aria-hidden="true"><Compass size={18} strokeWidth={2.3} style={{ transform: `rotate(${-compassHeading}deg)` }} /></span>{isMoonAligned && <span className="eclipse-moon-alignment-label absolute -bottom-9" aria-hidden="true">Lune alignée</span>}<span className="eclipse-astro-bearing absolute -bottom-4" aria-hidden="true"><small>{astronomicalBodyLabel}</small><strong>{astronomicalAzimuth == null ? "Az. —" : `${astronomicalAzimuth}° ${astronomicalDirection ?? ""}`}</strong></span></MapControlButton></div>}
       {isExpanded && <div className="map-compass-status absolute left-3 top-[142px] z-20 w-[188px]" data-swipe-exclude><div className="w-full rounded-xl border border-slate-500/60 bg-[#111c2b]/95 px-2.5 py-2 text-left text-[10px] font-semibold leading-snug text-slate-100 shadow-lg"><p>{orientationStatus === "denied" ? "Capteur refusé" : orientationStatus === "unsupported" ? "Capteur indisponible" : orientationStatus === "waiting" ? "Bougez le téléphone" : orientationStatus === "no-data" ? "Aucun cap reçu" : isDeviceCompassActive ? `Cap ${Math.round(compassHeading)}°${headingSource === "relative" ? isRelativeHeadingCalibrated ? " calibré" : " relatif" : ""}` : "Touchez la rose des vents"}</p>{!isDeviceCompassActive && orientationStatus !== "waiting" && orientationStatus !== "unsupported" && <p className="mt-1 border-t border-slate-600/70 pt-1.5 text-[9px] font-medium text-sky-100">Autorisez Mouvement et orientation dans les réglages du navigateur.</p>}</div></div>}
       {isExpanded && <div className="absolute left-[122px] top-3 z-20" data-swipe-exclude><MapTypeToggle value={expandedMapType} onChange={(value) => { setExpandedMapType(value); expandedMapRef.current?.setMapTypeId(value); }} /></div>}
+      {isExpanded && selectedLayer.type === "lunar" && <MapControlButton onClick={() => void toggleLunarObservationFullscreen()} aria-label={isLunarObservationFullscreen ? "Quitter le mode d’observation lunaire plein écran" : "Passer en mode d’observation lunaire plein écran"} title={isLunarObservationFullscreen ? "Quitter l’observation immersive" : "Observation lunaire immersive"} className="absolute left-[122px] top-14 z-20 h-10 w-10 text-sky-100" data-swipe-exclude><span className="sr-only">{isLunarObservationFullscreen ? "Quitter l’observation immersive" : "Observation immersive"}</span>{isLunarObservationFullscreen ? <Minimize2 className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" /> : <Maximize2 className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />}</MapControlButton>}
       {isExpanded && <MapControlButton onClick={closeExpandedMap} aria-label="Fermer la carte agrandie" title="Fermer la carte" className="absolute right-3 top-3 z-20"><X aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} /></MapControlButton>}
       {isExpanded && <div className="absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4" data-swipe-exclude><MapControlButton onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Centrer la carte sur ma position"} title={isLocating ? "Localisation en cours…" : "Centrer sur ma position"} aria-busy={isLocating} className="text-sky-200"><LocateFixed aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} /></MapControlButton><MapZoomControl onZoomIn={() => adjustExpandedZoom(1)} onZoomOut={() => adjustExpandedZoom(-1)} /></div>}
       {observationNotice && <div className="map-observability-notice absolute inset-x-3 bottom-3 z-20 flex items-start gap-2 rounded-xl border border-emerald-200/80 bg-emerald-950/95 px-3 py-2 text-emerald-50 shadow-lg" role="alert"><Navigation size={16} className="mt-0.5 shrink-0 text-emerald-300" aria-hidden="true" /><p className="text-[10px] font-semibold leading-snug">{observationNotice}<span className="mt-0.5 block text-[9px] font-normal text-emerald-100/80">Calcul astronomique : vérifiez l’horizon, les nuages et, pour le Soleil, utilisez une protection adaptée.</span></p></div>}

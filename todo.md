@@ -3310,3 +3310,9 @@
 - [x] Affiner la flèche bleue pour un rendu plus élégant et futuriste.
 - [x] Ajouter un effet visuel lorsque le cap du téléphone est aligné avec l’azimut réel de la Lune.
 - [x] Tester le rendu mobile et publier la version finale.
+
+## Guidage lunaire progressif et observation immersive
+- [x] Faire augmenter l’intensité du halo selon la proximité réelle avec l’azimut de la Lune.
+- [x] Ajouter une vibration haptique courte, unique et conditionnelle au verrouillage lunaire exact.
+- [x] Ajouter un mode plein écran immersif dédié à l’observation de la Lune.
+- [x] Tester les interactions, le mouvement réduit et le mobile avant publication.
