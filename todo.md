@@ -3472,3 +3472,8 @@
 - [x] Appliquer une couleur de gel aux segments, points et valeurs sous 0 °C.
 - [x] Tester les seuils sur les deux graphiques sans modifier les échelles ni les données.
 - [x] Vérifier la lisibilité mobile et publier.
+
+## Taille de l’icône météo principale
+- [x] Réduire légèrement l’icône météo principale du Dashboard.
+- [x] Conserver l’alignement avec la température et les indicateurs maximale/minimale.
+- [x] Vérifier la vue mobile et publier l’ajustement.
