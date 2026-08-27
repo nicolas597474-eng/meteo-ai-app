@@ -160,6 +160,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("eclipse-compass-label--cardinal");
     expect(source).toContain("eclipse-compass-label--intercardinal");
     expect(source).toContain("h-[104px] w-[104px]");
+    expect(source).toContain("displayedArrowRotation");
+    expect(source).toContain("shortestRotation");
+    expect(source).toContain("eclipse-compass-center-pulse");
     expect(source).toContain("eclipse-astro-guidance-arrow");
     expect(source).toContain("eclipse-astro-guidance-arrow__beam");
     expect(source).toContain("eclipse-astro-guidance-arrow__head");
@@ -169,6 +172,9 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain(".eclipse-compass-ring");
     expect(styles).toContain(".eclipse-compass-cardinal-arrow");
     expect(styles).toContain(".eclipse-compass-label--cardinal");
+    expect(styles).toContain(".eclipse-compass-center-pulse");
+    expect(styles).toContain("transition: transform 420ms");
+    expect(styles).toContain("@keyframes eclipse-compass-center-pulse");
     expect(styles).toContain(".eclipse-astro-guidance-arrow");
     expect(styles).toContain(".eclipse-astro-guidance-arrow__head");
     expect(styles).toContain(".eclipse-astro-bearing");

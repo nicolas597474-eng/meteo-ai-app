@@ -3299,3 +3299,8 @@
 - [x] Remplacer la flèche astronomique dorée par une flèche bleue électrique plus fine.
 - [x] Conserver une pointe lisible, un halo discret et l’orientation astronomique réelle.
 - [x] Tester le rendu mobile et publier après validation.
+
+## Animations de la boussole
+- [x] Ajouter une pulsation lumineuse bleue au noyau central, respectueuse des préférences de mouvement réduit.
+- [x] Animer la rotation de la flèche astronomique avec une transition courte, continue et fluide.
+- [x] Tester l’animation et l’accessibilité sur mobile avant publication.
