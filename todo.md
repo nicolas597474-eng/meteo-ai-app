@@ -3396,3 +3396,8 @@
 - [x] Déclencher une vibration haptique brève et unique lorsque l’alignement réel avec la Lune est atteint.
 - [x] Décision utilisateur : ne pas ajouter de fondu au libellé central « Lune alignée ».
 - [x] Vérifier les garde-fous, les tests et publier l’amélioration.
+
+## Diagnostic de la trajectoire lunaire à minuit
+- [x] Vérifier si l’interruption apparente de l’arc pointillé avant 00 h provient des données, de la géométrie ou d’un masquage visuel.
+- [x] Aucune correction requise : le repère 00 h masque localement le pointillé pour rester lisible, sans discontinuité des éphémérides.
+- [x] Valider la trajectoire et restituer le diagnostic.
