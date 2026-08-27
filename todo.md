@@ -2890,7 +2890,7 @@
 - [x] Correctif : renouveler la tâche planifiée des prévisions après déploiement et désactiver la tâche v6 qui renvoie 404.
 - [x] Validation technique : contrôler les dates forecasts, forecast_runs, hourly_forecasts et station_collection_snapshots sans supprimer l’historique ; TypeScript et Vitest validés. Le premier passage opérationnel de v7 reste à surveiller lors du prochain créneau 05:00 Paris.
 - [x] Sécurité : auditer l’origine de l’alerte de contenu potentiellement non fiable ; aucune instruction suspecte n’a été trouvée dans les sources applicatives, et aucune instruction externe n’est exécutée par les collectes ou l’interface.
-- [ ] Validation opérationnelle : confirmer le premier passage du cron v7 et la mise à jour du bilan AI Lab après son prochain créneau planifié.
+- [x] Validation opérationnelle : v7 a été remplacée par v8, qui a produit une exécution HTTP 200 le 27 août avec les huit modèles attendus ; aucun passage supplémentaire de la tâche v7 en pause n’est requis.
 - [x] Refonte Stations : afficher d’abord un résumé local lisible, une carte centrale et les stations réellement utilisées.
 - [x] Refonte Stations : déplacer les critères, filtres, sources candidates et détails techniques dans des sections repliables sans supprimer les données.
 - [x] Refonte Stations : clarifier les statuts, la fraîcheur des relevés, la couverture et le lien vers l’Historique.
@@ -2938,15 +2938,15 @@
 - [x] Validation: Vérifier TypeScript, Vitest et le rendu mobile de la relance additive.
 
 ## Validation opérationnelle des tâches planifiées
-- [ ] Confirmer le premier passage HTTP 200 de la tâche prévisions v7 et la mise à jour du bilan AI Lab.
-- [ ] Confirmer le premier passage HTTP 200 de la tâche snapshots physiques v3 et l’archivage des relevés réellement retournés.
-- [ ] Planification: Réinitialiser sans modification de données la prochaine exécution de v3 si son horaire reste figé dans le passé.
-- [ ] Validation: Contrôler les journaux de v3 et v7, les traces physiques et le bilan AI Lab après leurs premiers passages automatiques.
+- [x] Confirmer le passage opérationnel de la collecte de prévisions : v7 est remplacée par v8, validée HTTP 200 le 27 août avec les huit modèles attendus.
+- [x] Confirmer le passage opérationnel des snapshots : v3 est remplacée par v5, qui a produit neuf passages HTTP 200 avec des traces par lieu.
+- [x] Planification: Ne pas réinitialiser v3, conservée en pause et remplacée par v5 afin d’éviter les doublons.
+- [x] Validation: Contrôler les journaux de v5 et v8 ainsi que les traces physiques et le bilan de collecte après leurs passages automatiques.
 - [x] Planification: Créer v4 (`EjJsJFYrUWij9BeGD6GHze`) à la même route de collecte, planifiée chaque heure à xx:20 UTC, puis mettre v3 en pause afin d’éviter les doublons.
 - [x] Validation: Confirmer le premier passage HTTP 200 de v4 et les archives physiques réellement écrites, sans réécriture des snapshots existants. Contrôle du 26 août : huit journaux existent, dont les passages 00:29, 01:29 et 02:21 UTC avec HTTP 200 ; les traces horaires stockées sont présentes pour les deux favoris.
 - [x] Anomalie planificateur: v7 (`QXZR4pt2HTGfXmKNXyFb8j`) a finalement échoué en HTTP 403 à 03:10:55 UTC le 26 août (« permission error for cron cookie »), sans écriture de prévisions ; elle est mise en pause.
 - [x] Correctif v7 : renouveler l’autorisation cron via v8 (`YSVnbPqUuQkAB3y96C6WF3`) sur le callback `/api/scheduled/collect-favorites-forecasts`, sans modifier les archives de prévisions existantes.
-- [ ] Validation v8 : confirmer son premier passage HTTP 200 et des archives prévisions horodatées cohérentes avant de déclarer la collecte 05:00 opérationnelle. Contrôles à 04:11 puis 04:31 UTC le 26 août : aucun journal n’est présent, y compris après un créneau technique temporaire à 04:20 UTC ; aucune exécution n’est donc présumée. Le planning quotidien a été rétabli avec prochaine exécution annoncée le 27 août à 03:00 UTC (05:00 Paris).
+- [x] Validation v8 : première exécution HTTP 200 confirmée le 27 août à 03:07 UTC, avec les huit modèles attendus sans modèle manquant. La collecte quotidienne est opérationnelle ; l’ancien constat sans journal du 26 août est résolu.
 
 ## Synthèse locale directement visible
 - [x] Stations : remplacer le panneau déroulant « Détails de la synthèse locale » par un bloc toujours visible, sans retirer les mesures ni les compteurs.
@@ -3001,12 +3001,12 @@
 ## Contrôle complet des collectes et snapshots
 - [x] Audit : vérifier les journaux HTTP et l’état actif des tâches de prévisions, snapshots physiques et observations nocturnes. v4 et le cycle nocturne ont des HTTP 200 observés ; v8 reste active mais sans journal.
 - [x] Audit : contrôler en lecture seule la fraîcheur et la cohérence des archives de prévisions, snapshots physiques et traces associées. Les traces physiques ont été écrites jusqu’à 04:31 UTC ; les archives de prévisions restent à 17:04 UTC le 25 août.
-- [ ] Correctif : résoudre uniquement les erreurs confirmées, sans supprimer, réécrire ou fabriquer de données météo.
+- [x] Correctif : résoudre uniquement les erreurs confirmées, sans supprimer, réécrire ou fabriquer de données météo. Les tâches actives v5 et v8 ont désormais des journaux HTTP 200 ; les archives sont conservées.
 - [x] Correctif snapshots : traiter au plus deux favoris simultanément dans le callback physique afin de réduire les délais HTTP observés, sans modifier l’idempotence ni les archives existantes. TypeScript et 383 tests validés.
 - [x] Validation snapshots : le callback v4 optimisé a répondu HTTP 200 le 26 août à 06:31 UTC, après 17,4 s, avec 141 puis 232 stations qualifiées pour les deux favoris et aucune écriture directe ajoutée ; les archives existantes sont préservées.
-- [ ] Anomalie infrastructure : v4 n’a produit aucun nouveau journal après son créneau affiché de 05:20 UTC, tandis que v8 n’a aucun journal ; ne pas conclure à un bon fonctionnement avant une exécution HTTP 200 réelle.
-- [ ] Validation : confirmer les passages HTTP 200 et les archives réellement créées avant toute déclaration de bon fonctionnement.
-- [ ] Exécution ponctuelle autorisée : lancer une fois v4 et v8 depuis la gestion des tâches, puis contrôler les journaux HTTP et les écritures additives.
+- [x] Anomalie infrastructure : v4 et v7 sont remplacées par les tâches actives v5 et v8, qui produisent désormais des journaux HTTP 200 réels.
+- [x] Validation : confirmer les passages HTTP 200 et les archives réellement créées avant toute déclaration de bon fonctionnement. Confirmé pour v5 et v8 le 27 août.
+- [x] Exécution ponctuelle autorisée : ne pas lancer les anciennes tâches v4/v7 en pause ; les exécutions automatiques v5 et v8 valident le flux sans introduire de doublon.
 
 ## Contrôle de santé des services
 - [x] Santé : contrôler les processus, les ports, le serveur et les dépendances associées au projet.
