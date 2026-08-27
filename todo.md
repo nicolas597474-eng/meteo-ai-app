@@ -3289,3 +3289,13 @@
 - [x] Recomposer la boussole en grande rose circulaire, avec anneau bleu lumineux, graduations et repères intermédiaires à 22,5°.
 - [x] Ajouter les quatre flèches cardinales et harmoniser les libellés autour de la rose sans simuler de cap.
 - [x] Renforcer la flèche de l’astre, préserver l’accessibilité et valider le rendu mobile avant publication.
+
+## Alignement exact sur la référence de boussole
+- [x] Retirer les repères intermédiaires à 22,5° et conserver uniquement les huit directions principales.
+- [x] Reproduire la palette bleu nuit, bleus néon et halo violet de la référence sans fabriquer de données de vent.
+- [x] Harmoniser les flèches cardinales et astronomique, tester le mobile et publier la version finale.
+
+## Flèche bleue fine et design
+- [x] Remplacer la flèche astronomique dorée par une flèche bleue électrique plus fine.
+- [x] Conserver une pointe lisible, un halo discret et l’orientation astronomique réelle.
+- [x] Tester le rendu mobile et publier après validation.
