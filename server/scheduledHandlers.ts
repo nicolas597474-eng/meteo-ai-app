@@ -139,7 +139,7 @@ export function shouldNotifyOwnerForTechnicalFailures(streak: number): boolean {
 
 type PhysicalSnapshotFavorite = Awaited<ReturnType<typeof getAllFavoriteLocations>>[number];
 
-export type PhysicalSnapshotCollectionTrigger = "scheduled" | "manual";
+export type PhysicalSnapshotCollectionTrigger = "scheduled" | "manual" | "recovery";
 
 export type PhysicalSnapshotCollectionLocationResult = {
   locationKey: string;
@@ -153,9 +153,9 @@ export type PhysicalSnapshotCollectionLocationResult = {
 };
 
 /**
- * Collecte les observations physiques pour un ensemble de favoris. Le mode
- * manuel reste strictement additif : un relevé, snapshot ou trace déjà
- * archivé pour l’heure de Paris en cours n’est jamais réécrit.
+ * Collecte les observations physiques pour un ensemble de favoris. Les modes
+ * manuel et de reprise restent strictement additifs : un relevé, snapshot ou
+ * trace déjà archivé pour l’heure de Paris en cours n’est jamais réécrit.
  */
 export async function collectPhysicalObservationSnapshotsForFavorites(
   favorites: readonly PhysicalSnapshotFavorite[],
@@ -167,7 +167,8 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
   const date = getTodayParis();
   const hour = getParisHour();
   const results: PhysicalSnapshotCollectionLocationResult[] = [];
-  const preserveArchivedEvidence = trigger === "manual";
+  const preserveArchivedEvidence = trigger === "manual" || trigger === "recovery";
+  const recoveryOnly = trigger === "recovery";
 
   // Deux lieux sont collectés en parallèle, comme la collecte de prévisions.
   // Cela conserve les écritures indépendantes par lieu tout en évitant que deux
@@ -185,6 +186,22 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
       ]);
       snapshotAlreadyArchived = snapshots.some((snapshot) => snapshot.hour === hour);
       traceAlreadyArchived = traces.some((trace) => trace.hour === hour);
+    }
+
+    // La reprise programmée est un filet de sécurité à :45. Si le passage
+    // principal de :20 a déjà écrit le créneau, elle s’arrête sans solliciter
+    // les fournisseurs ni modifier les données archivées.
+    if (recoveryOnly && (snapshotAlreadyArchived || traceAlreadyArchived)) {
+      results.push({
+        locationKey,
+        stationCount: 0,
+        stored: false,
+        attempts: 0,
+        skipped: true,
+        snapshotPreserved: true,
+        reason: "Créneau déjà archivé par le passage horaire principal ; reprise ignorée.",
+      });
+      return;
     }
 
     let locationResult: PhysicalSnapshotCollectionLocationResult | null = null;
@@ -1381,7 +1398,8 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
     const favorites = await getAllFavoriteLocations();
-    res.json(await collectPhysicalObservationSnapshotsForFavorites(favorites, "scheduled"));
+    const trigger: PhysicalSnapshotCollectionTrigger = req.body?.snapshotMode === "recovery" ? "recovery" : "scheduled";
+    res.json(await collectPhysicalObservationSnapshotsForFavorites(favorites, trigger));
   } catch (error: any) {
     console.error("[MeteoAI] Physical snapshot collection error:", error);
     res.status(500).json({ error: error.message, stack: error.stack, context: { url: req.url }, timestamp: new Date().toISOString() });

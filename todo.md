@@ -1,5 +1,12 @@
 # MeteoAI - Project TODO
 
+## Créneaux de snapshots physiques manquants
+- [ ] Examiner les passages et les traces horaires des créneaux 16 h, 18 h et 19 h signalés absents.
+- [x] Vérifier la cadence active et les enregistrements réels, en distinguant absence de station et erreur technique.
+- [ ] Corriger uniquement la cause confirmée, puis valider la continuité de l’affichage.
+- [ ] Confirmer explicitement le statut des créneaux 16 h, 18 h et 19 h pour la date affichée, y compris les créneaux encore futurs.
+- [ ] Comparer les traces réelles à la logique de Santé des collectes afin d’écarter une omission purement visuelle.
+
 - [x] Database schema: forecasts, observations, reliability_scores, meteoai_forecasts tables
 - [x] API: tRPC router for weather data (forecasts, observations, scores)
 - [x] API: Open-Meteo collector service (AROME, ARPEGE, ICON, ECMWF, GFS, Best Match)

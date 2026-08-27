@@ -58,6 +58,19 @@ describe("relance manuelle des snapshots physiques", () => {
   });
 });
 
+describe("reprise programmée des snapshots physiques", () => {
+  it("prévoit une seconde tentative horaire idempotente sans déclenchement manuel", () => {
+    const handlerSource = readFileSync(new URL("../scheduledHandlers.ts", import.meta.url), "utf8");
+
+    expect(handlerSource).toContain('"scheduled" | "manual" | "recovery"');
+    expect(handlerSource).toContain('const preserveArchivedEvidence = trigger === "manual" || trigger === "recovery"');
+    expect(handlerSource).toContain('const recoveryOnly = trigger === "recovery"');
+    expect(handlerSource).toContain("Créneau déjà archivé par le passage horaire principal ; reprise ignorée.");
+    expect(handlerSource).toContain('req.body?.snapshotMode === "recovery" ? "recovery" : "scheduled"');
+    expect(handlerSource).not.toContain('collectPhysicalObservationSnapshotsForFavorites(favorites, "manual")');
+  });
+});
+
 describe("cadence affichée des snapshots physiques", () => {
   it("reflète la minute de déclenchement de la tâche v4", () => {
     const routerSource = readFileSync(new URL("./weather.ts", import.meta.url), "utf8");
