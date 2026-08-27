@@ -922,12 +922,20 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   position: fixed !important;
   inset: 0 !important;
   z-index: 60 !important;
+  pointer-events: auto !important;
   width: 100vw !important;
   min-width: 100vw !important;
   height: 100dvh !important;
   min-height: 100dvh !important;
   max-width: none !important;
   margin: 0 !important;
+}
+
+/* Radix désactive les pressions hors de son dialogue. La carte est montée hors du dialogue,
+   elle doit donc les réactiver explicitement sur son propre calque. */
+.eclipse-map-viewport *,
+.eclipse-map-viewport [data-swipe-exclude] {
+  pointer-events: auto;
 }
 
 .map-control-button {

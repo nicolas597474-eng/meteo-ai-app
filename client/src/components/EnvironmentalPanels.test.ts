@@ -86,6 +86,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain('className={isExpanded ? "eclipse-map-viewport" : height}');
     expect(styles).toContain(".eclipse-map-viewport");
     expect(styles).toContain("z-index: 60 !important");
+    expect(styles).toContain("pointer-events: auto !important");
+    expect(styles).toContain("Radix désactive les pressions hors de son dialogue");
     expect(styles).toContain("height: 100dvh !important");
     expect(styles).toContain("display: none");
     expect(source).toContain('absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4');

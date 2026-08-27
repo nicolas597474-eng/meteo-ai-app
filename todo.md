@@ -3226,3 +3226,8 @@
 - [x] Monter la carte des stations hors de tout conteneur qui pourrait la décaler sur mobile.
 - [x] Monter la carte de prévisions hors de tout conteneur qui pourrait la décaler sur mobile.
 - [x] Préserver tous les contrôles et comportements propres, puis valider par tests sans modifier les données ni les calculs météo. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Interactions tactiles de la carte d’éclipse plein écran
+- [x] Identifier et désactiver la couche de fenêtre résiduelle qui intercepte les pressions au-dessus de la carte.
+- [x] Rendre à nouveau fonctionnels les boutons de zoom, de centrage, de fond, de boussole et d’opacité.
+- [x] Vérifier le montage de la couche, le typage et la suite de tests avant publication. La validation tactile finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
