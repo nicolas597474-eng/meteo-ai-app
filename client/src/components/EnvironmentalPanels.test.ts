@@ -198,8 +198,9 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("@keyframes eclipse-compass-center-pulse");
     expect(styles).toContain(".eclipse-astro-guidance-arrow");
     expect(styles).toContain(".eclipse-astro-guidance-arrow__head");
-    expect(styles).toContain("stroke-width: 1.55");
-    expect(styles).toContain("transform: scaleX(0.64)");
+    expect(styles).toContain(".eclipse-compass-shell::after");
+    expect(styles).toContain("stroke-width: 1.2");
+    expect(styles).toContain("transform: scaleX(0.56) scaleY(1.08)");
     expect(styles).toContain(".eclipse-astro-bearing");
     expect(styles).toContain(".lunar-live-panel");
     expect(styles).toContain(".lunar-live-panel__metric");

@@ -3333,6 +3333,11 @@
 - [x] Composer un panneau lunaire discret et enrichir les accents bleu/cyan/violet sans surcharge.
 - [x] Affiner la flèche bleue, tester les données et le mobile, puis publier.
 
+## Cadran bleu nuit finalisé
+- [x] Renforcer l’anneau externe et la profondeur bleu nuit/cyan/violet sans afficher de degrés intermédiaires.
+- [x] Allonger et affiner encore la flèche bleue de guidage réel.
+- [x] Valider le contraste mobile, les animations et publier l’ajustement final.
+
 ## Informations lunaires en direct
 - [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
 - [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.
