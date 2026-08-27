@@ -862,6 +862,11 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   box-shadow: 0 8px 18px rgb(2 6 23 / 0.42);
 }
 
+/* La colonne compacte porte elle-même l’aide afin qu’aucune bulle absolue ne recouvre les contrôles. */
+.map-compass-status button[aria-label="Activer la boussole du téléphone"]::after {
+  content: none;
+}
+
 /* Carte d’éclipse immersive : seul le canevas et ses commandes restent visibles. */
 [data-slot="dialog-content"]:has([aria-label="Fermer la carte agrandie"]) {
   position: fixed !important;

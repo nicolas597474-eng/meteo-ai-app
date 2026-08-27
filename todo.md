@@ -3231,3 +3231,13 @@
 - [x] Identifier et désactiver la couche de fenêtre résiduelle qui intercepte les pressions au-dessus de la carte.
 - [x] Rendre à nouveau fonctionnels les boutons de zoom, de centrage, de fond, de boussole et d’opacité.
 - [x] Vérifier le montage de la couche, le typage et la suite de tests avant publication. La validation tactile finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Mise en page des indications de boussole
+- [x] Regrouper les libellés de cap et d’autorisation en une colonne compacte sans chevauchement.
+- [x] Garantir des espacements fixes, une largeur adaptée à l’écran mobile et une lisibilité complète.
+- [x] Valider le code, la vue plein écran et les tests avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
+
+## Simplification du contrôle de boussole
+- [x] Retirer le bouton séparé d’activation de la boussole, devenu redondant avec la rose des vents interactive.
+- [x] Conserver l’activation et les détails depuis la rose des vents, puis finaliser l’alignement des indications associées.
+- [x] Vérifier le code et les tests avant publication. La validation visuelle finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
