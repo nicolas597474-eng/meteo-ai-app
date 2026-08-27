@@ -3381,3 +3381,8 @@
 - [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.
 - [x] Afficher phase, distance et heure de calcul dans un panneau discret de l’observation immersive.
 - [x] Tester les données réelles, l’accessibilité et le mobile avant publication.
+
+## Cadrage et repères de la carte d’éclipse immersive
+- [x] Supprimer la bande blanche supérieure en ajustant légèrement le cadrage mondial de la carte immersive.
+- [x] Descendre l’indication lunaire, puis placer le panneau d’orientation juste en dessous avec des espaces visuels et tactiles réguliers.
+- [x] Vérifier le rendu mobile, les interactions de carte et publier le correctif.

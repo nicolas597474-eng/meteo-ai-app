@@ -71,7 +71,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("map.setCenter(localPosition)");
     expect(source).toContain("map.setZoom(5)");
     expect(source).toContain("Le cadrage de toutes les cellules peut tomber trop loin sur mobile");
-    expect(source).toContain("map.setZoom(2)");
+    expect(source).toContain("ECLIPSE_IMMERSIVE_WORLD_ZOOM = 2.35");
+    expect(source).toContain("map.setZoom(ECLIPSE_IMMERSIVE_WORLD_ZOOM)");
     expect(source).toContain('localMarkerContent.className = "eclipse-user-location-marker"');
     expect(source).toContain('mapContent("compact", "h-[280px]")');
     expect(source).toContain("Me localiser");
@@ -124,6 +125,9 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Bougez le téléphone");
     expect(source).toContain("map-compass-status");
     expect(source).toContain('map-compass-status absolute left-3 top-[208px] z-20 w-[188px]');
+    expect(styles).toContain("top: 8.5rem !important");
+    expect(styles).toContain(".eclipse-map-viewport .map-compass-status");
+    expect(styles).toContain("top: 11rem !important");
     expect(source).toContain("Autorisez Mouvement et orientation dans les réglages du navigateur.");
     expect(styles).toContain("La colonne compacte porte elle-même l’aide");
     expect(styles).toContain(".map-compass-status button");

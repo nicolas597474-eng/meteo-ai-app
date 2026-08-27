@@ -101,6 +101,8 @@ const COMPASS_ROSE_POINTS = [
 ] as const;
 
 const MOON_ALIGNMENT_TOLERANCE_DEG = 7;
+// Un léger rapprochement évite les tuiles incomplètes aux extrémités de la vue immersive mobile.
+const ECLIPSE_IMMERSIVE_WORLD_ZOOM = 2.35;
 
 function getAngularDistance(firstAngle: number, secondAngle: number) {
   return Math.abs(((firstAngle - secondAngle + 540) % 360) - 180);
@@ -480,10 +482,10 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     bounds.extend(localPosition);
     if (!bounds.isEmpty() && isExpanded) {
       // Le cadrage de toutes les cellules peut tomber trop loin sur mobile et
-      // laisser des bandes sans tuile. La vue immersive part donc du lieu actif,
-      // au zoom mondial minimum qui remplit le viewport.
+      // laisser des bandes sans tuile. La vue immersive part donc du lieu actif
+      // avec un léger rapprochement qui remplit durablement le viewport.
       map.setCenter(localPosition);
-      map.setZoom(2);
+      map.setZoom(ECLIPSE_IMMERSIVE_WORLD_ZOOM);
     }
     if (!isExpanded) {
       map.setCenter(localPosition);
@@ -491,6 +493,8 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     }
     if (isExpanded) requestAnimationFrame(() => {
       google.maps.event.trigger(map, "resize");
+      map.setCenter(localPosition);
+      map.setZoom(ECLIPSE_IMMERSIVE_WORLD_ZOOM);
       if (expandedMapRef.current === map) {
         isMapOpeningRef.current = false;
         setIsMapOpening(false);
@@ -604,14 +608,14 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     map.setHeading(0);
     map.setTilt(0);
     map.setCenter({ lat: center.lat, lng: center.lon });
-    map.setZoom(2);
+    map.setZoom(ECLIPSE_IMMERSIVE_WORLD_ZOOM);
     setExpandedHeading(0);
   };
   const adjustExpandedZoom = (delta: number) => {
     const map = expandedMapRef.current;
     if (!map) return;
     const currentZoom = map.getZoom() ?? 4;
-    map.setZoom(Math.max(2, Math.min(20, currentZoom + delta)));
+    map.setZoom(Math.max(ECLIPSE_IMMERSIVE_WORLD_ZOOM, Math.min(20, currentZoom + delta)));
   };
   const openExpandedMap = () => {
     if (isMapExpanded || isMapOpeningRef.current) return;

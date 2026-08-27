@@ -1130,6 +1130,9 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 .eclipse-astro-bearing {
   z-index: 7;
   left: 50%;
+  /* Sous la rose : l’azimut reste lisible, sans chevaucher le cadran. */
+  top: 8.5rem !important;
+  bottom: auto !important;
   display: inline-flex;
   min-width: max-content;
   align-items: center;
@@ -1288,6 +1291,11 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   min-height: 100dvh !important;
   max-width: none !important;
   margin: 0 !important;
+}
+
+/* Empilement de l’observation immersive : rose, relèvement lunaire, puis aide tactile. */
+.eclipse-map-viewport .map-compass-status {
+  top: 11rem !important;
 }
 
 /* Radix désactive les pressions hors de son dialogue. La carte est montée hors du dialogue,
