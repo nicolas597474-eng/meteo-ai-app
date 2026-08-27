@@ -3367,6 +3367,11 @@
 - [x] Recentrer la vue immersive sur la localisation active et son repère bleu.
 - [x] Préserver les contrôles accessibles et valider le rendu mobile avant publication.
 
+## Fiabilisation des snapshots physiques horaires
+- [x] Vérifier en lecture seule le créneau de 16 h, ses journaux et ses traces par lieu.
+- [x] Étendre à cinq le nombre maximum de tentatives automatiques par lieu et par créneau, sans exécution manuelle ni changement de cadence.
+- [x] Mettre à jour les tests et l’observabilité des tentatives, puis publier le correctif.
+
 ## Sélecteur de fond en tête de carte
 - [x] Placer Plan/Satellite tout en haut entre la boussole et la croix de fermeture.
 - [x] Garantir un espacement tactile sans chevauchement avec les contrôles voisins.

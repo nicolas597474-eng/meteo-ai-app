@@ -7,9 +7,9 @@ describe("collecte horaire des snapshots physiques", () => {
     const source = readFileSync(resolve(process.cwd(), "server/scheduledHandlers.ts"), "utf8");
 
     expect(source).toContain("Physical snapshot collection failed for");
-    expect(source).toContain("Physical snapshot collection failed after retry for");
+    expect(source).toContain("Physical snapshot collection failed after ${HOURLY_SNAPSHOT_MAX_ATTEMPTS} attempts for");
     expect(source).toContain("Erreur de collecte après relance : ${message}");
-    expect(source).toContain("retrying once:");
+    expect(source).toContain("retrying (${attempt + 2}/${HOURLY_SNAPSHOT_MAX_ATTEMPTS}):");
     expect(source).toContain('status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed"');
     expect(source).toContain("countConsecutiveTechnicalFailures");
     expect(source).toContain("Échecs techniques horaires répétés");
@@ -17,7 +17,7 @@ describe("collecte horaire des snapshots physiques", () => {
     expect(source).toContain("await processWithConcurrency(Array.from(unique.values()), 2");
   });
 
-  it("relance une fois la recherche lorsqu’aucune station physique qualifiée n’est disponible", () => {
+  it("relance la recherche jusqu’à la limite lorsqu’aucune station physique qualifiée n’est disponible", () => {
     const source = readFileSync(resolve(process.cwd(), "server/scheduledHandlers.ts"), "utf8");
 
     expect(source).toContain("No qualified physical station for");

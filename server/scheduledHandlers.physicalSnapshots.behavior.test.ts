@@ -1,0 +1,173 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  collectNearbyStations: vi.fn(),
+  getPhysicalActiveStations: vi.fn(),
+  calculateGroundTruth: vi.fn(),
+  getTodayParis: vi.fn(),
+  getParisHour: vi.fn(),
+  makeLocationKey: vi.fn(),
+  upsertWeatherStation: vi.fn(),
+  upsertStationObservation: vi.fn(),
+  refreshStationQualityProfiles: vi.fn(),
+  upsertQualifiedObservationSnapshot: vi.fn(),
+  getQualifiedObservationSnapshotsForDate: vi.fn(),
+  getPhysicalSnapshotCollectionTracesByDateRange: vi.fn(),
+  upsertPhysicalSnapshotCollectionTrace: vi.fn(),
+  notifyOwner: vi.fn(),
+}));
+
+vi.mock("./stationService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./stationService")>()),
+  collectNearbyStations: mocks.collectNearbyStations,
+  getPhysicalActiveStations: mocks.getPhysicalActiveStations,
+  calculateGroundTruth: mocks.calculateGroundTruth,
+}));
+
+vi.mock("./weatherTime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./weatherTime")>()),
+  getParisDate: mocks.getTodayParis,
+  getParisHour: mocks.getParisHour,
+}));
+
+vi.mock("./db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./db")>()),
+  makeLocationKey: mocks.makeLocationKey,
+  upsertWeatherStation: mocks.upsertWeatherStation,
+  upsertStationObservation: mocks.upsertStationObservation,
+  refreshStationQualityProfiles: mocks.refreshStationQualityProfiles,
+  upsertQualifiedObservationSnapshot: mocks.upsertQualifiedObservationSnapshot,
+  getQualifiedObservationSnapshotsForDate: mocks.getQualifiedObservationSnapshotsForDate,
+  getPhysicalSnapshotCollectionTracesByDateRange: mocks.getPhysicalSnapshotCollectionTracesByDateRange,
+  upsertPhysicalSnapshotCollectionTrace: mocks.upsertPhysicalSnapshotCollectionTrace,
+}));
+
+vi.mock("./_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));
+
+import { collectPhysicalObservationSnapshotsForFavorites } from "./scheduledHandlers";
+
+const emptySynthesis = {
+  stationCount: 0,
+  confidenceScore: 0,
+  temperature: null,
+  humidity: null,
+  pressure: null,
+  windSpeed: null,
+  windGust: null,
+  precipitation: null,
+  stationsUsed: [],
+};
+
+const qualifiedSynthesis = {
+  stationCount: 2,
+  confidenceScore: 0.92,
+  temperature: 18.4,
+  humidity: 71,
+  pressure: 1016,
+  windSpeed: 12,
+  windGust: 20,
+  precipitation: 0,
+  stationsUsed: [],
+};
+
+const favorite = (lat: number, lon: number) => ({
+  id: lat,
+  userId: 1,
+  name: `Lieu ${lat}`,
+  customName: null,
+  lat,
+  lon,
+  radiusKm: 20,
+});
+
+async function settleWithRetries<T>(pending: Promise<T>): Promise<T> {
+  await vi.runAllTimersAsync();
+  return pending;
+}
+
+describe("comportement des cinq tentatives de snapshots physiques", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    mocks.getTodayParis.mockReturnValue("2026-08-27");
+    mocks.getParisHour.mockReturnValue(16);
+    mocks.makeLocationKey.mockImplementation((lat: number, lon: number) => `${lat}_${lon}`);
+    mocks.collectNearbyStations.mockResolvedValue([]);
+    mocks.getPhysicalActiveStations.mockImplementation((stations: unknown[]) => stations);
+    mocks.calculateGroundTruth.mockReturnValue(emptySynthesis);
+    mocks.getQualifiedObservationSnapshotsForDate.mockResolvedValue([]);
+    mocks.getPhysicalSnapshotCollectionTracesByDateRange.mockResolvedValue([]);
+    mocks.upsertWeatherStation.mockResolvedValue(undefined);
+    mocks.upsertStationObservation.mockResolvedValue(undefined);
+    mocks.refreshStationQualityProfiles.mockResolvedValue(undefined);
+    mocks.upsertQualifiedObservationSnapshot.mockResolvedValue(undefined);
+    mocks.upsertPhysicalSnapshotCollectionTrace.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("effectue cinq essais au plus et enregistre le snapshot lorsque le cinquième réussit", async () => {
+    mocks.calculateGroundTruth
+      .mockReturnValueOnce(emptySynthesis)
+      .mockReturnValueOnce(emptySynthesis)
+      .mockReturnValueOnce(emptySynthesis)
+      .mockReturnValueOnce(emptySynthesis)
+      .mockReturnValueOnce(qualifiedSynthesis);
+
+    const result = await settleWithRetries(
+      collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled"),
+    );
+
+    expect(mocks.collectNearbyStations).toHaveBeenCalledTimes(5);
+    expect(result.status).toBe("completed");
+    expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 5, stationCount: 2 })]);
+    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ status: "stored", attempts: 5 }));
+  });
+
+  it("s’arrête dès le premier succès sans consommer de relance inutile", async () => {
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+
+    const result = await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.collectNearbyStations).toHaveBeenCalledTimes(1);
+    expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 1 })]);
+  });
+
+  it("classe l’absence persistante de station comme no_station après cinq essais, sans alerte technique", async () => {
+    const result = await settleWithRetries(
+      collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled"),
+    );
+
+    expect(mocks.collectNearbyStations).toHaveBeenCalledTimes(5);
+    expect(result.status).toBe("completed");
+    expect(result.errors).toBeUndefined();
+    expect(result.locations).toEqual([expect.objectContaining({ stored: false, attempts: 5, reason: "Aucune station physique qualifiée" })]);
+    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ status: "no_station", attempts: 5 }));
+    expect(mocks.notifyOwner).not.toHaveBeenCalled();
+  });
+
+  it("isole cinq erreurs techniques d’un favori sans empêcher le snapshot du suivant", async () => {
+    mocks.collectNearbyStations.mockImplementation(async (lat: number) => {
+      if (lat === 50.756) throw new Error("Fournisseur indisponible");
+      return [];
+    });
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+
+    const result = await settleWithRetries(
+      collectPhysicalObservationSnapshotsForFavorites([
+        favorite(50.756, 2.521),
+        favorite(50.676, 2.845),
+      ] as any, "scheduled"),
+    );
+
+    expect(result.status).toBe("partial");
+    expect(result.locations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ locationKey: "50.756_2.521", stored: false, attempts: 5, reason: expect.stringContaining("Erreur de collecte après relance") }),
+      expect.objectContaining({ locationKey: "50.676_2.845", stored: true, attempts: 1 }),
+    ]));
+    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ locationKey: "50.756_2.521", status: "failed", attempts: 5 }));
+    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ locationKey: "50.676_2.845", status: "stored", attempts: 1 }));
+  });
+});

@@ -115,7 +115,7 @@ export function buildStationCollectionSnapshot(input: {
   };
 }
 
-export const HOURLY_SNAPSHOT_MAX_ATTEMPTS = 2;
+export const HOURLY_SNAPSHOT_MAX_ATTEMPTS = 5;
 export const HOURLY_SNAPSHOT_RETRY_DELAY_MS = 1_200;
 export const TECHNICAL_FAILURE_ALERT_THRESHOLD = 3;
 
@@ -256,8 +256,8 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         if (synthesis.stationCount < 1 || synthesis.temperature == null) {
           if (shouldRetryHourlyFavorite(attempt)) {
             console.warn(
-              `[MeteoAI] No qualified physical station for ${favorite.customName ?? favorite.name}; retrying once:`,
-              { stationCount: synthesis.stationCount, hasTemperature: synthesis.temperature != null },
+              `[MeteoAI] No qualified physical station for ${favorite.customName ?? favorite.name}; retrying (${attempt + 2}/${HOURLY_SNAPSHOT_MAX_ATTEMPTS}):`,
+              { stationCount: synthesis.stationCount, hasTemperature: synthesis.temperature != null, attempt: attempt + 1 },
             );
             await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));
             continue;
@@ -307,11 +307,11 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
       } catch (error: any) {
         const message = error instanceof Error ? error.message : "Erreur de collecte inconnue";
         if (shouldRetryHourlyFavorite(attempt)) {
-          console.warn(`[MeteoAI] Physical snapshot collection failed for ${favorite.customName ?? favorite.name}; retrying once:`, message);
+          console.warn(`[MeteoAI] Physical snapshot collection failed for ${favorite.customName ?? favorite.name}; retrying (${attempt + 2}/${HOURLY_SNAPSHOT_MAX_ATTEMPTS}):`, message);
           await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));
           continue;
         }
-        console.error(`[MeteoAI] Physical snapshot collection failed after retry for ${favorite.customName ?? favorite.name}:`, message);
+        console.error(`[MeteoAI] Physical snapshot collection failed after ${HOURLY_SNAPSHOT_MAX_ATTEMPTS} attempts for ${favorite.customName ?? favorite.name}:`, message);
         locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, directReadingsAdded, reason: `Erreur de collecte après relance : ${message}` };
         results.push(locationResult);
       }

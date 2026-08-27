@@ -4,11 +4,12 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 describe("relance bornée des favoris de collecte horaire", () => {
-  it("autorise une seule relance puis conserve l'échec explicite", () => {
-    expect(HOURLY_SNAPSHOT_MAX_ATTEMPTS).toBe(2);
+  it("autorise jusqu’à quatre relances puis conserve l'échec explicite", () => {
+    expect(HOURLY_SNAPSHOT_MAX_ATTEMPTS).toBe(5);
     expect(HOURLY_SNAPSHOT_RETRY_DELAY_MS).toBe(1_200);
     expect(shouldRetryHourlyFavorite(0)).toBe(true);
-    expect(shouldRetryHourlyFavorite(1)).toBe(false);
+    expect(shouldRetryHourlyFavorite(3)).toBe(true);
+    expect(shouldRetryHourlyFavorite(4)).toBe(false);
   });
 
   it("le gestionnaire de collecte horaire notifie le propriétaire au seuil d’échecs techniques consécutifs", () => {
