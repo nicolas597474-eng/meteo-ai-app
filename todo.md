@@ -3343,6 +3343,11 @@
 - [x] Remplir l’anneau interne avec des secteurs continus bleu, cyan et violet.
 - [x] Tester la lisibilité mobile et publier le cadran ajusté.
 
+## Cadran intérieur à seize secteurs
+- [x] Diviser le remplissage intérieur en seize secteurs bleu, cyan et violet.
+- [x] Ajouter un cercle noir central qui sépare les secteurs en deux zones concentriques.
+- [x] Préserver les huit directions, le guidage réel et tester le mobile avant publication.
+
 ## Informations lunaires en direct
 - [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
 - [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.
