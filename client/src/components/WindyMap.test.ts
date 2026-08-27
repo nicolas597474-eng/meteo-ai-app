@@ -16,9 +16,12 @@ describe("WindyMap", () => {
     expect(source).toContain("right: `-${COMPACT_NATIVE_DETAIL_GUTTER_PX}px`");
     expect(source).toContain('className="pointer-events-none h-full w-full border-0"');
     expect(source).toContain('const hideNativeLegend = activeLayer === "clouds"');
-    expect(source).toContain("function CloudCoverageLegend()");
-    expect(source).toContain("Nuages · couverture du ciel");
+    expect(source).toContain("function CloudCoverageLegend({ compact = false }");
+    expect(source).toContain('compact ? "bottom-12" : "bottom-0"');
+    expect(source).toContain("grid grid-cols-6 text-[8px]");
     expect(source).toContain('0 %');
+    expect(source).toContain('20 %');
+    expect(source).toContain('80 %');
     expect(source).toContain('100 %');
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Aperçu météo fixe en mode compact");

@@ -3446,3 +3446,8 @@
 - [x] Empêcher le défilement vertical à l’intérieur des graphiques horaire et quotidien tout en préservant la navigation horizontale.
 - [x] Garantir que les températures maximales affichées restent au-dessus de leur courbe.
 - [x] Valider les gestes tactiles et publier le correctif mobile.
+
+## Légende de la couche Nuages
+- [x] Rétablir la légende basse dans le style visuel précédemment affiché sous la carte.
+- [x] Remplacer uniquement les graduations de pluie en mm par une échelle de couverture nuageuse en pourcentage cohérente avec la palette Windy.
+- [x] Vérifier la vue compacte et publier le correctif.

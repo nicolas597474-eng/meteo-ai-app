@@ -115,19 +115,18 @@ function LayerSelector({
   );
 }
 
-function CloudCoverageLegend() {
+function CloudCoverageLegend({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-2">
-      <div className="rounded-lg border border-white/15 bg-[#071018]/88 px-2.5 py-1.5 shadow-lg backdrop-blur-sm">
-        <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-slate-100">
-          <span>Nuages · couverture du ciel</span>
-          <span className="text-sky-200">%</span>
-        </div>
-        <div aria-hidden="true" className="h-2 rounded-full bg-[linear-gradient(90deg,#d7b85b_0%,#7c9fc1_48%,#f8fafc_100%)]" />
-        <div className="mt-0.5 flex justify-between text-[9px] text-slate-300">
+    <div className={`pointer-events-none absolute inset-x-0 z-10 ${compact ? "bottom-12" : "bottom-0"}`} aria-label="Échelle de couverture nuageuse de 0 à 100 pour cent">
+      <div className="border-t border-white/20 bg-[#0a1018]/78 px-2 pb-1 pt-1.5 shadow-[0_-5px_12px_rgba(2,6,23,0.22)] backdrop-blur-sm">
+        <div aria-hidden="true" className="h-2.5 border border-white/20 bg-[linear-gradient(90deg,#c2ab62_0%,#a9b2a7_20%,#88aab9_40%,#68bac3_60%,#9acbd2_80%,#edf5f7_100%)]" />
+        <div className="mt-0.5 grid grid-cols-6 text-[8px] font-medium leading-none text-slate-100/90">
           <span>0 %</span>
-          <span>50 %</span>
-          <span>100 %</span>
+          <span className="text-center">20 %</span>
+          <span className="text-center">40 %</span>
+          <span className="text-center">60 %</span>
+          <span className="text-center">80 %</span>
+          <span className="text-right">100 %</span>
         </div>
       </div>
     </div>
@@ -364,7 +363,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
-        {hideNativeLegend && <CloudCoverageLegend />}
+        {hideNativeLegend && <CloudCoverageLegend compact />}
         <MapZoomControl orientation="horizontal" ariaLabel="Zoom de l’aperçu fixe" className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2" onZoomIn={() => adjustCompactZoom(1)} onZoomOut={() => adjustCompactZoom(-1)} />
         {/* Bouton plein écran */}
         <button
