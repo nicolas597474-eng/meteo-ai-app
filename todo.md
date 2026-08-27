@@ -3264,3 +3264,13 @@
 - [x] Ajouter une pastille de santé lisible dans le Dashboard, reliée uniquement à ces traces réelles.
 - [x] Déclencher une alerte propriétaire au troisième échec technique physique consécutif, sans alerter pour une absence de station qualifiée ni répéter l’alerte au quatrième passage.
 - [x] Couvrir les états, l’historique, le seuil d’alerte et le rendu mobile, puis publier après validation complète. TypeScript sans erreur ; 104 fichiers de test réussis, 395 tests réussis et 2 ignorés.
+
+## Test contrôlé de l’alerte propriétaire
+- [x] Simuler le seuil de trois échecs techniques dans les tests isolés, sans écrire de trace fictive, d’archive ou de relevé météo.
+- [x] Vérifier qu’une alerte unique est demandée au seuil et qu’un créneau sans station qualifiée reste silencieux : le déclenchement est vrai à trois échecs, faux à deux comme à quatre, et interrompu par un créneau sans station.
+- [x] Présenter le résultat du test sans modifier les tâches de collecte actives. Simulation ciblée réussie ; TypeScript sans erreur ; 104 fichiers de test réussis, 396 tests réussis et 2 ignorés.
+
+## Surveillance de stabilité des collectes
+- [ ] Observer en lecture seule les prochains passages de snapshots physiques v5 et de prévisions v8.
+- [ ] Distinguer les réponses HTTP, les créneaux sans station qualifiée et les erreurs techniques éventuelles.
+- [ ] Présenter un bilan factuel de stabilité sans déclencher ni modifier les tâches.

@@ -132,6 +132,11 @@ export function countConsecutiveTechnicalFailures(traces: Array<{ status: string
   return count;
 }
 
+/** Une seule alerte est demandée au franchissement exact du seuil, sans répétition. */
+export function shouldNotifyOwnerForTechnicalFailures(streak: number): boolean {
+  return streak === TECHNICAL_FAILURE_ALERT_THRESHOLD;
+}
+
 type PhysicalSnapshotFavorite = Awaited<ReturnType<typeof getAllFavoriteLocations>>[number];
 
 export type PhysicalSnapshotCollectionTrigger = "scheduled" | "manual";
@@ -346,7 +351,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
       const streak = countConsecutiveTechnicalFailures(traces);
       return { ...failure, streak };
     }));
-    const newlyAlertableFailures = thresholdBreaches.filter((failure) => failure.streak === TECHNICAL_FAILURE_ALERT_THRESHOLD);
+    const newlyAlertableFailures = thresholdBreaches.filter((failure) => shouldNotifyOwnerForTechnicalFailures(failure.streak));
     if (newlyAlertableFailures.length > 0) {
     const parisTime = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
       const failedList = newlyAlertableFailures.map((failure) => `• ${failure.locationKey} — ${failure.reason ?? "raison inconnue"} (${failure.streak} échecs techniques consécutifs)`).join("\n");
