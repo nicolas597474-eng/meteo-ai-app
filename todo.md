@@ -3362,6 +3362,15 @@
 - [x] Supprimer le bouton situé à droite de la boussole dans la vue immersive de l’éclipse.
 - [x] Vérifier que les commandes restantes demeurent accessibles sans chevauchement.
 
+## Cadrage complet de la carte immersive
+- [x] Faire occuper toute la fenêtre mobile par la carte d’éclipse immersive sans bandes blanches.
+- [x] Recentrer la vue immersive sur la localisation active et son repère bleu.
+- [x] Préserver les contrôles accessibles et valider le rendu mobile avant publication.
+
+## Sélecteur de fond en tête de carte
+- [x] Placer Plan/Satellite tout en haut entre la boussole et la croix de fermeture.
+- [x] Garantir un espacement tactile sans chevauchement avec les contrôles voisins.
+
 ## Informations lunaires en direct
 - [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
 - [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.

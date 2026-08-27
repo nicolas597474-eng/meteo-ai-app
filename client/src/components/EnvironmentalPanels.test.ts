@@ -70,6 +70,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("allowPageScroll={!isExpanded}");
     expect(source).toContain("map.setCenter(localPosition)");
     expect(source).toContain("map.setZoom(5)");
+    expect(source).toContain("Le cadrage de toutes les cellules peut tomber trop loin sur mobile");
+    expect(source).toContain("map.setZoom(2)");
     expect(source).toContain('localMarkerContent.className = "eclipse-user-location-marker"');
     expect(source).toContain('mapContent("compact", "h-[280px]")');
     expect(source).toContain("Me localiser");
@@ -133,7 +135,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Touchez la rose des vents");
     expect(source).toContain("orientationStatus !== \"waiting\"");
     expect(source).not.toContain("bottom-[112px] right-3");
-    expect(source).toContain('absolute left-1/2 top-[158px] z-20 -translate-x-1/2');
+    expect(source).toContain('absolute left-[calc(50%+39px)] top-3 z-20 -translate-x-1/2');
     expect(source).toContain("MapTypeToggle value={expandedMapType}");
     expect(source).toContain("expandedMapRef.current?.setMapTypeId(value)");
     expect(source).toContain('mapTypeControl={false}');
