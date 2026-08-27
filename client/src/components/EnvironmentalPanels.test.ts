@@ -121,7 +121,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Boussole relative calibrée sur le nord");
     expect(source).toContain("Bougez le téléphone");
     expect(source).toContain("map-compass-status");
-    expect(source).toContain('map-compass-status absolute left-3 top-[142px] z-20 w-[188px]');
+    expect(source).toContain('map-compass-status absolute left-3 top-[208px] z-20 w-[188px]');
     expect(source).toContain("Autorisez Mouvement et orientation dans les réglages du navigateur.");
     expect(styles).toContain("La colonne compacte porte elle-même l’aide");
     expect(styles).toContain(".map-compass-status button");
@@ -133,7 +133,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Touchez la rose des vents");
     expect(source).toContain("orientationStatus !== \"waiting\"");
     expect(source).not.toContain("bottom-[112px] right-3");
-    expect(source).toContain('absolute left-[122px] top-3 z-20');
+    expect(source).toContain('absolute left-1/2 top-[158px] z-20 -translate-x-1/2');
     expect(source).toContain("MapTypeToggle value={expandedMapType}");
     expect(source).toContain("expandedMapRef.current?.setMapTypeId(value)");
     expect(source).toContain('mapTypeControl={false}');
@@ -161,7 +161,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("eclipse-compass-cardinal-arrow");
     expect(source).toContain("eclipse-compass-label--cardinal");
     expect(source).toContain("eclipse-compass-label--intercardinal");
-    expect(source).toContain("h-[104px] w-[104px]");
+    expect(source).toContain("h-[124px] w-[124px]");
     expect(source).toContain("displayedArrowRotation");
     expect(source).toContain("shortestRotation");
     expect(source).toContain("eclipse-compass-center-pulse");
@@ -173,7 +173,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("isMoonGuidanceActive");
     expect(source).toContain("navigator.vibrate(18)");
     expect(source).toContain("moonAlignmentHapticRef");
-    expect(source).toContain("toggleLunarObservationFullscreen");
+    expect(source).not.toContain("toggleLunarObservationFullscreen");
     expect(source).toContain("requestFullscreen");
     expect(source).toContain("moonObservationQuery");
     expect(source).toContain("Distance Terre–Lune");

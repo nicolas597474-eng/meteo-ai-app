@@ -3353,6 +3353,15 @@
 - [x] Faire ouvrir directement la carte des stations et la carte météo dans leurs vues immersives.
 - [x] Préserver les contrôles, le retour à la vue compacte et la compatibilité mobile, puis valider.
 
+## Boussole agrandie et sélecteur de fond recentré
+- [x] Agrandir la rose des vents dans la vue immersive tout en préservant sa lisibilité.
+- [x] Recentrer le sélecteur Plan/Satellite sur une zone dégagée qui ne chevauche aucun contrôle.
+- [x] Vérifier les zones tactiles mobiles et publier l’ajustement.
+
+## Simplification des contrôles immersifs
+- [x] Supprimer le bouton situé à droite de la boussole dans la vue immersive de l’éclipse.
+- [x] Vérifier que les commandes restantes demeurent accessibles sans chevauchement.
+
 ## Informations lunaires en direct
 - [x] Vérifier et réutiliser une source astronomique réelle pour la phase et la distance Terre–Lune.
 - [x] Actualiser le panneau dans l’interface sans créer de tâche planifiée supplémentaire.
