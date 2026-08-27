@@ -100,7 +100,7 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain("Radix désactive les pressions hors de son dialogue");
     expect(styles).toContain("height: 100dvh !important");
     expect(styles).toContain("display: none");
-    expect(source).toContain('absolute right-3 top-[28%] z-20 flex flex-col items-center gap-4');
+    expect(source).toContain('absolute right-3 top-[calc(28%+2.5rem)] z-20 flex flex-col items-center gap-4');
     expect(source).toContain("MapZoomControl onZoomIn={() => adjustExpandedZoom(1)}");
     expect(source).toContain("adjustExpandedZoom");
     expect(source).toContain("zoomControl={false}");
@@ -186,6 +186,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("formatLunarDistance");
     expect(source).toContain("eclipse-moon-alignment-ring");
     expect(source).toContain("Lune alignée");
+    expect(source).toContain('eclipse-moon-alignment-label absolute left-1/2 top-1/2');
     expect(source).toContain("eclipse-astro-guidance-arrow");
     expect(source).toContain("eclipse-astro-guidance-arrow__beam");
     expect(source).toContain("eclipse-astro-guidance-arrow__head");
@@ -198,6 +199,9 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain(".eclipse-compass-center-pulse");
     expect(styles).toContain(".eclipse-compass-shell.eclipse-moon-aligned");
     expect(styles).toContain(".eclipse-moon-alignment-ring");
+    expect(styles).toContain(".eclipse-moon-alignment-label");
+    expect(styles).toContain("top: 50%");
+    expect(styles).toContain("transform: translate(-50%, -50%)");
     expect(styles).toContain("rgb(168 85 247 / 0.34)");
     expect(styles).toContain("rgb(6 182 212 / 0.26)");
     expect(styles).toContain("--moon-guidance-opacity");

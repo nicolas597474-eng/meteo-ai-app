@@ -1026,6 +1026,7 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 .eclipse-moon-alignment-label {
   z-index: 8;
   left: 50%;
+  top: 50%;
   min-width: max-content;
   padding: 0.18rem 0.34rem;
   border: 1px solid rgb(103 232 249 / 0.7);
@@ -1037,7 +1038,8 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   letter-spacing: 0.07em;
   line-height: 1;
   text-transform: uppercase;
-  transform: translateX(-50%);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
   box-shadow: 0 0 12px rgb(34 211 238 / 0.38);
 }
 

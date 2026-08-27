@@ -3386,3 +3386,8 @@
 - [x] Supprimer la bande blanche supérieure en ajustant légèrement le cadrage mondial de la carte immersive.
 - [x] Descendre l’indication lunaire, puis placer le panneau d’orientation juste en dessous avec des espaces visuels et tactiles réguliers.
 - [x] Vérifier le rendu mobile, les interactions de carte et publier le correctif.
+
+## Alignement lunaire et commandes immersives
+- [x] Afficher « Lune alignée » au centre de la rose uniquement lorsque le cap et l’azimut lunaire réels sont alignés.
+- [x] Descendre le bloc de centrage et de zoom d’environ 1 cm en préservant son espacement interne.
+- [x] Vérifier les styles, les interactions et publier l’ajustement.
