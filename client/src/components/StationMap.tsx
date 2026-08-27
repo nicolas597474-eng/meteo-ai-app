@@ -261,7 +261,9 @@ rotateControl: false,
       </div>
       {mapReady && !isExpanded && (
         <div className="mt-2 space-y-2">
-          <MapTypeToggle value={mapType} onChange={changeMapType} />
+          <div className="flex justify-center">
+            <MapTypeToggle value={mapType} onChange={changeMapType} />
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"

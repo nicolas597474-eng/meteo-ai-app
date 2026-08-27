@@ -16,6 +16,7 @@ describe("carte des stations", () => {
     expect(source).toContain("isExpanded && typeof document !== \"undefined\"");
     expect(source).toContain('h-72 rounded-xl border border-slate-800 sm:h-80');
     expect(source).toContain('mt-2 space-y-2');
+    expect(source).toContain('className="flex justify-center"');
     expect(source).toContain('MapTypeToggle value={mapType} onChange={changeMapType}');
     expect(source).toContain("MapControlButton");
     expect(source).toContain("MapZoomControl");

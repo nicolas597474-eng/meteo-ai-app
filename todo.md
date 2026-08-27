@@ -3406,3 +3406,8 @@
 - [x] Réorganiser les boutons plus et moins sur une ligne horizontale dans la vue compacte.
 - [x] Réduire et harmoniser la hauteur du zoom et du bouton d’agrandissement à droite.
 - [x] Vérifier les interactions tactiles et publier le correctif mobile.
+
+## Sélecteur de fond de la carte des stations
+- [x] Centrer horizontalement le sélecteur Plan / Satellite sous la carte des stations.
+- [x] Vérifier le rendu mobile et les interactions de changement de fond.
+- [x] Publier le correctif sans modifier les données ni les marqueurs.
