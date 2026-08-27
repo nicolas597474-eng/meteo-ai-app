@@ -187,12 +187,16 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain(".eclipse-compass-center-pulse");
     expect(styles).toContain(".eclipse-compass-shell.eclipse-moon-aligned");
     expect(styles).toContain(".eclipse-moon-alignment-ring");
+    expect(styles).toContain("rgb(168 85 247 / 0.34)");
+    expect(styles).toContain("rgb(6 182 212 / 0.26)");
     expect(styles).toContain("--moon-guidance-opacity");
     expect(styles).toContain("--moon-guidance-scale");
     expect(styles).toContain("transition: transform 420ms");
     expect(styles).toContain("@keyframes eclipse-compass-center-pulse");
     expect(styles).toContain(".eclipse-astro-guidance-arrow");
     expect(styles).toContain(".eclipse-astro-guidance-arrow__head");
+    expect(styles).toContain("stroke-width: 1.55");
+    expect(styles).toContain("transform: scaleX(0.64)");
     expect(styles).toContain(".eclipse-astro-bearing");
     expect(source).toContain("Repère de rose");
     expect(source).toContain("Détails de la boussole");

@@ -3321,3 +3321,8 @@
 - [x] Reprendre les anneaux, segments radiaux et marqueurs lumineux de la référence sans afficher de degrés intermédiaires.
 - [x] Conserver seulement N, NE, E, SE, S, SO, O et NO autour du cadran.
 - [x] Préserver le guidage lunaire réel, tester le mobile et publier le nouveau cadran.
+
+## Palette intensifiée et flèche affinée
+- [x] Renforcer avec mesure les accents bleu, cyan et violet sur le fond, les anneaux et les segments.
+- [x] Affiner la flèche astronomique bleue et améliorer son aspect lumineux élégant.
+- [x] Vérifier la lisibilité mobile, les animations et publier l’ajustement.
