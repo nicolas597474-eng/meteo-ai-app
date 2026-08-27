@@ -28,6 +28,8 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE");
     expect(source).toContain("TEMPERATURE_LABEL_ABOVE_GAP");
     expect(source).toContain("const maxLabelY = getLabelAboveCurveY(pt.y, tempZoneTop, TEMPERATURE_LABEL_ABOVE_GAP)");
+    expect(source).toContain("const tempCurveTop = tempZoneTop + 34");
+    expect(source).toContain("tempCurveTop + (1 - (t - scaleBot) / scaleRange)");
     expect(source).toContain('WebkitOverflowScrolling: "touch"');
     expect(source).not.toContain('touchAction: "pan-x"');
     expect(source).not.toContain('overscrollBehavior: "contain"');

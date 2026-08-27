@@ -243,13 +243,15 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const precipScaleTop = Math.ceil(maxPrecip * 10) / 10;
   // Zone allocation: temp 55%, wind 20%, precip 20%, gaps 5%
   const tempZoneTop = PAD_T;
+  // Les maxima restent dans une bande dédiée au-dessus du tracé et de ses points.
+  const tempCurveTop = tempZoneTop + 34;
   const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.55;
   const windZoneTop = tempZoneBot + 4;
   const windZoneBot = windZoneTop + (CHART_H - PAD_T) * 0.20;
   const precipZoneTop = windZoneBot + 2;
   const precipZoneBot = CHART_H - 2;
 
-  const tempToY = useCallback((t: number) => tempZoneTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempZoneTop), [scaleBot, scaleRange, tempZoneTop, tempZoneBot]);
+  const tempToY = useCallback((t: number) => tempCurveTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempCurveTop), [scaleBot, scaleRange, tempCurveTop, tempZoneBot]);
   const colX = useCallback((i: number) => i * COL_W + COL_W / 2, []);
 
   // ── Draw scrollable canvas ──────────────────────────────────────────────────
@@ -457,7 +459,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
       ctx.fillStyle = today ? "#a5b4fc" : "rgba(107, 114, 128, 0.7)";
       ctx.fillText(line2, x, lblY + 24);
     });
-  }, [displayDays, N, selectedDay, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
+  }, [displayDays, N, selectedDay, animated, animProgress, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, tempZoneTop, tempCurveTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
 
   // ── Resize observer ─────────────────────────────────────────────────────────
   useEffect(() => {

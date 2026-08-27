@@ -360,13 +360,16 @@ export default function HourlyChart({ hours, locationName }: Props) {
   // Zone allocation: température 60 %, vent 20 %, pluie 20 %.
   // La lecture reste centrée sur la température depuis le retrait du ressenti.
   const tempZoneTop = PAD_T;
+  // Les valeurs maximales occupent une bande fixe au-dessus de la courbe :
+  // aucun chiffre ne peut ainsi recouvrir son point ou son tracé.
+  const tempCurveTop = tempZoneTop + 34;
   const tempZoneBot = PAD_T + (CHART_H - PAD_T) * 0.60;
   const windZoneTop = tempZoneBot + 4;
   const windZoneBot = windZoneTop + (CHART_H - PAD_T) * 0.20;
   const precipZoneTop = windZoneBot + 2;
   const precipZoneBot = CHART_H - 2;
 
-  const tempToY = useCallback((t: number) => tempZoneTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempZoneTop), [scaleBot, scaleRange, tempZoneTop, tempZoneBot]);
+  const tempToY = useCallback((t: number) => tempCurveTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempCurveTop), [scaleBot, scaleRange, tempCurveTop, tempZoneBot]);
   const colX = useCallback((i: number) => i * COL_W + COL_W / 2, []);
 
   // Current hour index
@@ -567,7 +570,7 @@ export default function HourlyChart({ hours, locationName }: Props) {
       ctx.fillRect(x - barW / 2, barTop, barW, barH);
     });
 
-  }, [hours, N, selectedHour, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, dayBoundaryIndexes, tempZoneTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
+  }, [hours, N, selectedHour, scrollableW, TOTAL_H, CHART_H, ICON_ROW, COL_W, PAD_T, scaleBot, scaleTop, scaleRange, gridStep, maxPrecip, tempToY, colX, nowHour, dayBoundaryIndexes, tempZoneTop, tempCurveTop, tempZoneBot, windZoneTop, windZoneBot, precipZoneTop, precipZoneBot]);
 
   // Resize observer
   useEffect(() => {

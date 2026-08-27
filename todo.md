@@ -3456,3 +3456,8 @@
 - [x] Rétablir le défilement vertical de la page lorsque le geste commence sur le graphique horaire ou quotidien.
 - [x] Préserver le défilement horizontal des données et les gestes de sélection.
 - [x] Vérifier les interactions mobiles et publier le correctif.
+
+## Lisibilité des températures sur les graphiques
+- [x] Créer une zone de lecture dédiée aux températures maximales au-dessus de la courbe et des points.
+- [x] Recalibrer la zone et les graduations de température sans réduire l’espace horizontal entre les colonnes.
+- [x] Vérifier les deux graphiques sur mobile et publier la correction.
