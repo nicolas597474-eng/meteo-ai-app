@@ -3304,3 +3304,9 @@
 - [x] Ajouter une pulsation lumineuse bleue au noyau central, respectueuse des préférences de mouvement réduit.
 - [x] Animer la rotation de la flèche astronomique avec une transition courte, continue et fluide.
 - [x] Tester l’animation et l’accessibilité sur mobile avant publication.
+
+## Affinage visuel et alignement lunaire
+- [x] Rapprocher encore le fond et les halos de la référence (bleu nuit, cyan, violet) sans surcharge.
+- [x] Affiner la flèche bleue pour un rendu plus élégant et futuriste.
+- [x] Ajouter un effet visuel lorsque le cap du téléphone est aligné avec l’azimut réel de la Lune.
+- [x] Tester le rendu mobile et publier la version finale.

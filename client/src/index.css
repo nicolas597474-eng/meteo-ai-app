@@ -827,17 +827,17 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   filter: drop-shadow(0 0 7px rgb(125 211 252 / 0.62));
 }
 
-/* Instrument de guidage astronomique : la rose reste une boussole, tandis que la flèche dorée
-   forme un relèvement long et explicite vers la zone du ciel à regarder. */
+/* Instrument de guidage astronomique : bleu nuit, cyan et violet, avec une flèche fine
+   et un verrouillage visuel activé uniquement quand la Lune est réellement dans l’axe. */
 .eclipse-compass-shell {
   isolation: isolate;
   overflow: visible !important;
   border-color: rgb(186 230 253 / 0.78) !important;
   background:
-    radial-gradient(circle at 50% 50%, rgb(226 232 240 / 0.15) 0 7%, transparent 8% 16%, rgb(56 189 248 / 0.12) 17% 19%, transparent 20% 31%, rgb(14 116 144 / 0.26) 32% 34%, transparent 35%),
-    conic-gradient(from 0deg, rgb(125 211 252 / 0.18), transparent 11%, rgb(14 165 233 / 0.10) 25%, transparent 38%, rgb(251 191 36 / 0.11) 50%, transparent 63%, rgb(14 165 233 / 0.12) 76%, transparent 88%, rgb(125 211 252 / 0.18)),
-    linear-gradient(145deg, rgb(15 23 42 / 0.98), rgb(3 7 18 / 0.99)) !important;
-  box-shadow: 0 0 0 1px rgb(125 211 252 / 0.22), 0 0 25px rgb(14 165 233 / 0.29), inset 0 0 20px rgb(14 165 233 / 0.16) !important;
+    radial-gradient(circle at 50% 50%, rgb(224 242 254 / 0.14) 0 7%, transparent 8% 16%, rgb(56 189 248 / 0.12) 17% 19%, transparent 20% 31%, rgb(49 46 129 / 0.20) 32% 34%, transparent 35%),
+    conic-gradient(from 270deg, rgb(139 92 246 / 0.26), transparent 18%, rgb(14 165 233 / 0.18) 43%, transparent 63%, rgb(59 130 246 / 0.16) 81%, transparent 92%, rgb(139 92 246 / 0.26)),
+    linear-gradient(145deg, rgb(10 20 42 / 0.99), rgb(2 6 23 / 0.99)) !important;
+  box-shadow: 0 0 0 1px rgb(125 211 252 / 0.24), 0 0 26px rgb(14 165 233 / 0.24), 0 0 38px rgb(109 40 217 / 0.12), inset 0 0 24px rgb(14 165 233 / 0.14) !important;
 }
 
 .eclipse-compass-ring {
@@ -951,6 +951,41 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   stroke-width: 1.35;
 }
 
+.eclipse-compass-shell.eclipse-moon-aligned {
+  border-color: rgb(165 243 252 / 0.96) !important;
+  box-shadow: 0 0 0 1px rgb(125 211 252 / 0.54), 0 0 30px rgb(34 211 238 / 0.42), 0 0 44px rgb(139 92 246 / 0.26), inset 0 0 26px rgb(56 189 248 / 0.20) !important;
+}
+
+.eclipse-moon-alignment-ring {
+  z-index: 6;
+  width: 3.9rem;
+  height: 3.9rem;
+  border: 1px solid rgb(165 243 252 / 0.82);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(186 230 253 / 0.16) 0 12%, rgb(56 189 248 / 0.10) 13% 39%, transparent 40%);
+  box-shadow: 0 0 11px rgb(34 211 238 / 0.78), 0 0 27px rgb(56 189 248 / 0.38), 0 0 38px rgb(139 92 246 / 0.24);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.eclipse-moon-alignment-label {
+  z-index: 8;
+  left: 50%;
+  min-width: max-content;
+  padding: 0.18rem 0.34rem;
+  border: 1px solid rgb(103 232 249 / 0.7);
+  border-radius: 0.38rem;
+  background: rgb(8 27 65 / 0.94);
+  color: rgb(207 250 254 / 0.98);
+  font-size: 0.42rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  line-height: 1;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  box-shadow: 0 0 12px rgb(34 211 238 / 0.38);
+}
+
 .eclipse-astro-bearing {
   z-index: 7;
   left: 50%;
@@ -995,11 +1030,15 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
   .eclipse-compass-center-pulse {
     animation: eclipse-compass-center-pulse 1.9s cubic-bezier(0.23, 1, 0.32, 1) infinite alternate;
   }
+
+  .eclipse-moon-alignment-ring {
+    animation: eclipse-moon-alignment-bloom 1.35s cubic-bezier(0.23, 1, 0.32, 1) infinite alternate;
+  }
 }
 
 @keyframes eclipse-compass-radar {
   0%, 100% { box-shadow: 0 0 0 1px rgb(14 165 233 / 0.18), 0 0 22px rgb(14 165 233 / 0.20), inset 0 0 18px rgb(14 165 233 / 0.11); }
-  50% { box-shadow: 0 0 0 1px rgb(251 191 36 / 0.36), 0 0 30px rgb(14 165 233 / 0.32), inset 0 0 25px rgb(251 191 36 / 0.10); }
+  50% { box-shadow: 0 0 0 1px rgb(139 92 246 / 0.42), 0 0 30px rgb(14 165 233 / 0.32), inset 0 0 25px rgb(99 102 241 / 0.12); }
 }
 
 @keyframes eclipse-astro-guidance-pulse {
@@ -1010,6 +1049,11 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 @keyframes eclipse-compass-center-pulse {
   from { opacity: 0.36; transform: translate(-50%, -50%) scale(0.78); }
   to { opacity: 0.82; transform: translate(-50%, -50%) scale(1.12); }
+}
+
+@keyframes eclipse-moon-alignment-bloom {
+  from { opacity: 0.56; transform: translate(-50%, -50%) scale(0.9); }
+  to { opacity: 0.94; transform: translate(-50%, -50%) scale(1.08); }
 }
 
 /* Aide affichée seulement tant que le bouton propose d’activer la boussole. */

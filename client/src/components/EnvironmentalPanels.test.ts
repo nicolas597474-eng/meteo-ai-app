@@ -163,6 +163,12 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("displayedArrowRotation");
     expect(source).toContain("shortestRotation");
     expect(source).toContain("eclipse-compass-center-pulse");
+    expect(source).toContain("MOON_ALIGNMENT_TOLERANCE_DEG");
+    expect(source).toContain("getAngularDistance");
+    expect(source).toContain("hasReliableCompassHeading");
+    expect(source).toContain("isMoonAligned");
+    expect(source).toContain("eclipse-moon-alignment-ring");
+    expect(source).toContain("Lune alignée");
     expect(source).toContain("eclipse-astro-guidance-arrow");
     expect(source).toContain("eclipse-astro-guidance-arrow__beam");
     expect(source).toContain("eclipse-astro-guidance-arrow__head");
@@ -173,6 +179,9 @@ describe("EnvironmentalPanels", () => {
     expect(styles).toContain(".eclipse-compass-cardinal-arrow");
     expect(styles).toContain(".eclipse-compass-label--cardinal");
     expect(styles).toContain(".eclipse-compass-center-pulse");
+    expect(styles).toContain(".eclipse-compass-shell.eclipse-moon-aligned");
+    expect(styles).toContain(".eclipse-moon-alignment-ring");
+    expect(styles).toContain("@keyframes eclipse-moon-alignment-bloom");
     expect(styles).toContain("transition: transform 420ms");
     expect(styles).toContain("@keyframes eclipse-compass-center-pulse");
     expect(styles).toContain(".eclipse-astro-guidance-arrow");
