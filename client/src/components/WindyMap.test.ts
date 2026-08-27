@@ -12,9 +12,14 @@ describe("WindyMap", () => {
     expect(source).toContain("COMPACT_NATIVE_PLAY_GUTTER_PX = 96");
     expect(source).toContain("COMPACT_NATIVE_DETAIL_GUTTER_PX = 172");
     expect(source).toContain("COMPACT_NATIVE_TIMELINE_GUTTER_PX = 78");
-    expect(source).toContain("bottom: `-${COMPACT_NATIVE_TIMELINE_GUTTER_PX}px`");
+    expect(source).toContain("bottom: `-${compactBottomGutter}px`");
     expect(source).toContain("right: `-${COMPACT_NATIVE_DETAIL_GUTTER_PX}px`");
     expect(source).toContain('className="pointer-events-none h-full w-full border-0"');
+    expect(source).toContain('const hideNativeLegend = activeLayer === "clouds"');
+    expect(source).toContain("function CloudCoverageLegend()");
+    expect(source).toContain("Nuages · couverture du ciel");
+    expect(source).toContain('0 %');
+    expect(source).toContain('100 %');
     expect(source).not.toContain('className="absolute inset-x-0 top-0 z-10 touch-pan-y"');
     expect(source).toContain("Aperçu météo fixe en mode compact");
     expect(source).toContain('aria-label="Boutons de couches météo"');

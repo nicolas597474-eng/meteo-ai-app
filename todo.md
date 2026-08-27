@@ -3411,3 +3411,8 @@
 - [x] Centrer horizontalement le sélecteur Plan / Satellite sous la carte des stations.
 - [x] Vérifier le rendu mobile et les interactions de changement de fond.
 - [x] Publier le correctif sans modifier les données ni les marqueurs.
+
+## Cohérence des légendes de la carte météo
+- [x] Corriger la couche Nuages afin que son unité et son échelle indiquent la couverture nuageuse en pourcentage, et non les précipitations en mm.
+- [x] Vérifier que la couche Pluie conserve son unité mm et que les autres couches restent inchangées.
+- [x] Valider le rendu mobile et publier le correctif de légende.

@@ -115,6 +115,25 @@ function LayerSelector({
   );
 }
 
+function CloudCoverageLegend() {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-2">
+      <div className="rounded-lg border border-white/15 bg-[#071018]/88 px-2.5 py-1.5 shadow-lg backdrop-blur-sm">
+        <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-slate-100">
+          <span>Nuages · couverture du ciel</span>
+          <span className="text-sky-200">%</span>
+        </div>
+        <div aria-hidden="true" className="h-2 rounded-full bg-[linear-gradient(90deg,#d7b85b_0%,#7c9fc1_48%,#f8fafc_100%)]" />
+        <div className="mt-0.5 flex justify-between text-[9px] text-slate-300">
+          <span>0 %</span>
+          <span>50 %</span>
+          <span>100 %</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   const preferenceLocationKey = makeWindyMapLocationKey(lat, lon);
   const [preferences, setPreferences] = useState<WindyMapPreferences>(() => getWindyMapPreferences(preferenceLocationKey));
@@ -232,6 +251,13 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, [isFullscreen]);
 
   const activeLayerInfo = WINDY_LAYERS.find((l) => l.id === activeLayer) ?? WINDY_LAYERS[0];
+  // La couche Nuages de l’embed Windy affiche nativement une légende de précipitations (mm)
+  // au lieu de la couverture nuageuse (%). Pour éviter cette incohérence, on masque la légende
+  // native de cette couche spécifique en décalant le bas de l’iframe.
+  const hideNativeLegend = activeLayer === "clouds";
+  const fullscreenBottomGutter = hideNativeLegend ? 32 : 0;
+  const compactBottomGutter = COMPACT_NATIVE_TIMELINE_GUTTER_PX + (hideNativeLegend ? 32 : 0);
+
   const windyUrlCompact = buildWindyUrlWithDetail(lat, lon, activeLayerInfo.windyParam, compactZoom, false);
   // En plein écran, on conserve la barre temporelle native et son bouton lecture,
   // mais on désactive le panneau détaillé Windy qui affiche le tableau horaire.
@@ -256,20 +282,27 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         {/* Carte plein écran */}
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10">
           <div
-            className="absolute inset-y-0 left-0 overflow-hidden"
-            style={{ right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px` }}
+            className="absolute inset-x-0 top-0 overflow-hidden"
+            style={{
+              bottom: `-${fullscreenBottomGutter}px`,
+              right: `-${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px`,
+            }}
           >
             <iframe
               key={iframeKey}
               src={windyUrlFullscreen}
               title={`Carte météo Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
               className="h-full border-0"
-              style={{ width: `calc(100% + ${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px)` }}
+              style={{
+                width: `calc(100% + ${FULLSCREEN_NATIVE_CONTROL_GUTTER_PX}px)`,
+                height: `calc(100% + ${fullscreenBottomGutter}px)`,
+              }}
               loading="lazy"
               allow="geolocation"
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
+          {hideNativeLegend && <CloudCoverageLegend />}
           <button
             type="button"
             onClick={closeFullscreen}
@@ -313,7 +346,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
         <div
           className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
           style={{
-            bottom: `-${COMPACT_NATIVE_TIMELINE_GUTTER_PX}px`,
+            bottom: `-${compactBottomGutter}px`,
             left: `-${COMPACT_NATIVE_PLAY_GUTTER_PX}px`,
             right: `-${COMPACT_NATIVE_DETAIL_GUTTER_PX}px`,
           }}
@@ -324,12 +357,14 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             src={windyUrlCompact}
             title={`Aperçu fixe Windy — ${activeLayerInfo.label} — ${locationName ?? "lieu actif"}`}
             className="pointer-events-none h-full w-full border-0"
+            style={{ height: `calc(100% + ${hideNativeLegend ? 32 : 0}px)` }}
             tabIndex={-1}
             loading="lazy"
             allow="geolocation"
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
+        {hideNativeLegend && <CloudCoverageLegend />}
         <MapZoomControl orientation="horizontal" ariaLabel="Zoom de l’aperçu fixe" className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2" onZoomIn={() => adjustCompactZoom(1)} onZoomOut={() => adjustCompactZoom(-1)} />
         {/* Bouton plein écran */}
         <button
