@@ -3158,8 +3158,8 @@
 
 ## Rétablissement des snapshots horaires
 - [x] Corriger le refus d’autorisation de l’ancienne tâche v4 sans modifier les snapshots ni les archives existants. v4 est en pause ; v5 (`RuT5SN5kPbD3eAAwb92mqz`) est active sur la même route et conserve une cadence horaire à xx:20 UTC.
-- [ ] Vérifier que la tâche v5 active se déclenche chaque heure à xx:20 UTC et produit un journal HTTP 200.
-- [ ] Contrôler les traces horaires créées après le prochain passage et documenter les créneaux sans station qualifiée séparément des erreurs d’exécution.
+- [x] Vérifier que la tâche v5 active se déclenche chaque heure à xx:20 UTC et produit un journal HTTP 200. Neuf passages réussis sont désormais consignés, dont 00:31, 01:22 et 02:31 UTC le 27 août.
+- [x] Contrôler les traces horaires créées après les passages automatiques et documenter les créneaux sans station qualifiée séparément des erreurs d’exécution. Les deux favoris ont produit des traces ; un créneau sans station qualifiée est signalé comme tel, sans réécriture.
 
 ## Boussole astronomique orientée par le téléphone
 - [x] Ajouter une activation explicite du capteur d’orientation de l’appareil mobile pour la boussole de visibilité d’éclipse.
@@ -3178,8 +3178,8 @@
 
 ## Collecte horaire automatique sécurisée
 - [x] Évaluer une capacité cryptographique dédiée en repli lorsque le cookie cron est absent ou invalide, puis retirer cette tentative après confirmation que le refus 403 se produit à la passerelle avant le handler.
-- [ ] Faire corriger l’autorisation cron par la plateforme tout en conservant la tâche v5 à xx:20 UTC, sans exposer de secret ou contourner l’authentification.
-- [ ] Vérifier un journal HTTP 200 et une trace de snapshot après le prochain passage automatique.
+- [x] Réévaluer l’autorisation cron en conservant la tâche v5 à xx:20 UTC, sans exposer de secret ni contourner l’authentification. Les appels de v5 sont maintenant autorisés par la plateforme.
+- [x] Vérifier un journal HTTP 200 et une trace de snapshot après les passages automatiques. Les passages récents répondent HTTP 200 et conservent les traces de stations qualifiées.
 
 ## Refonte futuriste de la boussole astronomique
 - [x] Recomposer la rose des vents avec une esthétique futuriste sombre, cyan et ambrée cohérente avec la carte d’éclipse.
@@ -3248,6 +3248,6 @@
 - [x] Vérifier le code et la suite de tests avant publication. La validation tactile finale reste à confirmer sur le téléphone de l’utilisateur. TypeScript sans erreur ; 103 fichiers de test réussis, 393 tests réussis et 2 ignorés.
 
 ## Collecte quotidienne des prévisions à 05:00
-- [x] Contrôler la tâche active de collecte des prévisions et son dernier journal d’exécution : v8 est active, mais aucun journal d’exécution n’est encore disponible.
+- [x] Contrôler la tâche active de collecte des prévisions et son dernier journal d’exécution : v8 est active et une première exécution HTTP 200 est maintenant disponible.
 - [x] Configurer la collecte des prévisions à 05:00 heure française d’été, soit 03:00 UTC, sans modifier les snapshots physiques horaires. La tâche v8 utilise désormais l’expression `0 0 3 * * *`.
-- [ ] Vérifier le prochain créneau planifié et attendre un journal HTTP 200 avant de considérer la collecte validée ; l’horodatage « prochain passage » renvoyé par la plateforme reste encore à 04:00 UTC après la mise à jour.
+- [x] Vérifier une exécution réelle : v8 a répondu HTTP 200 le 27 août à 03:07 UTC, avec les huit modèles attendus et collectés (AROME, ARPEGE, ICON, ECMWF, GFS, GEM, UKMET et Open-Meteo), sans modèle manquant.
