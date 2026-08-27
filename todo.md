@@ -3461,3 +3461,8 @@
 - [x] Créer une zone de lecture dédiée aux températures maximales au-dessus de la courbe et des points.
 - [x] Recalibrer la zone et les graduations de température sans réduire l’espace horizontal entre les colonnes.
 - [x] Vérifier les deux graphiques sur mobile et publier la correction.
+
+## Vérification de température extrême
+- [x] Simuler 42 °C dans un test isolé des graphiques, sans modifier les données affichées à l’utilisateur.
+- [x] Vérifier l’adaptation de l’échelle, le maintien du point dans la zone de courbe et l’espace du libellé au-dessus.
+- [x] Restituer le résultat de la simulation sans publier de données simulées.
