@@ -31,29 +31,34 @@ export function MapZoomControl({
   onZoomOut,
   className = "",
   ariaLabel = "Zoom manuel de la carte",
+  orientation = "vertical",
 }: {
   onZoomIn: () => void;
   onZoomOut: () => void;
   className?: string;
   ariaLabel?: string;
+  orientation?: "horizontal" | "vertical";
 }) {
+  const isHorizontal = orientation === "horizontal";
+  const controlSize = isHorizontal ? "h-10 w-11" : "h-14 w-12";
+  const separator = isHorizontal ? "border-r border-white/10" : "border-b border-white/10";
   return (
-    <div className={`${CONTROL_SURFACE} overflow-hidden rounded-2xl ${className}`} aria-label={ariaLabel}>
+    <div className={`${CONTROL_SURFACE} ${isHorizontal ? "inline-flex rounded-xl" : "rounded-2xl"} overflow-hidden ${className}`} aria-label={ariaLabel}>
       <button
         type="button"
         onClick={onZoomIn}
         aria-label="Zoomer"
-        className={`grid h-14 w-12 place-items-center border-b border-white/10 text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
+        className={`grid ${controlSize} place-items-center ${separator} text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
       >
-        <Plus aria-hidden="true" className="h-7 w-7" strokeWidth={2.15} />
+        <Plus aria-hidden="true" className={isHorizontal ? "h-6 w-6" : "h-7 w-7"} strokeWidth={2.15} />
       </button>
       <button
         type="button"
         onClick={onZoomOut}
         aria-label="Dézoomer"
-        className={`grid h-14 w-12 place-items-center text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
+        className={`grid ${controlSize} place-items-center text-slate-100 transition-colors hover:bg-white/10 active:bg-white/15 ${CONTROL_FOCUS}`}
       >
-        <Minus aria-hidden="true" className="h-7 w-7" strokeWidth={2.15} />
+        <Minus aria-hidden="true" className={isHorizontal ? "h-6 w-6" : "h-7 w-7"} strokeWidth={2.15} />
       </button>
     </div>
   );

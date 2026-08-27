@@ -3401,3 +3401,8 @@
 - [x] Vérifier si l’interruption apparente de l’arc pointillé avant 00 h provient des données, de la géométrie ou d’un masquage visuel.
 - [x] Aucune correction requise : le repère 00 h masque localement le pointillé pour rester lisible, sans discontinuité des éphémérides.
 - [x] Valider la trajectoire et restituer le diagnostic.
+
+## Commandes compactes de la carte météo
+- [x] Réorganiser les boutons plus et moins sur une ligne horizontale dans la vue compacte.
+- [x] Réduire et harmoniser la hauteur du zoom et du bouton d’agrandissement à droite.
+- [x] Vérifier les interactions tactiles et publier le correctif mobile.

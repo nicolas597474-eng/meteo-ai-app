@@ -330,13 +330,13 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
-        <MapZoomControl ariaLabel="Zoom de l’aperçu fixe" className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2" onZoomIn={() => adjustCompactZoom(1)} onZoomOut={() => adjustCompactZoom(-1)} />
+        <MapZoomControl orientation="horizontal" ariaLabel="Zoom de l’aperçu fixe" className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2" onZoomIn={() => adjustCompactZoom(1)} onZoomOut={() => adjustCompactZoom(-1)} />
         {/* Bouton plein écran */}
         <button
           type="button"
           onClick={openFullscreen}
           aria-label="Agrandir la carte"
-          className="absolute bottom-3 right-3 z-20 grid h-11 w-12 place-items-center rounded-2xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          className="absolute bottom-3 right-3 z-20 grid h-10 w-11 place-items-center rounded-xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         >
           <Maximize2 className="h-5 w-5" />
         </button>
