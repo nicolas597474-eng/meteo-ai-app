@@ -116,9 +116,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("const activeFavoriteWeather = {");
     expect(source).toContain("activeWeather={activeFavoriteWeather}");
     expect(source).not.toContain('alt="Paysage météo"');
-    expect(source).toContain('w-[4.25rem] shrink-0 pt-0.5');
-    expect(source).toContain('size={64} className="sm:hidden"');
-    expect(source).toContain('size={80} className="hidden sm:block"');
+    expect(source).toContain('w-[4.75rem] shrink-0 pt-0.5');
+    expect(source).toContain('size={72}');
+    expect(source.match(/<MeteoIcon name=\{getIconNameFromCondition\(displayedCondition\)\}/g)?.length).toBe(1);
     expect(source).toContain("getForecastCollectionReport");
     expect(source).toContain("Santé des collectes");
     expect(source).toContain("collection-health-panel");

@@ -834,9 +834,8 @@ export default function Dashboard() {
             {/* Main temperature row */}
             <div className="flex items-start gap-2 sm:gap-6">
               {/* The condition remains daily only when the hourly feed is unavailable. */}
-              <div className="w-[4.25rem] shrink-0 pt-0.5 sm:w-[5.25rem] sm:pt-0">
-                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} className="sm:hidden" />
-                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={80} className="hidden sm:block" />
+              <div className="w-[4.75rem] shrink-0 pt-0.5 sm:w-[5.25rem] sm:pt-0">
+                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={72} />
               </div>
 
               <div className={dashboardTemperatureLayout.content}>

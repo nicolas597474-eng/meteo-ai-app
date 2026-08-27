@@ -3438,6 +3438,10 @@
 - [x] Rétablir l’affichage exclusif des variantes mobile et bureau de l’icône météo principale.
 - [x] Vérifier qu’un seul pictogramme agrandi est rendu à chaque taille d’écran et publier le correctif.
 
+## Rendu unique de l’icône météo principale
+- [x] Remplacer les deux variantes responsive par un seul pictogramme météo agrandi dans la carte principale.
+- [x] Vérifier qu’aucun second nuage n’apparaît sous la température puis publier le correctif définitif.
+
 ## Stabilité des graphiques météo
 - [x] Empêcher le défilement vertical à l’intérieur des graphiques horaire et quotidien tout en préservant la navigation horizontale.
 - [x] Garantir que les températures maximales affichées restent au-dessus de leur courbe.
