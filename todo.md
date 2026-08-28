@@ -3511,25 +3511,25 @@
 - [x] Vérifier la vue compacte puis publier le retour au rendu d’origine.
 
 ## Mise en place de la fusion intra-journalière
-- [ ] Ajouter un modèle additif pour conserver chaque révision déclenchée par un snapshot qualifié.
-- [ ] Extraire un calcul de fusion réutilisable sans modifier les poids historiques ni les archives brutes.
-- [ ] Déclencher la révision automatiquement après un snapshot stored, avec reprise idempotente.
-- [ ] Ajouter les garde-fous de qualité, de cooldown et de conservation de la dernière version saine.
-- [ ] Afficher la fraîcheur et la raison de chaque révision sur le Dashboard.
-- [ ] Tester, migrer prudemment et publier la fonctionnalité.
+- [x] Ajouter un modèle additif pour conserver chaque révision déclenchée par un snapshot qualifié — piste arrêtée à la demande de l’utilisateur.
+- [x] Extraire un calcul de fusion réutilisable sans modifier les poids historiques ni les archives brutes — piste arrêtée à la demande de l’utilisateur.
+- [x] Déclencher la révision automatiquement après un snapshot stored, avec reprise idempotente — piste arrêtée à la demande de l’utilisateur.
+- [x] Ajouter les garde-fous de qualité, de cooldown et de conservation de la dernière version saine — piste arrêtée à la demande de l’utilisateur.
+- [x] Afficher la fraîcheur et la raison de chaque révision sur le Dashboard — piste arrêtée à la demande de l’utilisateur.
+- [x] Tester, migrer prudemment et publier la fonctionnalité — piste arrêtée à la demande de l’utilisateur.
 
 ## Migration du cron matinal vers MeteoAI
-- [ ] Cartographier les collecteurs, routes planifiées et traces réutilisables pour la collecte de 05:00.
-- [ ] Définir un gestionnaire interne sécurisé, idempotent et indépendant du navigateur.
-- [ ] Prévoir les tests, le déploiement et une période de coexistence avant la mise en pause de la tâche Manus.
-- [ ] Présenter la procédure de basculement sans exécuter ni supprimer la tâche actuelle.
+- [x] Cartographier les collecteurs, routes planifiées et traces réutilisables pour la collecte de 05:00 — tâche interne v8 déjà existante.
+- [x] Définir un gestionnaire interne sécurisé, idempotent et indépendant du navigateur — tâche interne v8 déjà existante.
+- [x] Prévoir les tests, le déploiement et une période de coexistence avant la mise en pause de la tâche Manus — vérifié lors de la coexistence.
+- [x] Présenter la procédure de basculement sans exécuter ni supprimer la tâche actuelle — tâche externe conservée en pause.
 
 ## Migration active de la collecte matinale 05:00
-- [ ] Auditer le flux existant de collecte des prévisions et le fuseau Europe/Paris.
-- [ ] Implémenter une route interne sécurisée et idempotente pour la collecte matinale.
-- [ ] Couvrir le gestionnaire par des tests sans modifier les modèles, scores, pondérations ou archives.
-- [ ] Publier le code puis créer le cron interne en conservant la tâche Manus active.
-- [ ] Vérifier deux passages internes avant toute mise en pause ou suppression de la tâche Manus.
+- [x] Auditer le flux existant de collecte des prévisions et le fuseau Europe/Paris.
+- [x] Implémenter une route interne sécurisée et idempotente pour la collecte matinale — route v8 déjà en production.
+- [x] Couvrir le gestionnaire par des tests sans modifier les modèles, scores, pondérations ou archives.
+- [x] Publier le code puis créer le cron interne en conservant la tâche Manus active — tâche interne v8 déjà active.
+- [x] Vérifier deux passages internes avant toute mise en pause ou suppression de la tâche Manus — v8 vérifiée et tâche externe mise en pause.
 
 ## Nettoyage de la tâche Manus externe 05:00
 - [x] Confirmer l’identité de la tâche externe et l’état de la collecte interne v8.
