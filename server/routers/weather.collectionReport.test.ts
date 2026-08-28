@@ -19,6 +19,10 @@ describe("weather.getForecastCollectionReport", () => {
     expect(source).toContain("scheduleCoverage");
     const procedure = source.slice(source.indexOf("getForecastCollectionReport:"), source.indexOf("getProviderDiagnostics:"));
     expect(procedure).not.toContain("collectExpertForecasts");
+    expect(procedure).toContain("getRecentCollectionJobs(24)");
+    expect(procedure).toContain("nextForecastRun");
+    expect(procedure).toContain("lastForecastRun");
+    expect(procedure).toContain("durationMs");
   });
 });
 

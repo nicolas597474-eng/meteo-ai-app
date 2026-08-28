@@ -887,18 +887,24 @@ function determineMajorityCondition(forecasts: any[]): string {
  * Stores results in location_forecasts table for instant display
  */
 export async function collectFavoritesForecastsHandler(req: Request, res: Response) {
+  let jobId = -1;
   try {
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) {
       return res.status(403).json({ error: "cron-only" });
     }
-
     // Le déclencheur teste 03h00 et 04h00 UTC afin de couvrir les changements
     // d'heure. Une seule exécution est admise : exactement 05h00 Europe/Paris.
     const parisHour = getParisHour();
     if (parisHour !== 5) {
       return res.json({ ok: true, skipped: "outside-05h00-paris", parisHour });
     }
+
+    jobId = await createCollectionJob({
+      jobType: "forecast",
+      status: "running",
+      scheduleCronTaskUid: user.taskUid,
+    });
 
     const today = getTodayParis();
     console.log(`[MeteoAI] Starting favorites forecast collection for ${today}`);
@@ -908,6 +914,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
     if (allFavorites.length === 0) {
       console.log("[MeteoAI] No favorite locations found, skipping.");
+      await updateCollectionJob(jobId, { status: "completed", servicesCollected: 0, completedAt: new Date() });
       return res.json({ ok: true, locationsProcessed: 0 });
     }
 
@@ -1379,6 +1386,12 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       }
     });
 
+    await updateCollectionJob(jobId, {
+      status: errors.length > 0 && locationsProcessed === 0 ? "failed" : "completed",
+      servicesCollected: locationsProcessed,
+      errorMessage: errors.length > 0 ? errors.join(" | ").slice(0, 4000) : undefined,
+      completedAt: new Date(),
+    });
     res.json({
       ok: true,
       date: today,
@@ -1388,6 +1401,13 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {
+    if (jobId > 0) {
+      await updateCollectionJob(jobId, {
+        status: "failed",
+        errorMessage: error.message,
+        completedAt: new Date(),
+      });
+    }
     console.error("[MeteoAI] Favorites forecast collection error:", error);
     res.status(500).json({
       error: error.message,

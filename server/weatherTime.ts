@@ -29,3 +29,29 @@ export function getParisMinute(date = new Date()): number {
 export function getParisDateDaysAgo(daysAgo: number, now = new Date()): string {
   return getParisDate(new Date(now.getTime() - daysAgo * 86_400_000));
 }
+
+function parisWallClockToUtc(date: string, hour: number): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  const wallClockUtc = Date.UTC(year, month - 1, day, hour, 0, 0);
+  const parisParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: METEO_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(wallClockUtc));
+  const value = Object.fromEntries(parisParts.map((part) => [part.type, part.value]));
+  const parisAsUtc = Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day), Number(value.hour), 0, 0);
+  return new Date(wallClockUtc + (wallClockUtc - parisAsUtc));
+}
+
+/** Retourne le prochain instant correspondant à 05:00 dans le fuseau métier. */
+export function getNextParisForecastRun(now = new Date()): Date {
+  const today = getParisDate(now);
+  const todayRun = parisWallClockToUtc(today, 5);
+  if (todayRun.getTime() > now.getTime()) return todayRun;
+  const [year, month, day] = today.split("-").map(Number);
+  const nextDate = getParisDate(new Date(Date.UTC(year, month - 1, day + 1, 12, 0, 0)));
+  return parisWallClockToUtc(nextDate, 5);
+}

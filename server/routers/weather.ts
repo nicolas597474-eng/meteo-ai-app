@@ -39,7 +39,7 @@ import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveSt
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
-import { getParisDate, getParisDateDaysAgo, getParisHour } from "../weatherTime";
+import { getParisDate, getParisDateDaysAgo, getParisHour, getNextParisForecastRun } from "../weatherTime";
 import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
 import { conditionFromWeatherValues } from "../weatherConditionLabels";
 import { computeOfficialDailyForecast } from "../officialForecast";
@@ -635,12 +635,16 @@ export const weatherRouter = router({
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
-      const [recentCollections, physicalTraces] = await Promise.all([
+      const [recentCollections, physicalTraces, recentJobs] = await Promise.all([
         getStationCollectionSnapshots(locationKey, 8),
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, getParisDateDaysAgo(1), getTodayParis()),
+        getRecentCollectionJobs(24),
       ]);
       const latestCollection = recentCollections[0] ?? null;
-      const lastForecastSuccess = recentCollections.find((collection) => collection.status !== "failed") ?? null;
+      const forecastJobs = recentJobs.filter((job) => job.jobType === "forecast");
+      const latestForecastJob = forecastJobs[0] ?? null;
+      const lastForecastJobSuccess = forecastJobs.find((job) => job.status === "completed" && !job.errorMessage) ?? null;
+      const lastForecastSuccess = lastForecastJobSuccess ?? recentCollections.find((collection) => collection.status !== "failed") ?? null;
       const lastPhysicalCollection = physicalTraces.find((trace) => trace.status !== "failed") ?? null;
       const hourlyHistory = buildRecentPhysicalSnapshotSlots(physicalTraces);
       const consecutiveTechnicalFailures = hourlyHistory.reduce((count, trace) => {
@@ -660,13 +664,24 @@ export const weatherRouter = router({
       return {
         scheduledAt: "05:00",
         scheduleTimeZone: "Europe/Paris",
+        nextForecastRun: getNextParisForecastRun().toISOString(),
         scheduleCoverage: "Le déclencheur vérifie 03:00 et 04:00 UTC, puis collecte uniquement à 05:00 heure de Paris pour couvrir l’heure d’été et l’heure d’hiver.",
+        lastForecastRun: latestForecastJob ? {
+          status: latestForecastJob.status === "completed" && latestForecastJob.errorMessage ? "partial" : latestForecastJob.status,
+          startedAt: latestForecastJob.startedAt,
+          collectedAt: latestForecastJob.completedAt ?? latestForecastJob.startedAt,
+          durationMs: latestForecastJob.completedAt && latestForecastJob.startedAt
+            ? Math.max(0, latestForecastJob.completedAt.getTime() - latestForecastJob.startedAt.getTime())
+            : null,
+          servicesCollected: latestForecastJob.servicesCollected,
+          errorMessage: latestForecastJob.errorMessage,
+        } : null,
         expectedModels,
         lastForecastSuccess: lastForecastSuccess ? {
-          status: lastForecastSuccess.status,
-          collectedAt: lastForecastSuccess.collectedAt,
-          dailyModelCount: lastForecastSuccess.dailyModelCount,
-          hourlyModelCount: lastForecastSuccess.hourlyModelCount,
+          status: "status" in lastForecastSuccess ? lastForecastSuccess.status : "completed",
+          collectedAt: "completedAt" in lastForecastSuccess ? lastForecastSuccess.completedAt : lastForecastSuccess.collectedAt,
+          dailyModelCount: "dailyModelCount" in lastForecastSuccess ? lastForecastSuccess.dailyModelCount : null,
+          hourlyModelCount: "hourlyModelCount" in lastForecastSuccess ? lastForecastSuccess.hourlyModelCount : null,
         } : null,
         lastPhysicalCollection: lastPhysicalCollection ? {
           status: lastPhysicalCollection.status,

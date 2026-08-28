@@ -1,5 +1,10 @@
 # MeteoAI - Project TODO
 
+## Configuration de la fusion intra-journalière
+- [x] Cartographier le raccordement entre un snapshot physique, la fusion officielle et la version affichée.
+- [x] Définir le déclenchement automatique, les seuils de qualité, l’idempotence et la conservation des révisions.
+- [x] Présenter la configuration recommandée sans modifier les modèles, scores, pondérations ou archives.
+
 ## Analyse des poids appliqués dans AI Lab
 - [x] Vérifier la trace de fusion et les critères de fiabilité utilisés pour les poids égaux à 12,5 %.
 - [x] Expliquer la cause à partir des données réelles, sans modifier le moteur de pondération.
@@ -3504,3 +3509,35 @@
 - [x] Retirer la légende personnalisée et le cadrage bas spécifique ajoutés à la couche Nuages.
 - [x] Rétablir la barre et la légende natives de Windy sans double affichage.
 - [x] Vérifier la vue compacte puis publier le retour au rendu d’origine.
+
+## Mise en place de la fusion intra-journalière
+- [ ] Ajouter un modèle additif pour conserver chaque révision déclenchée par un snapshot qualifié.
+- [ ] Extraire un calcul de fusion réutilisable sans modifier les poids historiques ni les archives brutes.
+- [ ] Déclencher la révision automatiquement après un snapshot stored, avec reprise idempotente.
+- [ ] Ajouter les garde-fous de qualité, de cooldown et de conservation de la dernière version saine.
+- [ ] Afficher la fraîcheur et la raison de chaque révision sur le Dashboard.
+- [ ] Tester, migrer prudemment et publier la fonctionnalité.
+
+## Migration du cron matinal vers MeteoAI
+- [ ] Cartographier les collecteurs, routes planifiées et traces réutilisables pour la collecte de 05:00.
+- [ ] Définir un gestionnaire interne sécurisé, idempotent et indépendant du navigateur.
+- [ ] Prévoir les tests, le déploiement et une période de coexistence avant la mise en pause de la tâche Manus.
+- [ ] Présenter la procédure de basculement sans exécuter ni supprimer la tâche actuelle.
+
+## Migration active de la collecte matinale 05:00
+- [ ] Auditer le flux existant de collecte des prévisions et le fuseau Europe/Paris.
+- [ ] Implémenter une route interne sécurisée et idempotente pour la collecte matinale.
+- [ ] Couvrir le gestionnaire par des tests sans modifier les modèles, scores, pondérations ou archives.
+- [ ] Publier le code puis créer le cron interne en conservant la tâche Manus active.
+- [ ] Vérifier deux passages internes avant toute mise en pause ou suppression de la tâche Manus.
+
+## Nettoyage de la tâche Manus externe 05:00
+- [x] Confirmer l’identité de la tâche externe et l’état de la collecte interne v8.
+- [x] Désactiver la tâche externe sans toucher aux données, aux archives ni aux tâches Heartbeat internes.
+- [x] Vérifier l’état final et conserver une procédure de réactivation si nécessaire.
+
+## Pastille de santé de la collecte interne v8
+- [x] Afficher les états « À jour », « Partiel », « En retard » et « Erreur technique ».
+- [x] Afficher le dernier succès, le prochain passage prévu, la durée et un lien vers le détail.
+- [x] Tester les quatre états et vérifier la lisibilité sur mobile.
+- [x] Publier la pastille sans modifier le moteur météo ni la collecte.

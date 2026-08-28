@@ -13,8 +13,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('label: "Créneau sans trace"');
     expect(source).toContain('label: "Archivé via reprise"');
     expect(source).toContain("missingSnapshotSlots");
-    expect(source).toContain("Créneau à rattraper");
-    expect(source).toContain("Le créneau est arrivé à échéance sans trace archivée");
+    expect(source).toContain("getCollectionHealth");
+    expect(source).toContain("formatCollectionDuration");
     expect(source).toContain("Précipitations observées (mm)");
     expect(source).toContain("acceptsPersonalPrecipitation");
     expect(source).toContain("Très nuageux");
@@ -126,6 +126,11 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('size={64}');
     expect(source.match(/<MeteoIcon name=\{getIconNameFromCondition\(displayedCondition\)\}/g)?.length).toBe(1);
     expect(source).toContain("getForecastCollectionReport");
+    expect(source).toContain("getCollectionHealth");
+    expect(source).toContain("formatCollectionDuration");
+    expect(source).toContain("lastForecastRun");
+    expect(source).toContain("nextForecastRun");
+    expect(source).toContain("Détails&nbsp;→");
     expect(source).toContain("Santé des collectes");
     expect(source).toContain("collection-health-panel");
     expect(source).toContain("Historique des 24 derniers créneaux horaires");
