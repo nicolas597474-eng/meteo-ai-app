@@ -3559,3 +3559,8 @@
 - [x] Restaurer le mode sombre fixe et supprimer la persistance du thème clair.
 - [x] Mettre à jour les tests et vérifier le rendu sombre.
 - [x] Publier le retour au mode sombre fixe.
+
+## Retour Android vers la dernière section
+- [x] Examiner l’historique de navigation actuel et le comportement du retour Android.
+- [x] Restaurer la dernière section consultée sans casser les liens ni les gestes mobiles.
+- [x] Tester le retour Android après navigation entre sections et publier le correctif.

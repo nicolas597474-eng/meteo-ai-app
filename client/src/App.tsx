@@ -178,6 +178,15 @@ function ScrollToTopOnRouteChange() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+
+    // Keep the current MeteoAI section on the browser history entry. Android's
+    // system back button then traverses the section the user visited just before.
+    const currentState = window.history.state && typeof window.history.state === "object"
+      ? window.history.state
+      : {};
+    if (currentState.meteoAiSection !== location) {
+      window.history.replaceState({ ...currentState, meteoAiSection: location }, "", location);
+    }
   }, [location]);
 
   return null;
