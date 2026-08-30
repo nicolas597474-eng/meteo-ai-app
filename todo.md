@@ -3553,3 +3553,9 @@
 - [x] Implémenter la bascule avec persistance de la préférence.
 - [x] Vérifier les contrastes, l’accessibilité et le rendu mobile.
 - [x] Tester puis publier le bouton de thème.
+
+## Suppression du mode clair / mode sombre
+- [x] Retirer le bouton de thème de la navigation desktop et mobile.
+- [x] Restaurer le mode sombre fixe et supprimer la persistance du thème clair.
+- [x] Mettre à jour les tests et vérifier le rendu sombre.
+- [x] Publier le retour au mode sombre fixe.

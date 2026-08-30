@@ -7,8 +7,8 @@ describe("navigation MeteoAI", () => {
     expect(source).toContain('hidden border-b border-border bg-background sm:block');
     expect(source).toContain("function BottomNav()");
     expect(source).toContain('aria-label="Navigation principale"');
-    expect(source).toContain('border-border bg-background text-foreground sm:hidden');
-    expect(source).toContain("<ThemeToggle compact");
+    expect(source).toContain('border-t border-border bg-background text-foreground sm:hidden');
+    expect(source).not.toContain("ThemeToggle");
     expect(source).toContain("pb-[calc(4rem+env(safe-area-inset-bottom))]");
     expect(source).toContain('{ path: "/details", label: "Prévisions", icon: FileText }');
     expect(source).not.toContain("backdrop-blur-xl");

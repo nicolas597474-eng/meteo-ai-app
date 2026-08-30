@@ -4,7 +4,6 @@ import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as React
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import ThemeToggle from "./components/ThemeToggle";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import Dashboard from "./pages/Dashboard";
 import {
@@ -140,7 +139,6 @@ function TopNav() {
                 </Link>
               );
             })}
-            <ThemeToggle className="ml-2" />
           </div>
         </div>
       </div>
@@ -171,7 +169,6 @@ function BottomNav() {
           );
         })}
       </div>
-      <ThemeToggle compact className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-3 z-[51] shadow-lg sm:hidden" />
     </nav>
   );
 }
@@ -225,7 +222,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark" switchable>
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
           <TopNav />
