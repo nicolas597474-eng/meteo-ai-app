@@ -10,6 +10,10 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+export function parseStoredTheme(stored: string | null, fallback: Theme): Theme {
+  return stored === "light" || stored === "dark" ? stored : fallback;
+}
+
 interface ThemeProviderProps {
   children: React.ReactNode;
   defaultTheme?: Theme;
@@ -22,11 +26,12 @@ export function ThemeProvider({
   switchable = false,
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (switchable) {
-      const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
+    if (!switchable || typeof window === "undefined") return defaultTheme;
+    try {
+      return parseStoredTheme(window.localStorage.getItem("theme"), defaultTheme);
+    } catch {
+      return defaultTheme;
     }
-    return defaultTheme;
   });
 
   useEffect(() => {
@@ -38,7 +43,11 @@ export function ThemeProvider({
     }
 
     if (switchable) {
-      localStorage.setItem("theme", theme);
+      try {
+        window.localStorage.setItem("theme", theme);
+      } catch {
+        // Le thème reste fonctionnel même si le stockage est bloqué.
+      }
     }
   }, [theme, switchable]);
 

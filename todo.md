@@ -3541,3 +3541,15 @@
 - [x] Afficher le dernier succès, le prochain passage prévu, la durée et un lien vers le détail.
 - [x] Tester les quatre états et vérifier la lisibilité sur mobile.
 - [x] Publier la pastille sans modifier le moteur météo ni la collecte.
+
+## Relance manuelle depuis la pastille de santé
+- [ ] Identifier la procédure sûre pour relancer la collecte de prévisions en retard.
+- [ ] Afficher le bouton uniquement avec l’état « En retard » et gérer son état de chargement.
+- [ ] Tester la relance, les erreurs et l’absence du bouton dans les autres états.
+- [ ] Vérifier le Dashboard mobile et publier la relance manuelle.
+
+## Bouton mode clair / mode sombre
+- [x] Examiner le système de thème existant et l’emplacement du bouton.
+- [x] Implémenter la bascule avec persistance de la préférence.
+- [x] Vérifier les contrastes, l’accessibilité et le rendu mobile.
+- [x] Tester puis publier le bouton de thème.

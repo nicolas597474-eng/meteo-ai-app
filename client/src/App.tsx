@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as React
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import ThemeToggle from "./components/ThemeToggle";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import Dashboard from "./pages/Dashboard";
 import {
@@ -139,6 +140,7 @@ function TopNav() {
                 </Link>
               );
             })}
+            <ThemeToggle className="ml-2" />
           </div>
         </div>
       </div>
@@ -149,7 +151,7 @@ function TopNav() {
 function BottomNav() {
   const [location] = useLocation();
   return (
-    <nav aria-label="Navigation principale" className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-700 bg-[#0d1117] sm:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <nav aria-label="Navigation principale" className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background text-foreground sm:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="flex h-16 items-center justify-around px-2">
         {navItems.map((item) => {
           const isActive = location === item.path;
@@ -169,6 +171,7 @@ function BottomNav() {
           );
         })}
       </div>
+      <ThemeToggle compact className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-3 z-[51] shadow-lg sm:hidden" />
     </nav>
   );
 }
@@ -222,7 +225,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
+      <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
           <TopNav />
