@@ -3543,10 +3543,10 @@
 - [x] Publier la pastille sans modifier le moteur météo ni la collecte.
 
 ## Relance manuelle depuis la pastille de santé
-- [ ] Identifier la procédure sûre pour relancer la collecte de prévisions en retard.
-- [ ] Afficher le bouton uniquement avec l’état « En retard » et gérer son état de chargement.
-- [ ] Tester la relance, les erreurs et l’absence du bouton dans les autres états.
-- [ ] Vérifier le Dashboard mobile et publier la relance manuelle.
+- [x] Identifier la procédure sûre pour relancer la collecte de prévisions en retard — demande arrêtée explicitement par l’utilisateur.
+- [x] Afficher le bouton uniquement avec l’état « En retard » et gérer son état de chargement — demande arrêtée explicitement par l’utilisateur.
+- [x] Tester la relance, les erreurs et l’absence du bouton dans les autres états — demande arrêtée explicitement par l’utilisateur.
+- [x] Vérifier le Dashboard mobile et publier la relance manuelle — demande arrêtée explicitement par l’utilisateur.
 
 ## Bouton mode clair / mode sombre
 - [x] Examiner le système de thème existant et l’emplacement du bouton.
