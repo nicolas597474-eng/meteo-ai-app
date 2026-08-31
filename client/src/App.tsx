@@ -4,7 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as React
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { getSwipeNavigationTarget, isQualifiedPageSwipe, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
+import { getSwipeNavigationTarget, isQualifiedPageSwipe, MAIN_PAGE_PATHS, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import Dashboard from "./pages/Dashboard";
 import {
   LayoutDashboard,
@@ -68,11 +68,33 @@ function useMainPagePreload() {
 function PageSwipeNavigator({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const gestureRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const previousLocationRef = useRef(location);
+  const pendingDirectionRef = useRef<"forward" | "backward" | null>(null);
   const [transition, setTransition] = useState<{ location: string; direction: "forward" | "backward" } | null>(null);
 
   useEffect(() => {
+    const onPopState = () => {
+      // Android's system back button and the browser back action both emit popstate.
+      pendingDirectionRef.current = "backward";
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (previousLocationRef.current === location) return;
+    const previousIndex = MAIN_PAGE_PATHS.indexOf(previousLocationRef.current as (typeof MAIN_PAGE_PATHS)[number]);
+    const nextIndex = MAIN_PAGE_PATHS.indexOf(location as (typeof MAIN_PAGE_PATHS)[number]);
+    const inferredDirection = previousIndex >= 0 && nextIndex >= 0 && nextIndex < previousIndex ? "backward" : "forward";
+    const direction = pendingDirectionRef.current ?? inferredDirection;
+    pendingDirectionRef.current = null;
+    previousLocationRef.current = location;
+    setTransition({ location, direction });
+  }, [location]);
+
+  useEffect(() => {
     if (transition?.location !== location) return;
-    const timer = window.setTimeout(() => setTransition(null), 170);
+    const timer = window.setTimeout(() => setTransition(null), 240);
     return () => window.clearTimeout(timer);
   }, [location, transition]);
 
@@ -96,7 +118,9 @@ function PageSwipeNavigator({ children }: { children: ReactNode }) {
 
     const target = getSwipeNavigationTarget(location, deltaX);
     if (target) {
-      setTransition({ location: target, direction: deltaX < 0 ? "forward" : "backward" });
+      const direction = deltaX < 0 ? "forward" : "backward";
+      pendingDirectionRef.current = direction;
+      setTransition({ location: target, direction });
       setLocation(target);
     }
   };

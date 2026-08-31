@@ -49,7 +49,7 @@ describe("navigation entre pages par glissement", () => {
     expect(appSource).toContain("window.setTimeout(preload, 250)");
     expect(appSource).toContain("loadWeatherAILab()");
     expect(appSource).toContain("loadWeatherDetails()");
-    expect(appSource).toContain("setTransition(null), 170");
+    expect(appSource).toContain("setTransition(null), 240");
     expect(styles).toContain("150ms cubic-bezier(0.23, 1, 0.32, 1)");
   });
 });

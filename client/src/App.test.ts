@@ -9,6 +9,9 @@ describe("navigation MeteoAI", () => {
     expect(source).toContain('aria-label="Navigation principale"');
     expect(source).toContain('meteoAiSection');
     expect(source).toContain('window.history.replaceState');
+    expect(source).toContain('window.addEventListener("popstate"');
+    expect(source).toContain('pendingDirectionRef.current = "backward"');
+    expect(source).toContain('page-swipe-transition--${transition.direction}');
     expect(source).toContain('border-t border-border bg-background text-foreground sm:hidden');
     expect(source).not.toContain("ThemeToggle");
     expect(source).toContain("pb-[calc(4rem+env(safe-area-inset-bottom))]");

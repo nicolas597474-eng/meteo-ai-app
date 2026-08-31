@@ -3564,3 +3564,9 @@
 - [x] Examiner l’historique de navigation actuel et le comportement du retour Android.
 - [x] Restaurer la dernière section consultée sans casser les liens ni les gestes mobiles.
 - [x] Tester le retour Android après navigation entre sections et publier le correctif.
+
+## Animation du retour vers la section précédente
+- [x] Examiner les transitions de navigation existantes et les styles de mouvement.
+- [x] Ajouter une animation fluide uniquement lors du retour Android ou navigateur.
+- [x] Respecter prefers-reduced-motion et tester la navigation mobile.
+- [x] Publier la transition de retour.
