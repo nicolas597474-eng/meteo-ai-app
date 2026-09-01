@@ -3588,3 +3588,9 @@
 - [x] Conserver le fuseau Europe/Paris et le traitement des horodatages absents.
 - [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
 - [x] Publier l’harmonisation après validation complète.
+
+## Fond ciel de la carte principale du Dashboard
+- [x] Vérifier le raccordement entre le style météo du ciel et la carte principale.
+- [x] Restaurer le fond dynamique sans modifier le contenu météo ni les calculs.
+- [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
+- [x] Publier la correction après validation complète.

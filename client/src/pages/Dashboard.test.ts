@@ -113,8 +113,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Tout développer");
     expect(source).toContain("Tout réduire");
     expect(source).toContain("overflow-visible rounded-[22px]");
-    expect(source).toContain("dashboard-weather-page");
     expect(source).toContain("dashboard-sky-card");
+    expect(source).toContain('<div className="dashboard-sky-card relative overflow-hidden');
+    expect(source).toContain("dashboard-sky-image");
     expect(source).not.toContain("Voir les prévisions détaillées");
     expect(source).not.toContain('href="/details"');
     expect(source).toContain("dashboardSkyImage");

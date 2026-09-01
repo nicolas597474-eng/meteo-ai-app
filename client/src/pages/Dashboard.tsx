@@ -691,7 +691,7 @@ export default function Dashboard() {
         />
 
         {/* ── Hero : Température actuelle + max/min ── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">
+        <div className="dashboard-sky-card relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border border-slate-700 rounded-2xl px-3 pb-3 pt-1 sm:p-6">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/58 via-slate-950/34 to-slate-950/82 pointer-events-none" />
           <div className="relative">
             {/* ── Regime badge ── */}
