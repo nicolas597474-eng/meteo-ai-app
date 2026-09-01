@@ -128,6 +128,8 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("getForecastCollectionReport");
     expect(source).toContain("getCollectionHealth");
     expect(source).toContain("formatCollectionDuration");
+    expect(source).toContain("formatCollectionTimestamp");
+    expect(source).toContain("Europe/Paris");
     expect(source).toContain("lastForecastRun");
     expect(source).toContain("nextForecastRun");
     expect(source).toContain("Détails&nbsp;→");

@@ -19,6 +19,7 @@ import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { getCollectionHealth, formatCollectionDuration } from "@/lib/collectionHealth";
+import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -140,11 +141,7 @@ type HourlyCollectionTrace = {
 type ForecastRunStatus = "completed" | "partial" | "failed";
 
 function formatCollectionDateTime(value: string | Date | null | undefined): string {
-  if (!value) return "Aucun succès vérifiable";
-  const date = new Date(value);
-  return Number.isFinite(date.getTime())
-    ? date.toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
-    : "Aucun succès vérifiable";
+  return value ? formatCollectionTimestamp(value) : "Aucun succès vérifiable";
 }
 
 function hourlyCollectionPresentation(trace: HourlyCollectionTrace) {

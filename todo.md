@@ -3582,3 +3582,9 @@
 - [x] Indiquer explicitement le fuseau Europe/Paris et gérer l’absence d’horodatage.
 - [x] Ajouter les tests de format et vérifier le rendu mobile.
 - [x] Publier la mise à jour après validation complète.
+
+## Horodatages cohérents dans Santé des collectes
+- [x] Utiliser le même format de date et d’heure explicites dans le Dashboard.
+- [x] Conserver le fuseau Europe/Paris et le traitement des horodatages absents.
+- [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
+- [x] Publier l’harmonisation après validation complète.
