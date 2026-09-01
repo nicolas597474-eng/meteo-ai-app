@@ -3576,3 +3576,9 @@
 - [x] Préserver les distinctions entre modèles experts, services publics et stations physiques.
 - [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
 - [x] Publier la correction après validation complète.
+
+## Date et heure explicites du snapshot
+- [x] Afficher clairement la date et l’heure de mise à jour du dernier snapshot.
+- [x] Indiquer explicitement le fuseau Europe/Paris et gérer l’absence d’horodatage.
+- [x] Ajouter les tests de format et vérifier le rendu mobile.
+- [x] Publier la mise à jour après validation complète.

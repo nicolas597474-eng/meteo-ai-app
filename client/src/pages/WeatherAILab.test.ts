@@ -82,6 +82,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("getForecastCollectionReport");
     expect(source).toContain("CollectionOperations");
     expect(source).toContain("Derniers succès de collecte");
+    expect(source).toContain("formatCollectionTimestamp");
+    expect(source).toContain("Mis à jour le ${formatCollectionTimestamp(collection.collectedAt)}");
     expect(source).toContain("Créneaux sans station qualifiée");
     expect(source).toContain("lastForecastSuccess");
     expect(source).toContain("lastPhysicalCollection");

@@ -12,6 +12,7 @@ import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } fro
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getForecastModelGuide } from "@/lib/forecastModelGuides";
+import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 
 function IndicatorHelp({ title, children }: { title: string; children: ReactNode }) {
   return <Popover><PopoverTrigger asChild><button type="button" aria-label={`Comprendre le calcul : ${title}`} className="grid h-6 w-6 place-items-center rounded-full border border-slate-700/70 bg-slate-950/30 text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><CircleHelp className="h-3.5 w-3.5" /></button></PopoverTrigger><PopoverContent side="bottom" align="center" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-slate-600 bg-[#101622] px-3 py-3 text-left text-[11px] leading-relaxed text-slate-100 shadow-xl"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/75">Calcul de l’indicateur</p><p className="mt-1 text-sm font-semibold text-white">{title}</p></div><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-700/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><div className="mt-2.5 space-y-2 text-slate-200">{children}</div></PopoverContent></Popover>;
@@ -291,8 +292,7 @@ type NoStationSlot = { date: string; hour: number; attempts: number; reason?: st
 function collectionMomentLabel(collection: CollectionSuccess | null, kind: "forecast" | "physical") {
   if (!collection) return "Aucun succès vérifiable";
   if (kind === "forecast" && collection.collectedAt) {
-    const date = new Date(collection.collectedAt);
-    return Number.isNaN(date.getTime()) ? "Horodatage indisponible" : date.toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+    return `Mis à jour le ${formatCollectionTimestamp(collection.collectedAt)}`;
   }
   if (collection.date != null && collection.hour != null) return `${new Date(`${collection.date}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })} · ${String(collection.hour).padStart(2, "0")} h`;
   return "Horodatage indisponible";
@@ -353,7 +353,7 @@ export default function WeatherAILab() {
   const dailyCollectedModelSet = new Set(forecastCollectionSnapshot?.dailyCollectedModels ?? []);
   const hourlyCollectedModelSet = new Set(forecastCollectionSnapshot?.hourlyCollectedModels ?? []);
   const forecastCollectionTimeLabel = forecastCollectionSnapshot?.collectedAt
-    ? new Date(forecastCollectionSnapshot.collectedAt).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
+    ? formatCollectionTimestamp(forecastCollectionSnapshot.collectedAt)
     : null;
   const lastForecastSuccess = forecastCollectionReport?.lastForecastSuccess ?? null;
   const lastPhysicalCollection = forecastCollectionReport?.lastPhysicalCollection ?? null;
