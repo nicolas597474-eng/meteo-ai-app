@@ -643,8 +643,10 @@ export const weatherRouter = router({
       const latestCollection = recentCollections[0] ?? null;
       const forecastJobs = recentJobs.filter((job) => job.jobType === "forecast");
       const latestForecastJob = forecastJobs[0] ?? null;
-      const lastForecastJobSuccess = forecastJobs.find((job) => job.status === "completed" && !job.errorMessage) ?? null;
-      const lastForecastSuccess = lastForecastJobSuccess ?? recentCollections.find((collection) => collection.status !== "failed") ?? null;
+      // Le dernier succès de modèles doit venir du snapshot de couverture :
+      // collection_jobs ne conserve que le nombre de lieux/services traités et
+      // ne possède pas les compteurs quotidien/horaire par modèle.
+      const lastForecastCoverage = recentCollections.find((collection) => collection.status !== "failed") ?? null;
       const lastPhysicalCollection = physicalTraces.find((trace) => trace.status !== "failed") ?? null;
       const hourlyHistory = buildRecentPhysicalSnapshotSlots(physicalTraces);
       const consecutiveTechnicalFailures = hourlyHistory.reduce((count, trace) => {
@@ -677,11 +679,11 @@ export const weatherRouter = router({
           errorMessage: latestForecastJob.errorMessage,
         } : null,
         expectedModels,
-        lastForecastSuccess: lastForecastSuccess ? {
-          status: "status" in lastForecastSuccess ? lastForecastSuccess.status : "completed",
-          collectedAt: "completedAt" in lastForecastSuccess ? lastForecastSuccess.completedAt : lastForecastSuccess.collectedAt,
-          dailyModelCount: "dailyModelCount" in lastForecastSuccess ? lastForecastSuccess.dailyModelCount : null,
-          hourlyModelCount: "hourlyModelCount" in lastForecastSuccess ? lastForecastSuccess.hourlyModelCount : null,
+        lastForecastSuccess: lastForecastCoverage ? {
+          status: lastForecastCoverage.status,
+          collectedAt: lastForecastCoverage.collectedAt,
+          dailyModelCount: lastForecastCoverage.dailyModelCount,
+          hourlyModelCount: lastForecastCoverage.hourlyModelCount,
         } : null,
         lastPhysicalCollection: lastPhysicalCollection ? {
           status: lastPhysicalCollection.status,

@@ -3570,3 +3570,9 @@
 - [x] Ajouter une animation fluide uniquement lors du retour Android ou navigateur.
 - [x] Respecter prefers-reduced-motion et tester la navigation mobile.
 - [x] Publier la transition de retour.
+
+## Raccordement des compteurs du dernier succès de collecte
+- [x] Utiliser les compteurs du dernier snapshot de couverture dans le bloc « Derniers succès de collecte ».
+- [x] Préserver les distinctions entre modèles experts, services publics et stations physiques.
+- [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
+- [x] Publier la correction après validation complète.

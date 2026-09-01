@@ -9,8 +9,6 @@ describe("weather.getForecastCollectionReport", () => {
     expect(source).toContain("dailyCollectedModels");
     expect(source).toContain("hourlyCollectedModels");
     expect(source).toContain("getStationCollectionSnapshots(locationKey, 8)");
-    expect(source).toContain("lastForecastSuccess");
-    expect(source).toContain("lastPhysicalCollection");
     expect(source).toContain("hourlyHistory");
     expect(source).toContain("technicalFailureStreak");
     expect(source).toContain("buildRecentPhysicalSnapshotSlots(physicalTraces)");
@@ -18,6 +16,12 @@ describe("weather.getForecastCollectionReport", () => {
     expect(source).toContain("missingSnapshotSlots");
     expect(source).toContain("scheduleCoverage");
     const procedure = source.slice(source.indexOf("getForecastCollectionReport:"), source.indexOf("getProviderDiagnostics:"));
+    expect(procedure).toContain("lastForecastSuccess");
+    expect(procedure).toContain("lastForecastCoverage");
+    expect(procedure).toContain("dailyModelCount: lastForecastCoverage.dailyModelCount");
+    expect(procedure).toContain("hourlyModelCount: lastForecastCoverage.hourlyModelCount");
+    expect(procedure).not.toContain("lastForecastJobSuccess ?? recentCollections.find");
+    expect(procedure).toContain("lastPhysicalCollection");
     expect(procedure).not.toContain("collectExpertForecasts");
     expect(procedure).toContain("getRecentCollectionJobs(24)");
     expect(procedure).toContain("nextForecastRun");
