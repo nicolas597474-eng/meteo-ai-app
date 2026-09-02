@@ -36,6 +36,11 @@ describe("History", () => {
     expect(source).toContain("Motif d’exclusion");
     expect(source).toContain("Score non mis à jour");
     expect(source).toContain("data?.eveningEvidence ?? []");
+    expect(source).toContain("isEveningEvidenceOpen");
+    expect(source).toContain('aria-controls="evening-evidence-content"');
+    expect(source).toContain('id="evening-evidence-content"');
+    expect(source).toContain("ChevronDown");
+    expect(source).toContain("ChevronUp");
   });
 
   it("explique les collectes horaires physiques futures avec statuts, tentatives et motifs", () => {

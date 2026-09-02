@@ -3600,3 +3600,9 @@
 - [x] Supprimer uniquement ce cercle sans modifier l’icône ni les autres effets.
 - [x] Ajouter un test de non-régression et vérifier le rendu mobile.
 - [x] Publier la correction après validation complète.
+
+## Panneau déroulant des preuves collectées chaque soir
+- [x] Repérer le composant et préserver son contenu actuel.
+- [x] Ajouter un panneau déroulant accessible, fermé par défaut, avec ouverture au toucher et au clavier.
+- [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
+- [x] Publier le panneau déroulant après validation complète.
