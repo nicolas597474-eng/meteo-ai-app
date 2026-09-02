@@ -118,6 +118,7 @@ export function buildStationCollectionSnapshot(input: {
 export const HOURLY_SNAPSHOT_MAX_ATTEMPTS = 5;
 export const HOURLY_SNAPSHOT_RETRY_DELAY_MS = 1_200;
 export const TECHNICAL_FAILURE_ALERT_THRESHOLD = 3;
+export const PHYSICAL_STATION_WRITE_CONCURRENCY = 8;
 
 export function shouldRetryHourlyFavorite(attempt: number): boolean {
   return attempt + 1 < HOURLY_SNAPSHOT_MAX_ATTEMPTS;
@@ -149,6 +150,7 @@ export type PhysicalSnapshotCollectionLocationResult = {
   skipped?: boolean;
   directReadingsAdded?: number;
   snapshotPreserved?: boolean;
+  durationMs?: number;
   reason?: string;
 };
 
@@ -161,6 +163,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
   favorites: readonly PhysicalSnapshotFavorite[],
   trigger: PhysicalSnapshotCollectionTrigger,
 ) {
+  const collectionStartedAt = Date.now();
   const unique = new Map<string, PhysicalSnapshotFavorite>();
   for (const favorite of favorites) unique.set(makeLocationKey(favorite.lat, favorite.lon), favorite);
 
@@ -175,23 +178,25 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
   // appels fournisseurs successifs dépassent le délai du callback Heartbeat.
   await processWithConcurrency(Array.from(unique.values()), 2, async (favorite) => {
     const locationKey = makeLocationKey(favorite.lat, favorite.lon);
+    const locationStartedAt = Date.now();
     const radiusKm = Math.max(5, Math.min(50, favorite.radiusKm ?? 20));
     let snapshotAlreadyArchived = false;
-    let traceAlreadyArchived = false;
+    let traceForHour: Awaited<ReturnType<typeof getPhysicalSnapshotCollectionTracesByDateRange>>[number] | null = null;
 
-    if (preserveArchivedEvidence) {
+    if (preserveArchivedEvidence || trigger === "scheduled") {
       const [snapshots, traces] = await Promise.all([
         getQualifiedObservationSnapshotsForDate(locationKey, date),
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, date, date),
       ]);
       snapshotAlreadyArchived = snapshots.some((snapshot) => snapshot.hour === hour);
-      traceAlreadyArchived = traces.some((trace) => trace.hour === hour);
+      traceForHour = traces.find((trace) => trace.hour === hour) ?? null;
     }
 
-    // La reprise programmée est un filet de sécurité à :45. Si le passage
-    // principal de :20 a déjà écrit le créneau, elle s’arrête sans solliciter
-    // les fournisseurs ni modifier les données archivées.
-    if (recoveryOnly && (snapshotAlreadyArchived || traceAlreadyArchived)) {
+    // La principale comme la reprise s'arrêtent immédiatement lorsqu'une preuve
+    // réussie existe déjà pour le créneau. Une ancienne trace no_station/failed
+    // n'empêche pas la reprise de tenter de produire le snapshot manquant.
+    const successfulEvidenceAlreadyArchived = snapshotAlreadyArchived || traceForHour?.status === "stored";
+    if ((trigger === "scheduled" || recoveryOnly) && successfulEvidenceAlreadyArchived) {
       results.push({
         locationKey,
         stationCount: 0,
@@ -199,7 +204,10 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         attempts: 0,
         skipped: true,
         snapshotPreserved: true,
-        reason: "Créneau déjà archivé par le passage horaire principal ; reprise ignorée.",
+        reason: trigger === "recovery"
+          ? "Créneau déjà archivé par le passage horaire principal ; reprise ignorée."
+          : "Créneau déjà archivé ; nouvelle exécution planifiée ignorée.",
+        durationMs: Date.now() - locationStartedAt,
       });
       return;
     }
@@ -216,7 +224,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           { netatmoUserId: favorite.userId },
         );
         const physical = getPhysicalActiveStations(discovered);
-        for (const station of physical) {
+        await processWithConcurrency(physical, PHYSICAL_STATION_WRITE_CONCURRENCY, async (station) => {
           await upsertWeatherStation({
             stationId: station.stationId,
             source: station.source,
@@ -236,7 +244,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
             sourceTier: station.sourceTier ?? null,
           });
           const observedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
-          if (!Number.isFinite(observedAt)) continue;
+          if (!Number.isFinite(observedAt)) return;
           const observation = {
             stationId: station.stationId,
             observedAt,
@@ -248,16 +256,12 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
             windDirection: station.windDirection,
             precipitation: station.precipitation,
           };
-          if (preserveArchivedEvidence) {
-            if (await insertStationObservationIfMissing(observation)) directReadingsAdded++;
-          } else {
-            await upsertStationObservation(observation);
-          }
-        }
+          if (await insertStationObservationIfMissing(observation)) directReadingsAdded++;
+        });
 
         await refreshStationQualityProfiles(physical.map((station) => station.stationId));
         const synthesis = calculateGroundTruth(physical);
-        if (preserveArchivedEvidence && (snapshotAlreadyArchived || traceAlreadyArchived)) {
+        if (preserveArchivedEvidence && successfulEvidenceAlreadyArchived) {
           locationResult = {
             locationKey,
             stationCount: synthesis.stationCount,
@@ -305,9 +309,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           precipitation: synthesis.precipitation,
           stationsUsed: synthesis.stationsUsed as any,
         };
-        const snapshotCreated = preserveArchivedEvidence
-          ? await insertQualifiedObservationSnapshotIfMissing(snapshot)
-          : (await upsertQualifiedObservationSnapshot(snapshot), true);
+        const snapshotCreated = await insertQualifiedObservationSnapshotIfMissing(snapshot);
         locationResult = snapshotCreated
           ? {
               locationKey,
@@ -344,6 +346,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     }
 
     if (locationResult) {
+      locationResult.durationMs = Date.now() - locationStartedAt;
       const status: "stored" | "failed" | "no_station" = locationResult.stored
         ? "stored"
         : locationResult.reason?.startsWith("Erreur de collecte")
@@ -360,10 +363,17 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         stationCount: locationResult.stationCount,
         reason: locationResult.reason ?? null,
       };
-      if (preserveArchivedEvidence) {
-        if (!traceAlreadyArchived) await insertPhysicalSnapshotCollectionTraceIfMissing(trace);
+      if (!traceForHour) {
+        await insertPhysicalSnapshotCollectionTraceIfMissing(trace);
+      } else if (status === "stored" && traceForHour.status !== "stored") {
+        await upsertPhysicalSnapshotCollectionTrace({
+          ...trace,
+          reason: trigger === "recovery"
+            ? "Snapshot archivé par la reprise automatique après un passage principal sans preuve réussie."
+            : "Snapshot archivé par une nouvelle exécution planifiée après une trace initiale sans preuve réussie.",
+        });
       } else {
-        await upsertPhysicalSnapshotCollectionTrace(trace);
+        console.info(`[MeteoAI] Physical trace preserved for ${locationKey} at ${date} ${hour}h (${traceForHour.status}).`);
       }
     }
   });
@@ -399,6 +409,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     date,
     hour,
     timeZone: "Europe/Paris",
+    durationMs: Date.now() - collectionStartedAt,
     locations: results,
     errors: collectionErrors.length > 0 ? collectionErrors.map((result) => ({ locationKey: result.locationKey, attempts: result.attempts, reason: result.reason })) : undefined,
   };

@@ -9,11 +9,14 @@ const mocks = vi.hoisted(() => ({
   makeLocationKey: vi.fn(),
   upsertWeatherStation: vi.fn(),
   upsertStationObservation: vi.fn(),
+  insertStationObservationIfMissing: vi.fn(),
   refreshStationQualityProfiles: vi.fn(),
   upsertQualifiedObservationSnapshot: vi.fn(),
+  insertQualifiedObservationSnapshotIfMissing: vi.fn(),
   getQualifiedObservationSnapshotsForDate: vi.fn(),
   getPhysicalSnapshotCollectionTracesByDateRange: vi.fn(),
   upsertPhysicalSnapshotCollectionTrace: vi.fn(),
+  insertPhysicalSnapshotCollectionTraceIfMissing: vi.fn(),
   notifyOwner: vi.fn(),
 }));
 
@@ -35,11 +38,14 @@ vi.mock("./db", async (importOriginal) => ({
   makeLocationKey: mocks.makeLocationKey,
   upsertWeatherStation: mocks.upsertWeatherStation,
   upsertStationObservation: mocks.upsertStationObservation,
+  insertStationObservationIfMissing: mocks.insertStationObservationIfMissing,
   refreshStationQualityProfiles: mocks.refreshStationQualityProfiles,
   upsertQualifiedObservationSnapshot: mocks.upsertQualifiedObservationSnapshot,
+  insertQualifiedObservationSnapshotIfMissing: mocks.insertQualifiedObservationSnapshotIfMissing,
   getQualifiedObservationSnapshotsForDate: mocks.getQualifiedObservationSnapshotsForDate,
   getPhysicalSnapshotCollectionTracesByDateRange: mocks.getPhysicalSnapshotCollectionTracesByDateRange,
   upsertPhysicalSnapshotCollectionTrace: mocks.upsertPhysicalSnapshotCollectionTrace,
+  insertPhysicalSnapshotCollectionTraceIfMissing: mocks.insertPhysicalSnapshotCollectionTraceIfMissing,
 }));
 
 vi.mock("./_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));
@@ -99,9 +105,12 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     mocks.getPhysicalSnapshotCollectionTracesByDateRange.mockResolvedValue([]);
     mocks.upsertWeatherStation.mockResolvedValue(undefined);
     mocks.upsertStationObservation.mockResolvedValue(undefined);
+    mocks.insertStationObservationIfMissing.mockResolvedValue(true);
     mocks.refreshStationQualityProfiles.mockResolvedValue(undefined);
     mocks.upsertQualifiedObservationSnapshot.mockResolvedValue(undefined);
+    mocks.insertQualifiedObservationSnapshotIfMissing.mockResolvedValue(true);
     mocks.upsertPhysicalSnapshotCollectionTrace.mockResolvedValue(undefined);
+    mocks.insertPhysicalSnapshotCollectionTraceIfMissing.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -123,7 +132,7 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     expect(mocks.collectNearbyStations).toHaveBeenCalledTimes(5);
     expect(result.status).toBe("completed");
     expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 5, stationCount: 2 })]);
-    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ status: "stored", attempts: 5 }));
+    expect(mocks.insertPhysicalSnapshotCollectionTraceIfMissing).toHaveBeenCalledWith(expect.objectContaining({ status: "stored", attempts: 5 }));
   });
 
   it("s’arrête dès le premier succès sans consommer de relance inutile", async () => {
@@ -144,7 +153,7 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     expect(result.status).toBe("completed");
     expect(result.errors).toBeUndefined();
     expect(result.locations).toEqual([expect.objectContaining({ stored: false, attempts: 5, reason: "Aucune station physique qualifiée" })]);
-    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ status: "no_station", attempts: 5 }));
+    expect(mocks.insertPhysicalSnapshotCollectionTraceIfMissing).toHaveBeenCalledWith(expect.objectContaining({ status: "no_station", attempts: 5 }));
     expect(mocks.notifyOwner).not.toHaveBeenCalled();
   });
 
@@ -167,7 +176,27 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
       expect.objectContaining({ locationKey: "50.756_2.521", stored: false, attempts: 5, reason: expect.stringContaining("Erreur de collecte après relance") }),
       expect.objectContaining({ locationKey: "50.676_2.845", stored: true, attempts: 1 }),
     ]));
-    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ locationKey: "50.756_2.521", status: "failed", attempts: 5 }));
-    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ locationKey: "50.676_2.845", status: "stored", attempts: 1 }));
+    expect(mocks.insertPhysicalSnapshotCollectionTraceIfMissing).toHaveBeenCalledWith(expect.objectContaining({ locationKey: "50.756_2.521", status: "failed", attempts: 5 }));
+    expect(mocks.insertPhysicalSnapshotCollectionTraceIfMissing).toHaveBeenCalledWith(expect.objectContaining({ locationKey: "50.676_2.845", status: "stored", attempts: 1 }));
+  });
+
+  it("ignore une nouvelle exécution planifiée lorsque le snapshot horaire existe déjà", async () => {
+    mocks.getQualifiedObservationSnapshotsForDate.mockResolvedValue([{ hour: 16 }]);
+
+    const result = await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.collectNearbyStations).not.toHaveBeenCalled();
+    expect(result.locations).toEqual([expect.objectContaining({ skipped: true, snapshotPreserved: true, attempts: 0 })]);
+  });
+
+  it("autorise la reprise après une trace no_station et remplace seulement la trace opérationnelle après succès", async () => {
+    mocks.getPhysicalSnapshotCollectionTracesByDateRange.mockResolvedValue([{ hour: 16, status: "no_station" }]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+
+    const result = await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "recovery");
+
+    expect(mocks.collectNearbyStations).toHaveBeenCalledTimes(1);
+    expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 1 })]);
+    expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ status: "stored" }));
   });
 });

@@ -687,8 +687,13 @@ export async function insertStationObservationIfMissing(data: InsertStationObser
     ))
     .limit(1);
   if (existing[0]) return false;
-  await db.insert(stationObservations).values(data);
-  return true;
+  try {
+    await db.insert(stationObservations).values(data);
+    return true;
+  } catch (error: any) {
+    if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) return false;
+    throw error;
+  }
 }
 
 /**
@@ -699,20 +704,31 @@ export async function refreshStationQualityProfiles(stationIds: string[], nowMs 
   const db = await getDb();
   const uniqueIds = Array.from(new Set(stationIds));
   if (!db || uniqueIds.length === 0) return;
+  const refreshIntervalMs = 6 * 60 * 60 * 1000;
+  const existingProfiles = await db.select({
+    stationId: stationQualityProfiles.stationId,
+    evaluatedAt: stationQualityProfiles.evaluatedAt,
+  }).from(stationQualityProfiles).where(inArray(stationQualityProfiles.stationId, uniqueIds));
+  const evaluatedAtByStation = new Map(existingProfiles.map((profile) => [profile.stationId, profile.evaluatedAt.getTime()]));
+  const dueIds = uniqueIds.filter((stationId) => nowMs - (evaluatedAtByStation.get(stationId) ?? 0) >= refreshIntervalMs);
+  if (dueIds.length === 0) return;
   const sinceMs = nowMs - 30 * 24 * 60 * 60 * 1000;
   const readings = await db.select().from(stationObservations).where(and(
-    inArray(stationObservations.stationId, uniqueIds),
+    inArray(stationObservations.stationId, dueIds),
     gte(stationObservations.observedAt, sinceMs),
   )).orderBy(stationObservations.observedAt);
   const byStation = new Map<string, typeof readings>();
   for (const reading of readings) byStation.set(reading.stationId, [...(byStation.get(reading.stationId) ?? []), reading]);
 
-  for (const stationId of uniqueIds) {
-    const profile = deriveStationQualityProfile({ stationId, nowMs, observations: byStation.get(stationId) ?? [] });
-    const data: InsertStationQualityProfile = { ...profile, firstObservedAt: profile.firstObservedAt ?? null, lastObservedAt: profile.lastObservedAt ?? null };
-    const existing = await db.select({ id: stationQualityProfiles.id }).from(stationQualityProfiles).where(eq(stationQualityProfiles.stationId, stationId)).limit(1);
-    if (existing[0]) await db.update(stationQualityProfiles).set(data).where(eq(stationQualityProfiles.id, existing[0].id));
-    else await db.insert(stationQualityProfiles).values(data);
+  const writeConcurrency = 12;
+  for (let index = 0; index < dueIds.length; index += writeConcurrency) {
+    await Promise.all(dueIds.slice(index, index + writeConcurrency).map(async (stationId) => {
+      const profile = deriveStationQualityProfile({ stationId, nowMs, observations: byStation.get(stationId) ?? [] });
+      const data: InsertStationQualityProfile = { ...profile, firstObservedAt: profile.firstObservedAt ?? null, lastObservedAt: profile.lastObservedAt ?? null };
+      await db.insert(stationQualityProfiles).values(data).onDuplicateKeyUpdate({
+        set: { ...data, evaluatedAt: new Date() },
+      });
+    }));
   }
 }
 
@@ -798,8 +814,13 @@ export async function insertQualifiedObservationSnapshotIfMissing(data: InsertQu
     ))
     .limit(1);
   if (existing[0]) return false;
-  await db.insert(qualifiedObservationSnapshots).values(data);
-  return true;
+  try {
+    await db.insert(qualifiedObservationSnapshots).values(data);
+    return true;
+  } catch (error: any) {
+    if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) return false;
+    throw error;
+  }
 }
 
 export async function getQualifiedObservationSnapshotsForDate(locationKey: string, date: string) {
