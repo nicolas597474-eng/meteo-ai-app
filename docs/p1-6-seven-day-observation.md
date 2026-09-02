@@ -32,6 +32,14 @@ Le bilan est écrit après les copies quotidiennes et horaires shadow de v8, dan
 
 Le 2 septembre 2026, Hondeghem et Erquinghem-Lys présentent chacun 8/8 flux quotidiens, 8/8 flux horaires, 100 % d’écritures persistées, 100 % d’intégrité canonique, zéro doublon et zéro donnée appliquée à la production. Le bilan quotidien est `VALIDABLE`, tandis que la fenêtre globale reste `OBSERVING` à 1/7 jour.
 
+## Contrôle de continuité du 2 septembre 2026
+
+La tâche v8 est active avec l’expression saisonnière `0 0 3,4 * * *`. Le passage de 03:00 UTC exécute le cycle lorsque l’heure locale de Paris est 05:00 ; le second passage est ignoré hors de cette heure. Le prochain cycle éligible est prévu le 3 septembre 2026 à 03:00 UTC.
+
+Le Data Hub shadow contient actuellement une seule date de cycle, le 2 septembre 2026, pour chacun des deux lieux. La fenêtre à 1/7 est donc **attendue** et ne révèle ni retard de persistance ni défaut du planificateur. Aucun jour antérieur n’est reconstruit depuis la production : P1.6 attend sept dates réellement écrites par le pipeline shadow.
+
+Deux réévaluations successives du bilan du 2 septembre ont conservé exactement une ligne par couple `(observationDate, locationKey)`. Les deux lieux restent à 8/8 flux quotidiens, 8/8 flux horaires, zéro groupe de runs dupliqués, zéro valeur hors shadow et zéro run appliqué à la production. Si les six prochains cycles restent conformes, la première décision sur une fenêtre complète pourra intervenir après le cycle du 8 septembre 2026.
+
 ## Rollback
 
 Le rollback applicatif consiste à retirer l’appel `recordP1ObservationDay` et le panneau propriétaire. La table additive peut rester inutilisée afin d’éviter une suppression destructive. Aucun rollback de données de production n’est requis, car P1.6 n’écrit que dans son stockage shadow dédié.

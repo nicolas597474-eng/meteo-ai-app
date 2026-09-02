@@ -92,6 +92,16 @@ describe("P1.6 observation evaluator", () => {
     expect(result.remainingDays).toBe(6);
   });
 
+  it("ne compte pas deux fois une même date lors d’un replay idempotent", () => {
+    const first = historyRow("2026-09-02", "VALIDABLE");
+    const replay = { ...historyRow("2026-09-02", "VALIDABLE"), id: 2 };
+    const result = resolveP1ObservationWindow([first, replay]);
+
+    expect(result.completedDays).toBe(1);
+    expect(result.remainingDays).toBe(6);
+    expect(result.verdict).toBe("OBSERVING");
+  });
+
   it("devient VALIDABLE après sept bilans quotidiens conformes", () => {
     const history = Array.from({ length: 7 }, (_, index) => historyRow(`2026-09-0${index + 1}`, "VALIDABLE"));
     expect(resolveP1ObservationWindow(history).verdict).toBe("VALIDABLE");

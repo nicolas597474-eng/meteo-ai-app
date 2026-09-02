@@ -3718,3 +3718,13 @@
 - [x] Vérifier les deux lieux réels, l’idempotence et `appliedToProduction = 0` sans modifier les archives de production.
 - [x] Valider TypeScript, Vitest complet, l’isolation statique des lecteurs, la qualité du diff et le rendu mobile.
 - [x] Publier uniquement la Phase 4 validée, sans commencer la Phase 5.
+
+## P1.6 — Poursuite de l’observation shadow sur sept jours
+- [x] Relire les règles P1.6, les tâches périodiques et les garde-fous de coexistence avant tout changement.
+- [x] Contrôler en lecture seule les bilans quotidiens réels par lieu, les jours distincts observés et le verdict courant.
+- [x] Vérifier que chaque passage v8 éligible déclenche l’évaluation P1.6 et que les replays restent idempotents.
+- [x] Distinguer une fenêtre encore incomplète d’une anomalie réelle de persistance ou de planification.
+- [x] Corriger uniquement un défaut shadow confirmé, sans modifier la collecte, la fusion, les scores, les poids ou les archives de production. Aucun défaut n’a été confirmé ; seul un test d’idempotence explicite a été ajouté.
+- [x] Confirmer `appliedToProduction = 0`, l’absence de doublon et l’absence de lecture P1.6 par les moteurs de production.
+- [x] Valider les verdicts, TypeScript, Vitest complet, la qualité du diff et le rapport propriétaire mobile : 479 tests réussis et 2 ignorés.
+- [x] Publier uniquement les ajustements P1.6 nécessaires, sans commencer la Phase 5.
