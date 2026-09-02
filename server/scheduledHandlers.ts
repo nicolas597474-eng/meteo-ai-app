@@ -782,6 +782,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             evidenceType: "physical_observation",
             regime: null,
           })));
+          totalScores += hourlyScores.length;
           locationSummaries.push(`📍 ${locName}: ${hourlyScores.length} score(s) calculé(s) sur ${dailyObservation.coverageHours} h physiques qualifiées`);
 
         } catch (err: any) {

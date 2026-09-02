@@ -1176,11 +1176,16 @@ export const weatherRouter = router({
       : 0;
 
     // 7. AI Analysis text
-    const modelCount = forecasts.length;
+    const activeForecasts = forecasts.filter((forecast) => forecast.serviceCategory === "expert");
+    const aggregatorCount = activeForecasts.some((forecast) => forecast.serviceName === "Open-Meteo") ? 1 : 0;
+    const namedModelCount = Math.max(0, activeForecasts.length - aggregatorCount);
+    const sourceComposition = aggregatorCount > 0
+      ? `${namedModelCount} modèle(s) numérique(s) + 1 agrégateur Best Match`
+      : `${namedModelCount} modèle(s) numérique(s)`;
     const topModel = ranking.length > 0 ? ranking[0].serviceName : null;
     const convergenceLevel = divergence.tempRange < 2 ? "excellente" : divergence.tempRange < 4 ? "bonne" : "modérée";
     const aiAnalysis = [
-      `MeteoAI synthétise ${modelCount} modèles numériques pour Hondeghem (50.76°N, 2.52°E).`,
+      `MeteoAI synthétise ${sourceComposition} pour Hondeghem (50.76°N, 2.52°E).`,
       `La convergence entre les modèles est ${convergenceLevel} aujourd'hui (écart max temp : ${divergence.tempRange}°C).`,
       `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`,
       topModel
@@ -1202,7 +1207,7 @@ export const weatherRouter = router({
 
     // 9. Replay steps (7 étapes de la synthèse IA)
     const replaySteps = [
-      { step: 1, title: "Collecte des modèles", description: `${modelCount} modèles collectés à 05h00 via Open-Meteo API`, icon: "📡" },
+      { step: 1, title: "Collecte des flux", description: `${activeForecasts.length} flux collectés à 05h00 via Open-Meteo API (${sourceComposition})`, icon: "📡" },
       { step: 2, title: "Détection du régime", description: `Régime "${regimeDef.label}" détecté — poids contextuels appliqués`, icon: "🔍" },
       { step: 3, title: "Calcul des dimensions", description: "4 dimensions d'erreur calculées indépendamment (T°, Précip, Vent, Cond)", icon: "📐" },
       { step: 4, title: "Scoring pondéré", description: `Score final = ${Math.round(weights.temp * 100)}% T° + ${Math.round(weights.precip * 100)}% Précip + ${Math.round(weights.wind * 100)}% Vent + ${Math.round(weights.condition * 100)}% Cond`, icon: "⚖️" },
@@ -1231,7 +1236,7 @@ export const weatherRouter = router({
       }));
 
     const sources = [
-      { name: "Open-Meteo API", type: "Prévisions de modèles", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modèle", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Prévisions, pas observations" },
+      { name: "Open-Meteo API", type: "7 modèles + 1 agrégateur", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modèle", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Flux de prévision, pas observations" },
       { name: "Modèles en validation", type: "Prévisions candidates", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "Collecte quotidienne", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
       { name: "Stations physiques", type: "Observations locales", models: [], updateFrequency: "Selon la dernière collecte", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Netatmo actif ; autres sources seulement si réellement collectées" },
       { name: "Scores de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Aucun classement avant seuil statistique" },

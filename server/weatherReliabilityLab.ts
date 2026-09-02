@@ -29,6 +29,11 @@ export const LABORATORY_PERIODS = {
 
 export type LaboratoryPeriodId = keyof typeof LABORATORY_PERIODS;
 
+export function normalizeLaboratoryServiceName(serviceName: string): string {
+  if (serviceName === "best_match") return "Open-Meteo";
+  return serviceName.replace(/ · validation$/, "");
+}
+
 function numberOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const number = Number(value);
@@ -80,8 +85,8 @@ export async function buildReliabilityLaboratory(input: {
   ]);
   const qualityProfiles = await getStationQualityProfiles(stationData.stations.map((station) => station.stationId));
 
-  const archivesByModel = new Map(archiveRows.map((row) => [row.serviceName, row]));
-  const aggregatesByModel = new Map(aggregateRows.map((row) => [row.serviceName, row]));
+  const archivesByModel = new Map(archiveRows.map((row) => [normalizeLaboratoryServiceName(row.serviceName), row]));
+  const aggregatesByModel = new Map(aggregateRows.map((row) => [normalizeLaboratoryServiceName(row.serviceName), row]));
   const profilesByStation = new Map(qualityProfiles.map((profile) => [profile.stationId, profile]));
 
   const modelCatalog = [
@@ -185,7 +190,7 @@ export async function buildReliabilityLaboratory(input: {
     };
   });
 
-  const leadTimeByBucket = new Map(leadTimeRows.map((row) => [`${row.serviceName}:${row.bucket}`, row]));
+  const leadTimeByBucket = new Map(leadTimeRows.map((row) => [`${normalizeLaboratoryServiceName(row.serviceName)}:${row.bucket}`, row]));
   const horizonAnalysis = LABORATORY_HORIZONS.map((definition) => {
     if (!definition.storageBucket) {
       return {
@@ -235,6 +240,7 @@ export async function buildReliabilityLaboratory(input: {
     models: models.map((model) => ({ ...model, rank: ranks.get(model.name) ?? null })),
     scoreTimeline: timeline.map((point) => ({
       ...point,
+      serviceName: normalizeLaboratoryServiceName(point.serviceName),
       comparisons: numberOrNull(point.comparisons) ?? 0,
       normalizedScore: round(numberOrNull(point.normalizedScore), 1),
       operationalScore: round(numberOrNull(point.operationalScore), 1),

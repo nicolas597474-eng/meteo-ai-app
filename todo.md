@@ -3606,3 +3606,16 @@
 - [x] Ajouter un panneau déroulant accessible, fermé par défaut, avec ouverture au toucher et au clavier.
 - [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
 - [x] Publier le panneau déroulant après validation complète.
+
+## Audit P0 du moteur multi-source
+- [x] Cartographier l’architecture, les fournisseurs, les API, les archives et les tâches automatiques actuelles.
+- [x] Vérifier que les huit sources affichées correspondent à des flux réellement reçus et exploitables.
+- [x] Identifier les simulations, doublons, fallbacks, caches, retries et limites juridiques ou techniques.
+- [x] Présenter l’audit et la feuille de route P1 à P28 sans modifier le moteur, les scores, les poids, les archives ou la prévision de production.
+
+## P0.1 — Cohérence des preuves et des huit flux
+- [x] Raccorder les scores `best_match` à Open-Meteo et les scores suffixés aux modèles en validation dans AI Lab.
+- [x] Corriger le compteur `totalScores` de la tâche nocturne sans recalculer ni modifier les scores enregistrés.
+- [x] Remplacer le libellé ambigu de huit modèles par « 7 modèles + 1 agrégateur » dans les écrans concernés.
+- [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
+- [x] Publier P0.1 après validation complète, sans modifier la fusion, les poids ni les archives.
