@@ -3626,3 +3626,11 @@
 - [x] Renforcer la reprise idempotente et les diagnostics sans réécrire un créneau déjà archivé.
 - [x] Ajouter les tests de non-régression et vérifier les passages réels après publication.
 - [x] Publier la tâche v6 stabilisée sans modifier les scores, les pondérations, le moteur ou les archives existantes.
+
+## P0.3 — Statuts opérationnels des huit flux
+- [x] Auditer les preuves quotidiennes, horaires et horodatages disponibles pour les 7 modèles et Best Match.
+- [x] Définir les règles déterministes `SUCCESS`, `PARTIAL`, `FAILED` et `STALE` sans modifier les données météo.
+- [x] Exposer un statut et un motif explicites pour chacun des huit flux dans le rapport de collecte.
+- [x] Afficher les statuts dans l’AI Lab avec une légende accessible sur mobile.
+- [x] Ajouter les tests de non-régression et vérifier les cas réels.
+- [x] Publier l’étape sans intégrer Météo-France ni modifier la fusion, les poids ou les archives.

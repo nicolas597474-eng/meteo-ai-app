@@ -109,6 +109,10 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Ce que MeteoAI en fait");
     expect(source).toContain("Limite à connaître");
     expect(source).toContain("Touchez un nom pour connaître son rôle");
+    expect(source).toContain("ForecastFlowStatusLegend");
+    expect(source).toContain("ForecastFlowStatusBadge");
+    expect(source).toContain("Statut opérationnel de tous les flux de prévision");
+    expect(source).toContain('operationalStatus?.status ?? "FAILED"');
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
     expect(source).toContain("<BackToTopButton />");
     expect(source).toContain('className="order-[-1] grid grid-cols-3 gap-2"');

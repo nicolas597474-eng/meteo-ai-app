@@ -62,6 +62,7 @@ import { getWeatherProviderDiagnostics } from "../weatherFetch";
 import { buildWeatherProvenance } from "../weatherProvenance";
 import { buildEveningEvidence } from "../historyEvidence";
 import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHandlers";
+import { buildForecastFlowStatuses } from "../forecastFlowStatus";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -662,6 +663,14 @@ export const weatherRouter = router({
       const expectedModels = WEATHER_SERVICES.expert.map((model) => model.name);
       const dailyMissingModels = latestCollection ? getMissingModelNames(latestCollection.dailyMissingModels) : [];
       const hourlyMissingModels = latestCollection ? getMissingModelNames(latestCollection.hourlyMissingModels) : [];
+      const dailyCollectedModels = latestCollection ? getCollectedModelNames(expectedModels, dailyMissingModels) : [];
+      const hourlyCollectedModels = latestCollection ? getCollectedModelNames(expectedModels, hourlyMissingModels) : [];
+      const flowStatuses = buildForecastFlowStatuses({
+        expectedModels,
+        dailyCollectedModels,
+        hourlyCollectedModels,
+        collectedAt: latestCollection?.collectedAt ?? null,
+      });
 
       return {
         scheduledAt: "05:00",
@@ -679,6 +688,7 @@ export const weatherRouter = router({
           errorMessage: latestForecastJob.errorMessage,
         } : null,
         expectedModels,
+        flowStatuses,
         lastForecastSuccess: lastForecastCoverage ? {
           status: lastForecastCoverage.status,
           collectedAt: lastForecastCoverage.collectedAt,
@@ -702,8 +712,8 @@ export const weatherRouter = router({
           collectedAt: latestCollection.collectedAt,
           dailyModelCount: latestCollection.dailyModelCount,
           hourlyModelCount: latestCollection.hourlyModelCount,
-          dailyCollectedModels: getCollectedModelNames(expectedModels, dailyMissingModels),
-          hourlyCollectedModels: getCollectedModelNames(expectedModels, hourlyMissingModels),
+          dailyCollectedModels,
+          hourlyCollectedModels,
           dailyMissingModels,
           hourlyMissingModels,
         } : null,

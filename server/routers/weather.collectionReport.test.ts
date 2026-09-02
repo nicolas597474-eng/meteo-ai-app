@@ -27,6 +27,10 @@ describe("weather.getForecastCollectionReport", () => {
     expect(procedure).toContain("nextForecastRun");
     expect(procedure).toContain("lastForecastRun");
     expect(procedure).toContain("durationMs");
+    expect(procedure).toContain("flowStatuses");
+    expect(procedure).toContain("buildForecastFlowStatuses");
+    expect(procedure).toContain("dailyCollectedModels");
+    expect(procedure).toContain("hourlyCollectedModels");
   });
 });
 
