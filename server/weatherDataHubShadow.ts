@@ -10,6 +10,8 @@ import {
   type InsertShadowWeatherValue,
 } from "../drizzle/schema";
 import {
+  PHASE2_SHADOW_SOURCE_CLASSIFICATIONS,
+  PHASE2_SOURCE_CATEGORIES,
   P1_SHADOW_SOURCE_DEFINITIONS,
   SHADOW_CANONICAL_VARIABLES,
   type ShadowCanonicalVariable,
@@ -216,10 +218,22 @@ async function ensureP1ShadowRegistry(): Promise<Map<string, number>> {
       set: { updatedAt: new Date() },
     });
 
+    const phase2BySourceKey = new Map(
+      PHASE2_SHADOW_SOURCE_CLASSIFICATIONS.map(classification => [classification.sourceKey, classification]),
+    );
+    const classifiedAt = Date.now();
     for (const source of P1_SHADOW_SOURCE_DEFINITIONS) {
+      const classification = phase2BySourceKey.get(source.sourceKey);
+      if (!classification) throw new Error(`missing_phase2_classification:${source.sourceKey}`);
       await db.insert(shadowWeatherSourceDefinitions).values({
         ...source,
         shadowEnabled: 1,
+        classificationCategory: classification.category,
+        classificationRole: classification.role,
+        classificationVersion: classification.evidence.version,
+        classificationEvidence: classification.evidence,
+        classificationAppliedToProduction: classification.appliedToProduction,
+        classifiedAt,
       }).onDuplicateKeyUpdate({
         set: {
           displayName: source.displayName,
@@ -232,6 +246,12 @@ async function ensureP1ShadowRegistry(): Promise<Map<string, number>> {
           sourceUrl: source.sourceUrl,
           licenseKey: source.licenseKey,
           shadowEnabled: 1,
+          classificationCategory: classification.category,
+          classificationRole: classification.role,
+          classificationVersion: classification.evidence.version,
+          classificationEvidence: classification.evidence,
+          classificationAppliedToProduction: classification.appliedToProduction,
+          classifiedAt,
           updatedAt: new Date(),
         },
       });
@@ -453,6 +473,7 @@ export async function executeShadowWriteSafely<T>(label: string, operation: () =
 export async function getShadowDataHubObservability(locationKey?: string, lookbackDays = 7) {
   const db = await getDb();
   if (!db) return null;
+  await ensureP1ShadowRegistry();
   const since = new Date(Date.now() - Math.max(1, lookbackDays) * 86_400_000);
   const runFilters = [gte(shadowWeatherIngestionRuns.createdAt, since)];
   if (locationKey) runFilters.push(eq(shadowWeatherIngestionRuns.locationKey, locationKey));
@@ -506,6 +527,31 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     .orderBy(desc(shadowWeatherIngestionRuns.createdAt))
     .limit(64);
 
+  const classifiedSources = await db.select({
+    sourceKey: shadowWeatherSourceDefinitions.sourceKey,
+    displayName: shadowWeatherSourceDefinitions.displayName,
+    sourceFamily: shadowWeatherSourceDefinitions.sourceFamily,
+    independenceClass: shadowWeatherSourceDefinitions.independenceClass,
+    category: shadowWeatherSourceDefinitions.classificationCategory,
+    role: shadowWeatherSourceDefinitions.classificationRole,
+    version: shadowWeatherSourceDefinitions.classificationVersion,
+    evidence: shadowWeatherSourceDefinitions.classificationEvidence,
+    appliedToProduction: shadowWeatherSourceDefinitions.classificationAppliedToProduction,
+    classifiedAt: shadowWeatherSourceDefinitions.classifiedAt,
+  }).from(shadowWeatherSourceDefinitions)
+    .where(eq(shadowWeatherSourceDefinitions.shadowEnabled, 1))
+    .orderBy(shadowWeatherSourceDefinitions.displayName);
+
+  const categoryCounts = new Map<string, number>();
+  for (const source of classifiedSources) {
+    if (source.category) categoryCounts.set(source.category, (categoryCounts.get(source.category) ?? 0) + 1);
+  }
+  const classificationsAppliedToProduction = classifiedSources.reduce(
+    (total, source) => total + Number(source.appliedToProduction ?? 0),
+    0,
+  );
+  const unclassifiedSourceCount = classifiedSources.filter(source => !source.category || !source.role).length;
+
   const firstReceivedAt = runSummary?.firstReceivedAt == null ? null : Number(runSummary.firstReceivedAt);
   const observationDaysElapsed = firstReceivedAt == null
     ? 0
@@ -518,6 +564,23 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     mode: "shadow" as const,
     productionReadsEnabled: false,
     sourceCount: P1_SHADOW_SOURCE_DEFINITIONS.length,
+    phase2Classification: {
+      version: "phase2-source-classification-v1" as const,
+      sourceCount: classifiedSources.length,
+      unclassifiedSourceCount,
+      appliedToProduction: classificationsAppliedToProduction,
+      valid: classifiedSources.length === 8
+        && unclassifiedSourceCount === 0
+        && categoryCounts.get("DETERMINISTIC") === 7
+        && categoryCounts.get("DERIVED_AGGREGATOR") === 1
+        && classificationsAppliedToProduction === 0,
+      categories: PHASE2_SOURCE_CATEGORIES.map(category => ({
+        category,
+        count: categoryCounts.get(category) ?? 0,
+        empty: (categoryCounts.get(category) ?? 0) === 0,
+      })),
+      sources: classifiedSources,
+    },
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),

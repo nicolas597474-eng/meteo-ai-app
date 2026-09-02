@@ -3681,3 +3681,12 @@
 - [x] Renommer la traçabilité des runs précédemment appelée P2 pour la rattacher à P1 et à la Phase 17.
 - [x] Présenter la véritable Phase 2 : modèles déterministes, ensembles, observations, radar et satellite.
 - [x] Définir le périmètre shadow initial de classification sans ajouter de source non connectée ni commencer la Phase 3.
+
+## Phase 2 officielle — Classification shadow des sources
+- [x] Définir les catégories contrôlées et les invariants de rôle, d’indépendance et de preuve.
+- [x] Ajouter uniquement des champs shadow de classification par migration additive.
+- [x] Classer les sept modèles comme déterministes et Best Match comme agrégateur dérivé non indépendant.
+- [x] Conserver ensemble, observation, radar et satellite comme catégories sans source tant qu’aucune ingestion réelle n’existe.
+- [x] Afficher au propriétaire les huit classifications et les catégories vides explicites.
+- [x] Vérifier par tests et données réelles l’unicité, l’absence de nouvelle source et l’isolation production.
+- [x] Publier la Phase 2 shadow sans commencer la Phase 3.

@@ -15,6 +15,18 @@ export const SHADOW_SOURCE_ROLES = [
   "observation_truth",
 ] as const;
 
+export const PHASE2_SOURCE_CATEGORIES = [
+  "DETERMINISTIC",
+  "ENSEMBLE",
+  "OBSERVATION",
+  "RADAR",
+  "SATELLITE",
+  "DERIVED_AGGREGATOR",
+] as const;
+
+export const PHASE2_SOURCE_ROLES = ["FORECAST", "OBSERVATION", "DERIVED"] as const;
+export const PHASE2_CLASSIFICATION_VERSION = "phase2-source-classification-v1" as const;
+
 export const SHADOW_INDEPENDENCE_CLASSES = [
   "independent_model",
   "related_family",
@@ -89,6 +101,8 @@ type ArrayValue<T extends readonly unknown[]> = T[number];
 
 export type ShadowSourceType = ArrayValue<typeof SHADOW_SOURCE_TYPES>;
 export type ShadowSourceRole = ArrayValue<typeof SHADOW_SOURCE_ROLES>;
+export type Phase2SourceCategory = ArrayValue<typeof PHASE2_SOURCE_CATEGORIES>;
+export type Phase2SourceRole = ArrayValue<typeof PHASE2_SOURCE_ROLES>;
 export type ShadowIndependenceClass = ArrayValue<typeof SHADOW_INDEPENDENCE_CLASSES>;
 export type ShadowRunStatus = ArrayValue<typeof SHADOW_RUN_STATUSES>;
 export type ShadowRunEvidenceStatus = ArrayValue<typeof SHADOW_RUN_EVIDENCE_STATUSES>;
@@ -128,6 +142,19 @@ export type ShadowProviderRunEvidence = {
   evidenceHash: string | null;
   detail: string;
   evidence: Record<string, unknown> | null;
+};
+
+export type Phase2SourceClassification = {
+  sourceKey: string;
+  category: Phase2SourceCategory;
+  role: Phase2SourceRole;
+  independenceClass: ShadowIndependenceClass;
+  evidence: {
+    version: typeof PHASE2_CLASSIFICATION_VERSION;
+    basis: "declared_model" | "derived_aggregator";
+    explanation: string;
+  };
+  appliedToProduction: 0;
 };
 
 export const P1_SHADOW_SOURCE_DEFINITIONS = [
@@ -268,6 +295,48 @@ export const P1_SHADOW_SOURCE_DEFINITIONS = [
     shadowEnabled: true,
   },
 ] as const satisfies readonly ShadowSourceDefinitionSeed[];
+
+export const PHASE2_SHADOW_SOURCE_CLASSIFICATIONS = P1_SHADOW_SOURCE_DEFINITIONS.map(source => {
+  const derived = source.model === "best_match";
+  return {
+    sourceKey: source.sourceKey,
+    category: derived ? "DERIVED_AGGREGATOR" : "DETERMINISTIC",
+    role: derived ? "DERIVED" : "FORECAST",
+    independenceClass: source.independenceClass,
+    evidence: {
+      version: PHASE2_CLASSIFICATION_VERSION,
+      basis: derived ? "derived_aggregator" : "declared_model",
+      explanation: derived
+        ? "Open-Meteo Best Match sélectionne ou assemble des modèles et reste non indépendant."
+        : `${source.displayName} est un modèle déterministe nommé dans le registre P1.`,
+    },
+    appliedToProduction: 0,
+  } as const satisfies Phase2SourceClassification;
+});
+
+export function validatePhase2ShadowClassifications(): { valid: true; sourceCount: number } {
+  const classifications = PHASE2_SHADOW_SOURCE_CLASSIFICATIONS;
+  if (classifications.length !== P1_SHADOW_SOURCE_DEFINITIONS.length) {
+    throw new Error("Phase 2 must classify every registered P1 source exactly once");
+  }
+
+  const keys = classifications.map(classification => classification.sourceKey);
+  if (new Set(keys).size !== keys.length) throw new Error("Duplicate Phase 2 source classification");
+
+  const deterministic = classifications.filter(classification => classification.category === "DETERMINISTIC");
+  const aggregators = classifications.filter(classification => classification.category === "DERIVED_AGGREGATOR");
+  if (deterministic.length !== 7 || aggregators.length !== 1) {
+    throw new Error("Phase 2 initial scope must contain seven deterministic models and one derived aggregator");
+  }
+  if (aggregators[0]?.sourceKey !== "openmeteo_best_match" || aggregators[0].independenceClass !== "non_independent") {
+    throw new Error("Best Match must remain the only non-independent derived aggregator");
+  }
+  if (classifications.some(classification => classification.appliedToProduction !== 0)) {
+    throw new Error("Phase 2 shadow classifications must never be applied to production");
+  }
+
+  return { valid: true, sourceCount: classifications.length };
+}
 
 export function getShadowCanonicalVariableDefinition(variable: ShadowCanonicalVariable) {
   return SHADOW_CANONICAL_VARIABLES[variable];

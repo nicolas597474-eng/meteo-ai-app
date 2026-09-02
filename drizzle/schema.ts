@@ -629,12 +629,20 @@ export const shadowWeatherSourceDefinitions = mysqlTable("shadow_weather_source_
   nativeResolutionKm: float("nativeResolutionKm"),
   expectedUpdateMinutes: int("expectedUpdateMinutes"),
   shadowEnabled: int("shadowEnabled").notNull().default(1),
+  classificationCategory: varchar("classificationCategory", { length: 32 }),
+  classificationRole: varchar("classificationRole", { length: 24 }),
+  classificationVersion: varchar("classificationVersion", { length: 64 }),
+  classificationEvidence: json("classificationEvidence"),
+  classificationAppliedToProduction: int("classificationAppliedToProduction").notNull().default(0),
+  classifiedAt: bigint("classifiedAt", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [
   uniqueIndex("shadow_source_definition_key_unique").on(table.sourceKey),
   index("shadow_source_definition_provider_model_idx").on(table.provider, table.model),
   index("shadow_source_definition_family_independence_idx").on(table.sourceFamily, table.independenceClass),
+  index("shadow_source_definition_phase2_category_idx").on(table.classificationCategory),
+  index("shadow_source_definition_phase2_applied_idx").on(table.classificationAppliedToProduction),
 ]);
 
 export type ShadowWeatherSourceDefinition = typeof shadowWeatherSourceDefinitions.$inferSelect;
