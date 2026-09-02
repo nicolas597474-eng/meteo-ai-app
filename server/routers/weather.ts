@@ -33,7 +33,6 @@ import {
   getQualifiedEvidenceStatus,
   getStationQualityProfiles,
   getFavoriteLocations,
-  getLatestPublicForecastProvenanceSnapshot,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
@@ -66,21 +65,6 @@ import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHan
 
 function getTodayParis(): string {
   return getParisDate();
-}
-
-function serializeMeteoFranceShadow(snapshot: Awaited<ReturnType<typeof getLatestPublicForecastProvenanceSnapshot>>) {
-  if (!snapshot) return null;
-  return {
-    status: snapshot.status,
-    provider: snapshot.provider,
-    upstreamModels: Array.isArray(snapshot.upstreamModels) ? snapshot.upstreamModels.map(String) : [],
-    fallbackReason: snapshot.fallbackReason,
-    officialConfigured: snapshot.officialConfigured === 1,
-    shadowMode: snapshot.shadowMode === 1,
-    appliedToProduction: snapshot.appliedToProduction === 1,
-    date: snapshot.date,
-    checkedAt: snapshot.checkedAt,
-  };
 }
 
 export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour()) {
@@ -633,10 +617,7 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
-      const [snapshot, meteoFranceShadowSnapshot] = await Promise.all([
-        resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM),
-        getLatestPublicForecastProvenanceSnapshot(locationKey, "Météo-France"),
-      ]);
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
       const currentFusion = snapshot.hourly.length === 0
         ? await getMeteoAIForecastByDate(snapshot.weatherDate, locationKey)
         : null;
@@ -646,10 +627,7 @@ export const weatherRouter = router({
       const dailyFallback = snapshot.hourly.length === 0
         ? buildDatedDailyFusionFallback(currentFusion ?? latestFusion)
         : null;
-      return {
-        ...buildWeatherProvenance(snapshot, dailyFallback),
-        meteoFranceShadow: serializeMeteoFranceShadow(meteoFranceShadowSnapshot),
-      };
+      return buildWeatherProvenance(snapshot, dailyFallback);
     }),
 
   /** Bilan archivé de la collecte de 05 h : modèles de prévision, jamais stations physiques. */
@@ -657,11 +635,10 @@ export const weatherRouter = router({
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
-      const [recentCollections, physicalTraces, recentJobs, meteoFranceShadowSnapshot] = await Promise.all([
+      const [recentCollections, physicalTraces, recentJobs] = await Promise.all([
         getStationCollectionSnapshots(locationKey, 8),
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, getParisDateDaysAgo(1), getTodayParis()),
         getRecentCollectionJobs(24),
-        getLatestPublicForecastProvenanceSnapshot(locationKey, "Météo-France"),
       ]);
       const latestCollection = recentCollections[0] ?? null;
       const forecastJobs = recentJobs.filter((job) => job.jobType === "forecast");
@@ -702,7 +679,6 @@ export const weatherRouter = router({
           errorMessage: latestForecastJob.errorMessage,
         } : null,
         expectedModels,
-        meteoFranceShadow: serializeMeteoFranceShadow(meteoFranceShadowSnapshot),
         lastForecastSuccess: lastForecastCoverage ? {
           status: lastForecastCoverage.status,
           collectedAt: lastForecastCoverage.collectedAt,

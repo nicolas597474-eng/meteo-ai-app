@@ -5,7 +5,6 @@ import {
   users,
   forecasts,
   forecastRuns,
-  publicForecastProvenanceSnapshots,
   observations,
   reliabilityScores,
   meteoaiForecast,
@@ -16,7 +15,6 @@ import {
   leadTimeScores,
   InsertForecast,
   InsertForecastRun,
-  InsertPublicForecastProvenanceSnapshot,
   InsertObservation,
   InsertReliabilityScore,
   InsertMeteoAIForecast,
@@ -189,38 +187,6 @@ export async function insertForecastRuns(data: InsertForecastRun[]): Promise<voi
       set: { capturedAt: new Date() },
     });
   }
-}
-
-/** Upsert the latest observability-only provenance check for one service/day. */
-export async function upsertPublicForecastProvenanceSnapshot(data: InsertPublicForecastProvenanceSnapshot): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  await db.insert(publicForecastProvenanceSnapshots).values(data).onDuplicateKeyUpdate({
-    set: {
-      status: data.status,
-      provider: data.provider ?? null,
-      upstreamModels: data.upstreamModels ?? null,
-      fallbackReason: data.fallbackReason ?? null,
-      officialConfigured: data.officialConfigured ?? 0,
-      shadowMode: 1,
-      appliedToProduction: 0,
-      checkedAt: new Date(),
-    },
-  });
-}
-
-/** Read the latest shadow provenance check without consulting production fusion rows. */
-export async function getLatestPublicForecastProvenanceSnapshot(locationKey: string, serviceName: string) {
-  const db = await getDb();
-  if (!db) return null;
-  const rows = await db.select().from(publicForecastProvenanceSnapshots)
-    .where(and(
-      eq(publicForecastProvenanceSnapshots.locationKey, locationKey),
-      eq(publicForecastProvenanceSnapshots.serviceName, serviceName),
-    ))
-    .orderBy(desc(publicForecastProvenanceSnapshots.date), desc(publicForecastProvenanceSnapshots.checkedAt))
-    .limit(1);
-  return rows[0] ?? null;
 }
 
 export async function getForecastsByDate(date: string, locationKey = "default") {

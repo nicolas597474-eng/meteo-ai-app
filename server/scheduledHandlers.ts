@@ -62,7 +62,6 @@ import {
   getPhysicalSnapshotCollectionTracesByDateRange,
   getStoredHourlyForecasts,
   getStationEvidenceSummary,
-  upsertPublicForecastProvenanceSnapshot,
 } from "./db";
 
 /**
@@ -858,24 +857,6 @@ async function generatePublicServiceForecasts(
 
   try {
     const real = await fetchRealPublicForecasts(date, lat, lon);
-    try {
-      await upsertPublicForecastProvenanceSnapshot({
-        locationKey,
-        date,
-        serviceName: "Météo-France",
-        status: real.mfProvenance.status,
-        provider: real.mfProvenance.provider,
-        upstreamModels: real.mfProvenance.upstreamModels,
-        fallbackReason: real.mfProvenance.fallbackReason,
-        officialConfigured: real.mfProvenance.officialConfigured ? 1 : 0,
-        shadowMode: 1,
-        appliedToProduction: 0,
-        checkedAt: new Date(real.mfProvenance.checkedAt),
-      });
-    } catch (provenanceError: any) {
-      // La traçabilité shadow ne doit jamais bloquer le flux public historique.
-      console.warn(`[MeteoAI] Météo-France provenance shadow unavailable: ${provenanceError.message}`);
-    }
     const rows: any[] = [];
     if (real.owm) {
       rows.push({
@@ -892,12 +873,7 @@ async function generatePublicServiceForecasts(
         tempMax: real.mf.tempMax, tempMin: real.mf.tempMin,
         precipitation: real.mf.precipitation, windSpeed: real.mf.windSpeed,
         windGust: real.mf.windGust, humidity: real.mf.humidity,
-        cloudCover: real.mf.cloudCover, condition: real.mf.condition,
-        rawData: {
-          provenance: real.mfProvenance,
-          shadowMode: true,
-          provenanceAppliedToProduction: false,
-        },
+        cloudCover: real.mf.cloudCover, condition: real.mf.condition, rawData: null,
       });
     }
     return rows;
@@ -1193,9 +1169,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             locationKey: locKey,
             validDate: today,
             serviceName: f.serviceName,
-            provider: f.serviceName === "OpenWeatherMap"
-              ? "openweathermap"
-              : ((f.rawData as any)?.provenance?.provider ?? "meteofrance-provenance-unknown"),
+            provider: f.serviceName === "OpenWeatherMap" ? "openweathermap" : "meteofrance-or-open-meteo",
             modelId: null,
             sourceKind: "service_forecast" as const,
             issuedAt,
