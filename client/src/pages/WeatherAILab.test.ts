@@ -126,6 +126,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("shadowDataHubReport.observation.elapsedDays");
     expect(source).toContain("shadowDataHubReport.observation.remainingDays");
     expect(source).toContain("Appliqué à production");
+    expect(source).toContain("ProviderRunEvidencePanel");
+    expect(source).toContain("shadowDataHubReport && <ProviderRunEvidencePanel");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {

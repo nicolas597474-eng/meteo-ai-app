@@ -14,11 +14,16 @@ import {
   SHADOW_CANONICAL_VARIABLES,
   type ShadowCanonicalVariable,
   type ShadowFreshnessStatus,
+  type ShadowProviderRunEvidence,
   type ShadowQualityStatus,
   type ShadowRunStatus,
 } from "../shared/weatherDataHub";
 import { getDb } from "./db";
 import type { ForecastData } from "./weatherServices";
+import {
+  createUnknownRunEvidence,
+  fetchProviderRunEvidenceMap,
+} from "./weatherProviderRunEvidence";
 
 export type ShadowHourlyForecast = {
   modelName: string;
@@ -261,6 +266,7 @@ async function persistOneShadowRun(input: {
   sourceKey: string;
   context: ShadowWriteContext;
   values: CanonicalShadowValue[];
+  runEvidence: ShadowProviderRunEvidence;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("shadow_database_unavailable");
@@ -268,15 +274,24 @@ async function persistOneShadowRun(input: {
   const sourceDefinitionId = registry.get(input.sourceKey);
   if (!sourceDefinitionId) throw new Error(`shadow_source_not_registered:${input.sourceKey}`);
   const status = getRunStatus(input.values);
+  const runTimeKnown = input.runEvidence.status === "PROVIDER_REPORTED" ? 1 : 0;
   const run: InsertShadowWeatherIngestionRun = {
     cycleKey: input.cycleKey,
     sourceDefinitionId,
     locationKey: input.context.locationKey,
     requestStartedAt: input.context.requestStartedAt,
     receivedAt: input.context.receivedAt,
-    providerRunTime: null,
-    runTimeKnown: 0,
-    providerAvailableAt: null,
+    providerRunTime: input.runEvidence.providerRunTime,
+    runTimeKnown,
+    providerAvailableAt: input.runEvidence.providerAvailableAt,
+    providerModifiedAt: input.runEvidence.providerModifiedAt,
+    runEvidenceStatus: input.runEvidence.status,
+    runEvidenceScope: input.runEvidence.scope,
+    runEvidenceObservedAt: input.runEvidence.observedAt,
+    runEvidenceSourceUrl: input.runEvidence.sourceUrl,
+    runEvidenceHash: input.runEvidence.evidenceHash,
+    runEvidenceDetail: input.runEvidence.detail,
+    runEvidence: input.runEvidence.evidence,
     status,
     attempts: 1,
     httpStatus: null,
@@ -294,8 +309,17 @@ async function persistOneShadowRun(input: {
       set: {
         requestStartedAt: run.requestStartedAt,
         receivedAt: run.receivedAt,
-        providerRunTime: null,
-        runTimeKnown: 0,
+        providerRunTime: run.providerRunTime,
+        runTimeKnown,
+        providerAvailableAt: run.providerAvailableAt,
+        providerModifiedAt: run.providerModifiedAt,
+        runEvidenceStatus: run.runEvidenceStatus,
+        runEvidenceScope: run.runEvidenceScope,
+        runEvidenceObservedAt: run.runEvidenceObservedAt,
+        runEvidenceSourceUrl: run.runEvidenceSourceUrl,
+        runEvidenceHash: run.runEvidenceHash,
+        runEvidenceDetail: run.runEvidenceDetail,
+        runEvidence: run.runEvidence,
         status: run.status,
         durationMs: run.durationMs,
         payloadHash: run.payloadHash,
@@ -353,6 +377,10 @@ export async function persistDailyForecastsToShadow(
   const errors: string[] = [];
   let sourceCount = 0;
   let valueCount = 0;
+  const sourceKeys = forecasts
+    .map(forecast => resolveP1ShadowSourceKey(forecast.serviceName))
+    .filter((sourceKey): sourceKey is string => sourceKey != null);
+  const runEvidenceBySource = await fetchProviderRunEvidenceMap(sourceKeys, context.receivedAt);
   for (const forecast of forecasts) {
     const sourceKey = resolveP1ShadowSourceKey(forecast.serviceName);
     if (!sourceKey) continue;
@@ -362,6 +390,10 @@ export async function persistDailyForecastsToShadow(
         sourceKey,
         context,
         values: normalizeDailyForecastToShadow(forecast, context),
+        runEvidence: runEvidenceBySource.get(sourceKey) ?? createUnknownRunEvidence({
+          observedAt: context.receivedAt,
+          detail: `Aucune preuve P2 reçue pour ${sourceKey}.`,
+        }),
       });
       sourceCount++;
     } catch (error) {
@@ -378,6 +410,10 @@ export async function persistHourlyForecastsToShadow(
   const errors: string[] = [];
   let sourceCount = 0;
   let valueCount = 0;
+  const sourceKeys = forecasts
+    .map(forecast => resolveP1ShadowSourceKey(forecast.modelName))
+    .filter((sourceKey): sourceKey is string => sourceKey != null);
+  const runEvidenceBySource = await fetchProviderRunEvidenceMap(sourceKeys, context.receivedAt);
   for (const forecast of forecasts) {
     const sourceKey = resolveP1ShadowSourceKey(forecast.modelName);
     if (!sourceKey) continue;
@@ -387,6 +423,10 @@ export async function persistHourlyForecastsToShadow(
         sourceKey,
         context,
         values: normalizeHourlyForecastToShadow(forecast, context),
+        runEvidence: runEvidenceBySource.get(sourceKey) ?? createUnknownRunEvidence({
+          observedAt: context.receivedAt,
+          detail: `Aucune preuve P2 reçue pour ${sourceKey}.`,
+        }),
       });
       sourceCount++;
     } catch (error) {
@@ -423,6 +463,9 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     failedRuns: sql<number>`sum(case when ${shadowWeatherIngestionRuns.status} = 'FAILED' then 1 else 0 end)`,
     appliedToProduction: sql<number>`sum(case when ${shadowWeatherIngestionRuns.appliedToProduction} = 1 then 1 else 0 end)`,
     knownProviderRuns: sql<number>`sum(case when ${shadowWeatherIngestionRuns.runTimeKnown} = 1 then 1 else 0 end)`,
+    metadataEvidenceRuns: sql<number>`sum(case when ${shadowWeatherIngestionRuns.runEvidenceStatus} = 'OPEN_METEO_METADATA' then 1 else 0 end)`,
+    scheduleDerivedRuns: sql<number>`sum(case when ${shadowWeatherIngestionRuns.runEvidenceStatus} = 'SCHEDULE_DERIVED' then 1 else 0 end)`,
+    unknownEvidenceRuns: sql<number>`sum(case when ${shadowWeatherIngestionRuns.runEvidenceStatus} = 'UNKNOWN' then 1 else 0 end)`,
     averageDurationMs: sql<number>`avg(${shadowWeatherIngestionRuns.durationMs})`,
     firstReceivedAt: sql<number>`min(${shadowWeatherIngestionRuns.receivedAt})`,
     lastReceivedAt: sql<number>`max(${shadowWeatherIngestionRuns.receivedAt})`,
@@ -447,6 +490,14 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     receivedAt: shadowWeatherIngestionRuns.receivedAt,
     durationMs: shadowWeatherIngestionRuns.durationMs,
     runTimeKnown: shadowWeatherIngestionRuns.runTimeKnown,
+    providerRunTime: shadowWeatherIngestionRuns.providerRunTime,
+    providerAvailableAt: shadowWeatherIngestionRuns.providerAvailableAt,
+    providerModifiedAt: shadowWeatherIngestionRuns.providerModifiedAt,
+    runEvidenceStatus: shadowWeatherIngestionRuns.runEvidenceStatus,
+    runEvidenceScope: shadowWeatherIngestionRuns.runEvidenceScope,
+    runEvidenceObservedAt: shadowWeatherIngestionRuns.runEvidenceObservedAt,
+    runEvidenceSourceUrl: shadowWeatherIngestionRuns.runEvidenceSourceUrl,
+    runEvidenceDetail: shadowWeatherIngestionRuns.runEvidenceDetail,
     appliedToProduction: shadowWeatherIngestionRuns.appliedToProduction,
   }).from(shadowWeatherIngestionRuns)
     .innerJoin(shadowWeatherSourceDefinitions, eq(shadowWeatherIngestionRuns.sourceDefinitionId, shadowWeatherSourceDefinitions.id))
@@ -471,6 +522,9 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
       failed: Number(runSummary?.failedRuns ?? 0),
       appliedToProduction: Number(runSummary?.appliedToProduction ?? 0),
       knownProviderRuns: Number(runSummary?.knownProviderRuns ?? 0),
+      metadataEvidenceRuns: Number(runSummary?.metadataEvidenceRuns ?? 0),
+      scheduleDerivedRuns: Number(runSummary?.scheduleDerivedRuns ?? 0),
+      unknownEvidenceRuns: Number(runSummary?.unknownEvidenceRuns ?? 0),
       averageDurationMs: runSummary?.averageDurationMs == null ? null : Number(runSummary.averageDurationMs),
       firstReceivedAt,
       lastReceivedAt: runSummary?.lastReceivedAt == null ? null : Number(runSummary.lastReceivedAt),

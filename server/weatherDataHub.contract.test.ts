@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   P1_SHADOW_SOURCE_DEFINITIONS,
   SHADOW_CANONICAL_VARIABLES,
+  SHADOW_RUN_EVIDENCE_SCOPES,
+  SHADOW_RUN_EVIDENCE_STATUSES,
   getShadowCanonicalVariableDefinition,
   validateP1ShadowSourceRegistry,
 } from "../shared/weatherDataHub";
@@ -27,5 +29,17 @@ describe("P1 shadow weather data hub contract", () => {
       expect(definition.levelKey).toBeTruthy();
       expect(getShadowCanonicalVariableDefinition(variable as keyof typeof SHADOW_CANONICAL_VARIABLES)).toEqual(definition);
     }
+  });
+
+  it("defines four explicit P2 evidence levels without treating metadata as payload proof", () => {
+    expect(SHADOW_RUN_EVIDENCE_STATUSES).toEqual([
+      "PROVIDER_REPORTED",
+      "OPEN_METEO_METADATA",
+      "SCHEDULE_DERIVED",
+      "UNKNOWN",
+    ]);
+    expect(SHADOW_RUN_EVIDENCE_SCOPES).toContain("payload_exact");
+    expect(SHADOW_RUN_EVIDENCE_SCOPES).toContain("model_exact");
+    expect(SHADOW_RUN_EVIDENCE_SCOPES).toContain("aggregator_unresolved");
   });
 });

@@ -25,6 +25,20 @@ export const SHADOW_INDEPENDENCE_CLASSES = [
 ] as const;
 
 export const SHADOW_RUN_STATUSES = ["SUCCESS", "PARTIAL", "FAILED", "STALE"] as const;
+export const SHADOW_RUN_EVIDENCE_STATUSES = [
+  "PROVIDER_REPORTED",
+  "OPEN_METEO_METADATA",
+  "SCHEDULE_DERIVED",
+  "UNKNOWN",
+] as const;
+export const SHADOW_RUN_EVIDENCE_SCOPES = [
+  "payload_exact",
+  "model_exact",
+  "model_family",
+  "aggregator_unresolved",
+  "schedule_only",
+  "none",
+] as const;
 export const SHADOW_QUALITY_STATUSES = ["VALID", "SUSPECT", "INVALID", "MISSING", "STALE"] as const;
 export const SHADOW_FRESHNESS_STATUSES = ["FRESH", "AGING", "STALE", "UNKNOWN"] as const;
 export const SHADOW_USAGE_STATUSES = [
@@ -58,6 +72,8 @@ export type ShadowSourceType = ArrayValue<typeof SHADOW_SOURCE_TYPES>;
 export type ShadowSourceRole = ArrayValue<typeof SHADOW_SOURCE_ROLES>;
 export type ShadowIndependenceClass = ArrayValue<typeof SHADOW_INDEPENDENCE_CLASSES>;
 export type ShadowRunStatus = ArrayValue<typeof SHADOW_RUN_STATUSES>;
+export type ShadowRunEvidenceStatus = ArrayValue<typeof SHADOW_RUN_EVIDENCE_STATUSES>;
+export type ShadowRunEvidenceScope = ArrayValue<typeof SHADOW_RUN_EVIDENCE_SCOPES>;
 export type ShadowQualityStatus = ArrayValue<typeof SHADOW_QUALITY_STATUSES>;
 export type ShadowFreshnessStatus = ArrayValue<typeof SHADOW_FRESHNESS_STATUSES>;
 export type ShadowUsageStatus = ArrayValue<typeof SHADOW_USAGE_STATUSES>;
@@ -80,6 +96,19 @@ export type ShadowSourceDefinitionSeed = {
   nativeResolutionKm: number | null;
   expectedUpdateMinutes: number | null;
   shadowEnabled: true;
+};
+
+export type ShadowProviderRunEvidence = {
+  status: ShadowRunEvidenceStatus;
+  scope: ShadowRunEvidenceScope;
+  providerRunTime: number | null;
+  providerAvailableAt: number | null;
+  providerModifiedAt: number | null;
+  observedAt: number;
+  sourceUrl: string | null;
+  evidenceHash: string | null;
+  detail: string;
+  evidence: Record<string, unknown> | null;
 };
 
 export const P1_SHADOW_SOURCE_DEFINITIONS = [

@@ -3657,3 +3657,13 @@
 - [x] P1.5 : créer un rapport propriétaire de couverture, qualité, fraîcheur et latence shadow.
 - [x] Vérifier par tests et inspection qu’aucun score, poids, fusion, classement ou prévision publique ne lit le Data Hub.
 - [x] Publier P1 et démarrer P1.6, une observation de sept jours, sans commencer P2.
+
+## P2 — Traçabilité réelle des runs fournisseur en shadow
+- [x] Présenter le périmètre, les statuts de preuve et les critères d’acceptation de P2.
+- [x] Auditer pour chacun des 7 modèles et Best Match les métadonnées de run réellement disponibles.
+- [x] Définir les statuts `PROVIDER_REPORTED`, `OPEN_METEO_METADATA`, `SCHEDULE_DERIVED` et `UNKNOWN` sans inventer d’heure fournisseur.
+- [x] Ajouter uniquement des champs et adaptateurs shadow pour conserver la preuve de run et sa provenance.
+- [x] Brancher P2 sur les écritures shadow sans modifier les collecteurs ni les tables de production.
+- [x] Étendre le rapport propriétaire P1 avec le statut, l’heure et la preuve de run P2.
+- [x] Vérifier les cas réels, l’isolation de production et l’absence de Météo-France.
+- [x] Publier P2 sans promouvoir P1, sans commencer P3 et en maintenant P1.6.

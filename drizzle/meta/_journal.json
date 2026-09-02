@@ -211,6 +211,13 @@
       "when": 1788341076773,
       "tag": "0029_blue_the_call",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1788342888476,
+      "tag": "0030_outgoing_ikaris",
+      "breakpoints": true
     }
   ]
 }
