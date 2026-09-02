@@ -5,7 +5,7 @@ import {
   parseOpenMeteoRunMetadata,
 } from "./weatherProviderRunEvidence";
 
-describe("P2 provider run evidence", () => {
+describe("Phase 17 provider run evidence preparation", () => {
   it("keeps Open-Meteo metadata distinct from payload-bound provider proof", () => {
     const evidence = parseOpenMeteoRunMetadata({
       payload: {

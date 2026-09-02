@@ -137,7 +137,7 @@ export async function fetchProviderRunEvidence(
   if (!target) {
     return createUnknownRunEvidence({
       observedAt,
-      detail: `Aucune cible de métadonnées P2 n’est déclarée pour ${sourceKey}.`,
+      detail: `Aucune cible de métadonnées de run n’est déclarée pour ${sourceKey}.`,
     });
   }
 
@@ -151,7 +151,7 @@ export async function fetchProviderRunEvidence(
     if (!response.ok) {
       return createUnknownRunEvidence({
         observedAt,
-        detail: `Métadonnées P2 indisponibles : HTTP ${response.status}.`,
+        detail: `Métadonnées de run indisponibles : HTTP ${response.status}.`,
         sourceUrl,
       });
     }
@@ -164,7 +164,7 @@ export async function fetchProviderRunEvidence(
   } catch (error) {
     return createUnknownRunEvidence({
       observedAt,
-      detail: `Métadonnées P2 indisponibles : ${error instanceof Error ? error.message : String(error)}.`,
+      detail: `Métadonnées de run indisponibles : ${error instanceof Error ? error.message : String(error)}.`,
       sourceUrl,
     });
   }
@@ -181,4 +181,3 @@ export async function fetchProviderRunEvidenceMap(
   ] as const));
   return new Map(entries);
 }
-

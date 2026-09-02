@@ -1,9 +1,9 @@
-# P2 — Traçabilité des runs fournisseur en mode shadow
+# Préparation de la Phase 17 — Traçabilité des runs fournisseur en mode shadow
 
 **Auteur : Manus AI**  
 **État : implémenté en shadow, sans lecture par la production**
 
-P2 enrichit les runs du Data Hub P1 avec une preuve distincte de l’heure de run. Il ne modifie ni les prévisions, ni la fusion, ni les scores, ni les poids. La documentation Open-Meteo expose une API de métadonnées indiquant l’initialisation, la disponibilité et la modification du dernier run de chaque modèle.[1]
+Cette préparation de la Phase 17 enrichit les runs du Data Hub P1 avec une preuve distincte de l’heure de run. Elle ne modifie ni les prévisions, ni la fusion, ni les scores, ni les poids. La documentation Open-Meteo expose une API de métadonnées indiquant l’initialisation, la disponibilité et la modification du dernier run de chaque modèle.[1]
 
 > Une heure provenant de l’API de métadonnées décrit le dernier run connu du modèle, mais ne prouve pas que le payload Forecast reçu est exactement lié à ce run.
 
@@ -16,7 +16,7 @@ P2 enrichit les runs du Data Hub P1 avec une preuve distincte de l’heure de ru
 
 ## Résultat du contrôle réel du 2 septembre 2026
 
-Le replay P2 a été exécuté sur les deux lieux favoris et a écrit exclusivement dans les tables shadow. Pour chaque lieu, les huit flux quotidiens et huit flux horaires ont été normalisés. Quatorze runs portent une métadonnée Open-Meteo, tandis que les deux runs Best Match restent explicitement inconnus. Aucun run ni aucune valeur shadow n’est appliqué à la production, et la clé unique complète ne présente aucun doublon.
+Le replay de traçabilité a été exécuté sur les deux lieux favoris et a écrit exclusivement dans les tables shadow. Pour chaque lieu, les huit flux quotidiens et huit flux horaires ont été normalisés. Quatorze runs portent une métadonnée Open-Meteo, tandis que les deux runs Best Match restent explicitement inconnus. Aucun run ni aucune valeur shadow n’est appliqué à la production, et la clé unique complète ne présente aucun doublon.
 
 | Contrôle | Résultat par lieu |
 |---|---:|
@@ -37,7 +37,7 @@ Les appels de métadonnées utilisent un délai court, une seule tentative et un
 
 ## Rollback
 
-Le code P2 peut être retiré sans toucher aux tables de production. Les colonnes shadow peuvent rester inutilisées. Le rollback fonctionnel consiste à désactiver l’enrichissement de preuve et à conserver P1 ; aucune suppression de données n’est requise.
+Le code de préparation Phase 17 peut être retiré sans toucher aux tables de production. Les colonnes shadow peuvent rester inutilisées. Le rollback fonctionnel consiste à désactiver l’enrichissement de preuve et à conserver P1 ; aucune suppression de données n’est requise.
 
 ## Références
 

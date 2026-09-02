@@ -393,7 +393,7 @@ export async function persistDailyForecastsToShadow(
         values: normalizeDailyForecastToShadow(forecast, context),
         runEvidence: runEvidenceBySource.get(sourceKey) ?? createUnknownRunEvidence({
           observedAt: context.receivedAt,
-          detail: `Aucune preuve P2 reçue pour ${sourceKey}.`,
+          detail: `Aucune preuve de run Phase 17 reçue pour ${sourceKey}.`,
         }),
       });
       sourceCount++;
@@ -426,7 +426,7 @@ export async function persistHourlyForecastsToShadow(
         values: normalizeHourlyForecastToShadow(forecast, context),
         runEvidence: runEvidenceBySource.get(sourceKey) ?? createUnknownRunEvidence({
           observedAt: context.receivedAt,
-          detail: `Aucune preuve P2 reçue pour ${sourceKey}.`,
+          detail: `Aucune preuve de run Phase 17 reçue pour ${sourceKey}.`,
         }),
       });
       sourceCount++;

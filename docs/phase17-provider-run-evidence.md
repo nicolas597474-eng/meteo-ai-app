@@ -1,4 +1,4 @@
-# P2 — Preuve des runs fournisseur
+# Préparation de la Phase 17 — Preuve des runs fournisseur
 
 ## Sources externes officielles
 
@@ -8,11 +8,11 @@ La même documentation précise que les métadonnées sont **éventuellement coh
 
 L’API Forecast assemble une série continuellement actualisée à partir des runs les plus récents. Elle ne renvoie pas dans son objet JSON standard l’initialisation exacte du run utilisé pour chaque valeur : <https://open-meteo.com/en/docs>.
 
-L’API Single Runs permet au contraire de demander un run explicitement identifié par son heure UTC d’initialisation avec le paramètre `run` : <https://open-meteo.com/en/docs/single-runs-api>. Ce service constitue une preuve forte lorsqu’il est utilisé pour reconstruire un run précis, mais P2 ne doit pas remplacer la collecte de production ni ajouter une deuxième collecte complète.
+L’API Single Runs permet au contraire de demander un run explicitement identifié par son heure UTC d’initialisation avec le paramètre `run` : <https://open-meteo.com/en/docs/single-runs-api>. Ce service constitue une preuve forte lorsqu’il est utilisé pour reconstruire un run précis, mais cette préparation de la Phase 17 ne doit pas remplacer la collecte de production ni ajouter une deuxième collecte complète.
 
 ## Conséquence pour MeteoAI
 
-P2 distingue quatre niveaux de preuve :
+La préparation de la Phase 17 distingue quatre niveaux de preuve :
 
 | Statut | Signification |
 |---|---|
@@ -21,6 +21,6 @@ P2 distingue quatre niveaux de preuve :
 | `SCHEDULE_DERIVED` | L’heure vient uniquement d’une cadence documentaire ou d’une règle interne ; elle n’est jamais enregistrée comme vraie heure fournisseur. |
 | `UNKNOWN` | Aucune preuve exploitable n’est disponible. |
 
-Pour les sept modèles nommés, P2 peut consulter le petit fichier `meta.json` du modèle correspondant avec un budget réseau court et un cache. Best Match reste `UNKNOWN`, car Open-Meteo peut sélectionner ou combiner des modèles selon le lieu et l’échéance.
+Pour les sept modèles nommés, le suivi peut consulter le petit fichier `meta.json` du modèle correspondant avec un budget réseau court et un cache. Best Match reste `UNKNOWN`, car Open-Meteo peut sélectionner ou combiner des modèles selon le lieu et l’échéance.
 
-P2 reste strictement shadow : aucune heure de run ne doit modifier la prévision, la fusion, les scores, les poids, les archives historiques ou la promotion de P1.
+La préparation de la Phase 17 reste strictement shadow : aucune heure de run ne doit modifier la prévision, la fusion, les scores, les poids, les archives historiques ou la promotion de P1. Elle ne constitue pas la Phase 2 officielle, consacrée à la classification des sources.

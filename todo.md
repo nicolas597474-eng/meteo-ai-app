@@ -3658,15 +3658,15 @@
 - [x] Vérifier par tests et inspection qu’aucun score, poids, fusion, classement ou prévision publique ne lit le Data Hub.
 - [x] Publier P1 et démarrer P1.6, une observation de sept jours, sans commencer P2.
 
-## P2 — Traçabilité réelle des runs fournisseur en shadow
-- [x] Présenter le périmètre, les statuts de preuve et les critères d’acceptation de P2.
+## Préparation Phase 17 — Traçabilité réelle des runs fournisseur en shadow
+- [x] Présenter le périmètre, les statuts de preuve et les critères d’acceptation de la traçabilité.
 - [x] Auditer pour chacun des 7 modèles et Best Match les métadonnées de run réellement disponibles.
 - [x] Définir les statuts `PROVIDER_REPORTED`, `OPEN_METEO_METADATA`, `SCHEDULE_DERIVED` et `UNKNOWN` sans inventer d’heure fournisseur.
 - [x] Ajouter uniquement des champs et adaptateurs shadow pour conserver la preuve de run et sa provenance.
-- [x] Brancher P2 sur les écritures shadow sans modifier les collecteurs ni les tables de production.
-- [x] Étendre le rapport propriétaire P1 avec le statut, l’heure et la preuve de run P2.
+- [x] Brancher la traçabilité sur les écritures shadow sans modifier les collecteurs ni les tables de production.
+- [x] Étendre le rapport propriétaire P1 avec le statut, l’heure et la preuve de run.
 - [x] Vérifier les cas réels, l’isolation de production et l’absence de Météo-France.
-- [x] Publier P2 sans promouvoir P1, sans commencer P3 et en maintenant P1.6.
+- [x] Publier la préparation Phase 17 sans promouvoir P1, sans commencer la Phase 2 officielle et en maintenant P1.6.
 
 ## P1.6 — Observation shadow automatisée sur sept jours
 - [x] Définir les critères déterministes de couverture, intégrité, idempotence et isolation production.
@@ -3678,6 +3678,6 @@
 - [x] Vérifier un bilan réel et le rendu mobile, puis publier sans commencer P3.
 
 ## Alignement avec la feuille de route officielle
-- [ ] Renommer la traçabilité des runs précédemment appelée P2 pour la rattacher à P1 et à la Phase 17.
-- [ ] Présenter la véritable Phase 2 : modèles déterministes, ensembles, observations, radar et satellite.
-- [ ] Définir le périmètre shadow initial de classification sans ajouter de source non connectée ni commencer la Phase 3.
+- [x] Renommer la traçabilité des runs précédemment appelée P2 pour la rattacher à P1 et à la Phase 17.
+- [x] Présenter la véritable Phase 2 : modèles déterministes, ensembles, observations, radar et satellite.
+- [x] Définir le périmètre shadow initial de classification sans ajouter de source non connectée ni commencer la Phase 3.

@@ -31,7 +31,7 @@ describe("P1 shadow weather data hub contract", () => {
     }
   });
 
-  it("defines four explicit P2 evidence levels without treating metadata as payload proof", () => {
+  it("defines four explicit Phase 17 evidence levels without treating metadata as payload proof", () => {
     expect(SHADOW_RUN_EVIDENCE_STATUSES).toEqual([
       "PROVIDER_REPORTED",
       "OPEN_METEO_METADATA",

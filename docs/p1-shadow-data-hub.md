@@ -23,4 +23,4 @@ Le 2 septembre 2026, une vérification indépendante du chemin de production a �
 
 Le rapport administrateur de l’AI Lab affiche le jour d’observation sur sept, les runs reçus, les valeurs valides ou manquantes, les statuts par source et le nombre de lignes appliquées à la production. Le cycle v8 existant alimente cette observation ; aucune nouvelle tâche planifiée n’est créée.
 
-P2 ne doit pas démarrer avant la fin de la fenêtre et une validation explicite de l’utilisateur.
+La Phase 2 officielle de classification ne doit pas être promue avant la fin de la fenêtre et une validation explicite de l’utilisateur.
