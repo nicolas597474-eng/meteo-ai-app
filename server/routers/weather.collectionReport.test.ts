@@ -20,6 +20,12 @@ describe("weather.getForecastCollectionReport", () => {
     expect(procedure).toContain("lastForecastCoverage");
     expect(procedure).toContain("dailyModelCount: lastForecastCoverage.dailyModelCount");
     expect(procedure).toContain("hourlyModelCount: lastForecastCoverage.hourlyModelCount");
+    expect(procedure).toContain("expectedPublicServices");
+    expect(procedure).toContain("publicServices");
+    expect(procedure).toContain('forecast.serviceCategory === "public"');
+    expect(procedure).toContain("dailyAvailable: Boolean(forecast)");
+    expect(procedure).toContain("hourlyAvailable: false");
+    expect(procedure).toContain("publicServiceCount");
     expect(procedure).not.toContain("lastForecastJobSuccess ?? recentCollections.find");
     expect(procedure).toContain("lastPhysicalCollection");
     expect(procedure).not.toContain("collectExpertForecasts");
