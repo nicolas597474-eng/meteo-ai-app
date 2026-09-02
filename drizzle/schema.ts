@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, json, bigint, uniqueIndex } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, json, bigint, uniqueIndex, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -590,3 +590,144 @@ export const personalModelCalibrations = mysqlTable("personal_model_calibrations
 ]);
 export type PersonalModelCalibration = typeof personalModelCalibrations.$inferSelect;
 export type InsertPersonalModelCalibration = typeof personalModelCalibrations.$inferInsert;
+
+/**
+ * P1 shadow-only licence registry. These rows document whether a source may be
+ * observed by the canonical hub; they never grant access to production fusion.
+ */
+export const shadowWeatherLicenses = mysqlTable("shadow_weather_licenses", {
+  licenseKey: varchar("licenseKey", { length: 64 }).primaryKey(),
+  label: varchar("label", { length: 128 }).notNull(),
+  termsUrl: varchar("termsUrl", { length: 512 }),
+  usageStatus: varchar("usageStatus", { length: 32 }).notNull(),
+  attributionText: text("attributionText"),
+  redistributionAllowed: int("redistributionAllowed").notNull().default(0),
+  reviewedAt: bigint("reviewedAt", { mode: "number" }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ShadowWeatherLicense = typeof shadowWeatherLicenses.$inferSelect;
+export type InsertShadowWeatherLicense = typeof shadowWeatherLicenses.$inferInsert;
+
+/** Stable metadata for each source observed by P1. */
+export const shadowWeatherSourceDefinitions = mysqlTable("shadow_weather_source_definitions", {
+  id: int("id").autoincrement().primaryKey(),
+  sourceKey: varchar("sourceKey", { length: 96 }).notNull(),
+  displayName: varchar("displayName", { length: 128 }).notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  sourceFamily: varchar("sourceFamily", { length: 64 }).notNull(),
+  model: varchar("model", { length: 96 }).notNull(),
+  modelVersion: varchar("modelVersion", { length: 64 }),
+  sourceType: varchar("sourceType", { length: 32 }).notNull(),
+  sourceRole: varchar("sourceRole", { length: 32 }).notNull(),
+  independenceClass: varchar("independenceClass", { length: 32 }).notNull(),
+  apiIdentifier: varchar("apiIdentifier", { length: 160 }).notNull(),
+  sourceUrl: varchar("sourceUrl", { length: 512 }),
+  licenseKey: varchar("licenseKey", { length: 64 }).notNull(),
+  nativeResolutionKm: float("nativeResolutionKm"),
+  expectedUpdateMinutes: int("expectedUpdateMinutes"),
+  shadowEnabled: int("shadowEnabled").notNull().default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_source_definition_key_unique").on(table.sourceKey),
+  index("shadow_source_definition_provider_model_idx").on(table.provider, table.model),
+  index("shadow_source_definition_family_independence_idx").on(table.sourceFamily, table.independenceClass),
+]);
+
+export type ShadowWeatherSourceDefinition = typeof shadowWeatherSourceDefinitions.$inferSelect;
+export type InsertShadowWeatherSourceDefinition = typeof shadowWeatherSourceDefinitions.$inferInsert;
+
+/** One logical ingestion attempt per source, location and collection cycle. */
+export const shadowWeatherIngestionRuns = mysqlTable("shadow_weather_ingestion_runs", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  cycleKey: varchar("cycleKey", { length: 128 }).notNull(),
+  sourceDefinitionId: int("sourceDefinitionId").notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  requestStartedAt: bigint("requestStartedAt", { mode: "number" }).notNull(),
+  receivedAt: bigint("receivedAt", { mode: "number" }),
+  providerRunTime: bigint("providerRunTime", { mode: "number" }),
+  runTimeKnown: int("runTimeKnown").notNull().default(0),
+  providerAvailableAt: bigint("providerAvailableAt", { mode: "number" }),
+  status: varchar("status", { length: 16 }).notNull(),
+  attempts: int("attempts").notNull().default(1),
+  httpStatus: int("httpStatus"),
+  durationMs: int("durationMs"),
+  payloadHash: varchar("payloadHash", { length: 64 }),
+  rawStorageKey: varchar("rawStorageKey", { length: 512 }),
+  failureClass: varchar("failureClass", { length: 48 }),
+  failureReason: text("failureReason"),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_ingestion_cycle_source_location_unique").on(table.cycleKey, table.sourceDefinitionId, table.locationKey),
+  index("shadow_ingestion_location_created_idx").on(table.locationKey, table.createdAt),
+  index("shadow_ingestion_source_status_idx").on(table.sourceDefinitionId, table.status),
+]);
+
+export type ShadowWeatherIngestionRun = typeof shadowWeatherIngestionRuns.$inferSelect;
+export type InsertShadowWeatherIngestionRun = typeof shadowWeatherIngestionRuns.$inferInsert;
+
+/** Canonical value store. No production query may read this table during P1. */
+export const shadowWeatherValues = mysqlTable("shadow_weather_values", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  ingestionRunId: bigint("ingestionRunId", { mode: "number" }).notNull(),
+  sourceDefinitionId: int("sourceDefinitionId").notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  latitude: float("latitude").notNull(),
+  longitude: float("longitude").notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  forecastHorizonMinutes: int("forecastHorizonMinutes"),
+  variable: varchar("variable", { length: 48 }).notNull(),
+  value: float("value"),
+  unit: varchar("unit", { length: 16 }).notNull(),
+  levelKey: varchar("levelKey", { length: 32 }).notNull(),
+  memberKey: varchar("memberKey", { length: 32 }).notNull().default("deterministic"),
+  nativeResolutionKm: float("nativeResolutionKm"),
+  qualityStatus: varchar("qualityStatus", { length: 16 }).notNull(),
+  freshnessStatus: varchar("freshnessStatus", { length: 16 }).notNull(),
+  missingData: int("missingData").notNull().default(0),
+  confidence: float("confidence"),
+  qcFlags: json("qcFlags"),
+  ingestedAt: bigint("ingestedAt", { mode: "number" }).notNull(),
+  shadowMode: int("shadowMode").notNull().default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_value_run_valid_variable_level_member_unique").on(
+    table.ingestionRunId,
+    table.validTime,
+    table.variable,
+    table.levelKey,
+    table.memberKey,
+  ),
+  index("shadow_value_location_valid_variable_idx").on(table.locationKey, table.validTime, table.variable),
+  index("shadow_value_run_quality_idx").on(table.ingestionRunId, table.qualityStatus),
+  index("shadow_value_source_valid_variable_idx").on(table.sourceDefinitionId, table.validTime, table.variable),
+  index("shadow_value_quality_freshness_ingested_idx").on(table.qualityStatus, table.freshnessStatus, table.ingestedAt),
+]);
+
+export type ShadowWeatherValue = typeof shadowWeatherValues.$inferSelect;
+export type InsertShadowWeatherValue = typeof shadowWeatherValues.$inferInsert;
+
+/** Documented lineage used later by P15; it has no effect on current weights. */
+export const shadowWeatherSourceRelations = mysqlTable("shadow_weather_source_relations", {
+  id: int("id").autoincrement().primaryKey(),
+  relationKey: varchar("relationKey", { length: 128 }).notNull(),
+  parentSourceId: int("parentSourceId").notNull(),
+  childSourceId: int("childSourceId"),
+  relationType: varchar("relationType", { length: 32 }).notNull(),
+  effectiveFrom: bigint("effectiveFrom", { mode: "number" }),
+  effectiveTo: bigint("effectiveTo", { mode: "number" }),
+  evidence: json("evidence"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_source_relation_key_unique").on(table.relationKey),
+  index("shadow_source_relation_parent_type_idx").on(table.parentSourceId, table.relationType),
+]);
+
+export type ShadowWeatherSourceRelation = typeof shadowWeatherSourceRelations.$inferSelect;
+export type InsertShadowWeatherSourceRelation = typeof shadowWeatherSourceRelations.$inferInsert;

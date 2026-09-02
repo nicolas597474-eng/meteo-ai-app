@@ -34,6 +34,29 @@ describe("weather.getForecastCollectionReport", () => {
   });
 });
 
+describe("weather.getShadowDataHubReport", () => {
+  it("reste réservé à l’administrateur et séparé du rapport public de production", () => {
+    const routerSource = readFileSync(new URL("./weather.ts", import.meta.url), "utf8");
+    const scheduledSource = readFileSync(new URL("../scheduledHandlers.ts", import.meta.url), "utf8");
+    const shadowSource = readFileSync(new URL("../weatherDataHubShadow.ts", import.meta.url), "utf8");
+
+    expect(routerSource).toContain("getShadowDataHubReport: adminProcedure");
+    expect(routerSource).toContain("getShadowDataHubObservability");
+    expect(shadowSource).toContain('productionReadsEnabled: false');
+    expect(shadowSource).toContain('appliedToProduction: 0');
+    expect(scheduledSource).toContain("executeShadowWriteSafely(`daily:${locKey}`");
+    expect(scheduledSource).toContain("executeShadowWriteSafely(`hourly:${locKey}`");
+    const dailyProductionWrite = scheduledSource.indexOf("await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);");
+    const dailyShadowWrite = scheduledSource.indexOf("persistDailyForecastsToShadow(expertData");
+    const hourlyProductionWrite = scheduledSource.indexOf("await insertHourlyForecasts(rows);");
+    const hourlyShadowWrite = scheduledSource.indexOf("persistHourlyForecastsToShadow(hourlyAllModels");
+    expect(dailyProductionWrite).toBeGreaterThanOrEqual(0);
+    expect(dailyShadowWrite).toBeGreaterThan(dailyProductionWrite);
+    expect(hourlyProductionWrite).toBeGreaterThanOrEqual(0);
+    expect(hourlyShadowWrite).toBeGreaterThan(hourlyProductionWrite);
+  });
+});
+
 describe("collectFavoritesForecastsHandler", () => {
   it("écrit le bilan des modèles indépendamment du flux physique différé", () => {
     const source = readFileSync(new URL("../scheduledHandlers.ts", import.meta.url), "utf8");

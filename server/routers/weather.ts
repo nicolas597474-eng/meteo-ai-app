@@ -63,6 +63,7 @@ import { buildWeatherProvenance } from "../weatherProvenance";
 import { buildEveningEvidence } from "../historyEvidence";
 import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHandlers";
 import { buildForecastFlowStatuses } from "../forecastFlowStatus";
+import { getShadowDataHubObservability } from "../weatherDataHubShadow";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -718,6 +719,20 @@ export const weatherRouter = router({
           hourlyMissingModels,
         } : null,
       };
+    }),
+
+  /** P1 owner-only observability. This procedure is never used by forecast production. */
+  getShadowDataHubReport: adminProcedure
+    .input(z.object({
+      lat: latitudeSchema.optional(),
+      lon: longitudeSchema.optional(),
+      lookbackDays: z.number().int().min(1).max(30).default(7),
+    }).optional())
+    .query(async ({ input }) => {
+      const locationKey = input?.lat != null && input?.lon != null
+        ? makeLocationKey(input.lat, input.lon)
+        : undefined;
+      return getShadowDataHubObservability(locationKey, input?.lookbackDays ?? 7);
     }),
 
   /** Diagnostics éphémères des appels fournisseurs, sans persistance en base. */

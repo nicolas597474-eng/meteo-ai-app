@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { Link } from "wouter";
@@ -309,9 +310,13 @@ function CollectionOperations({ forecast, physical, noStationSlots, scheduleCove
 }
 
 export default function WeatherAILab() {
+  const { user } = useAuth();
   const { activeLocation } = useLocation();
   const { style: pageSkyStyle } = usePageWeatherSky();
   const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
+  const shadowReportInput = useMemo(() => activeLocation
+    ? { lat: activeLocation.lat, lon: activeLocation.lon, lookbackDays: 7 }
+    : { lookbackDays: 7 }, [activeLocation?.lat, activeLocation?.lon]);
   const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, {
     staleTime: 2 * 60_000,
     refetchOnWindowFocus: false,
@@ -320,6 +325,12 @@ export default function WeatherAILab() {
   });
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: false });
   const { data: forecastCollectionReport } = trpc.weather.getForecastCollectionReport.useQuery(input, { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false });
+  const { data: shadowDataHubReport } = trpc.weather.getShadowDataHubReport.useQuery(shadowReportInput, {
+    enabled: user?.role === "admin",
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
   const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
   const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
   const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
@@ -496,6 +507,15 @@ export default function WeatherAILab() {
     </section>
 
     <CollectionOperations forecast={lastForecastSuccess} physical={lastPhysicalCollection} noStationSlots={noQualifiedStationSlots} scheduleCoverage={forecastCollectionReport?.scheduleCoverage} />
+
+    {user?.role === "admin" && <section className="rounded-2xl border border-violet-300/25 bg-violet-300/[0.05] p-4" aria-labelledby="shadow-data-hub-title">
+      <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-2"><Database className="mt-0.5 h-5 w-5 shrink-0 text-violet-200" /><div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-violet-200/75">P1 · Rapport propriétaire</p><h2 id="shadow-data-hub-title" className="text-sm font-semibold text-slate-100">Data Hub canonique shadow</h2><p className="mt-1 text-[10px] leading-relaxed text-slate-400">Copie d’observation isolée : aucune valeur de ce Data Hub n’alimente les prévisions, scores ou poids.</p></div></div><span className="shrink-0 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-[9px] font-semibold text-emerald-100">Production protégée</span></div>
+      {shadowDataHubReport ? <>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-xl border border-white/10 bg-slate-950/25 p-2.5"><p className="text-lg font-bold text-violet-100">{shadowDataHubReport.sourceCount}</p><p className="text-[9px] uppercase tracking-wide text-slate-500">Flux enregistrés</p></div><div className="rounded-xl border border-white/10 bg-slate-950/25 p-2.5"><p className="text-lg font-bold text-sky-100">{shadowDataHubReport.runs.total}</p><p className="text-[9px] uppercase tracking-wide text-slate-500">Runs sur 7 jours</p></div><div className="rounded-xl border border-white/10 bg-slate-950/25 p-2.5"><p className="text-lg font-bold text-emerald-100">{shadowDataHubReport.values.valid}/{shadowDataHubReport.values.total}</p><p className="text-[9px] uppercase tracking-wide text-slate-500">Valeurs valides</p></div><div className="rounded-xl border border-white/10 bg-slate-950/25 p-2.5"><p className={`text-lg font-bold ${shadowDataHubReport.runs.appliedToProduction === 0 ? "text-emerald-100" : "text-red-200"}`}>{shadowDataHubReport.runs.appliedToProduction}</p><p className="text-[9px] uppercase tracking-wide text-slate-500">Appliqué à production</p></div></div>
+        <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/25 p-3 text-[10px] leading-relaxed text-slate-300"><p><span className="font-semibold text-violet-100">Observation P1.6 · </span>{shadowDataHubReport.runs.total > 0 ? `jour ${shadowDataHubReport.observation.elapsedDays}/${shadowDataHubReport.observation.requiredDays} ; ${shadowDataHubReport.observation.remainingDays} jour(s) restant(s).` : "prête ; elle commencera au prochain cycle v8 publié."}</p><p className="mt-1"><span className="font-semibold text-slate-200">Vrai run fournisseur · </span>{shadowDataHubReport.runs.knownProviderRuns} run(s) identifié(s). Les autres restent explicitement inconnus.</p><p className="mt-1"><span className="font-semibold text-slate-200">Dernière réception · </span>{shadowDataHubReport.runs.lastReceivedAt ? formatCollectionTimestamp(new Date(shadowDataHubReport.runs.lastReceivedAt)) : "Aucune écriture shadow pour ce lieu."}</p></div>
+        {shadowDataHubReport.latestRuns.length > 0 && <div className="mt-3 grid gap-1.5 sm:grid-cols-2" aria-label="Derniers runs du Data Hub shadow">{Array.from(new Map(shadowDataHubReport.latestRuns.map(run => [run.sourceKey, run])).values()).slice(0, shadowDataHubReport.sourceCount).map((run) => <div key={run.sourceKey} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-950/20 px-2.5 py-2 text-[10px]"><span className="min-w-0"><span className="block truncate font-semibold text-slate-100">{run.displayName}</span><span className="text-[9px] text-slate-500">{run.sourceType === "aggregator" ? "Agrégateur non indépendant" : "Modèle nommé"} · run réel {run.runTimeKnown ? "connu" : "inconnu"}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold ${run.status === "SUCCESS" ? "bg-emerald-300/10 text-emerald-100" : run.status === "PARTIAL" ? "bg-amber-300/10 text-amber-100" : "bg-red-300/10 text-red-100"}`}>{run.status}</span></div>)}</div>}
+      </> : <p className="mt-3 rounded-xl border border-white/10 bg-slate-950/25 p-3 text-[10px] leading-relaxed text-slate-400">Le rapport shadow sera disponible après le premier cycle v8 publié. Cette attente ne modifie pas la prévision actuelle.</p>}
+    </section>}
 
     <ForecastModelGuideDialog modelName={selectedCollectionModel} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
 

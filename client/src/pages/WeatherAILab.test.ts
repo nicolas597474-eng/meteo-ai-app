@@ -117,6 +117,15 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("<BackToTopButton />");
     expect(source).toContain('className="order-[-1] grid grid-cols-3 gap-2"');
     expect(source).toContain('className="order-[-2] flex items-center justify-between gap-2"');
+    expect(source).toContain("getShadowDataHubReport");
+    expect(source).toContain('enabled: user?.role === "admin"');
+    expect(source).toContain("Data Hub canonique shadow");
+    expect(source).toContain("Production protégée");
+    expect(source).toContain("aucune valeur de ce Data Hub n’alimente les prévisions, scores ou poids");
+    expect(source).toContain("Observation P1.6");
+    expect(source).toContain("shadowDataHubReport.observation.elapsedDays");
+    expect(source).toContain("shadowDataHubReport.observation.remainingDays");
+    expect(source).toContain("Appliqué à production");
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {

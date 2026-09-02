@@ -3634,3 +3634,26 @@
 - [x] Afficher les statuts dans l’AI Lab avec une légende accessible sur mobile.
 - [x] Ajouter les tests de non-régression et vérifier les cas réels.
 - [x] Publier l’étape sans intégrer Météo-France ni modifier la fusion, les poids ou les archives.
+
+## Restitution de la feuille de route P0 à P28
+- [x] Relire la feuille de route validée et ses critères exacts.
+- [x] Comparer chaque phase aux versions publiées, aux tâches actives et aux décisions d’abandon.
+- [x] Classer chaque phase comme terminée, partielle, non commencée ou abandonnée.
+- [x] Présenter la feuille de route complète et identifier le prochain jalon exact avant toute nouvelle implémentation.
+
+## P1 — Conception du Data Hub canonique shadow
+- [x] Inventorier les tables, contrats et flux existants auxquels le Data Hub devra s’ajouter sans les remplacer.
+- [x] Définir les champs obligatoires, vocabulaires contrôlés et règles de qualité du contrat canonique.
+- [x] Concevoir les tables additives, index, contraintes et clés d’idempotence.
+- [x] Définir la coexistence avec la production, la double écriture shadow, l’observabilité et le rollback.
+- [x] Présenter la conception complète pour validation avant toute migration ou implémentation.
+
+## P1 — Implémentation du Data Hub canonique shadow
+- [x] P1.1 : créer les types, vocabulaires contrôlés et tests purs sans écriture en base.
+- [x] P1.2 : générer, relire et appliquer uniquement une migration additive pour les tables shadow.
+- [x] Initialiser le registre des 7 modèles et de Best Match sans ajouter Météo-France.
+- [x] P1.3 : normaliser les prévisions quotidiennes et horaires sans inventer le vrai run fournisseur.
+- [x] P1.4 : brancher une double écriture shadow non bloquante, jamais lue par la production.
+- [x] P1.5 : créer un rapport propriétaire de couverture, qualité, fraîcheur et latence shadow.
+- [x] Vérifier par tests et inspection qu’aucun score, poids, fusion, classement ou prévision publique ne lit le Data Hub.
+- [x] Publier P1 et démarrer P1.6, une observation de sept jours, sans commencer P2.

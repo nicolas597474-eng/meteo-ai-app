@@ -16,6 +16,11 @@ import { isOperationalObservation } from "./observationProvenance";
 import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
+import {
+  executeShadowWriteSafely,
+  persistDailyForecastsToShadow,
+  persistHourlyForecastsToShadow,
+} from "./weatherDataHubShadow";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
 import {
@@ -1095,7 +1100,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         });
 
         // Collect expert forecasts for this location
+        const dailyShadowRequestStartedAt = Date.now();
         const expertData = await collectExpertForecasts(today, { lat: fav.lat, lon: fav.lon });
+        const dailyShadowReceivedAt = Date.now();
         const dailyCoverage = getModelCoverage(expertData.map((forecast) => forecast.serviceName));
         console.log(`[Models] ${fav.name}: quotidien ${dailyCoverage.collected.length}/${dailyCoverage.expected.length}`);
         if (dailyCoverage.missing.length > 0) {
@@ -1184,6 +1191,23 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             rawData: f.rawData as any,
           })),
         ]);
+
+        await executeShadowWriteSafely(`daily:${locKey}`, async () => {
+          const shadowResult = await persistDailyForecastsToShadow(expertData, {
+            locationKey: locKey,
+            latitude: fav.lat,
+            longitude: fav.lon,
+            targetDate: today,
+            requestStartedAt: dailyShadowRequestStartedAt,
+            receivedAt: dailyShadowReceivedAt,
+          });
+          if (!shadowResult.ok) {
+            console.warn(`[DataHubShadow] ${fav.name}: daily partial — ${shadowResult.errors.join(" | ")}`);
+          } else {
+            console.log(`[DataHubShadow] ${fav.name}: daily ${shadowResult.sourceCount} source(s), ${shadowResult.valueCount} value(s)`);
+          }
+          return shadowResult;
+        });
 
         // Candidate outputs are archived independently and cannot enter the
         // forecasts table, official fusion or eight-model coverage counters.
@@ -1321,7 +1345,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // Collect hourly forecasts for all models for this location
         let hourlyCoverage = getModelCoverage([]);
         try {
+          const hourlyShadowRequestStartedAt = Date.now();
           const hourlyAllModels = await collectHourlyForecastAllModels(today, { lat: fav.lat, lon: fav.lon });
+          const hourlyShadowReceivedAt = Date.now();
           hourlyCoverage = getModelCoverage(hourlyAllModels.map((forecast) => forecast.modelName === "best_match" ? "Open-Meteo" : forecast.modelName));
           console.log(`[Models] ${fav.name}: horaire ${hourlyCoverage.collected.length}/${hourlyCoverage.expected.length}`);
           if (hourlyCoverage.missing.length > 0) {
@@ -1346,6 +1372,22 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             }));
             await insertHourlyForecasts(rows);
           }
+          await executeShadowWriteSafely(`hourly:${locKey}`, async () => {
+            const shadowResult = await persistHourlyForecastsToShadow(hourlyAllModels, {
+              locationKey: locKey,
+              latitude: fav.lat,
+              longitude: fav.lon,
+              targetDate: today,
+              requestStartedAt: hourlyShadowRequestStartedAt,
+              receivedAt: hourlyShadowReceivedAt,
+            });
+            if (!shadowResult.ok) {
+              console.warn(`[DataHubShadow] ${fav.name}: hourly partial — ${shadowResult.errors.join(" | ")}`);
+            } else {
+              console.log(`[DataHubShadow] ${fav.name}: hourly ${shadowResult.sourceCount} source(s), ${shadowResult.valueCount} value(s)`);
+            }
+            return shadowResult;
+          });
           const validationHourly = await collectValidationHourlyForecasts(today, { lat: fav.lat, lon: fav.lon });
           for (const { modelName, hours } of validationHourly) {
             await insertHourlyForecasts(hours.map((h) => ({
