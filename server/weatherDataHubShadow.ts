@@ -12,6 +12,8 @@ import {
 import {
   PHASE2_SHADOW_SOURCE_CLASSIFICATIONS,
   PHASE2_SOURCE_CATEGORIES,
+  PHASE3_HORIZON_STRATEGY_VERSION,
+  PHASE3_HORIZON_WINDOWS,
   P1_SHADOW_SOURCE_DEFINITIONS,
   SHADOW_CANONICAL_VARIABLES,
   type ShadowCanonicalVariable,
@@ -56,7 +58,7 @@ export type ShadowWriteContext = {
 
 export type CanonicalShadowValue = {
   validTime: number;
-  forecastHorizonMinutes: null;
+  forecastHorizonMinutes: number | null;
   variable: ShadowCanonicalVariable;
   value: number | null;
   unit: string;
@@ -69,6 +71,105 @@ export type CanonicalShadowValue = {
   confidence: null;
   qcFlags: string[];
 };
+
+export type Phase3ShadowHorizonValue = {
+  sourceKey: string;
+  displayName: string;
+  category: string | null;
+  independenceClass: string;
+  forecastHorizonMinutes: number | null;
+  validTime?: number | null;
+  receivedAt?: number | null;
+  missingData: number;
+  qualityStatus: string;
+  appliedToProduction: number;
+};
+
+export function buildPhase3HorizonHierarchyReport(rows: Phase3ShadowHorizonValue[]) {
+  const rowsWithResolvedHorizon = rows.map(row => {
+    if (row.forecastHorizonMinutes != null) return row;
+    if (row.validTime == null || row.receivedAt == null) return row;
+    const derivedHorizonMinutes = Math.round((Number(row.validTime) - Number(row.receivedAt)) / 60_000);
+    return {
+      ...row,
+      forecastHorizonMinutes: derivedHorizonMinutes >= 0 && derivedHorizonMinutes <= 21_600
+        ? derivedHorizonMinutes
+        : null,
+    };
+  });
+  const appliedToProduction = rows.reduce((total, row) => total + Number(row.appliedToProduction === 1), 0);
+  const windows = PHASE3_HORIZON_WINDOWS.map(window => {
+    const windowRows = rowsWithResolvedHorizon.filter(row => {
+      const horizon = row.forecastHorizonMinutes;
+      if (horizon == null || !Number.isFinite(horizon)) return false;
+      const isLastWindow = window.key === "7_15d";
+      return horizon >= window.minMinutes && (isLastWindow ? horizon <= window.maxMinutes : horizon < window.maxMinutes);
+    });
+    const validSourceKeys = new Set(
+      windowRows
+        .filter(row => row.missingData === 0 && row.qualityStatus === "VALID")
+        .map(row => row.sourceKey),
+    );
+    const availablePrioritySourceKeys = window.prioritySourceKeys.filter(sourceKey => validSourceKeys.has(sourceKey));
+    const availableContextSourceKeys = window.contextSourceKeys.filter(sourceKey => validSourceKeys.has(sourceKey));
+    const availableDerivedReferenceSourceKeys = window.derivedReferenceSourceKeys.filter(sourceKey => validSourceKeys.has(sourceKey));
+    const availableCapabilities = new Set<string>();
+    const availableIndependentSourceKeys = [...availablePrioritySourceKeys, ...availableContextSourceKeys];
+    if (availableIndependentSourceKeys.length > 0) availableCapabilities.add("DETERMINISTIC");
+    const missingCapabilities = window.requiredCapabilities.filter(capability => !availableCapabilities.has(capability));
+    const availableRequiredCapabilityCount = window.requiredCapabilities.length - missingCapabilities.length;
+    const status: "COMPLETE" | "PARTIAL" | "UNAVAILABLE" = availableRequiredCapabilityCount === 0
+      ? "UNAVAILABLE"
+      : missingCapabilities.length > 0
+        ? "PARTIAL"
+        : "COMPLETE";
+    const sourceNames = new Map(
+      rowsWithResolvedHorizon.map(row => [row.sourceKey, row.displayName]),
+    );
+    return {
+      key: window.key,
+      label: window.label,
+      minMinutes: window.minMinutes,
+      maxMinutes: window.maxMinutes,
+      status,
+      uncertaintyRequired: window.uncertaintyRequired,
+      requiredCapabilities: [...window.requiredCapabilities],
+      availableCapabilities: Array.from(availableCapabilities),
+      missingCapabilities,
+      availablePrioritySources: availablePrioritySourceKeys.map(sourceKey => ({
+        sourceKey,
+        displayName: sourceNames.get(sourceKey) ?? sourceKey,
+      })),
+      availableContextSources: availableContextSourceKeys.map(sourceKey => ({
+        sourceKey,
+        displayName: sourceNames.get(sourceKey) ?? sourceKey,
+      })),
+      derivedReferences: availableDerivedReferenceSourceKeys.map(sourceKey => ({
+        sourceKey,
+        displayName: sourceNames.get(sourceKey) ?? sourceKey,
+        independent: false as const,
+      })),
+      validValueCount: windowRows.filter(row => row.missingData === 0 && row.qualityStatus === "VALID").length,
+      appliedToProduction: 0 as const,
+    };
+  });
+  const knownHorizonValueCount = rowsWithResolvedHorizon.filter(row => row.forecastHorizonMinutes != null).length;
+  return {
+    version: PHASE3_HORIZON_STRATEGY_VERSION,
+    horizonBasis: "ingestion_received_at" as const,
+    horizonBasisDetail: "Échéance calculée depuis la réception du payload, jamais présentée comme l’heure réelle du run fournisseur.",
+    windowCount: windows.length,
+    knownHorizonValueCount,
+    unknownHorizonValueCount: rows.length - knownHorizonValueCount,
+    appliedToProduction,
+    productionReadsEnabled: false as const,
+    valid: windows.length === 6
+      && appliedToProduction === 0
+      && windows.every(window => window.appliedToProduction === 0)
+      && windows.every(window => window.derivedReferences.every(reference => reference.independent === false)),
+    windows,
+  };
+}
 
 const SOURCE_KEY_BY_COLLECTOR_NAME = new Map<string, string>([
   ["AROME", "openmeteo_arome_france_hd"],
@@ -120,13 +221,18 @@ function toCanonicalValue(
   variable: ShadowCanonicalVariable,
   value: number | null | undefined,
   validTime: number,
+  receivedAt: number,
   extraFlags: string[],
 ): CanonicalShadowValue {
   const definition = SHADOW_CANONICAL_VARIABLES[variable];
   const normalizedValue = value != null && Number.isFinite(value) ? Number(value) : null;
+  const rawHorizonMinutes = Math.round((validTime - receivedAt) / 60_000);
+  const forecastHorizonMinutes = rawHorizonMinutes >= 0 && rawHorizonMinutes <= 21_600
+    ? rawHorizonMinutes
+    : null;
   return {
     validTime,
-    forecastHorizonMinutes: null,
+    forecastHorizonMinutes,
     variable,
     value: normalizedValue,
     unit: definition.unit,
@@ -137,8 +243,21 @@ function toCanonicalValue(
     freshnessStatus: "UNKNOWN",
     missingData: normalizedValue == null ? 1 : 0,
     confidence: null,
-    qcFlags: [...extraFlags, "provider_run_time_unknown"],
+    qcFlags: [
+      ...extraFlags,
+      "provider_run_time_unknown",
+      forecastHorizonMinutes == null ? "outside_phase3_horizon" : "horizon_from_ingestion_time",
+    ],
   };
+}
+
+function getDailyArrayValue(daily: Record<string, unknown>, key: string, index: number) {
+  const values = daily[key];
+  if (!Array.isArray(values)) return undefined;
+  const value = values[index];
+  if (value == null) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 export function resolveP1ShadowSourceKey(collectorName: string): string | null {
@@ -149,17 +268,53 @@ export function normalizeDailyForecastToShadow(
   forecast: ForecastData,
   context: ShadowWriteContext,
 ): CanonicalShadowValue[] {
-  const validTime = parisLocalDateTimeToEpochMs(context.targetDate, 12);
-  const flags = ["daily_aggregate", "timezone_europe_paris"];
-  return [
-    toCanonicalValue("air_temperature_max", forecast.tempMax, validTime, flags),
-    toCanonicalValue("air_temperature_min", forecast.tempMin, validTime, flags),
-    toCanonicalValue("precipitation_amount", forecast.precipitation, validTime, flags),
-    toCanonicalValue("wind_speed_10m", forecast.windSpeed, validTime, flags),
-    toCanonicalValue("wind_gust_10m", forecast.windGust, validTime, flags),
-    toCanonicalValue("relative_humidity_2m", forecast.humidity, validTime, flags),
-    toCanonicalValue("cloud_cover_total", forecast.cloudCover, validTime, flags),
-  ];
+  const rawData = forecast.rawData && typeof forecast.rawData === "object"
+    ? forecast.rawData as Record<string, unknown>
+    : null;
+  const daily = rawData?.daily && typeof rawData.daily === "object"
+    ? rawData.daily as Record<string, unknown>
+    : null;
+  const dates = daily && Array.isArray(daily.time)
+    ? daily.time.filter((value): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))
+    : [];
+  const candidates = dates.length > 0
+    ? dates.map((date, index) => ({
+      date,
+      tempMax: getDailyArrayValue(daily!, "temperature_2m_max", index),
+      tempMin: getDailyArrayValue(daily!, "temperature_2m_min", index),
+      precipitation: getDailyArrayValue(daily!, "precipitation_sum", index),
+      windSpeed: getDailyArrayValue(daily!, "wind_speed_10m_max", index),
+      windGust: getDailyArrayValue(daily!, "wind_gusts_10m_max", index),
+      humidity: getDailyArrayValue(daily!, "relative_humidity_2m_mean", index),
+      cloudCover: getDailyArrayValue(daily!, "cloud_cover_mean", index),
+    }))
+    : [{
+      date: context.targetDate,
+      tempMax: forecast.tempMax,
+      tempMin: forecast.tempMin,
+      precipitation: forecast.precipitation,
+      windSpeed: forecast.windSpeed,
+      windGust: forecast.windGust,
+      humidity: forecast.humidity,
+      cloudCover: forecast.cloudCover,
+    }];
+  const values: CanonicalShadowValue[] = [];
+  for (const candidate of candidates) {
+    const validTime = parisLocalDateTimeToEpochMs(candidate.date, 12);
+    const horizonMinutes = Math.round((validTime - context.receivedAt) / 60_000);
+    if (horizonMinutes < 0 || horizonMinutes > PHASE3_HORIZON_WINDOWS.at(-1)!.maxMinutes) continue;
+    const flags = ["daily_aggregate", "timezone_europe_paris", "phase3_horizon"];
+    values.push(
+      toCanonicalValue("air_temperature_max", candidate.tempMax, validTime, context.receivedAt, flags),
+      toCanonicalValue("air_temperature_min", candidate.tempMin, validTime, context.receivedAt, flags),
+      toCanonicalValue("precipitation_amount", candidate.precipitation, validTime, context.receivedAt, flags),
+      toCanonicalValue("wind_speed_10m", candidate.windSpeed, validTime, context.receivedAt, flags),
+      toCanonicalValue("wind_gust_10m", candidate.windGust, validTime, context.receivedAt, flags),
+      toCanonicalValue("relative_humidity_2m", candidate.humidity, validTime, context.receivedAt, flags),
+      toCanonicalValue("cloud_cover_total", candidate.cloudCover, validTime, context.receivedAt, flags),
+    );
+  }
+  return values;
 }
 
 export function normalizeHourlyForecastToShadow(
@@ -171,16 +326,16 @@ export function normalizeHourlyForecastToShadow(
     const validTime = parisLocalDateTimeToEpochMs(context.targetDate, hour.hour);
     const flags = ["hourly_value", "timezone_europe_paris"];
     values.push(
-      toCanonicalValue("air_temperature_2m", hour.temperature, validTime, flags),
-      toCanonicalValue("apparent_temperature", hour.apparentTemperature, validTime, flags),
-      toCanonicalValue("precipitation_amount", hour.precipitation, validTime, flags),
-      toCanonicalValue("wind_speed_10m", hour.windSpeed, validTime, flags),
-      toCanonicalValue("wind_gust_10m", hour.windGusts, validTime, flags),
-      toCanonicalValue("wind_direction_10m", hour.windDirection, validTime, flags),
-      toCanonicalValue("relative_humidity_2m", hour.humidity, validTime, flags),
-      toCanonicalValue("air_pressure_msl", hour.pressure, validTime, [...flags, "provider_field_surface_pressure"]),
-      toCanonicalValue("cloud_cover_total", hour.cloudCover, validTime, flags),
-      toCanonicalValue("weather_code", hour.weatherCode, validTime, flags),
+      toCanonicalValue("air_temperature_2m", hour.temperature, validTime, context.receivedAt, flags),
+      toCanonicalValue("apparent_temperature", hour.apparentTemperature, validTime, context.receivedAt, flags),
+      toCanonicalValue("precipitation_amount", hour.precipitation, validTime, context.receivedAt, flags),
+      toCanonicalValue("wind_speed_10m", hour.windSpeed, validTime, context.receivedAt, flags),
+      toCanonicalValue("wind_gust_10m", hour.windGusts, validTime, context.receivedAt, flags),
+      toCanonicalValue("wind_direction_10m", hour.windDirection, validTime, context.receivedAt, flags),
+      toCanonicalValue("relative_humidity_2m", hour.humidity, validTime, context.receivedAt, flags),
+      toCanonicalValue("air_pressure_msl", hour.pressure, validTime, context.receivedAt, [...flags, "provider_field_surface_pressure"]),
+      toCanonicalValue("cloud_cover_total", hour.cloudCover, validTime, context.receivedAt, flags),
+      toCanonicalValue("weather_code", hour.weatherCode, validTime, context.receivedAt, flags),
     );
   }
   return values;
@@ -542,6 +697,30 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     .where(eq(shadowWeatherSourceDefinitions.shadowEnabled, 1))
     .orderBy(shadowWeatherSourceDefinitions.displayName);
 
+  const horizonValues = await db.select({
+    sourceKey: shadowWeatherSourceDefinitions.sourceKey,
+    displayName: shadowWeatherSourceDefinitions.displayName,
+    category: shadowWeatherSourceDefinitions.classificationCategory,
+    independenceClass: shadowWeatherSourceDefinitions.independenceClass,
+    forecastHorizonMinutes: shadowWeatherValues.forecastHorizonMinutes,
+    validTime: shadowWeatherValues.validTime,
+    receivedAt: shadowWeatherIngestionRuns.receivedAt,
+    missingData: shadowWeatherValues.missingData,
+    qualityStatus: shadowWeatherValues.qualityStatus,
+    appliedToProduction: shadowWeatherIngestionRuns.appliedToProduction,
+  }).from(shadowWeatherValues)
+    .innerJoin(shadowWeatherIngestionRuns, eq(shadowWeatherValues.ingestionRunId, shadowWeatherIngestionRuns.id))
+    .innerJoin(shadowWeatherSourceDefinitions, eq(shadowWeatherValues.sourceDefinitionId, shadowWeatherSourceDefinitions.id))
+    .where(and(...runFilters, eq(shadowWeatherValues.shadowMode, 1)));
+  const phase3HorizonHierarchy = buildPhase3HorizonHierarchyReport(horizonValues.map(value => ({
+    ...value,
+    forecastHorizonMinutes: value.forecastHorizonMinutes == null ? null : Number(value.forecastHorizonMinutes),
+    validTime: Number(value.validTime),
+    receivedAt: Number(value.receivedAt),
+    missingData: Number(value.missingData),
+    appliedToProduction: Number(value.appliedToProduction),
+  })));
+
   const categoryCounts = new Map<string, number>();
   for (const source of classifiedSources) {
     if (source.category) categoryCounts.set(source.category, (categoryCounts.get(source.category) ?? 0) + 1);
@@ -581,6 +760,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
       })),
       sources: classifiedSources,
     },
+    phase3HorizonHierarchy,
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),

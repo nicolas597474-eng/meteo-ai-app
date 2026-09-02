@@ -30,7 +30,7 @@ describe("P1 shadow normalizer", () => {
     expect(parisLocalDateTimeToEpochMs("2026-01-15", 12)).toBe(Date.parse("2026-01-15T11:00:00Z"));
   });
 
-  it("normalizes daily values with canonical units and unknown provider run time", () => {
+  it("normalizes daily values with canonical units and a shadow horizon based on ingestion time", () => {
     const values = normalizeDailyForecastToShadow({
       serviceName: "AROME",
       serviceCategory: "expert",
@@ -46,8 +46,43 @@ describe("P1 shadow normalizer", () => {
     expect(values).toHaveLength(7);
     expect(values.find(value => value.variable === "air_temperature_max")).toMatchObject({ value: 20, unit: "Cel", qualityStatus: "VALID" });
     expect(values.find(value => value.variable === "precipitation_amount")).toMatchObject({ value: null, missingData: 1, qualityStatus: "MISSING" });
-    expect(values.every(value => value.forecastHorizonMinutes === null)).toBe(true);
+    expect(values.every(value => value.forecastHorizonMinutes === 420)).toBe(true);
+    expect(values.every(value => value.qcFlags.includes("horizon_from_ingestion_time"))).toBe(true);
     expect(values.every(value => value.qcFlags.includes("provider_run_time_unknown"))).toBe(true);
+  });
+
+  it("reuses the received daily payload through fifteen days without a new provider call", () => {
+    const dates = Array.from({ length: 16 }, (_, index) => `2026-09-${String(index + 2).padStart(2, "0")}`);
+    const series = dates.map((_, index) => index + 1);
+    const values = normalizeDailyForecastToShadow({
+      serviceName: "ECMWF",
+      serviceCategory: "expert",
+      tempMax: 20,
+      tempMin: 12,
+      precipitation: 0,
+      windSpeed: 18,
+      windGust: 31,
+      humidity: 76,
+      cloudCover: 50,
+      condition: null,
+      rawData: {
+        daily: {
+          time: dates,
+          temperature_2m_max: series,
+          temperature_2m_min: series,
+          precipitation_sum: series,
+          wind_speed_10m_max: series,
+          wind_gusts_10m_max: series,
+          relative_humidity_2m_mean: series,
+          cloud_cover_mean: series,
+        },
+      },
+    }, context);
+
+    expect(values).toHaveLength(15 * 7);
+    expect(values[0]?.forecastHorizonMinutes).toBe(420);
+    expect(values.at(-1)?.forecastHorizonMinutes).toBe(20_580);
+    expect(values.every(value => value.qcFlags.includes("phase3_horizon"))).toBe(true);
   });
 
   it("normalizes every hourly parameter without fabricating provider metadata", () => {
@@ -69,6 +104,7 @@ describe("P1 shadow normalizer", () => {
     }, context);
     expect(values).toHaveLength(10);
     expect(values.find(value => value.variable === "air_pressure_msl")).toMatchObject({ value: 1018, unit: "hPa" });
+    expect(values.every(value => value.forecastHorizonMinutes === 120)).toBe(true);
     expect(values.every(value => value.freshnessStatus === "UNKNOWN")).toBe(true);
     expect(values.every(value => value.confidence === null)).toBe(true);
   });

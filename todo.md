@@ -3690,3 +3690,19 @@
 - [x] Afficher au propriétaire les huit classifications et les catégories vides explicites.
 - [x] Vérifier par tests et données réelles l’unicité, l’absence de nouvelle source et l’isolation production.
 - [x] Publier la Phase 2 shadow sans commencer la Phase 3.
+
+## Phase 3 officielle — Cadrage et exécution shadow
+- [x] Retrouver dans la feuille de route validée la définition exacte, les livrables et les critères d’acceptation de la Phase 3 : hiérarchie dynamique selon six fenêtres de 0 heure à 15 jours.
+- [x] Auditer les contrats, tables, collecteurs et rapports existants concernés, sans modifier la production.
+- [x] Documenter le périmètre shadow, les invariants, le rollback et les fichiers autorisés avant l’implémentation.
+- [x] Implémenter uniquement les éléments exigés par la Phase 3, sans nouvelle source ni donnée inventée.
+- [x] Exposer les résultats uniquement au propriétaire tant que la Phase 3 reste en shadow.
+- [x] Vérifier sur données réelles l’idempotence, l’isolation de la production et l’absence d’effet sur les moteurs, scores, poids et archives.
+- [x] Valider TypeScript, Vitest complet, la qualité du diff et le rendu mobile avant publication.
+- [x] Publier uniquement la Phase 3 validée, sans commencer la Phase 4.
+- [x] Définir les six fenêtres officielles, leurs priorités et les capacités manquantes dans un contrat partagé versionné.
+- [x] Renseigner `forecastHorizonMinutes` uniquement dans les valeurs shadow à partir de `receivedAt`, sans inventer un run fournisseur.
+- [x] Étendre la persistance quotidienne shadow aux échéances réellement présentes dans le payload déjà collecté, sans nouvel appel API.
+- [x] Évaluer la couverture réelle de chaque fenêtre et conserver Best Match comme simple repère dérivé non indépendant.
+- [x] Afficher au propriétaire les sources disponibles, les priorités absentes et l’interdiction de certitude déterministe à 7–15 jours.
+- [x] Vérifier les six fenêtres sur les deux lieux réels et confirmer `appliedToProduction = 0` partout.

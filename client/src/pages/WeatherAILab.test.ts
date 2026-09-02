@@ -128,6 +128,10 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Appliqué à production");
     expect(source).toContain("ProviderRunEvidencePanel");
     expect(source).toContain("shadowDataHubReport && <ProviderRunEvidencePanel");
+    expect(source).toContain("Phase2SourceClassificationPanel");
+    expect(source).toContain("Phase3HorizonHierarchyPanel");
+    expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase2Classification');
+    expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase3HorizonHierarchy');
   });
 
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {

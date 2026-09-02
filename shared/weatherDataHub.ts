@@ -27,6 +27,20 @@ export const PHASE2_SOURCE_CATEGORIES = [
 export const PHASE2_SOURCE_ROLES = ["FORECAST", "OBSERVATION", "DERIVED"] as const;
 export const PHASE2_CLASSIFICATION_VERSION = "phase2-source-classification-v1" as const;
 
+export const PHASE3_HORIZON_STRATEGY_VERSION = "phase3-horizon-hierarchy-v1" as const;
+export const PHASE3_SOURCE_CAPABILITIES = [
+  "DETERMINISTIC",
+  "ENSEMBLE",
+  "AI_MODEL",
+  "AI_ENSEMBLE",
+  "OBSERVATION",
+  "RADAR",
+  "SATELLITE",
+  "NOWCAST_AROME_PI",
+  "VERY_SHORT_RANGE",
+  "CONSENSUS",
+] as const;
+
 export const SHADOW_INDEPENDENCE_CLASSES = [
   "independent_model",
   "related_family",
@@ -103,6 +117,7 @@ export type ShadowSourceType = ArrayValue<typeof SHADOW_SOURCE_TYPES>;
 export type ShadowSourceRole = ArrayValue<typeof SHADOW_SOURCE_ROLES>;
 export type Phase2SourceCategory = ArrayValue<typeof PHASE2_SOURCE_CATEGORIES>;
 export type Phase2SourceRole = ArrayValue<typeof PHASE2_SOURCE_ROLES>;
+export type Phase3SourceCapability = ArrayValue<typeof PHASE3_SOURCE_CAPABILITIES>;
 export type ShadowIndependenceClass = ArrayValue<typeof SHADOW_INDEPENDENCE_CLASSES>;
 export type ShadowRunStatus = ArrayValue<typeof SHADOW_RUN_STATUSES>;
 export type ShadowRunEvidenceStatus = ArrayValue<typeof SHADOW_RUN_EVIDENCE_STATUSES>;
@@ -154,6 +169,19 @@ export type Phase2SourceClassification = {
     basis: "declared_model" | "derived_aggregator";
     explanation: string;
   };
+  appliedToProduction: 0;
+};
+
+export type Phase3HorizonWindow = {
+  key: "0_2h" | "2_6h" | "6_24h" | "1_3d" | "3_7d" | "7_15d";
+  label: string;
+  minMinutes: number;
+  maxMinutes: number;
+  requiredCapabilities: readonly Phase3SourceCapability[];
+  prioritySourceKeys: readonly string[];
+  contextSourceKeys: readonly string[];
+  derivedReferenceSourceKeys: readonly ["openmeteo_best_match"];
+  uncertaintyRequired: boolean;
   appliedToProduction: 0;
 };
 
@@ -295,6 +323,165 @@ export const P1_SHADOW_SOURCE_DEFINITIONS = [
     shadowEnabled: true,
   },
 ] as const satisfies readonly ShadowSourceDefinitionSeed[];
+
+const PHASE3_DETERMINISTIC_SOURCE_KEYS = [
+  "openmeteo_arome_france_hd",
+  "openmeteo_arpege_europe",
+  "openmeteo_icon_eu",
+  "openmeteo_ecmwf_ifs025",
+  "openmeteo_gfs_seamless",
+  "openmeteo_gem_seamless",
+  "openmeteo_ukmo_seamless",
+] as const;
+
+export const PHASE3_HORIZON_WINDOWS = [
+  {
+    key: "0_2h",
+    label: "0 à 2 heures",
+    minMinutes: 0,
+    maxMinutes: 120,
+    requiredCapabilities: ["OBSERVATION", "RADAR", "NOWCAST_AROME_PI", "SATELLITE", "VERY_SHORT_RANGE"],
+    prioritySourceKeys: [],
+    contextSourceKeys: PHASE3_DETERMINISTIC_SOURCE_KEYS,
+    derivedReferenceSourceKeys: ["openmeteo_best_match"],
+    uncertaintyRequired: false,
+    appliedToProduction: 0,
+  },
+  {
+    key: "2_6h",
+    label: "2 à 6 heures",
+    minMinutes: 120,
+    maxMinutes: 360,
+    requiredCapabilities: ["OBSERVATION", "RADAR", "NOWCAST_AROME_PI", "DETERMINISTIC", "ENSEMBLE"],
+    prioritySourceKeys: [
+      "openmeteo_arome_france_hd",
+      "openmeteo_arpege_europe",
+      "openmeteo_icon_eu",
+      "openmeteo_ecmwf_ifs025",
+      "openmeteo_gfs_seamless",
+      "openmeteo_ukmo_seamless",
+      "openmeteo_gem_seamless",
+    ],
+    contextSourceKeys: [],
+    derivedReferenceSourceKeys: ["openmeteo_best_match"],
+    uncertaintyRequired: false,
+    appliedToProduction: 0,
+  },
+  {
+    key: "6_24h",
+    label: "6 à 24 heures",
+    minMinutes: 360,
+    maxMinutes: 1_440,
+    requiredCapabilities: ["DETERMINISTIC", "AI_MODEL", "ENSEMBLE", "OBSERVATION"],
+    prioritySourceKeys: [
+      "openmeteo_arome_france_hd",
+      "openmeteo_ecmwf_ifs025",
+      "openmeteo_icon_eu",
+      "openmeteo_arpege_europe",
+      "openmeteo_gfs_seamless",
+      "openmeteo_ukmo_seamless",
+      "openmeteo_gem_seamless",
+    ],
+    contextSourceKeys: [],
+    derivedReferenceSourceKeys: ["openmeteo_best_match"],
+    uncertaintyRequired: false,
+    appliedToProduction: 0,
+  },
+  {
+    key: "1_3d",
+    label: "1 à 3 jours",
+    minMinutes: 1_440,
+    maxMinutes: 4_320,
+    requiredCapabilities: ["DETERMINISTIC", "AI_MODEL", "ENSEMBLE"],
+    prioritySourceKeys: [
+      "openmeteo_ecmwf_ifs025",
+      "openmeteo_arome_france_hd",
+      "openmeteo_icon_eu",
+      "openmeteo_gfs_seamless",
+      "openmeteo_ukmo_seamless",
+      "openmeteo_gem_seamless",
+      "openmeteo_arpege_europe",
+    ],
+    contextSourceKeys: [],
+    derivedReferenceSourceKeys: ["openmeteo_best_match"],
+    uncertaintyRequired: false,
+    appliedToProduction: 0,
+  },
+  {
+    key: "3_7d",
+    label: "3 à 7 jours",
+    minMinutes: 4_320,
+    maxMinutes: 10_080,
+    requiredCapabilities: ["DETERMINISTIC", "AI_MODEL", "ENSEMBLE"],
+    prioritySourceKeys: [
+      "openmeteo_ecmwf_ifs025",
+      "openmeteo_gfs_seamless",
+      "openmeteo_icon_eu",
+      "openmeteo_ukmo_seamless",
+      "openmeteo_gem_seamless",
+      "openmeteo_arpege_europe",
+      "openmeteo_arome_france_hd",
+    ],
+    contextSourceKeys: [],
+    derivedReferenceSourceKeys: ["openmeteo_best_match"],
+    uncertaintyRequired: false,
+    appliedToProduction: 0,
+  },
+  {
+    key: "7_15d",
+    label: "7 à 15 jours",
+    minMinutes: 10_080,
+    maxMinutes: 21_600,
+    requiredCapabilities: ["ENSEMBLE", "AI_ENSEMBLE", "CONSENSUS"],
+    prioritySourceKeys: [],
+    contextSourceKeys: [
+      "openmeteo_ecmwf_ifs025",
+      "openmeteo_gfs_seamless",
+      "openmeteo_icon_eu",
+      "openmeteo_ukmo_seamless",
+      "openmeteo_gem_seamless",
+      "openmeteo_arpege_europe",
+      "openmeteo_arome_france_hd",
+    ],
+    derivedReferenceSourceKeys: ["openmeteo_best_match"],
+    uncertaintyRequired: true,
+    appliedToProduction: 0,
+  },
+] as const satisfies readonly Phase3HorizonWindow[];
+
+export function getPhase3HorizonWindow(forecastHorizonMinutes: number | null | undefined) {
+  if (forecastHorizonMinutes == null || !Number.isFinite(forecastHorizonMinutes) || forecastHorizonMinutes < 0) {
+    return null;
+  }
+  return PHASE3_HORIZON_WINDOWS.find((window, index) => {
+    const isLastWindow = index === PHASE3_HORIZON_WINDOWS.length - 1;
+    return forecastHorizonMinutes >= window.minMinutes
+      && (isLastWindow ? forecastHorizonMinutes <= window.maxMinutes : forecastHorizonMinutes < window.maxMinutes);
+  }) ?? null;
+}
+
+export function validatePhase3HorizonStrategy(): { valid: true; windowCount: number } {
+  if (PHASE3_HORIZON_WINDOWS.length !== 6) throw new Error("Phase 3 must define exactly six horizon windows");
+  if (PHASE3_HORIZON_WINDOWS[0]?.minMinutes !== 0 || PHASE3_HORIZON_WINDOWS.at(-1)?.maxMinutes !== 21_600) {
+    throw new Error("Phase 3 horizon windows must cover 0 minutes through 15 days");
+  }
+  for (let index = 0; index < PHASE3_HORIZON_WINDOWS.length; index++) {
+    const window = PHASE3_HORIZON_WINDOWS[index];
+    const next = PHASE3_HORIZON_WINDOWS[index + 1];
+    if (next && window.maxMinutes !== next.minMinutes) throw new Error(`Phase 3 horizon gap after ${window.key}`);
+    if (window.appliedToProduction !== 0) throw new Error(`Phase 3 window ${window.key} must remain shadow-only`);
+    const prioritySourceKeys: readonly string[] = window.prioritySourceKeys;
+    const contextSourceKeys: readonly string[] = window.contextSourceKeys;
+    if (prioritySourceKeys.includes("openmeteo_best_match") || contextSourceKeys.includes("openmeteo_best_match")) {
+      throw new Error("Best Match must remain a derived reference outside independent priorities");
+    }
+    const registeredKeys = new Set(P1_SHADOW_SOURCE_DEFINITIONS.map(source => source.sourceKey));
+    for (const sourceKey of [...window.prioritySourceKeys, ...window.contextSourceKeys, ...window.derivedReferenceSourceKeys]) {
+      if (!registeredKeys.has(sourceKey)) throw new Error(`Unregistered Phase 3 source: ${sourceKey}`);
+    }
+  }
+  return { valid: true, windowCount: PHASE3_HORIZON_WINDOWS.length };
+}
 
 export const PHASE2_SHADOW_SOURCE_CLASSIFICATIONS = P1_SHADOW_SOURCE_DEFINITIONS.map(source => {
   const derived = source.model === "best_match";
