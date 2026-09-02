@@ -42,6 +42,18 @@ describe("P1 shadow normalizer", () => {
       humidity: 76,
       cloudCover: 100,
       condition: null,
+      rawData: {
+        timezone: "Europe/Paris",
+        daily_units: {
+          temperature_2m_max: "°C",
+          temperature_2m_min: "°C",
+          precipitation_sum: "mm",
+          wind_speed_10m_max: "km/h",
+          wind_gusts_10m_max: "km/h",
+          relative_humidity_2m_mean: "%",
+          cloud_cover_mean: "%",
+        },
+      },
     }, context);
     expect(values).toHaveLength(7);
     expect(values.find(value => value.variable === "air_temperature_max")).toMatchObject({ value: 20, unit: "Cel", qualityStatus: "VALID" });
@@ -49,6 +61,16 @@ describe("P1 shadow normalizer", () => {
     expect(values.every(value => value.forecastHorizonMinutes === 420)).toBe(true);
     expect(values.every(value => value.qcFlags.includes("horizon_from_ingestion_time"))).toBe(true);
     expect(values.every(value => value.qcFlags.includes("provider_run_time_unknown"))).toBe(true);
+    expect(values.find(value => value.variable === "air_temperature_max")?.normalizationMetadata).toMatchObject({
+      version: "phase4-data-normalization-v1",
+      status: "NORMALIZED",
+      sourceUnit: "°C",
+      canonicalUnit: "Cel",
+      conversion: "celsius_identity",
+      sourceTimezone: "Europe/Paris",
+      coordinateStatus: "VALID",
+      appliedToProduction: 0,
+    });
   });
 
   it("reuses the received daily payload through fifteen days without a new provider call", () => {
@@ -66,6 +88,16 @@ describe("P1 shadow normalizer", () => {
       cloudCover: 50,
       condition: null,
       rawData: {
+        timezone: "Europe/Paris",
+        daily_units: {
+          temperature_2m_max: "°C",
+          temperature_2m_min: "°C",
+          precipitation_sum: "mm",
+          wind_speed_10m_max: "km/h",
+          wind_gusts_10m_max: "km/h",
+          relative_humidity_2m_mean: "%",
+          cloud_cover_mean: "%",
+        },
         daily: {
           time: dates,
           temperature_2m_max: series,
@@ -101,9 +133,30 @@ describe("P1 shadow normalizer", () => {
         cloudCover: 100,
         weatherCode: 3,
       }],
+      sourceMetadata: {
+        timezone: "Europe/Paris",
+        utcOffsetSeconds: 7200,
+        units: {
+          temperature: "°C",
+          apparentTemperature: "°C",
+          precipitation: "mm",
+          windSpeed: "km/h",
+          windGusts: "km/h",
+          windDirection: "°",
+          humidity: "%",
+          pressure: "hPa",
+          cloudCover: "%",
+          weatherCode: "wmo code",
+        },
+      },
     }, context);
     expect(values).toHaveLength(10);
-    expect(values.find(value => value.variable === "air_pressure_msl")).toMatchObject({ value: 1018, unit: "hPa" });
+    expect(values.find(value => value.variable === "air_pressure_surface")).toMatchObject({
+      value: 1018,
+      unit: "hPa",
+      normalizationMetadata: { status: "NORMALIZED", sourceUnit: "hPa", canonicalUnit: "hPa" },
+    });
+    expect(values.find(value => value.variable === "wind_direction_10m")?.normalizationMetadata.cardinalDirection).toBe("O");
     expect(values.every(value => value.forecastHorizonMinutes === 120)).toBe(true);
     expect(values.every(value => value.freshnessStatus === "UNKNOWN")).toBe(true);
     expect(values.every(value => value.confidence === null)).toBe(true);

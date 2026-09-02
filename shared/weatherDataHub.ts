@@ -41,6 +41,20 @@ export const PHASE3_SOURCE_CAPABILITIES = [
   "CONSENSUS",
 ] as const;
 
+export const PHASE4_NORMALIZATION_VERSION = "phase4-data-normalization-v1" as const;
+export const PHASE4_NORMALIZATION_STATUSES = ["NORMALIZED", "MISSING", "ISSUES"] as const;
+export const PHASE4_NORMALIZATION_ISSUES = [
+  "MISSING_VALUE",
+  "NON_FINITE_VALUE",
+  "MISSING_SOURCE_UNIT",
+  "UNSUPPORTED_SOURCE_UNIT",
+  "VALUE_OUT_OF_RANGE",
+  "INVALID_TIMESTAMP",
+  "INVALID_COORDINATES",
+  "MISSING_SOURCE_TIMEZONE",
+  "UNEXPECTED_SOURCE_TIMEZONE",
+] as const;
+
 export const SHADOW_INDEPENDENCE_CLASSES = [
   "independent_model",
   "related_family",
@@ -94,7 +108,7 @@ export const SHADOW_USAGE_STATUSES = [
   "disabled",
 ] as const;
 
-export const SHADOW_CANONICAL_UNITS = ["Cel", "mm", "km/h", "degree", "%", "hPa", "wmo_code"] as const;
+export const SHADOW_CANONICAL_UNITS = ["Cel", "mm", "km/h", "degree", "%", "hPa", "km", "cm", "wmo_code"] as const;
 
 export const SHADOW_CANONICAL_VARIABLES = {
   air_temperature_2m: { unit: "Cel", levelKey: "2m" },
@@ -107,7 +121,10 @@ export const SHADOW_CANONICAL_VARIABLES = {
   wind_direction_10m: { unit: "degree", levelKey: "10m" },
   relative_humidity_2m: { unit: "%", levelKey: "2m" },
   air_pressure_msl: { unit: "hPa", levelKey: "msl" },
+  air_pressure_surface: { unit: "hPa", levelKey: "surface" },
   cloud_cover_total: { unit: "%", levelKey: "total_atmosphere" },
+  visibility: { unit: "km", levelKey: "surface" },
+  snowfall_amount: { unit: "cm", levelKey: "surface" },
   weather_code: { unit: "wmo_code", levelKey: "surface" },
 } as const;
 
@@ -118,6 +135,8 @@ export type ShadowSourceRole = ArrayValue<typeof SHADOW_SOURCE_ROLES>;
 export type Phase2SourceCategory = ArrayValue<typeof PHASE2_SOURCE_CATEGORIES>;
 export type Phase2SourceRole = ArrayValue<typeof PHASE2_SOURCE_ROLES>;
 export type Phase3SourceCapability = ArrayValue<typeof PHASE3_SOURCE_CAPABILITIES>;
+export type Phase4NormalizationStatus = ArrayValue<typeof PHASE4_NORMALIZATION_STATUSES>;
+export type Phase4NormalizationIssue = ArrayValue<typeof PHASE4_NORMALIZATION_ISSUES>;
 export type ShadowIndependenceClass = ArrayValue<typeof SHADOW_INDEPENDENCE_CLASSES>;
 export type ShadowRunStatus = ArrayValue<typeof SHADOW_RUN_STATUSES>;
 export type ShadowRunEvidenceStatus = ArrayValue<typeof SHADOW_RUN_EVIDENCE_STATUSES>;
@@ -127,6 +146,37 @@ export type ShadowFreshnessStatus = ArrayValue<typeof SHADOW_FRESHNESS_STATUSES>
 export type ShadowUsageStatus = ArrayValue<typeof SHADOW_USAGE_STATUSES>;
 export type ShadowCanonicalUnit = ArrayValue<typeof SHADOW_CANONICAL_UNITS>;
 export type ShadowCanonicalVariable = keyof typeof SHADOW_CANONICAL_VARIABLES;
+
+export type Phase4NormalizationMetadata = {
+  version: typeof PHASE4_NORMALIZATION_VERSION;
+  status: Phase4NormalizationStatus;
+  sourceValue: number | null;
+  sourceUnit: string | null;
+  canonicalUnit: ShadowCanonicalUnit;
+  conversion: string;
+  sourceTimezone: string | null;
+  cardinalDirection: string | null;
+  coordinateStatus: "VALID" | "INVALID";
+  nativeResolutionStatus: "KNOWN" | "UNKNOWN";
+  issues: Phase4NormalizationIssue[];
+  appliedToProduction: 0;
+};
+
+export type Phase4NormalizationInput = {
+  variable: ShadowCanonicalVariable;
+  value: number | null | undefined;
+  sourceUnit: string | null | undefined;
+  sourceTimezone: string | null | undefined;
+  latitude: number;
+  longitude: number;
+  validTime: number;
+  nativeResolutionKm: number | null;
+};
+
+export type Phase4NormalizationResult = {
+  value: number | null;
+  metadata: Phase4NormalizationMetadata;
+};
 
 export type ShadowSourceDefinitionSeed = {
   sourceKey: string;
@@ -527,6 +577,150 @@ export function validatePhase2ShadowClassifications(): { valid: true; sourceCoun
 
 export function getShadowCanonicalVariableDefinition(variable: ShadowCanonicalVariable) {
   return SHADOW_CANONICAL_VARIABLES[variable];
+}
+
+const PHASE4_CARDINAL_DIRECTIONS = [
+  "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+  "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO",
+] as const;
+
+function normalizePhase4UnitToken(unit: string) {
+  return unit.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function roundPhase4Value(value: number) {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function getPhase4CardinalDirection(degrees: number) {
+  const index = Math.round(degrees / 22.5) % PHASE4_CARDINAL_DIRECTIONS.length;
+  return PHASE4_CARDINAL_DIRECTIONS[index] ?? null;
+}
+
+function convertPhase4Value(
+  variable: ShadowCanonicalVariable,
+  sourceValue: number,
+  sourceUnit: string,
+): { value: number | null; conversion: string } {
+  const canonicalUnit = SHADOW_CANONICAL_VARIABLES[variable].unit;
+  const unit = normalizePhase4UnitToken(sourceUnit);
+
+  if (canonicalUnit === "Cel") {
+    if (["°c", "cel", "c", "celsius"].includes(unit)) return { value: sourceValue, conversion: "celsius_identity" };
+    if (["°f", "f", "fahrenheit"].includes(unit)) return { value: (sourceValue - 32) * 5 / 9, conversion: "fahrenheit_to_celsius" };
+    if (["k", "kelvin"].includes(unit)) return { value: sourceValue - 273.15, conversion: "kelvin_to_celsius" };
+  }
+  if (canonicalUnit === "km/h") {
+    if (["km/h", "kmh", "kph"].includes(unit)) return { value: sourceValue, conversion: "kilometres_per_hour_identity" };
+    if (["m/s", "mps"].includes(unit)) return { value: sourceValue * 3.6, conversion: "metres_per_second_to_kilometres_per_hour" };
+    if (["mph", "mi/h"].includes(unit)) return { value: sourceValue * 1.609344, conversion: "miles_per_hour_to_kilometres_per_hour" };
+    if (["kn", "kt", "knot", "knots"].includes(unit)) return { value: sourceValue * 1.852, conversion: "knots_to_kilometres_per_hour" };
+  }
+  if (canonicalUnit === "mm") {
+    if (unit === "mm") return { value: sourceValue, conversion: "millimetres_identity" };
+    if (unit === "cm") return { value: sourceValue * 10, conversion: "centimetres_to_millimetres" };
+    if (["in", "inch", "inches"].includes(unit)) return { value: sourceValue * 25.4, conversion: "inches_to_millimetres" };
+  }
+  if (canonicalUnit === "hPa") {
+    if (["hpa", "mbar"].includes(unit)) return { value: sourceValue, conversion: "hectopascals_identity" };
+    if (unit === "pa") return { value: sourceValue / 100, conversion: "pascals_to_hectopascals" };
+    if (unit === "kpa") return { value: sourceValue * 10, conversion: "kilopascals_to_hectopascals" };
+  }
+  if (canonicalUnit === "%") {
+    if (["%", "percent", "percentage"].includes(unit)) return { value: sourceValue, conversion: "percentage_identity" };
+    if (["fraction", "0-1"].includes(unit)) return { value: sourceValue * 100, conversion: "fraction_to_percentage" };
+  }
+  if (canonicalUnit === "degree") {
+    if (["degree", "degrees", "°", "deg"].includes(unit)) {
+      return { value: sourceValue === 360 ? 0 : sourceValue, conversion: sourceValue === 360 ? "degrees_wrap_360_to_0" : "degrees_identity" };
+    }
+    if (["rad", "radian", "radians"].includes(unit)) return { value: sourceValue * 180 / Math.PI, conversion: "radians_to_degrees" };
+  }
+  if (canonicalUnit === "km") {
+    if (unit === "km") return { value: sourceValue, conversion: "kilometres_identity" };
+    if (["m", "metre", "metres", "meter", "meters"].includes(unit)) return { value: sourceValue / 1_000, conversion: "metres_to_kilometres" };
+  }
+  if (canonicalUnit === "cm") {
+    if (unit === "cm") return { value: sourceValue, conversion: "centimetres_identity" };
+    if (unit === "mm") return { value: sourceValue / 10, conversion: "millimetres_to_centimetres" };
+    if (["m", "metre", "metres", "meter", "meters"].includes(unit)) return { value: sourceValue * 100, conversion: "metres_to_centimetres" };
+  }
+  if (canonicalUnit === "wmo_code" && ["wmo_code", "wmocode", "wmo", "code"].includes(unit)) {
+    return { value: sourceValue, conversion: "wmo_code_identity" };
+  }
+  return { value: null, conversion: "unsupported_source_unit" };
+}
+
+function isPhase4ValueInStructuralRange(variable: ShadowCanonicalVariable, value: number) {
+  if (["air_temperature_2m", "air_temperature_max", "air_temperature_min", "apparent_temperature"].includes(variable)) return value >= -100 && value <= 70;
+  if (["wind_speed_10m", "wind_gust_10m"].includes(variable)) return value >= 0 && value <= 500;
+  if (["relative_humidity_2m", "cloud_cover_total"].includes(variable)) return value >= 0 && value <= 100;
+  if (variable === "precipitation_amount") return value >= 0 && value <= 1_000;
+  if (["air_pressure_msl", "air_pressure_surface"].includes(variable)) return value >= 800 && value <= 1_200;
+  if (variable === "wind_direction_10m") return value >= 0 && value < 360;
+  if (variable === "visibility") return value >= 0 && value <= 500;
+  if (variable === "snowfall_amount") return value >= 0 && value <= 1_000;
+  if (variable === "weather_code") return Number.isInteger(value) && value >= 0 && value <= 99;
+  return true;
+}
+
+export function normalizePhase4WeatherValue(input: Phase4NormalizationInput): Phase4NormalizationResult {
+  const definition = SHADOW_CANONICAL_VARIABLES[input.variable];
+  const issues: Phase4NormalizationIssue[] = [];
+  const sourceValue = input.value == null ? null : Number(input.value);
+  const sourceUnit = input.sourceUnit?.trim() || null;
+  const sourceTimezone = input.sourceTimezone?.trim() || null;
+
+  if (sourceValue == null) issues.push("MISSING_VALUE");
+  else if (!Number.isFinite(sourceValue)) issues.push("NON_FINITE_VALUE");
+  if (!sourceUnit) issues.push("MISSING_SOURCE_UNIT");
+  if (!Number.isFinite(input.validTime) || input.validTime <= 0) issues.push("INVALID_TIMESTAMP");
+  if (!Number.isFinite(input.latitude) || input.latitude < -90 || input.latitude > 90 || !Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180) {
+    issues.push("INVALID_COORDINATES");
+  }
+  if (!sourceTimezone) issues.push("MISSING_SOURCE_TIMEZONE");
+  else if (!["Europe/Paris", "UTC", "GMT"].includes(sourceTimezone)) issues.push("UNEXPECTED_SOURCE_TIMEZONE");
+
+  let normalizedValue: number | null = null;
+  let conversion = sourceValue == null ? "missing_value" : "unresolved_unit";
+  if (sourceValue != null && Number.isFinite(sourceValue) && sourceUnit) {
+    const converted = convertPhase4Value(input.variable, sourceValue, sourceUnit);
+    normalizedValue = converted.value == null ? null : roundPhase4Value(converted.value);
+    conversion = converted.conversion;
+    if (converted.value == null) issues.push("UNSUPPORTED_SOURCE_UNIT");
+  }
+  if (normalizedValue != null && !isPhase4ValueInStructuralRange(input.variable, normalizedValue)) {
+    issues.push("VALUE_OUT_OF_RANGE");
+  }
+
+  const status: Phase4NormalizationStatus = sourceValue == null
+    ? "MISSING"
+    : issues.length === 0
+      ? "NORMALIZED"
+      : "ISSUES";
+  const cardinalDirection = input.variable === "wind_direction_10m"
+    && normalizedValue != null
+    && isPhase4ValueInStructuralRange(input.variable, normalizedValue)
+      ? getPhase4CardinalDirection(normalizedValue)
+      : null;
+
+  return {
+    value: normalizedValue,
+    metadata: {
+      version: PHASE4_NORMALIZATION_VERSION,
+      status,
+      sourceValue: sourceValue != null && Number.isFinite(sourceValue) ? sourceValue : null,
+      sourceUnit,
+      canonicalUnit: definition.unit,
+      conversion,
+      sourceTimezone,
+      cardinalDirection,
+      coordinateStatus: issues.includes("INVALID_COORDINATES") ? "INVALID" : "VALID",
+      nativeResolutionStatus: input.nativeResolutionKm == null ? "UNKNOWN" : "KNOWN",
+      issues,
+      appliedToProduction: 0,
+    },
+  };
 }
 
 export function validateP1ShadowSourceRegistry(): { valid: true; sourceCount: number } {

@@ -617,10 +617,7 @@ export async function collectHourlyForecast(
  * Returns an array of { modelName, hours } for storage in hourly_forecasts table.
  * Called daily at 05h00 by the heartbeat cron.
  */
-export async function collectHourlyForecastAllModels(
-  targetDate: string,
-  coords?: { lat: number; lon: number }
-): Promise<Array<{
+export type HourlyModelForecast = {
   modelName: string;
   hours: Array<{
     hour: number;
@@ -635,7 +632,28 @@ export async function collectHourlyForecastAllModels(
     cloudCover: number | null;
     weatherCode: number | null;
   }>;
-}>> {
+  sourceMetadata?: {
+    timezone: string | null;
+    utcOffsetSeconds: number | null;
+    units: {
+      temperature: string | null;
+      apparentTemperature: string | null;
+      precipitation: string | null;
+      windSpeed: string | null;
+      windGusts: string | null;
+      windDirection: string | null;
+      humidity: string | null;
+      pressure: string | null;
+      cloudCover: string | null;
+      weatherCode: string | null;
+    };
+  };
+};
+
+export async function collectHourlyForecastAllModels(
+  targetDate: string,
+  coords?: { lat: number; lon: number }
+): Promise<HourlyModelForecast[]> {
   const location = coords ?? HONDEGHEM;
   const modelsToCollect = [
     { name: "AROME", modelId: "meteofrance_arome_france_hd" },
@@ -648,22 +666,7 @@ export async function collectHourlyForecastAllModels(
     { name: "best_match", modelId: null }, // Open-Meteo best match
   ];
 
-  const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<{
-    modelName: string;
-    hours: Array<{
-      hour: number;
-      temperature: number | null;
-      apparentTemperature: number | null;
-      precipitation: number | null;
-      windSpeed: number | null;
-      windGusts: number | null;
-      windDirection: number | null;
-      humidity: number | null;
-      pressure: number | null;
-      cloudCover: number | null;
-      weatherCode: number | null;
-    }>;
-  } | null> => {
+  const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<HourlyModelForecast | null> => {
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
@@ -719,7 +722,30 @@ export async function collectHourlyForecastAllModels(
       }
 
       if (hours.length > 0) {
-        return { modelName: model.name, hours };
+        const hourlyUnits = data.hourly_units && typeof data.hourly_units === "object"
+          ? data.hourly_units as Record<string, unknown>
+          : {};
+        const getUnit = (key: string) => typeof hourlyUnits[key] === "string" ? hourlyUnits[key] as string : null;
+        return {
+          modelName: model.name,
+          hours,
+          sourceMetadata: {
+            timezone: typeof data.timezone === "string" ? data.timezone : null,
+            utcOffsetSeconds: Number.isFinite(Number(data.utc_offset_seconds)) ? Number(data.utc_offset_seconds) : null,
+            units: {
+              temperature: getUnit("temperature_2m"),
+              apparentTemperature: getUnit("apparent_temperature"),
+              precipitation: getUnit("precipitation"),
+              windSpeed: getUnit("wind_speed_10m"),
+              windGusts: getUnit("wind_gusts_10m"),
+              windDirection: getUnit("wind_direction_10m"),
+              humidity: getUnit("relative_humidity_2m"),
+              pressure: getUnit("surface_pressure"),
+              cloudCover: getUnit("cloud_cover"),
+              weatherCode: getUnit("weather_code"),
+            },
+          },
+        };
       }
       return null;
     } catch (err) {

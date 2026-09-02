@@ -3706,3 +3706,15 @@
 - [x] Évaluer la couverture réelle de chaque fenêtre et conserver Best Match comme simple repère dérivé non indépendant.
 - [x] Afficher au propriétaire les sources disponibles, les priorités absentes et l’interdiction de certitude déterministe à 7–15 jours.
 - [x] Vérifier les six fenêtres sur les deux lieux réels et confirmer `appliedToProduction = 0` partout.
+
+## Phase 4 officielle — Normalisation des données shadow
+- [x] Auditer les variables, unités, horodatages, fuseaux, coordonnées, résolutions, valeurs manquantes et métadonnées actuellement persistés dans le Data Hub shadow.
+- [x] Définir un contrat canonique versionné couvrant °C, km/h, m/s, mm, hPa, %, degrés, directions cardinales, km et unité de neige.
+- [x] Distinguer la normalisation Phase 4 du contrôle qualité Phase 5 : vérifier et signaler sans introduire les statuts QC futurs dans la production.
+- [x] Implémenter des conversions pures, déterministes et testées uniquement dans le pipeline shadow.
+- [x] Conserver dans `normalizationMetadata` l’unité source, l’unité canonique, la conversion appliquée et les anomalies de normalisation.
+- [x] Renseigner les données manquantes sans inventer de valeur, de résolution, de fuseau ou de métadonnée fournisseur.
+- [x] Afficher au propriétaire la couverture des unités canoniques, les conversions et les anomalies par variable.
+- [x] Vérifier les deux lieux réels, l’idempotence et `appliedToProduction = 0` sans modifier les archives de production.
+- [x] Valider TypeScript, Vitest complet, l’isolation statique des lecteurs, la qualité du diff et le rendu mobile.
+- [x] Publier uniquement la Phase 4 validée, sans commencer la Phase 5.

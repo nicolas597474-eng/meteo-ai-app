@@ -709,6 +709,7 @@ export const shadowWeatherValues = mysqlTable("shadow_weather_values", {
   missingData: int("missingData").notNull().default(0),
   confidence: float("confidence"),
   qcFlags: json("qcFlags"),
+  normalizationMetadata: json("normalizationMetadata"),
   ingestedAt: bigint("ingestedAt", { mode: "number" }).notNull(),
   shadowMode: int("shadowMode").notNull().default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

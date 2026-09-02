@@ -14,8 +14,11 @@ import {
   PHASE2_SOURCE_CATEGORIES,
   PHASE3_HORIZON_STRATEGY_VERSION,
   PHASE3_HORIZON_WINDOWS,
+  PHASE4_NORMALIZATION_VERSION,
   P1_SHADOW_SOURCE_DEFINITIONS,
   SHADOW_CANONICAL_VARIABLES,
+  normalizePhase4WeatherValue,
+  type Phase4NormalizationMetadata,
   type ShadowCanonicalVariable,
   type ShadowFreshnessStatus,
   type ShadowProviderRunEvidence,
@@ -23,29 +26,14 @@ import {
   type ShadowRunStatus,
 } from "../shared/weatherDataHub";
 import { getDb } from "./db";
-import type { ForecastData } from "./weatherServices";
+import type { ForecastData, HourlyModelForecast } from "./weatherServices";
 import {
   createUnknownRunEvidence,
   fetchProviderRunEvidenceMap,
 } from "./weatherProviderRunEvidence";
 import { getP1ObservationWindow } from "./weatherP1Observation";
 
-export type ShadowHourlyForecast = {
-  modelName: string;
-  hours: Array<{
-    hour: number;
-    temperature: number | null;
-    apparentTemperature: number | null;
-    precipitation: number | null;
-    windSpeed: number | null;
-    windGusts: number | null;
-    windDirection: number | null;
-    humidity: number | null;
-    pressure: number | null;
-    cloudCover: number | null;
-    weatherCode: number | null;
-  }>;
-};
+export type ShadowHourlyForecast = HourlyModelForecast;
 
 export type ShadowWriteContext = {
   locationKey: string;
@@ -70,6 +58,7 @@ export type CanonicalShadowValue = {
   missingData: 0 | 1;
   confidence: null;
   qcFlags: string[];
+  normalizationMetadata: Phase4NormalizationMetadata;
 };
 
 export type Phase3ShadowHorizonValue = {
@@ -171,6 +160,111 @@ export function buildPhase3HorizonHierarchyReport(rows: Phase3ShadowHorizonValue
   };
 }
 
+export type Phase4ShadowNormalizationValue = {
+  variable: string;
+  unit: string;
+  normalizationMetadata: unknown;
+  missingData: number;
+  shadowMode: number;
+  appliedToProduction: number;
+};
+
+function parsePhase4NormalizationMetadata(value: unknown): Phase4NormalizationMetadata | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const metadata = value as Partial<Phase4NormalizationMetadata>;
+  if (metadata.version !== PHASE4_NORMALIZATION_VERSION) return null;
+  if (!metadata.status || !Array.isArray(metadata.issues)) return null;
+  return metadata as Phase4NormalizationMetadata;
+}
+
+export function buildPhase4NormalizationReport(rows: Phase4ShadowNormalizationValue[]) {
+  const appliedToProduction = rows.reduce((total, row) => total + Number(row.appliedToProduction === 1), 0);
+  const nonShadowValueCount = rows.filter(row => row.shadowMode !== 1).length;
+  let normalizationAppliedToProduction = 0;
+  const issueCounts = new Map<string, number>();
+  const variables = Object.entries(SHADOW_CANONICAL_VARIABLES).map(([variable, definition]) => {
+    const variableRows = rows.filter(row => row.variable === variable);
+    const metadataRows = variableRows.map(row => ({ row, metadata: parsePhase4NormalizationMetadata(row.normalizationMetadata) }));
+    const normalizedValueCount = metadataRows.filter(item => item.metadata?.status === "NORMALIZED").length;
+    const missingValueCount = metadataRows.filter(item => item.metadata?.status === "MISSING").length;
+    const issueValueCount = metadataRows.filter(item => item.metadata?.status === "ISSUES").length;
+    const legacyValueCount = metadataRows.filter(item => item.metadata == null).length;
+    const sourceUnits = new Set<string>();
+    const conversions = new Map<string, number>();
+    const variableIssues = new Map<string, number>();
+    let canonicalUnitMismatchCount = 0;
+    for (const { row, metadata } of metadataRows) {
+      if (!metadata) continue;
+      if (metadata.sourceUnit) sourceUnits.add(metadata.sourceUnit);
+      conversions.set(metadata.conversion, (conversions.get(metadata.conversion) ?? 0) + 1);
+      if (metadata.canonicalUnit !== definition.unit || row.unit !== definition.unit) canonicalUnitMismatchCount++;
+      normalizationAppliedToProduction += Number(
+        (metadata as unknown as { appliedToProduction?: number }).appliedToProduction === 1,
+      );
+      if (metadata.status === "ISSUES") {
+        for (const issue of metadata.issues) {
+          variableIssues.set(issue, (variableIssues.get(issue) ?? 0) + 1);
+          issueCounts.set(issue, (issueCounts.get(issue) ?? 0) + 1);
+        }
+      }
+    }
+    const status: "NORMALIZED" | "PARTIAL" | "LEGACY_ONLY" | "NO_INGESTION" = variableRows.length === 0
+      ? "NO_INGESTION"
+      : legacyValueCount === variableRows.length
+        ? "LEGACY_ONLY"
+        : legacyValueCount === 0 && issueValueCount === 0 && canonicalUnitMismatchCount === 0
+          ? "NORMALIZED"
+          : "PARTIAL";
+    return {
+      variable,
+      canonicalUnit: definition.unit,
+      levelKey: definition.levelKey,
+      status,
+      totalValueCount: variableRows.length,
+      normalizedValueCount,
+      missingValueCount,
+      issueValueCount,
+      legacyValueCount,
+      canonicalUnitMismatchCount,
+      sourceUnits: Array.from(sourceUnits).sort(),
+      conversions: Array.from(conversions.entries())
+        .map(([conversion, count]) => ({ conversion, count }))
+        .sort((left, right) => right.count - left.count || left.conversion.localeCompare(right.conversion)),
+      issues: Array.from(variableIssues.entries())
+        .map(([issue, count]) => ({ issue, count }))
+        .sort((left, right) => right.count - left.count || left.issue.localeCompare(right.issue)),
+      appliedToProduction: 0 as const,
+    };
+  });
+  const normalizedValueCount = variables.reduce((total, variable) => total + variable.normalizedValueCount, 0);
+  const missingValueCount = variables.reduce((total, variable) => total + variable.missingValueCount, 0);
+  const issueValueCount = variables.reduce((total, variable) => total + variable.issueValueCount, 0);
+  const legacyValueCount = variables.reduce((total, variable) => total + variable.legacyValueCount, 0);
+  const canonicalUnitMismatchCount = variables.reduce((total, variable) => total + variable.canonicalUnitMismatchCount, 0);
+  return {
+    version: PHASE4_NORMALIZATION_VERSION,
+    expectedVariableCount: variables.length,
+    ingestedVariableCount: variables.filter(variable => variable.totalValueCount > 0).length,
+    normalizedValueCount,
+    missingValueCount,
+    issueValueCount,
+    legacyValueCount,
+    canonicalUnitMismatchCount,
+    appliedToProduction,
+    normalizationAppliedToProduction,
+    nonShadowValueCount,
+    productionReadsEnabled: false as const,
+    valid: appliedToProduction === 0
+      && normalizationAppliedToProduction === 0
+      && nonShadowValueCount === 0
+      && canonicalUnitMismatchCount === 0,
+    issues: Array.from(issueCounts.entries())
+      .map(([issue, count]) => ({ issue, count }))
+      .sort((left, right) => right.count - left.count || left.issue.localeCompare(right.issue)),
+    variables,
+  };
+}
+
 const SOURCE_KEY_BY_COLLECTOR_NAME = new Map<string, string>([
   ["AROME", "openmeteo_arome_france_hd"],
   ["ARPEGE", "openmeteo_arpege_europe"],
@@ -223,9 +317,22 @@ function toCanonicalValue(
   validTime: number,
   receivedAt: number,
   extraFlags: string[],
+  sourceUnit: string | null,
+  sourceTimezone: string | null,
+  context: Pick<ShadowWriteContext, "latitude" | "longitude">,
 ): CanonicalShadowValue {
   const definition = SHADOW_CANONICAL_VARIABLES[variable];
-  const normalizedValue = value != null && Number.isFinite(value) ? Number(value) : null;
+  const normalization = normalizePhase4WeatherValue({
+    variable,
+    value,
+    sourceUnit,
+    sourceTimezone,
+    latitude: context.latitude,
+    longitude: context.longitude,
+    validTime,
+    nativeResolutionKm: null,
+  });
+  const normalizedValue = normalization.value;
   const rawHorizonMinutes = Math.round((validTime - receivedAt) / 60_000);
   const forecastHorizonMinutes = rawHorizonMinutes >= 0 && rawHorizonMinutes <= 21_600
     ? rawHorizonMinutes
@@ -239,7 +346,7 @@ function toCanonicalValue(
     levelKey: definition.levelKey,
     memberKey: "deterministic",
     nativeResolutionKm: null,
-    qualityStatus: normalizedValue == null ? "MISSING" : "VALID",
+    qualityStatus: normalizedValue == null ? "MISSING" : normalization.metadata.status === "NORMALIZED" ? "VALID" : "SUSPECT",
     freshnessStatus: "UNKNOWN",
     missingData: normalizedValue == null ? 1 : 0,
     confidence: null,
@@ -247,7 +354,11 @@ function toCanonicalValue(
       ...extraFlags,
       "provider_run_time_unknown",
       forecastHorizonMinutes == null ? "outside_phase3_horizon" : "horizon_from_ingestion_time",
+      `phase4:${normalization.metadata.version}`,
+      `phase4_status:${normalization.metadata.status}`,
+      ...normalization.metadata.issues.map(issue => `phase4_issue:${issue}`),
     ],
+    normalizationMetadata: normalization.metadata,
   };
 }
 
@@ -274,6 +385,11 @@ export function normalizeDailyForecastToShadow(
   const daily = rawData?.daily && typeof rawData.daily === "object"
     ? rawData.daily as Record<string, unknown>
     : null;
+  const dailyUnits = rawData?.daily_units && typeof rawData.daily_units === "object"
+    ? rawData.daily_units as Record<string, unknown>
+    : null;
+  const sourceTimezone = typeof rawData?.timezone === "string" ? rawData.timezone : null;
+  const sourceUnit = (key: string) => dailyUnits && typeof dailyUnits[key] === "string" ? dailyUnits[key] as string : null;
   const dates = daily && Array.isArray(daily.time)
     ? daily.time.filter((value): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))
     : [];
@@ -305,13 +421,13 @@ export function normalizeDailyForecastToShadow(
     if (horizonMinutes < 0 || horizonMinutes > PHASE3_HORIZON_WINDOWS.at(-1)!.maxMinutes) continue;
     const flags = ["daily_aggregate", "timezone_europe_paris", "phase3_horizon"];
     values.push(
-      toCanonicalValue("air_temperature_max", candidate.tempMax, validTime, context.receivedAt, flags),
-      toCanonicalValue("air_temperature_min", candidate.tempMin, validTime, context.receivedAt, flags),
-      toCanonicalValue("precipitation_amount", candidate.precipitation, validTime, context.receivedAt, flags),
-      toCanonicalValue("wind_speed_10m", candidate.windSpeed, validTime, context.receivedAt, flags),
-      toCanonicalValue("wind_gust_10m", candidate.windGust, validTime, context.receivedAt, flags),
-      toCanonicalValue("relative_humidity_2m", candidate.humidity, validTime, context.receivedAt, flags),
-      toCanonicalValue("cloud_cover_total", candidate.cloudCover, validTime, context.receivedAt, flags),
+      toCanonicalValue("air_temperature_max", candidate.tempMax, validTime, context.receivedAt, flags, sourceUnit("temperature_2m_max"), sourceTimezone, context),
+      toCanonicalValue("air_temperature_min", candidate.tempMin, validTime, context.receivedAt, flags, sourceUnit("temperature_2m_min"), sourceTimezone, context),
+      toCanonicalValue("precipitation_amount", candidate.precipitation, validTime, context.receivedAt, flags, sourceUnit("precipitation_sum"), sourceTimezone, context),
+      toCanonicalValue("wind_speed_10m", candidate.windSpeed, validTime, context.receivedAt, flags, sourceUnit("wind_speed_10m_max"), sourceTimezone, context),
+      toCanonicalValue("wind_gust_10m", candidate.windGust, validTime, context.receivedAt, flags, sourceUnit("wind_gusts_10m_max"), sourceTimezone, context),
+      toCanonicalValue("relative_humidity_2m", candidate.humidity, validTime, context.receivedAt, flags, sourceUnit("relative_humidity_2m_mean"), sourceTimezone, context),
+      toCanonicalValue("cloud_cover_total", candidate.cloudCover, validTime, context.receivedAt, flags, sourceUnit("cloud_cover_mean"), sourceTimezone, context),
     );
   }
   return values;
@@ -322,20 +438,22 @@ export function normalizeHourlyForecastToShadow(
   context: ShadowWriteContext,
 ): CanonicalShadowValue[] {
   const values: CanonicalShadowValue[] = [];
+  const sourceTimezone = forecast.sourceMetadata?.timezone ?? null;
+  const units = forecast.sourceMetadata?.units;
   for (const hour of forecast.hours) {
     const validTime = parisLocalDateTimeToEpochMs(context.targetDate, hour.hour);
     const flags = ["hourly_value", "timezone_europe_paris"];
     values.push(
-      toCanonicalValue("air_temperature_2m", hour.temperature, validTime, context.receivedAt, flags),
-      toCanonicalValue("apparent_temperature", hour.apparentTemperature, validTime, context.receivedAt, flags),
-      toCanonicalValue("precipitation_amount", hour.precipitation, validTime, context.receivedAt, flags),
-      toCanonicalValue("wind_speed_10m", hour.windSpeed, validTime, context.receivedAt, flags),
-      toCanonicalValue("wind_gust_10m", hour.windGusts, validTime, context.receivedAt, flags),
-      toCanonicalValue("wind_direction_10m", hour.windDirection, validTime, context.receivedAt, flags),
-      toCanonicalValue("relative_humidity_2m", hour.humidity, validTime, context.receivedAt, flags),
-      toCanonicalValue("air_pressure_msl", hour.pressure, validTime, context.receivedAt, [...flags, "provider_field_surface_pressure"]),
-      toCanonicalValue("cloud_cover_total", hour.cloudCover, validTime, context.receivedAt, flags),
-      toCanonicalValue("weather_code", hour.weatherCode, validTime, context.receivedAt, flags),
+      toCanonicalValue("air_temperature_2m", hour.temperature, validTime, context.receivedAt, flags, units?.temperature ?? null, sourceTimezone, context),
+      toCanonicalValue("apparent_temperature", hour.apparentTemperature, validTime, context.receivedAt, flags, units?.apparentTemperature ?? null, sourceTimezone, context),
+      toCanonicalValue("precipitation_amount", hour.precipitation, validTime, context.receivedAt, flags, units?.precipitation ?? null, sourceTimezone, context),
+      toCanonicalValue("wind_speed_10m", hour.windSpeed, validTime, context.receivedAt, flags, units?.windSpeed ?? null, sourceTimezone, context),
+      toCanonicalValue("wind_gust_10m", hour.windGusts, validTime, context.receivedAt, flags, units?.windGusts ?? null, sourceTimezone, context),
+      toCanonicalValue("wind_direction_10m", hour.windDirection, validTime, context.receivedAt, flags, units?.windDirection ?? null, sourceTimezone, context),
+      toCanonicalValue("relative_humidity_2m", hour.humidity, validTime, context.receivedAt, flags, units?.humidity ?? null, sourceTimezone, context),
+      toCanonicalValue("air_pressure_surface", hour.pressure, validTime, context.receivedAt, flags, units?.pressure ?? null, sourceTimezone, context),
+      toCanonicalValue("cloud_cover_total", hour.cloudCover, validTime, context.receivedAt, flags, units?.cloudCover ?? null, sourceTimezone, context),
+      toCanonicalValue("weather_code", hour.weatherCode, validTime, context.receivedAt, flags, units?.weatherCode ?? null, sourceTimezone, context),
     );
   }
   return values;
@@ -536,6 +654,7 @@ async function persistOneShadowRun(input: {
       missingData: value.missingData,
       confidence: value.confidence,
       qcFlags: value.qcFlags,
+      normalizationMetadata: value.normalizationMetadata,
       ingestedAt: input.context.receivedAt,
       shadowMode: 1,
     }));
@@ -702,11 +821,15 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     displayName: shadowWeatherSourceDefinitions.displayName,
     category: shadowWeatherSourceDefinitions.classificationCategory,
     independenceClass: shadowWeatherSourceDefinitions.independenceClass,
+    variable: shadowWeatherValues.variable,
+    unit: shadowWeatherValues.unit,
+    normalizationMetadata: shadowWeatherValues.normalizationMetadata,
     forecastHorizonMinutes: shadowWeatherValues.forecastHorizonMinutes,
     validTime: shadowWeatherValues.validTime,
     receivedAt: shadowWeatherIngestionRuns.receivedAt,
     missingData: shadowWeatherValues.missingData,
     qualityStatus: shadowWeatherValues.qualityStatus,
+    shadowMode: shadowWeatherValues.shadowMode,
     appliedToProduction: shadowWeatherIngestionRuns.appliedToProduction,
   }).from(shadowWeatherValues)
     .innerJoin(shadowWeatherIngestionRuns, eq(shadowWeatherValues.ingestionRunId, shadowWeatherIngestionRuns.id))
@@ -718,6 +841,14 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     validTime: Number(value.validTime),
     receivedAt: Number(value.receivedAt),
     missingData: Number(value.missingData),
+    appliedToProduction: Number(value.appliedToProduction),
+  })));
+  const phase4Normalization = buildPhase4NormalizationReport(horizonValues.map(value => ({
+    variable: value.variable,
+    unit: value.unit,
+    normalizationMetadata: value.normalizationMetadata,
+    missingData: Number(value.missingData),
+    shadowMode: Number(value.shadowMode),
     appliedToProduction: Number(value.appliedToProduction),
   })));
 
@@ -761,6 +892,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
       sources: classifiedSources,
     },
     phase3HorizonHierarchy,
+    phase4Normalization,
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),

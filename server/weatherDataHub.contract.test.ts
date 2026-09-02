@@ -4,11 +4,13 @@ import {
   PHASE2_SHADOW_SOURCE_CLASSIFICATIONS,
   PHASE2_SOURCE_CATEGORIES,
   PHASE3_HORIZON_WINDOWS,
+  PHASE4_NORMALIZATION_VERSION,
   SHADOW_CANONICAL_VARIABLES,
   SHADOW_RUN_EVIDENCE_SCOPES,
   SHADOW_RUN_EVIDENCE_STATUSES,
   getShadowCanonicalVariableDefinition,
   getPhase3HorizonWindow,
+  normalizePhase4WeatherValue,
   validatePhase2ShadowClassifications,
   validatePhase3HorizonStrategy,
   validateP1ShadowSourceRegistry,
@@ -93,5 +95,45 @@ describe("P1 shadow weather data hub contract", () => {
     expect(getPhase3HorizonWindow(21_600)?.key).toBe("7_15d");
     expect(getPhase3HorizonWindow(21_601)).toBeNull();
     expect(getPhase3HorizonWindow(10_080)?.uncertaintyRequired).toBe(true);
+  });
+
+  it("normalizes the Phase 4 canonical units with deterministic conversions", () => {
+    const base = {
+      sourceTimezone: "Europe/Paris",
+      latitude: 50.756,
+      longitude: 2.438,
+      validTime: Date.parse("2026-09-02T10:00:00Z"),
+      nativeResolutionKm: null,
+    };
+    expect(normalizePhase4WeatherValue({ ...base, variable: "air_temperature_2m", value: 68, sourceUnit: "°F" })).toMatchObject({
+      value: 20,
+      metadata: { version: PHASE4_NORMALIZATION_VERSION, status: "NORMALIZED", canonicalUnit: "Cel", conversion: "fahrenheit_to_celsius", appliedToProduction: 0 },
+    });
+    expect(normalizePhase4WeatherValue({ ...base, variable: "wind_speed_10m", value: 10, sourceUnit: "m/s" }).value).toBe(36);
+    expect(normalizePhase4WeatherValue({ ...base, variable: "air_pressure_surface", value: 101_325, sourceUnit: "Pa" }).value).toBe(1013.25);
+    expect(normalizePhase4WeatherValue({ ...base, variable: "visibility", value: 12_000, sourceUnit: "m" }).value).toBe(12);
+    expect(normalizePhase4WeatherValue({ ...base, variable: "snowfall_amount", value: 25, sourceUnit: "mm" }).value).toBe(2.5);
+  });
+
+  it("keeps missing or structurally impossible Phase 4 values explicit", () => {
+    const base = {
+      sourceTimezone: "Europe/Paris",
+      latitude: 50.756,
+      longitude: 2.438,
+      validTime: Date.parse("2026-09-02T10:00:00Z"),
+      nativeResolutionKm: null,
+    };
+    expect(normalizePhase4WeatherValue({ ...base, variable: "precipitation_amount", value: null, sourceUnit: "mm" })).toMatchObject({
+      value: null,
+      metadata: { status: "MISSING", issues: ["MISSING_VALUE"] },
+    });
+    expect(normalizePhase4WeatherValue({ ...base, variable: "relative_humidity_2m", value: 120, sourceUnit: "%" })).toMatchObject({
+      value: 120,
+      metadata: { status: "ISSUES", issues: ["VALUE_OUT_OF_RANGE"] },
+    });
+    expect(normalizePhase4WeatherValue({ ...base, variable: "wind_speed_10m", value: 12, sourceUnit: null })).toMatchObject({
+      value: null,
+      metadata: { status: "ISSUES", issues: ["MISSING_SOURCE_UNIT"] },
+    });
   });
 });
