@@ -15,10 +15,13 @@ import {
   PHASE3_HORIZON_STRATEGY_VERSION,
   PHASE3_HORIZON_WINDOWS,
   PHASE4_NORMALIZATION_VERSION,
+  PHASE5_QUALITY_CONTROL_VERSION,
   P1_SHADOW_SOURCE_DEFINITIONS,
   SHADOW_CANONICAL_VARIABLES,
+  evaluatePhase5QualityControl,
   normalizePhase4WeatherValue,
   type Phase4NormalizationMetadata,
+  type Phase5QualityControlMetadata,
   type ShadowCanonicalVariable,
   type ShadowFreshnessStatus,
   type ShadowProviderRunEvidence,
@@ -59,6 +62,10 @@ export type CanonicalShadowValue = {
   confidence: null;
   qcFlags: string[];
   normalizationMetadata: Phase4NormalizationMetadata;
+  phase5QualityStatus: ShadowQualityStatus | null;
+  phase5QualityMetadata: Phase5QualityControlMetadata | null;
+  phase5EvaluatedAt: number | null;
+  phase5AppliedToProduction: 0;
 };
 
 export type Phase3ShadowHorizonValue = {
@@ -265,6 +272,145 @@ export function buildPhase4NormalizationReport(rows: Phase4ShadowNormalizationVa
   };
 }
 
+export type Phase5ShadowQualityValue = {
+  ingestionRunId: number;
+  sourceKey: string;
+  displayName: string;
+  cycleKey: string;
+  runStatus: ShadowRunStatus;
+  receivedAt: number;
+  latitude: number;
+  longitude: number;
+  validTime: number;
+  variable: ShadowCanonicalVariable;
+  value: number | null;
+  levelKey: string;
+  memberKey: string;
+  missingData: number;
+  normalizationMetadata: unknown;
+  phase5QualityStatus: string | null;
+  phase5QualityMetadata: unknown;
+  phase5EvaluatedAt: number | null;
+  phase5AppliedToProduction: number;
+  shadowMode: number;
+  runAppliedToProduction: number;
+};
+
+function parsePhase5QualityMetadata(value: unknown): Phase5QualityControlMetadata | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const metadata = value as Partial<Phase5QualityControlMetadata>;
+  if (metadata.version !== PHASE5_QUALITY_CONTROL_VERSION || !metadata.status || !Array.isArray(metadata.rules)) return null;
+  return metadata as Phase5QualityControlMetadata;
+}
+
+function emptyPhase5StatusCounts() {
+  return { VALID: 0, SUSPECT: 0, INVALID: 0, MISSING: 0, STALE: 0 };
+}
+
+export function buildPhase5QualityControlReport(rows: Phase5ShadowQualityValue[], evaluatedAt = Date.now()) {
+  const duplicateCounts = new Map<string, number>();
+  for (const row of rows) {
+    const key = `${row.ingestionRunId}|${row.validTime}|${row.variable}|${row.levelKey}|${row.memberKey}`;
+    duplicateCounts.set(key, (duplicateCounts.get(key) ?? 0) + 1);
+  }
+  const previousBySeries = new Map<string, Phase5ShadowQualityValue>();
+  const evaluations = [...rows]
+    .sort((left, right) => left.validTime - right.validTime || left.variable.localeCompare(right.variable))
+    .map(row => {
+      const key = `${row.ingestionRunId}|${row.validTime}|${row.variable}|${row.levelKey}|${row.memberKey}`;
+      const seriesKey = `${row.ingestionRunId}|${row.variable}|${row.levelKey}|${row.memberKey}`;
+      const previous = previousBySeries.get(seriesKey);
+      const qc = evaluatePhase5QualityControl({
+        variable: row.variable,
+        value: row.value,
+        missingData: row.missingData === 1 ? 1 : 0,
+        validTime: row.validTime,
+        receivedAt: row.receivedAt,
+        evaluatedAt,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        aggregation: row.cycleKey.startsWith("daily:") ? "daily" : "hourly",
+        runStatus: row.runStatus,
+        duplicateCount: duplicateCounts.get(key) ?? 1,
+        normalizationMetadata: parsePhase4NormalizationMetadata(row.normalizationMetadata),
+        previousValue: previous?.value,
+        previousValidTime: previous?.validTime,
+      });
+      if (row.value != null) previousBySeries.set(seriesKey, row);
+      return { row, qc };
+    });
+
+  const counts = emptyPhase5StatusCounts();
+  const freshnessCounts = { FRESH: 0, AGING: 0, STALE: 0, UNKNOWN: 0 };
+  const ruleCounts = new Map<string, number>();
+  for (const { qc } of evaluations) {
+    counts[qc.status]++;
+    freshnessCounts[qc.metadata.freshnessStatus]++;
+    for (const rule of qc.metadata.rules) ruleCounts.set(rule, (ruleCounts.get(rule) ?? 0) + 1);
+  }
+
+  const byVariable = Array.from(new Set(rows.map(row => row.variable))).sort().map(variable => {
+    const variableCounts = emptyPhase5StatusCounts();
+    for (const { row, qc } of evaluations) if (row.variable === variable) variableCounts[qc.status]++;
+    return { variable, total: Object.values(variableCounts).reduce((total, count) => total + count, 0), counts: variableCounts };
+  });
+  const sources = P1_SHADOW_SOURCE_DEFINITIONS.map(source => {
+    const sourceEvaluations = evaluations.filter(item => item.row.sourceKey === source.sourceKey);
+    const sourceCounts = emptyPhase5StatusCounts();
+    for (const { qc } of sourceEvaluations) sourceCounts[qc.status]++;
+    return {
+      sourceKey: source.sourceKey,
+      displayName: source.displayName,
+      available: sourceEvaluations.length > 0,
+      total: sourceEvaluations.length,
+      counts: sourceCounts,
+      latestReceivedAt: sourceEvaluations.reduce<number | null>((latest, item) => latest == null || item.row.receivedAt > latest ? item.row.receivedAt : latest, null),
+    };
+  });
+
+  const duplicateGroupCount = Array.from(duplicateCounts.values()).filter(count => count > 1).length;
+  const distinctRuns = new Map(rows.map(row => [row.ingestionRunId, row]));
+  const partialRunCount = Array.from(distinctRuns.values()).filter(row => row.runStatus === "PARTIAL").length;
+  const failedRunCount = Array.from(distinctRuns.values()).filter(row => row.runStatus === "FAILED").length;
+  const storedPhase5ValueCount = rows.filter(row => parsePhase5QualityMetadata(row.phase5QualityMetadata) != null).length;
+  const appliedToProduction = rows.filter(row => row.phase5AppliedToProduction === 1 || row.runAppliedToProduction === 1).length;
+  const metadataAppliedToProduction = rows.filter(row => {
+    const metadata = parsePhase5QualityMetadata(row.phase5QualityMetadata);
+    return (metadata as unknown as { appliedToProduction?: number } | null)?.appliedToProduction === 1;
+  }).length;
+  const nonShadowValueCount = rows.filter(row => row.shadowMode !== 1).length;
+
+  return {
+    version: PHASE5_QUALITY_CONTROL_VERSION,
+    evaluatedAt,
+    totalValueCount: rows.length,
+    dynamicallyEvaluatedValueCount: evaluations.length,
+    storedPhase5ValueCount,
+    legacyValueCount: rows.length - storedPhase5ValueCount,
+    counts,
+    freshnessCounts,
+    usableInShadowCount: counts.VALID + counts.SUSPECT,
+    excludedFromPhase5ShadowCount: counts.INVALID + counts.MISSING + counts.STALE,
+    partialRunCount,
+    failedRunCount,
+    duplicateGroupCount,
+    unavailableSourceCount: sources.filter(source => !source.available).length,
+    appliedToProduction,
+    metadataAppliedToProduction,
+    nonShadowValueCount,
+    productionReadsEnabled: false as const,
+    valid: evaluations.length === rows.length
+      && appliedToProduction === 0
+      && metadataAppliedToProduction === 0
+      && nonShadowValueCount === 0,
+    rules: Array.from(ruleCounts.entries())
+      .map(([rule, count]) => ({ rule, count }))
+      .sort((left, right) => right.count - left.count || left.rule.localeCompare(right.rule)),
+    byVariable,
+    sources,
+  };
+}
+
 const SOURCE_KEY_BY_COLLECTOR_NAME = new Map<string, string>([
   ["AROME", "openmeteo_arome_france_hd"],
   ["ARPEGE", "openmeteo_arpege_europe"],
@@ -359,7 +505,59 @@ function toCanonicalValue(
       ...normalization.metadata.issues.map(issue => `phase4_issue:${issue}`),
     ],
     normalizationMetadata: normalization.metadata,
+    phase5QualityStatus: null,
+    phase5QualityMetadata: null,
+    phase5EvaluatedAt: null,
+    phase5AppliedToProduction: 0,
   };
+}
+
+function applyPhase5QualityControlToValues(
+  values: CanonicalShadowValue[],
+  context: ShadowWriteContext,
+): CanonicalShadowValue[] {
+  const runStatus = getRunStatus(values);
+  const duplicateCounts = new Map<string, number>();
+  for (const value of values) {
+    const key = `${value.validTime}|${value.variable}|${value.levelKey}|${value.memberKey}`;
+    duplicateCounts.set(key, (duplicateCounts.get(key) ?? 0) + 1);
+  }
+  const previousBySeries = new Map<string, CanonicalShadowValue>();
+  return values.map(value => {
+    const key = `${value.validTime}|${value.variable}|${value.levelKey}|${value.memberKey}`;
+    const seriesKey = `${value.variable}|${value.levelKey}|${value.memberKey}`;
+    const previous = previousBySeries.get(seriesKey);
+    const qc = evaluatePhase5QualityControl({
+      variable: value.variable,
+      value: value.value,
+      missingData: value.missingData,
+      validTime: value.validTime,
+      receivedAt: context.receivedAt,
+      evaluatedAt: context.receivedAt,
+      latitude: context.latitude,
+      longitude: context.longitude,
+      aggregation: value.qcFlags.includes("daily_aggregate") ? "daily" : "hourly",
+      runStatus,
+      duplicateCount: duplicateCounts.get(key) ?? 1,
+      normalizationMetadata: value.normalizationMetadata,
+      previousValue: previous?.value,
+      previousValidTime: previous?.validTime,
+    });
+    if (value.value != null) previousBySeries.set(seriesKey, value);
+    return {
+      ...value,
+      phase5QualityStatus: qc.status,
+      phase5QualityMetadata: qc.metadata,
+      phase5EvaluatedAt: qc.metadata.evaluatedAt,
+      phase5AppliedToProduction: 0 as const,
+      qcFlags: [
+        ...value.qcFlags,
+        `phase5:${PHASE5_QUALITY_CONTROL_VERSION}`,
+        `phase5_status:${qc.status}`,
+        ...qc.metadata.rules.map(rule => `phase5_rule:${rule}`),
+      ],
+    };
+  });
 }
 
 function getDailyArrayValue(daily: Record<string, unknown>, key: string, index: number) {
@@ -430,7 +628,7 @@ export function normalizeDailyForecastToShadow(
       toCanonicalValue("cloud_cover_total", candidate.cloudCover, validTime, context.receivedAt, flags, sourceUnit("cloud_cover_mean"), sourceTimezone, context),
     );
   }
-  return values;
+  return applyPhase5QualityControlToValues(values, context);
 }
 
 export function normalizeHourlyForecastToShadow(
@@ -456,7 +654,7 @@ export function normalizeHourlyForecastToShadow(
       toCanonicalValue("weather_code", hour.weatherCode, validTime, context.receivedAt, flags, units?.weatherCode ?? null, sourceTimezone, context),
     );
   }
-  return values;
+  return applyPhase5QualityControlToValues(values, context);
 }
 
 function getRunStatus(values: CanonicalShadowValue[]): ShadowRunStatus {
@@ -655,6 +853,10 @@ async function persistOneShadowRun(input: {
       confidence: value.confidence,
       qcFlags: value.qcFlags,
       normalizationMetadata: value.normalizationMetadata,
+      phase5QualityStatus: value.phase5QualityStatus,
+      phase5QualityMetadata: value.phase5QualityMetadata,
+      phase5EvaluatedAt: value.phase5EvaluatedAt,
+      phase5AppliedToProduction: value.phase5AppliedToProduction,
       ingestedAt: input.context.receivedAt,
       shadowMode: 1,
     }));
@@ -817,13 +1019,25 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     .orderBy(shadowWeatherSourceDefinitions.displayName);
 
   const horizonValues = await db.select({
+    ingestionRunId: shadowWeatherValues.ingestionRunId,
     sourceKey: shadowWeatherSourceDefinitions.sourceKey,
     displayName: shadowWeatherSourceDefinitions.displayName,
     category: shadowWeatherSourceDefinitions.classificationCategory,
     independenceClass: shadowWeatherSourceDefinitions.independenceClass,
+    cycleKey: shadowWeatherIngestionRuns.cycleKey,
+    runStatus: shadowWeatherIngestionRuns.status,
+    latitude: shadowWeatherValues.latitude,
+    longitude: shadowWeatherValues.longitude,
     variable: shadowWeatherValues.variable,
+    value: shadowWeatherValues.value,
     unit: shadowWeatherValues.unit,
+    levelKey: shadowWeatherValues.levelKey,
+    memberKey: shadowWeatherValues.memberKey,
     normalizationMetadata: shadowWeatherValues.normalizationMetadata,
+    phase5QualityStatus: shadowWeatherValues.phase5QualityStatus,
+    phase5QualityMetadata: shadowWeatherValues.phase5QualityMetadata,
+    phase5EvaluatedAt: shadowWeatherValues.phase5EvaluatedAt,
+    phase5AppliedToProduction: shadowWeatherValues.phase5AppliedToProduction,
     forecastHorizonMinutes: shadowWeatherValues.forecastHorizonMinutes,
     validTime: shadowWeatherValues.validTime,
     receivedAt: shadowWeatherIngestionRuns.receivedAt,
@@ -869,6 +1083,29 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
   const observationWindow = locationKey
     ? await getP1ObservationWindow(locationKey, Math.max(14, lookbackDays))
     : null;
+  const phase5QualityControl = buildPhase5QualityControlReport(horizonValues.map(value => ({
+    ingestionRunId: Number(value.ingestionRunId),
+    sourceKey: value.sourceKey,
+    displayName: value.displayName,
+    cycleKey: value.cycleKey,
+    runStatus: value.runStatus as ShadowRunStatus,
+    receivedAt: Number(value.receivedAt),
+    latitude: Number(value.latitude),
+    longitude: Number(value.longitude),
+    validTime: Number(value.validTime),
+    variable: value.variable as ShadowCanonicalVariable,
+    value: value.value == null ? null : Number(value.value),
+    levelKey: value.levelKey,
+    memberKey: value.memberKey,
+    missingData: Number(value.missingData),
+    normalizationMetadata: value.normalizationMetadata,
+    phase5QualityStatus: value.phase5QualityStatus,
+    phase5QualityMetadata: value.phase5QualityMetadata,
+    phase5EvaluatedAt: value.phase5EvaluatedAt == null ? null : Number(value.phase5EvaluatedAt),
+    phase5AppliedToProduction: Number(value.phase5AppliedToProduction),
+    shadowMode: Number(value.shadowMode),
+    runAppliedToProduction: Number(value.appliedToProduction),
+  })), Date.now());
 
   return {
     mode: "shadow" as const,
@@ -893,6 +1130,15 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     },
     phase3HorizonHierarchy,
     phase4Normalization,
+    phase5QualityControl: {
+      ...phase5QualityControl,
+      p1Observation: {
+        completedDays: observationWindow?.completedDays ?? 0,
+        requiredDays: observationWindow?.requiredDays ?? 7,
+        verdict: observationWindow?.verdict ?? "OBSERVING",
+        stillOpen: (observationWindow?.completedDays ?? 0) < (observationWindow?.requiredDays ?? 7),
+      },
+    },
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),

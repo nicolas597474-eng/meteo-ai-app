@@ -34,7 +34,7 @@ describe("Phase4NormalizationPanel", () => {
     expect(html).toContain("VALUE_OUT_OF_RANGE · 1");
     expect(html).toContain("Visibilité");
     expect(html).toContain("Aucune valeur réellement ingérée");
-    expect(html).toContain("La Phase 5 de contrôle qualité contextuel n’est pas commencée");
+    expect(html).toContain("La préparation Phase 5 utilise une preuve QC séparée");
     expect(html).toContain("Normalisation shadow uniquement");
   });
 });

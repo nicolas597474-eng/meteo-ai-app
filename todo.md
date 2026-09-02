@@ -3728,3 +3728,25 @@
 - [x] Confirmer `appliedToProduction = 0`, l’absence de doublon et l’absence de lecture P1.6 par les moteurs de production.
 - [x] Valider les verdicts, TypeScript, Vitest complet, la qualité du diff et le rapport propriétaire mobile : 479 tests réussis et 2 ignorés.
 - [x] Publier uniquement les ajustements P1.6 nécessaires, sans commencer la Phase 5.
+
+## Passage conditionnel de P1.6 à la Phase 5 officielle
+- [x] Vérifier si P1.6 contient réellement sept dates distinctes par lieu : contrôle du 2 septembre 2026, résultat 1/7 pour chaque lieu ; fenêtre globale encore `OBSERVING`.
+- [ ] Confirmer sur les sept jours zéro doublon, zéro valeur hors shadow et zéro application à la production.
+- [x] Ne pas considérer une validation humaine comme un remplacement des sept bilans techniques requis.
+- [x] Autorisation utilisateur : préparer la Phase 5 en parallèle sans déclarer P1.6 terminée ni remplacer ses sept bilans techniques.
+- [x] Relire la définition officielle et préparer la Phase 5 sans fermer P1.6.
+- [x] Auditer et concevoir la Phase 5 en shadow sans modifier les statuts, calculs ou lectures de production.
+- [x] Implémenter, tester et publier uniquement la préparation Phase 5 sans commencer la Phase 6.
+
+## Phase 5 officielle — Préparation parallèle du contrôle qualité shadow
+- [x] Relire les statuts officiels `VALID`, `SUSPECT`, `INVALID`, `MISSING` et `STALE`, ainsi que leurs règles d’usage.
+- [x] Auditer le champ `qualityStatus`, les métadonnées Phase 4, les seuils existants et tous les lecteurs potentiels.
+- [x] Définir des contrôles déterministes de bornes physiques, cohérence, pics ou gradients et fraîcheur, sans apprentissage ni valeur inventée.
+- [x] Documenter la séparation entre le statut QC Phase 5 shadow et les décisions de fusion, scores ou pondérations de production.
+- [x] Persister la preuve QC, ses règles et sa version uniquement dans les tables shadow par migration additive si nécessaire.
+- [x] Préserver les valeurs `SUSPECT` comme utilisables en shadow avec avertissement ; exclure `INVALID` uniquement du rapport Phase 5 shadow.
+- [x] Conserver `MISSING` sans valeur et calculer `STALE` depuis une référence temporelle traçable.
+- [x] Afficher au propriétaire les statuts, motifs et comptes QC sans exposition publique.
+- [x] Vérifier sur les deux lieux réels l’idempotence, les cinq statuts, zéro application production et l’absence de lecteur métier.
+- [x] Valider TypeScript, Vitest complet, la qualité du diff et le rendu mobile : 488 tests réussis et 2 ignorés.
+- [x] Publier uniquement la préparation Phase 5, en laissant P1.6 ouverte et sans commencer la Phase 6.

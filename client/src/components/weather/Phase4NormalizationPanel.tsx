@@ -101,7 +101,7 @@ export function Phase4NormalizationPanel({ normalization }: { normalization: Pha
       </article>)}
     </div>
 
-    <p className="mt-3 text-[9px] leading-relaxed text-slate-500">Les lignes héritées restent inchangées. La Phase 5 de contrôle qualité contextuel n’est pas commencée.</p>
+    <p className="mt-3 text-[9px] leading-relaxed text-slate-500">Les lignes héritées restent inchangées. La préparation Phase 5 utilise une preuve QC séparée et ne remplace pas la normalisation.</p>
     <p className="mt-2 flex items-center gap-1.5 text-[9px] text-emerald-200/85"><ShieldCheck className="h-3.5 w-3.5" />Normalisation shadow uniquement · version {normalization.version}</p>
   </section>;
 }

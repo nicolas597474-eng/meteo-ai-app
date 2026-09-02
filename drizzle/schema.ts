@@ -710,6 +710,10 @@ export const shadowWeatherValues = mysqlTable("shadow_weather_values", {
   confidence: float("confidence"),
   qcFlags: json("qcFlags"),
   normalizationMetadata: json("normalizationMetadata"),
+  phase5QualityStatus: varchar("phase5QualityStatus", { length: 16 }),
+  phase5QualityMetadata: json("phase5QualityMetadata"),
+  phase5EvaluatedAt: bigint("phase5EvaluatedAt", { mode: "number" }),
+  phase5AppliedToProduction: int("phase5AppliedToProduction").notNull().default(0),
   ingestedAt: bigint("ingestedAt", { mode: "number" }).notNull(),
   shadowMode: int("shadowMode").notNull().default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -725,6 +729,8 @@ export const shadowWeatherValues = mysqlTable("shadow_weather_values", {
   index("shadow_value_run_quality_idx").on(table.ingestionRunId, table.qualityStatus),
   index("shadow_value_source_valid_variable_idx").on(table.sourceDefinitionId, table.validTime, table.variable),
   index("shadow_value_quality_freshness_ingested_idx").on(table.qualityStatus, table.freshnessStatus, table.ingestedAt),
+  index("shadow_value_phase5_status_evaluated_idx").on(table.phase5QualityStatus, table.phase5EvaluatedAt),
+  index("shadow_value_phase5_applied_idx").on(table.phase5AppliedToProduction),
 ]);
 
 export type ShadowWeatherValue = typeof shadowWeatherValues.$inferSelect;

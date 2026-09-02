@@ -55,6 +55,29 @@ export const PHASE4_NORMALIZATION_ISSUES = [
   "UNEXPECTED_SOURCE_TIMEZONE",
 ] as const;
 
+export const PHASE5_QUALITY_CONTROL_VERSION = "phase5-quality-control-v1" as const;
+export const PHASE5_QUALITY_RULES = [
+  "MISSING_VALUE",
+  "MISSING_FLAG_MISMATCH",
+  "NON_FINITE_VALUE",
+  "PHYSICAL_RANGE_INVALID",
+  "NORMALIZATION_INVALID",
+  "NORMALIZATION_MISSING",
+  "TIMESTAMP_INCOHERENT",
+  "COORDINATES_INVALID",
+  "DUPLICATE_VALUE",
+  "RUN_FAILED",
+  "RUN_INCOMPLETE",
+  "EXTREME_VALUE",
+  "RAPID_VARIATION",
+  "STALE_DATA",
+] as const;
+
+export const PHASE5_FRESHNESS_THRESHOLDS = {
+  freshThroughHours: 24,
+  staleAfterHours: 30,
+} as const;
+
 export const SHADOW_INDEPENDENCE_CLASSES = [
   "independent_model",
   "related_family",
@@ -137,6 +160,7 @@ export type Phase2SourceRole = ArrayValue<typeof PHASE2_SOURCE_ROLES>;
 export type Phase3SourceCapability = ArrayValue<typeof PHASE3_SOURCE_CAPABILITIES>;
 export type Phase4NormalizationStatus = ArrayValue<typeof PHASE4_NORMALIZATION_STATUSES>;
 export type Phase4NormalizationIssue = ArrayValue<typeof PHASE4_NORMALIZATION_ISSUES>;
+export type Phase5QualityRule = ArrayValue<typeof PHASE5_QUALITY_RULES>;
 export type ShadowIndependenceClass = ArrayValue<typeof SHADOW_INDEPENDENCE_CLASSES>;
 export type ShadowRunStatus = ArrayValue<typeof SHADOW_RUN_STATUSES>;
 export type ShadowRunEvidenceStatus = ArrayValue<typeof SHADOW_RUN_EVIDENCE_STATUSES>;
@@ -176,6 +200,45 @@ export type Phase4NormalizationInput = {
 export type Phase4NormalizationResult = {
   value: number | null;
   metadata: Phase4NormalizationMetadata;
+};
+
+export type Phase5QualityControlMetadata = {
+  version: typeof PHASE5_QUALITY_CONTROL_VERSION;
+  status: ShadowQualityStatus;
+  freshnessStatus: ShadowFreshnessStatus;
+  rules: Phase5QualityRule[];
+  aggregation: "hourly" | "daily";
+  runStatus: ShadowRunStatus;
+  evaluatedAt: number;
+  receivedAt: number;
+  validTime: number;
+  duplicateCount: number;
+  usableInShadow: boolean;
+  excludedFromPhase5Shadow: boolean;
+  thresholdVersion: "phase5-qc-thresholds-v1";
+  appliedToProduction: 0;
+};
+
+export type Phase5QualityControlInput = {
+  variable: ShadowCanonicalVariable;
+  value: number | null;
+  missingData: 0 | 1;
+  validTime: number;
+  receivedAt: number;
+  evaluatedAt: number;
+  latitude: number;
+  longitude: number;
+  aggregation: "hourly" | "daily";
+  runStatus: ShadowRunStatus;
+  duplicateCount: number;
+  normalizationMetadata: Phase4NormalizationMetadata | null;
+  previousValue?: number | null;
+  previousValidTime?: number | null;
+};
+
+export type Phase5QualityControlResult = {
+  status: ShadowQualityStatus;
+  metadata: Phase5QualityControlMetadata;
 };
 
 export type ShadowSourceDefinitionSeed = {
@@ -718,6 +781,120 @@ export function normalizePhase4WeatherValue(input: Phase4NormalizationInput): Ph
       coordinateStatus: issues.includes("INVALID_COORDINATES") ? "INVALID" : "VALID",
       nativeResolutionStatus: input.nativeResolutionKm == null ? "UNKNOWN" : "KNOWN",
       issues,
+      appliedToProduction: 0,
+    },
+  };
+}
+
+function isPhase5ExtremeValue(variable: ShadowCanonicalVariable, value: number, aggregation: "hourly" | "daily") {
+  if (["air_temperature_2m", "air_temperature_max", "air_temperature_min", "apparent_temperature"].includes(variable)) {
+    return value < -60 || value > 50;
+  }
+  if (variable === "wind_speed_10m") return value > 250;
+  if (variable === "wind_gust_10m") return value > 300;
+  if (variable === "precipitation_amount") return value > (aggregation === "daily" ? 500 : 150);
+  if (["air_pressure_msl", "air_pressure_surface"].includes(variable)) return value < 850 || value > 1_100;
+  return false;
+}
+
+function getPhase5RapidVariationThreshold(variable: ShadowCanonicalVariable) {
+  if (["air_temperature_2m", "air_temperature_max", "air_temperature_min", "apparent_temperature"].includes(variable)) return 15;
+  if (["wind_speed_10m", "wind_gust_10m"].includes(variable)) return 150;
+  if (["air_pressure_msl", "air_pressure_surface"].includes(variable)) return 20;
+  return null;
+}
+
+export function evaluatePhase5QualityControl(input: Phase5QualityControlInput): Phase5QualityControlResult {
+  const invalidRules = new Set<Phase5QualityRule>();
+  const suspectRules = new Set<Phase5QualityRule>();
+  const secondaryRules = new Set<Phase5QualityRule>();
+  const valueMissing = input.value == null;
+  const flagMissing = input.missingData === 1;
+
+  if (valueMissing) secondaryRules.add("MISSING_VALUE");
+  if (valueMissing !== flagMissing) invalidRules.add("MISSING_FLAG_MISMATCH");
+  if (input.value != null && !Number.isFinite(input.value)) invalidRules.add("NON_FINITE_VALUE");
+  if (input.value != null && Number.isFinite(input.value) && !isPhase4ValueInStructuralRange(input.variable, input.value)) {
+    invalidRules.add("PHYSICAL_RANGE_INVALID");
+  }
+  if (!input.normalizationMetadata) suspectRules.add("NORMALIZATION_MISSING");
+  else if (input.normalizationMetadata.status === "ISSUES"
+    || input.normalizationMetadata.issues.some(issue => issue !== "MISSING_VALUE")) {
+    invalidRules.add("NORMALIZATION_INVALID");
+  }
+  if (!Number.isFinite(input.latitude) || input.latitude < -90 || input.latitude > 90
+    || !Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180) {
+    invalidRules.add("COORDINATES_INVALID");
+  }
+  const maximumForecastOffsetMs = 16 * 86_400_000;
+  const minimumForecastOffsetMs = -24 * 3_600_000;
+  if (!Number.isFinite(input.validTime) || input.validTime <= 0
+    || !Number.isFinite(input.receivedAt) || input.receivedAt <= 0
+    || !Number.isFinite(input.evaluatedAt) || input.evaluatedAt < input.receivedAt - 300_000
+    || input.validTime - input.receivedAt < minimumForecastOffsetMs
+    || input.validTime - input.receivedAt > maximumForecastOffsetMs) {
+    invalidRules.add("TIMESTAMP_INCOHERENT");
+  }
+  if (input.duplicateCount > 1) invalidRules.add("DUPLICATE_VALUE");
+  if (input.runStatus === "FAILED") invalidRules.add("RUN_FAILED");
+  else if (input.runStatus === "PARTIAL") suspectRules.add("RUN_INCOMPLETE");
+
+  if (input.value != null && Number.isFinite(input.value) && isPhase5ExtremeValue(input.variable, input.value, input.aggregation)) {
+    suspectRules.add("EXTREME_VALUE");
+  }
+
+  const rapidThreshold = getPhase5RapidVariationThreshold(input.variable);
+  if (rapidThreshold != null && input.value != null && input.previousValue != null
+    && Number.isFinite(input.value) && Number.isFinite(input.previousValue)
+    && input.previousValidTime != null) {
+    const deltaMinutes = (input.validTime - input.previousValidTime) / 60_000;
+    if (deltaMinutes > 0 && deltaMinutes <= 60) {
+      const ratePerHour = Math.abs(input.value - input.previousValue) / (deltaMinutes / 60);
+      if (deltaMinutes <= 30 && ratePerHour > rapidThreshold * 2) invalidRules.add("RAPID_VARIATION");
+      else if (ratePerHour > rapidThreshold) suspectRules.add("RAPID_VARIATION");
+    }
+  }
+
+  const ageHours = Math.max(0, (input.evaluatedAt - input.receivedAt) / 3_600_000);
+  const freshnessStatus: ShadowFreshnessStatus = ageHours > PHASE5_FRESHNESS_THRESHOLDS.staleAfterHours
+    ? "STALE"
+    : ageHours > PHASE5_FRESHNESS_THRESHOLDS.freshThroughHours
+      ? "AGING"
+      : "FRESH";
+  if (freshnessStatus === "STALE") secondaryRules.add("STALE_DATA");
+
+  const status: ShadowQualityStatus = valueMissing || flagMissing
+    ? "MISSING"
+    : invalidRules.size > 0
+      ? "INVALID"
+      : freshnessStatus === "STALE"
+        ? "STALE"
+        : suspectRules.size > 0
+          ? "SUSPECT"
+          : "VALID";
+  const rules = Array.from(new Set([
+    ...Array.from(invalidRules),
+    ...Array.from(suspectRules),
+    ...Array.from(secondaryRules),
+  ]));
+  const usableInShadow = status === "VALID" || status === "SUSPECT";
+
+  return {
+    status,
+    metadata: {
+      version: PHASE5_QUALITY_CONTROL_VERSION,
+      status,
+      freshnessStatus,
+      rules,
+      aggregation: input.aggregation,
+      runStatus: input.runStatus,
+      evaluatedAt: input.evaluatedAt,
+      receivedAt: input.receivedAt,
+      validTime: input.validTime,
+      duplicateCount: Math.max(0, Math.trunc(input.duplicateCount)),
+      usableInShadow,
+      excludedFromPhase5Shadow: !usableInShadow,
+      thresholdVersion: "phase5-qc-thresholds-v1",
       appliedToProduction: 0,
     },
   };
