@@ -3606,9 +3606,3 @@
 - [x] Ajouter un panneau déroulant accessible, fermé par défaut, avec ouverture au toucher et au clavier.
 - [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
 - [x] Publier le panneau déroulant après validation complète.
-
-## Dix sources météo affichées sur toutes les pages
-- [x] Inventorier toutes les pages affichant le compteur de 8 modèles ou une liste de modèles.
-- [x] Ajouter Météo-France et OpenWeatherMap comme services publics affichables, sans les confondre avec les modèles experts dans les calculs.
-- [x] Afficher les détails des deux services au même niveau que les modèles sur chaque page concernée.
-- [x] Ajouter les tests de cohérence, vérifier le rendu mobile et publier après validation.

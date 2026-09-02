@@ -660,28 +660,8 @@ export const weatherRouter = router({
         .map((trace) => ({ date: trace.date, hour: trace.hour, attempts: trace.attempts, reason: trace.reason }));
       const missingSnapshotSlots = hourlyHistory.filter((trace) => trace.status === "missing").length;
       const expectedModels = WEATHER_SERVICES.expert.map((model) => model.name);
-      const expectedPublicServices = WEATHER_SERVICES.public.map((service) => service.name);
       const dailyMissingModels = latestCollection ? getMissingModelNames(latestCollection.dailyMissingModels) : [];
       const hourlyMissingModels = latestCollection ? getMissingModelNames(latestCollection.hourlyMissingModels) : [];
-      const archivedPublicForecasts = latestCollection
-        ? (await getForecastsByDate(latestCollection.date, locationKey)).filter((forecast) => forecast.serviceCategory === "public")
-        : [];
-      const publicForecastByName = new Map(archivedPublicForecasts.map((forecast) => [forecast.serviceName, forecast]));
-      const publicServices = expectedPublicServices.map((name) => {
-        const forecast = publicForecastByName.get(name);
-        return {
-          name,
-          dailyAvailable: Boolean(forecast),
-          hourlyAvailable: false,
-          tempMax: forecast?.tempMax ?? null,
-          tempMin: forecast?.tempMin ?? null,
-          precipitation: forecast?.precipitation ?? null,
-          windSpeed: forecast?.windSpeed ?? null,
-          cloudCover: forecast?.cloudCover ?? null,
-          condition: forecast?.condition ?? null,
-        };
-      });
-      const publicServiceCount = publicServices.filter((service) => service.dailyAvailable).length;
 
       return {
         scheduledAt: "05:00",
@@ -699,14 +679,11 @@ export const weatherRouter = router({
           errorMessage: latestForecastJob.errorMessage,
         } : null,
         expectedModels,
-        publicServices,
         lastForecastSuccess: lastForecastCoverage ? {
           status: lastForecastCoverage.status,
           collectedAt: lastForecastCoverage.collectedAt,
           dailyModelCount: lastForecastCoverage.dailyModelCount,
           hourlyModelCount: lastForecastCoverage.hourlyModelCount,
-          publicServiceCount,
-          expectedPublicServiceCount: expectedPublicServices.length,
         } : null,
         lastPhysicalCollection: lastPhysicalCollection ? {
           status: lastPhysicalCollection.status,
@@ -1159,17 +1136,14 @@ export const weatherRouter = router({
       : forecasts;
     const modelIndicator = buildModelIndicator(trace);
 
-    // Détails des prévisions quotidiennes persistées. Les services publics
-    // apparaissent au même niveau de lecture que les modèles experts, mais
-    // restent exclus des calculs de fusion et des poids.
+    // Détails des prévisions quotidiennes persistées.
     const allServicesList = [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public];
-    const modelDetails = forecasts.map(f => {
+    const modelDetails = appliedForecasts.map(f => {
       const service = allServicesList.find((s: { name: string }) => s.name === f.serviceName);
       const applied = appliedModelWeights.find((model) => model.name === f.serviceName);
       return {
         name: f.serviceName,
         label: service?.name ?? f.serviceName,
-        category: f.serviceCategory,
         tempMax: f.tempMax,
         tempMin: f.tempMin,
         precipitation: f.precipitation,
@@ -1177,7 +1151,6 @@ export const weatherRouter = router({
         cloudCover: f.cloudCover,
         condition: f.condition,
         averageWeight: applied?.averageWeight ?? null,
-        contributesToFusion: Boolean(applied),
       };
     });
 
@@ -1203,13 +1176,11 @@ export const weatherRouter = router({
       : 0;
 
     // 7. AI Analysis text
-    const expertModelCount = forecasts.filter((forecast) => forecast.serviceCategory === "expert").length;
-    const publicServiceCount = forecasts.filter((forecast) => forecast.serviceCategory === "public").length;
-    const sourceCount = expertModelCount + publicServiceCount;
+    const modelCount = forecasts.length;
     const topModel = ranking.length > 0 ? ranking[0].serviceName : null;
     const convergenceLevel = divergence.tempRange < 2 ? "excellente" : divergence.tempRange < 4 ? "bonne" : "modérée";
     const aiAnalysis = [
-      `MeteoAI a archivé ${expertModelCount} modèles experts et ${publicServiceCount} services publics, soit ${sourceCount} sources pour Hondeghem (50.76°N, 2.52°E). Les services publics restent séparés de la fusion et de ses poids.`,
+      `MeteoAI synthétise ${modelCount} modèles numériques pour Hondeghem (50.76°N, 2.52°E).`,
       `La convergence entre les modèles est ${convergenceLevel} aujourd'hui (écart max temp : ${divergence.tempRange}°C).`,
       `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`,
       topModel
@@ -1231,7 +1202,7 @@ export const weatherRouter = router({
 
     // 9. Replay steps (7 étapes de la synthèse IA)
     const replaySteps = [
-      { step: 1, title: "Collecte des prévisions", description: `${expertModelCount} modèles experts et ${publicServiceCount} services publics archivés à 05h00`, icon: "📡" },
+      { step: 1, title: "Collecte des modèles", description: `${modelCount} modèles collectés à 05h00 via Open-Meteo API`, icon: "📡" },
       { step: 2, title: "Détection du régime", description: `Régime "${regimeDef.label}" détecté — poids contextuels appliqués`, icon: "🔍" },
       { step: 3, title: "Calcul des dimensions", description: "4 dimensions d'erreur calculées indépendamment (T°, Précip, Vent, Cond)", icon: "📐" },
       { step: 4, title: "Scoring pondéré", description: `Score final = ${Math.round(weights.temp * 100)}% T° + ${Math.round(weights.precip * 100)}% Précip + ${Math.round(weights.wind * 100)}% Vent + ${Math.round(weights.condition * 100)}% Cond`, icon: "⚖️" },
@@ -1260,8 +1231,7 @@ export const weatherRouter = router({
       }));
 
     const sources = [
-      { name: "Open-Meteo API", type: "Prévisions de modèles", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modèle", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Prévisions de modèles experts, pas observations" },
-      { name: "Services publics de prévision", type: "Prévisions de services", models: WEATHER_SERVICES.public.map((service) => service.name), updateFrequency: "Collecte quotidienne selon disponibilité", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Archivés avec les modèles experts, mais exclus de la fusion et de ses poids" },
+      { name: "Open-Meteo API", type: "Prévisions de modèles", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modèle", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Prévisions, pas observations" },
       { name: "Modèles en validation", type: "Prévisions candidates", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "Collecte quotidienne", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
       { name: "Stations physiques", type: "Observations locales", models: [], updateFrequency: "Selon la dernière collecte", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Netatmo actif ; autres sources seulement si réellement collectées" },
       { name: "Scores de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Aucun classement avant seuil statistique" },
@@ -1319,7 +1289,7 @@ export const weatherRouter = router({
       regimeSourceUpdatedAt: operationalRegime.sourceUpdatedAt,
       regimeSourceAgeMinutes: operationalRegime.sourceAgeMinutes,
       regimeDataCoverage: operationalRegime.dataCoverage,
-      modelsUsed: appliedModelWeights.length || expertModelCount,
+      modelsUsed: appliedModelWeights.length || modelDetails.length,
       historicalTimeSeries,
       historicalServices: allServices,
     };
