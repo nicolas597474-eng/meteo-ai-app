@@ -3624,5 +3624,5 @@
 - [x] Diagnostiquer précisément les timeouts de 30 secondes et l’erreur 403 du cookie planifié.
 - [x] Réduire le temps critique de collecte tout en conservant les contrôles de qualité et la concurrence bornée.
 - [x] Renforcer la reprise idempotente et les diagnostics sans réécrire un créneau déjà archivé.
-- [ ] Ajouter les tests de non-régression et vérifier les passages réels après publication.
-- [ ] Publier la tâche v6 stabilisée sans modifier les scores, les pondérations, le moteur ou les archives existantes.
+- [x] Ajouter les tests de non-régression et vérifier les passages réels après publication.
+- [x] Publier la tâche v6 stabilisée sans modifier les scores, les pondérations, le moteur ou les archives existantes.
