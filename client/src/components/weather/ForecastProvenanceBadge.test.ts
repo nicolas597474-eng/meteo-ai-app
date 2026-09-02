@@ -9,5 +9,9 @@ describe("ForecastProvenanceBadge", () => {
     expect(source).toContain("Donnée calculée le");
     expect(source).toContain("Horodatage indisponible");
     expect(source).toContain("h disponibles");
+    expect(source).toContain("Météo-France · suivi shadow");
+    expect(source).toContain("Flux authentifié Météo-France");
+    expect(source).toContain("Repli Open-Meteo · AROME/ARPEGE");
+    expect(source).toContain("non appliqué à la prévision visible");
   });
 });

@@ -27,6 +27,8 @@ describe("weather.getForecastCollectionReport", () => {
     expect(procedure).toContain("nextForecastRun");
     expect(procedure).toContain("lastForecastRun");
     expect(procedure).toContain("durationMs");
+    expect(procedure).toContain("meteoFranceShadow");
+    expect(procedure).toContain('getLatestPublicForecastProvenanceSnapshot(locationKey, "Météo-France")');
   });
 });
 
@@ -41,6 +43,13 @@ describe("collectFavoritesForecastsHandler", () => {
     const writeBlock = source.slice(start, end);
     expect(writeBlock).toContain("await insertStationCollectionSnapshot(buildStationCollectionSnapshot({");
     expect(writeBlock).not.toContain("if (!stationCollectionDeferred)");
+  });
+
+  it("garde l’écriture de provenance shadow non bloquante pour le flux historique", () => {
+    const source = readFileSync(new URL("../scheduledHandlers.ts", import.meta.url), "utf8");
+    expect(source).toContain("La traçabilité shadow ne doit jamais bloquer le flux public historique.");
+    expect(source).toContain("Météo-France provenance shadow unavailable");
+    expect(source).toContain("provenanceAppliedToProduction: false");
   });
 });
 

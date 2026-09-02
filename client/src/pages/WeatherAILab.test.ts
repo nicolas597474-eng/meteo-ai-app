@@ -89,6 +89,9 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("lastPhysicalCollection");
     expect(source).toContain("noQualifiedStationSlots");
     expect(source).toContain("scheduleCoverage");
+    expect(source).toContain("meteoFranceShadow");
+    expect(source).toContain("Provenance Météo-France");
+    expect(source).toContain("Ce statut n’est pas appliqué à la prévision visible.");
     expect(source).toContain("staleTime: 2 * 60_000");
     expect(source).toContain("staleTime: 5 * 60_000");
     expect(source).toContain("Prévisions · 7 modèles + 1 agrégateur");

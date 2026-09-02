@@ -77,6 +77,31 @@ export type ForecastRun = typeof forecastRuns.$inferSelect;
 export type InsertForecastRun = typeof forecastRuns.$inferInsert;
 
 /**
+ * Latest daily provenance check for a public forecast service. This table is
+ * observability-only: `shadowMode=1` and `appliedToProduction=0` guarantee the
+ * recorded status cannot become a fusion input by itself.
+ */
+export const publicForecastProvenanceSnapshots = mysqlTable("public_forecast_provenance_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  serviceName: varchar("serviceName", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["official", "fallback", "unavailable"]).notNull(),
+  provider: varchar("provider", { length: 96 }),
+  upstreamModels: json("upstreamModels"),
+  fallbackReason: varchar("fallbackReason", { length: 255 }),
+  officialConfigured: int("officialConfigured").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  checkedAt: timestamp("checkedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("public_forecast_provenance_location_date_service_unique").on(table.locationKey, table.date, table.serviceName),
+]);
+
+export type PublicForecastProvenanceSnapshot = typeof publicForecastProvenanceSnapshots.$inferSelect;
+export type InsertPublicForecastProvenanceSnapshot = typeof publicForecastProvenanceSnapshots.$inferInsert;
+
+/**
  * Real weather observations from local stations.
  * Each row = one day's actual weather at Hondeghem.
  */

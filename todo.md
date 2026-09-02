@@ -3626,3 +3626,11 @@
 - [x] Renforcer la reprise idempotente et les diagnostics sans réécrire un créneau déjà archivé.
 - [x] Ajouter les tests de non-régression et vérifier les passages réels après publication.
 - [x] Publier la tâche v6 stabilisée sans modifier les scores, les pondérations, le moteur ou les archives existantes.
+
+## P0.3 — Provenance Météo-France en mode shadow
+- [x] Auditer le flux officiel, le repli AROME/ARPEGE et les archives actuellement produites.
+- [x] Définir les statuts `official`, `fallback`, `unavailable` et les métadonnées de provenance associées.
+- [x] Persister la provenance shadow sans modifier les valeurs, la fusion, les scores ni les pondérations de production.
+- [x] Afficher clairement la provenance et l’état shadow dans les écrans de suivi concernés.
+- [x] Ajouter les tests de non-régression et vérifier un passage réel sans basculer la prévision visible.
+- [x] Publier P0.3 après validation complète en conservant l’ancien système actif en parallèle.

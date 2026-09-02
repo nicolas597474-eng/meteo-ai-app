@@ -29,6 +29,74 @@ export interface RealForecastResult {
   rawData: unknown;
 }
 
+export type MeteoFranceProvenanceStatus = "official" | "fallback" | "unavailable";
+
+export type MeteoFranceProvenance = {
+  status: MeteoFranceProvenanceStatus;
+  provider: "meteofrance-authenticated" | "open-meteo-meteofrance" | null;
+  upstreamModels: string[];
+  fallbackReason: string | null;
+  officialConfigured: boolean;
+  shadowMode: true;
+  appliedToProduction: false;
+  checkedAt: string;
+};
+
+export function resolveMeteoFranceProvenance(
+  officialConfigured: boolean,
+  officialForecast: RealForecastResult | null,
+  fallbackForecast: RealForecastResult | null,
+  checkedAt = new Date().toISOString(),
+): { forecast: RealForecastResult | null; provenance: MeteoFranceProvenance } {
+  if (officialForecast) {
+    return {
+      forecast: officialForecast,
+      provenance: {
+        status: "official",
+        provider: "meteofrance-authenticated",
+        upstreamModels: [],
+        fallbackReason: null,
+        officialConfigured,
+        shadowMode: true,
+        appliedToProduction: false,
+        checkedAt,
+      },
+    };
+  }
+
+  if (fallbackForecast) {
+    return {
+      forecast: fallbackForecast,
+      provenance: {
+        status: "fallback",
+        provider: "open-meteo-meteofrance",
+        upstreamModels: ["AROME", "ARPEGE"],
+        fallbackReason: officialConfigured ? "Flux Météo-France authentifié indisponible" : "Clé du flux Météo-France authentifié absente",
+        officialConfigured,
+        shadowMode: true,
+        appliedToProduction: false,
+        checkedAt,
+      },
+    };
+  }
+
+  return {
+    forecast: null,
+    provenance: {
+      status: "unavailable",
+      provider: null,
+      upstreamModels: [],
+      fallbackReason: officialConfigured
+        ? "Flux Météo-France authentifié et repli Open-Meteo indisponibles"
+        : "Clé Météo-France absente et repli Open-Meteo indisponible",
+      officialConfigured,
+      shadowMode: true,
+      appliedToProduction: false,
+      checkedAt,
+    },
+  };
+}
+
 // ─────────────────────────────────────────────────────────────
 // OpenWeatherMap — /data/2.5/forecast (5 jours, pas de 3h)
 // Endpoint : https://api.openweathermap.org/data/2.5/forecast
@@ -319,7 +387,9 @@ export async function fetchRealPublicForecasts(
   targetDate: string,
   lat: number,
   lon: number
-): Promise<{ owm: RealForecastResult | null; mf: RealForecastResult | null }> {
+): Promise<{ owm: RealForecastResult | null; mf: RealForecastResult | null; mfProvenance: MeteoFranceProvenance }> {
+  const officialConfigured = Boolean(ENV.meteoFranceApiKey);
+  const checkedAt = new Date().toISOString();
   const [owmResult, mfPortailResult, mfOpenMeteoResult] = await Promise.allSettled([
     fetchOpenWeatherMap(targetDate, lat, lon),
     fetchMeteoFrance(targetDate, lat, lon),
@@ -328,14 +398,15 @@ export async function fetchRealPublicForecasts(
 
   const owm = owmResult.status === "fulfilled" ? owmResult.value : null;
 
-  // Préférer le portail officiel, sinon utiliser Open-Meteo ARPEGE/AROME
-  let mf: RealForecastResult | null = null;
-  if (mfPortailResult.status === "fulfilled" && mfPortailResult.value) {
-    mf = mfPortailResult.value;
-  } else if (mfOpenMeteoResult.status === "fulfilled" && mfOpenMeteoResult.value) {
-    mf = mfOpenMeteoResult.value;
+  // Préférer le portail officiel, sinon utiliser Open-Meteo ARPEGE/AROME.
+  const officialForecast = mfPortailResult.status === "fulfilled" ? mfPortailResult.value : null;
+  const fallbackForecast = mfOpenMeteoResult.status === "fulfilled" ? mfOpenMeteoResult.value : null;
+  const resolvedMeteoFrance = resolveMeteoFranceProvenance(officialConfigured, officialForecast, fallbackForecast, checkedAt);
+  const mf = resolvedMeteoFrance.forecast;
+  const mfProvenance = resolvedMeteoFrance.provenance;
+  if (mfProvenance.status === "fallback") {
     console.log(`[MeteoAI] Météo-France via Open-Meteo (fallback ARPEGE/AROME)`);
   }
 
-  return { owm, mf };
+  return { owm, mf, mfProvenance };
 }

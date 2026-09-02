@@ -10,9 +10,20 @@ export type ForecastProvenanceData = {
   hourlyCoverage: number;
   dailyCoverage: number;
   modelsUsed: number;
+  meteoFranceShadow?: {
+    status: "official" | "fallback" | "unavailable";
+    provider: string | null;
+    upstreamModels: string[];
+    fallbackReason: string | null;
+    officialConfigured: boolean;
+    shadowMode: boolean;
+    appliedToProduction: boolean;
+    date: string;
+    checkedAt: Date | string;
+  } | null;
 };
 
-function displayDate(value: string | null) {
+function displayDate(value: Date | string | null) {
   if (!value) return null;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
@@ -36,6 +47,12 @@ export function ForecastProvenanceBadge({ data, className = "" }: { data: Foreca
     : isDailyFallback
       ? "border-amber-300/30 bg-amber-300/[0.08] text-amber-100"
       : "border-sky-300/25 bg-sky-400/[0.06] text-sky-100";
+  const mfShadow = data.meteoFranceShadow;
+  const mfStatusLabel = mfShadow?.status === "official"
+    ? "Flux authentifié Météo-France"
+    : mfShadow?.status === "fallback"
+      ? "Repli Open-Meteo · AROME/ARPEGE"
+      : "Flux Météo-France indisponible";
 
   return (
     <section role="status" aria-label="Provenance météo" className={`rounded-xl border px-3 py-2 ${tone} ${className}`}>
@@ -49,6 +66,11 @@ export function ForecastProvenanceBadge({ data, className = "" }: { data: Foreca
             {data.source ? ` · ${data.source}` : ""}
             {data.kind === "hourly_forecast" ? ` · ${data.hourlyCoverage} h disponibles` : ""}
           </p>
+          {mfShadow && <div className="mt-2 border-t border-white/10 pt-2 text-[9px] leading-relaxed">
+            <p className="font-semibold uppercase tracking-[0.1em] opacity-80">Météo-France · suivi shadow</p>
+            <p className="mt-0.5">{mfStatusLabel}</p>
+            <p className="opacity-70">Contrôlé le {displayDate(mfShadow.checkedAt) ?? "—"} · non appliqué à la prévision visible.</p>
+          </div>}
         </div>
       </div>
     </section>
