@@ -31,6 +31,25 @@ export const SHADOW_RUN_EVIDENCE_STATUSES = [
   "SCHEDULE_DERIVED",
   "UNKNOWN",
 ] as const;
+
+export const P1_OBSERVATION_VERDICTS = [
+  "OBSERVING",
+  "VALIDABLE",
+  "EXTEND",
+  "FAILED",
+] as const;
+
+export type P1ObservationVerdict = typeof P1_OBSERVATION_VERDICTS[number];
+
+export const P1_OBSERVATION_THRESHOLDS = {
+  requiredDays: 7,
+  expectedSources: 8,
+  minimumWriteSuccessRate: 0.99,
+  minimumContractIntegrityRate: 1,
+  maximumDuplicateRunGroups: 0,
+  maximumAppliedToProduction: 0,
+  maximumNonShadowValues: 0,
+} as const;
 export const SHADOW_RUN_EVIDENCE_SCOPES = [
   "payload_exact",
   "model_exact",

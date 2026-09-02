@@ -721,6 +721,45 @@ export const shadowWeatherValues = mysqlTable("shadow_weather_values", {
 export type ShadowWeatherValue = typeof shadowWeatherValues.$inferSelect;
 export type InsertShadowWeatherValue = typeof shadowWeatherValues.$inferInsert;
 
+/** One idempotent daily acceptance snapshot per location during P1.6. */
+export const shadowWeatherObservationDays = mysqlTable("shadow_weather_observation_days", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  observationDate: varchar("observationDate", { length: 10 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  expectedSourceCount: int("expectedSourceCount").notNull().default(8),
+  dailySourceCount: int("dailySourceCount").notNull().default(0),
+  hourlySourceCount: int("hourlySourceCount").notNull().default(0),
+  totalRunCount: int("totalRunCount").notNull().default(0),
+  successRunCount: int("successRunCount").notNull().default(0),
+  partialRunCount: int("partialRunCount").notNull().default(0),
+  failedRunCount: int("failedRunCount").notNull().default(0),
+  totalValueCount: int("totalValueCount").notNull().default(0),
+  validValueCount: int("validValueCount").notNull().default(0),
+  missingValueCount: int("missingValueCount").notNull().default(0),
+  duplicateRunGroupCount: int("duplicateRunGroupCount").notNull().default(0),
+  nonShadowValueCount: int("nonShadowValueCount").notNull().default(0),
+  appliedToProductionCount: int("appliedToProductionCount").notNull().default(0),
+  writeSuccessRate: float("writeSuccessRate").notNull().default(0),
+  contractIntegrityRate: float("contractIntegrityRate").notNull().default(0),
+  coverageGatePassed: int("coverageGatePassed").notNull().default(0),
+  writeSuccessGatePassed: int("writeSuccessGatePassed").notNull().default(0),
+  idempotenceGatePassed: int("idempotenceGatePassed").notNull().default(0),
+  isolationGatePassed: int("isolationGatePassed").notNull().default(0),
+  contractGatePassed: int("contractGatePassed").notNull().default(0),
+  verdict: varchar("verdict", { length: 16 }).notNull().default("OBSERVING"),
+  reasons: json("reasons"),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_observation_date_location_unique").on(table.observationDate, table.locationKey),
+  index("shadow_observation_location_date_idx").on(table.locationKey, table.observationDate),
+  index("shadow_observation_verdict_date_idx").on(table.verdict, table.observationDate),
+]);
+
+export type ShadowWeatherObservationDay = typeof shadowWeatherObservationDays.$inferSelect;
+export type InsertShadowWeatherObservationDay = typeof shadowWeatherObservationDays.$inferInsert;
+
 /** Documented lineage used later by P15; it has no effect on current weights. */
 export const shadowWeatherSourceRelations = mysqlTable("shadow_weather_source_relations", {
   id: int("id").autoincrement().primaryKey(),

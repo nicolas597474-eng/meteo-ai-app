@@ -24,6 +24,7 @@ import {
   createUnknownRunEvidence,
   fetchProviderRunEvidenceMap,
 } from "./weatherProviderRunEvidence";
+import { getP1ObservationWindow } from "./weatherP1Observation";
 
 export type ShadowHourlyForecast = {
   modelName: string;
@@ -509,6 +510,9 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
   const observationDaysElapsed = firstReceivedAt == null
     ? 0
     : Math.min(7, Math.max(1, Math.floor((Date.now() - firstReceivedAt) / 86_400_000) + 1));
+  const observationWindow = locationKey
+    ? await getP1ObservationWindow(locationKey, Math.max(14, lookbackDays))
+    : null;
 
   return {
     mode: "shadow" as const,
@@ -535,6 +539,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
       remainingDays: Math.max(0, 7 - observationDaysElapsed),
       complete: observationDaysElapsed >= 7,
     },
+    observationWindow,
     values: {
       total: Number(valueSummary?.totalValues ?? 0),
       valid: Number(valueSummary?.validValues ?? 0),

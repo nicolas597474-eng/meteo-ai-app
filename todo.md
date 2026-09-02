@@ -3667,3 +3667,17 @@
 - [x] Étendre le rapport propriétaire P1 avec le statut, l’heure et la preuve de run P2.
 - [x] Vérifier les cas réels, l’isolation de production et l’absence de Météo-France.
 - [x] Publier P2 sans promouvoir P1, sans commencer P3 et en maintenant P1.6.
+
+## P1.6 — Observation shadow automatisée sur sept jours
+- [x] Définir les critères déterministes de couverture, intégrité, idempotence et isolation production.
+- [x] Ajouter une table additive de bilans quotidiens P1.6 sans modifier les valeurs shadow ni les tables de production.
+- [x] Construire un évaluateur idempotent avec les verdicts `OBSERVING`, `VALIDABLE`, `EXTEND` et `FAILED`.
+- [x] Enregistrer le bilan après la collecte v8 sans jamais bloquer son flux historique.
+- [x] Afficher au propriétaire l’historique quotidien, les critères et le verdict P1.6.
+- [x] Tester les quatre verdicts, l’idempotence et l’absence totale d’application à la production.
+- [x] Vérifier un bilan réel et le rendu mobile, puis publier sans commencer P3.
+
+## Alignement avec la feuille de route officielle
+- [ ] Renommer la traçabilité des runs précédemment appelée P2 pour la rattacher à P1 et à la Phase 17.
+- [ ] Présenter la véritable Phase 2 : modèles déterministes, ensembles, observations, radar et satellite.
+- [ ] Définir le périmètre shadow initial de classification sans ajouter de source non connectée ni commencer la Phase 3.

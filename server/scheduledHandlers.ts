@@ -21,6 +21,7 @@ import {
   persistDailyForecastsToShadow,
   persistHourlyForecastsToShadow,
 } from "./weatherDataHubShadow";
+import { recordP1ObservationDay } from "./weatherP1Observation";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
 import {
@@ -1431,6 +1432,17 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           daily: dailyCoverage,
           hourly: hourlyCoverage,
         }));
+
+        await executeShadowWriteSafely(`p1.6:${locKey}:${today}`, async () => {
+          const evaluation = await recordP1ObservationDay({
+            observationDate: today,
+            locationKey: locKey,
+          });
+          console.log(
+            `[DataHubShadow] ${fav.name}: P1.6 ${evaluation.verdict} — quotidien ${evaluation.dailySourceCount}/${evaluation.expectedSourceCount}, horaire ${evaluation.hourlySourceCount}/${evaluation.expectedSourceCount}`,
+          );
+          return evaluation;
+        });
 
         locationsProcessed++;
 
