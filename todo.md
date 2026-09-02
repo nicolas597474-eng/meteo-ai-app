@@ -3594,3 +3594,9 @@
 - [x] Restaurer le fond dynamique sans modifier le contenu météo ni les calculs.
 - [x] Ajouter les tests de non-régression et vérifier le rendu mobile.
 - [x] Publier la correction après validation complète.
+
+## Cercle d’animation derrière le soleil
+- [x] Identifier le cercle généré par l’icône solaire.
+- [x] Supprimer uniquement ce cercle sans modifier l’icône ni les autres effets.
+- [x] Ajouter un test de non-régression et vérifier le rendu mobile.
+- [x] Publier la correction après validation complète.

@@ -23,6 +23,11 @@ describe("MeteoIcon", () => {
     expect(source).toContain('aria-hidden=\"true\"');
   });
 
+  it("retire le fin cercle d’animation derrière le soleil tout en conservant son disque", () => {
+    expect(source).not.toContain('r="18.5" fill={ray} opacity="0.1"');
+    expect(source).toContain('r="12.8" fill={`url(#${ids.sun})`}');
+  });
+
   it("centralise les effets contextuels sur toutes les familles météo", () => {
     expect(source).toContain("type WeatherEffectKind");
     expect(source).toContain("getWeatherEffectKind");
