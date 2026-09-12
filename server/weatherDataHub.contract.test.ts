@@ -11,6 +11,7 @@ import {
   getShadowCanonicalVariableDefinition,
   getPhase3HorizonWindow,
   normalizePhase4WeatherValue,
+  calculatePhase6ShadowCandidate,
   validatePhase2ShadowClassifications,
   validatePhase3HorizonStrategy,
   validateP1ShadowSourceRegistry,
@@ -113,6 +114,112 @@ describe("P1 shadow weather data hub contract", () => {
     expect(normalizePhase4WeatherValue({ ...base, variable: "air_pressure_surface", value: 101_325, sourceUnit: "Pa" }).value).toBe(1013.25);
     expect(normalizePhase4WeatherValue({ ...base, variable: "visibility", value: 12_000, sourceUnit: "m" }).value).toBe(12);
     expect(normalizePhase4WeatherValue({ ...base, variable: "snowfall_amount", value: 25, sourceUnit: "mm" }).value).toBe(2.5);
+  });
+
+  it("calculates explainable Phase 6 shadow weights without counting Best Match as independent", () => {
+    const result = calculatePhase6ShadowCandidate({
+      variable: "air_temperature_2m",
+      phase3WindowKey: "6_24h",
+      evaluatedAt: Date.parse("2026-09-02T10:00:00Z"),
+      sources: [
+        {
+          sourceKey: "openmeteo_arome_france_hd",
+          sourceType: "deterministic_model",
+          independenceClass: "independent_model",
+          value: 10,
+          phase5Status: "VALID",
+          freshnessStatus: "FRESH",
+          localPerformanceScore: 80,
+          horizonPerformanceScore: 90,
+          variablePerformanceScore: 90,
+          nativeResolutionKm: 1,
+          regimeMatch: 1,
+          convergenceScore: 1,
+        },
+        {
+          sourceKey: "openmeteo_ecmwf_ifs025",
+          sourceType: "deterministic_model",
+          independenceClass: "independent_model",
+          value: 20,
+          phase5Status: "SUSPECT",
+          freshnessStatus: "AGING",
+          localPerformanceScore: 60,
+          horizonPerformanceScore: 70,
+          variablePerformanceScore: 80,
+          nativeResolutionKm: 9,
+          regimeMatch: 0.5,
+          convergenceScore: 0.5,
+        },
+        {
+          sourceKey: "openmeteo_best_match",
+          sourceType: "aggregator",
+          independenceClass: "non_independent",
+          value: 15,
+          phase5Status: "VALID",
+          freshnessStatus: "FRESH",
+          isDerived: true,
+        },
+      ],
+    });
+
+    expect(result.status).toBe("SHADOW_READY");
+    expect(result.candidateValue).toBeGreaterThan(10);
+    expect(result.candidateValue).toBeLessThan(20);
+    expect(result.weights.reduce((sum, item) => sum + item.normalizedWeight, 0)).toBeCloseTo(1, 8);
+    expect(result.weights.find(item => item.sourceKey === "openmeteo_best_match")).toMatchObject({
+      normalizedWeight: 0,
+      includedInCandidate: false,
+      referenceOnly: true,
+    });
+    expect(result.referenceValues).toEqual([{ sourceKey: "openmeteo_best_match", value: 15 }]);
+    expect(result.independentSourceCount).toBe(2);
+    expect(result.productionReadsEnabled).toBe(false);
+    expect(result.appliedToProduction).toBe(0);
+  });
+
+  it("keeps missing evidence visible and returns unavailable when no eligible value exists", () => {
+    const partial = calculatePhase6ShadowCandidate({
+      variable: "wind_speed_10m",
+      phase3WindowKey: "1_3d",
+      evaluatedAt: Date.parse("2026-09-02T10:00:00Z"),
+      sources: [
+        {
+          sourceKey: "openmeteo_arpege_europe",
+          sourceType: "deterministic_model",
+          independenceClass: "independent_model",
+          value: 12,
+          phase5Status: "VALID",
+          freshnessStatus: "UNKNOWN",
+        },
+        {
+          sourceKey: "openmeteo_icon_eu",
+          sourceType: "deterministic_model",
+          independenceClass: "independent_model",
+          value: 18,
+          phase5Status: "VALID",
+          freshnessStatus: "UNKNOWN",
+        },
+      ],
+    });
+    expect(partial.status).toBe("PARTIAL");
+    expect(partial.weights.every(item => item.missingEvidence.length > 0)).toBe(true);
+
+    const unavailable = calculatePhase6ShadowCandidate({
+      variable: "precipitation_amount",
+      phase3WindowKey: "7_15d",
+      evaluatedAt: Date.parse("2026-09-02T10:00:00Z"),
+      sources: [
+        {
+          sourceKey: "openmeteo_gfs_seamless",
+          sourceType: "deterministic_model",
+          independenceClass: "independent_model",
+          value: null,
+          phase5Status: "MISSING",
+          freshnessStatus: "STALE",
+        },
+      ],
+    });
+    expect(unavailable).toMatchObject({ status: "UNAVAILABLE", candidateValue: null, contributingSourceCount: 0 });
   });
 
   it("keeps missing or structurally impossible Phase 4 values explicit", () => {

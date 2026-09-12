@@ -6,6 +6,7 @@ import {
   shadowWeatherSourceDefinitions,
   shadowWeatherSourceRelations,
   shadowWeatherValues,
+  shadowWeatherPhase6Candidates,
   type InsertShadowWeatherIngestionRun,
   type InsertShadowWeatherValue,
 } from "../drizzle/schema";
@@ -16,12 +17,20 @@ import {
   PHASE3_HORIZON_WINDOWS,
   PHASE4_NORMALIZATION_VERSION,
   PHASE5_QUALITY_CONTROL_VERSION,
+  PHASE6_FUSION_VARIABLES,
+  PHASE6_SMART_FUSION_VERSION,
   P1_SHADOW_SOURCE_DEFINITIONS,
+  calculatePhase6ShadowCandidate,
+  getPhase3HorizonWindow,
   SHADOW_CANONICAL_VARIABLES,
   evaluatePhase5QualityControl,
   normalizePhase4WeatherValue,
   type Phase4NormalizationMetadata,
   type Phase5QualityControlMetadata,
+  type Phase6ShadowFusionSource,
+  type Phase6ShadowFusionInput,
+  type Phase6FusionVariable,
+  type Phase3HorizonWindow,
   type ShadowCanonicalVariable,
   type ShadowFreshnessStatus,
   type ShadowProviderRunEvidence,
@@ -867,6 +876,148 @@ async function persistOneShadowRun(input: {
   });
 }
 
+async function persistPhase6ShadowCandidates(input: {
+  cycleKey: string;
+  locationKey: string;
+  evaluatedAt: number;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const rows = await db.select({
+    sourceKey: shadowWeatherSourceDefinitions.sourceKey,
+    sourceType: shadowWeatherSourceDefinitions.sourceType,
+    independenceClass: shadowWeatherSourceDefinitions.independenceClass,
+    variable: shadowWeatherValues.variable,
+    validTime: shadowWeatherValues.validTime,
+    forecastHorizonMinutes: shadowWeatherValues.forecastHorizonMinutes,
+    value: shadowWeatherValues.value,
+    phase5QualityStatus: shadowWeatherValues.phase5QualityStatus,
+    freshnessStatus: shadowWeatherValues.freshnessStatus,
+    nativeResolutionKm: shadowWeatherValues.nativeResolutionKm,
+  })
+    .from(shadowWeatherValues)
+    .innerJoin(shadowWeatherIngestionRuns, eq(shadowWeatherValues.ingestionRunId, shadowWeatherIngestionRuns.id))
+    .innerJoin(shadowWeatherSourceDefinitions, eq(shadowWeatherValues.sourceDefinitionId, shadowWeatherSourceDefinitions.id))
+    .where(and(
+      eq(shadowWeatherIngestionRuns.cycleKey, input.cycleKey),
+      eq(shadowWeatherValues.locationKey, input.locationKey),
+    ));
+
+  const grouped = new Map<string, {
+    variable: Phase6FusionVariable;
+    validTime: number;
+    phase3WindowKey: Phase3HorizonWindow["key"];
+    sources: Phase6ShadowFusionSource[];
+  }>();
+
+  for (const row of rows) {
+    if (!PHASE6_FUSION_VARIABLES.includes(row.variable as Phase6FusionVariable)) continue;
+    const phase3Window = getPhase3HorizonWindow(row.forecastHorizonMinutes);
+    if (!phase3Window) continue;
+    const variable = row.variable as Phase6FusionVariable;
+    const groupKey = `${row.validTime}:${variable}:${phase3Window.key}`;
+    const group = grouped.get(groupKey) ?? {
+      variable,
+      validTime: row.validTime,
+      phase3WindowKey: phase3Window.key,
+      sources: [],
+    };
+    group.sources.push({
+      sourceKey: row.sourceKey,
+      sourceType: row.sourceType as Phase6ShadowFusionSource["sourceType"],
+      independenceClass: row.independenceClass as Phase6ShadowFusionSource["independenceClass"],
+      value: row.value,
+      available: row.value != null,
+      phase5Status: (row.phase5QualityStatus ?? "MISSING") as ShadowQualityStatus,
+      freshnessStatus: (row.freshnessStatus ?? "UNKNOWN") as ShadowFreshnessStatus,
+      nativeResolutionKm: row.nativeResolutionKm,
+      isDerived: row.independenceClass !== "independent_model",
+    });
+    grouped.set(groupKey, group);
+  }
+
+  let persisted = 0;
+  for (const group of Array.from(grouped.values())) {
+    const result = calculatePhase6ShadowCandidate({
+      variable: group.variable,
+      sources: group.sources,
+      phase3WindowKey: group.phase3WindowKey,
+      evaluatedAt: input.evaluatedAt,
+    });
+    await db.insert(shadowWeatherPhase6Candidates).values({
+      cycleKey: input.cycleKey,
+      locationKey: input.locationKey,
+      validTime: group.validTime,
+      variable: group.variable,
+      phase3WindowKey: group.phase3WindowKey,
+      candidateStatus: result.status,
+      candidateValue: result.candidateValue,
+      contributingSourceCount: result.contributingSourceCount,
+      independentSourceCount: result.independentSourceCount,
+      weights: result.weights,
+      referenceValues: result.referenceValues,
+      productionReadsEnabled: 0,
+      shadowMode: 1,
+      appliedToProduction: 0,
+      evaluatedAt: result.evaluatedAt,
+    }).onDuplicateKeyUpdate({
+      set: {
+        candidateStatus: result.status,
+        candidateValue: result.candidateValue,
+        contributingSourceCount: result.contributingSourceCount,
+        independentSourceCount: result.independentSourceCount,
+        weights: result.weights,
+        referenceValues: result.referenceValues,
+        productionReadsEnabled: 0,
+        shadowMode: 1,
+        appliedToProduction: 0,
+        evaluatedAt: result.evaluatedAt,
+        updatedAt: new Date(),
+      },
+    });
+    persisted += 1;
+  }
+    return persisted;
+}
+
+/**
+ * Rejoue uniquement les valeurs déjà présentes dans le Data Hub shadow.
+ * Ce helper ne lit ni n’écrit aucune table de production et reste idempotent
+ * grâce à la clé unique du candidat Phase 6.
+ */
+export async function rebuildPhase6ShadowCandidatesFromExistingValues(input?: {
+  locationKeys?: readonly string[];
+  cycleKeys?: readonly string[];
+}): Promise<{ cycleCount: number; candidateCount: number }> {
+  const db = await getDb();
+  if (!db) return { cycleCount: 0, candidateCount: 0 };
+  const cycles = await db.select({
+    cycleKey: shadowWeatherIngestionRuns.cycleKey,
+    locationKey: shadowWeatherIngestionRuns.locationKey,
+    evaluatedAt: sql<number>`max(${shadowWeatherIngestionRuns.receivedAt})`,
+  })
+    .from(shadowWeatherIngestionRuns)
+    .innerJoin(shadowWeatherValues, eq(shadowWeatherValues.ingestionRunId, shadowWeatherIngestionRuns.id))
+    .groupBy(shadowWeatherIngestionRuns.cycleKey, shadowWeatherIngestionRuns.locationKey);
+  const locationFilter = input?.locationKeys ? new Set(input.locationKeys) : null;
+  const cycleFilter = input?.cycleKeys ? new Set(input.cycleKeys) : null;
+  let cycleCount = 0;
+  let candidateCount = 0;
+  for (const cycle of cycles) {
+    if (locationFilter && !locationFilter.has(cycle.locationKey)) continue;
+    if (cycleFilter && !cycleFilter.has(cycle.cycleKey)) continue;
+    const evaluatedAt = Number(cycle.evaluatedAt ?? Date.now());
+    candidateCount += await persistPhase6ShadowCandidates({
+      cycleKey: cycle.cycleKey,
+      locationKey: cycle.locationKey,
+      evaluatedAt: Number.isFinite(evaluatedAt) ? evaluatedAt : Date.now(),
+    });
+    cycleCount += 1;
+  }
+  return { cycleCount, candidateCount };
+}
+
 export async function persistDailyForecastsToShadow(
   forecasts: ForecastData[],
   context: ShadowWriteContext,
@@ -896,6 +1047,15 @@ export async function persistDailyForecastsToShadow(
     } catch (error) {
       errors.push(`${forecast.serviceName}:${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+  try {
+    await persistPhase6ShadowCandidates({
+      cycleKey: `daily:${context.targetDate}:v1`,
+      locationKey: context.locationKey,
+      evaluatedAt: context.receivedAt,
+    });
+  } catch (error) {
+    errors.push(`phase6:${error instanceof Error ? error.message : String(error)}`);
   }
   return { ok: errors.length === 0, sourceCount, valueCount, errors };
 }
@@ -930,6 +1090,15 @@ export async function persistHourlyForecastsToShadow(
       errors.push(`${forecast.modelName}:${error instanceof Error ? error.message : String(error)}`);
     }
   }
+  try {
+    await persistPhase6ShadowCandidates({
+      cycleKey: `hourly:${context.targetDate}:v1`,
+      locationKey: context.locationKey,
+      evaluatedAt: context.receivedAt,
+    });
+  } catch (error) {
+    errors.push(`phase6:${error instanceof Error ? error.message : String(error)}`);
+  }
   return { ok: errors.length === 0, sourceCount, valueCount, errors };
 }
 
@@ -944,6 +1113,62 @@ export async function executeShadowWriteSafely<T>(label: string, operation: () =
     console.warn(`[DataHubShadow] ${label} failed without affecting production:`, error);
     return null;
   }
+}
+
+async function buildPhase6FusionReport(locationKey?: string) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      version: PHASE6_SMART_FUSION_VERSION,
+      candidateCount: 0,
+      statuses: { SHADOW_READY: 0, PARTIAL: 0, UNAVAILABLE: 0 },
+      byVariable: [],
+      byWindow: [],
+      productionReadsEnabled: 0,
+      appliedToProduction: 0,
+      shadowModeViolations: 0,
+      valid: false,
+    } as const;
+  }
+  const filters = locationKey ? [eq(shadowWeatherPhase6Candidates.locationKey, locationKey)] : [];
+  const rows = await db.select({
+    candidateStatus: shadowWeatherPhase6Candidates.candidateStatus,
+    variable: shadowWeatherPhase6Candidates.variable,
+    phase3WindowKey: shadowWeatherPhase6Candidates.phase3WindowKey,
+    productionReadsEnabled: shadowWeatherPhase6Candidates.productionReadsEnabled,
+    shadowMode: shadowWeatherPhase6Candidates.shadowMode,
+    appliedToProduction: shadowWeatherPhase6Candidates.appliedToProduction,
+    independentSourceCount: shadowWeatherPhase6Candidates.independentSourceCount,
+  }).from(shadowWeatherPhase6Candidates).where(and(...filters));
+  const statuses = { SHADOW_READY: 0, PARTIAL: 0, UNAVAILABLE: 0 };
+  const variables = new Map<string, number>();
+  const windows = new Map<string, number>();
+  let productionReadsEnabled = 0;
+  let appliedToProduction = 0;
+  let shadowModeViolations = 0;
+  for (const row of rows) {
+    if (row.candidateStatus in statuses) {
+      statuses[row.candidateStatus as keyof typeof statuses] += 1;
+    }
+    variables.set(row.variable, (variables.get(row.variable) ?? 0) + 1);
+    windows.set(row.phase3WindowKey, (windows.get(row.phase3WindowKey) ?? 0) + 1);
+    productionReadsEnabled += Number(row.productionReadsEnabled ?? 0);
+    appliedToProduction += Number(row.appliedToProduction ?? 0);
+    if (Number(row.shadowMode ?? 0) !== 1 || Number(row.independentSourceCount ?? 0) < 0) shadowModeViolations += 1;
+  }
+  return {
+    version: PHASE6_SMART_FUSION_VERSION,
+    candidateCount: rows.length,
+    statuses,
+    byVariable: Array.from(variables.entries()).map(([variable, count]) => ({ variable, count })),
+    byWindow: Array.from(windows.entries()).map(([window, count]) => ({ window, count })),
+    productionReadsEnabled,
+    appliedToProduction,
+    shadowModeViolations,
+    valid: rows.length === 0
+      ? true
+      : productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0,
+  } as const;
 }
 
 export async function getShadowDataHubObservability(locationKey?: string, lookbackDays = 7) {
@@ -1083,6 +1308,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
   const observationWindow = locationKey
     ? await getP1ObservationWindow(locationKey, Math.max(14, lookbackDays))
     : null;
+  const phase6Fusion = await buildPhase6FusionReport(locationKey);
   const phase5QualityControl = buildPhase5QualityControlReport(horizonValues.map(value => ({
     ingestionRunId: Number(value.ingestionRunId),
     sourceKey: value.sourceKey,
@@ -1139,6 +1365,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
         stillOpen: (observationWindow?.completedDays ?? 0) < (observationWindow?.requiredDays ?? 7),
       },
     },
+    phase6Fusion,
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),

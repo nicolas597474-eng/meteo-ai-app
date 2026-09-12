@@ -3750,3 +3750,42 @@
 - [x] Vérifier sur les deux lieux réels l’idempotence, les cinq statuts, zéro application production et l’absence de lecteur métier.
 - [x] Valider TypeScript, Vitest complet, la qualité du diff et le rendu mobile : 488 tests réussis et 2 ignorés.
 - [x] Publier uniquement la préparation Phase 5, en laissant P1.6 ouverte et sans commencer la Phase 6.
+
+## P1.6 — Contrôle automatique en deux temps
+- [x] Méthode choisie par l’utilisateur : deux contrôles ponctuels dans cette conversation, réunis dans une seule planification à deux déclenchements.
+- [x] Arrêt demandé par l’utilisateur : désactiver les contrôles automatiques et conserver P1.6 officiellement ouverte à 3/7, sans clôture artificielle.
+- [x] Planification `4uYDhvW3nCHvm4MzDmj6JR` confirmée en pause ; aucun nouveau déclenchement P1.6 ne sera lancé automatiquement.
+- [x] Validation explicite de gouvernance : l’utilisateur considère l’analyse P1.6 comme terminée et validée, autorisant le démarrage de la Phase 6.
+
+## Phase 6 officielle — Fusion intelligente shadow
+- [x] Auditer les poids, scores, horizons et filtres actuels de la fusion de production.
+- [x] Concevoir le contrat shadow des poids dynamiques et du candidat fusionné.
+- [x] Implémenter le moteur pur et la persistance additive strictement shadow.
+- [x] Évaluer les huit flux et exposer les composantes au propriétaire.
+- [x] Valider l’idempotence, les sources dérivées, les tests et l’isolation production.
+- [x] Publier uniquement l’évaluation Phase 6 shadow sans promotion production.
+- [x] Configurer un contrôle en lecture seule le 3 septembre 2026 à 03:30 UTC après le cycle v8, sans relancer ni modifier la collecte.
+- [ ] Vérifier lors du premier contrôle que chaque lieu progresse de 1/7 à 2/7 avec une nouvelle date distincte conforme.
+- [x] Configurer une validation complète en lecture seule le 8 septembre 2026 à 03:30 UTC après le cycle v8 ; planification active `4uYDhvW3nCHvm4MzDmj6JR`, expiration à 04:30 UTC.
+- [ ] Confirmer lors du contrôle final sept dates distinctes par lieu, zéro doublon, zéro valeur hors shadow et zéro application production.
+- [ ] Clôturer officiellement P1.6 uniquement si le verdict global est `VALIDABLE` à 7/7.
+- [ ] Poursuivre ensuite la feuille de route sans commencer la Phase 6 avant cette validation réelle.
+
+## Phase 6 officielle — Audit préparatoire uniquement pendant P1.6
+- [x] Relire la définition officielle, les livrables et les critères d’acceptation de la Phase 6.
+- [x] Auditer en lecture seule la fusion, les pondérations, les corrections locales, les scores et les consommateurs de production existants.
+- [x] Identifier les dépendances entre les données normalisées Phase 4, les statuts QC Phase 5 et le moteur de fusion actuel.
+- [x] Documenter un périmètre strictement shadow, les invariants d’isolation et le rollback avant toute implémentation.
+- [x] Ne créer aucune migration, aucun moteur parallèle et aucune écriture Phase 6 pendant que P1.6 reste inférieure à 7/7.
+- [ ] Maintenir l’implémentation Phase 6 bloquée jusqu’à la clôture réelle et documentée de P1.6.
+
+## Nettoyage préalable Phase 6 — Arrêt des écritures publiques abandonnées
+- [x] Recenser tous les écrivains et lecteurs actuels de Météo-France et OpenWeatherMap dans le cycle de prévision.
+- [x] Empêcher toute nouvelle écriture Météo-France et OpenWeatherMap sans supprimer ni réécrire les archives existantes.
+- [x] Verrouiller la fusion quotidienne sur les sept modèles actifs et Open-Meteo Best Match uniquement.
+- [x] Conserver Best Match comme agrégateur dérivé non indépendant dans le Data Hub shadow.
+- [x] Ajouter des tests empêchant le retour des écritures publiques et toute inclusion de ces services dans la trace finale.
+- [x] Vérifier que P1.6 reste ouverte à 3/7, que la préparation Phase 5 reste shadow et que les poids finaux 7+1 ne changent pas.
+- [x] Valider TypeScript, Vitest complet (491 réussis, 2 ignorés), la qualité du diff et l’absence de migration ou suppression de données.
+- [x] Publier uniquement ce nettoyage ciblé sans démarrer l’implémentation Phase 6.
+- [x] Rejouer idempotemment les cycles shadow historiques dans le seul candidat Phase 6 afin d’obtenir une mesure réelle sans appel fournisseur.

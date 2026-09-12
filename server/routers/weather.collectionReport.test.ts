@@ -46,12 +46,14 @@ describe("weather.getShadowDataHubReport", () => {
     expect(shadowSource).toContain('appliedToProduction: 0');
     expect(scheduledSource).toContain("executeShadowWriteSafely(`daily:${locKey}`");
     expect(scheduledSource).toContain("executeShadowWriteSafely(`hourly:${locKey}`");
-    const dailyProductionWrite = scheduledSource.indexOf("await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);");
+    const dailyProductionWrite = scheduledSource.indexOf("await insertForecasts(forecastRowsForLoc);");
     const dailyShadowWrite = scheduledSource.indexOf("persistDailyForecastsToShadow(expertData");
     const hourlyProductionWrite = scheduledSource.indexOf("await insertHourlyForecasts(rows);");
     const hourlyShadowWrite = scheduledSource.indexOf("persistHourlyForecastsToShadow(hourlyAllModels");
     expect(dailyProductionWrite).toBeGreaterThanOrEqual(0);
     expect(dailyShadowWrite).toBeGreaterThan(dailyProductionWrite);
+    expect(scheduledSource).not.toContain("generatePublicServiceForecasts");
+    expect(scheduledSource).not.toContain("publicRowsForLoc");
     expect(hourlyProductionWrite).toBeGreaterThanOrEqual(0);
     expect(hourlyShadowWrite).toBeGreaterThan(hourlyProductionWrite);
   });

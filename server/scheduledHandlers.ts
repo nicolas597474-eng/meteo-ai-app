@@ -9,7 +9,6 @@ import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
-import { fetchRealPublicForecasts } from "./realWeatherAPIs";
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { isOperationalObservation } from "./observationProvenance";
@@ -510,19 +509,10 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         rawData: f.rawData as any,
       })));
 
-      // Also insert public service entries
-      const publicForecasts = await generatePublicServiceForecasts(
-        today,
-        defaultLocKey,
-        HONDEGHEM.lat,
-        HONDEGHEM.lon
-      );
-      if (publicForecasts.length > 0) {
-        await insertForecasts(publicForecasts);
-      }
-
-      // Get all forecasts for today to compute MeteoAI synthesis
-      const allForecasts = await getForecastsByDate(today, defaultLocKey);
+      // La fusion de ce passage utilise explicitement les sept modèles actifs et
+      // Best Match. Les anciennes lignes publiques restent archivées mais ne sont
+      // ni relues ni réécrites par ce cycle.
+      const allForecasts = expertData;
 
       if (allForecasts.length > 0) {
         // Calculate stability index
@@ -655,11 +645,11 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       // Update job as completed
       await updateCollectionJob(jobId, {
         status: "completed",
-        servicesCollected: forecastRows.length + publicForecasts.length,
+        servicesCollected: forecastRows.length,
         completedAt: new Date(),
       });
 
-      res.json({ ok: true, servicesCollected: forecastRows.length + publicForecasts.length });
+      res.json({ ok: true, servicesCollected: forecastRows.length });
     } catch (err: any) {
       await updateCollectionJob(jobId, {
         status: "failed",
@@ -845,47 +835,6 @@ export async function collectObservationsHandler(req: Request, res: Response) {
       context: { url: req.url },
       timestamp: new Date().toISOString(),
     });
-  }
-}
-
-/**
- * Generate public service forecasts from real provider responses only.
- * Aucune donnée synthétique ou aléatoire ne peut alimenter les prévisions,
- * les scores de fiabilité ou la fusion officielle.
- */
-async function generatePublicServiceForecasts(
-  date: string,
-  locationKey = "default",
-  lat?: number,
-  lon?: number
-): Promise<any[]> {
-  if (lat === undefined || lon === undefined) return [];
-
-  try {
-    const real = await fetchRealPublicForecasts(date, lat, lon);
-    const rows: any[] = [];
-    if (real.owm) {
-      rows.push({
-        locationKey, date, serviceName: "OpenWeatherMap", serviceCategory: "public",
-        tempMax: real.owm.tempMax, tempMin: real.owm.tempMin,
-        precipitation: real.owm.precipitation, windSpeed: real.owm.windSpeed,
-        windGust: real.owm.windGust, humidity: real.owm.humidity,
-        cloudCover: real.owm.cloudCover, condition: real.owm.condition, rawData: null,
-      });
-    }
-    if (real.mf) {
-      rows.push({
-        locationKey, date, serviceName: "Météo-France", serviceCategory: "public",
-        tempMax: real.mf.tempMax, tempMin: real.mf.tempMin,
-        precipitation: real.mf.precipitation, windSpeed: real.mf.windSpeed,
-        windGust: real.mf.windGust, humidity: real.mf.humidity,
-        cloudCover: real.mf.cloudCover, condition: real.mf.condition, rawData: null,
-      });
-    }
-    return rows;
-  } catch (e: any) {
-    console.warn(`[MeteoAI] Real public APIs unavailable: ${e.message}`);
-    return [];
   }
 }
 
@@ -1150,12 +1099,12 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           condition: f.condition,
           rawData: f.rawData as any,
         }));
-        // Also add public service forecasts (real APIs when keys available, simulation otherwise)
-        const publicRowsForLoc = await generatePublicServiceForecasts(today, locKey, fav.lat, fav.lon);
-        await insertForecasts([...forecastRowsForLoc, ...publicRowsForLoc]);
+        // Écriture strictement limitée aux sept modèles actifs et à Best Match.
+        // Les archives publiques historiques ne sont ni supprimées ni réécrites.
+        await insertForecasts(forecastRowsForLoc);
         const issuedAt = Date.now();
-        await insertForecastRuns([
-          ...expertData.map((f) => ({
+        await insertForecastRuns(
+          expertData.map((f) => ({
             locationKey: locKey,
             validDate: today,
             serviceName: f.serviceName,
@@ -1172,26 +1121,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             cloudCover: f.cloudCover,
             condition: f.condition,
             rawData: f.rawData as any,
-          })),
-          ...publicRowsForLoc.map((f) => ({
-            locationKey: locKey,
-            validDate: today,
-            serviceName: f.serviceName,
-            provider: f.serviceName === "OpenWeatherMap" ? "openweathermap" : "meteofrance-or-open-meteo",
-            modelId: null,
-            sourceKind: "service_forecast" as const,
-            issuedAt,
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-            windGust: f.windGust,
-            humidity: f.humidity,
-            cloudCover: f.cloudCover,
-            condition: f.condition,
-            rawData: f.rawData as any,
-          })),
-        ]);
+          }))
+        );
 
         await executeShadowWriteSafely(`daily:${locKey}`, async () => {
           const shadowResult = await persistDailyForecastsToShadow(expertData, {

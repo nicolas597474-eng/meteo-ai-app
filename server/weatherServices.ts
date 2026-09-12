@@ -21,10 +21,8 @@ export const WEATHER_SERVICES = {
     { name: "UKMET", modelId: "ukmo_seamless", category: "expert" as const },
     { name: "Open-Meteo", modelId: "best_match", category: "expert" as const },
   ],
-  public: [
-    { name: "Météo-France", category: "public" as const, availability: "conditional" as const },
-    { name: "OpenWeatherMap", category: "public" as const, availability: "conditional" as const },
-  ],
+  /** Aucun service public de prévision n'est actif ni écrit en production. */
+  public: [] as const,
   /** Marques documentaires uniquement : aucune donnée ne doit être affichée ou scorée sans intégration réelle. */
   inactivePublicCatalogue: ["Meteoblue", "AccuWeather", "Apple Weather", "Weather.com", "Ventusky", "Weatherbit", "World Weather Online", "La Chaîne Météo"] as const,
 };

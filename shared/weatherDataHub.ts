@@ -241,6 +241,191 @@ export type Phase5QualityControlResult = {
   metadata: Phase5QualityControlMetadata;
 };
 
+export const PHASE6_SMART_FUSION_VERSION = "phase6-smart-fusion-v1" as const;
+export const PHASE6_WEIGHT_COMPONENTS = [
+  "localPerformance",
+  "horizonPerformance",
+  "variablePerformance",
+  "quality",
+  "freshness",
+  "resolution",
+  "regime",
+  "convergence",
+  "independence",
+] as const;
+export const PHASE6_FUSION_VARIABLES = [
+  "air_temperature_2m",
+  "precipitation_amount",
+  "wind_speed_10m",
+  "wind_gust_10m",
+  "relative_humidity_2m",
+  "cloud_cover_total",
+] as const;
+export const PHASE6_SHADOW_CANDIDATE_STATUSES = ["SHADOW_READY", "PARTIAL", "UNAVAILABLE"] as const;
+
+export type Phase6WeightComponent = ArrayValue<typeof PHASE6_WEIGHT_COMPONENTS>;
+export type Phase6FusionVariable = ArrayValue<typeof PHASE6_FUSION_VARIABLES>;
+export type Phase6ShadowCandidateStatus = ArrayValue<typeof PHASE6_SHADOW_CANDIDATE_STATUSES>;
+
+export type Phase6ShadowFusionSource = {
+  sourceKey: string;
+  sourceType: ShadowSourceType;
+  independenceClass: ShadowIndependenceClass;
+  value: number | null;
+  available?: boolean;
+  phase5Status: ShadowQualityStatus;
+  freshnessStatus: ShadowFreshnessStatus;
+  localPerformanceScore?: number | null;
+  horizonPerformanceScore?: number | null;
+  variablePerformanceScore?: number | null;
+  nativeResolutionKm?: number | null;
+  regimeMatch?: number | null;
+  convergenceScore?: number | null;
+  isDerived?: boolean;
+};
+
+export type Phase6ShadowWeightMetadata = {
+  sourceKey: string;
+  value: number | null;
+  rawWeight: number;
+  normalizedWeight: number;
+  includedInCandidate: boolean;
+  referenceOnly: boolean;
+  components: Record<Phase6WeightComponent, number>;
+  missingEvidence: string[];
+};
+
+export type Phase6ShadowFusionInput = {
+  variable: Phase6FusionVariable;
+  sources: Phase6ShadowFusionSource[];
+  phase3WindowKey: Phase3HorizonWindow["key"];
+  evaluatedAt: number;
+};
+
+export type Phase6ShadowFusionResult = {
+  version: typeof PHASE6_SMART_FUSION_VERSION;
+  variable: Phase6FusionVariable;
+  status: Phase6ShadowCandidateStatus;
+  candidateValue: number | null;
+  weights: Phase6ShadowWeightMetadata[];
+  referenceValues: Array<{ sourceKey: string; value: number }>;
+  contributingSourceCount: number;
+  independentSourceCount: number;
+  evaluatedAt: number;
+  phase3WindowKey: Phase3HorizonWindow["key"];
+  productionReadsEnabled: false;
+  appliedToProduction: 0;
+};
+
+const phase6Clamp = (value: number, minimum: number, maximum: number) =>
+  Math.min(maximum, Math.max(minimum, value));
+
+const phase6EvidenceFactor = (score: number | null | undefined) =>
+  score == null || !Number.isFinite(score)
+    ? { value: 1, missing: true }
+    : { value: phase6Clamp(score / 100, 0.25, 1.5), missing: false };
+
+export function calculatePhase6ShadowCandidate(input: Phase6ShadowFusionInput): Phase6ShadowFusionResult {
+  const weights = input.sources.map(source => {
+    const referenceOnly = source.isDerived === true
+      || source.sourceType === "aggregator"
+      || source.independenceClass === "non_independent"
+      || source.independenceClass === "derived";
+    const usable = source.available !== false
+      && source.value != null
+      && Number.isFinite(source.value)
+      && source.phase5Status !== "INVALID"
+      && source.phase5Status !== "MISSING"
+      && source.phase5Status !== "STALE"
+      && !referenceOnly;
+    const local = phase6EvidenceFactor(source.localPerformanceScore);
+    const horizon = phase6EvidenceFactor(source.horizonPerformanceScore);
+    const variable = phase6EvidenceFactor(source.variablePerformanceScore);
+    const quality = source.phase5Status === "VALID" ? 1
+      : source.phase5Status === "SUSPECT" ? 0.75
+        : 0;
+    const freshness = source.freshnessStatus === "FRESH" ? 1
+      : source.freshnessStatus === "AGING" ? 0.85
+        : source.freshnessStatus === "UNKNOWN" ? 0.7
+          : 0;
+    const resolution = source.nativeResolutionKm == null
+      ? 1
+      : phase6Clamp(1 / (1 + Math.max(0, source.nativeResolutionKm) / 10), 0.5, 1);
+    const regime = source.regimeMatch == null
+      ? 1
+      : phase6Clamp(0.5 + phase6Clamp(source.regimeMatch, 0, 1) * 0.5, 0.5, 1);
+    const convergence = source.convergenceScore == null
+      ? 1
+      : phase6Clamp(0.75 + phase6Clamp(source.convergenceScore, 0, 1) * 0.5, 0.75, 1.25);
+    const independence = source.independenceClass === "independent_model" ? 1
+      : source.independenceClass === "related_family" ? 0.85
+        : source.independenceClass === "unknown" ? 0.7
+          : 0;
+    const rawWeight = usable
+      ? local.value * horizon.value * variable.value * quality * freshness * resolution * regime * convergence * independence
+      : 0;
+    const missingEvidence = [
+      local.missing ? "localPerformance" : null,
+      horizon.missing ? "horizonPerformance" : null,
+      variable.missing ? "variablePerformance" : null,
+      source.nativeResolutionKm == null ? "resolution" : null,
+      source.regimeMatch == null ? "regime" : null,
+      source.convergenceScore == null ? "convergence" : null,
+    ].filter((item): item is string => item != null);
+    return {
+      sourceKey: source.sourceKey,
+      value: source.value,
+      rawWeight,
+      normalizedWeight: 0,
+      includedInCandidate: usable,
+      referenceOnly,
+      components: {
+        localPerformance: local.value,
+        horizonPerformance: horizon.value,
+        variablePerformance: variable.value,
+        quality,
+        freshness,
+        resolution,
+        regime,
+        convergence,
+        independence,
+      },
+      missingEvidence,
+    } satisfies Phase6ShadowWeightMetadata;
+  });
+  const totalWeight = weights.reduce((sum, item) => sum + item.rawWeight, 0);
+  const normalizedWeights = weights.map(item => ({
+    ...item,
+    normalizedWeight: totalWeight > 0 && item.rawWeight > 0 ? item.rawWeight / totalWeight : 0,
+  }));
+  const contributing = normalizedWeights.filter(item => item.includedInCandidate && item.normalizedWeight > 0);
+  const candidateValue = contributing.length > 0
+    ? contributing.reduce((sum, item) => sum + (item.value ?? 0) * item.normalizedWeight, 0)
+    : null;
+  const referenceValues = normalizedWeights
+    .filter(item => item.referenceOnly && item.value != null && Number.isFinite(item.value))
+    .map(item => ({ sourceKey: item.sourceKey, value: item.value as number }));
+  const status: Phase6ShadowCandidateStatus = contributing.length === 0
+    ? "UNAVAILABLE"
+    : contributing.length < 2 || normalizedWeights.some(item => item.missingEvidence.length > 0 && item.includedInCandidate)
+      ? "PARTIAL"
+      : "SHADOW_READY";
+  return {
+    version: PHASE6_SMART_FUSION_VERSION,
+    variable: input.variable,
+    status,
+    candidateValue,
+    weights: normalizedWeights,
+    referenceValues,
+    contributingSourceCount: contributing.length,
+    independentSourceCount: contributing.filter(item => !item.referenceOnly).length,
+    evaluatedAt: input.evaluatedAt,
+    phase3WindowKey: input.phase3WindowKey,
+    productionReadsEnabled: false,
+    appliedToProduction: 0,
+  };
+}
+
 export type ShadowSourceDefinitionSeed = {
   sourceKey: string;
   displayName: string;

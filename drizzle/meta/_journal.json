@@ -246,6 +246,13 @@
       "when": 1788370543442,
       "tag": "0034_lumpy_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1788919385126,
+      "tag": "0035_left_gambit",
+      "breakpoints": true
     }
   ]
 }

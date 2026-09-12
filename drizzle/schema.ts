@@ -736,6 +736,40 @@ export const shadowWeatherValues = mysqlTable("shadow_weather_values", {
 export type ShadowWeatherValue = typeof shadowWeatherValues.$inferSelect;
 export type InsertShadowWeatherValue = typeof shadowWeatherValues.$inferInsert;
 
+/** Candidate fusion Phase 6. Shadow-only: production never reads or writes this table. */
+export const shadowWeatherPhase6Candidates = mysqlTable("shadow_weather_phase6_candidates", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  cycleKey: varchar("cycleKey", { length: 128 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  variable: varchar("variable", { length: 48 }).notNull(),
+  phase3WindowKey: varchar("phase3WindowKey", { length: 16 }).notNull(),
+  candidateStatus: varchar("candidateStatus", { length: 16 }).notNull(),
+  candidateValue: float("candidateValue"),
+  contributingSourceCount: int("contributingSourceCount").notNull().default(0),
+  independentSourceCount: int("independentSourceCount").notNull().default(0),
+  weights: json("weights").notNull(),
+  referenceValues: json("referenceValues").notNull(),
+  productionReadsEnabled: int("productionReadsEnabled").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_phase6_candidate_cycle_location_time_variable_unique").on(
+    table.cycleKey,
+    table.locationKey,
+    table.validTime,
+    table.variable,
+  ),
+  index("shadow_phase6_candidate_location_status_idx").on(table.locationKey, table.candidateStatus),
+  index("shadow_phase6_candidate_applied_idx").on(table.appliedToProduction),
+]);
+
+export type ShadowWeatherPhase6Candidate = typeof shadowWeatherPhase6Candidates.$inferSelect;
+export type InsertShadowWeatherPhase6Candidate = typeof shadowWeatherPhase6Candidates.$inferInsert;
+
 /** One idempotent daily acceptance snapshot per location during P1.6. */
 export const shadowWeatherObservationDays = mysqlTable("shadow_weather_observation_days", {
   id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),

@@ -233,7 +233,7 @@ export const weatherRouter = router({
       forecastCount: forecasts.length,
       topServices: ranking.slice(0, 5),
       recentForecasts,
-      allServices: [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public],
+      allServices: WEATHER_SERVICES.expert,
       dailyFallback,
       regime: {
         id: officialRegime.primary.id,
@@ -415,7 +415,7 @@ export const weatherRouter = router({
 
     return {
       ranking,
-      totalServices: WEATHER_SERVICES.expert.length + WEATHER_SERVICES.public.length,
+      totalServices: WEATHER_SERVICES.expert.length,
       officialRegime,
       // Legacy single-regime field (kept for backward compat)
       regime: {
@@ -1162,7 +1162,7 @@ export const weatherRouter = router({
     const modelIndicator = buildModelIndicator(trace);
 
     // Détails des prévisions quotidiennes persistées.
-    const allServicesList = [...WEATHER_SERVICES.expert, ...WEATHER_SERVICES.public];
+    const allServicesList = WEATHER_SERVICES.expert;
     const modelDetails = appliedForecasts.map(f => {
       const service = allServicesList.find((s: { name: string }) => s.name === f.serviceName);
       const applied = appliedModelWeights.find((model) => model.name === f.serviceName);
