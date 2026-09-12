@@ -3731,7 +3731,7 @@
 
 ## Passage conditionnel de P1.6 à la Phase 5 officielle
 - [x] Vérifier si P1.6 contient réellement sept dates distinctes par lieu : contrôle du 2 septembre 2026, résultat 1/7 pour chaque lieu ; fenêtre globale encore `OBSERVING`.
-- [ ] Confirmer sur les sept jours zéro doublon, zéro valeur hors shadow et zéro application à la production.
+- [x] Analyse P1.6 considérée terminée par validation explicite de gouvernance ; les contrôles réels disponibles confirment zéro doublon, zéro valeur hors shadow et zéro application à la production, tandis que la couverture technique reste documentée à 3/7.
 - [x] Ne pas considérer une validation humaine comme un remplacement des sept bilans techniques requis.
 - [x] Autorisation utilisateur : préparer la Phase 5 en parallèle sans déclarer P1.6 terminée ni remplacer ses sept bilans techniques.
 - [x] Relire la définition officielle et préparer la Phase 5 sans fermer P1.6.
@@ -3765,11 +3765,11 @@
 - [x] Valider l’idempotence, les sources dérivées, les tests et l’isolation production.
 - [x] Publier uniquement l’évaluation Phase 6 shadow sans promotion production.
 - [x] Configurer un contrôle en lecture seule le 3 septembre 2026 à 03:30 UTC après le cycle v8, sans relancer ni modifier la collecte.
-- [ ] Vérifier lors du premier contrôle que chaque lieu progresse de 1/7 à 2/7 avec une nouvelle date distincte conforme.
+- [x] Contrôle intermédiaire automatique arrêté à la demande ; aucune progression artificielle n’est déclarée et l’état technique disponible reste documenté à 3/7.
 - [x] Configurer une validation complète en lecture seule le 8 septembre 2026 à 03:30 UTC après le cycle v8 ; planification active `4uYDhvW3nCHvm4MzDmj6JR`, expiration à 04:30 UTC.
-- [ ] Confirmer lors du contrôle final sept dates distinctes par lieu, zéro doublon, zéro valeur hors shadow et zéro application production.
-- [ ] Clôturer officiellement P1.6 uniquement si le verdict global est `VALIDABLE` à 7/7.
-- [ ] Poursuivre ensuite la feuille de route sans commencer la Phase 6 avant cette validation réelle.
+- [x] Contrôle final automatique annulé à la demande ; la validation de gouvernance autorise la suite sans transformer P1.6 en preuve technique 7/7.
+- [x] P1.6 clôturée au niveau gouvernance à la demande de l’utilisateur ; le verdict technique historique reste explicitement `OBSERVING` à 3/7.
+- [x] Poursuivre la feuille de route autorisé par validation explicite ; la Phase 6 a été implémentée et publiée uniquement en shadow, sans promotion production.
 
 ## Phase 6 officielle — Audit préparatoire uniquement pendant P1.6
 - [x] Relire la définition officielle, les livrables et les critères d’acceptation de la Phase 6.
@@ -3777,7 +3777,7 @@
 - [x] Identifier les dépendances entre les données normalisées Phase 4, les statuts QC Phase 5 et le moteur de fusion actuel.
 - [x] Documenter un périmètre strictement shadow, les invariants d’isolation et le rollback avant toute implémentation.
 - [x] Ne créer aucune migration, aucun moteur parallèle et aucune écriture Phase 6 pendant que P1.6 reste inférieure à 7/7.
-- [ ] Maintenir l’implémentation Phase 6 bloquée jusqu’à la clôture réelle et documentée de P1.6.
+- [x] Garde-fou remplacé par la décision de gouvernance : l’implémentation Phase 6 est autorisée uniquement en shadow, avec production, poids, scores et archives inchangés.
 
 ## Nettoyage préalable Phase 6 — Arrêt des écritures publiques abandonnées
 - [x] Recenser tous les écrivains et lecteurs actuels de Météo-France et OpenWeatherMap dans le cycle de prévision.
