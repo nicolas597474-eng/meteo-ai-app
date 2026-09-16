@@ -3789,3 +3789,11 @@
 - [x] Valider TypeScript, Vitest complet (491 réussis, 2 ignorés), la qualité du diff et l’absence de migration ou suppression de données.
 - [x] Publier uniquement ce nettoyage ciblé sans démarrer l’implémentation Phase 6.
 - [x] Rejouer idempotemment les cycles shadow historiques dans le seul candidat Phase 6 afin d’obtenir une mesure réelle sans appel fournisseur.
+
+## Phase 7 officielle — Performance locale shadow
+- [x] Relire la définition officielle et les critères d’acceptation de la Phase 7.
+- [x] Auditer les preuves locales, observations, stations et performances disponibles par lieu.
+- [x] Documenter le périmètre shadow, les seuils, l’idempotence et le rollback Phase 7.
+- [x] Implémenter uniquement les contrats et preuves Phase 7 autorisés après audit ; la persistance reste inactive tant qu’aucune observation physique shadow n’est ingérée.
+- [x] Valider les données réelles, l’isolation production, les tests et le rendu mobile ; état réel `INSUFFICIENT` avec 0 fiche physique, 0 lecture/application production, 500 tests réussis et aperçu mobile sans erreur de layout.
+- [x] Publier uniquement la préparation Phase 7 shadow ; aucune performance locale n’est déclarée `VALIDABLE` et aucune pondération candidate n’est promue.

@@ -7,6 +7,7 @@ import {
   shadowWeatherSourceRelations,
   shadowWeatherValues,
   shadowWeatherPhase6Candidates,
+  shadowWeatherPhase7LocalPerformance,
   type InsertShadowWeatherIngestionRun,
   type InsertShadowWeatherValue,
 } from "../drizzle/schema";
@@ -19,8 +20,10 @@ import {
   PHASE5_QUALITY_CONTROL_VERSION,
   PHASE6_FUSION_VARIABLES,
   PHASE6_SMART_FUSION_VERSION,
+  PHASE7_LOCAL_PERFORMANCE_VERSION,
   P1_SHADOW_SOURCE_DEFINITIONS,
   calculatePhase6ShadowCandidate,
+  calculatePhase7LocalPerformance,
   getPhase3HorizonWindow,
   SHADOW_CANONICAL_VARIABLES,
   evaluatePhase5QualityControl,
@@ -31,6 +34,7 @@ import {
   type Phase6ShadowFusionInput,
   type Phase6FusionVariable,
   type Phase3HorizonWindow,
+  type Phase7LocalPerformanceInput,
   type ShadowCanonicalVariable,
   type ShadowFreshnessStatus,
   type ShadowProviderRunEvidence,
@@ -1309,6 +1313,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     ? await getP1ObservationWindow(locationKey, Math.max(14, lookbackDays))
     : null;
   const phase6Fusion = await buildPhase6FusionReport(locationKey);
+  const phase7LocalPerformance = await buildPhase7LocalPerformanceReport(locationKey);
   const phase5QualityControl = buildPhase5QualityControlReport(horizonValues.map(value => ({
     ingestionRunId: Number(value.ingestionRunId),
     sourceKey: value.sourceKey,
@@ -1366,6 +1371,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
       },
     },
     phase6Fusion,
+    phase7LocalPerformance,
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),
@@ -1395,4 +1401,129 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     },
     latestRuns,
   };
+}
+
+async function buildPhase7LocalPerformanceReport(locationKey?: string) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      version: PHASE7_LOCAL_PERFORMANCE_VERSION,
+      recordCount: 0,
+      statuses: { INSUFFICIENT: 0, OBSERVING: 0, VALIDABLE: 0, INVALID: 0 },
+      locations: [],
+      bySource: [],
+      physicalEvidenceComparisons: 0,
+      legacyEvidenceComparisons: 0,
+      productionReadsEnabled: 0,
+      appliedToProduction: 0,
+      shadowModeViolations: 0,
+      readyForPromotion: false,
+      valid: false,
+    } as const;
+  }
+  const filters = locationKey ? [eq(shadowWeatherPhase7LocalPerformance.locationKey, locationKey)] : [];
+  const rows = await db.select({
+    locationKey: shadowWeatherPhase7LocalPerformance.locationKey,
+    sourceKey: shadowWeatherPhase7LocalPerformance.sourceKey,
+    variable: shadowWeatherPhase7LocalPerformance.variable,
+    phase3WindowKey: shadowWeatherPhase7LocalPerformance.phase3WindowKey,
+    evidenceType: shadowWeatherPhase7LocalPerformance.evidenceType,
+    performanceStatus: shadowWeatherPhase7LocalPerformance.performanceStatus,
+    comparisonCount: shadowWeatherPhase7LocalPerformance.comparisonCount,
+    evaluatedDays: shadowWeatherPhase7LocalPerformance.evaluatedDays,
+    physicalComparisonCount: shadowWeatherPhase7LocalPerformance.physicalComparisonCount,
+    legacyComparisonCount: shadowWeatherPhase7LocalPerformance.legacyComparisonCount,
+    mae: shadowWeatherPhase7LocalPerformance.mae,
+    rmse: shadowWeatherPhase7LocalPerformance.rmse,
+    bias: shadowWeatherPhase7LocalPerformance.bias,
+    productionReadsEnabled: shadowWeatherPhase7LocalPerformance.productionReadsEnabled,
+    shadowMode: shadowWeatherPhase7LocalPerformance.shadowMode,
+    appliedToProduction: shadowWeatherPhase7LocalPerformance.appliedToProduction,
+  }).from(shadowWeatherPhase7LocalPerformance).where(and(...filters));
+  const statuses = { INSUFFICIENT: 0, OBSERVING: 0, VALIDABLE: 0, INVALID: 0 };
+  const locations = new Set<string>();
+  const sourceCounts = new Map<string, number>();
+  let physicalEvidenceComparisons = 0;
+  let legacyEvidenceComparisons = 0;
+  let productionReadsEnabled = 0;
+  let appliedToProduction = 0;
+  let shadowModeViolations = 0;
+  for (const row of rows) {
+    if (row.performanceStatus in statuses) statuses[row.performanceStatus as keyof typeof statuses] += 1;
+    locations.add(row.locationKey);
+    sourceCounts.set(row.sourceKey, (sourceCounts.get(row.sourceKey) ?? 0) + 1);
+    physicalEvidenceComparisons += Number(row.physicalComparisonCount ?? 0);
+    legacyEvidenceComparisons += Number(row.legacyComparisonCount ?? 0);
+    productionReadsEnabled += Number(row.productionReadsEnabled ?? 0);
+    appliedToProduction += Number(row.appliedToProduction ?? 0);
+    if (Number(row.shadowMode ?? 0) !== 1) shadowModeViolations += 1;
+  }
+  return {
+    version: PHASE7_LOCAL_PERFORMANCE_VERSION,
+    recordCount: rows.length,
+    statuses,
+    locations: Array.from(locations),
+    bySource: Array.from(sourceCounts.entries()).map(([sourceKey, count]) => ({ sourceKey, count })),
+    physicalEvidenceComparisons,
+    legacyEvidenceComparisons,
+    productionReadsEnabled,
+    appliedToProduction,
+    shadowModeViolations,
+    readyForPromotion: statuses.VALIDABLE > 0 && physicalEvidenceComparisons > 0,
+    valid: productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0,
+    records: rows,
+  } as const;
+}
+
+/**
+ * Persiste une performance locale calculée à partir d’une preuve explicitement fournie.
+ * Cette fonction est shadow-only et n’est appelée que lorsqu’une branche d’observation
+ * apporte des valeurs physiques ; elle ne lit aucune table de production.
+ */
+export async function persistPhase7LocalPerformanceShadow(input: Phase7LocalPerformanceInput & { periodKey: string }): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = calculatePhase7LocalPerformance(input);
+  await db.insert(shadowWeatherPhase7LocalPerformance).values({
+    periodKey: input.periodKey,
+    locationKey: result.locationKey,
+    sourceKey: result.sourceKey,
+    variable: result.variable,
+    phase3WindowKey: result.horizonKey,
+    evidenceType: result.physicalComparisonCount > 0 ? "physical_observation" : "legacy_unqualified",
+    performanceStatus: result.status,
+    comparisonCount: result.comparisonCount,
+    evaluatedDays: result.evaluatedDays,
+    physicalComparisonCount: result.physicalComparisonCount,
+    legacyComparisonCount: result.legacyComparisonCount,
+    mae: result.mae,
+    rmse: result.rmse,
+    bias: result.bias,
+    lastValidTime: result.lastValidTime,
+    missingEvidence: result.missingEvidence,
+    productionReadsEnabled: 0,
+    shadowMode: 1,
+    appliedToProduction: 0,
+    evaluatedAt: result.evaluatedAt,
+  }).onDuplicateKeyUpdate({
+    set: {
+      evidenceType: result.physicalComparisonCount > 0 ? "physical_observation" : "legacy_unqualified",
+      performanceStatus: result.status,
+      comparisonCount: result.comparisonCount,
+      evaluatedDays: result.evaluatedDays,
+      physicalComparisonCount: result.physicalComparisonCount,
+      legacyComparisonCount: result.legacyComparisonCount,
+      mae: result.mae,
+      rmse: result.rmse,
+      bias: result.bias,
+      lastValidTime: result.lastValidTime,
+      missingEvidence: result.missingEvidence,
+      productionReadsEnabled: 0,
+      shadowMode: 1,
+      appliedToProduction: 0,
+      evaluatedAt: result.evaluatedAt,
+      updatedAt: new Date(),
+    },
+  });
+  return true;
 }

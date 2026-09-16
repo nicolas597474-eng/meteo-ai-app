@@ -770,6 +770,47 @@ export const shadowWeatherPhase6Candidates = mysqlTable("shadow_weather_phase6_c
 export type ShadowWeatherPhase6Candidate = typeof shadowWeatherPhase6Candidates.$inferSelect;
 export type InsertShadowWeatherPhase6Candidate = typeof shadowWeatherPhase6Candidates.$inferInsert;
 
+/** Local performance history for Phase 7. Shadow-only: no production reader may use this table. */
+export const shadowWeatherPhase7LocalPerformance = mysqlTable("shadow_weather_phase7_local_performance", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  periodKey: varchar("periodKey", { length: 64 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  sourceKey: varchar("sourceKey", { length: 128 }).notNull(),
+  variable: varchar("variable", { length: 48 }).notNull(),
+  phase3WindowKey: varchar("phase3WindowKey", { length: 16 }).notNull(),
+  evidenceType: varchar("evidenceType", { length: 32 }).notNull(),
+  performanceStatus: varchar("performanceStatus", { length: 16 }).notNull(),
+  comparisonCount: int("comparisonCount").notNull().default(0),
+  evaluatedDays: int("evaluatedDays").notNull().default(0),
+  physicalComparisonCount: int("physicalComparisonCount").notNull().default(0),
+  legacyComparisonCount: int("legacyComparisonCount").notNull().default(0),
+  mae: float("mae"),
+  rmse: float("rmse"),
+  bias: float("bias"),
+  lastValidTime: bigint("lastValidTime", { mode: "number" }),
+  missingEvidence: json("missingEvidence"),
+  productionReadsEnabled: int("productionReadsEnabled").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_p7_perf_period_loc_src_var_win_uq").on(
+    table.periodKey,
+    table.locationKey,
+    table.sourceKey,
+    table.variable,
+    table.phase3WindowKey,
+  ),
+  index("shadow_phase7_local_performance_location_status_idx").on(table.locationKey, table.performanceStatus),
+  index("shadow_phase7_local_performance_source_variable_idx").on(table.sourceKey, table.variable),
+  index("shadow_phase7_local_performance_applied_idx").on(table.appliedToProduction),
+]);
+
+export type ShadowWeatherPhase7LocalPerformance = typeof shadowWeatherPhase7LocalPerformance.$inferSelect;
+export type InsertShadowWeatherPhase7LocalPerformance = typeof shadowWeatherPhase7LocalPerformance.$inferInsert;
+
 /** One idempotent daily acceptance snapshot per location during P1.6. */
 export const shadowWeatherObservationDays = mysqlTable("shadow_weather_observation_days", {
   id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),

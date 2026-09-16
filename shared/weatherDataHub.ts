@@ -1101,3 +1101,115 @@ export function validateP1ShadowSourceRegistry(): { valid: true; sourceCount: nu
 
   return { valid: true, sourceCount: keys.length };
 }
+
+export const PHASE7_LOCAL_PERFORMANCE_VERSION = "phase7-local-performance-v1" as const;
+export const PHASE7_LOCAL_PERFORMANCE_STATUSES = ["INSUFFICIENT", "OBSERVING", "VALIDABLE", "INVALID"] as const;
+export const PHASE7_LOCAL_PERFORMANCE_THRESHOLDS = {
+  minimumComparisons: 18,
+  minimumDays: 2,
+  validableComparisons: 30,
+  validableDays: 7,
+} as const;
+export const PHASE7_LOCAL_PERFORMANCE_VARIABLES = PHASE6_FUSION_VARIABLES;
+
+export type Phase7LocalPerformanceStatus = ArrayValue<typeof PHASE7_LOCAL_PERFORMANCE_STATUSES>;
+export type Phase7LocalPerformanceVariable = ArrayValue<typeof PHASE7_LOCAL_PERFORMANCE_VARIABLES>;
+export type Phase7EvidenceType = "physical_observation" | "legacy_unqualified";
+
+export type Phase7LocalPerformanceSample = {
+  forecastValue: number | null;
+  observedValue: number | null;
+  validTime: number;
+  evidenceType: Phase7EvidenceType;
+  qualityStatus: ShadowQualityStatus;
+};
+
+export type Phase7LocalPerformanceInput = {
+  locationKey: string;
+  sourceKey: string;
+  variable: Phase7LocalPerformanceVariable;
+  horizonKey: Phase3HorizonWindow["key"];
+  samples: Phase7LocalPerformanceSample[];
+  evaluatedAt: number;
+};
+
+export type Phase7LocalPerformanceResult = {
+  version: typeof PHASE7_LOCAL_PERFORMANCE_VERSION;
+  locationKey: string;
+  sourceKey: string;
+  variable: Phase7LocalPerformanceVariable;
+  horizonKey: Phase3HorizonWindow["key"];
+  status: Phase7LocalPerformanceStatus;
+  comparisonCount: number;
+  evaluatedDays: number;
+  physicalComparisonCount: number;
+  legacyComparisonCount: number;
+  mae: number | null;
+  rmse: number | null;
+  bias: number | null;
+  lastValidTime: number | null;
+  missingEvidence: string[];
+  productionReadsEnabled: false;
+  appliedToProduction: 0;
+  evaluatedAt: number;
+};
+
+export function calculatePhase7LocalPerformance(input: Phase7LocalPerformanceInput): Phase7LocalPerformanceResult {
+  const usable = input.samples.filter(sample =>
+    sample.forecastValue != null
+    && sample.observedValue != null
+    && Number.isFinite(sample.forecastValue)
+    && Number.isFinite(sample.observedValue)
+    && Number.isFinite(sample.validTime)
+    && sample.qualityStatus !== "INVALID"
+    && sample.qualityStatus !== "MISSING"
+    && sample.qualityStatus !== "STALE",
+  );
+  const errors = usable.map(sample => (sample.forecastValue as number) - (sample.observedValue as number));
+  const absoluteErrors = errors.map(error => Math.abs(error));
+  const mae = errors.length > 0 ? absoluteErrors.reduce((sum, error) => sum + error, 0) / errors.length : null;
+  const rmse = errors.length > 0
+    ? Math.sqrt(errors.reduce((sum, error) => sum + error * error, 0) / errors.length)
+    : null;
+  const bias = errors.length > 0 ? errors.reduce((sum, error) => sum + error, 0) / errors.length : null;
+  const evaluatedDays = new Set(usable.map(sample => new Date(sample.validTime).toISOString().slice(0, 10))).size;
+  const physicalComparisonCount = usable.filter(sample => sample.evidenceType === "physical_observation").length;
+  const legacyComparisonCount = usable.filter(sample => sample.evidenceType === "legacy_unqualified").length;
+  const missingEvidence = [
+    physicalComparisonCount === 0 ? "physical_observation" : null,
+    input.samples.length === 0 ? "samples" : null,
+    evaluatedDays < PHASE7_LOCAL_PERFORMANCE_THRESHOLDS.minimumDays ? "distinct_days" : null,
+  ].filter((item): item is string => item != null);
+  const status: Phase7LocalPerformanceStatus = usable.length === 0
+    ? "INSUFFICIENT"
+    : usable.some(sample => sample.qualityStatus === "SUSPECT")
+      ? "OBSERVING"
+      : usable.length >= PHASE7_LOCAL_PERFORMANCE_THRESHOLDS.validableComparisons
+        && evaluatedDays >= PHASE7_LOCAL_PERFORMANCE_THRESHOLDS.validableDays
+        && physicalComparisonCount > 0
+        ? "VALIDABLE"
+        : usable.length >= PHASE7_LOCAL_PERFORMANCE_THRESHOLDS.minimumComparisons
+          && evaluatedDays >= PHASE7_LOCAL_PERFORMANCE_THRESHOLDS.minimumDays
+          ? "OBSERVING"
+          : "INSUFFICIENT";
+  return {
+    version: PHASE7_LOCAL_PERFORMANCE_VERSION,
+    locationKey: input.locationKey,
+    sourceKey: input.sourceKey,
+    variable: input.variable,
+    horizonKey: input.horizonKey,
+    status,
+    comparisonCount: usable.length,
+    evaluatedDays,
+    physicalComparisonCount,
+    legacyComparisonCount,
+    mae,
+    rmse,
+    bias,
+    lastValidTime: usable.length > 0 ? Math.max(...usable.map(sample => sample.validTime)) : null,
+    missingEvidence,
+    productionReadsEnabled: false,
+    appliedToProduction: 0,
+    evaluatedAt: input.evaluatedAt,
+  };
+}

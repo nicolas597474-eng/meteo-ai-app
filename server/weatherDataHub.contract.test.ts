@@ -244,3 +244,52 @@ describe("P1 shadow weather data hub contract", () => {
     });
   });
 });
+
+
+describe("Phase 7 local performance shadow contract", () => {
+  it("requires physical evidence for a VALIDABLE local result and never enables production", async () => {
+    const { calculatePhase7LocalPerformance } = await import("../shared/weatherDataHub");
+    const result = calculatePhase7LocalPerformance({
+      locationKey: "50.676_2.845",
+      sourceKey: "openmeteo_arome_france_hd",
+      variable: "air_temperature_2m",
+      horizonKey: "6_24h",
+      evaluatedAt: Date.parse("2026-09-13T10:00:00Z"),
+      samples: Array.from({ length: 30 }, (_, index) => ({
+        forecastValue: 20 + index / 100,
+        observedValue: 20,
+        validTime: Date.parse("2026-09-01T10:00:00Z") + index * 86_400_000,
+        evidenceType: "physical_observation" as const,
+        qualityStatus: "VALID" as const,
+      })),
+    });
+    expect(result.status).toBe("VALIDABLE");
+    expect(result.physicalComparisonCount).toBe(30);
+    expect(result.legacyComparisonCount).toBe(0);
+    expect(result.productionReadsEnabled).toBe(false);
+    expect(result.appliedToProduction).toBe(0);
+  });
+
+  it("keeps legacy evidence separate and does not invent a local qualification", async () => {
+    const { calculatePhase7LocalPerformance } = await import("../shared/weatherDataHub");
+    const result = calculatePhase7LocalPerformance({
+      locationKey: "50.676_2.845",
+      sourceKey: "openmeteo_gfs_seamless",
+      variable: "wind_speed_10m",
+      horizonKey: "1_3d",
+      evaluatedAt: Date.parse("2026-09-13T10:00:00Z"),
+      samples: Array.from({ length: 30 }, (_, index) => ({
+        forecastValue: 12,
+        observedValue: 10,
+        validTime: Date.parse("2026-09-01T10:00:00Z") + index * 86_400_000,
+        evidenceType: "legacy_unqualified" as const,
+        qualityStatus: "VALID" as const,
+      })),
+    });
+    expect(result.status).toBe("OBSERVING");
+    expect(result.physicalComparisonCount).toBe(0);
+    expect(result.legacyComparisonCount).toBe(30);
+    expect(result.missingEvidence).toContain("physical_observation");
+    expect(result.appliedToProduction).toBe(0);
+  });
+});
