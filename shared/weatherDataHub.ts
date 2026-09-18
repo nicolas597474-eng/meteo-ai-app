@@ -1213,3 +1213,194 @@ export function calculatePhase7LocalPerformance(input: Phase7LocalPerformanceInp
     evaluatedAt: input.evaluatedAt,
   };
 }
+
+
+export const PHASE8_METRICS_VERSION = "phase8-metrics-v1" as const;
+export const PHASE8_METRICS_STATUSES = ["INSUFFICIENT", "OBSERVING", "VALIDABLE", "INVALID"] as const;
+export const PHASE8_METRIC_VARIABLES = [
+  "air_temperature_2m",
+  "precipitation_amount",
+  "wind_speed_10m",
+  "wind_gust_10m",
+  "wind_direction_10m",
+  "air_pressure_msl",
+] as const;
+export const PHASE8_METRICS_THRESHOLDS = {
+  minimumComparisons: 18,
+  minimumDays: 2,
+  validableComparisons: 30,
+  validableDays: 7,
+} as const;
+
+export type Phase8MetricStatus = ArrayValue<typeof PHASE8_METRICS_STATUSES>;
+export type Phase8MetricVariable = ArrayValue<typeof PHASE8_METRIC_VARIABLES>;
+export type Phase8MetricEvidenceType = "physical_observation" | "legacy_unqualified";
+
+export type Phase8MetricSample = {
+  forecastValue: number | null;
+  observedValue: number | null;
+  validTime: number;
+  evidenceType: Phase8MetricEvidenceType;
+  qualityStatus: ShadowQualityStatus;
+  probability?: number | null;
+  observedEvent?: boolean | null;
+};
+
+export type Phase8MetricInput = {
+  locationKey: string;
+  sourceKey: string;
+  variable: Phase8MetricVariable;
+  horizonKey: Phase3HorizonWindow["key"];
+  periodStart: number;
+  periodEnd: number;
+  samples: Phase8MetricSample[];
+  evaluatedAt: number;
+};
+
+export type Phase8MetricResult = {
+  version: typeof PHASE8_METRICS_VERSION;
+  locationKey: string;
+  sourceKey: string;
+  variable: Phase8MetricVariable;
+  horizonKey: Phase3HorizonWindow["key"];
+  periodStart: number;
+  periodEnd: number;
+  status: Phase8MetricStatus;
+  comparisonCount: number;
+  evaluatedDays: number;
+  physicalComparisonCount: number;
+  legacyComparisonCount: number;
+  mae: number | null;
+  rmse: number | null;
+  bias: number | null;
+  medianAbsoluteError: number | null;
+  rainHitRate: number | null;
+  rainHits: number;
+  rainMisses: number;
+  rainFalseAlarms: number;
+  windDirectionMeanAbsoluteError: number | null;
+  brierScore: number | null;
+  crps: number | null;
+  calibrationError: number | null;
+  metricAvailability: "DETERMINISTIC_ONLY" | "PROBABILISTIC_AVAILABLE";
+  missingEvidence: string[];
+  productionReadsEnabled: false;
+  appliedToProduction: 0;
+  evaluatedAt: number;
+};
+
+function phase8Median(values: number[]) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
+function phase8Round(value: number | null) {
+  return value == null ? null : Math.round(value * 100) / 100;
+}
+
+function phase8CircularDirectionError(forecast: number, observed: number) {
+  const delta = Math.abs(((forecast - observed + 540) % 360) - 180);
+  return Math.min(180, delta);
+}
+
+export function calculatePhase8Metrics(input: Phase8MetricInput): Phase8MetricResult {
+  const validSamples = input.samples.filter(sample =>
+    sample.forecastValue != null
+    && sample.observedValue != null
+    && Number.isFinite(sample.forecastValue)
+    && Number.isFinite(sample.observedValue)
+    && Number.isFinite(sample.validTime)
+    && sample.qualityStatus !== "INVALID"
+    && sample.qualityStatus !== "MISSING"
+    && sample.qualityStatus !== "STALE",
+  );
+  const invalidInputCount = input.samples.filter(sample => sample.qualityStatus === "INVALID").length;
+  const errors = validSamples.map(sample => (sample.forecastValue as number) - (sample.observedValue as number));
+  const absoluteErrors = errors.map(error => Math.abs(error));
+  const comparisonCount = validSamples.length;
+  const physicalComparisonCount = validSamples.filter(sample => sample.evidenceType === "physical_observation").length;
+  const legacyComparisonCount = validSamples.filter(sample => sample.evidenceType === "legacy_unqualified").length;
+  const evaluatedDays = new Set(validSamples.map(sample => new Date(sample.validTime).toISOString().slice(0, 10))).size;
+  const isRainVariable = input.variable === "precipitation_amount";
+  const isDirectionVariable = input.variable === "wind_direction_10m";
+  let rainHits = 0;
+  let rainMisses = 0;
+  let rainFalseAlarms = 0;
+  if (isRainVariable) {
+    for (const sample of validSamples) {
+      const forecastRain = (sample.forecastValue as number) >= 1;
+      const observedRain = (sample.observedValue as number) >= 1;
+      if (forecastRain && observedRain) rainHits++;
+      else if (!forecastRain && observedRain) rainMisses++;
+      else if (forecastRain && !observedRain) rainFalseAlarms++;
+    }
+  }
+  const directionErrors = isDirectionVariable
+    ? validSamples.map(sample => phase8CircularDirectionError(sample.forecastValue as number, sample.observedValue as number))
+    : [];
+  const probabilitySamples = validSamples.filter(sample =>
+    sample.probability != null && Number.isFinite(sample.probability) && sample.observedEvent != null,
+  );
+  const brierScore = probabilitySamples.length > 0
+    ? probabilitySamples.reduce((sum, sample) => {
+      const probability = Math.min(1, Math.max(0, sample.probability as number));
+      const event = sample.observedEvent ? 1 : 0;
+      return sum + (probability - event) ** 2;
+    }, 0) / probabilitySamples.length
+    : null;
+  const missingEvidence = [
+    physicalComparisonCount === 0 ? "physical_observation" : null,
+    comparisonCount === 0 ? "comparisons" : null,
+    evaluatedDays < PHASE8_METRICS_THRESHOLDS.minimumDays ? "distinct_days" : null,
+    input.variable === "precipitation_amount" && comparisonCount > 0 && rainHits + rainMisses + rainFalseAlarms === 0 ? "rain_events" : null,
+  ].filter((item): item is string => item != null);
+  const status: Phase8MetricStatus = invalidInputCount > 0 && comparisonCount === 0
+    ? "INVALID"
+    : comparisonCount === 0
+      ? "INSUFFICIENT"
+      : comparisonCount >= PHASE8_METRICS_THRESHOLDS.validableComparisons
+        && evaluatedDays >= PHASE8_METRICS_THRESHOLDS.validableDays
+        && physicalComparisonCount > 0
+        ? "VALIDABLE"
+        : comparisonCount >= PHASE8_METRICS_THRESHOLDS.minimumComparisons
+          && evaluatedDays >= PHASE8_METRICS_THRESHOLDS.minimumDays
+          ? "OBSERVING"
+          : "INSUFFICIENT";
+  return {
+    version: PHASE8_METRICS_VERSION,
+    locationKey: input.locationKey,
+    sourceKey: input.sourceKey,
+    variable: input.variable,
+    horizonKey: input.horizonKey,
+    periodStart: input.periodStart,
+    periodEnd: input.periodEnd,
+    status,
+    comparisonCount,
+    evaluatedDays,
+    physicalComparisonCount,
+    legacyComparisonCount,
+    mae: phase8Round(errors.length > 0 ? absoluteErrors.reduce((sum, error) => sum + error, 0) / errors.length : null),
+    rmse: phase8Round(errors.length > 0 ? Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length) : null),
+    bias: phase8Round(errors.length > 0 ? errors.reduce((sum, error) => sum + error, 0) / errors.length : null),
+    medianAbsoluteError: phase8Round(phase8Median(absoluteErrors)),
+    rainHitRate: isRainVariable && rainHits + rainMisses > 0 ? phase8Round(rainHits / (rainHits + rainMisses)) : null,
+    rainHits,
+    rainMisses,
+    rainFalseAlarms,
+    windDirectionMeanAbsoluteError: isDirectionVariable && directionErrors.length > 0
+      ? phase8Round(directionErrors.reduce((sum, error) => sum + error, 0) / directionErrors.length)
+      : null,
+    brierScore: phase8Round(brierScore),
+    crps: null,
+    calibrationError: null,
+    metricAvailability: probabilitySamples.length > 0 ? "PROBABILISTIC_AVAILABLE" : "DETERMINISTIC_ONLY",
+    missingEvidence,
+    productionReadsEnabled: false,
+    appliedToProduction: 0,
+    evaluatedAt: input.evaluatedAt,
+  };
+}

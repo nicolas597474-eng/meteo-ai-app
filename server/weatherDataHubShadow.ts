@@ -8,6 +8,7 @@ import {
   shadowWeatherValues,
   shadowWeatherPhase6Candidates,
   shadowWeatherPhase7LocalPerformance,
+  shadowWeatherPhase8Metrics,
   type InsertShadowWeatherIngestionRun,
   type InsertShadowWeatherValue,
 } from "../drizzle/schema";
@@ -21,6 +22,11 @@ import {
   PHASE6_FUSION_VARIABLES,
   PHASE6_SMART_FUSION_VERSION,
   PHASE7_LOCAL_PERFORMANCE_VERSION,
+  PHASE8_METRICS_VERSION,
+  PHASE8_METRIC_VARIABLES,
+  calculatePhase8Metrics,
+  type Phase8MetricInput,
+  type Phase8MetricResult,
   P1_SHADOW_SOURCE_DEFINITIONS,
   calculatePhase6ShadowCandidate,
   calculatePhase7LocalPerformance,
@@ -1175,6 +1181,48 @@ async function buildPhase6FusionReport(locationKey?: string) {
   } as const;
 }
 
+export type Phase8MetricReportRow = {
+  periodKey: string; periodStart: number; periodEnd: number; locationKey: string; sourceKey: string;
+  variable: string; horizonKey: string; status: string; comparisonCount: number; evaluatedDays: number;
+  physicalComparisonCount: number; legacyComparisonCount: number; mae: number | null; rmse: number | null;
+  bias: number | null; medianAbsoluteError: number | null; rainHitRate: number | null; rainHits: number;
+  rainMisses: number; rainFalseAlarms: number; windDirectionMeanAbsoluteError: number | null;
+  brierScore: number | null; crps: number | null; calibrationError: number | null; metricAvailability: string;
+  missingEvidence: unknown; productionReadsEnabled: number; appliedToProduction: number; evaluatedAt: number;
+};
+export function buildPhase8MetricsReport(rows: Phase8MetricReportRow[]) {
+  const statuses = { INSUFFICIENT: 0, OBSERVING: 0, VALIDABLE: 0, INVALID: 0 };
+  let productionReadsEnabled = 0, appliedToProduction = 0, shadowModeViolations = 0;
+  for (const row of rows) {
+    if (row.status in statuses) statuses[row.status as keyof typeof statuses] += 1;
+    productionReadsEnabled += Number(row.productionReadsEnabled ?? 0);
+    appliedToProduction += Number(row.appliedToProduction ?? 0);
+    if (Number(row.productionReadsEnabled ?? 0) !== 0 || Number(row.appliedToProduction ?? 0) !== 0) shadowModeViolations += 1;
+  }
+  return { version: PHASE8_METRICS_VERSION, metricCount: rows.length, statuses, variables: [...PHASE8_METRIC_VARIABLES],
+    physicalEvidenceComparisons: rows.reduce((n, row) => n + Number(row.physicalComparisonCount ?? 0), 0),
+    legacyEvidenceComparisons: rows.reduce((n, row) => n + Number(row.legacyComparisonCount ?? 0), 0),
+    productionReadsEnabled, appliedToProduction, shadowModeViolations,
+    valid: productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0, records: rows } as const;
+}
+export async function persistPhase8Metrics(input: Phase8MetricInput & { periodKey: string }): Promise<boolean> {
+  const db = await getDb(); if (!db) return false;
+  const result = calculatePhase8Metrics(input);
+  const values = { periodKey: input.periodKey, periodStart: result.periodStart, periodEnd: result.periodEnd,
+    locationKey: result.locationKey, sourceKey: result.sourceKey, variable: result.variable,
+    phase3WindowKey: result.horizonKey, metricStatus: result.status, comparisonCount: result.comparisonCount,
+    evaluatedDays: result.evaluatedDays, physicalComparisonCount: result.physicalComparisonCount,
+    legacyComparisonCount: result.legacyComparisonCount, mae: result.mae, rmse: result.rmse, bias: result.bias,
+    medianAbsoluteError: result.medianAbsoluteError, rainHitRate: result.rainHitRate, rainHits: result.rainHits,
+    rainMisses: result.rainMisses, rainFalseAlarms: result.rainFalseAlarms,
+    windDirectionMeanAbsoluteError: result.windDirectionMeanAbsoluteError, brierScore: result.brierScore,
+    crps: result.crps, calibrationError: result.calibrationError, metricAvailability: result.metricAvailability,
+    missingEvidence: result.missingEvidence, productionReadsEnabled: 0, shadowMode: 1,
+    appliedToProduction: 0, evaluatedAt: result.evaluatedAt, updatedAt: new Date() };
+  await db.insert(shadowWeatherPhase8Metrics).values(values).onDuplicateKeyUpdate({ set: values });
+  return true;
+}
+
 export async function getShadowDataHubObservability(locationKey?: string, lookbackDays = 7) {
   const db = await getDb();
   if (!db) return null;
@@ -1314,6 +1362,12 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     : null;
   const phase6Fusion = await buildPhase6FusionReport(locationKey);
   const phase7LocalPerformance = await buildPhase7LocalPerformanceReport(locationKey);
+  const phase8Filters = locationKey ? [eq(shadowWeatherPhase8Metrics.locationKey, locationKey)] : [];
+  const phase8Rows = await db.select().from(shadowWeatherPhase8Metrics).where(and(...phase8Filters,
+    gte(shadowWeatherPhase8Metrics.periodEnd, Date.now() - Math.max(1, lookbackDays) * 86_400_000)));
+  const phase8Metrics = buildPhase8MetricsReport(phase8Rows.map(row => ({ ...row,
+    periodStart: Number(row.periodStart), periodEnd: Number(row.periodEnd), evaluatedAt: Number(row.evaluatedAt),
+    horizonKey: row.phase3WindowKey, status: row.metricStatus })));
   const phase5QualityControl = buildPhase5QualityControlReport(horizonValues.map(value => ({
     ingestionRunId: Number(value.ingestionRunId),
     sourceKey: value.sourceKey,
@@ -1372,6 +1426,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     },
     phase6Fusion,
     phase7LocalPerformance,
+    phase8Metrics,
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),

@@ -3797,3 +3797,11 @@
 - [x] Implémenter uniquement les contrats et preuves Phase 7 autorisés après audit ; la persistance reste inactive tant qu’aucune observation physique shadow n’est ingérée.
 - [x] Valider les données réelles, l’isolation production, les tests et le rendu mobile ; état réel `INSUFFICIENT` avec 0 fiche physique, 0 lecture/application production, 500 tests réussis et aperçu mobile sans erreur de layout.
 - [x] Publier uniquement la préparation Phase 7 shadow ; aucune performance locale n’est déclarée `VALIDABLE` et aucune pondération candidate n’est promue.
+
+## Phase 8 officielle — Préparation shadow
+- [x] Relire la définition officielle et les critères d’acceptation de la Phase 8.
+- [x] Auditer les données, dépendances, tables et consommateurs existants de la Phase 8.
+- [x] Documenter le périmètre shadow, les seuils et le plan de rollback Phase 8.
+- [ ] Implémenter uniquement les contrats et preuves Phase 8 autorisés après audit.
+- [ ] Valider les données réelles, l’isolation production, les tests et le rendu mobile.
+- [ ] Publier uniquement la préparation Phase 8 shadow, sans promotion des pondérations candidates.

@@ -868,3 +868,55 @@ export const shadowWeatherSourceRelations = mysqlTable("shadow_weather_source_re
 
 export type ShadowWeatherSourceRelation = typeof shadowWeatherSourceRelations.$inferSelect;
 export type InsertShadowWeatherSourceRelation = typeof shadowWeatherSourceRelations.$inferInsert;
+
+
+/** Metrics Phase 8. Shadow-only: no production reader may use this table. */
+export const shadowWeatherPhase8Metrics = mysqlTable("shadow_weather_phase8_metrics", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  periodKey: varchar("periodKey", { length: 64 }).notNull(),
+  periodStart: bigint("periodStart", { mode: "number" }).notNull(),
+  periodEnd: bigint("periodEnd", { mode: "number" }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  sourceKey: varchar("sourceKey", { length: 128 }).notNull(),
+  variable: varchar("variable", { length: 48 }).notNull(),
+  phase3WindowKey: varchar("phase3WindowKey", { length: 16 }).notNull(),
+  metricStatus: varchar("metricStatus", { length: 16 }).notNull(),
+  comparisonCount: int("comparisonCount").notNull().default(0),
+  evaluatedDays: int("evaluatedDays").notNull().default(0),
+  physicalComparisonCount: int("physicalComparisonCount").notNull().default(0),
+  legacyComparisonCount: int("legacyComparisonCount").notNull().default(0),
+  mae: float("mae"),
+  rmse: float("rmse"),
+  bias: float("bias"),
+  medianAbsoluteError: float("medianAbsoluteError"),
+  rainHitRate: float("rainHitRate"),
+  rainHits: int("rainHits").notNull().default(0),
+  rainMisses: int("rainMisses").notNull().default(0),
+  rainFalseAlarms: int("rainFalseAlarms").notNull().default(0),
+  windDirectionMeanAbsoluteError: float("windDirectionMeanAbsoluteError"),
+  brierScore: float("brierScore"),
+  crps: float("crps"),
+  calibrationError: float("calibrationError"),
+  metricAvailability: varchar("metricAvailability", { length: 32 }).notNull().default("DETERMINISTIC_ONLY"),
+  missingEvidence: json("missingEvidence"),
+  productionReadsEnabled: int("productionReadsEnabled").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_p8_metric_period_loc_src_var_win_uq").on(
+    table.periodKey,
+    table.locationKey,
+    table.sourceKey,
+    table.variable,
+    table.phase3WindowKey,
+  ),
+  index("shadow_p8_metric_location_status_idx").on(table.locationKey, table.metricStatus),
+  index("shadow_p8_metric_source_variable_idx").on(table.sourceKey, table.variable),
+  index("shadow_p8_metric_applied_idx").on(table.appliedToProduction),
+]);
+
+export type ShadowWeatherPhase8Metric = typeof shadowWeatherPhase8Metrics.$inferSelect;
+export type InsertShadowWeatherPhase8Metric = typeof shadowWeatherPhase8Metrics.$inferInsert;

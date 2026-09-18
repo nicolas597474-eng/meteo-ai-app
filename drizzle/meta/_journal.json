@@ -267,6 +267,13 @@
       "when": 1789278086476,
       "tag": "0037_high_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "5",
+      "when": 1789535323292,
+      "tag": "0038_charming_aaron_stack",
+      "breakpoints": true
     }
   ]
 }
