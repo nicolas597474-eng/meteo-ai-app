@@ -3802,6 +3802,6 @@
 - [x] Relire la définition officielle et les critères d’acceptation de la Phase 8.
 - [x] Auditer les données, dépendances, tables et consommateurs existants de la Phase 8.
 - [x] Documenter le périmètre shadow, les seuils et le plan de rollback Phase 8.
-- [ ] Implémenter uniquement les contrats et preuves Phase 8 autorisés après audit.
-- [ ] Valider les données réelles, l’isolation production, les tests et le rendu mobile.
-- [ ] Publier uniquement la préparation Phase 8 shadow, sans promotion des pondérations candidates.
+- [x] Implémenter uniquement les contrats et preuves Phase 8 autorisés après audit.
+- [x] Valider les données réelles, l’isolation production, les tests et le rendu mobile.
+- [x] Publier uniquement la préparation Phase 8 shadow, sans promotion des pondérations candidates.
