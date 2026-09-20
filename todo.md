@@ -3805,3 +3805,7 @@
 - [x] Implémenter uniquement les contrats et preuves Phase 8 autorisés après audit.
 - [x] Valider les données réelles, l’isolation production, les tests et le rendu mobile.
 - [x] Publier uniquement la préparation Phase 8 shadow, sans promotion des pondérations candidates.
+- [x] Ajouter une table shadow additive conservant chaque comparaison et sa provenance complète.
+- [x] Mettre en place le replay historique contrôlé avec rejet des données non alignées et prévention du data leakage.
+- [x] Atteindre les paliers de 18 puis 30 comparaisons valides sans fabriquer ni extrapoler d’observations.
+- [x] Produire le rapport intermédiaire et le rapport complet Phase 8 ; ne pas préparer la Phase 9.

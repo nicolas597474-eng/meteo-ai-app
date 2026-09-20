@@ -920,3 +920,42 @@ export const shadowWeatherPhase8Metrics = mysqlTable("shadow_weather_phase8_metr
 
 export type ShadowWeatherPhase8Metric = typeof shadowWeatherPhase8Metrics.$inferSelect;
 export type InsertShadowWeatherPhase8Metric = typeof shadowWeatherPhase8Metrics.$inferInsert;
+
+/** Une ligne auditable par comparaison Phase 8, issue uniquement d’une preuve physique qualifiée. */
+export const shadowWeatherPhase8Comparisons = mysqlTable("shadow_weather_phase8_comparisons", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  comparisonKey: varchar("comparisonKey", { length: 160 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  sourceKey: varchar("sourceKey", { length: 128 }).notNull(),
+  variable: varchar("variable", { length: 48 }).notNull(),
+  phase3WindowKey: varchar("phase3WindowKey", { length: 16 }).notNull(),
+  forecastRunId: bigint("forecastRunId", { mode: "number" }).notNull(),
+  forecastIssuedAt: bigint("forecastIssuedAt", { mode: "number" }).notNull(),
+  forecastValidTime: bigint("forecastValidTime", { mode: "number" }).notNull(),
+  forecastHorizonMinutes: int("forecastHorizonMinutes").notNull(),
+  observationId: int("observationId").notNull(),
+  observationDate: varchar("observationDate", { length: 10 }).notNull(),
+  observationHour: int("observationHour").notNull(),
+  observationAt: bigint("observationAt", { mode: "number" }).notNull(),
+  observationCollectedAt: timestamp("observationCollectedAt").notNull(),
+  forecastValue: float("forecastValue").notNull(),
+  observedValue: float("observedValue").notNull(),
+  error: float("error").notNull(),
+  absoluteError: float("absoluteError").notNull(),
+  observationQualityStatus: varchar("observationQualityStatus", { length: 24 }).notNull(),
+  observationStationCount: int("observationStationCount").notNull(),
+  observationConfidence: float("observationConfidence"),
+  observationProvenance: json("observationProvenance").notNull(),
+  forecastProvenance: json("forecastProvenance").notNull(),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_p8_comparison_key_uq").on(table.comparisonKey),
+  index("shadow_p8_comparison_group_idx").on(table.locationKey, table.sourceKey, table.variable, table.phase3WindowKey),
+  index("shadow_p8_comparison_observation_idx").on(table.observationId, table.observationAt),
+  index("shadow_p8_comparison_applied_idx").on(table.appliedToProduction),
+]);
+
+export type ShadowWeatherPhase8Comparison = typeof shadowWeatherPhase8Comparisons.$inferSelect;
+export type InsertShadowWeatherPhase8Comparison = typeof shadowWeatherPhase8Comparisons.$inferInsert;

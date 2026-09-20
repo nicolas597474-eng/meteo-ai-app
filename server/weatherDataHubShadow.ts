@@ -9,8 +9,11 @@ import {
   shadowWeatherPhase6Candidates,
   shadowWeatherPhase7LocalPerformance,
   shadowWeatherPhase8Metrics,
+  shadowWeatherPhase8Comparisons,
+  qualifiedObservationSnapshots,
   type InsertShadowWeatherIngestionRun,
   type InsertShadowWeatherValue,
+  type InsertShadowWeatherPhase8Comparison,
 } from "../drizzle/schema";
 import {
   PHASE2_SHADOW_SOURCE_CLASSIFICATIONS,
@@ -27,6 +30,7 @@ import {
   calculatePhase8Metrics,
   type Phase8MetricInput,
   type Phase8MetricResult,
+  type Phase8MetricVariable,
   P1_SHADOW_SOURCE_DEFINITIONS,
   calculatePhase6ShadowCandidate,
   calculatePhase7LocalPerformance,
@@ -1205,6 +1209,187 @@ export function buildPhase8MetricsReport(rows: Phase8MetricReportRow[]) {
     productionReadsEnabled, appliedToProduction, shadowModeViolations,
     valid: productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0, records: rows } as const;
 }
+type Phase8ReplayOptions = {
+  locationKey?: string;
+  sinceMs?: number;
+  untilMs?: number;
+  dryRun?: boolean;
+};
+
+type Phase8ReplayCandidate = {
+  valueId: number;
+  ingestionRunId: number;
+  sourceDefinitionId: number;
+  sourceKey: string;
+  displayName: string;
+  provider: string;
+  model: string;
+  sourceUrl: string | null;
+  locationKey: string;
+  variable: Phase8MetricVariable;
+  value: number;
+  validTime: number;
+  forecastHorizonMinutes: number;
+  receivedAt: number;
+  runEvidenceStatus: string;
+  runEvidenceSourceUrl: string | null;
+  payloadHash: string | null;
+  runStatus: string;
+};
+
+type Phase8ReplaySnapshot = typeof qualifiedObservationSnapshots.$inferSelect;
+
+function phase8ParisWallClockToUtc(date: string, hour: number): number {
+  const [year, month, day] = date.split("-").map(Number);
+  const wallClockUtc = Date.UTC(year, month - 1, day, hour, 0, 0);
+  const parisParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(wallClockUtc));
+  const value = Object.fromEntries(parisParts.map(part => [part.type, part.value]));
+  const parisAsUtc = Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day), Number(value.hour), 0, 0);
+  return wallClockUtc + (wallClockUtc - parisAsUtc);
+}
+
+function phase8ObservationValue(snapshot: Phase8ReplaySnapshot, variable: Phase8MetricVariable): number | null {
+  const values: Partial<Record<Phase8MetricVariable, number | null>> = {
+    air_temperature_2m: snapshot.temperature,
+    precipitation_amount: snapshot.precipitation,
+    wind_speed_10m: snapshot.windSpeed,
+    wind_gust_10m: snapshot.windGust,
+    // qualified_observation_snapshots ne conserve pas de direction de vent.
+    wind_direction_10m: null,
+    air_pressure_msl: snapshot.pressure,
+  };
+  const observed = values[variable];
+  return observed != null && Number.isFinite(observed) ? Number(observed) : null;
+}
+
+function phase8ReplayPeriodKey(start: number, end: number, locationKey: string, variable: string, horizonKey: string) {
+  return `p8-${createHash("sha256").update(`${start}|${end}|${locationKey}|${variable}|${horizonKey}`).digest("hex").slice(0, 28)}`;
+}
+
+export type Phase8ControlledReplayReport = {
+  version: typeof PHASE8_METRICS_VERSION;
+  dryRun: boolean;
+  sinceMs: number;
+  untilMs: number;
+  snapshotCount: number;
+  candidateCount: number;
+  eligibleComparisonCount: number;
+  persistedComparisonCount: number;
+  rejected: Record<string, number>;
+  groups: Array<{ locationKey: string; sourceKey: string; variable: Phase8MetricVariable; horizonKey: string; comparisons: number; status: string; mae: number | null; rmse: number | null; bias: number | null }>;
+  productionReadsEnabled: false;
+  appliedToProduction: 0;
+};
+
+/**
+ * Replay historique Phase 8 : seules les valeurs shadow émises avant l’instant
+ * d’observation et les synthèses physiques qualifiées sont admissibles.
+ * La fonction ne lit ni n’écrit aucune table de production et est idempotente.
+ */
+export async function replayPhase8Controlled(options: Phase8ReplayOptions = {}): Promise<Phase8ControlledReplayReport | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const untilMs = options.untilMs ?? Date.now();
+  const sinceMs = options.sinceMs ?? (untilMs - 45 * 86_400_000);
+  const rejected: Record<string, number> = {};
+  const reject = (reason: string) => { rejected[reason] = (rejected[reason] ?? 0) + 1; };
+  const snapshotFilters = [gte(qualifiedObservationSnapshots.collectedAt, new Date(sinceMs))];
+  if (options.locationKey) snapshotFilters.push(eq(qualifiedObservationSnapshots.locationKey, options.locationKey));
+  const snapshots = await db.select().from(qualifiedObservationSnapshots).where(and(...snapshotFilters));
+  const valueRows = await db.select({
+    value: shadowWeatherValues,
+    run: shadowWeatherIngestionRuns,
+    source: shadowWeatherSourceDefinitions,
+  }).from(shadowWeatherValues)
+    .innerJoin(shadowWeatherIngestionRuns, eq(shadowWeatherIngestionRuns.id, shadowWeatherValues.ingestionRunId))
+    .innerJoin(shadowWeatherSourceDefinitions, eq(shadowWeatherSourceDefinitions.id, shadowWeatherValues.sourceDefinitionId))
+    .where(and(eq(shadowWeatherValues.shadowMode, 1), eq(shadowWeatherIngestionRuns.shadowMode, 1), eq(shadowWeatherValues.missingData, 0)));
+
+  const candidates: Phase8ReplayCandidate[] = [];
+  for (const row of valueRows) {
+    const value = row.value;
+    const variable = PHASE8_METRIC_VARIABLES.includes(value.variable as Phase8MetricVariable) ? value.variable as Phase8MetricVariable : null;
+    if (!variable) { reject("variable_non_phase8"); continue; }
+    if (options.locationKey && value.locationKey !== options.locationKey) { reject("location_filter"); continue; }
+    if (value.value == null || !Number.isFinite(value.value)) { reject("forecast_value_missing"); continue; }
+    if (value.qualityStatus !== "VALID" || value.phase5QualityStatus !== "VALID") { reject("forecast_quality_not_valid"); continue; }
+    if (row.run.status !== "SUCCESS" || row.run.receivedAt == null) { reject("run_not_successfully_received"); continue; }
+    if (value.validTime < sinceMs || value.validTime > untilMs) { reject("forecast_outside_period"); continue; }
+    const horizon = value.forecastHorizonMinutes;
+    if (horizon == null || getPhase3HorizonWindow(horizon) == null || horizon < 0) { reject("horizon_unresolved"); continue; }
+    candidates.push({
+      valueId: value.id, ingestionRunId: value.ingestionRunId, sourceDefinitionId: value.sourceDefinitionId,
+      sourceKey: row.source.sourceKey, displayName: row.source.displayName, provider: row.source.provider,
+      model: row.source.model, sourceUrl: row.source.sourceUrl, locationKey: value.locationKey,
+      variable, value: Number(value.value), validTime: value.validTime, forecastHorizonMinutes: horizon,
+      receivedAt: Number(row.run.receivedAt), runEvidenceStatus: row.run.runEvidenceStatus,
+      runEvidenceSourceUrl: row.run.runEvidenceSourceUrl, payloadHash: row.run.payloadHash, runStatus: row.run.status,
+    });
+  }
+  const latestByKey = new Map<string, Phase8ReplayCandidate>();
+  for (const candidate of candidates) {
+    const key = `${candidate.locationKey}|${candidate.sourceKey}|${candidate.variable}|${candidate.validTime}`;
+    const previous = latestByKey.get(key);
+    if (!previous || candidate.receivedAt > previous.receivedAt || (candidate.receivedAt === previous.receivedAt && candidate.valueId > previous.valueId)) latestByKey.set(key, candidate);
+  }
+  const groups = new Map<string, { candidate: Phase8ReplayCandidate; snapshot: Phase8ReplaySnapshot; observedValue: number; observationAt: number }[]>();
+  for (const snapshot of snapshots) {
+    if (snapshot.stationCount <= 0 || snapshot.confidenceScore == null || !Number.isFinite(snapshot.confidenceScore)) { reject("observation_not_qualified"); continue; }
+    const observationAt = phase8ParisWallClockToUtc(snapshot.date, snapshot.hour);
+    if (observationAt < sinceMs || observationAt > untilMs || observationAt > Date.now()) { reject("observation_outside_period"); continue; }
+    for (const variable of PHASE8_METRIC_VARIABLES) {
+      const observedValue = phase8ObservationValue(snapshot, variable);
+      if (observedValue == null) { reject(`observation_missing_${variable}`); continue; }
+      const matching = Array.from(latestByKey.values()).filter(candidate => candidate.locationKey === snapshot.locationKey && candidate.validTime === observationAt && candidate.variable === variable);
+      if (matching.length === 0) { reject(`no_aligned_forecast_${variable}`); continue; }
+      for (const candidate of matching) {
+        if (candidate.receivedAt >= observationAt) { reject("forecast_received_after_observation"); continue; }
+        const window = getPhase3HorizonWindow(candidate.forecastHorizonMinutes);
+        if (!window) { reject("horizon_unresolved_after_alignment"); continue; }
+        const key = `${candidate.locationKey}|${candidate.sourceKey}|${candidate.variable}|${window.key}`;
+        const group = groups.get(key) ?? [];
+        group.push({ candidate, snapshot, observedValue, observationAt });
+        groups.set(key, group);
+      }
+    }
+  }
+  const reportGroups: Phase8ControlledReplayReport["groups"] = [];
+  let persistedComparisonCount = 0;
+  for (const [groupKey, entries] of Array.from(groups.entries())) {
+    const [locationKey, sourceKey, variable, horizonKey] = groupKey.split("|") as [string, string, Phase8MetricVariable, string];
+    const samples = entries.map(entry => ({ forecastValue: entry.candidate.value, observedValue: entry.observedValue, validTime: entry.observationAt, evidenceType: "physical_observation" as const, qualityStatus: "VALID" as const }));
+    const periodStart = Math.min(...entries.map(entry => entry.observationAt));
+    const periodEnd = Math.max(...entries.map(entry => entry.observationAt));
+    const metric = calculatePhase8Metrics({ locationKey, sourceKey, variable, horizonKey: horizonKey as Phase8MetricInput["horizonKey"], periodStart, periodEnd, samples, evaluatedAt: untilMs });
+    reportGroups.push({ locationKey, sourceKey, variable, horizonKey, comparisons: metric.comparisonCount, status: metric.status, mae: metric.mae, rmse: metric.rmse, bias: metric.bias });
+    if (options.dryRun) continue;
+    const periodKey = phase8ReplayPeriodKey(periodStart, periodEnd, locationKey, variable, horizonKey);
+    for (const entry of entries) {
+      const error = entry.candidate.value - entry.observedValue;
+      const comparison: InsertShadowWeatherPhase8Comparison = {
+        comparisonKey: `${periodKey}|${entry.candidate.sourceKey}|${variable}|${entry.observationAt}`,
+        locationKey, sourceKey: entry.candidate.sourceKey, variable, phase3WindowKey: horizonKey,
+        forecastRunId: entry.candidate.ingestionRunId, forecastIssuedAt: entry.candidate.receivedAt,
+        forecastValidTime: entry.candidate.validTime, forecastHorizonMinutes: entry.candidate.forecastHorizonMinutes,
+        observationId: entry.snapshot.id, observationDate: entry.snapshot.date, observationHour: entry.snapshot.hour,
+        observationAt: entry.observationAt, observationCollectedAt: new Date(entry.snapshot.collectedAt),
+        forecastValue: entry.candidate.value, observedValue: entry.observedValue, error, absoluteError: Math.abs(error),
+        observationQualityStatus: "VALID", observationStationCount: entry.snapshot.stationCount,
+        observationConfidence: entry.snapshot.confidenceScore,
+        observationProvenance: { table: "qualified_observation_snapshots", id: entry.snapshot.id, locationKey: entry.snapshot.locationKey, date: entry.snapshot.date, hour: entry.snapshot.hour, observedAt: entry.observationAt, stationCount: entry.snapshot.stationCount, confidenceScore: entry.snapshot.confidenceScore, stationsUsed: entry.snapshot.stationsUsed, collectedAt: new Date(entry.snapshot.collectedAt).toISOString() },
+        forecastProvenance: { table: "shadow_weather_values", valueId: entry.candidate.valueId, ingestionRunId: entry.candidate.ingestionRunId, sourceDefinitionId: entry.candidate.sourceDefinitionId, sourceKey: entry.candidate.sourceKey, displayName: entry.candidate.displayName, provider: entry.candidate.provider, model: entry.candidate.model, forecastIssuedAt: entry.candidate.receivedAt, forecastValidTime: entry.candidate.validTime, forecastHorizonMinutes: entry.candidate.forecastHorizonMinutes, runEvidenceStatus: entry.candidate.runEvidenceStatus, runEvidenceSourceUrl: entry.candidate.runEvidenceSourceUrl, payloadHash: entry.candidate.payloadHash },
+        shadowMode: 1, appliedToProduction: 0,
+      };
+      await db.insert(shadowWeatherPhase8Comparisons).values(comparison).onDuplicateKeyUpdate({ set: comparison });
+      persistedComparisonCount++;
+    }
+    await persistPhase8Metrics({ locationKey, sourceKey, variable, horizonKey: horizonKey as Phase8MetricInput["horizonKey"], periodStart, periodEnd, samples, evaluatedAt: untilMs, periodKey } as Phase8MetricInput & { periodKey: string });
+  }
+  return { version: PHASE8_METRICS_VERSION, dryRun: options.dryRun === true, sinceMs, untilMs, snapshotCount: snapshots.length, candidateCount: candidates.length, eligibleComparisonCount: reportGroups.reduce((total, group) => total + group.comparisons, 0), persistedComparisonCount, rejected, groups: reportGroups, productionReadsEnabled: false, appliedToProduction: 0 };
+}
+
 export async function persistPhase8Metrics(input: Phase8MetricInput & { periodKey: string }): Promise<boolean> {
   const db = await getDb(); if (!db) return false;
   const result = calculatePhase8Metrics(input);

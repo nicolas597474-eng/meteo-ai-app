@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildPhase8MetricsReport } from "./weatherDataHubShadow";
 import { calculatePhase8Metrics } from "../shared/weatherDataHub";
+import fs from "node:fs";
 
 describe("Phase 8 metrics shadow", () => {
   it("calcule les métriques déterministes sans inventer les probabilités", () => {
@@ -43,5 +44,14 @@ describe("Phase 8 metrics shadow", () => {
     expect(report.valid).toBe(true);
     expect(report.statuses.VALIDABLE).toBe(1);
     expect(report.physicalEvidenceComparisons).toBe(30);
+  });
+
+  it("impose le replay physique, l’alignement temporel et le mode shadow", () => {
+    const source = fs.readFileSync(new URL("./weatherDataHubShadow.ts", import.meta.url), "utf8");
+    expect(source).toContain("forecast_received_after_observation");
+    expect(source).toContain("qualified_observation_snapshots");
+    expect(source).toContain("shadowMode: 1, appliedToProduction: 0");
+    expect(source).toContain("observationProvenance");
+    expect(source).toContain("forecastProvenance");
   });
 });
