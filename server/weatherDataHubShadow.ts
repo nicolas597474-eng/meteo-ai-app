@@ -1484,6 +1484,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     ingestionRunId: shadowWeatherValues.ingestionRunId,
     sourceKey: shadowWeatherSourceDefinitions.sourceKey,
     displayName: shadowWeatherSourceDefinitions.displayName,
+    locationKey: shadowWeatherValues.locationKey,
     category: shadowWeatherSourceDefinitions.classificationCategory,
     independenceClass: shadowWeatherSourceDefinitions.independenceClass,
     cycleKey: shadowWeatherIngestionRuns.cycleKey,
@@ -1537,6 +1538,24 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     0,
   );
   const unclassifiedSourceCount = classifiedSources.filter(source => !source.category || !source.role).length;
+
+  const coverageByLocation = new Map<string, { daily: Set<string>; hourly: Set<string> }>();
+  for (const value of horizonValues) {
+    const coverage = coverageByLocation.get(value.locationKey) ?? { daily: new Set<string>(), hourly: new Set<string>() };
+    const target = value.cycleKey.startsWith("daily:") ? coverage.daily : coverage.hourly;
+    target.add(value.sourceKey);
+    coverageByLocation.set(value.locationKey, coverage);
+  }
+  const observedCoverage = Array.from(coverageByLocation.entries())
+    .map(([observedLocationKey, coverage]) => ({
+      locationKey: observedLocationKey,
+      dailySourceCount: coverage.daily.size,
+      hourlySourceCount: coverage.hourly.size,
+      expectedSourceCount: P1_SHADOW_SOURCE_DEFINITIONS.length,
+      dailyCoverageRate: coverage.daily.size / P1_SHADOW_SOURCE_DEFINITIONS.length,
+      hourlyCoverageRate: coverage.hourly.size / P1_SHADOW_SOURCE_DEFINITIONS.length,
+    }))
+    .sort((left, right) => left.locationKey.localeCompare(right.locationKey));
 
   const firstReceivedAt = runSummary?.firstReceivedAt == null ? null : Number(runSummary.firstReceivedAt);
   const observationDaysElapsed = firstReceivedAt == null
@@ -1597,6 +1616,12 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
         empty: (categoryCounts.get(category) ?? 0) === 0,
       })),
       sources: classifiedSources,
+    },
+    phase1Coverage: {
+      configuredSourceCount: P1_SHADOW_SOURCE_DEFINITIONS.length,
+      observedLocationCount: observedCoverage.length,
+      locations: observedCoverage,
+      shadowOnly: true as const,
     },
     phase3HorizonHierarchy,
     phase4Normalization,
