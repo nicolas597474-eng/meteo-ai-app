@@ -663,6 +663,8 @@ export function normalizeHourlyForecastToShadow(
   const units = forecast.sourceMetadata?.units;
   for (const hour of forecast.hours) {
     const validTime = parisLocalDateTimeToEpochMs(context.targetDate, hour.hour);
+    const horizonMinutes = Math.round((validTime - context.receivedAt) / 60_000);
+    if (horizonMinutes < 0 || horizonMinutes > PHASE3_HORIZON_WINDOWS.at(-1)!.maxMinutes) continue;
     const flags = ["hourly_value", "timezone_europe_paris"];
     values.push(
       toCanonicalValue("air_temperature_2m", hour.temperature, validTime, context.receivedAt, flags, units?.temperature ?? null, sourceTimezone, context),

@@ -162,6 +162,15 @@ describe("P1 shadow normalizer", () => {
     expect(values.every(value => value.confidence === null)).toBe(true);
   });
 
+  it("exclut les créneaux horaires déjà écoulés au lieu de leur attribuer un horizon nul", () => {
+    const values = normalizeHourlyForecastToShadow({
+      modelName: "best_match",
+      hours: [{ hour: 4, temperature: 15, apparentTemperature: 15, precipitation: 0, windSpeed: 5, windGusts: 8, windDirection: 180, humidity: 70, pressure: 1015, cloudCover: 40, weatherCode: 1 }],
+      sourceMetadata: { timezone: "Europe/Paris", utcOffsetSeconds: 7200, units: { temperature: "°C", apparentTemperature: "°C", precipitation: "mm", windSpeed: "km/h", windGusts: "km/h", windDirection: "°", humidity: "%", pressure: "hPa", cloudCover: "%", weatherCode: "wmo code" } },
+    }, context);
+    expect(values).toEqual([]);
+  });
+
   it("never propagates a shadow write failure to production", async () => {
     await expect(executeShadowWriteSafely("test", async () => {
       throw new Error("shadow unavailable");

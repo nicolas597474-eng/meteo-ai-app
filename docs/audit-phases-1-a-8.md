@@ -56,6 +56,12 @@ L’audit révèle toutefois **19 960 valeurs sur 102 600** dont `forecastHorizo
 
 **Sévérité : moyenne.** Il s’agit d’une perte de couverture shadow, pas d’une contamination de production.
 
+### Correction appliquée après l’audit
+
+La cause identifiée est le stockage de créneaux horaires locaux déjà écoulés au moment de la réception du run. Leur différence avec `receivedAt` devenait négative et était convertie en horizon `null`. Le normaliseur horaire shadow exclut désormais ces créneaux, ainsi que ceux situés au-delà de la fenêtre maximale de quinze jours, au lieu de les persister comme prévisions sans échéance.
+
+La correction est couverte par un test dédié et ne reconstruit aucune échéance. Les anciennes lignes historiques restent conservées pour la traçabilité et ne sont pas réécrites. Le dry-run de replay effectué après la correction n’a produit aucune écriture (`persistedComparisonCount=0`), a conservé `productionReadsEnabled=false` et `appliedToProduction=0`, et recense encore 9 610 horizons non résolus historiques. Cette valeur ne mesure donc pas uniquement les nouvelles collectes ; la réduction complète sera mesurable après les prochains cycles v8 corrigés.
+
 ## Phase 4 — Normalisation canonique
 
 Les **102 600 valeurs** contrôlées disposent d’une métadonnée de normalisation non nulle. La normalisation est donc persistée et traçable au niveau de chaque valeur shadow.
