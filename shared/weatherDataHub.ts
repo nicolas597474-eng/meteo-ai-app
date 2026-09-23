@@ -1357,6 +1357,7 @@ export function calculatePhase8Metrics(input: Phase8MetricInput): Phase8MetricRe
     comparisonCount === 0 ? "comparisons" : null,
     evaluatedDays < PHASE8_METRICS_THRESHOLDS.minimumDays ? "distinct_days" : null,
     input.variable === "precipitation_amount" && comparisonCount > 0 && rainHits + rainMisses + rainFalseAlarms === 0 ? "rain_events" : null,
+    probabilitySamples.length === 0 ? "probability_distribution_and_event_outcome" : null,
   ].filter((item): item is string => item != null);
   const status: Phase8MetricStatus = invalidInputCount > 0 && comparisonCount === 0
     ? "INVALID"

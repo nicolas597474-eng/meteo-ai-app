@@ -9,4 +9,12 @@ describe("Phase 8 metrics panel", () => {
     expect(source).toContain("appliquées à production");
     expect(source).toContain("Brier, CRPS");
   });
+
+  it("explique l’indisponibilité probabiliste sans fabriquer de score", () => {
+    const source = fs.readFileSync(new URL("./Phase8MetricsPanel.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Métriques probabilistes");
+    expect(source).toContain("Non disponibles");
+    expect(source).toContain("preuves probabilistes");
+    expect(source).toContain("probabilisticMetrics.reasons");
+  });
 });

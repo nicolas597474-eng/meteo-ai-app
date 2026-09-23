@@ -75,7 +75,7 @@ Les valeurs ci-dessous sont des moyennes des métriques de groupes, et non une n
 | Vitesse du vent | `2_6h` | 894 | 9,86 | 11,17 | 9,75 |
 | Vitesse du vent | `6_24h` | 2 614 | 10,76 | 12,14 | 10,22 |
 
-Les métriques probabilistes Brier, CRPS et calibration restent indisponibles, car aucune probabilité exploitable n’est réellement ingérée dans les valeurs comparées. Elles ne sont pas déduites des métriques déterministes.
+Les métriques probabilistes Brier, CRPS et calibration restent indisponibles après contrôle des données réelles. Les **108 120 valeurs shadow** auditées portent toutes `memberKey=deterministic` ; aucune probabilité d’événement, distribution d’ensemble, quantile ou issue binaire traçable n’est ingérée. Le rapport Phase 8 expose désormais explicitement le statut `UNAVAILABLE`, les compteurs Brier/CRPS/calibration à zéro comme **métriques non calculées**, et les raisons d’absence de preuve. Ces valeurs zéro ne représentent donc pas une performance. Aucune probabilité n’est reconstruite à partir de l’écart entre modèles ou d’une extrapolation.
 
 ## Données exclues
 

@@ -1197,16 +1197,28 @@ export type Phase8MetricReportRow = {
 export function buildPhase8MetricsReport(rows: Phase8MetricReportRow[]) {
   const statuses = { INSUFFICIENT: 0, OBSERVING: 0, VALIDABLE: 0, INVALID: 0 };
   let productionReadsEnabled = 0, appliedToProduction = 0, shadowModeViolations = 0;
+  let probabilisticRecordCount = 0;
   for (const row of rows) {
     if (row.status in statuses) statuses[row.status as keyof typeof statuses] += 1;
     productionReadsEnabled += Number(row.productionReadsEnabled ?? 0);
     appliedToProduction += Number(row.appliedToProduction ?? 0);
+    if (row.metricAvailability === "PROBABILISTIC_AVAILABLE") probabilisticRecordCount += 1;
     if (Number(row.productionReadsEnabled ?? 0) !== 0 || Number(row.appliedToProduction ?? 0) !== 0) shadowModeViolations += 1;
   }
   return { version: PHASE8_METRICS_VERSION, metricCount: rows.length, statuses, variables: [...PHASE8_METRIC_VARIABLES],
     physicalEvidenceComparisons: rows.reduce((n, row) => n + Number(row.physicalComparisonCount ?? 0), 0),
     legacyEvidenceComparisons: rows.reduce((n, row) => n + Number(row.legacyComparisonCount ?? 0), 0),
     productionReadsEnabled, appliedToProduction, shadowModeViolations,
+    probabilisticMetrics: {
+      status: probabilisticRecordCount > 0 ? "PARTIAL" as const : "UNAVAILABLE" as const,
+      brierRecordCount: rows.filter(row => row.brierScore != null).length,
+      crpsRecordCount: rows.filter(row => row.crps != null).length,
+      calibrationRecordCount: rows.filter(row => row.calibrationError != null).length,
+      evidenceRecordCount: probabilisticRecordCount,
+      reasons: probabilisticRecordCount > 0
+        ? ["Une preuve de probabilité est présente pour une partie des comparaisons ; CRPS et calibration restent indisponibles sans distribution prédictive complète."]
+        : ["Aucune probabilité d’événement, distribution d’ensemble ou issue binaire traçable n’est ingérée.", "Brier, CRPS et calibration restent non calculés ; aucune valeur zéro ne représente une performance."],
+    },
     valid: productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0, records: rows } as const;
 }
 type Phase8ReplayOptions = {

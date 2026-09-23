@@ -24,6 +24,9 @@ describe("Phase 8 metrics shadow", () => {
     expect(result.rmse).toBe(1.58);
     expect(result.brierScore).toBeNull();
     expect(result.crps).toBeNull();
+    expect(result.calibrationError).toBeNull();
+    expect(result.metricAvailability).toBe("DETERMINISTIC_ONLY");
+    expect(result.missingEvidence).toContain("probability_distribution_and_event_outcome");
     expect(result.status).toBe("INSUFFICIENT");
     expect(result.appliedToProduction).toBe(0);
   });
@@ -44,6 +47,8 @@ describe("Phase 8 metrics shadow", () => {
     expect(report.valid).toBe(true);
     expect(report.statuses.VALIDABLE).toBe(1);
     expect(report.physicalEvidenceComparisons).toBe(30);
+    expect(report.probabilisticMetrics).toMatchObject({ status: "UNAVAILABLE", brierRecordCount: 0, crpsRecordCount: 0, calibrationRecordCount: 0, evidenceRecordCount: 0 });
+    expect(report.probabilisticMetrics.reasons.join(" ")).toContain("Aucune probabilité");
   });
 
   it("impose le replay physique, l’alignement temporel et le mode shadow", () => {
