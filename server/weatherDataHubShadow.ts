@@ -682,10 +682,83 @@ export function normalizeHourlyForecastToShadow(
   return applyPhase5QualityControlToValues(values, context);
 }
 
-function getRunStatus(values: CanonicalShadowValue[]): ShadowRunStatus {
+export function getRunStatus(values: CanonicalShadowValue[], cycleKey?: string): ShadowRunStatus {
   if (values.length === 0 || values.every(value => value.missingData === 1)) return "FAILED";
-  if (values.some(value => value.missingData === 1)) return "PARTIAL";
+
+  // P1 mesure la réception d'un payload exploitable, pas la disponibilité
+  // uniforme de chaque variable facultative. Les champs absents restent
+  // conservés comme MISSING et continuent d'être traités par P4/P5.
+  // La température est le minimum commun aux deux granularités :
+  // température max/min pour le quotidien, température à 2 m pour l'horaire.
+  const requiredVariables = cycleKey?.startsWith("daily:")
+    ? ["air_temperature_max", "air_temperature_min"]
+    : ["air_temperature_2m"];
+  const hasUsableCore = requiredVariables.every(variable =>
+    values.some(value => value.variable === variable && value.missingData === 0 && value.value != null),
+  );
+  if (!hasUsableCore) return "PARTIAL";
   return "SUCCESS";
+}
+
+/** Recalcule les statuts P1 des runs déjà archivés, uniquement depuis le shadow. */
+export async function repairPersistedP1RunStatuses(): Promise<{ inspected: number; updated: number; productionWrites: number }> {
+  const db = await getDb();
+  if (!db) return { inspected: 0, updated: 0, productionWrites: 0 };
+  const runs = await db.select({
+    id: shadowWeatherIngestionRuns.id,
+    cycleKey: shadowWeatherIngestionRuns.cycleKey,
+    status: shadowWeatherIngestionRuns.status,
+    shadowMode: shadowWeatherIngestionRuns.shadowMode,
+    appliedToProduction: shadowWeatherIngestionRuns.appliedToProduction,
+  }).from(shadowWeatherIngestionRuns);
+  let updated = 0;
+  for (const run of runs) {
+    const rows = await db.select({
+      id: shadowWeatherValues.id,
+      variable: shadowWeatherValues.variable,
+      value: shadowWeatherValues.value,
+      missingData: shadowWeatherValues.missingData,
+      phase5QualityStatus: shadowWeatherValues.phase5QualityStatus,
+      phase5QualityMetadata: shadowWeatherValues.phase5QualityMetadata,
+    }).from(shadowWeatherValues).where(eq(shadowWeatherValues.ingestionRunId, run.id));
+    const values = rows.map(row => ({
+      variable: row.variable as CanonicalShadowValue["variable"],
+      value: row.value == null ? null : Number(row.value),
+      missingData: Number(row.missingData),
+    })) as CanonicalShadowValue[];
+    const nextStatus = getRunStatus(values, run.cycleKey);
+    if (nextStatus !== run.status) {
+      await db.update(shadowWeatherIngestionRuns).set({
+        status: nextStatus,
+        failureClass: nextStatus === "FAILED" ? "empty_payload" : null,
+        failureReason: nextStatus === "FAILED" ? "Aucune valeur centrale exploitable" : null,
+        shadowMode: 1,
+        appliedToProduction: 0,
+        updatedAt: new Date(),
+      }).where(eq(shadowWeatherIngestionRuns.id, run.id));
+      updated++;
+    }
+    if (nextStatus === "SUCCESS") {
+      for (const row of rows) {
+        const metadata = row.phase5QualityMetadata as (Phase5QualityControlMetadata & { rules?: string[] }) | null;
+        if (row.phase5QualityStatus !== "SUSPECT" || !metadata || !Array.isArray(metadata.rules)) continue;
+        const rules = metadata.rules.filter(rule => rule !== "RUN_INCOMPLETE");
+        if (rules.length > 0) continue;
+        await db.update(shadowWeatherValues).set({
+          phase5QualityStatus: row.missingData === 1 ? "MISSING" : "VALID",
+          phase5QualityMetadata: {
+            ...metadata,
+            status: row.missingData === 1 ? "MISSING" : "VALID",
+            runStatus: "SUCCESS",
+            rules,
+            usableInShadow: row.missingData !== 1,
+            excludedFromPhase5Shadow: row.missingData === 1,
+          },
+        }).where(eq(shadowWeatherValues.id, row.id));
+      }
+    }
+  }
+  return { inspected: runs.length, updated, productionWrites: 0 };
 }
 
 function buildPayloadHash(values: CanonicalShadowValue[]) {
@@ -790,7 +863,7 @@ async function persistOneShadowRun(input: {
   const registry = await ensureP1ShadowRegistry();
   const sourceDefinitionId = registry.get(input.sourceKey);
   if (!sourceDefinitionId) throw new Error(`shadow_source_not_registered:${input.sourceKey}`);
-  const status = getRunStatus(input.values);
+  const status = getRunStatus(input.values, input.cycleKey);
   const runTimeKnown = input.runEvidence.status === "PROVIDER_REPORTED" ? 1 : 0;
   const run: InsertShadowWeatherIngestionRun = {
     cycleKey: input.cycleKey,

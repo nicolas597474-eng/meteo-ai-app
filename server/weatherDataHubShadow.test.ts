@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   executeShadowWriteSafely,
+  getRunStatus,
   normalizeDailyForecastToShadow,
   normalizeHourlyForecastToShadow,
   parisLocalDateTimeToEpochMs,
@@ -17,6 +18,26 @@ const context = {
 };
 
 describe("P1 shadow normalizer", () => {
+  it("classe SUCCESS un payload quotidien exploitable malgré des variables optionnelles absentes", () => {
+    const values = normalizeDailyForecastToShadow({
+      serviceName: "AROME", serviceCategory: "expert", tempMax: 20, tempMin: 12,
+      precipitation: null, windSpeed: 18, windGust: null, humidity: null, cloudCover: null,
+      condition: null,
+      rawData: { timezone: "Europe/Paris", daily_units: { temperature_2m_max: "°C", temperature_2m_min: "°C", precipitation_sum: "mm", wind_speed_10m_max: "km/h", wind_gusts_10m_max: "km/h", relative_humidity_2m_mean: "%", cloud_cover_mean: "%" } },
+    }, context);
+    expect(getRunStatus(values, "daily:2026-09-02:v1")).toBe("SUCCESS");
+  });
+
+  it("ne classe pas SUCCESS un payload sans variable centrale exploitable", () => {
+    const values = normalizeDailyForecastToShadow({
+      serviceName: "AROME", serviceCategory: "expert", tempMax: null, tempMin: null,
+      precipitation: 0, windSpeed: 18, windGust: 20, humidity: 70, cloudCover: 40,
+      condition: null,
+      rawData: { timezone: "Europe/Paris", daily_units: { temperature_2m_max: "°C", temperature_2m_min: "°C", precipitation_sum: "mm", wind_speed_10m_max: "km/h", wind_gusts_10m_max: "km/h", relative_humidity_2m_mean: "%", cloud_cover_mean: "%" } },
+    }, context);
+    expect(getRunStatus(values, "daily:2026-09-02:v1")).toBe("PARTIAL");
+  });
+
   it("maps seven models and Best Match without public weather services", () => {
     expect(resolveP1ShadowSourceKey("AROME")).toBe("openmeteo_arome_france_hd");
     expect(resolveP1ShadowSourceKey("Open-Meteo")).toBe("openmeteo_best_match");
