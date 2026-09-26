@@ -46,7 +46,7 @@ La classification est cohérente avec la gouvernance actuelle : sept sources son
 
 Cette classification évite de compter Best Match comme un modèle indépendant supplémentaire. Elle est respectée dans les candidats Phase 6 et dans le rapport Phase 8.
 
-**Anomalie : aucune.** La classification décrit toutefois la nature des flux ; elle ne constitue pas à elle seule une preuve de qualité statistique ou d’indépendance sur une longue période.
+**Correction de précision appliquée.** La classification décrivait correctement la nature des modèles, mais le champ `independenceClass=independent_model` pouvait être lu à tort comme une indépendance complète des fournisseurs. La preuve Phase 2 conserve désormais séparément `upstreamProvider=open_meteo` et `providerIndependence=shared_provider`. Les sept modèles restent distincts au niveau numérique, mais leurs flux ne sont pas présentés comme issus de fournisseurs amont indépendants. Best Match reste dérivé et non indépendant. Cette correction est shadow-only et ne constitue pas une preuve de qualité statistique sur une longue période.
 
 ## Phase 3 — Hiérarchie des horizons
 

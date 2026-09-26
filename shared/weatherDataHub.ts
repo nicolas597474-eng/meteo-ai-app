@@ -26,6 +26,7 @@ export const PHASE2_SOURCE_CATEGORIES = [
 
 export const PHASE2_SOURCE_ROLES = ["FORECAST", "OBSERVATION", "DERIVED"] as const;
 export const PHASE2_CLASSIFICATION_VERSION = "phase2-source-classification-v1" as const;
+export const PHASE2_PROVIDER_INDEPENDENCE = ["shared_provider", "provider_unknown"] as const;
 
 export const PHASE3_HORIZON_STRATEGY_VERSION = "phase3-horizon-hierarchy-v1" as const;
 export const PHASE3_SOURCE_CAPABILITIES = [
@@ -466,6 +467,8 @@ export type Phase2SourceClassification = {
     version: typeof PHASE2_CLASSIFICATION_VERSION;
     basis: "declared_model" | "derived_aggregator";
     explanation: string;
+    upstreamProvider: string;
+    providerIndependence: typeof PHASE2_PROVIDER_INDEPENDENCE[number];
   };
   appliedToProduction: 0;
 };
@@ -791,9 +794,11 @@ export const PHASE2_SHADOW_SOURCE_CLASSIFICATIONS = P1_SHADOW_SOURCE_DEFINITIONS
     evidence: {
       version: PHASE2_CLASSIFICATION_VERSION,
       basis: derived ? "derived_aggregator" : "declared_model",
+      upstreamProvider: source.provider,
+      providerIndependence: "shared_provider",
       explanation: derived
         ? "Open-Meteo Best Match sélectionne ou assemble des modèles et reste non indépendant."
-        : `${source.displayName} est un modèle déterministe nommé dans le registre P1.`,
+        : `${source.displayName} est un modèle déterministe nommé ; son indépendance est celle du modèle, mais les huit flux sont exposés par le fournisseur amont ${source.provider}.`,
     },
     appliedToProduction: 0,
   } as const satisfies Phase2SourceClassification;
@@ -818,6 +823,9 @@ export function validatePhase2ShadowClassifications(): { valid: true; sourceCoun
   }
   if (classifications.some(classification => classification.appliedToProduction !== 0)) {
     throw new Error("Phase 2 shadow classifications must never be applied to production");
+  }
+  if (classifications.some(classification => classification.evidence.providerIndependence !== "shared_provider")) {
+    throw new Error("Phase 2 must expose the shared upstream provider scope");
   }
 
   return { valid: true, sourceCount: classifications.length };

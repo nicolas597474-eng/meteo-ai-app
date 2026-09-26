@@ -3689,6 +3689,9 @@
 - [x] Conserver ensemble, observation, radar et satellite comme catégories sans source tant qu’aucune ingestion réelle n’existe.
 - [x] Afficher au propriétaire les huit classifications et les catégories vides explicites.
 - [x] Vérifier par tests et données réelles l’unicité, l’absence de nouvelle source et l’isolation production.
+- [x] Distinguer explicitement l’indépendance du modèle de la provenance amont commune Open-Meteo.
+- [x] Rafraîchir la preuve Phase 2 persistée sans réécrire les runs, valeurs ou données de production.
+- [x] Vérifier que Best Match reste exclu du décompte des modèles indépendants dans Phase 6.
 - [x] Publier la Phase 2 shadow sans commencer la Phase 3.
 
 ## Phase 3 officielle — Cadrage et exécution shadow

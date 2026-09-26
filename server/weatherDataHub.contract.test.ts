@@ -60,6 +60,12 @@ describe("P1 shadow weather data hub contract", () => {
     ]);
   });
 
+  it("distingue l’indépendance du modèle de la provenance amont partagée", () => {
+    expect(PHASE2_SHADOW_SOURCE_CLASSIFICATIONS.every(source => source.evidence.upstreamProvider === "open_meteo")).toBe(true);
+    expect(PHASE2_SHADOW_SOURCE_CLASSIFICATIONS.every(source => source.evidence.providerIndependence === "shared_provider")).toBe(true);
+    expect(PHASE2_SHADOW_SOURCE_CLASSIFICATIONS.filter(source => source.category === "DETERMINISTIC")).toHaveLength(7);
+  });
+
   it("defines future categories without assigning a source before a real ingestion exists", () => {
     expect(PHASE2_SOURCE_CATEGORIES).toEqual([
       "DETERMINISTIC",
