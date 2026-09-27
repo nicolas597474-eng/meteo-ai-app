@@ -114,6 +114,35 @@ describe("Phase 5 shadow quality control", () => {
     });
   });
 
+  it("keeps a persisted historical VALID result valid when the report is opened later", () => {
+    const normalization = input().normalizationMetadata;
+    const stored = evaluatePhase5QualityControl(input()).metadata;
+    const report = buildPhase5QualityControlReport([{
+      ingestionRunId: 42,
+      sourceKey: "openmeteo_arome_france_hd",
+      displayName: "AROME",
+      cycleKey: "hourly:2026-09-02:v1",
+      runStatus: "SUCCESS",
+      receivedAt,
+      latitude: 50.756,
+      longitude: 2.521,
+      validTime,
+      variable: "air_temperature_2m",
+      value: 20,
+      levelKey: "2m",
+      memberKey: "deterministic",
+      missingData: 0,
+      normalizationMetadata: normalization,
+      phase5QualityStatus: "VALID",
+      phase5QualityMetadata: stored,
+      phase5EvaluatedAt: receivedAt,
+      phase5AppliedToProduction: 0,
+      shadowMode: 1,
+      runAppliedToProduction: 0,
+    }], Date.parse("2026-09-26T06:00:00Z"));
+    expect(report.counts).toMatchObject({ VALID: 1, STALE: 0 });
+  });
+
   it("detects a rapid variation only when a previous comparable point exists", () => {
     expect(evaluatePhase5QualityControl(input({
       value: 30,

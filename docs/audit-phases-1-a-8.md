@@ -72,11 +72,13 @@ La couverture fonctionnelle reste partielle. La température, les précipitation
 
 ## Phase 5 — Contrôle qualité
 
-La répartition observée dans `shadow_weather_values` est de **66 870 valeurs `VALID`**, **19 808 `SUSPECT`** et **15 922 `MISSING`**. Aucune violation `phase5AppliedToProduction` n’a été détectée.
+La répartition historique observée dans `shadow_weather_values` est de **66 870 valeurs `VALID`**, **19 808 `SUSPECT`** et **15 922 `MISSING`**. Aucune violation `phase5AppliedToProduction` n’a été détectée.
 
 La règle d’exclusion est correctement appliquée au replay Phase 8. Les valeurs `SUSPECT`, `MISSING`, `INVALID` ou `STALE` ne sont pas transformées en preuves valides. Cela explique notamment pourquoi AROME reste exclu des comparaisons Phase 8 : ses valeurs pertinentes ne satisfont pas la qualité requise.
 
-**Sévérité : moyenne pour la couverture, nulle pour l’isolation.** Près d’un tiers des valeurs n’est pas directement utilisable pour une comparaison physique. Le volume brut ingéré ne doit donc pas être présenté comme un volume de données évaluables.
+Une anomalie de présentation a été corrigée : le rapport recalculait les valeurs historiques avec l’heure actuelle, ce qui transformait artificiellement des valeurs anciennes en `STALE`. Il utilise désormais la preuve Phase 5 persistée au moment de l’ingestion, ou l’heure d’ingestion pour les anciennes lignes sans preuve, sans modifier les valeurs météo. Sur le rapport récent contrôlé : **33 840 valeurs**, **25 044 VALID**, **2 844 SUSPECT**, **5 952 MISSING**, **0 STALE**, **0 INVALID**. Les `MISSING` restent donc explicitement absentes et ne sont jamais remplacées ou comptées comme valides.
+
+**Sévérité : moyenne pour la couverture, nulle pour l’isolation.** Une partie des valeurs reste non directement utilisable pour une comparaison physique, mais le rapport ne confond plus ancienneté historique et erreur actuelle.
 
 ## Phase 6 — Fusion intelligente expérimentale
 

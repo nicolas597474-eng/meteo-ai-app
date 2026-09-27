@@ -343,22 +343,29 @@ export function buildPhase5QualityControlReport(rows: Phase5ShadowQualityValue[]
       const key = `${row.ingestionRunId}|${row.validTime}|${row.variable}|${row.levelKey}|${row.memberKey}`;
       const seriesKey = `${row.ingestionRunId}|${row.variable}|${row.levelKey}|${row.memberKey}`;
       const previous = previousBySeries.get(seriesKey);
-      const qc = evaluatePhase5QualityControl({
-        variable: row.variable,
-        value: row.value,
-        missingData: row.missingData === 1 ? 1 : 0,
-        validTime: row.validTime,
-        receivedAt: row.receivedAt,
-        evaluatedAt,
-        latitude: row.latitude,
-        longitude: row.longitude,
-        aggregation: row.cycleKey.startsWith("daily:") ? "daily" : "hourly",
-        runStatus: row.runStatus,
-        duplicateCount: duplicateCounts.get(key) ?? 1,
-        normalizationMetadata: parsePhase4NormalizationMetadata(row.normalizationMetadata),
-        previousValue: previous?.value,
-        previousValidTime: previous?.validTime,
-      });
+      const storedMetadata = parsePhase5QualityMetadata(row.phase5QualityMetadata);
+      const qc = storedMetadata
+        ? { status: storedMetadata.status, metadata: storedMetadata }
+        : evaluatePhase5QualityControl({
+          variable: row.variable,
+          value: row.value,
+          missingData: row.missingData === 1 ? 1 : 0,
+          validTime: row.validTime,
+          receivedAt: row.receivedAt,
+          // A legacy row without a persisted QC timestamp is evaluated at
+          // ingestion time, never against the current wall clock. Otherwise
+          // every historical value would become STALE merely because the
+          // administrator opened the report later.
+          evaluatedAt: row.phase5EvaluatedAt ?? row.receivedAt,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          aggregation: row.cycleKey.startsWith("daily:") ? "daily" : "hourly",
+          runStatus: row.runStatus,
+          duplicateCount: duplicateCounts.get(key) ?? 1,
+          normalizationMetadata: parsePhase4NormalizationMetadata(row.normalizationMetadata),
+          previousValue: previous?.value,
+          previousValidTime: previous?.validTime,
+        });
       if (row.value != null) previousBySeries.set(seriesKey, row);
       return { row, qc };
     });
