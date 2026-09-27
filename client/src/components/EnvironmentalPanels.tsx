@@ -978,13 +978,21 @@ const REALISTIC_MOON_SURFACE = "/manus-storage/meteoai-realistic-moon-surface_f2
 
 function RealisticMoon({ phase, size, alt, cloudCover }: { phase: { label: string; illuminationPct: number; brightLimbAngleDeg: number }; size: "marker" | "detail"; alt: string; cloudCover: number | null }) {
   const illumination = Math.max(0, Math.min(100, Number(phase.illuminationPct) || 0));
-  const isWaxing = /croissant|premier|gibbeuse croissante/i.test(phase.label);
-  const highlightPosition = isWaxing ? "100% 50%" : "0% 50%";
-  const transparentStop = Math.max(2, Math.min(96, illumination));
   const diameter = size === "marker" ? "h-10 w-10" : "h-16 w-16";
   const glow = getLunarGlowStrength(cloudCover);
-  const glowStyle = { transform: `rotate(${phase.brightLimbAngleDeg}deg)`, "--moon-glow-opacity": String(glow.opacity) } as CSSProperties;
-  return <span className={`realistic-moon-glow relative block ${diameter} overflow-hidden rounded-full`} data-cloud-cover={glow.cloudCover ?? "unknown"} style={glowStyle}><img src={REALISTIC_MOON_SURFACE} alt={alt} className="h-full w-full object-contain" /><span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(ellipse at ${highlightPosition}, rgba(2, 6, 23, 0) 0%, rgba(2, 6, 23, 0) ${transparentStop}%, rgba(2, 6, 23, 0.94) ${Math.min(100, transparentStop + 16)}%, rgba(2, 6, 23, 0.98) 100%)` }} /></span>;
+  const glowStyle = { "--moon-glow-opacity": String(glow.opacity) } as CSSProperties;
+  
+  // Calculer l'angle éclairé en degrés (0-360)
+  const illuminatedAngle = illumination * 3.6;
+  
+  // Créer un masque conique où :
+  // - La partie éclairée (illuminatedAngle degrés) est transparente (on voit la lune)
+  // - La partie sombre est opaque avec un léger voile (on ne voit pas la lune)
+  // Le gradient part de brightLimbAngleDeg (direction du limbe lumineux)
+  // et crée un secteur transparent de illuminatedAngle degrés
+  return <span className={`realistic-moon-glow relative block ${diameter} overflow-hidden rounded-full`} data-cloud-cover={glow.cloudCover ?? "unknown"} style={glowStyle}><img src={REALISTIC_MOON_SURFACE} alt={alt} className="h-full w-full object-contain" /><span aria-hidden="true" className="absolute inset-0 rounded-full" style={{
+    background: `conic-gradient(from ${phase.brightLimbAngleDeg}deg at 50% 50%, rgba(2, 6, 23, 0) 0deg ${illuminatedAngle}deg, rgba(2, 6, 23, 0.85) ${illuminatedAngle}deg 360deg)`
+  }} /></span>;
 }
 
 function SunMoonPanelTemporal({ astronomy, source }: { astronomy: EnvironmentalData["astronomy"]; source: string }) {
