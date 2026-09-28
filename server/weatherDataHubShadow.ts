@@ -708,9 +708,9 @@ export function getRunStatus(values: CanonicalShadowValue[], cycleKey?: string):
 }
 
 /** Recalcule les statuts P1 des runs déjà archivés, uniquement depuis le shadow. */
-export async function repairPersistedP1RunStatuses(): Promise<{ inspected: number; updated: number; productionWrites: number }> {
+export async function repairPersistedP1RunStatuses(): Promise<{ inspected: number; updated: number; metadataUpdated: number; productionWrites: number }> {
   const db = await getDb();
-  if (!db) return { inspected: 0, updated: 0, productionWrites: 0 };
+  if (!db) return { inspected: 0, updated: 0, metadataUpdated: 0, productionWrites: 0 };
   const runs = await db.select({
     id: shadowWeatherIngestionRuns.id,
     cycleKey: shadowWeatherIngestionRuns.cycleKey,
@@ -719,6 +719,7 @@ export async function repairPersistedP1RunStatuses(): Promise<{ inspected: numbe
     appliedToProduction: shadowWeatherIngestionRuns.appliedToProduction,
   }).from(shadowWeatherIngestionRuns);
   let updated = 0;
+  let metadataUpdated = 0;
   for (const run of runs) {
     const rows = await db.select({
       id: shadowWeatherValues.id,
@@ -748,24 +749,27 @@ export async function repairPersistedP1RunStatuses(): Promise<{ inspected: numbe
     if (nextStatus === "SUCCESS") {
       for (const row of rows) {
         const metadata = row.phase5QualityMetadata as (Phase5QualityControlMetadata & { rules?: string[] }) | null;
-        if (row.phase5QualityStatus !== "SUSPECT" || !metadata || !Array.isArray(metadata.rules)) continue;
+        if (!metadata || !Array.isArray(metadata.rules) || !metadata.rules.includes("RUN_INCOMPLETE")) continue;
         const rules = metadata.rules.filter(rule => rule !== "RUN_INCOMPLETE");
-        if (rules.length > 0) continue;
+        const nextQualityStatus = row.phase5QualityStatus === "SUSPECT" && rules.length === 0
+          ? (row.missingData === 1 ? "MISSING" : "VALID")
+          : row.phase5QualityStatus;
         await db.update(shadowWeatherValues).set({
-          phase5QualityStatus: row.missingData === 1 ? "MISSING" : "VALID",
+          phase5QualityStatus: nextQualityStatus,
           phase5QualityMetadata: {
             ...metadata,
-            status: row.missingData === 1 ? "MISSING" : "VALID",
+            status: nextQualityStatus,
             runStatus: "SUCCESS",
             rules,
-            usableInShadow: row.missingData !== 1,
-            excludedFromPhase5Shadow: row.missingData === 1,
+            usableInShadow: nextQualityStatus === "VALID" || nextQualityStatus === "SUSPECT",
+            excludedFromPhase5Shadow: nextQualityStatus !== "VALID" && nextQualityStatus !== "SUSPECT",
           },
         }).where(eq(shadowWeatherValues.id, row.id));
+        metadataUpdated++;
       }
     }
   }
-  return { inspected: runs.length, updated, productionWrites: 0 };
+  return { inspected: runs.length, updated, metadataUpdated, productionWrites: 0 };
 }
 
 function buildPayloadHash(values: CanonicalShadowValue[]) {

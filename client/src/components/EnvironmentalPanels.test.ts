@@ -34,11 +34,13 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("météores/h au zénith dans des conditions idéales");
     expect(source).toContain("Carte locale d’observation");
     expect(source).toContain("Il ne représente pas la bande géométrique d’une éclipse");
-    expect(source).toContain("Zones de visibilité d’éclipse");
+    expect(source).toContain("function getMapTitle");
+    expect(source).toContain("Zones de visibilite d'eclipse");
     expect(source).toContain("Bande centrale NASA");
     expect(source).toContain("eclipseMapLayers");
     expect(source).toContain("Agrandir la carte");
-    expect(source).toContain("Carte de visibilité d’éclipse");
+    expect(source).toContain("function getExpandedMapTitle");
+    expect(source).toContain("Carte de visibilite d'eclipse");
     expect(source).toContain("map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded");
     expect(source).toContain("cameraControl: false");
     expect(source).toContain("addressControlOptions: { position: google.maps.ControlPosition.TOP_CENTER }");
@@ -348,17 +350,16 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Alerte sonore");
     expect(source).toContain("L’éclipse commence maintenant");
     expect(temporalSunMoonSource).toContain("<RealisticMoon phase={moonPhase}");
-    expect(source).toContain("rotate(${phase.brightLimbAngleDeg}deg)");
+    expect(source).toContain("from ${phase.brightLimbAngleDeg}deg at 50% 50%");
     expect(temporalSunMoonSource).toContain("moon: { label: position.lunar.label");
   });
 
   it("utilise une texture réaliste pour toute phase lunaire visible", () => {
     expect(source).toContain("meteoai-realistic-moon-surface_f2f79daf.png");
     expect(source).toContain("function RealisticMoon");
-    expect(source).toContain("radial-gradient(ellipse at ${highlightPosition}");
-    expect(source).toContain("Lune réaliste représentant ${moonPhase.label}");
-    expect(styles).toContain("Premier croissant : seul l’astre est visible");
-    expect(styles).toContain("background: transparent !important");
+    expect(source).toContain("const illuminatedAngle = illumination * 3.6");
+    expect(source).toContain("conic-gradient(from ${phase.brightLimbAngleDeg}deg at 50% 50%");
+    expect(source).toContain("rgba(2, 6, 23, 0) 0deg ${illuminatedAngle}deg");
   });
 
   it("anime une lueur lunaire discrète sans l’imposer aux préférences de mouvement réduit", () => {
