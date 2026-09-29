@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, Gauge, Eye, ChevronDown } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
-import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
+import { getHourlyConditionLabel } from "@/lib/hourlyConditionLabel";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLabelLanes";
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
@@ -51,9 +51,7 @@ interface Props {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getConditionLabel(cloudCover: number | null, precip: number | null, condition: string | null): string {
-  if (condition && /(orage|brouillard|neige|pluie|averse)/i.test(condition)) return condition;
-  if (cloudCover != null || precip != null) return conditionFromWeatherValues(precip, cloudCover);
-  return condition ?? "Ensoleillé";
+  return getHourlyConditionLabel(cloudCover, precip, condition);
 }
 
 function getConditionBg(cloudCover: number | null, precip: number | null, condition: string | null): string {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
+const celestialSvgPathsSource = readFileSync(new URL("../lib/celestialSvgPaths.ts", import.meta.url), "utf8");
 const apparentSunMoonSource = source.slice(source.indexOf("function SunMoonPanelApparent"), source.indexOf("export function EnvironmentalPanels"));
 const trajectorySunMoonSource = source.slice(source.indexOf("function SunMoonPanelTrajectory"), source.indexOf("export function EnvironmentalPanels"));
 const temporalSunMoonSource = source.slice(source.indexOf("function SunMoonPanelTemporal"), source.indexOf("export function EnvironmentalPanels"));
@@ -288,8 +289,8 @@ describe("EnvironmentalPanels", () => {
     expect(apparentSunMoonSource).toContain("getApparentAstronomyPosition.useQuery");
     expect(apparentSunMoonSource).toContain("refetchInterval: 60_000");
     expect(apparentSunMoonSource).toContain("projectApparentBodyOnArc");
-    expect(source).toContain("left: 50 - 42 * Math.sin(azimuthRadians)");
-    expect(source).toContain("Math.sin(altitudeRadians)");
+    expect(celestialSvgPathsSource).toContain("left: 50 - 42 * Math.sin(azimuthRadians)");
+    expect(celestialSvgPathsSource).toContain("Math.sin(altitudeRadians)");
     expect(apparentSunMoonSource).toContain("sunArc");
     expect(apparentSunMoonSource).toContain("moonArc");
     expect(apparentSunMoonSource).toContain("formatAzimuth(apparentPosition.sun.azimuthDeg)");

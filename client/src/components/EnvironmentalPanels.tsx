@@ -9,6 +9,7 @@ import { isNightAtLocalMinutes } from "@/lib/celestialNight";
 import { isEclipseInProgress } from "@/lib/eclipseStatus";
 import { isEclipseStartDue } from "@/lib/eclipseStartAlert";
 import { getLunarGlowStrength } from "@/lib/lunarGlow";
+import { buildTerrainPath, buildTrajectoryPath, projectApparentBodyOnArc, type TerrainHorizonPathPoint } from "@/lib/celestialSvgPaths";
 import { trpc } from "@/lib/trpc";
 
 type EnvironmentalData = {
@@ -189,31 +190,6 @@ type ApparentAstronomyPosition = {
   calculatedAt: string;
 };
 
-/** Projection horizontale : Est à gauche, Sud au sommet, Ouest à droite. */
-function projectApparentBodyOnArc(position: ApparentBodyPosition) {
-  if (!position.aboveHorizon || position.altitudeDeg == null || position.azimuthDeg == null) return null;
-  const altitudeRadians = position.altitudeDeg * Math.PI / 180;
-  const azimuthRadians = position.azimuthDeg * Math.PI / 180;
-  return {
-    left: 50 - 42 * Math.sin(azimuthRadians),
-    bottom: 16 + Math.max(0, Math.sin(altitudeRadians)) * 124,
-  };
-}
-
-function buildTrajectoryPath(points: ApparentTrajectoryPoint[]) {
-  let hasVisiblePoint = false;
-  return points.reduce((path, point) => {
-    const projected = projectApparentBodyOnArc(point);
-    if (!projected) {
-      hasVisiblePoint = false;
-      return path;
-    }
-    const command = hasVisiblePoint ? "L" : "M";
-    hasVisiblePoint = true;
-    return `${path}${command}${projected.left.toFixed(2)} ${(160 - projected.bottom).toFixed(2)} `;
-  }, "").trim();
-}
-
 function selectTrajectoryTimeMarkers(points: ApparentTrajectoryPoint[], hours: number[]) {
   return hours.flatMap((hour) => {
     const point = points.find((candidate) => new Date(candidate.at).getUTCHours() === hour && new Date(candidate.at).getUTCMinutes() === 0);
@@ -265,28 +241,8 @@ function useTimelapseSimulation(sunTrajectory: ApparentTrajectoryPoint[], moonTr
   return { active, playing, play, pause, toggle, stop, seek, frameIndex, totalFrames, sunFrame, moonFrame, progress, timeLabel };
 }
 
-type TerrainHorizonPoint = { azimuthDeg: number; elevationDeg: number };
+type TerrainHorizonPoint = TerrainHorizonPathPoint;
 type TerrainHorizonProfile = { points: TerrainHorizonPoint[]; observerElevationM: number; resolutionM: number; source: string };
-
-function buildTerrainPath(points: TerrainHorizonPoint[]) {
-  if (!points.length) return "";
-  const sorted = [...points].sort((a, b) => a.azimuthDeg - b.azimuthDeg);
-  const project = (p: TerrainHorizonPoint) => {
-    const azRad = p.azimuthDeg * Math.PI / 180;
-    const left = 50 - 42 * Math.sin(azRad);
-    const altRad = Math.max(0, p.elevationDeg) * Math.PI / 180;
-    const bottom = 16 + Math.sin(altRad) * 124;
-    return { x: left, y: 160 - bottom };
-  };
-  const first = project(sorted[0]);
-  let d = `M${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
-  for (let i = 1; i < sorted.length; i++) {
-    const p = project(sorted[i]);
-    d += ` L${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
-  }
-  d += ` L100 158 L0 158 Z`;
-  return d;
-}
 
 function minutesNow(timeZone: string) {
   const parts = new Intl.DateTimeFormat("fr-FR", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
