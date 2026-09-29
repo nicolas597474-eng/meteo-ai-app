@@ -96,7 +96,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');
     expect(source).not.toContain('CalendarDays className="h-4 w-4 text-sky-300 sm:h-4.5 sm:w-4.5"');
     expect(source).toContain('text-lg font-bold tracking-tight text-slate-50 sm:text-xl');
-    expect(source).toContain('space-y-2 px-3 pb-3 pt-1');
+    expect(source).toContain('space-y-2 px-1 pb-3 pt-[max(env(safe-area-inset-top),0.25rem)]');
+    expect(source).toContain('min-h-dvh bg-background');
+    expect(source).toContain('sm:max-w-2xl');
     expect(source).toContain('px-3 pb-3 pt-1 sm:p-6');
     expect(source).not.toContain('mb-0.5 flex justify-center sm:mb-3');
     expect(source).toContain('mb-1 flex justify-center sm:mb-1.5');

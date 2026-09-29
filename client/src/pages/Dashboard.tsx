@@ -673,8 +673,8 @@ export default function Dashboard() {
   const visibleLocalContributors = showAllLocalContributors ? localContributors : localContributors.slice(0, 6);
 
   return (
-    <div className="dashboard-weather-page min-h-screen bg-background" style={dashboardSkyStyle}>
-      <div className="mx-auto max-w-2xl space-y-2 px-3 pb-3 pt-1 sm:space-y-6 sm:px-6 sm:py-8">
+    <div className="dashboard-weather-page min-h-dvh bg-background" style={dashboardSkyStyle}>
+      <div className="mx-auto w-full max-w-none space-y-2 px-1 pb-3 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:space-y-6 sm:px-6 sm:py-8">
 
         {!authLoading && !user && (
           <div role="status" className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-xs text-blue-100">
@@ -696,7 +696,7 @@ export default function Dashboard() {
           <div className="relative">
             {/* ── Regime badge ── */}
             {regime && (
-              <div className="mb-1 rounded-xl border border-slate-600/50 bg-slate-800/60 px-2.5 py-1 sm:mb-2 sm:px-3 sm:py-1.5">
+              <div className="mb-1 sm:mb-2 sm:rounded-xl sm:border sm:border-slate-600/50 sm:bg-slate-800/60 sm:px-3 sm:py-1.5">
                 <div className="mb-1 flex justify-center sm:mb-1.5">
                   <p className="text-lg font-bold tracking-tight text-slate-50 sm:text-xl">
                     {panelDate}
