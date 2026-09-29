@@ -64,6 +64,7 @@ import { buildEveningEvidence } from "../historyEvidence";
 import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHandlers";
 import { buildForecastFlowStatuses } from "../forecastFlowStatus";
 import { getShadowDataHubObservability } from "../weatherDataHubShadow";
+import { runHondeghemAromeShadowComparison } from "../aromeHondeghemShadow";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -612,6 +613,10 @@ export const weatherRouter = router({
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
       return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
+
+  /** Comparaison manuelle AROME en lecture seule, limitée à Hondeghem et sans effet sur la production. */
+  compareHondeghemAromeShadow: adminProcedure
+    .mutation(async () => runHondeghemAromeShadowComparison()),
 
   /** Provenance commune : horaires, repli quotidien réel ou indisponibilité explicite. */
   getForecastProvenance: publicProcedure
