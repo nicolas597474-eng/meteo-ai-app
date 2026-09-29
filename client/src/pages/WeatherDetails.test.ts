@@ -37,7 +37,10 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Accord {value}%");
     expect(source).toContain("!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px]");
     expect(source).toContain('border px-3 pb-4 pt-3 transition-colors');
-    expect(source).toContain('px-3 pb-1 scrollbar-hide snap-x');
+    expect(source).toContain('px-2 pb-1 scrollbar-hide snap-x');
+    expect(source).toContain('min-h-dvh bg-[#0d1117]');
+    expect(source).toContain('max-w-none space-y-3 px-1');
+    expect(source).toContain('sm:pb-28');
     expect(source).toContain('mt-1 text-center text-[10px] text-slate-500');
     expect(source).toContain('<div className="mb-2 pb-2">');
     expect(source).not.toContain('<div className="mb-3 border-b border-white/12 pb-3">');
@@ -85,5 +88,13 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('href="/history"');
     expect(source.indexOf("Historique des prévisions")).toBeGreaterThan(source.indexOf("Prochains jours"));
     expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("/* ═══ SECTION 5: TENDANCES ═══ */"));
+  });
+
+  it("conserve une seule surface de premier niveau pour les sections Tendances et Confiance", () => {
+    expect(source).toContain('<TrendSection days={days} />');
+    expect(source).not.toContain('weather-surface-inset rounded-[18px] border border-white/8 bg-white/[0.025] p-3');
+    expect(source).toContain('<ConfidenceSection confidence={confidence} regime={regime} />');
+    expect(source).toContain('<WindyMap lat={activeLocation.lat} lon={activeLocation.lon} locationName={activeLocation.name} />');
+    expect(source).toContain('className="space-y-2"');
   });
 });
