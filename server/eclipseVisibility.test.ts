@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEclipseVisibilityLayers, getLocalEclipseCircumstances } from "./eclipseVisibility";
+import { getEclipseVisibilityLayers, getLocalEclipseCircumstances, getMeteorVisibilityLayers } from "./eclipseVisibility";
 
 describe("eclipse visibility layers", () => {
   const layers = getEclipseVisibilityLayers([
@@ -18,6 +18,25 @@ describe("eclipse visibility layers", () => {
     expect(layer?.centralPath?.northLimit.length).toBeGreaterThan(8);
     expect(layer?.centralPath?.southLimit.length).toBe(layer?.centralPath?.northLimit.length);
     expect(layer?.centralPath?.attribution).toContain("NASA");
+  });
+
+  it("calculates a visibility layer for the 2027 penumbral lunar eclipse", () => {
+    const layer = getEclipseVisibilityLayers([
+      { id: "lunar_penumbral_2027_02_20", title: "Éclipse lunaire pénombrale", date: "2027-02-20" },
+    ])[0];
+    expect(layer?.type).toBe("lunar");
+    expect(layer?.visibilityCells.length).toBeGreaterThan(0);
+    expect(layer?.sourceUrl).toContain("usno.navy.mil");
+  });
+
+  it("maps potential dark-sky areas for a meteor-shower peak without claiming radiant visibility", () => {
+    const layer = getMeteorVisibilityLayers([
+      { id: "orionids_2026", title: "Orionides", date: "2026-10-21", observationNote: "À observer après minuit.", sourceLabel: "AMS", sourceUrl: "https://example.test/orionids" },
+    ])[0];
+    expect(layer?.type).toBe("meteor");
+    expect(layer?.visibilityCells.length).toBeGreaterThan(0);
+    expect(layer?.precisionLabel).toContain("obscurité potentielle");
+    expect(layer?.observationNote).toContain("après minuit");
   });
 
   it("returns local lunar circumstances without claiming visibility below the horizon", () => {

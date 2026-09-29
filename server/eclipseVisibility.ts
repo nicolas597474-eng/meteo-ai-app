@@ -18,10 +18,11 @@ export type EclipseMapLayer = {
   eventId: string;
   title: string;
   date: string;
-  type: "solar" | "lunar";
+  type: "solar" | "lunar" | "meteor";
   sourceLabel: string;
   sourceUrl: string;
   precisionLabel: string;
+  observationNote?: string;
   visibilityCells: EclipseVisibilityCell[];
   centralPath?: {
     northLimit: Array<{ lat: number; lng: number }>;
@@ -53,6 +54,15 @@ type EclipseCandidate = {
   date: string;
 };
 
+export type MeteorVisibilityCandidate = {
+  id: string;
+  title: string;
+  date: string;
+  observationNote: string;
+  sourceLabel: string;
+  sourceUrl: string;
+};
+
 const layerCache = new Map<string, EclipseMapLayer>();
 const GRID_STEP_DEGREES = 15;
 
@@ -73,6 +83,11 @@ function withinOneDay(actual: Date, expectedDate: string) {
 
 function moonAltitudeAt(time: AstroTime, observer: AstronomyObserver) {
   const equator = Astronomy.Equator(Astronomy.Body.Moon, time, observer, true, true);
+  return Astronomy.Horizon(time, observer, equator.ra, equator.dec, "normal").altitude;
+}
+
+function sunAltitudeAt(time: AstroTime, observer: AstronomyObserver) {
+  const equator = Astronomy.Equator(Astronomy.Body.Sun, time, observer, true, true);
   return Astronomy.Horizon(time, observer, equator.ra, equator.dec, "normal").altitude;
 }
 
@@ -189,9 +204,48 @@ function buildSolarVisibilityLayer(event: EclipseCandidate): EclipseMapLayer {
   return layer;
 }
 
+function buildMeteorVisibilityLayer(event: MeteorVisibilityCandidate): EclipseMapLayer {
+  const cached = layerCache.get(event.id);
+  if (cached) return cached;
+
+  const visibilityCells: EclipseVisibilityCell[] = [];
+  const [year, month, day] = event.date.split("-").map(Number);
+  for (let lat = -75; lat <= 75; lat += GRID_STEP_DEGREES) {
+    for (let lon = -180; lon <= 180; lon += GRID_STEP_DEGREES) {
+      // Minuit solaire local, approximation adaptée à une carte mondiale au pic.
+      const localMidnight = new Date(Date.UTC(year, month - 1, day) - (lon / 15) * 60 * 60 * 1_000);
+      const observer = new Astronomy.Observer(lat, lon, 0);
+      const altitude = sunAltitudeAt(new Astronomy.AstroTime(localMidnight), observer);
+      if (altitude > 0) continue;
+      visibilityCells.push({
+        ...cellBounds(lat, lon),
+        visibility: altitude <= -18 ? "full_event" : "partial",
+      });
+    }
+  }
+
+  const layer: EclipseMapLayer = {
+    eventId: event.id,
+    title: event.title,
+    date: event.date,
+    type: "meteor",
+    sourceLabel: event.sourceLabel,
+    sourceUrl: event.sourceUrl,
+    observationNote: event.observationNote,
+    precisionLabel: `Zones de nuit calculées avec Astronomy Engine au minuit solaire local, le jour du pic, sur un maillage de ${GRID_STEP_DEGREES}°. Elles indiquent seulement l’obscurité potentielle : radiant, horizon local, météo et heure d’observation ne sont pas modélisés.`,
+    visibilityCells,
+  };
+  layerCache.set(event.id, layer);
+  return layer;
+}
+
+export function getMeteorVisibilityLayers(events: MeteorVisibilityCandidate[]) {
+  return events.map(buildMeteorVisibilityLayer);
+}
+
 export function getEclipseVisibilityLayers(events: EclipseCandidate[]) {
   return events.flatMap((event) => {
-    if (event.id === "lunar_partial_2026_08_28") return [buildLunarVisibilityLayer(event)];
+    if (event.id.startsWith("lunar_")) return [buildLunarVisibilityLayer(event)];
     if (event.id === "solar_partial_2027_08_02") return [buildSolarVisibilityLayer(event)];
     return [];
   });

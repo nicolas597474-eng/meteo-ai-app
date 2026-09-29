@@ -36,12 +36,16 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Carte locale d’observation");
     expect(source).toContain("Il ne représente pas la bande géométrique d’une éclipse");
     expect(source).toContain("function getMapTitle");
-    expect(source).toContain("Zones de visibilite d'eclipse");
+    expect(source).toContain("Zones de visibilité d’éclipse");
+    expect(source).toContain("Zones de nuit des étoiles filantes");
+    expect(source).toContain("const eventMapLayers = outlook.eventMapLayers");
+    expect(source).toContain("setSelectedLayerId(firstLayerId)");
+    expect(source).toContain("Nuit astronomique");
     expect(source).toContain("Bande centrale NASA");
     expect(source).toContain("eclipseMapLayers");
     expect(source).toContain("Agrandir la carte");
     expect(source).toContain("function getExpandedMapTitle");
-    expect(source).toContain("Carte de visibilite d'eclipse");
+    expect(source).toContain("Carte de visibilité d’éclipse");
     expect(source).toContain("map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded");
     expect(source).toContain("cameraControl: false");
     expect(source).toContain("addressControlOptions: { position: google.maps.ControlPosition.TOP_CENTER }");

@@ -1,4 +1,4 @@
-import { getEclipseVisibilityLayers, type EclipseMapLayer } from "./eclipseVisibility";
+import { getEclipseVisibilityLayers, getMeteorVisibilityLayers, type EclipseMapLayer } from "./eclipseVisibility";
 
 import { createRequire } from "node:module";
 
@@ -45,6 +45,7 @@ export type AstronomyOutlook = {
   daylightChangeTomorrowSeconds: number | null;
   upcomingEclipses: EclipseAlert[];
   eclipseMapLayers: EclipseMapLayer[];
+  eventMapLayers: EclipseMapLayer[];
   upcomingMeteorShowers: MeteorShowerAlert[];
 };
 
@@ -243,5 +244,9 @@ export function buildAstronomyOutlook(input: {
       };
     });
   const eclipseMapLayers = getEclipseVisibilityLayers(upcomingEclipses);
-  return { moonMilestones, nextSolarMilestone, daylightChangeTomorrowSeconds, upcomingEclipses, eclipseMapLayers, upcomingMeteorShowers };
+  const eventMapLayers = [
+    ...eclipseMapLayers,
+    ...getMeteorVisibilityLayers(upcomingMeteorShowers),
+  ].sort((left, right) => left.date.localeCompare(right.date) || left.eventId.localeCompare(right.eventId));
+  return { moonMilestones, nextSolarMilestone, daylightChangeTomorrowSeconds, upcomingEclipses, eclipseMapLayers, eventMapLayers, upcomingMeteorShowers };
 }
