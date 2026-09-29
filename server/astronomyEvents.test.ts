@@ -19,6 +19,13 @@ describe("buildAstronomyOutlook", () => {
     expect(outlook.upcomingEclipses[0]).toMatchObject({ title: "Éclipse lunaire partielle", date: "2026-08-28", skyOutlook: { cloudCoverMean: 80 } });
     expect(outlook.upcomingEclipses[1]?.skyOutlook).toBeNull();
     expect(outlook.upcomingMeteorShowers[0]).toMatchObject({ title: "Orionides", date: "2026-10-21", zhr: 20, skyOutlook: null });
+    expect(outlook.eventMapLayers[0]).toMatchObject({ eventId: "lunar_partial_2026_08_28", type: "lunar", date: "2026-08-28" });
+
+    const autumnOutlook = buildAstronomyOutlook({ dates: [], moonPhases: [], daylightDurations: [], cloudCoverMeans: [], today: "2026-09-30" });
+    expect(autumnOutlook.eventMapLayers[0]).toMatchObject({ eventId: "orionids_2026", type: "meteor", date: "2026-10-21" });
+    const penumbralLayer = autumnOutlook.eventMapLayers.find((layer) => layer.eventId === "lunar_penumbral_2027_02_20");
+    expect(penumbralLayer?.type).toBe("lunar");
+    expect(penumbralLayer?.visibilityCells.length).toBeGreaterThan(0);
   });
 
   it("conserve une alerte solaire avec sa consigne de sécurité", () => {
