@@ -673,8 +673,8 @@ export default function Dashboard() {
   const visibleLocalContributors = showAllLocalContributors ? localContributors : localContributors.slice(0, 6);
 
   return (
-    <div className="dashboard-weather-page min-h-dvh bg-background" style={dashboardSkyStyle}>
-      <div className="mx-auto w-full max-w-none space-y-2 px-1 pb-3 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:space-y-6 sm:px-6 sm:py-8">
+    <div className="dashboard-weather-page min-h-dvh w-full overflow-x-clip bg-background" style={dashboardSkyStyle}>
+      <div className="mx-auto w-full min-w-0 max-w-none space-y-2 px-1 pb-3 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:space-y-6 sm:px-6 sm:py-8">
 
         {!authLoading && !user && (
           <div role="status" className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-xs text-blue-100">

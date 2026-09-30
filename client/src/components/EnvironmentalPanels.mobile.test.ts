@@ -1,0 +1,78 @@
+import * as React from "react";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { beforeAll, describe, expect, it } from "vitest";
+import { vi } from "vitest";
+
+vi.mock("@/lib/trpc", () => {
+  const useQuery = () => ({ data: undefined, error: null, isFetching: false, isLoading: false });
+  const weather = new Proxy({}, { get: () => ({ useQuery }) });
+  return { trpc: { weather } };
+});
+vi.mock("@/components/MeteoIcon", () => ({ MeteoIcon: () => null }));
+
+let EnvironmentalPanels: typeof import("./EnvironmentalPanels").EnvironmentalPanels;
+beforeAll(async () => {
+  (globalThis as typeof globalThis & { React?: typeof React }).React = React;
+  ({ EnvironmentalPanels } = await import("./EnvironmentalPanels"));
+});
+
+const fixture = {
+  source: "fixture astronomique",
+  air: {
+    aqi: 35,
+    descriptor: { label: "Acceptable", tone: "lime" as const },
+    pm25: 8,
+    pm10: 14,
+    nitrogenDioxide: 6,
+    ozone: 22,
+    observedAt: "2026-09-30T04:00:00.000Z",
+    hourly: Array.from({ length: 24 }, (_, index) => ({ time: `2026-09-30T${String(index).padStart(2, "0")}:00:00.000Z`, value: 20 + index })),
+  },
+  astronomy: {
+    sunrise: "2026-09-30T05:15:00.000Z",
+    sunset: "2026-09-30T17:00:00.000Z",
+    daylightDurationSeconds: 42_300,
+    moonrise: "2026-09-30T15:00:00.000Z",
+    moonset: "2026-09-30T23:00:00.000Z",
+    moon: { label: "Gibbeuse décroissante", symbol: "◕" },
+    moonIllumination: 85,
+    lunar: { angleDeg: 225.1, label: "Gibbeuse décroissante", symbol: "◕", waxing: false, illuminationPct: 85, brightLimbAngleDeg: 41.3 },
+    dayProgress: 0.5,
+    sunAltitudeDeg: 25,
+    moonAltitudeDeg: 14,
+    sunAzimuthDeg: 180,
+    moonAzimuthDeg: 225,
+    sunAboveHorizon: true,
+    moonAboveHorizon: true,
+    altitudeCalculatedAt: "2026-09-30T04:06:28.000Z",
+    timezone: "Europe/Paris",
+    cloudCover: 20,
+    coordinates: { lat: 50.89, lon: 2.56 },
+    outlook: { moonMilestones: [], upcomingEclipses: [], upcomingMeteorShowers: [], daylightChangeTomorrowSeconds: 0, nextSolarMilestone: null },
+  },
+} as never;
+
+describe("mise en page mobile des panneaux environnementaux", () => {
+  it("rend trois surfaces indépendantes dans une grille à une colonne sans cadres météo imbriqués", () => {
+    const markup = renderToStaticMarkup(createElement(EnvironmentalPanels, { data: fixture, isLoading: false }));
+
+    expect(markup).toContain('aria-label="Qualité de l’air, soleil et lune"');
+    expect(markup).toContain('class="grid min-w-0 w-full grid-cols-1 gap-3 sm:grid-cols-2"');
+    expect((markup.match(/weather-surface/g) ?? [])).toHaveLength(3);
+    expect((markup.match(/relative w-full min-w-0 max-w-full rounded-2xl border p-3/g) ?? [])).toHaveLength(2);
+    expect(markup).toContain("PM2.5");
+    expect(markup).toContain("NO₂");
+  });
+
+  it("rend le diagramme lunaire sans débordement de largeur et conserve une phase cohérente", () => {
+    const markup = renderToStaticMarkup(createElement(EnvironmentalPanels, { data: fixture, isLoading: false }));
+
+    expect(markup).toContain("w-full max-w-[330px] min-w-0 overflow-visible");
+    expect(markup).toContain('data-phase-label="Gibbeuse décroissante" data-illumination-pct="85" data-bright-limb-angle-deg="41.3" data-waxing="false"');
+    expect(markup).toContain('Éclairage 85%');
+    expect(markup).toContain("A 35 50");
+    expect(markup).not.toContain("conic-gradient(from");
+    expect(markup).not.toContain("celestial-arc-scene--night relative mx-auto mt-7");
+  });
+});

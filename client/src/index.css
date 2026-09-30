@@ -168,39 +168,6 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* L’arche Soleil & Lune conserve une géométrie de demi-cercle complète,
-   y compris sur les écrans mobiles étroits. Un ratio 2:1 évite le sommet aplati
-   produit par une ellipse trop basse. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 {
-  height: 12rem !important;
-  overflow: visible !important;
-}
-
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > div:first-child {
-  height: auto !important;
-  aspect-ratio: 2 / 1;
-  bottom: 1rem !important;
-}
-
-/* Les astres restent lisibles par leur forme ; leurs textes ne se superposent plus à l’arche. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.text-amber-100,
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.text-indigo-100 {
-  display: none;
-}
-
-/* Les heures restent juste au-dessus de l’horizon ; leurs libellés sont
-   sortis de leur flux afin d’apparaître clairement sous la ligne. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0.left-0,
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0.right-0 {
-  bottom: 1.15rem !important;
-}
-
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 > span.absolute.bottom-0 > small {
-  position: absolute;
-  top: calc(100% + 0.75rem);
-  white-space: nowrap;
-}
-
 /* Alertes astronomiques : les informations secondaires restent lisibles sans concurrencer les titres. */
 .astronomy-outlook-panel .text-\[9px\] {
   font-size: 0.6875rem;
@@ -215,21 +182,6 @@ section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relat
 .astronomy-outlook-panel .text-\[11px\] {
   font-size: 0.8125rem;
   line-height: 1.5;
-}
-
-/* Premier croissant : seul l’astre est visible, sans pastille, cercle ni fond décoratif. */
-section[aria-label="Qualité de l’air, soleil et lune"] div:has(> img.moon-3d-first-crescent) {
-  width: 6rem !important;
-  height: 6rem !important;
-  margin-left: -0.5rem;
-  overflow: visible !important;
-  border-color: transparent !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-}
-
-img.moon-3d-first-crescent {
-  transform: scale(1.18);
 }
 
 /* Lueur lunaire légère : elle souligne la texture sans altérer la phase ou son orientation. */
@@ -800,23 +752,15 @@ img.moon-3d-first-crescent {
 }
 
 .celestial-below-horizon-label {
-  bottom: -2.1rem !important;
-  display: block;
-  font-size: 0.68rem;
-  line-height: 1.1;
-  padding: 0.18rem 0.45rem;
+  margin-top: 0.35rem;
   width: fit-content;
+  max-width: 100%;
   margin-inline: auto;
-  border: 1px solid rgb(148 163 184 / 0.35);
-  border-radius: 999px;
-  background: rgb(2 6 23 / 0.86);
-  box-shadow: 0 2px 8px rgb(2 6 23 / 0.65);
-}
-
-/* Le message sous l’horizon sort visuellement de l’arche ; la ligne d’horaires
-   commence après une bande dédiée pour éviter toute superposition. */
-section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2) .relative.mx-auto.mt-7 + div {
-  margin-top: 3rem !important;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: rgb(203 213 225 / 0.8);
 }
 
 @keyframes meteo-effect-sun-pulse {

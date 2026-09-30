@@ -38,7 +38,10 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px]");
     expect(source).toContain('border px-3 pb-4 pt-3 transition-colors');
     expect(source).toContain('px-2 pb-1 scrollbar-hide snap-x');
-    expect(source).toContain('min-h-dvh bg-[#0d1117]');
+    expect(source).toContain('min-h-dvh w-full overflow-x-clip bg-[#0d1117]');
+    expect(source).toContain('w-full min-w-0 max-w-none space-y-3');
+    expect(source).toContain('min-w-0 w-full max-w-full rounded-2xl border');
+    expect(source).toContain('overflow-x-auto overscroll-x-contain');
     expect(source).toContain('max-w-none space-y-3 px-1');
     expect(source).toContain('sm:pb-28');
     expect(source).toContain('mt-1 text-center text-[10px] text-slate-500');

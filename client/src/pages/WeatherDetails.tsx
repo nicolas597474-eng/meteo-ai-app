@@ -250,10 +250,10 @@ export default function WeatherDetails() {
 
   if (isLoading) {
     return (
-      <div className="weather-page-sky min-h-dvh bg-[#0d1117]" style={pageSkyStyle}>
-        <div className="mx-auto w-full max-w-none space-y-4 px-1 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:px-3 sm:py-4">
+      <div className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
+        <div className="mx-auto w-full min-w-0 max-w-none space-y-4 px-1 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:px-3 sm:py-4">
           <Skeleton className="h-10 w-48" />
-          {slowLoad && <div role="status" className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-100">La source météo met plus de temps que prévu. MeteoAI réessaie uniquement les erreurs temporaires.</div>}
+          {slowLoad && <div role="status" className="min-w-0 w-full max-w-full rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-100">La source météo met plus de temps que prévu. MeteoAI réessaie uniquement les erreurs temporaires.</div>}
           <Skeleton className="h-64 w-full rounded-2xl" />
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -264,7 +264,7 @@ export default function WeatherDetails() {
 
   if (isError || !data) {
     const isTimeout = /timeout|délai|aborted/i.test(error?.message ?? "");
-    return <div className="weather-page-sky min-h-dvh bg-[#0d1117]" style={pageSkyStyle}><div className="mx-auto w-full max-w-none px-1 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:px-3 sm:py-5"><MeteoSurface tone="default" className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] p-3 text-center sm:rounded-[24px] sm:p-5"><MeteoIcon name="refresh" size={26} /><h1 className="mt-3 text-base font-semibold text-white">Prévisions temporairement indisponibles</h1><p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-slate-300">{isTimeout ? "Le délai de la source météo a été dépassé après les réessais autorisés." : "La prévision ne peut pas être chargée pour le moment. Aucune donnée n’est remplacée ou inventée."}</p><button type="button" onClick={() => void refetch()} disabled={isFetching} className="mt-4 min-h-10 rounded-xl border border-sky-300/40 bg-sky-300/10 px-4 text-xs font-semibold text-sky-100 disabled:opacity-50">{isFetching ? "Nouvel essai…" : "Réessayer"}</button></MeteoSurface></div><BackToTopButton /></div>;
+    return <div className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}><div className="mx-auto w-full min-w-0 max-w-none px-1 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:px-3 sm:py-5"><MeteoSurface tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] p-3 text-center sm:rounded-[24px] sm:p-5"><MeteoIcon name="refresh" size={26} /><h1 className="mt-3 text-base font-semibold text-white">Prévisions temporairement indisponibles</h1><p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-slate-300">{isTimeout ? "Le délai de la source météo a été dépassé après les réessais autorisés." : "La prévision ne peut pas être chargée pour le moment. Aucune donnée n’est remplacée ou inventée."}</p><button type="button" onClick={() => void refetch()} disabled={isFetching} className="mt-4 min-h-10 rounded-xl border border-sky-300/40 bg-sky-300/10 px-4 text-xs font-semibold text-sky-100 disabled:opacity-50">{isFetching ? "Nouvel essai…" : "Réessayer"}</button></MeteoSurface></div><BackToTopButton /></div>;
   }
 
   const hours = data.hours ?? [];
@@ -276,10 +276,10 @@ export default function WeatherDetails() {
   const currentHour = hours[currentHourIdx] ?? hours[0];
 
   return (
-    <div className="weather-page-sky min-h-dvh bg-[#0d1117]" style={pageSkyStyle}>
-      <div className="mx-auto w-full max-w-none space-y-3 px-1 pt-[max(env(safe-area-inset-top),0.25rem)] pb-3 sm:max-w-2xl sm:space-y-5 sm:px-3 sm:py-4 sm:pb-28">
+    <div className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
+      <div className="mx-auto w-full min-w-0 max-w-none space-y-3 px-1 pt-[max(env(safe-area-inset-top),0.25rem)] pb-3 sm:max-w-2xl sm:space-y-5 sm:px-3 sm:py-4 sm:pb-28">
         {/* ═══ SECTION 1: PRÉVISIONS HORAIRES ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-2xl border border-white/10 bg-[rgba(26,48,70,0.56)] p-2 sm:rounded-[26px] sm:p-3">
+        <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-white/10 bg-[rgba(26,48,70,0.56)] p-2 sm:rounded-[26px] sm:p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10"><MeteoIcon name="refresh" size={18} /></span>
@@ -366,7 +366,7 @@ export default function WeatherDetails() {
           <p className="mt-1 text-center text-[10px] text-slate-500">← Glissez pour voir les heures suivantes →</p>
         </MeteoSurface>
 
-        {user?.role === "admin" && <MeteoSurface as="section" tone="default" className="rounded-2xl border border-violet-300/25 bg-violet-300/[0.045] p-3 sm:rounded-[24px] sm:p-4" aria-labelledby="arome-shadow-title">
+        {user?.role === "admin" && <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-violet-300/25 bg-violet-300/[0.045] p-3 sm:rounded-[24px] sm:p-4" aria-labelledby="arome-shadow-title">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-200/75">Diagnostic manuel · mode shadow</p>
@@ -436,7 +436,7 @@ export default function WeatherDetails() {
         </MeteoSurface>}
 
         {/* ═══ SECTION : CARTE MÉTÉO ANIMÉE ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-2xl border border-white/10 bg-[rgba(26,48,70,0.56)] p-2 sm:rounded-[26px] sm:p-4">
+        <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-white/10 bg-[rgba(26,48,70,0.56)] p-2 sm:rounded-[26px] sm:p-4">
           <div className="mb-3 flex items-center gap-2.5">
             <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10 text-lg">🌍</span>
             <div>
@@ -452,7 +452,7 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 2: PRÉVISIONS DES PROCHAINS JOURS ═══ */}
-        <MeteoSurface as="section" tone="default" className="rounded-2xl border border-white/10 bg-[rgba(11,17,28,0.86)] p-2 sm:rounded-[24px] sm:p-4">
+        <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-white/10 bg-[rgba(11,17,28,0.86)] p-2 sm:rounded-[24px] sm:p-4">
           <div className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-full border border-white/12 bg-white/[0.04]"><MeteoIcon name="calendar" size={16} /></span>
             <div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">Tendance étendue</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Prochains jours</h2></div>
@@ -522,7 +522,7 @@ export default function WeatherDetails() {
           </div>
         </MeteoSurface>
 
-        <MeteoSurface as="section" tone="default" className="rounded-2xl border border-emerald-400/35 bg-emerald-400/[0.06] p-2 shadow-[0_0_24px_rgba(52,211,153,0.08)] sm:rounded-[24px] sm:p-3">
+        <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-emerald-400/35 bg-emerald-400/[0.06] p-2 shadow-[0_0_24px_rgba(52,211,153,0.08)] sm:rounded-[24px] sm:p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-full border border-emerald-300/25 bg-emerald-400/10"><MeteoIcon name="calendar" size={15} /></span><h2 className="text-sm font-semibold text-white">Historique des prévisions</h2></div>
@@ -533,13 +533,13 @@ export default function WeatherDetails() {
         </MeteoSurface>
 
         {/* ═══ SECTION 5: TENDANCES ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-2xl border border-white/8 bg-black/20 p-2 sm:rounded-[24px] sm:p-4">
+        <MeteoSurface as="section" tone="subtle" className="min-w-0 w-full max-w-full rounded-2xl border border-white/8 bg-black/20 p-2 sm:rounded-[24px] sm:p-4">
           <h2 className="mb-3 text-lg font-semibold tracking-tight text-white">Tendances</h2>
           <TrendSection days={days} />
         </MeteoSurface>
 
         {/* ═══ SECTION 6: CONFIANCE DE PRÉVISION ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="rounded-2xl border border-white/8 bg-black/20 p-2 sm:rounded-[24px] sm:p-4">
+        <MeteoSurface as="section" tone="subtle" className="min-w-0 w-full max-w-full rounded-2xl border border-white/8 bg-black/20 p-2 sm:rounded-[24px] sm:p-4">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
               <MeteoIcon name="confidence" size={18} />
               Confiance de prévision officielle
