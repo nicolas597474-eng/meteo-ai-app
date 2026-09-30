@@ -40,6 +40,8 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Zones de nuit des étoiles filantes");
     expect(source).toContain("const eventMapLayers = outlook.eventMapLayers");
     expect(source).toContain("setSelectedLayerId(firstLayerId)");
+    expect(source).toContain("AstronomyEventSelector");
+    expect(source).toContain("setSelectedPoint(null)");
     expect(source).toContain("Nuit astronomique");
     expect(source).toContain("Bande centrale NASA");
     expect(source).toContain("eclipseMapLayers");
@@ -357,6 +359,8 @@ describe("EnvironmentalPanels", () => {
   it("utilise une texture réaliste pour toute phase lunaire visible", () => {
     expect(source).toContain("meteoai-realistic-moon-surface_f2f79daf.png");
     expect(source).toContain("function RealisticMoon");
+    expect(source).not.toContain("overflow-hidden rounded-full bg-slate-950");
+    expect(source).not.toContain("ring-1 ring-slate-200/20");
     expect(source).toContain("getLunarShadowPath(illumination)");
     expect(source).toContain("getLunarShadowTransform(phase.brightLimbAngleDeg)");
     expect(source).toContain("<path d={shadowPath}");

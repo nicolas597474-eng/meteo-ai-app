@@ -29,6 +29,7 @@ describe("navigation entre pages par glissement", () => {
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("button");
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("[data-swipe-exclude]");
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain(".overflow-x-auto");
+    expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("[data-horizontal-scroll]");
     expect(PAGE_SWIPE_IGNORE_SELECTOR).toContain("canvas");
   });
 
@@ -37,6 +38,9 @@ describe("navigation entre pages par glissement", () => {
     const styles = readFileSync(new URL("./index.css", import.meta.url), "utf8");
     expect(appSource).toContain("page-swipe-transition--${transition.direction}");
     expect(appSource).toContain('deltaX < 0 ? "forward" : "backward"');
+    expect(appSource).toContain('className="touch-auto"');
+    expect(appSource).toContain("onPointerCancel={onPointerCancel}");
+    expect(styles).toContain("touch-action: pan-x pan-y");
     expect(styles).toContain("page-swipe-enter-from-right");
     expect(styles).toContain("page-swipe-enter-from-left");
     expect(styles).toContain("prefers-reduced-motion: no-preference");

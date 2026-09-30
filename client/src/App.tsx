@@ -125,11 +125,13 @@ function PageSwipeNavigator({ children }: { children: ReactNode }) {
     }
   };
 
+  const onPointerCancel = () => { gestureRef.current = null; };
+
   const transitionClass = transition?.location === location
     ? `page-swipe-transition page-swipe-transition--${transition.direction}`
     : "";
 
-  return <div className="touch-pan-y sm:touch-auto" onPointerDown={onPointerDown} onPointerUp={onPointerUp}><div key={location} className={transitionClass}>{children}</div></div>;
+  return <div className="touch-auto" onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}><div key={location} className={transitionClass}>{children}</div></div>;
 }
 
 function TopNav() {
