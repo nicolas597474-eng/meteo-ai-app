@@ -3,8 +3,10 @@
  * Location: Hondeghem (lat: 50.7567, lon: 2.5204)
  */
 
+import { randomUUID } from "node:crypto";
 import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weatherConditionLabels";
 import { fetchWeather } from "./weatherFetch";
+import { getParisDateAndHour } from "./parisHourlyTime";
 
 // Hondeghem coordinates
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
@@ -623,7 +625,13 @@ export async function collectHourlyForecast(
  */
 export type HourlyModelForecast = {
   modelName: string;
+  modelId?: string | null;
+  sourceName?: string;
+  captureRunId?: string;
+  requestStartedAt?: number;
+  availableAt?: number;
   hours: Array<{
+    validAt?: number;
     hour: number;
     temperature: number | null;
     apparentTemperature: number | null;
@@ -672,12 +680,14 @@ export async function collectHourlyForecastAllModels(
   ];
 
   const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<HourlyModelForecast | null> => {
+    const requestStartedAt = Date.now();
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
       url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,surface_pressure,cloud_cover,weather_code");
       url.searchParams.set("timezone", "Europe/Paris");
+      url.searchParams.set("timeformat", "unixtime");
       url.searchParams.set("forecast_days", "2");
       if (model.modelId) {
         url.searchParams.set("models", model.modelId);
@@ -690,10 +700,12 @@ export async function collectHourlyForecastAllModels(
       }
 
       const data = await response.json();
+      const availableAt = Date.now();
       const hourly = data.hourly;
       if (!hourly?.time) return null;
 
       const hours: Array<{
+        validAt: number;
         hour: number;
         temperature: number | null;
         apparentTemperature: number | null;
@@ -708,11 +720,14 @@ export async function collectHourlyForecastAllModels(
       }> = [];
 
       for (let i = 0; i < hourly.time.length; i++) {
-        const dt: string = hourly.time[i]; // "2026-07-05T14:00"
-        if (!dt.startsWith(targetDate)) continue;
-        const hourNum = parseInt(dt.slice(11, 13), 10);
+        const unixSeconds = Number(hourly.time[i]);
+        if (!Number.isFinite(unixSeconds)) continue;
+        const validAt = unixSeconds * 1000;
+        const parisTime = getParisDateAndHour(validAt);
+        if (!parisTime || parisTime.date !== targetDate) continue;
         hours.push({
-          hour: hourNum,
+          validAt,
+          hour: parisTime.hour,
           temperature: hourly.temperature_2m?.[i] ?? null,
           apparentTemperature: hourly.apparent_temperature?.[i] ?? null,
           precipitation: hourly.precipitation?.[i] ?? null,
@@ -733,6 +748,11 @@ export async function collectHourlyForecastAllModels(
         const getUnit = (key: string) => typeof hourlyUnits[key] === "string" ? hourlyUnits[key] as string : null;
         return {
           modelName: model.name,
+          modelId: model.modelId,
+          sourceName: "open-meteo",
+          captureRunId: randomUUID(),
+          requestStartedAt,
+          availableAt,
           hours,
           sourceMetadata: {
             timezone: typeof data.timezone === "string" ? data.timezone : null,
@@ -781,7 +801,12 @@ export async function collectValidationHourlyForecasts(
 ): Promise<Array<{
   modelName: string;
   modelId: string;
+  sourceName: string;
+  captureRunId: string;
+  requestStartedAt: number;
+  availableAt: number;
   hours: Array<{
+    validAt: number;
     hour: number;
     temperature: number | null;
     apparentTemperature: number | null;
@@ -796,22 +821,31 @@ export async function collectValidationHourlyForecasts(
 }>> {
   const location = coords ?? HONDEGHEM;
   const results = await Promise.all(VALIDATION_WEATHER_MODELS.map(async (model) => {
+    const requestStartedAt = Date.now();
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
       url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,cloud_cover,weather_code");
       url.searchParams.set("timezone", "Europe/Paris");
+      url.searchParams.set("timeformat", "unixtime");
       url.searchParams.set("forecast_days", "2");
       url.searchParams.set("models", model.modelId);
       const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
       if (!response.ok) return null;
-      const hourly = (await response.json()).hourly;
+      const data = await response.json();
+      const availableAt = Date.now();
+      const hourly = data.hourly;
       if (!hourly?.time) return null;
-      const hours = hourly.time.flatMap((dt: string, index: number) => {
-        if (!dt.startsWith(targetDate) || hourly.temperature_2m?.[index] == null) return [];
+      const hours = hourly.time.flatMap((unixTime: number | string, index: number) => {
+        const unixSeconds = Number(unixTime);
+        if (!Number.isFinite(unixSeconds) || hourly.temperature_2m?.[index] == null) return [];
+        const validAt = unixSeconds * 1000;
+        const parisTime = getParisDateAndHour(validAt);
+        if (!parisTime || parisTime.date !== targetDate) return [];
         return [{
-          hour: Number.parseInt(dt.slice(11, 13), 10),
+          validAt,
+          hour: parisTime.hour,
           temperature: hourly.temperature_2m[index] ?? null,
           apparentTemperature: hourly.apparent_temperature?.[index] ?? null,
           precipitation: hourly.precipitation?.[index] ?? null,
@@ -823,7 +857,15 @@ export async function collectValidationHourlyForecasts(
           weatherCode: hourly.weather_code?.[index] ?? null,
         }];
       });
-      return hours.length > 0 ? { modelName: model.name, modelId: model.modelId, hours } : null;
+      return hours.length > 0 ? {
+        modelName: model.name,
+        modelId: model.modelId,
+        sourceName: "open-meteo",
+        captureRunId: randomUUID(),
+        requestStartedAt,
+        availableAt,
+        hours,
+      } : null;
     } catch (err) {
       console.warn(`[ValidationHourly] Error fetching ${model.name}:`, err);
       return null;

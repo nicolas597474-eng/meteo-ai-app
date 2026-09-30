@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPhase8MetricsReport } from "./weatherDataHubShadow";
+import { buildPhase8MetricsReport, selectLatestAdmissiblePhase8Candidates } from "./weatherDataHubShadow";
 import { calculatePhase8Metrics } from "../shared/weatherDataHub";
 import fs from "node:fs";
 
@@ -40,6 +40,18 @@ describe("Phase 8 metrics shadow", () => {
     expect(result.windDirectionMeanAbsoluteError).toBe(2);
   });
 
+  it("sélectionne le run admissible le plus récent et écarte les réceptions postérieures", () => {
+    const observationAt = Date.parse("2026-09-29T10:00:00Z");
+    const validTime = observationAt;
+    const selected = selectLatestAdmissiblePhase8Candidates([
+      { valueId: 1, sourceKey: "arome", locationKey: "x", variable: "air_temperature_2m", validTime, receivedAt: observationAt - 6 * 60 * 60_000 },
+      { valueId: 2, sourceKey: "arome", locationKey: "x", variable: "air_temperature_2m", validTime, receivedAt: observationAt - 20 * 60_000 },
+      { valueId: 3, sourceKey: "arome", locationKey: "x", variable: "air_temperature_2m", validTime, receivedAt: observationAt + 60_000 },
+      { valueId: 4, sourceKey: "gfs", locationKey: "x", variable: "air_temperature_2m", validTime, receivedAt: observationAt - 90 * 60_000 },
+    ], { locationKey: "x", variable: "air_temperature_2m", validTime, observationAt });
+    expect(selected.map((candidate) => candidate.valueId)).toEqual([2, 4]);
+  });
+
   it("signale toute violation de l’isolation", () => {
     const report = buildPhase8MetricsReport([{
       periodKey: "p", periodStart: 1, periodEnd: 2, locationKey: "x", sourceKey: "a", variable: "air_temperature_2m", horizonKey: "0_2h", status: "VALIDABLE", comparisonCount: 30, evaluatedDays: 7, physicalComparisonCount: 30, legacyComparisonCount: 0, mae: 1, rmse: 1, bias: 0, medianAbsoluteError: 1, rainHitRate: null, rainHits: 0, rainMisses: 0, rainFalseAlarms: 0, windDirectionMeanAbsoluteError: null, brierScore: null, crps: null, calibrationError: null, metricAvailability: "DETERMINISTIC_ONLY", missingEvidence: [], productionReadsEnabled: 0, appliedToProduction: 0, evaluatedAt: 2,
@@ -54,6 +66,7 @@ describe("Phase 8 metrics shadow", () => {
   it("impose le replay physique, l’alignement temporel et le mode shadow", () => {
     const source = fs.readFileSync(new URL("./weatherDataHubShadow.ts", import.meta.url), "utf8");
     expect(source).toContain("forecast_received_after_observation");
+    expect(source).toContain("observation_time_ambiguous_or_nonexistent");
     expect(source).toContain("qualified_observation_snapshots");
     expect(source).toContain("shadowMode: 1, appliedToProduction: 0");
     expect(source).toContain("observationProvenance");
