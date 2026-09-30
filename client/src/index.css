@@ -1567,3 +1567,10 @@
   border: none;
   cursor: pointer;
 }
+
+/* Sélecteur astronomique mobile : le rail accepte les balayages horizontaux et le défilement vertical de la page. */
+.astronomy-event-scroll {
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
