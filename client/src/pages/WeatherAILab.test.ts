@@ -92,8 +92,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("staleTime: 2 * 60_000");
     expect(source).toContain("staleTime: 5 * 60_000");
     expect(source).toContain("Prévisions · 7 modèles + 1 agrégateur");
-    expect(source).toContain("Collecte prévue à {forecastCollectionReport?.scheduledAt");
-    expect(source).toContain("ce n’est pas une confirmation du passage de 05:00 du jour en cours");
+    expect(source).toContain("Cadence prévue : {forecastCollectionReport?.scheduledAt");
+    expect(source).toContain("ce n’est pas une confirmation d’un passage programmé le jour en cours");
     expect(source).toContain("Stations météorologiques ·");
     expect(source).toContain("leurs relevés physiques sont collectés par un flux horaire distinct");
     expect(source).toContain("expectedForecastModels.map");
@@ -165,7 +165,7 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("getDetailedForecast.invalidate(detailedForecastInput)");
     expect(source).toContain("getDashboard.fetch(coordinates)");
     expect(source).toContain("La relance n’écrit ni le point météo courant ni les observations, qui restent alimentés séparément");
-    expect(source).toContain("Les compteurs du batch planifié de 05:00 ne sont pas modifiés");
+    expect(source).toContain("Les compteurs des lots planifiés ne sont pas modifiés");
     expect(source).toContain("Une fusion récente existe déjà");
   });
 });

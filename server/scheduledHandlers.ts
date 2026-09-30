@@ -5,11 +5,14 @@
  */
 
 import type { Request, Response } from "express";
+import { randomUUID } from "node:crypto";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
-import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
+import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour } from "./weatherTime";
+import { getActiveParisForecastHours } from "./forecastScheduleConfig";
+import { FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, FORECAST_REFRESH_LOCK_LEASE_MS, getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { isOperationalObservation } from "./observationProvenance";
 import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
@@ -36,6 +39,9 @@ import {
 import {
   insertForecasts,
   insertForecastRuns,
+  claimScheduledForecastCollectionJob,
+  acquireForecastRefreshLock,
+  releaseForecastRefreshLock,
   insertObservation,
   insertReliabilityScores,
   upsertMeteoAIForecast,
@@ -91,6 +97,10 @@ export function getModelCoverage(receivedNames: string[]) {
     collected: expectedNames.filter((name) => received.has(name)),
     missing: expectedNames.filter((name) => !received.has(name)),
   };
+}
+
+export function getForecastCollectionJobStatus(locationsProcessed: number, errors: readonly string[]) {
+  return errors.length > 0 && locationsProcessed === 0 ? "failed" as const : "completed" as const;
 }
 
 export function buildStationCollectionSnapshot(input: {
@@ -850,30 +860,48 @@ function determineMajorityCondition(forecasts: any[]): string {
 
 /**
  * Handler: Collect forecasts for all registered favorite locations
- * Triggered daily at 05h00 Paris time (03h00 UTC summer)
+ * Triggered at the active Europe/Paris forecast cadence; external Heartbeat is UTC.
  * Stores results in location_forecasts table for instant display
  */
 export async function collectFavoritesForecastsHandler(req: Request, res: Response) {
   let jobId = -1;
+  let scheduledLockOwnerToken: string | null = null;
+  let today = "";
+  let locationsProcessed = 0;
+  let dailyModelsCollected = 0;
+  let hourlyModelsCollected = 0;
+  let dailyModelsExpected = 0;
+  let hourlyModelsExpected = 0;
   try {
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) {
       return res.status(403).json({ error: "cron-only" });
     }
-    // Le déclencheur teste 03h00 et 04h00 UTC afin de couvrir les changements
-    // d'heure. Une seule exécution est admise : exactement 05h00 Europe/Paris.
-    const parisHour = getParisHour();
-    if (parisHour !== 5) {
-      return res.json({ ok: true, skipped: "outside-05h00-paris", parisHour });
+    const activeHours = getActiveParisForecastHours();
+    const slot = getParisForecastSlot(new Date(), activeHours);
+    if (!slot) {
+      return res.json({ ok: true, skipped: "outside-scheduled-paris-hours", parisHour: getParisHour() });
     }
 
-    jobId = await createCollectionJob({
-      jobType: "forecast",
-      status: "running",
-      scheduleCronTaskUid: user.taskUid,
-    });
+    const lockOwnerToken = randomUUID();
+    const scheduleLockAcquired = await acquireForecastRefreshLock(
+      FAVORITES_FORECAST_SCHEDULER_LOCK_KEY,
+      lockOwnerToken,
+      new Date(),
+      FORECAST_REFRESH_LOCK_LEASE_MS,
+    );
+    if (!scheduleLockAcquired) {
+      return res.json({ ok: true, skipped: "collection-in-progress", slot: slot.key });
+    }
+    scheduledLockOwnerToken = lockOwnerToken;
 
-    const today = getTodayParis();
+    const jobClaim = await claimScheduledForecastCollectionJob(slot.key, user.taskUid);
+    if (!jobClaim.claimed) {
+      return res.json({ ok: true, skipped: jobClaim.reason, slot: slot.key });
+    }
+    jobId = jobClaim.jobId;
+
+    today = slot.date;
     console.log(`[MeteoAI] Starting favorites forecast collection for ${today}`);
 
     // Get all favorites across all users
@@ -881,7 +909,15 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
     if (allFavorites.length === 0) {
       console.log("[MeteoAI] No favorite locations found, skipping.");
-      await updateCollectionJob(jobId, { status: "completed", servicesCollected: 0, completedAt: new Date() });
+      await updateCollectionJob(jobId, {
+        status: "completed",
+        servicesCollected: 0,
+        dailyModelsCollected: 0,
+        dailyModelsExpected: 0,
+        hourlyModelsCollected: 0,
+        hourlyModelsExpected: 0,
+        completedAt: new Date(),
+      });
       return res.json({ ok: true, locationsProcessed: 0 });
     }
 
@@ -897,6 +933,10 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     }
 
     console.log(`[MeteoAI] Processing ${uniqueLocations.length} unique locations (${allFavorites.length} total favorites)`);
+    const expectedModelsPerLocation = getModelCoverage([]).expected.length;
+    dailyModelsExpected = uniqueLocations.length * expectedModelsPerLocation;
+    hourlyModelsExpected = uniqueLocations.length * expectedModelsPerLocation;
+    await updateCollectionJob(jobId, { dailyModelsExpected, hourlyModelsExpected });
 
     // Get only qualified evidence for operational model weights.
     const ranking = await getQualifiedCumulativeRankingForLocation("default");
@@ -906,9 +946,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     });
 
     // Les relevés physiques ont leur propre tâche horaire : les exécuter ici
-    // pouvait faire dépasser le délai de la collecte de prévisions de 05h00.
+    // pouvait faire dépasser le délai d’un batch de prévisions favoris.
     const stationCollectionDeferred = true;
-    let locationsProcessed = 0;
     const errors: string[] = [];
     const coverageByLocation: Array<{
       location: string;
@@ -923,13 +962,20 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     // d'achever les deux favoris avant le délai du callback, tout en bornant
     // les appels réseau et les écritures en base lorsque la liste grandit.
     await processWithConcurrency(uniqueLocations, 2, async (fav) => {
+      const locKey = makeLocationKey(fav.lat, fav.lon);
+      const locationLockKey = getLocationForecastRefreshLockKey(locKey);
+      const locationLockOwnerToken = randomUUID();
+      const locationLockAcquired = await acquireForecastRefreshLock(locationLockKey, locationLockOwnerToken);
+      if (!locationLockAcquired) {
+        errors.push(`${fav.name}: une collecte manuelle ou planifiée est déjà en cours pour ce lieu.`);
+        return;
+      }
       try {
+       try {
         console.log(`[MeteoAI] Collecting forecasts for ${fav.name} (${fav.lat}, ${fav.lon})`);
         let physicalStationCount = 0;
         const radiusKm = Math.max(5, Math.min(50, fav.radiusKm ?? 20));
 
-        // Compute locationKey for this favorite
-        const locKey = makeLocationKey(fav.lat, fav.lon);
         const stationEvidence = await getStationEvidenceSummary(locKey, fav.lat, fav.lon);
 
         // Collect physical station evidence once per unique location. Proxy
@@ -1057,19 +1103,31 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         console.log(`[Models] ${fav.name}: quotidien ${dailyCoverage.collected.length}/${dailyCoverage.expected.length}`);
         if (dailyCoverage.missing.length > 0) {
           console.warn(`[Models] ${fav.name}: quotidien indisponible — ${dailyCoverage.missing.join(", ")}`);
+          errors.push(`${fav.name}: couverture quotidienne partielle — modèles manquants : ${dailyCoverage.missing.join(", ")}.`);
         }
+        let hourlyCoverage = getModelCoverage([]);
+        const persistedHourlyModelNames = new Set<string>();
 
         if (expertData.length === 0) {
           console.warn(`[MeteoAI] No data for ${fav.name}`);
+          errors.push(`${fav.name}: aucun modèle quotidien n'a fourni de prévision.`);
           await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
             locationKey: locKey,
             date: today,
             radiusKm,
             physicalStationCount,
             daily: dailyCoverage,
-            hourly: dailyCoverage,
+            hourly: hourlyCoverage,
             forceFailed: true,
           }));
+          coverageByLocation.push({
+            location: fav.customName ?? fav.name,
+            daily: dailyCoverage,
+            hourly: hourlyCoverage,
+            physicalStationCount,
+            stationCollectionDeferred,
+            stations: stationEvidence,
+          });
           return;
         }
 
@@ -1102,6 +1160,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // Écriture strictement limitée aux sept modèles actifs et à Best Match.
         // Les archives publiques historiques ne sont ni supprimées ni réécrites.
         await insertForecasts(forecastRowsForLoc);
+        dailyModelsCollected += dailyCoverage.collected.length;
         const issuedAt = Date.now();
         await insertForecastRuns(
           expertData.map((f) => ({
@@ -1251,7 +1310,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           confidenceScore: favConfidenceScore,
           weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
-        });
+        }, { refreshComputedAt: true });
 
         for (const matchFav of matchingFavorites) {
           await upsertLocationForecast({
@@ -1262,7 +1321,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             date: today,
             tempMax: meteoAI.tempMax,
             tempMin: meteoAI.tempMin,
-            tempCurrent: null,
             precipitation: meteoAI.precipitation,
             windSpeed: meteoAI.windSpeed,
             condition,
@@ -1275,7 +1333,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         }
 
         // Collect hourly forecasts for all models for this location
-        let hourlyCoverage = getModelCoverage([]);
         try {
           const hourlyShadowRequestStartedAt = Date.now();
           const hourlyAllModels = await collectHourlyForecastAllModels(today, { lat: fav.lat, lon: fav.lon });
@@ -1303,7 +1360,13 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               weatherCode: h.weatherCode,
             }));
             await insertHourlyForecasts(rows);
+            const coverageName = modelName === "best_match" ? "Open-Meteo" : modelName;
+            if (rows.length > 0 && hourlyCoverage.expected.includes(coverageName) && !persistedHourlyModelNames.has(coverageName)) {
+              persistedHourlyModelNames.add(coverageName);
+              hourlyModelsCollected++;
+            }
           }
+          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames));
           await executeShadowWriteSafely(`hourly:${locKey}`, async () => {
             const shadowResult = await persistHourlyForecastsToShadow(hourlyAllModels, {
               locationKey: locKey,
@@ -1342,6 +1405,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           console.log(`[HourlyAll] Stored ${hourlyAllModels.length} models for ${fav.name}`);
         } catch (hourlyErr: any) {
           console.warn(`[HourlyAll] Failed for ${fav.name}:`, hourlyErr.message);
+          errors.push(`${fav.name}: collecte horaire partielle — ${hourlyErr.message}`);
+          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames));
+        }
+        if (hourlyCoverage.missing.length > 0) {
+          errors.push(`${fav.name}: couverture horaire partielle — modèles manquants : ${hourlyCoverage.missing.join(", ")}.`);
         }
 
         coverageByLocation.push({
@@ -1381,11 +1449,22 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         console.error(`[MeteoAI] Error collecting for ${fav.name}:`, err.message);
         errors.push(`${fav.name}: ${err.message}`);
       }
+      } finally {
+        try {
+          await releaseForecastRefreshLock(locationLockKey, locationLockOwnerToken);
+        } catch (error) {
+          console.warn(`[MeteoAI] Could not release forecast lease for ${locKey}:`, error);
+        }
+      }
     });
 
     await updateCollectionJob(jobId, {
-      status: errors.length > 0 && locationsProcessed === 0 ? "failed" : "completed",
+      status: getForecastCollectionJobStatus(locationsProcessed, errors),
       servicesCollected: locationsProcessed,
+      dailyModelsCollected,
+      dailyModelsExpected,
+      hourlyModelsCollected,
+      hourlyModelsExpected,
       errorMessage: errors.length > 0 ? errors.join(" | ").slice(0, 4000) : undefined,
       completedAt: new Date(),
     });
@@ -1394,16 +1473,26 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       date: today,
       locationsProcessed,
       totalFavorites: allFavorites.length,
+      dailyModelCoverage: { collected: dailyModelsCollected, expected: dailyModelsExpected },
+      hourlyModelCoverage: { collected: hourlyModelsCollected, expected: hourlyModelsExpected },
       coverageByLocation,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {
     if (jobId > 0) {
-      await updateCollectionJob(jobId, {
-        status: "failed",
-        errorMessage: error.message,
-        completedAt: new Date(),
-      });
+      try {
+        await updateCollectionJob(jobId, {
+          status: "failed",
+          dailyModelsCollected,
+          dailyModelsExpected,
+          hourlyModelsCollected,
+          hourlyModelsExpected,
+          errorMessage: error.message,
+          completedAt: new Date(),
+        });
+      } catch (updateError) {
+        console.error("[MeteoAI] Could not persist failed collection status:", updateError);
+      }
     }
     console.error("[MeteoAI] Favorites forecast collection error:", error);
     res.status(500).json({
@@ -1412,6 +1501,14 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       context: { url: req.url },
       timestamp: new Date().toISOString(),
     });
+  } finally {
+    if (scheduledLockOwnerToken) {
+      try {
+        await releaseForecastRefreshLock(FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, scheduledLockOwnerToken);
+      } catch (error) {
+        console.error("[MeteoAI] Could not release favorites forecast scheduler lease:", error);
+      }
+    }
   }
 }
 

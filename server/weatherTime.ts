@@ -5,6 +5,36 @@
  */
 export const METEO_TIME_ZONE = "Europe/Paris";
 
+/** Six collectes quotidiennes espacées de quatre heures, dont le run historique de 05:00. */
+export const PARIS_FORECAST_RUN_HOURS = [1, 5, 9, 13, 17, 21] as const;
+
+/**
+ * Heartbeat ne prend que des expressions UTC statiques. Ces heures couvrent les
+ * deux offsets Europe/Paris (+01:00 et +02:00); le handler ignore les créneaux
+ * qui ne correspondent pas à l'un des six horaires parisiens.
+ */
+export const FORECAST_HEARTBEAT_UTC_HOURS = [0, 3, 4, 7, 8, 11, 12, 15, 16, 19, 20, 23] as const;
+export const FORECAST_HEARTBEAT_CRON_UTC = "0 0 0,3,4,7,8,11,12,15,16,19,20,23 * * *";
+export const PARIS_FORECAST_SCHEDULE_LABEL = PARIS_FORECAST_RUN_HOURS
+  .map((hour) => `${String(hour).padStart(2, "0")}:00`)
+  .join(", ");
+const PARIS_WALL_CLOCK_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: METEO_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+export type ParisForecastRunHour = typeof PARIS_FORECAST_RUN_HOURS[number];
+export type ParisForecastSlot = {
+  date: string;
+  hour: ParisForecastRunHour;
+  key: string;
+};
+
 export function getParisDate(date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: METEO_TIME_ZONE });
 }
@@ -26,32 +56,59 @@ export function getParisMinute(date = new Date()): number {
   return minute != null ? Number(minute) : 0;
 }
 
+/** Retourne le créneau local canonique, ou null pour un appel Heartbeat de garde. */
+export function getParisForecastSlot(date = new Date(), runHours: readonly number[] = PARIS_FORECAST_RUN_HOURS): ParisForecastSlot | null {
+  const hour = getParisHour(date);
+  if (!runHours.includes(hour)) return null;
+
+  const parisDate = getParisDate(date);
+  const hourText = String(hour).padStart(2, "0");
+  return {
+    date: parisDate,
+    hour: hour as ParisForecastRunHour,
+    key: `favorites-forecast:${parisDate}:${hourText}`,
+  };
+}
+
 export function getParisDateDaysAgo(daysAgo: number, now = new Date()): string {
   return getParisDate(new Date(now.getTime() - daysAgo * 86_400_000));
 }
 
 function parisWallClockToUtc(date: string, hour: number): Date {
   const [year, month, day] = date.split("-").map(Number);
-  const wallClockUtc = Date.UTC(year, month - 1, day, hour, 0, 0);
-  const parisParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: METEO_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(wallClockUtc));
-  const value = Object.fromEntries(parisParts.map((part) => [part.type, part.value]));
-  const parisAsUtc = Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day), Number(value.hour), 0, 0);
-  return new Date(wallClockUtc + (wallClockUtc - parisAsUtc));
+  const approximateUtc = Date.UTC(year, month - 1, day, hour, 0, 0);
+  const expected = {
+    year: String(year),
+    month: String(month).padStart(2, "0"),
+    day: String(day).padStart(2, "0"),
+    hour: String(hour).padStart(2, "0"),
+  };
+
+  // Find the actual UTC instant matching Paris wall time. Offset subtraction
+  // based on a single nearby instant is wrong when DST changes that same day.
+  for (let deltaMinutes = -180; deltaMinutes <= 180; deltaMinutes += 15) {
+    const candidate = new Date(approximateUtc + deltaMinutes * 60_000);
+    const parts = Object.fromEntries(PARIS_WALL_CLOCK_FORMATTER.formatToParts(candidate).map((part) => [part.type, part.value]));
+    if (parts.year === expected.year && parts.month === expected.month && parts.day === expected.day
+      && parts.hour === expected.hour && parts.minute === "00") {
+      return candidate;
+    }
+  }
+  throw new RangeError(`The Paris wall-clock time ${date} ${String(hour).padStart(2, "0")}:00 does not exist.`);
 }
 
-/** Retourne le prochain instant correspondant à 05:00 dans le fuseau métier. */
-export function getNextParisForecastRun(now = new Date()): Date {
+function nextParisDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return getParisDate(new Date(Date.UTC(year, month - 1, day + 1, 12, 0, 0)));
+}
+
+/** Retourne le prochain créneau de prévision dans le fuseau métier Europe/Paris. */
+export function getNextParisForecastRun(now = new Date(), runHours: readonly number[] = PARIS_FORECAST_RUN_HOURS): Date {
+  if (runHours.length === 0) throw new Error("At least one Paris forecast hour is required.");
   const today = getParisDate(now);
-  const todayRun = parisWallClockToUtc(today, 5);
-  if (todayRun.getTime() > now.getTime()) return todayRun;
-  const [year, month, day] = today.split("-").map(Number);
-  const nextDate = getParisDate(new Date(Date.UTC(year, month - 1, day + 1, 12, 0, 0)));
-  return parisWallClockToUtc(nextDate, 5);
+  for (const hour of runHours) {
+    const candidate = parisWallClockToUtc(today, hour);
+    if (candidate.getTime() > now.getTime()) return candidate;
+  }
+  return parisWallClockToUtc(nextParisDate(today), runHours[0]);
 }

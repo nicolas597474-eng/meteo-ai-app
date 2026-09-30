@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildStationCollectionSnapshot, getModelCoverage, processWithConcurrency } from "./scheduledHandlers";
+import { buildStationCollectionSnapshot, getForecastCollectionJobStatus, getModelCoverage, processWithConcurrency } from "./scheduledHandlers";
 import { VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
 describe("getModelCoverage", () => {
@@ -38,7 +38,7 @@ describe("getModelCoverage", () => {
   });
 });
 
-describe("collecte horaire de 05h00", () => {
+describe("cadence automatique des prévisions", () => {
   it("borne la concurrence des lieux tout en traitant chaque favori", async () => {
     const active: number[] = [];
     const processed: number[] = [];
@@ -71,6 +71,35 @@ describe("collecte horaire de 05h00", () => {
     expect(source).toContain("relevés physiques confiés à la collecte horaire dédiée");
     expect(source).toContain("getStationEvidenceSummary");
     expect(source).toContain("stations: stationEvidence");
+  });
+
+  it("distingue un succès complet, une collecte partielle et un échec total", () => {
+    expect(getForecastCollectionJobStatus(2, [])).toBe("completed");
+    expect(getForecastCollectionJobStatus(2, ["un des lieux a échoué"])).toBe("completed");
+    expect(getForecastCollectionJobStatus(0, ["aucun lieu n’a abouti"])).toBe("failed");
+  });
+
+  it("garde les écritures sérialisées par lieu et ne compte que les modèles réellement persistés", () => {
+    const source = readFileSync(new URL("./scheduledHandlers.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export async function collectFavoritesForecastsHandler");
+    const end = source.indexOf("export async function collectPhysicalObservationSnapshotsForFavorites", start);
+    const handler = source.slice(start, end);
+    const dailyWrite = handler.indexOf("await insertForecasts(forecastRowsForLoc);");
+    const dailyCounter = handler.indexOf("dailyModelsCollected += dailyCoverage.collected.length", dailyWrite);
+    const hourlyWrite = handler.indexOf("await insertHourlyForecasts(rows);");
+    const hourlyCounter = handler.indexOf("hourlyModelsCollected++", hourlyWrite);
+
+    expect(handler).toContain("getParisForecastSlot(new Date(), activeHours)");
+    expect(handler).toContain("claimScheduledForecastCollectionJob(slot.key, user.taskUid)");
+    expect(handler).toContain("FAVORITES_FORECAST_SCHEDULER_LOCK_KEY");
+    expect(handler).toContain("getLocationForecastRefreshLockKey(locKey)");
+    expect(dailyCounter).toBeGreaterThan(dailyWrite);
+    expect(hourlyCounter).toBeGreaterThan(hourlyWrite);
+    expect(handler).toContain("{ refreshComputedAt: true }");
+    expect(handler).toContain("await insertForecastRuns(");
+    expect(handler).not.toContain("cacheManualHourlyForecast");
+    expect(handler).not.toContain("cacheOfficialCurrentWeather");
+    expect(handler).not.toContain("tempCurrent");
   });
 
   it("borne aussi à deux lieux simultanés la collecte dédiée de snapshots physiques", () => {
