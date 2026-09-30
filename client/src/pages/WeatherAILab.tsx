@@ -33,6 +33,19 @@ function HelpDetail({ label, children }: { label: string; children: ReactNode })
   return <p><span className="font-semibold text-sky-100">{label} · </span>{children}</p>;
 }
 
+function manualRefreshTime(value: string | null) {
+  if (!value) return "aucun horodatage récent";
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "medium", timeZone: "Europe/Paris" })
+    : "horodatage indisponible";
+}
+
+function manualRefreshGranularity(label: string, result: { status: "succeeded" | "partial" | "failed"; modelCount: number; expectedModelCount: number; updatedAt: string | null; error?: string }) {
+  const state = result.status === "succeeded" ? "succès" : result.status === "partial" ? "partiel" : "échec";
+  return `${label} : ${state}, ${result.modelCount}/${result.expectedModelCount} flux · ${manualRefreshTime(result.updatedAt)}${result.error ? ` · ${result.error}` : ""}`;
+}
+
 type SimulationStep = {
   id: string;
   title: string;
@@ -343,9 +356,28 @@ export default function WeatherAILab() {
   const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
   const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
   const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const utils = trpc.useUtils();
   const refreshFusion = trpc.weather.refreshManualFusion.useMutation({
-    onSuccess: async () => { await refetch(); },
+    onSuccess: async (result) => {
+      if (!("daily" in result)) return;
+      if (result.status === "failed") {
+        await Promise.allSettled([refetch()]);
+        return;
+      }
+      const coordinates = { lat: result.location.lat, lon: result.location.lon };
+      const detailedForecastInput = { ...coordinates, includeExtendedPeriods: false };
+      await Promise.allSettled([
+        refetch(),
+        utils.weather.getDashboard.invalidate(coordinates),
+        utils.weather.getDetailedForecast.invalidate(detailedForecastInput),
+      ]);
+      await Promise.allSettled([
+        utils.weather.getDashboard.fetch(coordinates),
+        utils.weather.getDetailedForecast.fetch(detailedForecastInput),
+      ]);
+    },
   });
+  const manualRefreshResult = refreshFusion.data && "daily" in refreshFusion.data ? refreshFusion.data : null;
   const [slowLoad, setSlowLoad] = useState(false);
   const [selectedCollectionModel, setSelectedCollectionModel] = useState<string | null>(null);
 
@@ -507,8 +539,14 @@ export default function WeatherAILab() {
     </header>
 
     {refreshFusion.isError && <p className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-100">La relance n’a pas abouti : {refreshFusion.error.message}</p>}
-    {refreshFusion.data?.status === "cooldown" && <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">Une fusion vient déjà d’être calculée. Réessayez dans environ {refreshFusion.data.retryAfterSeconds} s.</p>}
-    {refreshFusion.data?.status === "refreshed" && <p className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-100">Fusion relancée avec {refreshFusion.data.modelCount} flux de prévision ; la trace vient d’être actualisée.</p>}
+    {refreshFusion.data?.status === "cooldown" && <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">Une fusion récente existe déjà. Réessayez dans environ {refreshFusion.data.retryAfterSeconds} s.</p>}
+    {refreshFusion.data?.status === "in_progress" && <p role="status" className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">Une relance pour ce lieu est déjà en cours ; aucun second lot n’a été lancé.</p>}
+    {manualRefreshResult && <div role="status" aria-live="polite" className={`rounded-xl border px-3 py-2 text-xs ${manualRefreshResult.status === "failed" ? "border-red-400/30 bg-red-400/10 text-red-100" : manualRefreshResult.status === "partial" ? "border-amber-400/30 bg-amber-400/10 text-amber-100" : "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"}`}>
+      <p className="font-semibold">{manualRefreshResult.status === "refreshed" ? "Prévisions quotidiennes et horaires actualisées." : manualRefreshResult.status === "partial" ? "Résultat partiel : une granularité ou certaines sources n’ont pas abouti." : "Échec de la relance des prévisions."}</p>
+      <p className="mt-1">{manualRefreshGranularity("Quotidien", manualRefreshResult.daily)}</p>
+      <p className="mt-1">{manualRefreshGranularity("Horaire", manualRefreshResult.hourly)}</p>
+      <p className="mt-1 text-[10px] opacity-80">La relance n’écrit ni le point météo courant ni les observations, qui restent alimentés séparément. Les compteurs du batch planifié de 05:00 ne sont pas modifiés.</p>
+    </div>}
 
     <section className="rounded-2xl border border-sky-400/25 bg-sky-400/[0.055] p-4" aria-labelledby="forecast-collection-title">
       <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10"><Clock className="h-4 w-4 text-sky-200" /></span><div className="min-w-0"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Prévisions · 7 modèles + 1 agrégateur</p><h2 id="forecast-collection-title" className="text-sm font-semibold text-slate-100">Collecte prévue à {forecastCollectionReport?.scheduledAt ?? "05:00"}</h2></div></div>{forecastCollectionSnapshot && <span className="shrink-0 rounded-full bg-sky-300/10 px-2 py-1 text-[9px] font-semibold text-sky-100">Dernier bilan</span>}</div>

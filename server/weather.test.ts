@@ -41,6 +41,15 @@ describe("weather.getDashboard", () => {
     }));
   });
 
+  it("conserve l’horodatage du snapshot source quand il est fourni", () => {
+    const sourceUpdatedAt = new Date("2026-08-12T12:01:00.000Z");
+    const current = getCurrentHourlyRegimeInput([
+      { hour: "14:00", temp: 23.4, precipitation: 0, windSpeed: 9, humidity: 50, cloudCover: 12 },
+    ], 14, sourceUpdatedAt);
+
+    expect(current?.updatedAt).toEqual(sourceUpdatedAt);
+  });
+
   it("returns dashboard data with today's date", async () => {
     const ctx = createPublicContext();
     const caller = appRouter.createCaller(ctx);

@@ -155,11 +155,17 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain('"Relancer"');
   });
 
-  it("propose une relance manuelle pour le lieu favori avec ses états explicites", () => {
+  it("présente les résultats quotidiens et horaires séparément et rafraîchit le Dashboard du même lieu", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
     expect(source).toContain("refreshManualFusion");
     expect(source).toContain("Relancer");
-    expect(source).toContain("Fusion relancée avec");
-    expect(source).toContain("Une fusion vient déjà d’être calculée");
+    expect(source).toContain("manualRefreshGranularity(\"Quotidien\"");
+    expect(source).toContain("manualRefreshGranularity(\"Horaire\"");
+    expect(source).toContain("getDashboard.invalidate(coordinates)");
+    expect(source).toContain("getDetailedForecast.invalidate(detailedForecastInput)");
+    expect(source).toContain("getDashboard.fetch(coordinates)");
+    expect(source).toContain("La relance n’écrit ni le point météo courant ni les observations, qui restent alimentés séparément");
+    expect(source).toContain("Les compteurs du batch planifié de 05:00 ne sont pas modifiés");
+    expect(source).toContain("Une fusion récente existe déjà");
   });
 });

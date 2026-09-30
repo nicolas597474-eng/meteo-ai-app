@@ -1,11 +1,247 @@
-import { describe, expect, it } from "vitest";
-import { isManualFusionCoolingDown, MANUAL_FUSION_COOLDOWN_MS } from "./manualFusion";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("relance manuelle de fusion", () => {
+const mocks = vi.hoisted(() => ({
+  expertServices: [
+    "AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo",
+  ].map((name) => ({ name, modelId: name === "Open-Meteo" ? "best_match" : name.toLowerCase(), category: "expert" as const })),
+  collectExpertForecasts: vi.fn(),
+  collectHourlyForecast: vi.fn(),
+  collectHourlyForecastAllModels: vi.fn(),
+  getMeteoAIForecastByDate: vi.fn(),
+  getQualifiedCumulativeRankingForLocation: vi.fn(),
+  getQualifiedLeadTimeScoresForLocation: vi.fn(),
+  getStoredHourlyForecasts: vi.fn(),
+  insertForecastRuns: vi.fn(),
+  insertForecasts: vi.fn(),
+  insertHourlyForecasts: vi.fn(),
+  upsertLocationForecast: vi.fn(),
+  upsertMeteoAIForecast: vi.fn(),
+  cacheManualHourlyForecast: vi.fn(),
+  persistedDailySnapshot: null as any,
+  storedHourlyRows: [] as any[],
+  failingHourlyModels: new Set<string>(),
+}));
+
+vi.mock("./weatherServices", () => ({
+  WEATHER_SERVICES: { expert: mocks.expertServices },
+  collectExpertForecasts: mocks.collectExpertForecasts,
+  collectHourlyForecast: mocks.collectHourlyForecast,
+  collectHourlyForecastAllModels: mocks.collectHourlyForecastAllModels,
+}));
+vi.mock("./db", () => ({
+  getMeteoAIForecastByDate: mocks.getMeteoAIForecastByDate,
+  getQualifiedCumulativeRankingForLocation: mocks.getQualifiedCumulativeRankingForLocation,
+  getQualifiedLeadTimeScoresForLocation: mocks.getQualifiedLeadTimeScoresForLocation,
+  getStoredHourlyForecasts: mocks.getStoredHourlyForecasts,
+  insertForecastRuns: mocks.insertForecastRuns,
+  insertForecasts: mocks.insertForecasts,
+  insertHourlyForecasts: mocks.insertHourlyForecasts,
+  makeLocationKey: (lat: number, lon: number) => `${Math.round(lat * 1000) / 1000}_${Math.round(lon * 1000) / 1000}`,
+  upsertLocationForecast: mocks.upsertLocationForecast,
+  upsertMeteoAIForecast: mocks.upsertMeteoAIForecast,
+}));
+vi.mock("./officialWeatherSnapshot", () => ({ cacheManualHourlyForecast: mocks.cacheManualHourlyForecast }));
+vi.mock("./weatherTime", () => ({ getParisDate: () => "2026-09-30" }));
+vi.mock("./weatherConditionLabels", () => ({ conditionFromWeatherValues: () => "Nuageux" }));
+vi.mock("./statsEngine", () => ({ calculateStabilityIndex: () => ({ index: 72, label: "stable" }) }));
+vi.mock("./officialForecast", () => ({
+  computeOfficialDailyForecast: () => ({ tempMax: 23, tempMin: 12, precipitation: 0.4, windSpeed: 12, weights: {}, trace: {} }),
+}));
+vi.mock("./fusionEngine", () => ({
+  applyBiasCorrection: (forecasts: unknown[]) => forecasts,
+  computeConfidenceScore: () => 84,
+  getLeadTimeWeights: () => ({}),
+  isEligibleGlobalReliabilityScore: () => false,
+}));
+
+import { isManualFusionCoolingDown, MANUAL_FUSION_COOLDOWN_MS, refreshManualFusionForFavorite } from "./manualFusion";
+
+const favorite = { id: 9, userId: 4, lat: 50.7567, lon: 2.5204, name: "Hondeghem", customName: null };
+const serviceNames = mocks.expertServices.map((service) => service.name);
+
+function dailyModels(names = serviceNames) {
+  return names.map((serviceName) => ({
+    serviceName,
+    serviceCategory: "expert" as const,
+    tempMax: 23,
+    tempMin: 12,
+    precipitation: 0.4,
+    windSpeed: 12,
+    windGust: 20,
+    humidity: 70,
+    cloudCover: 60,
+    condition: "Nuageux",
+    rawData: { serviceName },
+  }));
+}
+
+function displayHours(date = "2026-09-30") {
+  return [14, 15].map((hour) => ({
+    date,
+    hour: `${String(hour).padStart(2, "0")}:00`,
+    temp: 20 + hour / 10,
+    apparentTemp: 20,
+    precipitation: 0,
+    windSpeed: 12,
+    windGust: 18,
+    windDirection: 190,
+    cloudCover: 40,
+    humidity: 60,
+    uvIndex: 3,
+    condition: "Nuageux",
+    weatherCode: 3,
+    pressure: 1012,
+  }));
+}
+
+function hourlyModels(names = serviceNames.filter((name) => name !== "Open-Meteo")) {
+  return names.map((modelName) => ({
+    modelName,
+    hours: [14, 15].map((hour) => ({
+      hour,
+      temperature: 20 + hour / 10,
+      apparentTemperature: 20,
+      precipitation: 0,
+      windSpeed: 12,
+      windGusts: 18,
+      windDirection: 190,
+      humidity: 60,
+      pressure: 1012,
+      cloudCover: 40,
+      weatherCode: 3,
+    })),
+  }));
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.persistedDailySnapshot = null;
+  mocks.storedHourlyRows = [];
+  mocks.failingHourlyModels.clear();
+  mocks.collectExpertForecasts.mockResolvedValue(dailyModels());
+  mocks.collectHourlyForecast.mockResolvedValue(displayHours());
+  mocks.collectHourlyForecastAllModels.mockResolvedValue(hourlyModels());
+  mocks.getMeteoAIForecastByDate.mockImplementation(async () => mocks.persistedDailySnapshot);
+  mocks.getQualifiedCumulativeRankingForLocation.mockResolvedValue([]);
+  mocks.getQualifiedLeadTimeScoresForLocation.mockResolvedValue([]);
+  mocks.getStoredHourlyForecasts.mockImplementation(async () => mocks.storedHourlyRows.slice());
+  mocks.insertForecasts.mockResolvedValue(undefined);
+  mocks.insertForecastRuns.mockResolvedValue(undefined);
+  mocks.upsertLocationForecast.mockResolvedValue(undefined);
+  mocks.upsertMeteoAIForecast.mockImplementation(async (data: any) => {
+    mocks.persistedDailySnapshot = { computedAt: data.computedAt, weights: data.weights };
+  });
+  mocks.insertHourlyForecasts.mockImplementation(async (rows: any[]) => {
+    const first = rows[0];
+    if (mocks.failingHourlyModels.has(first.modelName)) throw new Error("simulated write failure");
+    mocks.storedHourlyRows = mocks.storedHourlyRows.filter((row) => !(row.locationKey === first.locationKey && row.date === first.date && row.modelName === first.modelName));
+    mocks.storedHourlyRows.push(...rows.map((row) => ({ ...row })));
+  });
+});
+
+describe("relance manuelle des prévisions", () => {
   it("bloque seulement les relances trop rapprochées", () => {
     const now = Date.parse("2026-08-16T15:00:00.000Z");
     expect(isManualFusionCoolingDown(new Date(now - MANUAL_FUSION_COOLDOWN_MS + 1), now)).toBe(true);
     expect(isManualFusionCoolingDown(new Date(now - MANUAL_FUSION_COOLDOWN_MS), now)).toBe(false);
     expect(isManualFusionCoolingDown(null, now)).toBe(false);
+  });
+
+  it("confirme les deux granularités, les timestamps et des lignes horaires uniques au bon lieu/date", async () => {
+    const result = await refreshManualFusionForFavorite(favorite);
+
+    expect(result.status).toBe("refreshed");
+    if (result.status === "cooldown" || result.status === "in_progress") throw new Error("Unexpected status");
+    expect(result.location).toEqual({ lat: favorite.lat, lon: favorite.lon });
+    expect(result.daily).toMatchObject({ status: "succeeded", modelCount: 8, expectedModelCount: 8 });
+    expect(result.hourly).toMatchObject({ status: "succeeded", modelCount: 8, expectedModelCount: 8 });
+    expect(result.daily.updatedAt).toBeTruthy();
+    expect(result.hourly.updatedAt).toBeTruthy();
+    expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
+    expect(mocks.collectExpertForecasts).toHaveBeenCalledWith("2026-09-30", { lat: favorite.lat, lon: favorite.lon });
+    expect(mocks.collectHourlyForecast).toHaveBeenCalledWith("2026-09-30", { lat: favorite.lat, lon: favorite.lon }, 2, { includeCurrentSnapshot: false });
+    expect(mocks.collectHourlyForecastAllModels).toHaveBeenCalledWith("2026-09-30", { lat: favorite.lat, lon: favorite.lon }, { includeBestMatch: false });
+    expect(mocks.insertForecasts).toHaveBeenCalledTimes(1);
+    expect(mocks.insertForecastRuns).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertLocationForecast).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertMeteoAIForecast).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertMeteoAIForecast.mock.calls[0][1]).toEqual({ refreshComputedAt: true });
+    expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(8);
+    expect(mocks.storedHourlyRows).toHaveLength(16);
+    expect(new Set(mocks.storedHourlyRows.map((row) => row.modelName)).size).toBe(8);
+    expect(mocks.storedHourlyRows.every((row) => row.locationKey === "50.757_2.52" && row.date === "2026-09-30")).toBe(true);
+    expect(mocks.cacheManualHourlyForecast).toHaveBeenCalledTimes(1);
+    expect(mocks.cacheManualHourlyForecast).toHaveBeenCalledWith(
+      { lat: favorite.lat, lon: favorite.lon },
+      "2026-09-30",
+      displayHours(),
+      expect.any(Date),
+    );
+
+    const repeated = await refreshManualFusionForFavorite(favorite);
+    expect(repeated.status).toBe("cooldown");
+    expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
+    expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(8);
+  });
+
+  it("rapporte un succès partiel sans horodatage pour la granularité échouée", async () => {
+    mocks.collectExpertForecasts.mockResolvedValue([]);
+    mocks.collectHourlyForecast.mockResolvedValue([]);
+    mocks.collectHourlyForecastAllModels.mockResolvedValue(hourlyModels());
+
+    const result = await refreshManualFusionForFavorite(favorite);
+
+    expect(result.status).toBe("partial");
+    if (result.status !== "partial") throw new Error("Expected partial status");
+    expect(result.daily).toMatchObject({ status: "failed", modelCount: 0, updatedAt: null });
+    expect(result.hourly).toMatchObject({ status: "partial", modelCount: 7, expectedModelCount: 8 });
+    expect(result.hourly.updatedAt).toBeTruthy();
+    expect(result.daily.error).toBeTruthy();
+    expect(mocks.cacheManualHourlyForecast).not.toHaveBeenCalled();
+  });
+
+  it("rapporte un échec global sans horodatage récent quand aucune granularité ne s’enregistre", async () => {
+    mocks.collectExpertForecasts.mockResolvedValue([]);
+    mocks.collectHourlyForecast.mockResolvedValue([]);
+    mocks.collectHourlyForecastAllModels.mockResolvedValue([]);
+
+    const result = await refreshManualFusionForFavorite(favorite);
+
+    expect(result.status).toBe("failed");
+    if (result.status !== "failed") throw new Error("Expected failure status");
+    expect(result.daily).toMatchObject({ status: "failed", updatedAt: null });
+    expect(result.hourly).toMatchObject({ status: "failed", updatedAt: null });
+    expect(mocks.insertForecasts).not.toHaveBeenCalled();
+    expect(mocks.insertHourlyForecasts).not.toHaveBeenCalled();
+  });
+
+  it("ne lance pas de seconde collecte concurrente pour le même lieu", async () => {
+    let releaseDaily!: (rows: ReturnType<typeof dailyModels>) => void;
+    mocks.collectExpertForecasts.mockImplementationOnce(() => new Promise((resolve) => { releaseDaily = resolve; }));
+
+    const firstRun = refreshManualFusionForFavorite(favorite);
+    const concurrentRun = await refreshManualFusionForFavorite(favorite);
+    expect(concurrentRun.status).toBe("in_progress");
+    expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
+    expect(mocks.collectHourlyForecast).toHaveBeenCalledTimes(1);
+
+    releaseDaily(dailyModels());
+    const completed = await firstRun;
+    expect(completed.status).toBe("refreshed");
+    expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(8);
+  });
+
+  it("marque une écriture horaire en erreur comme partielle sans annoncer 8/8", async () => {
+    mocks.failingHourlyModels.add("AROME");
+
+    const result = await refreshManualFusionForFavorite(favorite);
+
+    expect(result.status).toBe("partial");
+    if (result.status !== "partial") throw new Error("Expected partial status");
+    expect(result.daily.status).toBe("succeeded");
+    expect(result.hourly).toMatchObject({ status: "partial", modelCount: 7, expectedModelCount: 8 });
+    expect(result.hourly.updatedAt).toBeTruthy();
+    expect(result.hourly.error).toBeTruthy();
+    expect(mocks.cacheManualHourlyForecast).toHaveBeenCalledTimes(1);
   });
 });
