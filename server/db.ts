@@ -14,6 +14,8 @@ import {
   favoriteLocations,
   locationForecasts,
   hourlyForecasts,
+  hourlyForecastRunValues,
+  hourlyForecastEvaluationScores,
   leadTimeScores,
   InsertForecast,
   InsertForecastRun,
@@ -24,6 +26,8 @@ import {
   InsertFavoriteLocation,
   InsertLocationForecast,
   InsertHourlyForecast,
+  InsertHourlyForecastRunValue,
+  InsertHourlyForecastEvaluationScore,
   InsertLeadTimeScore,
   weatherStations,
   stationObservations,
@@ -282,6 +286,20 @@ export async function insertReliabilityScores(data: InsertReliabilityScore[]): P
   const db = await getDb();
   if (!db || data.length === 0) return;
   await db.insert(reliabilityScores).values(data);
+}
+
+/** Idempotent compatibility write for hourly scores recomputed from immutable runs. */
+export async function upsertHourlyCompatibilityReliabilityScores(data: InsertReliabilityScore[]): Promise<void> {
+  const db = await getDb();
+  if (!db || data.length === 0) return;
+  for (const row of data) {
+    const updateSet = Object.fromEntries(Object.entries(row).filter(([key, value]) =>
+      !["id", "locationKey", "date", "serviceName", "evidenceType", "computedAt"].includes(key)
+      && value !== undefined,
+    ));
+    updateSet.computedAt = new Date();
+    await db.insert(reliabilityScores).values(row).onDuplicateKeyUpdate({ set: updateSet });
+  }
 }
 
 export async function getLatestReliabilityScores(locationKey = "default") {
@@ -1318,14 +1336,79 @@ export async function getLocationForecastsForUser(userId: number, date: string) 
 
 // ─── HOURLY FORECASTS HELPERS ────────────────────────────────────────────────
 
+type HourlyForecastCapture = {
+  captureRunId: string;
+  sourceName: string;
+  modelId: string | null;
+  requestStartedAt: number;
+  availableAt: number;
+  units?: {
+    temperature?: string | null;
+    precipitation?: string | null;
+    windSpeed?: string | null;
+    windGusts?: string | null;
+    humidity?: string | null;
+    pressure?: string | null;
+  };
+};
+
+type InsertHourlyForecastWithCapture = InsertHourlyForecast & {
+  validTime?: number;
+  captureRun?: HourlyForecastCapture;
+};
+
 /**
  * Insert a batch of hourly forecast rows for a location/date/model.
- * Replaces existing rows for the same locationKey+date+modelName combination.
+ * Preserves the current latest-series behavior while first appending verified
+ * UTC-timed values to the immutable capture archive when run metadata is present.
  */
-export async function insertHourlyForecasts(rows: InsertHourlyForecast[]): Promise<void> {
+export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCapture[]): Promise<void> {
   if (!rows.length) return;
   const db = await getDb();
   if (!db) return;
+
+  const captures = new Map<string, InsertHourlyForecastWithCapture[]>();
+  for (const row of rows) {
+    if (!row.captureRun || !row.validTime || !Number.isFinite(row.validTime)) continue;
+    const current = captures.get(row.captureRun.captureRunId) ?? [];
+    captures.set(row.captureRun.captureRunId, [...current, row]);
+  }
+  for (const [captureRunId, captureRows] of Array.from(captures.entries())) {
+    const capture = captureRows[0].captureRun!;
+    const runValues: InsertHourlyForecastRunValue[] = captureRows.flatMap((row) => {
+      if (row.captureRun?.captureRunId !== captureRunId) return [];
+      const values: Array<{ variable: string; value: number | null; unit: string | null }> = [
+        { variable: "temperature", value: row.temperature ?? null, unit: capture.units?.temperature ?? "°C" },
+        { variable: "precipitation", value: row.precipitation ?? null, unit: capture.units?.precipitation ?? "mm" },
+        { variable: "wind_speed", value: row.windSpeed ?? null, unit: capture.units?.windSpeed ?? "km/h" },
+        { variable: "wind_gust", value: row.windGusts ?? null, unit: capture.units?.windGusts ?? "km/h" },
+        { variable: "humidity", value: row.humidity ?? null, unit: capture.units?.humidity ?? "%" },
+        { variable: "pressure", value: row.pressure ?? null, unit: capture.units?.pressure ?? "hPa" },
+      ];
+      return values.map(({ variable, value, unit }) => ({
+        captureRunId,
+        locationKey: row.locationKey,
+        targetDate: row.date,
+        sourceName: capture.sourceName,
+        modelName: row.modelName,
+        modelId: capture.modelId,
+        requestStartedAt: capture.requestStartedAt,
+        availableAt: capture.availableAt,
+        validTime: row.validTime!,
+        variable,
+        value: value != null && Number.isFinite(value) ? value : null,
+        unit,
+      }));
+    });
+    if (runValues.length > 0) {
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < runValues.length; i += 100) {
+          await tx.insert(hourlyForecastRunValues).values(runValues.slice(i, i + 100));
+        }
+      });
+    }
+  }
+
   // Delete existing rows for this locationKey + date + modelName before inserting
   const { locationKey, date, modelName } = rows[0];
   await db
@@ -1339,7 +1422,8 @@ export async function insertHourlyForecasts(rows: InsertHourlyForecast[]): Promi
     );
   // Insert in batches of 50 to avoid query size limits
   for (let i = 0; i < rows.length; i += 50) {
-    await db.insert(hourlyForecasts).values(rows.slice(i, i + 50));
+    const activeRows = rows.slice(i, i + 50).map(({ validTime: _validTime, captureRun: _captureRun, ...row }) => row);
+    await db.insert(hourlyForecasts).values(activeRows);
   }
 }
 
@@ -1359,6 +1443,47 @@ export async function getStoredHourlyForecasts(locationKey: string, date: string
       )
     )
     .orderBy(hourlyForecasts.modelName, hourlyForecasts.hour);
+}
+
+/** Read immutable hourly forecast values for one location and Paris forecast day. */
+export async function getHourlyForecastRunValues(locationKey: string, date: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(hourlyForecastRunValues).where(and(
+    eq(hourlyForecastRunValues.locationKey, locationKey),
+    eq(hourlyForecastRunValues.targetDate, date),
+  )).orderBy(hourlyForecastRunValues.modelName, hourlyForecastRunValues.validTime, hourlyForecastRunValues.variable, hourlyForecastRunValues.availableAt);
+}
+
+/** Insert or deterministically refresh detailed scores for one observation day. */
+export async function persistHourlyForecastEvaluationScores(rows: InsertHourlyForecastEvaluationScore[]): Promise<void> {
+  const db = await getDb();
+  if (!db || rows.length === 0) return;
+  for (const row of rows) {
+    await db.insert(hourlyForecastEvaluationScores).values(row).onDuplicateKeyUpdate({
+      set: {
+        modelId: row.modelId,
+        observationCount: row.observationCount,
+        evaluableObservationCount: row.evaluableObservationCount,
+        sampleSize: row.sampleSize,
+        coverageRatio: row.coverageRatio,
+        mae: row.mae,
+        rmse: row.rmse,
+        bias: row.bias,
+        computedAt: new Date(),
+      },
+    });
+  }
+}
+
+/** Retrieve model/variable/horizon scores for a location and observation date. */
+export async function getHourlyForecastEvaluationScores(locationKey: string, date: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(hourlyForecastEvaluationScores).where(and(
+    eq(hourlyForecastEvaluationScores.locationKey, locationKey),
+    eq(hourlyForecastEvaluationScores.date, date),
+  )).orderBy(hourlyForecastEvaluationScores.sourceName, hourlyForecastEvaluationScores.modelName, hourlyForecastEvaluationScores.variable, hourlyForecastEvaluationScores.horizonBucket);
 }
 
 // ─── OBSERVATIONS PERSONNELLES ET CALIBRATION ──────────────────────────────

@@ -513,6 +513,55 @@ export const hourlyForecasts = mysqlTable("hourly_forecasts", {
 export type HourlyForecast = typeof hourlyForecasts.$inferSelect;
 export type InsertHourlyForecast = typeof hourlyForecasts.$inferInsert;
 
+/** Immutable per-run, per-variable archive used for leakage-safe hourly verification. */
+export const hourlyForecastRunValues = mysqlTable("hourly_forecast_run_values", {
+  id: int("id").autoincrement().primaryKey(),
+  captureRunId: varchar("captureRunId", { length: 36 }).notNull(), // Local capture UUID; not an upstream model-run identifier.
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  targetDate: varchar("targetDate", { length: 10 }).notNull(), // Europe/Paris calendar date for lookup only.
+  sourceName: varchar("sourceName", { length: 64 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }), // Null when the upstream aggregator does not expose a specific model ID.
+  requestStartedAt: bigint("requestStartedAt", { mode: "number" }).notNull(),
+  availableAt: bigint("availableAt", { mode: "number" }).notNull(), // Receipt time on this application host.
+  validTime: bigint("validTime", { mode: "number" }).notNull(), // Absolute UTC epoch milliseconds.
+  variable: varchar("variable", { length: 32 }).notNull(),
+  value: float("value"),
+  unit: varchar("unit", { length: 32 }),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("hourly_run_values_identity").on(table.captureRunId, table.locationKey, table.modelName, table.validTime, table.variable),
+  index("hourly_run_values_location_target_idx").on(table.locationKey, table.targetDate),
+  index("hourly_run_values_series_idx").on(table.locationKey, table.modelName, table.variable, table.validTime),
+]);
+export type HourlyForecastRunValue = typeof hourlyForecastRunValues.$inferSelect;
+export type InsertHourlyForecastRunValue = typeof hourlyForecastRunValues.$inferInsert;
+
+/** Idempotent daily verification output, split by source/model/variable/lead-time bucket. */
+export const hourlyForecastEvaluationScores = mysqlTable("hourly_forecast_evaluation_scores", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // Physical-observation date in Europe/Paris.
+  sourceName: varchar("sourceName", { length: 64 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }),
+  variable: varchar("variable", { length: 32 }).notNull(),
+  horizonBucket: varchar("horizonBucket", { length: 16 }).notNull(), // Shared Phase 3 horizon key.
+  observationCount: int("observationCount").notNull().default(0),
+  evaluableObservationCount: int("evaluableObservationCount").notNull().default(0),
+  sampleSize: int("sampleSize").notNull().default(0),
+  coverageRatio: float("coverageRatio").notNull().default(0), // sampleSize / evaluableObservationCount.
+  mae: float("mae"),
+  rmse: float("rmse"),
+  bias: float("bias"), // Forecast minus observation.
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("hourly_eval_score_day_model_variable_horizon_unique").on(table.locationKey, table.date, table.sourceName, table.modelName, table.variable, table.horizonBucket),
+  index("hourly_eval_score_location_date_idx").on(table.locationKey, table.date),
+]);
+export type HourlyForecastEvaluationScore = typeof hourlyForecastEvaluationScores.$inferSelect;
+export type InsertHourlyForecastEvaluationScore = typeof hourlyForecastEvaluationScores.$inferInsert;
+
 /**
  * Lead-time scoring — per-model, per-location, per-horizon error metrics.
  * Populated during observation collection by comparing forecasts issued N days

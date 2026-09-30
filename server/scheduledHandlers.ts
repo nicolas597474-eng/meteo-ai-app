@@ -17,6 +17,7 @@ import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { isOperationalObservation } from "./observationProvenance";
 import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
+import { evaluateHourlyForecastRuns, isHourlyForecastVariable, type HourlyForecastVariable } from "./hourlyForecastRunScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import {
   executeShadowWriteSafely,
@@ -43,7 +44,7 @@ import {
   acquireForecastRefreshLock,
   releaseForecastRefreshLock,
   insertObservation,
-  insertReliabilityScores,
+  upsertHourlyCompatibilityReliabilityScores,
   upsertMeteoAIForecast,
   createCollectionJob,
   updateCollectionJob,
@@ -71,7 +72,8 @@ import {
   insertPhysicalSnapshotCollectionTraceIfMissing,
   getQualifiedObservationSnapshotsForDate,
   getPhysicalSnapshotCollectionTracesByDateRange,
-  getStoredHourlyForecasts,
+  getHourlyForecastRunValues,
+  persistHourlyForecastEvaluationScores,
   getStationEvidenceSummary,
 } from "./db";
 
@@ -760,47 +762,75 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             rawData: { coverageHours: dailyObservation.coverageHours, aggregation: dailyObservation.reason } as any,
           });
 
-          const hourlyForecasts = await getStoredHourlyForecasts(locKey, yesterday);
-          const hourlyScores = scoreQualifiedHourlyModels(snapshots, hourlyForecasts);
-          if (hourlyScores.length === 0) {
-            locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune prévision horaire alignée`);
+          const hourlyForecastRuns = await getHourlyForecastRunValues(locKey, yesterday);
+          if (hourlyForecastRuns.length === 0) {
+            locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune capture horaire vérifiable archivée; les anciennes séries mutables ne sont pas réutilisées`);
             continue;
           }
-          await insertReliabilityScores(hourlyScores.map((score) => ({
-            locationKey: locKey,
-            date: yesterday,
-            serviceName: score.serviceName,
-            sampleSize: score.sampleSize,
-            maeTemp: score.maeTemp,
-            maePrecip: score.maePrecip,
-            maeWind: score.maeWind,
-            rmseTemp: score.rmseTemp,
-            rmsePrecip: score.rmsePrecip,
-            rmseWind: score.rmseWind,
-            biasTemp: score.biasTemp,
-            precipScore: score.precipScore,
-            precipPod: score.precipPod,
-            precipFar: score.precipFar,
-            precipCsi: score.precipCsi,
-            precipFalsePositives: score.precipFalsePositives,
-            precipFalseNegatives: score.precipFalseNegatives,
-            windScore: score.windScore,
-            windMaeGusts: score.windMaeGusts,
-            weightedScore: score.weightedScore,
-            normalizedScore: score.normalizedScore,
-            humidityScore: score.humidityScore,
-            humidityMae: score.humidityMae,
-            humidityRmse: score.humidityRmse,
-            humidityBias: score.humidityBias,
-            pressureScore: score.pressureScore,
-            pressureMae: score.pressureMae,
-            pressureRmse: score.pressureRmse,
-            pressureBias: score.pressureBias,
-            evidenceType: "physical_observation",
-            regime: null,
-          })));
-          totalScores += hourlyScores.length;
-          locationSummaries.push(`📍 ${locName}: ${hourlyScores.length} score(s) calculé(s) sur ${dailyObservation.coverageHours} h physiques qualifiées`);
+          const evaluation = evaluateHourlyForecastRuns(
+            snapshots,
+            hourlyForecastRuns.flatMap((run) => isHourlyForecastVariable(run.variable)
+              ? [{ ...run, variable: run.variable as HourlyForecastVariable }]
+              : []),
+          );
+          const hourlyScores = evaluation.compatibilityScores;
+          if (evaluation.scores.length > 0) {
+            await persistHourlyForecastEvaluationScores(evaluation.scores.map((score) => ({
+              locationKey: score.locationKey,
+              date: score.date,
+              sourceName: score.sourceName,
+              modelName: score.modelName,
+              modelId: score.modelId,
+              variable: score.variable,
+              horizonBucket: score.horizonBucket,
+              observationCount: score.observationCount,
+              evaluableObservationCount: score.evaluableObservationCount,
+              sampleSize: score.sampleSize,
+              coverageRatio: score.coverageRatio,
+              mae: score.mae,
+              rmse: score.rmse,
+              bias: score.bias,
+            })));
+          }
+          if (hourlyScores.length > 0) {
+            await upsertHourlyCompatibilityReliabilityScores(hourlyScores.map((score) => ({
+              locationKey: locKey,
+              date: yesterday,
+              serviceName: score.serviceName,
+              sampleSize: score.sampleSize,
+              maeTemp: score.maeTemp,
+              maePrecip: score.maePrecip,
+              maeWind: score.maeWind,
+              rmseTemp: score.rmseTemp,
+              rmsePrecip: score.rmsePrecip,
+              rmseWind: score.rmseWind,
+              biasTemp: score.biasTemp,
+              precipScore: score.precipScore,
+              precipPod: score.precipPod,
+              precipFar: score.precipFar,
+              precipCsi: score.precipCsi,
+              precipFalsePositives: score.precipFalsePositives,
+              precipFalseNegatives: score.precipFalseNegatives,
+              windScore: score.windScore,
+              windMaeGusts: score.windMaeGusts,
+              weightedScore: score.weightedScore,
+              normalizedScore: score.normalizedScore,
+              humidityScore: score.humidityScore,
+              humidityMae: score.humidityMae,
+              humidityRmse: score.humidityRmse,
+              humidityBias: score.humidityBias,
+              pressureScore: score.pressureScore,
+              pressureMae: score.pressureMae,
+              pressureRmse: score.pressureRmse,
+              pressureBias: score.pressureBias,
+              evidenceType: "physical_observation",
+              regime: null,
+            })));
+          }
+          const coveredGroups = evaluation.scores.filter((score) => score.sampleSize > 0).length;
+          const comparisonCount = evaluation.scores.reduce((total, score) => total + score.sampleSize, 0);
+          totalScores += hourlyScores.length + evaluation.scores.length;
+          locationSummaries.push(`📍 ${locName}: ${hourlyScores.length} score(s) agrégé(s) compatibles; ${coveredGroups}/${evaluation.scores.length} groupes détaillés modèle/variable/horizon couverts, ${comparisonCount} comparaison(s) physiques`);
 
         } catch (err: any) {
           console.error(`[MeteoAI] Error processing ${locName}:`, err.message);
@@ -1342,11 +1372,29 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           if (hourlyCoverage.missing.length > 0) {
             console.warn(`[Models] ${fav.name}: horaire indisponible — ${hourlyCoverage.missing.join(", ")}`);
           }
-          for (const { modelName, hours } of hourlyAllModels) {
+          for (const forecast of hourlyAllModels) {
+            const { modelName, hours } = forecast;
+            const captureRunId = forecast.captureRunId ?? randomUUID();
             const rows = hours.map((h) => ({
               locationKey: locKey,
               date: today,
               hour: h.hour,
+              validTime: h.validAt,
+              captureRun: {
+                captureRunId,
+                sourceName: forecast.sourceName ?? "open-meteo",
+                modelId: forecast.modelId ?? null,
+                requestStartedAt: forecast.requestStartedAt ?? hourlyShadowRequestStartedAt,
+                availableAt: forecast.availableAt ?? hourlyShadowReceivedAt,
+                units: {
+                  temperature: forecast.sourceMetadata?.units.temperature,
+                  precipitation: forecast.sourceMetadata?.units.precipitation,
+                  windSpeed: forecast.sourceMetadata?.units.windSpeed,
+                  windGusts: forecast.sourceMetadata?.units.windGusts,
+                  humidity: forecast.sourceMetadata?.units.humidity,
+                  pressure: forecast.sourceMetadata?.units.pressure,
+                },
+              },
               modelName,
               temperature: h.temperature,
               apparentTemperature: h.apparentTemperature,
@@ -1384,11 +1432,21 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             return shadowResult;
           });
           const validationHourly = await collectValidationHourlyForecasts(today, { lat: fav.lat, lon: fav.lon });
-          for (const { modelName, hours } of validationHourly) {
+          for (const forecast of validationHourly) {
+            const { modelName, hours } = forecast;
+            const captureRunId = forecast.captureRunId;
             await insertHourlyForecasts(hours.map((h) => ({
               locationKey: locKey,
               date: today,
               hour: h.hour,
+              validTime: h.validAt,
+              captureRun: {
+                captureRunId,
+                sourceName: forecast.sourceName,
+                modelId: forecast.modelId,
+                requestStartedAt: forecast.requestStartedAt,
+                availableAt: forecast.availableAt,
+              },
               modelName: `${modelName} · validation`,
               temperature: h.temperature,
               apparentTemperature: h.apparentTemperature,

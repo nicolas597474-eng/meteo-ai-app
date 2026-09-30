@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import {
   shadowWeatherIngestionRuns,
@@ -58,6 +58,7 @@ import {
   fetchProviderRunEvidenceMap,
 } from "./weatherProviderRunEvidence";
 import { getP1ObservationWindow } from "./weatherP1Observation";
+import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 
 export type ShadowHourlyForecast = HourlyModelForecast;
 
@@ -669,21 +670,23 @@ export function normalizeHourlyForecastToShadow(
   const sourceTimezone = forecast.sourceMetadata?.timezone ?? null;
   const units = forecast.sourceMetadata?.units;
   for (const hour of forecast.hours) {
-    const validTime = parisLocalDateTimeToEpochMs(context.targetDate, hour.hour);
-    const horizonMinutes = Math.round((validTime - context.receivedAt) / 60_000);
+    const validTime = hour.validAt ?? parisLocalHourToUniqueEpochMs(context.targetDate, hour.hour);
+    if (validTime == null) continue;
+    const availableAt = forecast.availableAt ?? context.receivedAt;
+    const horizonMinutes = Math.round((validTime - availableAt) / 60_000);
     if (horizonMinutes < 0 || horizonMinutes > PHASE3_HORIZON_WINDOWS.at(-1)!.maxMinutes) continue;
     const flags = ["hourly_value", "timezone_europe_paris"];
     values.push(
-      toCanonicalValue("air_temperature_2m", hour.temperature, validTime, context.receivedAt, flags, units?.temperature ?? null, sourceTimezone, context),
-      toCanonicalValue("apparent_temperature", hour.apparentTemperature, validTime, context.receivedAt, flags, units?.apparentTemperature ?? null, sourceTimezone, context),
-      toCanonicalValue("precipitation_amount", hour.precipitation, validTime, context.receivedAt, flags, units?.precipitation ?? null, sourceTimezone, context),
-      toCanonicalValue("wind_speed_10m", hour.windSpeed, validTime, context.receivedAt, flags, units?.windSpeed ?? null, sourceTimezone, context),
-      toCanonicalValue("wind_gust_10m", hour.windGusts, validTime, context.receivedAt, flags, units?.windGusts ?? null, sourceTimezone, context),
-      toCanonicalValue("wind_direction_10m", hour.windDirection, validTime, context.receivedAt, flags, units?.windDirection ?? null, sourceTimezone, context),
-      toCanonicalValue("relative_humidity_2m", hour.humidity, validTime, context.receivedAt, flags, units?.humidity ?? null, sourceTimezone, context),
-      toCanonicalValue("air_pressure_surface", hour.pressure, validTime, context.receivedAt, flags, units?.pressure ?? null, sourceTimezone, context),
-      toCanonicalValue("cloud_cover_total", hour.cloudCover, validTime, context.receivedAt, flags, units?.cloudCover ?? null, sourceTimezone, context),
-      toCanonicalValue("weather_code", hour.weatherCode, validTime, context.receivedAt, flags, units?.weatherCode ?? null, sourceTimezone, context),
+      toCanonicalValue("air_temperature_2m", hour.temperature, validTime, availableAt, flags, units?.temperature ?? null, sourceTimezone, context),
+      toCanonicalValue("apparent_temperature", hour.apparentTemperature, validTime, availableAt, flags, units?.apparentTemperature ?? null, sourceTimezone, context),
+      toCanonicalValue("precipitation_amount", hour.precipitation, validTime, availableAt, flags, units?.precipitation ?? null, sourceTimezone, context),
+      toCanonicalValue("wind_speed_10m", hour.windSpeed, validTime, availableAt, flags, units?.windSpeed ?? null, sourceTimezone, context),
+      toCanonicalValue("wind_gust_10m", hour.windGusts, validTime, availableAt, flags, units?.windGusts ?? null, sourceTimezone, context),
+      toCanonicalValue("wind_direction_10m", hour.windDirection, validTime, availableAt, flags, units?.windDirection ?? null, sourceTimezone, context),
+      toCanonicalValue("relative_humidity_2m", hour.humidity, validTime, availableAt, flags, units?.humidity ?? null, sourceTimezone, context),
+      toCanonicalValue("air_pressure_surface", hour.pressure, validTime, availableAt, flags, units?.pressure ?? null, sourceTimezone, context),
+      toCanonicalValue("cloud_cover_total", hour.cloudCover, validTime, availableAt, flags, units?.cloudCover ?? null, sourceTimezone, context),
+      toCanonicalValue("weather_code", hour.weatherCode, validTime, availableAt, flags, units?.weatherCode ?? null, sourceTimezone, context),
     );
   }
   return applyPhase5QualityControlToValues(values, context);
@@ -1175,13 +1178,18 @@ export async function persistHourlyForecastsToShadow(
     const sourceKey = resolveP1ShadowSourceKey(forecast.modelName);
     if (!sourceKey) continue;
     try {
+      const runContext: ShadowWriteContext = {
+        ...context,
+        requestStartedAt: forecast.requestStartedAt ?? context.requestStartedAt,
+        receivedAt: forecast.availableAt ?? context.receivedAt,
+      };
       valueCount += await persistOneShadowRun({
-        cycleKey: `hourly:${context.targetDate}:v1`,
+        cycleKey: `hourly:${context.targetDate}:v2:${forecast.captureRunId ?? randomUUID()}`,
         sourceKey,
-        context,
-        values: normalizeHourlyForecastToShadow(forecast, context),
+        context: runContext,
+        values: normalizeHourlyForecastToShadow(forecast, runContext),
         runEvidence: runEvidenceBySource.get(sourceKey) ?? createUnknownRunEvidence({
-          observedAt: context.receivedAt,
+          observedAt: runContext.receivedAt,
           detail: `Aucune preuve de run Phase 17 reçue pour ${sourceKey}.`,
         }),
       });
@@ -1337,15 +1345,35 @@ type Phase8ReplayCandidate = {
 
 type Phase8ReplaySnapshot = typeof qualifiedObservationSnapshots.$inferSelect;
 
-function phase8ParisWallClockToUtc(date: string, hour: number): number {
-  const [year, month, day] = date.split("-").map(Number);
-  const wallClockUtc = Date.UTC(year, month - 1, day, hour, 0, 0);
-  const parisParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
-  }).formatToParts(new Date(wallClockUtc));
-  const value = Object.fromEntries(parisParts.map(part => [part.type, part.value]));
-  const parisAsUtc = Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day), Number(value.hour), 0, 0);
-  return wallClockUtc + (wallClockUtc - parisAsUtc);
+function phase8ParisWallClockToUtc(date: string, hour: number): number | null {
+  return parisLocalHourToUniqueEpochMs(date, hour);
+}
+
+/** Select the latest run received before the observation independently per source. */
+export function selectLatestAdmissiblePhase8Candidates<T extends {
+  valueId: number;
+  sourceKey: string;
+  locationKey: string;
+  variable: string;
+  validTime: number;
+  receivedAt: number;
+}>(
+  candidates: readonly T[],
+  target: { locationKey: string; variable: string; validTime: number; observationAt: number },
+): T[] {
+  const latestBySource = new Map<string, T>();
+  for (const candidate of candidates) {
+    if (candidate.locationKey !== target.locationKey
+      || candidate.variable !== target.variable
+      || candidate.validTime !== target.validTime
+      || candidate.receivedAt >= target.observationAt) continue;
+    const previous = latestBySource.get(candidate.sourceKey);
+    if (!previous || candidate.receivedAt > previous.receivedAt
+      || (candidate.receivedAt === previous.receivedAt && candidate.valueId > previous.valueId)) {
+      latestBySource.set(candidate.sourceKey, candidate);
+    }
+  }
+  return Array.from(latestBySource.values()).sort((left, right) => left.sourceKey.localeCompare(right.sourceKey));
 }
 
 function phase8ObservationValue(snapshot: Phase8ReplaySnapshot, variable: Phase8MetricVariable): number | null {
@@ -1426,24 +1454,37 @@ export async function replayPhase8Controlled(options: Phase8ReplayOptions = {}):
       runEvidenceSourceUrl: row.run.runEvidenceSourceUrl, payloadHash: row.run.payloadHash, runStatus: row.run.status,
     });
   }
-  const latestByKey = new Map<string, Phase8ReplayCandidate>();
+  const candidatesByObservation = new Map<string, Phase8ReplayCandidate[]>();
   for (const candidate of candidates) {
-    const key = `${candidate.locationKey}|${candidate.sourceKey}|${candidate.variable}|${candidate.validTime}`;
-    const previous = latestByKey.get(key);
-    if (!previous || candidate.receivedAt > previous.receivedAt || (candidate.receivedAt === previous.receivedAt && candidate.valueId > previous.valueId)) latestByKey.set(key, candidate);
+    const key = `${candidate.locationKey}|${candidate.validTime}|${candidate.variable}`;
+    const aligned = candidatesByObservation.get(key) ?? [];
+    aligned.push(candidate);
+    candidatesByObservation.set(key, aligned);
   }
   const groups = new Map<string, { candidate: Phase8ReplayCandidate; snapshot: Phase8ReplaySnapshot; observedValue: number; observationAt: number }[]>();
   for (const snapshot of snapshots) {
     if (snapshot.stationCount <= 0 || snapshot.confidenceScore == null || !Number.isFinite(snapshot.confidenceScore)) { reject("observation_not_qualified"); continue; }
     const observationAt = phase8ParisWallClockToUtc(snapshot.date, snapshot.hour);
+    if (observationAt == null) { reject("observation_time_ambiguous_or_nonexistent"); continue; }
     if (observationAt < sinceMs || observationAt > untilMs || observationAt > Date.now()) { reject("observation_outside_period"); continue; }
     for (const variable of PHASE8_METRIC_VARIABLES) {
       const observedValue = phase8ObservationValue(snapshot, variable);
       if (observedValue == null) { reject(`observation_missing_${variable}`); continue; }
-      const matching = Array.from(latestByKey.values()).filter(candidate => candidate.locationKey === snapshot.locationKey && candidate.validTime === observationAt && candidate.variable === variable);
-      if (matching.length === 0) { reject(`no_aligned_forecast_${variable}`); continue; }
+      // The physical hour is conservatively represented by the start of its Paris wall-clock hour.
+      const aligned = candidatesByObservation.get(`${snapshot.locationKey}|${observationAt}|${variable}`) ?? [];
+      const matching = selectLatestAdmissiblePhase8Candidates(aligned, {
+        locationKey: snapshot.locationKey,
+        variable,
+        validTime: observationAt,
+        observationAt,
+      });
+      if (matching.length === 0) {
+        reject(aligned.some(candidate => candidate.receivedAt >= observationAt)
+          ? "forecast_received_after_observation"
+          : `no_aligned_forecast_${variable}`);
+        continue;
+      }
       for (const candidate of matching) {
-        if (candidate.receivedAt >= observationAt) { reject("forecast_received_after_observation"); continue; }
         const window = getPhase3HorizonWindow(candidate.forecastHorizonMinutes);
         if (!window) { reject("horizon_unresolved_after_alignment"); continue; }
         const key = `${candidate.locationKey}|${candidate.sourceKey}|${candidate.variable}|${window.key}`;
