@@ -274,17 +274,11 @@ describe("EnvironmentalPanels", () => {
 
   it("préserve l’arche complète du cycle solaire sur mobile", () => {
     expect(source).toContain("rounded-t-full");
-    expect(styles).toContain("Qualité de l’air, soleil et lune");
-    expect(styles).toContain("height: 12rem !important");
-    expect(styles).toContain("aspect-ratio: 2 / 1");
-    expect(styles).toContain("ratio 2:1 évite le sommet aplati");
-    expect(styles).toContain("bottom: 1.15rem !important");
-    expect(source).toContain('belowHorizon && <span className="celestial-below-horizon-label absolute');
-    expect(styles).toContain("bottom: -2.1rem !important");
-    expect(styles).toContain("margin-top: 3rem !important");
-    expect(styles).toContain("top: calc(100% + 0.75rem)");
-    expect(styles).toContain("text-amber-100");
-    expect(styles).toContain("text-indigo-100");
+    expect(temporalSunMoonSource).toContain("w-full max-w-[330px] min-w-0 overflow-visible");
+    expect(temporalSunMoonSource).toContain('belowHorizon && <p className="celestial-below-horizon-label min-w-0">');
+    expect(styles).toContain(".celestial-below-horizon-label {");
+    expect(styles).not.toContain('section[aria-label="Qualité de l’air, soleil et lune"] > :nth-child(2)');
+    expect(styles).not.toContain("bottom: -2.1rem !important");
     expect(styles).toContain("celestial-solar-disc-breathe");
     expect(styles).toContain("prefers-reduced-motion: no-preference");
   });
@@ -342,8 +336,8 @@ describe("EnvironmentalPanels", () => {
 
   it("affiche la phase, l’éclairage et l’orientation issus du calcul géométrique lunaire", () => {
     expect(temporalSunMoonSource).toContain("position.lunar");
-    expect(temporalSunMoonSource).toContain("brightLimbAngleDeg");
-    expect(temporalSunMoonSource).toContain("illuminationPct");
+    expect(source).toContain("brightLimbAngleDeg");
+    expect(source).toContain("illuminationPct");
     expect(temporalSunMoonSource).toContain("displayTimeInZone(value, astronomy.timezone)");
     expect(source).toContain("Visibilité locale");
     expect(source).toContain("getEclipseCircumstances.useQuery");
@@ -355,16 +349,18 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Alerte sonore");
     expect(source).toContain("L’éclipse commence maintenant");
     expect(temporalSunMoonSource).toContain("<RealisticMoon phase={moonPhase}");
-    expect(source).toContain("from ${phase.brightLimbAngleDeg}deg at 50% 50%");
-    expect(temporalSunMoonSource).toContain("moon: { label: position.lunar.label");
+    expect(temporalSunMoonSource).toContain("const moonPhase = position.lunar ?? astronomy.lunar");
+    expect(temporalSunMoonSource).toContain("moonPhase.label");
+    expect(temporalSunMoonSource).toContain("moonPhase.illuminationPct");
   });
 
   it("utilise une texture réaliste pour toute phase lunaire visible", () => {
     expect(source).toContain("meteoai-realistic-moon-surface_f2f79daf.png");
     expect(source).toContain("function RealisticMoon");
-    expect(source).toContain("const illuminatedAngle = illumination * 3.6");
-    expect(source).toContain("conic-gradient(from ${phase.brightLimbAngleDeg}deg at 50% 50%");
-    expect(source).toContain("rgba(2, 6, 23, 0) 0deg ${illuminatedAngle}deg");
+    expect(source).toContain("getLunarShadowPath(illumination)");
+    expect(source).toContain("getLunarShadowTransform(phase.brightLimbAngleDeg)");
+    expect(source).toContain("<path d={shadowPath}");
+    expect(source).not.toContain("conic-gradient(from ${phase.brightLimbAngleDeg}");
   });
 
   it("anime une lueur lunaire discrète sans l’imposer aux préférences de mouvement réduit", () => {

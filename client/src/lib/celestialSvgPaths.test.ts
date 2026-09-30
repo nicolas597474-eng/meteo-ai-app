@@ -40,6 +40,24 @@ describe("celestial SVG paths", () => {
     ).toBeNull();
   });
 
+  it("keeps 48 px edge markers inside the card gutter at narrow mobile widths", () => {
+    const edgePositions = [90, 270].map((azimuthDeg) =>
+      projectApparentBodyOnArc({ aboveHorizon: true, altitudeDeg: 30, azimuthDeg })
+    );
+    const markerRadius = 24;
+    const cardGutter = 12;
+
+    for (const sceneWidth of [184, 216, 248, 288]) {
+      for (const position of edgePositions) {
+        if (!position) throw new Error("Expected an above-horizon mobile marker");
+        const markerLeft = (position.left / 100) * sceneWidth - markerRadius;
+        const markerRight = (position.left / 100) * sceneWidth + markerRadius;
+        expect(markerLeft).toBeGreaterThanOrEqual(-cardGutter);
+        expect(markerRight).toBeLessThanOrEqual(sceneWidth + cardGutter);
+      }
+    }
+  });
+
   it("breaks the trajectory around invalid and below-horizon points", () => {
     const path = buildTrajectoryPath([
       {

@@ -66,6 +66,18 @@ describe("environmentalData", () => {
     expect(position.events.moon.culmination).toBeTruthy();
   });
 
+  it("garde le nom, l’éclairage et l’orientation du rendu alignés sur la géométrie du 30 septembre 2026", () => {
+    const position = getApparentAstronomyPosition(
+      { lat: 50.89, lon: 2.56 },
+      new Date("2026-09-30T04:06:28.000Z"),
+    );
+
+    expect(position.lunar.label).toBe("Gibbeuse décroissante");
+    expect(position.lunar.illuminationPct).toBe(85);
+    expect(position.lunar.waxing).toBe(false);
+    expect(position.lunar.brightLimbAngleDeg).toBeCloseTo(41.3, 1);
+  });
+
   it("respecte les variations de lieu, de saison et de latitude dans l’état d’horizon", () => {
     const equatorEquinox = getApparentAstronomyPosition({ lat: 0, lon: 0 }, new Date("2026-03-20T12:00:00.000Z"));
     const northPoleSummer = getApparentAstronomyPosition({ lat: 89, lon: 0 }, new Date("2026-06-21T12:00:00.000Z"));

@@ -295,6 +295,7 @@ export type EnvironmentalSnapshot = {
     moonPhase: number | null;
     moon: ReturnType<typeof getMoonPhaseDescriptor>;
     moonIllumination: number | null;
+    lunar: AstronomicalMoonPhase;
     dayProgress: number | null;
     sunAltitudeDeg: number | null;
     moonAltitudeDeg: number | null;
@@ -385,6 +386,7 @@ export async function getEnvironmentalSnapshot(coords: { lat: number; lon: numbe
       moonPhase: apparentPosition.lunar.angleDeg,
       moon: { label: apparentPosition.lunar.label, symbol: apparentPosition.lunar.symbol },
       moonIllumination: apparentPosition.lunar.illuminationPct,
+      lunar: apparentPosition.lunar,
       dayProgress: calculateDayProgress(sunrise, sunset, timezone),
       sunAltitudeDeg: apparentPosition.sun.altitudeDeg,
       moonAltitudeDeg: apparentPosition.moon.altitudeDeg,
