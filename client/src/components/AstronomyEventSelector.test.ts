@@ -51,6 +51,8 @@ describe("AstronomyEventSelector — rendu mobile", () => {
     expect(markup).toContain("min-w-[11rem]");
     expect(markup).toContain("max-w-[14rem]");
     expect(markup).not.toContain("rounded-full");
+    expect(markup).not.toContain("border-slate-");
+    expect(markup).not.toContain("border-sky-");
     for (const label of [
       "Météores",
       "Lunaire",
