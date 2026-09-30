@@ -70,7 +70,7 @@ function getTodayParis(): string {
   return getParisDate();
 }
 
-export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour()) {
+export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), sourceUpdatedAt?: Date | string) {
   const hourNumber = Number(currentHour);
   const current = hours.find((hour) => {
     const match = String(hour?.hour ?? "").match(/^(\d{1,2}):/);
@@ -83,7 +83,7 @@ export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = get
     windSpeed: current.windSpeed ?? null,
     humidity: current.humidity ?? null,
     cloudCover: current.cloudCover ?? null,
-    updatedAt: new Date(),
+    updatedAt: sourceUpdatedAt == null ? new Date() : new Date(sourceUpdatedAt),
   };
 }
 
@@ -222,7 +222,7 @@ export const weatherRouter = router({
       ? buildDatedDailyFusionFallback(meteoAI ?? recentForecasts[0])
       : null;
 
-    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly));
+    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly, getParisHour(), new Date(officialSnapshot.computedAt)));
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
     const modelIndicator = buildModelIndicator(trace);
 
@@ -794,7 +794,7 @@ export const weatherRouter = router({
       const dailyFallback = hours.length === 0
         ? buildDatedDailyFusionFallback(meteoAI ?? recentForecasts[0])
         : null;
-      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours));
+      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt)));
       const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id);
 
       // Best model
@@ -843,7 +843,7 @@ export const weatherRouter = router({
 
       return {
         today: snapshot.weatherDate,
-        officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source },
+        officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source },
         hours,
         periodHours,
         days,
@@ -1150,7 +1150,7 @@ export const weatherRouter = router({
     // couvre notamment la nébulosité.
     const officialSnapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
     const liveHours = officialSnapshot.hourly;
-    const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours));
+    const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours, getParisHour(), new Date(officialSnapshot.computedAt)));
     const regime = operationalRegime.primary.id;
     const regimeDef = operationalRegime.primary;
     const weights = operationalRegime.blendedWeights;

@@ -433,23 +433,25 @@ export async function getQualifiedCumulativeRankingForLocation(locationKey = "de
 
 // ─── METEOAI FORECAST HELPERS ───────────────────────────────────────────────
 
-export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast): Promise<void> {
+export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast, options: { refreshComputedAt?: boolean } = {}): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  // Note: unique constraint was dropped; use locationKey+date as logical key
+  // Keep the current fusion per location/date; only manual refresh asks to bump computedAt.
+  const update: Partial<InsertMeteoAIForecast> = {
+    tempMax: data.tempMax,
+    tempMin: data.tempMin,
+    precipitation: data.precipitation,
+    windSpeed: data.windSpeed,
+    condition: data.condition,
+    stabilityIndex: data.stabilityIndex,
+    stabilityLabel: data.stabilityLabel,
+    confidenceScore: data.confidenceScore,
+    weights: data.weights,
+    explanation: data.explanation,
+  };
+  if (options.refreshComputedAt) update.computedAt = data.computedAt ?? new Date();
   await db.insert(meteoaiForecast).values(data).onDuplicateKeyUpdate({
-    set: {
-      tempMax: data.tempMax,
-      tempMin: data.tempMin,
-      precipitation: data.precipitation,
-      windSpeed: data.windSpeed,
-      condition: data.condition,
-      stabilityIndex: data.stabilityIndex,
-      stabilityLabel: data.stabilityLabel,
-      confidenceScore: data.confidenceScore,
-      weights: data.weights,
-      explanation: data.explanation,
-    },
+    set: update,
   });
 }
 

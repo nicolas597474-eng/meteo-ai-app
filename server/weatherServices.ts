@@ -435,14 +435,18 @@ export async function collectHourlyForecast(
   targetDate: string,
   coords?: { lat: number; lon: number },
   forecastDays = 2,
+  options: { includeCurrentSnapshot?: boolean } = {},
 ): Promise<HourlyPoint[]> {
   const location = coords ?? HONDEGHEM;
+  const includeCurrentSnapshot = options.includeCurrentSnapshot !== false;
   try {
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", location.lat.toString());
     url.searchParams.set("longitude", location.lon.toString());
     url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index,surface_pressure,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall,weather_code");
-    url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,weather_code");
+    if (includeCurrentSnapshot) {
+      url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,weather_code");
+    }
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
 
@@ -580,28 +584,30 @@ export async function collectHourlyForecast(
     // La condition actuelle est produite à un pas de 15 minutes par la source.
     // Elle remplace l’instant horaire équivalent pour éviter de présenter à 11h30
     // une valeur ou un ciel calculé pour 11h00.
-    const current = data.current;
-    const currentHour = typeof current?.time === "string" ? `${current.time.slice(11, 13)}:00` : null;
-    const currentIndex = currentHour ? points.findIndex((point) => point.hour === currentHour) : -1;
-    if (currentIndex >= 0) {
-      const currentPrecipitation = current.precipitation ?? points[currentIndex].precipitation;
-      const currentCloudCover = current.cloud_cover ?? points[currentIndex].cloudCover;
-      const currentWeatherCode = current.weather_code ?? points[currentIndex].weatherCode ?? null;
-      points[currentIndex] = {
-        ...points[currentIndex],
-        temp: current.temperature_2m ?? points[currentIndex].temp,
-        apparentTemp: current.apparent_temperature ?? points[currentIndex].apparentTemp,
-        precipitation: currentPrecipitation,
-        windSpeed: current.wind_speed_10m ?? points[currentIndex].windSpeed,
-        windGust: current.wind_gusts_10m ?? points[currentIndex].windGust,
-        windDirection: current.wind_direction_10m ?? points[currentIndex].windDirection,
-        cloudCover: currentCloudCover,
-        humidity: current.relative_humidity_2m ?? points[currentIndex].humidity,
-        weatherCode: currentWeatherCode,
-        condition: conditionFromWmoWeatherCode(currentWeatherCode, currentPrecipitation, currentCloudCover),
-        observedAt: current.time ?? null,
-        isCurrent: true,
-      };
+    if (includeCurrentSnapshot) {
+      const current = data.current;
+      const currentHour = typeof current?.time === "string" ? `${current.time.slice(11, 13)}:00` : null;
+      const currentIndex = currentHour ? points.findIndex((point) => point.hour === currentHour) : -1;
+      if (currentIndex >= 0) {
+        const currentPrecipitation = current.precipitation ?? points[currentIndex].precipitation;
+        const currentCloudCover = current.cloud_cover ?? points[currentIndex].cloudCover;
+        const currentWeatherCode = current.weather_code ?? points[currentIndex].weatherCode ?? null;
+        points[currentIndex] = {
+          ...points[currentIndex],
+          temp: current.temperature_2m ?? points[currentIndex].temp,
+          apparentTemp: current.apparent_temperature ?? points[currentIndex].apparentTemp,
+          precipitation: currentPrecipitation,
+          windSpeed: current.wind_speed_10m ?? points[currentIndex].windSpeed,
+          windGust: current.wind_gusts_10m ?? points[currentIndex].windGust,
+          windDirection: current.wind_direction_10m ?? points[currentIndex].windDirection,
+          cloudCover: currentCloudCover,
+          humidity: current.relative_humidity_2m ?? points[currentIndex].humidity,
+          weatherCode: currentWeatherCode,
+          condition: conditionFromWmoWeatherCode(currentWeatherCode, currentPrecipitation, currentCloudCover),
+          observedAt: current.time ?? null,
+          isCurrent: true,
+        };
+      }
     }
     return points;
   } catch (err) {
@@ -650,7 +656,8 @@ export type HourlyModelForecast = {
 
 export async function collectHourlyForecastAllModels(
   targetDate: string,
-  coords?: { lat: number; lon: number }
+  coords?: { lat: number; lon: number },
+  options: { includeBestMatch?: boolean } = {},
 ): Promise<HourlyModelForecast[]> {
   const location = coords ?? HONDEGHEM;
   const modelsToCollect = [
@@ -661,7 +668,7 @@ export async function collectHourlyForecastAllModels(
     { name: "GFS", modelId: "gfs_seamless" },
     { name: "GEM", modelId: "gem_seamless" },
     { name: "UKMET", modelId: "ukmo_seamless" },
-    { name: "best_match", modelId: null }, // Open-Meteo best match
+    ...(options.includeBestMatch === false ? [] : [{ name: "best_match", modelId: null }]), // Open-Meteo best match
   ];
 
   const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<HourlyModelForecast | null> => {
