@@ -1,5 +1,6 @@
-import { eq, desc, and, gte, lte, sql, isNull, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, isNull, isNotNull, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { acquireForecastLease, decideScheduledForecastJobDisposition, FORECAST_REFRESH_LOCK_LEASE_MS } from "./forecastRefreshLock";
 import {
   InsertUser,
   users,
@@ -9,6 +10,7 @@ import {
   reliabilityScores,
   meteoaiForecast,
   collectionJobs,
+  forecastRefreshLocks,
   favoriteLocations,
   locationForecasts,
   hourlyForecasts,
@@ -436,7 +438,7 @@ export async function getQualifiedCumulativeRankingForLocation(locationKey = "de
 export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast, options: { refreshComputedAt?: boolean } = {}): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  // Keep the current fusion per location/date; only manual refresh asks to bump computedAt.
+  // Keep one current fusion per location/date; completed manual and scheduled refreshes may bump computedAt.
   const update: Partial<InsertMeteoAIForecast> = {
     tempMax: data.tempMax,
     tempMin: data.tempMin,
@@ -529,7 +531,7 @@ export async function createCollectionJob(data: InsertCollectionJob): Promise<nu
 
 export async function updateCollectionJob(
   id: number,
-  updates: Partial<Pick<InsertCollectionJob, "status" | "servicesCollected" | "errorMessage" | "completedAt">>
+  updates: Partial<Pick<InsertCollectionJob, "status" | "servicesCollected" | "dailyModelsCollected" | "dailyModelsExpected" | "hourlyModelsCollected" | "hourlyModelsExpected" | "errorMessage" | "completedAt">>
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -544,6 +546,137 @@ export async function getRecentCollectionJobs(limit = 10) {
     .from(collectionJobs)
     .orderBy(desc(collectionJobs.startedAt))
     .limit(limit);
+}
+
+export async function getRecentScheduledForecastCollectionJobs(limit = 2) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(collectionJobs)
+    .where(and(eq(collectionJobs.jobType, "forecast"), isNotNull(collectionJobs.scheduleRunKey)))
+    .orderBy(desc(collectionJobs.startedAt))
+    .limit(limit);
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  const candidates = [error, (error as any)?.cause, (error as any)?.driverError];
+  return candidates.some((candidate: any) => candidate?.code === "ER_DUP_ENTRY" || candidate?.errno === 1062);
+}
+
+function affectedRows(result: unknown): number {
+  const first = Array.isArray(result) ? (result as any[])[0] : result as any;
+  return Number(first?.affectedRows ?? 0);
+}
+
+/** Persistent lease shared by the scheduled batch and manual AI Lab refresh. */
+export async function acquireForecastRefreshLock(
+  lockKey: string,
+  ownerToken: string,
+  now = new Date(),
+  leaseMs = FORECAST_REFRESH_LOCK_LEASE_MS,
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable while acquiring forecast refresh lock.");
+
+  return acquireForecastLease({
+    async insertIfAbsent(input) {
+      try {
+        await db.insert(forecastRefreshLocks).values(input);
+        return true;
+      } catch (error) {
+        if (isDuplicateKeyError(error)) return false;
+        throw error;
+      }
+    },
+    async claimIfExpired(input) {
+      const result = await db.update(forecastRefreshLocks)
+        .set({ ownerToken: input.ownerToken, leaseExpiresAt: input.leaseExpiresAt })
+        .where(and(
+          eq(forecastRefreshLocks.lockKey, input.lockKey),
+          lte(forecastRefreshLocks.leaseExpiresAt, input.now),
+        ));
+      return affectedRows(result) > 0;
+    },
+  }, { lockKey, ownerToken, now, leaseMs });
+}
+
+/** Release only the lease still owned by this invocation. */
+export async function releaseForecastRefreshLock(lockKey: string, ownerToken: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(forecastRefreshLocks).where(and(
+    eq(forecastRefreshLocks.lockKey, lockKey),
+    eq(forecastRefreshLocks.ownerToken, ownerToken),
+  ));
+}
+
+export type ScheduledForecastJobClaim =
+  | { claimed: true; jobId: number }
+  | { claimed: false; reason: "already-completed" | "in-progress" };
+
+/** One durable collection_jobs row per Paris slot; failed/stale slots may be retried. */
+export async function claimScheduledForecastCollectionJob(
+  scheduleRunKey: string,
+  scheduleCronTaskUid: string,
+  now = new Date(),
+): Promise<ScheduledForecastJobClaim> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable while claiming scheduled forecast collection.");
+
+  let existing = (await db.select().from(collectionJobs)
+    .where(eq(collectionJobs.scheduleRunKey, scheduleRunKey)).limit(1))[0];
+
+  if (!existing) {
+    try {
+      const result = await db.insert(collectionJobs).values({
+        jobType: "forecast",
+        status: "running",
+        scheduleCronTaskUid,
+        scheduleRunKey,
+        servicesCollected: 0,
+        dailyModelsCollected: 0,
+        dailyModelsExpected: 0,
+        hourlyModelsCollected: 0,
+        hourlyModelsExpected: 0,
+        startedAt: now,
+      });
+      const jobId = Number((result as any)[0]?.insertId ?? 0);
+      if (jobId > 0) return { claimed: true, jobId };
+      throw new Error("Scheduled collection job insert returned no id.");
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) throw error;
+      existing = (await db.select().from(collectionJobs)
+        .where(eq(collectionJobs.scheduleRunKey, scheduleRunKey)).limit(1))[0];
+      if (!existing) throw new Error("Duplicate scheduled collection slot exists but could not be read.");
+    }
+  }
+
+  const disposition = decideScheduledForecastJobDisposition(existing, now);
+  if (disposition !== "retry") return { claimed: false, reason: disposition };
+  const staleBefore = now.getTime() - FORECAST_REFRESH_LOCK_LEASE_MS;
+
+  const result = await db.update(collectionJobs).set({
+    status: "running",
+    scheduleCronTaskUid,
+    servicesCollected: 0,
+    dailyModelsCollected: 0,
+    dailyModelsExpected: 0,
+    hourlyModelsCollected: 0,
+    hourlyModelsExpected: 0,
+    errorMessage: null,
+    startedAt: now,
+    completedAt: null,
+  }).where(and(
+    eq(collectionJobs.id, existing.id),
+    or(
+      eq(collectionJobs.status, "pending"),
+      eq(collectionJobs.status, "failed"),
+      and(eq(collectionJobs.status, "running"), lte(collectionJobs.startedAt, new Date(staleBefore))),
+    ),
+  ));
+
+  return affectedRows(result) > 0
+    ? { claimed: true, jobId: existing.id }
+    : { claimed: false, reason: "in-progress" };
 }
 
 
@@ -1115,9 +1248,16 @@ export async function consumeNetatmoOAuthState(stateHash: string, now = new Date
  * Upsert a pre-fetched forecast for a favorite location.
  * If a row for (favoriteLocationId, date) already exists, update it.
  */
+export function buildLocationForecastUpdateData(data: InsertLocationForecast, updatedAt = new Date()) {
+  const updateData: Partial<InsertLocationForecast> & { updatedAt: Date } = { ...data, updatedAt };
+  delete updateData.tempCurrent;
+  return updateData;
+}
+
 export async function upsertLocationForecast(data: InsertLocationForecast) {
   const db = await getDb();
   if (!db) return;
+  const updateData = buildLocationForecastUpdateData(data);
   // Try update first
   const existing = await db
     .select({ id: locationForecasts.id })
@@ -1133,7 +1273,7 @@ export async function upsertLocationForecast(data: InsertLocationForecast) {
   if (existing.length > 0) {
     await db
       .update(locationForecasts)
-      .set({ ...data, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(locationForecasts.id, existing[0].id));
   } else {
     await db.insert(locationForecasts).values(data);

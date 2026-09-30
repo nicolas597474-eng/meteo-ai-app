@@ -200,10 +200,22 @@ export const collectionJobs = mysqlTable("collection_jobs", {
   jobType: mysqlEnum("jobType", ["forecast", "observation"]).notNull(),
   status: mysqlEnum("status", ["pending", "running", "completed", "failed"]).notNull(),
   scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
+  scheduleRunKey: varchar("scheduleRunKey", { length: 48 }),
   servicesCollected: int("servicesCollected"),
+  dailyModelsCollected: int("dailyModelsCollected").default(0).notNull(),
+  dailyModelsExpected: int("dailyModelsExpected").default(0).notNull(),
+  hourlyModelsCollected: int("hourlyModelsCollected").default(0).notNull(),
+  hourlyModelsExpected: int("hourlyModelsExpected").default(0).notNull(),
   errorMessage: text("errorMessage"),
   startedAt: timestamp("startedAt").defaultNow().notNull(),
   completedAt: timestamp("completedAt"),
+}, (table) => [uniqueIndex("collection_jobs_schedule_run_key_unique").on(table.scheduleRunKey)]);
+
+/** Ephemeral compare-and-set leases; rows are removed on release and reused after expiry. */
+export const forecastRefreshLocks = mysqlTable("forecast_refresh_locks", {
+  lockKey: varchar("lockKey", { length: 64 }).primaryKey(),
+  ownerToken: varchar("ownerToken", { length: 64 }).notNull(),
+  leaseExpiresAt: timestamp("leaseExpiresAt").notNull(),
 });
 
 export type CollectionJob = typeof collectionJobs.$inferSelect;
@@ -443,7 +455,7 @@ export type InsertFavoriteLocation = typeof favoriteLocations.$inferInsert;
 
 /**
  * Pre-fetched forecasts for each favorite location.
- * Populated daily at 05h00 by the heartbeat cron.
+ * Populated by the favorites forecast schedule (05:00 default; every 4h when enabled).
  * Allows instant display without waiting for API calls.
  */
 export const locationForecasts = mysqlTable("location_forecasts", {
@@ -477,7 +489,7 @@ export type InsertLocationForecast = typeof locationForecasts.$inferInsert;
 
 /**
  * Hourly forecasts collected per location per model.
- * Populated daily at 05h00 by the heartbeat cron.
+ * Populated by the favorites forecast schedule (05:00 default; every 4h when enabled).
  * Stores 24h of hourly data per model per location.
  */
 export const hourlyForecasts = mysqlTable("hourly_forecasts", {

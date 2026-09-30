@@ -1,11 +1,13 @@
 import { applyBiasCorrection, computeConfidenceScore, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type LeadTimeBucket, type LeadTimePerf, type ServiceBias } from "./fusionEngine";
+import { randomUUID } from "node:crypto";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDate } from "./weatherTime";
 import { calculateStabilityIndex } from "./statsEngine";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { WEATHER_SERVICES, collectExpertForecasts, collectHourlyForecast, collectHourlyForecastAllModels, type HourlyPoint } from "./weatherServices";
 import { cacheManualHourlyForecast } from "./officialWeatherSnapshot";
-import { getMeteoAIForecastByDate, getQualifiedCumulativeRankingForLocation, getQualifiedLeadTimeScoresForLocation, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
+import { acquireForecastRefreshLock, getMeteoAIForecastByDate, getQualifiedCumulativeRankingForLocation, getQualifiedLeadTimeScoresForLocation, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
+import { getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
 
 type ManualFusionFavorite = {
   id: number;
@@ -187,7 +189,6 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       date: today,
       tempMax: meteoAI.tempMax,
       tempMin: meteoAI.tempMin,
-      tempCurrent: null,
       precipitation: meteoAI.precipitation,
       windSpeed: meteoAI.windSpeed,
       condition,
@@ -339,7 +340,12 @@ export async function refreshManualFusionForFavorite(favorite: ManualFusionFavor
   if (inFlightRefreshes.has(locationKey)) return { status: "in_progress" as const };
 
   inFlightRefreshes.add(locationKey);
+  const lockKey = getLocationForecastRefreshLockKey(locationKey);
+  const lockOwnerToken = randomUUID();
+  let lockAcquired = false;
   try {
+    lockAcquired = await acquireForecastRefreshLock(lockKey, lockOwnerToken);
+    if (!lockAcquired) return { status: "in_progress" as const };
     const today = getParisDate();
     const currentSnapshot = await getMeteoAIForecastByDate(today, locationKey);
     if (isManualFusionCoolingDown(currentSnapshot?.computedAt)) {
@@ -367,5 +373,12 @@ export async function refreshManualFusionForFavorite(favorite: ManualFusionFavor
     return result;
   } finally {
     inFlightRefreshes.delete(locationKey);
+    if (lockAcquired) {
+      try {
+        await releaseForecastRefreshLock(lockKey, lockOwnerToken);
+      } catch (error) {
+        console.warn(`[ManualFusion] Could not release refresh lease for ${locationKey}:`, error);
+      }
+    }
   }
 }

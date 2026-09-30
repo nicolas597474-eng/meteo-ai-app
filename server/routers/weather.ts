@@ -15,6 +15,7 @@ import {
   getCumulativeRanking,
   getCumulativeRankingForLocation,
   getRecentCollectionJobs,
+  getRecentScheduledForecastCollectionJobs,
   insertForecasts,
   insertObservation,
   insertReliabilityScores,
@@ -40,6 +41,8 @@ import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
 import { getParisDate, getParisDateDaysAgo, getParisHour, getNextParisForecastRun } from "../weatherTime";
+import { getActiveParisForecastHours, getFavoritesForecastCadence, getFavoritesForecastScheduleLabel, getRequiredFavoritesForecastHeartbeatCron } from "../forecastScheduleConfig";
+import { getForecastRunDisplayStatus } from "../forecastRunSummary";
 import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
 import { conditionFromWeatherValues } from "../weatherConditionLabels";
 import { computeOfficialDailyForecast } from "../officialForecast";
@@ -637,7 +640,7 @@ export const weatherRouter = router({
       return buildWeatherProvenance(snapshot, dailyFallback);
     }),
 
-  /** Bilan archivé de la collecte de 05 h : modèles de prévision, jamais stations physiques. */
+  /** Bilan des lots planifiés favoris, distinct des snapshots des stations physiques. */
   getForecastCollectionReport: publicProcedure
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
@@ -645,14 +648,29 @@ export const weatherRouter = router({
       const [recentCollections, physicalTraces, recentJobs] = await Promise.all([
         getStationCollectionSnapshots(locationKey, 8),
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, getParisDateDaysAgo(1), getTodayParis()),
-        getRecentCollectionJobs(24),
+        getRecentScheduledForecastCollectionJobs(2),
       ]);
       const latestCollection = recentCollections[0] ?? null;
-      const forecastJobs = recentJobs.filter((job) => job.jobType === "forecast");
-      const latestForecastJob = forecastJobs[0] ?? null;
-      // Le dernier succès de modèles doit venir du snapshot de couverture :
-      // collection_jobs ne conserve que le nombre de lieux/services traités et
-      // ne possède pas les compteurs quotidien/horaire par modèle.
+      const recentForecastRuns = recentJobs.map((job) => ({
+        status: getForecastRunDisplayStatus(job),
+        startedAt: job.startedAt,
+        collectedAt: job.completedAt ?? job.startedAt,
+        durationMs: job.completedAt && job.startedAt
+          ? Math.max(0, job.completedAt.getTime() - job.startedAt.getTime())
+          : null,
+        locationsProcessed: job.servicesCollected ?? 0,
+        dailyModelsCollected: job.dailyModelsCollected ?? 0,
+        dailyModelsExpected: job.dailyModelsExpected ?? 0,
+        hourlyModelsCollected: job.hourlyModelsCollected ?? 0,
+        hourlyModelsExpected: job.hourlyModelsExpected ?? 0,
+        errorMessage: job.errorMessage,
+      }));
+      const latestForecastJob = recentForecastRuns[0] ?? null;
+      const cadence = getFavoritesForecastCadence();
+      const activeForecastHours = getActiveParisForecastHours();
+      const scheduleLabel = getFavoritesForecastScheduleLabel();
+      // Le dernier état de couverture par modèle vient du snapshot spécifique
+      // au lieu; les nouveaux jobs gardent aussi leurs compteurs propres au lot.
       const lastForecastCoverage = recentCollections.find((collection) => collection.status !== "failed") ?? null;
       const lastPhysicalCollection = physicalTraces.find((trace) => trace.status !== "failed") ?? null;
       const hourlyHistory = buildRecentPhysicalSnapshotSlots(physicalTraces);
@@ -679,20 +697,25 @@ export const weatherRouter = router({
       });
 
       return {
-        scheduledAt: "05:00",
+        scheduledAt: cadence === "every-4-hours" ? "toutes les 4 h" : "05:00",
+        scheduledTimes: scheduleLabel,
+        forecastCadence: cadence,
         scheduleTimeZone: "Europe/Paris",
-        nextForecastRun: getNextParisForecastRun().toISOString(),
-        scheduleCoverage: "Le déclencheur vérifie 03:00 et 04:00 UTC, puis collecte uniquement à 05:00 heure de Paris pour couvrir l’heure d’été et l’heure d’hiver.",
+        nextForecastRun: getNextParisForecastRun(new Date(), activeForecastHours).toISOString(),
+        requiredHeartbeatCronUtc: cadence === "every-4-hours" ? getRequiredFavoritesForecastHeartbeatCron() : null,
+        scheduleManagedExternally: true,
+        scheduleCoverage: cadence === "every-4-hours"
+          ? `Mode 4 h actif dans la configuration runtime : ${scheduleLabel} heure de Paris. Le Heartbeat externe doit utiliser ${getRequiredFavoritesForecastHeartbeatCron()} UTC; les appels hors créneaux parisiens autorisés sont ignorés.`
+          : "Le mode sûr reste la collecte de 05:00 Europe/Paris. Le Heartbeat est configuré hors dépôt; l’activation 4 h nécessite de mettre à jour ensemble sa cadence et la configuration runtime après déploiement.",
         lastForecastRun: latestForecastJob ? {
-          status: latestForecastJob.status === "completed" && latestForecastJob.errorMessage ? "partial" : latestForecastJob.status,
+          status: latestForecastJob.status,
           startedAt: latestForecastJob.startedAt,
-          collectedAt: latestForecastJob.completedAt ?? latestForecastJob.startedAt,
-          durationMs: latestForecastJob.completedAt && latestForecastJob.startedAt
-            ? Math.max(0, latestForecastJob.completedAt.getTime() - latestForecastJob.startedAt.getTime())
-            : null,
-          servicesCollected: latestForecastJob.servicesCollected,
+          collectedAt: latestForecastJob.collectedAt,
+          durationMs: latestForecastJob.durationMs,
+          servicesCollected: latestForecastJob.locationsProcessed,
           errorMessage: latestForecastJob.errorMessage,
         } : null,
+        recentForecastRuns,
         expectedModels,
         flowStatuses,
         lastForecastSuccess: lastForecastCoverage ? {
@@ -1237,7 +1260,7 @@ export const weatherRouter = router({
 
     // 9. Replay steps (7 étapes de la synthèse IA)
     const replaySteps = [
-      { step: 1, title: "Collecte des flux", description: `${activeForecasts.length} flux collectés à 05h00 via Open-Meteo API (${sourceComposition})`, icon: "📡" },
+      { step: 1, title: "Collecte des flux", description: `${activeForecasts.length} flux collectés lors du dernier batch planifié via Open-Meteo API (${sourceComposition})`, icon: "📡" },
       { step: 2, title: "Détection du régime", description: `Régime "${regimeDef.label}" détecté — poids contextuels appliqués`, icon: "🔍" },
       { step: 3, title: "Calcul des dimensions", description: "4 dimensions d'erreur calculées indépendamment (T°, Précip, Vent, Cond)", icon: "📐" },
       { step: 4, title: "Scoring pondéré", description: `Score final = ${Math.round(weights.temp * 100)}% T° + ${Math.round(weights.precip * 100)}% Précip + ${Math.round(weights.wind * 100)}% Vent + ${Math.round(weights.condition * 100)}% Cond`, icon: "⚖️" },

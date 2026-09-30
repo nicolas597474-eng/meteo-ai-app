@@ -5,7 +5,7 @@ describe("weather.getForecastCollectionReport", () => {
   it("retourne uniquement la couverture archivée des modèles, séparée des stations", () => {
     const source = readFileSync(new URL("./weather.ts", import.meta.url), "utf8");
     expect(source).toContain("getForecastCollectionReport: publicProcedure");
-    expect(source).toContain('scheduledAt: "05:00"');
+    expect(source).toContain('cadence === "every-4-hours" ? "toutes les 4 h" : "05:00"');
     expect(source).toContain("dailyCollectedModels");
     expect(source).toContain("hourlyCollectedModels");
     expect(source).toContain("getStationCollectionSnapshots(locationKey, 8)");
@@ -23,9 +23,14 @@ describe("weather.getForecastCollectionReport", () => {
     expect(procedure).not.toContain("lastForecastJobSuccess ?? recentCollections.find");
     expect(procedure).toContain("lastPhysicalCollection");
     expect(procedure).not.toContain("collectExpertForecasts");
-    expect(procedure).toContain("getRecentCollectionJobs(24)");
+    expect(procedure).toContain("getRecentScheduledForecastCollectionJobs(2)");
     expect(procedure).toContain("nextForecastRun");
     expect(procedure).toContain("lastForecastRun");
+    expect(procedure).toContain("recentForecastRuns");
+    expect(procedure).toContain("const recentForecastRuns = recentJobs.map");
+    expect(procedure).toContain("dailyModelsCollected: job.dailyModelsCollected ?? 0");
+    expect(procedure).toContain("hourlyModelsCollected: job.hourlyModelsCollected ?? 0");
+    expect(procedure).toContain("scheduleManagedExternally: true");
     expect(procedure).toContain("durationMs");
     expect(procedure).toContain("flowStatuses");
     expect(procedure).toContain("buildForecastFlowStatuses");

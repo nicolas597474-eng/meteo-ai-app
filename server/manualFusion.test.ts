@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   collectExpertForecasts: vi.fn(),
   collectHourlyForecast: vi.fn(),
   collectHourlyForecastAllModels: vi.fn(),
+  acquireForecastRefreshLock: vi.fn(),
+  releaseForecastRefreshLock: vi.fn(),
   getMeteoAIForecastByDate: vi.fn(),
   getQualifiedCumulativeRankingForLocation: vi.fn(),
   getQualifiedLeadTimeScoresForLocation: vi.fn(),
@@ -29,6 +31,8 @@ vi.mock("./weatherServices", () => ({
   collectHourlyForecastAllModels: mocks.collectHourlyForecastAllModels,
 }));
 vi.mock("./db", () => ({
+  acquireForecastRefreshLock: mocks.acquireForecastRefreshLock,
+  releaseForecastRefreshLock: mocks.releaseForecastRefreshLock,
   getMeteoAIForecastByDate: mocks.getMeteoAIForecastByDate,
   getQualifiedCumulativeRankingForLocation: mocks.getQualifiedCumulativeRankingForLocation,
   getQualifiedLeadTimeScoresForLocation: mocks.getQualifiedLeadTimeScoresForLocation,
@@ -121,6 +125,8 @@ beforeEach(() => {
   mocks.collectExpertForecasts.mockResolvedValue(dailyModels());
   mocks.collectHourlyForecast.mockResolvedValue(displayHours());
   mocks.collectHourlyForecastAllModels.mockResolvedValue(hourlyModels());
+  mocks.acquireForecastRefreshLock.mockResolvedValue(true);
+  mocks.releaseForecastRefreshLock.mockResolvedValue(undefined);
   mocks.getMeteoAIForecastByDate.mockImplementation(async () => mocks.persistedDailySnapshot);
   mocks.getQualifiedCumulativeRankingForLocation.mockResolvedValue([]);
   mocks.getQualifiedLeadTimeScoresForLocation.mockResolvedValue([]);
@@ -164,6 +170,7 @@ describe("relance manuelle des prévisions", () => {
     expect(mocks.insertForecasts).toHaveBeenCalledTimes(1);
     expect(mocks.insertForecastRuns).toHaveBeenCalledTimes(1);
     expect(mocks.upsertLocationForecast).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertLocationForecast.mock.calls[0][0]).not.toHaveProperty("tempCurrent");
     expect(mocks.upsertMeteoAIForecast).toHaveBeenCalledTimes(1);
     expect(mocks.upsertMeteoAIForecast.mock.calls[0][1]).toEqual({ refreshComputedAt: true });
     expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(8);
@@ -177,6 +184,8 @@ describe("relance manuelle des prévisions", () => {
       displayHours(),
       expect.any(Date),
     );
+    expect(mocks.acquireForecastRefreshLock).toHaveBeenCalledWith("forecast-location:50.757_2.52", expect.any(String));
+    expect(mocks.releaseForecastRefreshLock).toHaveBeenCalledWith("forecast-location:50.757_2.52", expect.any(String));
 
     const repeated = await refreshManualFusionForFavorite(favorite);
     expect(repeated.status).toBe("cooldown");
@@ -220,6 +229,7 @@ describe("relance manuelle des prévisions", () => {
     mocks.collectExpertForecasts.mockImplementationOnce(() => new Promise((resolve) => { releaseDaily = resolve; }));
 
     const firstRun = refreshManualFusionForFavorite(favorite);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const concurrentRun = await refreshManualFusionForFavorite(favorite);
     expect(concurrentRun.status).toBe("in_progress");
     expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
@@ -229,6 +239,17 @@ describe("relance manuelle des prévisions", () => {
     const completed = await firstRun;
     expect(completed.status).toBe("refreshed");
     expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(8);
+  });
+
+  it("respecte un lease déjà pris par une collecte programmée sur le lieu", async () => {
+    mocks.acquireForecastRefreshLock.mockResolvedValue(false);
+
+    const result = await refreshManualFusionForFavorite(favorite);
+
+    expect(result.status).toBe("in_progress");
+    expect(mocks.collectExpertForecasts).not.toHaveBeenCalled();
+    expect(mocks.collectHourlyForecastAllModels).not.toHaveBeenCalled();
+    expect(mocks.releaseForecastRefreshLock).not.toHaveBeenCalled();
   });
 
   it("marque une écriture horaire en erreur comme partielle sans annoncer 8/8", async () => {
