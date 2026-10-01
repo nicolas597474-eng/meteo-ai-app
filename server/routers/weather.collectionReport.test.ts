@@ -36,6 +36,15 @@ describe("weather.getForecastCollectionReport", () => {
     expect(procedure).toContain("buildForecastFlowStatuses");
     expect(procedure).toContain("dailyCollectedModels");
     expect(procedure).toContain("hourlyCollectedModels");
+    expect(procedure).toContain("const expectedHourlyModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name)");
+    expect(procedure).toContain("getCollectedModelNames(expectedHourlyModels, hourlyMissingModels)");
+    expect(procedure).toContain('result.modelName === "best_match"');
+    expect(procedure).toContain("bestMatchAudit.archiveRowsWritten > 0");
+    expect(procedure).toContain("expectedHourlyModels,");
+    expect(procedure).toContain("getLatestHourlyForecastCollectionResults(locationKey)");
+    expect(procedure).toContain("hourlyModelCollectionAvailable");
+    expect(procedure).toContain("archiveRowsWritten: result.archiveRowsWritten");
+    expect(procedure).toContain("isOfficialModel: result.isOfficialModel === 1");
   });
 });
 
@@ -53,7 +62,7 @@ describe("weather.getShadowDataHubReport", () => {
     expect(scheduledSource).toContain("executeShadowWriteSafely(`hourly:${locKey}`");
     const dailyProductionWrite = scheduledSource.indexOf("await insertForecasts(forecastRowsForLoc);");
     const dailyShadowWrite = scheduledSource.indexOf("persistDailyForecastsToShadow(expertData");
-    const hourlyProductionWrite = scheduledSource.indexOf("await insertHourlyForecasts(rows);");
+    const hourlyProductionWrite = scheduledSource.indexOf("const writeResult = await insertHourlyForecasts(rows);");
     const hourlyShadowWrite = scheduledSource.indexOf("persistHourlyForecastsToShadow(hourlyAllModels");
     expect(dailyProductionWrite).toBeGreaterThanOrEqual(0);
     expect(dailyShadowWrite).toBeGreaterThan(dailyProductionWrite);

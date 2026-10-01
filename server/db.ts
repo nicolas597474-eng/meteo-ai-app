@@ -16,6 +16,7 @@ import {
   hourlyForecasts,
   hourlyForecastRunValues,
   hourlyForecastEvaluationScores,
+  hourlyForecastCollectionResults,
   leadTimeScores,
   InsertForecast,
   InsertForecastRun,
@@ -28,6 +29,7 @@ import {
   InsertHourlyForecast,
   InsertHourlyForecastRunValue,
   InsertHourlyForecastEvaluationScore,
+  InsertHourlyForecastCollectionResult,
   InsertLeadTimeScore,
   weatherStations,
   stationObservations,
@@ -58,6 +60,8 @@ import { buildForecastUpdateSet } from "./forecastWrite";
 import { deriveStationQualityProfile } from "./stationQualityService";
 import { getGroundTruthReferenceBounds } from "./groundTruthReference";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
+import { HourlyForecastPersistenceError, withHourlyForecastPersistenceStages } from "./hourlyForecastPersistence";
+export { HourlyForecastPersistenceError } from "./hourlyForecastPersistence";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -1362,69 +1366,72 @@ type InsertHourlyForecastWithCapture = InsertHourlyForecast & {
  * Preserves the current latest-series behavior while first appending verified
  * UTC-timed values to the immutable capture archive when run metadata is present.
  */
-export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCapture[]): Promise<void> {
-  if (!rows.length) return;
+export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCapture[]): Promise<{
+  archiveRowsWritten: number;
+  projectionRowsWritten: number;
+}> {
+  if (!rows.length) return { archiveRowsWritten: 0, projectionRowsWritten: 0 };
   const db = await getDb();
-  if (!db) return;
+  if (!db) throw new HourlyForecastPersistenceError("database_unavailable", 0, 0);
 
   const captures = new Map<string, InsertHourlyForecastWithCapture[]>();
   for (const row of rows) {
-    if (!row.captureRun || !row.validTime || !Number.isFinite(row.validTime)) continue;
+    if (!row.captureRun || !Number.isFinite(row.validTime)) continue;
     const current = captures.get(row.captureRun.captureRunId) ?? [];
     captures.set(row.captureRun.captureRunId, [...current, row]);
   }
-  for (const [captureRunId, captureRows] of Array.from(captures.entries())) {
-    const capture = captureRows[0].captureRun!;
-    const runValues: InsertHourlyForecastRunValue[] = captureRows.flatMap((row) => {
-      if (row.captureRun?.captureRunId !== captureRunId) return [];
-      const values: Array<{ variable: string; value: number | null; unit: string | null }> = [
-        { variable: "temperature", value: row.temperature ?? null, unit: capture.units?.temperature ?? "°C" },
-        { variable: "precipitation", value: row.precipitation ?? null, unit: capture.units?.precipitation ?? "mm" },
-        { variable: "wind_speed", value: row.windSpeed ?? null, unit: capture.units?.windSpeed ?? "km/h" },
-        { variable: "wind_gust", value: row.windGusts ?? null, unit: capture.units?.windGusts ?? "km/h" },
-        { variable: "humidity", value: row.humidity ?? null, unit: capture.units?.humidity ?? "%" },
-        { variable: "pressure", value: row.pressure ?? null, unit: capture.units?.pressure ?? "hPa" },
-      ];
-      return values.map(({ variable, value, unit }) => ({
-        captureRunId,
-        locationKey: row.locationKey,
-        targetDate: row.date,
-        sourceName: capture.sourceName,
-        modelName: row.modelName,
-        modelId: capture.modelId,
-        requestStartedAt: capture.requestStartedAt,
-        availableAt: capture.availableAt,
-        validTime: row.validTime!,
-        variable,
-        value: value != null && Number.isFinite(value) ? value : null,
-        unit,
-      }));
-    });
-    if (runValues.length > 0) {
-      await db.transaction(async (tx) => {
-        for (let i = 0; i < runValues.length; i += 100) {
+  return withHourlyForecastPersistenceStages(async (confirmCommittedRows) => {
+    for (const [captureRunId, captureRows] of Array.from(captures.entries())) {
+      const capture = captureRows[0].captureRun!;
+      const runValues: InsertHourlyForecastRunValue[] = captureRows.flatMap((row) => {
+        if (row.captureRun?.captureRunId !== captureRunId) return [];
+        const values: Array<{ variable: string; value: number | null; unit: string | null }> = [
+          { variable: "temperature", value: row.temperature ?? null, unit: capture.units?.temperature ?? "°C" },
+          { variable: "precipitation", value: row.precipitation ?? null, unit: capture.units?.precipitation ?? "mm" },
+          { variable: "wind_speed", value: row.windSpeed ?? null, unit: capture.units?.windSpeed ?? "km/h" },
+          { variable: "wind_gust", value: row.windGusts ?? null, unit: capture.units?.windGusts ?? "km/h" },
+          { variable: "humidity", value: row.humidity ?? null, unit: capture.units?.humidity ?? "%" },
+          { variable: "pressure", value: row.pressure ?? null, unit: capture.units?.pressure ?? "hPa" },
+        ];
+        return values.map(({ variable, value, unit }) => ({
+          captureRunId,
+          locationKey: row.locationKey,
+          targetDate: row.date,
+          sourceName: capture.sourceName,
+          modelName: row.modelName,
+          modelId: capture.modelId,
+          requestStartedAt: capture.requestStartedAt,
+          availableAt: capture.availableAt,
+          validTime: row.validTime!,
+          variable,
+          value: value != null && Number.isFinite(value) ? value : null,
+          unit,
+        }));
+      });
+      if (runValues.length > 0) {
+        await db.transaction(async (tx) => {
+          for (let i = 0; i < runValues.length; i += 100) {
           await tx.insert(hourlyForecastRunValues).values(runValues.slice(i, i + 100));
         }
-      });
+        });
+        confirmCommittedRows(runValues.length);
+      }
     }
-  }
-
-  // Delete existing rows for this locationKey + date + modelName before inserting
-  const { locationKey, date, modelName } = rows[0];
-  await db
-    .delete(hourlyForecasts)
-    .where(
-      and(
+  }, async (confirmCommittedRows) => {
+    const { locationKey, date, modelName } = rows[0];
+    await db.transaction(async (tx) => {
+      await tx.delete(hourlyForecasts).where(and(
         eq(hourlyForecasts.locationKey, locationKey),
         eq(hourlyForecasts.date, date),
-        eq(hourlyForecasts.modelName, modelName)
-      )
-    );
-  // Insert in batches of 50 to avoid query size limits
-  for (let i = 0; i < rows.length; i += 50) {
-    const activeRows = rows.slice(i, i + 50).map(({ validTime: _validTime, captureRun: _captureRun, ...row }) => row);
-    await db.insert(hourlyForecasts).values(activeRows);
-  }
+        eq(hourlyForecasts.modelName, modelName),
+      ));
+      for (let i = 0; i < rows.length; i += 50) {
+        const activeRows = rows.slice(i, i + 50).map(({ validTime: _validTime, captureRun: _captureRun, ...row }) => row);
+        await tx.insert(hourlyForecasts).values(activeRows);
+      }
+    });
+    confirmCommittedRows(rows.length);
+  });
 }
 
 /**
@@ -1453,6 +1460,50 @@ export async function getHourlyForecastRunValues(locationKey: string, date: stri
     eq(hourlyForecastRunValues.locationKey, locationKey),
     eq(hourlyForecastRunValues.targetDate, date),
   )).orderBy(hourlyForecastRunValues.modelName, hourlyForecastRunValues.validTime, hourlyForecastRunValues.variable, hourlyForecastRunValues.availableAt);
+}
+
+/** Idempotently records one model result for a scheduled batch attempt. */
+export async function upsertHourlyForecastCollectionResults(rows: InsertHourlyForecastCollectionResult[]): Promise<void> {
+  if (rows.length === 0) return;
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable while recording hourly collection evidence.");
+  for (const row of rows) {
+    await db.insert(hourlyForecastCollectionResults).values(row).onDuplicateKeyUpdate({
+      set: {
+        status: row.status,
+        requestAttempts: row.requestAttempts,
+        hoursReceived: row.hoursReceived,
+        valuesReceived: row.valuesReceived,
+        expectedValueCount: row.expectedValueCount,
+        archiveRowsWritten: row.archiveRowsWritten,
+        projectionRowsWritten: row.projectionRowsWritten,
+        errorCode: row.errorCode,
+        completedAt: row.completedAt,
+      },
+    });
+  }
+}
+
+/** Read all model outcomes from the latest scheduled batch attempt for one location. */
+export async function getLatestHourlyForecastCollectionResults(locationKey: string) {
+  try {
+    const db = await getDb();
+    if (!db) return { available: false, results: [] };
+    const latest = await db.select({ batchAttemptId: hourlyForecastCollectionResults.batchAttemptId })
+      .from(hourlyForecastCollectionResults)
+      .where(eq(hourlyForecastCollectionResults.locationKey, locationKey))
+      .orderBy(desc(hourlyForecastCollectionResults.attemptedAt), desc(hourlyForecastCollectionResults.id))
+      .limit(1);
+    if (!latest[0]) return { available: true, results: [] };
+    const results = await db.select().from(hourlyForecastCollectionResults).where(and(
+      eq(hourlyForecastCollectionResults.locationKey, locationKey),
+      eq(hourlyForecastCollectionResults.batchAttemptId, latest[0].batchAttemptId),
+    )).orderBy(hourlyForecastCollectionResults.modelName);
+    return { available: true, results };
+  } catch {
+    console.warn("[HourlyAudit] Detailed collection report is unavailable; verify database migration status.");
+    return { available: false, results: [] };
+  }
 }
 
 /** Insert or deterministically refresh detailed scores for one observation day. */

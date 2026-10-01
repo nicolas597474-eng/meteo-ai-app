@@ -32,8 +32,14 @@ type ProviderDiagnosticState = Omit<WeatherProviderDiagnostic, "freshnessMs">;
 
 const responseCache = new Map<string, CachedWeatherResponse>();
 const providerDiagnostics = new Map<string, ProviderDiagnosticState>();
+const responseAttemptCounts = new WeakMap<Response, number>();
 let cacheHits = 0;
 let cacheMisses = 0;
+
+/** Returns the network attempts for this exact response (zero for a cache hit). */
+export function getWeatherResponseAttemptCount(response: Response): number {
+  return responseAttemptCounts.get(response) ?? 0;
+}
 
 function cacheKey(input: RequestInfo | URL, init: RequestInit): string | null {
   const method = (init.method ?? "GET").toUpperCase();
@@ -126,7 +132,9 @@ export async function fetchWeather(
       lastAttempts: 0,
       lastRetries: 0,
     });
-    return responseFromCache(cached);
+    const cachedResponse = responseFromCache(cached);
+    responseAttemptCounts.set(cachedResponse, 0);
+    return cachedResponse;
   }
   if (key) {
     responseCache.delete(key);
@@ -164,6 +172,7 @@ export async function fetchWeather(
           lastAttempts: attempt,
           lastRetries: attempt - 1,
         });
+        responseAttemptCounts.set(response, attempt);
         return response;
       }
 
@@ -183,6 +192,7 @@ export async function fetchWeather(
           lastAttempts: attempt,
           lastRetries: attempt - 1,
         });
+        responseAttemptCounts.set(response, attempt);
         return response;
       }
       lastError = new Error(`HTTP ${response.status}`);

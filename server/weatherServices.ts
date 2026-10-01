@@ -5,7 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weatherConditionLabels";
-import { fetchWeather } from "./weatherFetch";
+import { fetchWeather, getWeatherResponseAttemptCount } from "./weatherFetch";
 import { getParisDateAndHour } from "./parisHourlyTime";
 
 // Hondeghem coordinates
@@ -663,7 +663,7 @@ export async function collectHourlyForecast(
 /**
  * Collect hourly forecasts for ALL expert models for a given date and location.
  * Returns an array of { modelName, hours } for storage in hourly_forecasts table.
- * Called daily at 05h00 by the heartbeat cron.
+ * Called at each active favorite-forecast schedule slot; deployment Heartbeat is configured separately.
  */
 export type HourlyModelForecast = {
   modelName: string;
@@ -720,11 +720,45 @@ export type HourlyModelForecast = {
   };
 };
 
-export async function collectHourlyForecastAllModels(
+export type HourlyModelCollectionStatus = "attempting" | "succeeded" | "partial" | "failed" | "safe_error";
+export type HourlyModelCollectionDiagnostic = {
+  modelName: string;
+  modelId: string | null;
+  status: Exclude<HourlyModelCollectionStatus, "attempting">;
+  attemptCount: number;
+  hoursReceived: number;
+  valuesReceived: number;
+  expectedValueCount: number;
+  errorCode: string | null;
+};
+
+export type CollectedHourlyForecastModels = {
+  forecasts: HourlyModelForecast[];
+  diagnostics: HourlyModelCollectionDiagnostic[];
+};
+
+const HOURLY_ARCHIVE_VARIABLES = [
+  "temperature", "precipitation", "windSpeed", "windGusts", "humidity", "pressure",
+] as const;
+
+function finiteHourlyValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function classifyHourlyProviderError(error: unknown): string {
+  if (error instanceof Error && error.name === "SyntaxError") return "invalid_response";
+  if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError" || /timeout|timed out|aborted/i.test(error.message))) {
+    return "timeout";
+  }
+  return "source_unavailable";
+}
+
+/** Collects each model independently and preserves safe per-model outcome metadata. */
+export async function collectHourlyForecastAllModelsWithDiagnostics(
   targetDate: string,
   coords?: { lat: number; lon: number },
   options: { includeBestMatch?: boolean; includeNextDay?: boolean } = {},
-): Promise<HourlyModelForecast[]> {
+): Promise<CollectedHourlyForecastModels> {
   const location = coords ?? HONDEGHEM;
   const lastDate = options.includeNextDay ? (() => {
     const [year, month, day] = targetDate.split("-").map(Number);
@@ -736,8 +770,10 @@ export async function collectHourlyForecastAllModels(
     ...(options.includeBestMatch === false ? [] : [{ name: "best_match", modelId: null }]), // Open-Meteo best match
   ];
 
-  const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<HourlyModelForecast | null> => {
+  type ModelAttempt = { forecast: HourlyModelForecast | null; diagnostic: HourlyModelCollectionDiagnostic };
+  const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<ModelAttempt> => {
     const requestStartedAt = Date.now();
+    let attemptCount = 0;
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
@@ -750,76 +786,76 @@ export async function collectHourlyForecastAllModels(
         url.searchParams.set("models", model.modelId);
       }
 
-      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts });
+      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts, cacheTtlMs: 0 });
+      attemptCount = getWeatherResponseAttemptCount(response);
       if (!response.ok) {
-        console.warn(`[HourlyAll] ${model.name} HTTP ${response.status}`);
-        return null;
+        const errorCode = response.status >= 500 ? "provider_http_5xx" : response.status >= 400 ? "provider_http_4xx" : "provider_http_error";
+        console.warn(`[HourlyAll] ${model.name} request failed (${errorCode}).`);
+        return { forecast: null, diagnostic: {
+          modelName: model.name, modelId: model.modelId, status: "failed", attemptCount,
+          hoursReceived: 0, valuesReceived: 0, expectedValueCount: 0, errorCode,
+        } };
       }
 
       const data = await response.json();
       const availableAt = Date.now();
-      const hourly = data.hourly;
-      if (!hourly?.time) return null;
+      if (!data || typeof data !== "object" || !("hourly" in data)) {
+        return { forecast: null, diagnostic: {
+          modelName: model.name, modelId: model.modelId, status: "failed", attemptCount,
+          hoursReceived: 0, valuesReceived: 0, expectedValueCount: 0, errorCode: "invalid_response",
+        } };
+      }
+      const hourly = (data as { hourly?: Record<string, unknown> }).hourly;
+      const rawTimes = hourly?.time;
+      if (!hourly || !Array.isArray(rawTimes) || rawTimes.length === 0) {
+        return { forecast: null, diagnostic: {
+          modelName: model.name, modelId: model.modelId, status: "failed", attemptCount,
+          hoursReceived: 0, valuesReceived: 0, expectedValueCount: 0, errorCode: "no_usable_data",
+        } };
+      }
 
-      const hours: Array<{
-        validAt: number;
-        hour: number;
-        temperature: number | null;
-        apparentTemperature: number | null;
-        precipitation: number | null;
-        windSpeed: number | null;
-        windGusts: number | null;
-        windDirection: number | null;
-        humidity: number | null;
-        pressure: number | null;
-        cloudCover: number | null;
-        weatherCode: number | null;
-        uvIndex: number | null;
-        dewPoint: number | null;
-        visibility: number | null;
-        solarRadiation: number | null;
-        cloudLow: number | null;
-        cloudMid: number | null;
-        cloudHigh: number | null;
-        snowfall: number | null;
-      }> = [];
+      const hours: HourlyModelForecast["hours"] = [];
+      let valuesReceived = 0;
 
-      for (let i = 0; i < hourly.time.length; i++) {
-        const unixSeconds = Number(hourly.time[i]);
+      for (let i = 0; i < rawTimes.length; i++) {
+        const unixSeconds = typeof rawTimes[i] === "number" ? rawTimes[i] : Number.NaN;
         if (!Number.isFinite(unixSeconds)) continue;
         const validAt = unixSeconds * 1000;
         const parisTime = getParisDateAndHour(validAt);
         if (!parisTime || parisTime.date < targetDate || parisTime.date > lastDate) continue;
-        hours.push({
+        const parsedHour = {
           validAt,
           hour: parisTime.hour,
-          temperature: hourly.temperature_2m?.[i] ?? null,
-          apparentTemperature: hourly.apparent_temperature?.[i] ?? null,
-          precipitation: hourly.precipitation?.[i] ?? null,
-          windSpeed: hourly.wind_speed_10m?.[i] ?? null,
-          windGusts: hourly.wind_gusts_10m?.[i] ?? null,
-          windDirection: hourly.wind_direction_10m?.[i] ?? null,
-          humidity: hourly.relative_humidity_2m?.[i] ?? null,
-          pressure: hourly.surface_pressure?.[i] ?? null,
-          cloudCover: hourly.cloud_cover?.[i] ?? null,
-          weatherCode: hourly.weather_code?.[i] ?? null,
-          uvIndex: hourly.uv_index?.[i] ?? null,
-          dewPoint: hourly.dew_point_2m?.[i] ?? null,
-          visibility: hourly.visibility?.[i] != null ? Number(hourly.visibility[i]) / 1000 : null,
-          solarRadiation: hourly.shortwave_radiation?.[i] ?? null,
-          cloudLow: hourly.cloud_cover_low?.[i] ?? null,
-          cloudMid: hourly.cloud_cover_mid?.[i] ?? null,
-          cloudHigh: hourly.cloud_cover_high?.[i] ?? null,
-          snowfall: hourly.snowfall?.[i] ?? null,
-        });
+          temperature: finiteHourlyValue(hourly.temperature_2m instanceof Array ? hourly.temperature_2m[i] : null),
+          apparentTemperature: finiteHourlyValue(hourly.apparent_temperature instanceof Array ? hourly.apparent_temperature[i] : null),
+          precipitation: finiteHourlyValue(hourly.precipitation instanceof Array ? hourly.precipitation[i] : null),
+          windSpeed: finiteHourlyValue(hourly.wind_speed_10m instanceof Array ? hourly.wind_speed_10m[i] : null),
+          windGusts: finiteHourlyValue(hourly.wind_gusts_10m instanceof Array ? hourly.wind_gusts_10m[i] : null),
+          windDirection: finiteHourlyValue(hourly.wind_direction_10m instanceof Array ? hourly.wind_direction_10m[i] : null),
+          humidity: finiteHourlyValue(hourly.relative_humidity_2m instanceof Array ? hourly.relative_humidity_2m[i] : null),
+          pressure: finiteHourlyValue(hourly.surface_pressure instanceof Array ? hourly.surface_pressure[i] : null),
+          cloudCover: finiteHourlyValue(hourly.cloud_cover instanceof Array ? hourly.cloud_cover[i] : null),
+          weatherCode: finiteHourlyValue(hourly.weather_code instanceof Array ? hourly.weather_code[i] : null),
+          uvIndex: finiteHourlyValue(hourly.uv_index instanceof Array ? hourly.uv_index[i] : null),
+          dewPoint: finiteHourlyValue(hourly.dew_point_2m instanceof Array ? hourly.dew_point_2m[i] : null),
+          visibility: finiteHourlyValue(hourly.visibility instanceof Array ? hourly.visibility[i] : null) == null
+            ? null : finiteHourlyValue(hourly.visibility instanceof Array ? hourly.visibility[i] : null)! / 1000,
+          solarRadiation: finiteHourlyValue(hourly.shortwave_radiation instanceof Array ? hourly.shortwave_radiation[i] : null),
+          cloudLow: finiteHourlyValue(hourly.cloud_cover_low instanceof Array ? hourly.cloud_cover_low[i] : null),
+          cloudMid: finiteHourlyValue(hourly.cloud_cover_mid instanceof Array ? hourly.cloud_cover_mid[i] : null),
+          cloudHigh: finiteHourlyValue(hourly.cloud_cover_high instanceof Array ? hourly.cloud_cover_high[i] : null),
+          snowfall: finiteHourlyValue(hourly.snowfall instanceof Array ? hourly.snowfall[i] : null),
+        };
+        valuesReceived += HOURLY_ARCHIVE_VARIABLES.filter((key) => parsedHour[key] != null).length;
+        hours.push(parsedHour);
       }
 
       if (hours.length > 0) {
-        const hourlyUnits = data.hourly_units && typeof data.hourly_units === "object"
-          ? data.hourly_units as Record<string, unknown>
+        const hourlyUnits = (data as { hourly_units?: unknown }).hourly_units && typeof (data as { hourly_units?: unknown }).hourly_units === "object"
+          ? (data as { hourly_units: Record<string, unknown> }).hourly_units
           : {};
         const getUnit = (key: string) => typeof hourlyUnits[key] === "string" ? hourlyUnits[key] as string : null;
-        return {
+        const forecast: HourlyModelForecast = {
           modelName: model.name,
           modelId: model.modelId,
           sourceName: "open-meteo",
@@ -828,8 +864,8 @@ export async function collectHourlyForecastAllModels(
           availableAt,
           hours,
           sourceMetadata: {
-            timezone: typeof data.timezone === "string" ? data.timezone : null,
-            utcOffsetSeconds: Number.isFinite(Number(data.utc_offset_seconds)) ? Number(data.utc_offset_seconds) : null,
+            timezone: typeof (data as { timezone?: unknown }).timezone === "string" ? (data as { timezone: string }).timezone : null,
+            utcOffsetSeconds: Number.isFinite(Number((data as { utc_offset_seconds?: unknown }).utc_offset_seconds)) ? Number((data as { utc_offset_seconds?: unknown }).utc_offset_seconds) : null,
             units: {
               temperature: getUnit("temperature_2m"),
               apparentTemperature: getUnit("apparent_temperature"),
@@ -852,27 +888,79 @@ export async function collectHourlyForecastAllModels(
             },
           },
         };
+        const expectedValueCount = hours.length * HOURLY_ARCHIVE_VARIABLES.length;
+        if (valuesReceived === 0) {
+          return { forecast: null, diagnostic: {
+            modelName: model.name, modelId: model.modelId, status: "failed", attemptCount,
+            hoursReceived: hours.length, valuesReceived: 0, expectedValueCount, errorCode: "no_usable_data",
+          } };
+        }
+        return { forecast, diagnostic: {
+          modelName: model.name,
+          modelId: model.modelId,
+          status: valuesReceived === expectedValueCount ? "succeeded" : valuesReceived > 0 ? "partial" : "failed",
+          attemptCount,
+          hoursReceived: hours.length,
+          valuesReceived,
+          expectedValueCount,
+          errorCode: valuesReceived > 0 ? null : "no_usable_data",
+        } };
       }
-      return null;
+      return { forecast: null, diagnostic: {
+        modelName: model.name, modelId: model.modelId, status: "failed", attemptCount,
+        hoursReceived: 0, valuesReceived: 0, expectedValueCount: 0, errorCode: "no_usable_data",
+      } };
     } catch (err) {
-      console.warn(`[HourlyAll] Error fetching ${model.name}:`, err);
-      return null;
+      const errorCode = classifyHourlyProviderError(err);
+      console.warn(`[HourlyAll] ${model.name} request failed (${errorCode}).`);
+      return { forecast: null, diagnostic: {
+        modelName: model.name, modelId: model.modelId,
+        status: errorCode === "invalid_response" ? "failed" : "safe_error",
+        attemptCount: attemptCount || attempts,
+        hoursReceived: 0, valuesReceived: 0, expectedValueCount: 0, errorCode,
+      } };
     }
   };
 
   const firstPass = await Promise.all(modelsToCollect.map((model) => collectModel(model, 2)));
-  const collected = firstPass.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null);
-  const collectedNames = new Set(collected.map((forecast) => forecast.modelName));
-  const missingModels = modelsToCollect.filter((model) => !collectedNames.has(model.name));
+  const retryIndexes = firstPass.map((result, index) => result.diagnostic.status === "succeeded" ? -1 : index).filter((index) => index >= 0);
+  const retryPass = new Map<number, ModelAttempt>();
+  if (retryIndexes.length > 0) {
+    console.warn(`[HourlyAll] Retry targeted for ${retryIndexes.length} incomplete model source(s).`);
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+    const retryResults = await Promise.all(retryIndexes.map((index) => collectModel(modelsToCollect[index], 1)));
+    retryIndexes.forEach((index, resultIndex) => retryPass.set(index, retryResults[resultIndex]));
+  }
 
-  if (missingModels.length === 0) return collected;
+  const outcomes = firstPass.map((first, index) => {
+    const retry = retryPass.get(index);
+    if (!retry) return first;
+    const firstQuality = first.diagnostic.valuesReceived;
+    const retryQuality = retry.diagnostic.valuesReceived;
+    const selected = retryQuality > firstQuality ? retry : first;
+    const status = selected.diagnostic.status;
+    return {
+      forecast: selected.forecast,
+      diagnostic: {
+        ...selected.diagnostic,
+        attemptCount: first.diagnostic.attemptCount + retry.diagnostic.attemptCount,
+        errorCode: status === "succeeded" ? null : retry.diagnostic.errorCode ?? selected.diagnostic.errorCode,
+      },
+    };
+  });
 
-  // Le second passage cible seulement les sources réellement absentes. Les
-  // données déjà collectées sont conservées et aucune substitution n’est faite.
-  console.warn(`[HourlyAll] Retry targeted for missing models: ${missingModels.map((model) => model.name).join(", ")}`);
-  await new Promise((resolve) => setTimeout(resolve, 1_200));
-  const retryPass = await Promise.all(missingModels.map((model) => collectModel(model, 1)));
-  return [...collected, ...retryPass.filter((forecast): forecast is NonNullable<typeof forecast> => forecast !== null)];
+  return {
+    forecasts: outcomes.flatMap((outcome) => outcome.forecast ? [outcome.forecast] : []),
+    diagnostics: outcomes.map(({ diagnostic }) => diagnostic),
+  };
+}
+
+export async function collectHourlyForecastAllModels(
+  targetDate: string,
+  coords?: { lat: number; lon: number },
+  options: { includeBestMatch?: boolean; includeNextDay?: boolean } = {},
+): Promise<HourlyModelForecast[]> {
+  return (await collectHourlyForecastAllModelsWithDiagnostics(targetDate, coords, options)).forecasts;
 }
 
 /** Collect hourly candidate series without affecting active model coverage. */

@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildStationCollectionSnapshot, getForecastCollectionJobStatus, getModelCoverage, processWithConcurrency } from "./scheduledHandlers";
-import { VALIDATION_WEATHER_MODELS } from "./weatherServices";
+import { OFFICIAL_HOURLY_MODELS, VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
 describe("getModelCoverage", () => {
-  it("définit une couverture quotidienne et horaire sur les huit modèles actifs", () => {
+  it("conserve le catalogue quotidien à huit flux par défaut", () => {
     const coverage = getModelCoverage([
       "AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo",
     ]);
@@ -28,6 +28,16 @@ describe("getModelCoverage", () => {
 
     expect(coverage.collected).toHaveLength(8);
     expect(coverage.missing).toEqual([]);
+  });
+
+  it("sépare le compte horaire des sept sources officielles de la référence Best Match", () => {
+    const expectedOfficialModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+    const coverage = getModelCoverage([...expectedOfficialModels, "Open-Meteo"], expectedOfficialModels);
+
+    expect(coverage.expected).toEqual(expectedOfficialModels);
+    expect(coverage.collected).toEqual(expectedOfficialModels);
+    expect(coverage.expected).not.toContain("Open-Meteo");
+    expect(coverage.collected).not.toContain("Open-Meteo");
   });
 
   it("conserve les candidats hors du compteur de couverture active", () => {
@@ -56,13 +66,14 @@ describe("cadence automatique des prévisions", () => {
     expect(processed.sort()).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it("relance uniquement les modèles absents sans remplacer les données déjà archivées", () => {
+  it("relance uniquement les modèles incomplets et conserve la meilleure réponse par source", () => {
     const source = readFileSync(new URL("./weatherServices.ts", import.meta.url), "utf8");
-    expect(source).toContain("Retry targeted for missing models");
-    expect(source).toContain("const missingModels = modelsToCollect.filter");
-    expect(source).toContain("collectModel(model, 2)");
-    expect(source).toContain("collectModel(model, 1)");
-    expect(source).toContain("return [...collected");
+    expect(source).toContain("Retry targeted for ${retryIndexes.length} incomplete model source(s)");
+    expect(source).toContain("const retryIndexes = firstPass.map");
+    expect(source).toContain("modelsToCollect.map((model) => collectModel(model, 2))");
+    expect(source).toContain("retryIndexes.map((index) => collectModel(modelsToCollect[index], 1))");
+    expect(source).toContain("const selected = retryQuality > firstQuality ? retry : first");
+    expect(source).toContain("forecasts: outcomes.flatMap");
   });
 
   it("délègue les relevés physiques à la tâche dédiée pour préserver le délai de prévision", () => {
@@ -86,13 +97,18 @@ describe("cadence automatique des prévisions", () => {
     const handler = source.slice(start, end);
     const dailyWrite = handler.indexOf("await insertForecasts(forecastRowsForLoc);");
     const dailyCounter = handler.indexOf("dailyModelsCollected += dailyCoverage.collected.length", dailyWrite);
-    const hourlyWrite = handler.indexOf("await insertHourlyForecasts(rows);");
+    const hourlyWrite = handler.indexOf("const writeResult = await insertHourlyForecasts(rows);");
     const hourlyCounter = handler.indexOf("hourlyModelsCollected++", hourlyWrite);
 
     expect(handler).toContain("getParisForecastSlot(new Date(), activeHours)");
     expect(handler).toContain("claimScheduledForecastCollectionJob(slot.key, user.taskUid)");
     expect(handler).toContain("FAVORITES_FORECAST_SCHEDULER_LOCK_KEY");
     expect(handler).toContain("getLocationForecastRefreshLockKey(locKey)");
+    expect(handler).toContain("await upsertHourlyForecastCollectionResults(initialHourlyResults)");
+    expect(handler).toContain("archiveRowsWritten = writeResult.archiveRowsWritten");
+    expect(handler).toContain("OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName)");
+    expect(handler).toContain("hourlyModelsExpected = uniqueLocations.length * OFFICIAL_HOURLY_COVERAGE_MODELS.length");
+    expect(handler.indexOf("collectHourlyForecastAllModelsWithDiagnostics(today")).toBeLessThan(handler.indexOf("if (expertData.length === 0)"));
     expect(dailyCounter).toBeGreaterThan(dailyWrite);
     expect(hourlyCounter).toBeGreaterThan(hourlyWrite);
     expect(handler).toContain("{ refreshComputedAt: true }");

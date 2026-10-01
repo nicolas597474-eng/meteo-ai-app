@@ -8,14 +8,17 @@ export const FAVORITES_FORECAST_CADENCE_ENV = "METEOAI_FAVORITES_FORECAST_CADENC
 export type FavoritesForecastCadence = "daily-05" | "every-4-hours";
 
 /**
- * The existing 05:00 schedule remains the safe default. Set this runtime value
- * to `4h` only together with the external Heartbeat cron update documented in
- * docs/favorites-forecast-schedule.md.
+ * Four-hour collection is the application default. Set the runtime value to
+ * `daily-05` only when the external Heartbeat is intentionally kept daily; the
+ * Heartbeat itself remains externally managed and must use the documented UTC
+ * guard expression for all six Paris collection slots.
  */
 export function getFavoritesForecastCadence(
   env: Record<string, string | undefined> = process.env,
 ): FavoritesForecastCadence {
-  return env[FAVORITES_FORECAST_CADENCE_ENV] === "4h" ? "every-4-hours" : "daily-05";
+  const configuredCadence = env[FAVORITES_FORECAST_CADENCE_ENV];
+  if (configuredCadence === undefined || configuredCadence === "4h") return "every-4-hours";
+  return "daily-05";
 }
 
 export function getActiveParisForecastHours(

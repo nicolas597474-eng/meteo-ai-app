@@ -11,7 +11,7 @@ export function LocalOfficialDeltaChart({ points }: { points: DeltaPoint[] | und
   if (!points?.length) {
     return (
       <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/45 px-3 py-3 text-xs text-muted-foreground">
-        L’historique se remplira après la collecte de relevés physiques comparables à une prévision officielle horaire.
+        L’historique se remplira lorsque des relevés physiques seront comparables aux prévisions horaires officielles qualifiées des sept modèles.
       </div>
     );
   }
@@ -23,7 +23,7 @@ export function LocalOfficialDeltaChart({ points }: { points: DeltaPoint[] | und
   return (
     <div className="rounded-xl border border-slate-700/80 bg-slate-950/70 px-3 pt-3 pb-2">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs font-semibold text-slate-100">Écart local − officiel</p>
+        <p className="text-xs font-semibold text-slate-100">Écart local − moteur horaire officiel</p>
         <p className="text-[10px] text-slate-400">24 h · {visible.length} créneau{visible.length > 1 ? "x" : ""} comparable{visible.length > 1 ? "s" : ""}</p>
       </div>
       <div className="mt-2 flex h-24 items-stretch gap-1.5 overflow-x-auto pb-1" aria-label="Historique des écarts locaux et officiels sur 24 heures">
@@ -31,7 +31,7 @@ export function LocalOfficialDeltaChart({ points }: { points: DeltaPoint[] | und
           const height = Math.max(5, (Math.abs(point.deltaC) / maxDelta) * 38);
           const positive = point.deltaC >= 0;
           return (
-            <div key={point.key} className="flex min-w-8 flex-1 flex-col items-center justify-end" title={`${point.label} : local ${point.localTemperature.toFixed(1)}°, officiel ${point.officialTemperature.toFixed(1)}°, écart ${point.deltaC >= 0 ? "+" : ""}${point.deltaC.toFixed(1)}°`}>
+            <div key={point.key} className="flex min-w-8 flex-1 flex-col items-center justify-end" title={`${point.label} : local ${point.localTemperature.toFixed(1)}°, moteur horaire officiel ${point.officialTemperature.toFixed(1)}°, écart ${point.deltaC >= 0 ? "+" : ""}${point.deltaC.toFixed(1)}°`}>
               <span className={`mb-1 text-[9px] font-semibold ${positive ? "text-orange-300" : "text-sky-300"}`}>
                 {point.deltaC >= 0 ? "+" : ""}{point.deltaC.toFixed(1)}
               </span>

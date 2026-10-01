@@ -302,6 +302,13 @@
       "when": 1790828370925,
       "tag": "0042_p1_6_admin_closure",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1790835785330,
+      "tag": "0043_hourly_collection_evidence",
+      "breakpoints": true
     }
   ]
 }

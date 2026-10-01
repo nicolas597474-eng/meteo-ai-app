@@ -1,6 +1,7 @@
 import { getPhase3HorizonWindow } from "../shared/weatherDataHub";
 import { HOURLY_FORECAST_VARIABLES } from "./hourlyForecastRunScoring";
 import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
+import type { HourlyForecastRunValue } from "../drizzle/schema";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { getParisDateDaysAgo } from "./weatherTime";
@@ -33,6 +34,110 @@ const FORECAST_FIELD_BY_VARIABLE: Record<OfficialHourlyVariable, keyof HourlyMod
   humidity: "humidity",
   pressure: "pressure",
 };
+
+const ARCHIVED_VARIABLE_FIELD: Readonly<Record<string, keyof HourlyModelForecast["hours"][number]>> = {
+  temperature: "temperature",
+  precipitation: "precipitation",
+  wind_speed: "windSpeed",
+  wind_gust: "windGusts",
+  humidity: "humidity",
+  pressure: "pressure",
+};
+
+/** Rebuild the latest archived run for each official model without consulting Best Match. */
+export function reconstructOfficialHourlyModelsFromArchive(
+  rows: readonly HourlyForecastRunValue[],
+  targetDate: string,
+): HourlyModelForecast[] {
+  type Capture = {
+    captureRunId: string;
+    modelName: OfficialHourlyModelName;
+    modelId: string;
+    sourceName: string;
+    requestStartedAt: number;
+    availableAt: number;
+    maxId: number;
+    rows: HourlyForecastRunValue[];
+  };
+
+  const capturesByModel = new Map<OfficialHourlyModelName, Map<string, Capture>>();
+  for (const row of rows) {
+    if (row.targetDate !== targetDate || !MODEL_NAME_SET.has(row.modelName)) continue;
+    const modelName = row.modelName as OfficialHourlyModelName;
+    const expectedModelId = MODEL_ID_BY_NAME.get(modelName);
+    if (row.sourceName !== "open-meteo" || row.modelId !== expectedModelId) continue;
+    if (!Number.isFinite(row.requestStartedAt) || !Number.isFinite(row.availableAt) || !Number.isFinite(row.validTime)) continue;
+
+    const captures = capturesByModel.get(modelName) ?? new Map<string, Capture>();
+    const capture = captures.get(row.captureRunId) ?? {
+      captureRunId: row.captureRunId,
+      modelName,
+      modelId: expectedModelId,
+      sourceName: row.sourceName,
+      requestStartedAt: row.requestStartedAt,
+      availableAt: row.availableAt,
+      maxId: row.id,
+      rows: [],
+    };
+    capture.maxId = Math.max(capture.maxId, row.id);
+    capture.rows.push(row);
+    captures.set(row.captureRunId, capture);
+    capturesByModel.set(modelName, captures);
+  }
+
+  const forecasts: HourlyModelForecast[] = [];
+  for (const modelName of OFFICIAL_HOURLY_MODEL_NAMES) {
+    const captures = Array.from(capturesByModel.get(modelName)?.values() ?? []);
+    captures.sort((left, right) => left.availableAt - right.availableAt
+      || left.requestStartedAt - right.requestStartedAt
+      || left.maxId - right.maxId);
+    const latest = captures.at(-1);
+    if (!latest) continue;
+
+    const hoursByValidAt = new Map<number, HourlyModelForecast["hours"][number]>();
+    for (const row of latest.rows) {
+      const field = ARCHIVED_VARIABLE_FIELD[row.variable];
+      if (!field) continue;
+      const parisTime = getParisDateAndHour(row.validTime);
+      if (!parisTime || parisTime.date !== targetDate) continue;
+      const hour = hoursByValidAt.get(row.validTime) ?? {
+        validAt: row.validTime,
+        hour: parisTime.hour,
+        temperature: null,
+        apparentTemperature: null,
+        precipitation: null,
+        windSpeed: null,
+        windGusts: null,
+        windDirection: null,
+        humidity: null,
+        pressure: null,
+        cloudCover: null,
+        weatherCode: null,
+        uvIndex: null,
+        dewPoint: null,
+        visibility: null,
+        solarRadiation: null,
+        cloudLow: null,
+        cloudMid: null,
+        cloudHigh: null,
+        snowfall: null,
+      };
+      (hour as unknown as Record<string, number | null | undefined>)[field] = row.value != null && Number.isFinite(row.value) ? row.value : null;
+      hoursByValidAt.set(row.validTime, hour);
+    }
+
+    forecasts.push({
+      modelName,
+      modelId: latest.modelId,
+      sourceName: latest.sourceName,
+      captureRunId: latest.captureRunId,
+      requestStartedAt: latest.requestStartedAt,
+      availableAt: latest.availableAt,
+      hours: Array.from(hoursByValidAt.values()).sort((left, right) => (left.validAt ?? 0) - (right.validAt ?? 0)),
+    });
+  }
+  return forecasts;
+}
 
 export type OfficialHourlyEvaluationHistoryScore = {
   date: string;
