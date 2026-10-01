@@ -910,7 +910,22 @@ export const shadowWeatherObservationDays = mysqlTable("shadow_weather_observati
 
 export type ShadowWeatherObservationDay = typeof shadowWeatherObservationDays.$inferSelect;
 export type InsertShadowWeatherObservationDay = typeof shadowWeatherObservationDays.$inferInsert;
-
+/** Immutable administrative closure; distinct from P1.6 daily evidence and weather verdicts. */
+export const shadowWeatherObservationClosures = mysqlTable("shadow_weather_observation_closures", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  closureStatus: varchar("closureStatus", { length: 24 }).notNull().default("CLOSED"),
+  validatedByUserId: int("validatedByUserId").notNull(),
+  validatedAt: bigint("validatedAt", { mode: "number" }).notNull(),
+  evidenceSnapshot: json("evidenceSnapshot").notNull(),
+  evidenceHash: varchar("evidenceHash", { length: 64 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_observation_closure_location_unique").on(table.locationKey),
+  index("shadow_observation_closure_validator_time_idx").on(table.validatedByUserId, table.validatedAt),
+]);
+export type ShadowWeatherObservationClosure = typeof shadowWeatherObservationClosures.$inferSelect;
+export type InsertShadowWeatherObservationClosure = typeof shadowWeatherObservationClosures.$inferInsert;
 /** Documented lineage used later by P15; it has no effect on current weights. */
 export const shadowWeatherSourceRelations = mysqlTable("shadow_weather_source_relations", {
   id: int("id").autoincrement().primaryKey(),

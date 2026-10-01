@@ -7,6 +7,8 @@ describe("WeatherAILab P1.6 owner panel", () => {
   it("keeps P1.6 behind the existing admin-only shadow report", () => {
     expect(source).toContain("shadowDataHubReport?.observationWindow");
     expect(source).toContain("<P1ObservationPanel window={shadowDataHubReport.observationWindow}");
+    expect(source).toContain("closure={shadowDataHubReport.observationClosure}");
+    expect(source).toContain("location={activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : null}");
     expect(source).toContain('user?.role === "admin"');
   });
 });

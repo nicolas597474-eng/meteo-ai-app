@@ -566,7 +566,7 @@ export default function WeatherAILab() {
 
     {user?.role === "admin" && shadowDataHubReport && <ProviderRunEvidencePanel report={shadowDataHubReport} />}
 
-    {user?.role === "admin" && shadowDataHubReport?.observationWindow && <P1ObservationPanel window={shadowDataHubReport.observationWindow} />}
+    {user?.role === "admin" && shadowDataHubReport?.observationWindow && <P1ObservationPanel window={shadowDataHubReport.observationWindow} closure={shadowDataHubReport.observationClosure} location={activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : null} />}
 
     {user?.role === "admin" && shadowDataHubReport?.phase2Classification && <Phase2SourceClassificationPanel classification={shadowDataHubReport.phase2Classification} />}
 
