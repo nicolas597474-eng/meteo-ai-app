@@ -67,6 +67,7 @@ import { buildEveningEvidence } from "../historyEvidence";
 import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHandlers";
 import { buildForecastFlowStatuses } from "../forecastFlowStatus";
 import { getShadowDataHubObservability } from "../weatherDataHubShadow";
+import { getP1ObservationClosure } from "../weatherP1Closure";
 import { runHondeghemAromeShadowComparison } from "../aromeHondeghemShadow";
 
 function getTodayParis(): string {
@@ -760,7 +761,12 @@ export const weatherRouter = router({
       const locationKey = input?.lat != null && input?.lon != null
         ? makeLocationKey(input.lat, input.lon)
         : undefined;
-      return getShadowDataHubObservability(locationKey, input?.lookbackDays ?? 7);
+      const report = await getShadowDataHubObservability(locationKey, input?.lookbackDays ?? 7);
+      if (!report) return null;
+      return {
+        ...report,
+        observationClosure: locationKey ? await getP1ObservationClosure(locationKey) : null,
+      };
     }),
 
   /** Diagnostics éphémères des appels fournisseurs, sans persistance en base. */

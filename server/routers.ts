@@ -6,6 +6,7 @@ import { weatherRouter } from "./routers/weather";
 import { favoritesRouter } from "./routers/favorites";
 import { netatmoRouter } from "./routers/netatmo";
 import { personalObservationsRouter } from "./routers/personalObservations";
+import { p1ObservationRouter } from "./routers/p1Observation";
 
 export const appRouter = router({
   system: systemRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   favorites: favoritesRouter,
   netatmo: netatmoRouter,
   personalObservations: personalObservationsRouter,
+  p1Observation: p1ObservationRouter,
 });
 
 export type AppRouter = typeof appRouter;
