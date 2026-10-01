@@ -18,6 +18,7 @@ describe("provenance unifiée des pages météo", () => {
       const source = readFileSync(new URL(`./${filename}`, import.meta.url), "utf8");
       expect(source).toContain("ForecastProvenanceBadge");
       expect(source).toContain("weather.getForecastProvenance.useQuery");
+      expect(source).toContain("HourlyWeightingNotice");
     }
   });
 

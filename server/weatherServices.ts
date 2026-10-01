@@ -29,6 +29,17 @@ export const WEATHER_SERVICES = {
   inactivePublicCatalogue: ["Meteoblue", "AccuWeather", "Apple Weather", "Weather.com", "Ventusky", "Weatherbit", "World Weather Online", "La Chaîne Météo"] as const,
 };
 
+/** Les seules séries admises dans la prévision horaire officielle. */
+export const OFFICIAL_HOURLY_MODELS = [
+  { name: "AROME", modelId: "meteofrance_arome_france_hd" },
+  { name: "ARPEGE", modelId: "meteofrance_arpege_europe" },
+  { name: "ICON", modelId: "dwd_icon_eu" },
+  { name: "ECMWF", modelId: "ecmwf_ifs025" },
+  { name: "GFS", modelId: "gfs_seamless" },
+  { name: "GEM", modelId: "gem_seamless" },
+  { name: "UKMET", modelId: "ukmo_seamless" },
+] as const;
+
 /** Modèles observés séparément avant toute éventuelle qualification. */
 export const VALIDATION_WEATHER_MODELS = [
   { name: "DMI HARMONIE-DINI", modelId: "dmi_seamless", family: "harmonie" as const },
@@ -237,9 +248,21 @@ export type DayForecast = {
   sunset?: string | null;
 };
 
+export type HourlyPointWeighting = {
+  method: "historical_skill" | "equal_fallback";
+  horizonBucket: string | null;
+  fallbackReason: "insufficient_historical_evidence" | "history_unavailable" | "horizon_not_scored" | null;
+  scoredVariables: string[];
+  minimumComparisons: number | null;
+  minimumComparableDays: number | null;
+  modelWeights: Array<{ modelName: string; weight: number }>;
+};
+
 export type HourlyPoint = {
   date?: string;              // YYYY-MM-DD, nécessaire lorsque la couverture dépasse la journée courante
   hour: string;      // "HH:00"
+  validAt?: number; // Absolute UTC instant; preserves repeated local hours at DST fall-back.
+  forecastWeighting?: HourlyPointWeighting;
   temp: number | null;
   apparentTemp: number | null;
   precipitation: number | null;
@@ -643,6 +666,14 @@ export type HourlyModelForecast = {
     pressure: number | null;
     cloudCover: number | null;
     weatherCode: number | null;
+    uvIndex?: number | null;
+    dewPoint?: number | null;
+    visibility?: number | null; // km
+    solarRadiation?: number | null;
+    cloudLow?: number | null;
+    cloudMid?: number | null;
+    cloudHigh?: number | null;
+    snowfall?: number | null;
   }>;
   sourceMetadata?: {
     timezone: string | null;
@@ -658,6 +689,14 @@ export type HourlyModelForecast = {
       pressure: string | null;
       cloudCover: string | null;
       weatherCode: string | null;
+      uvIndex?: string | null;
+      dewPoint?: string | null;
+      visibility?: string | null;
+      solarRadiation?: string | null;
+      cloudLow?: string | null;
+      cloudMid?: string | null;
+      cloudHigh?: string | null;
+      snowfall?: string | null;
     };
   };
 };
@@ -665,17 +704,16 @@ export type HourlyModelForecast = {
 export async function collectHourlyForecastAllModels(
   targetDate: string,
   coords?: { lat: number; lon: number },
-  options: { includeBestMatch?: boolean } = {},
+  options: { includeBestMatch?: boolean; includeNextDay?: boolean } = {},
 ): Promise<HourlyModelForecast[]> {
   const location = coords ?? HONDEGHEM;
+  const lastDate = options.includeNextDay ? (() => {
+    const [year, month, day] = targetDate.split("-").map(Number);
+    const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
+    return Number.isFinite(nextDate.getTime()) ? nextDate.toISOString().slice(0, 10) : targetDate;
+  })() : targetDate;
   const modelsToCollect = [
-    { name: "AROME", modelId: "meteofrance_arome_france_hd" },
-    { name: "ARPEGE", modelId: "meteofrance_arpege_europe" },
-    { name: "ICON", modelId: "dwd_icon_eu" },
-    { name: "ECMWF", modelId: "ecmwf_ifs025" },
-    { name: "GFS", modelId: "gfs_seamless" },
-    { name: "GEM", modelId: "gem_seamless" },
-    { name: "UKMET", modelId: "ukmo_seamless" },
+    ...OFFICIAL_HOURLY_MODELS,
     ...(options.includeBestMatch === false ? [] : [{ name: "best_match", modelId: null }]), // Open-Meteo best match
   ];
 
@@ -685,7 +723,7 @@ export async function collectHourlyForecastAllModels(
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,surface_pressure,cloud_cover,weather_code");
+      url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,surface_pressure,cloud_cover,weather_code,uv_index,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall");
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("timeformat", "unixtime");
       url.searchParams.set("forecast_days", "2");
@@ -717,6 +755,14 @@ export async function collectHourlyForecastAllModels(
         pressure: number | null;
         cloudCover: number | null;
         weatherCode: number | null;
+        uvIndex: number | null;
+        dewPoint: number | null;
+        visibility: number | null;
+        solarRadiation: number | null;
+        cloudLow: number | null;
+        cloudMid: number | null;
+        cloudHigh: number | null;
+        snowfall: number | null;
       }> = [];
 
       for (let i = 0; i < hourly.time.length; i++) {
@@ -724,7 +770,7 @@ export async function collectHourlyForecastAllModels(
         if (!Number.isFinite(unixSeconds)) continue;
         const validAt = unixSeconds * 1000;
         const parisTime = getParisDateAndHour(validAt);
-        if (!parisTime || parisTime.date !== targetDate) continue;
+        if (!parisTime || parisTime.date < targetDate || parisTime.date > lastDate) continue;
         hours.push({
           validAt,
           hour: parisTime.hour,
@@ -738,6 +784,14 @@ export async function collectHourlyForecastAllModels(
           pressure: hourly.surface_pressure?.[i] ?? null,
           cloudCover: hourly.cloud_cover?.[i] ?? null,
           weatherCode: hourly.weather_code?.[i] ?? null,
+          uvIndex: hourly.uv_index?.[i] ?? null,
+          dewPoint: hourly.dew_point_2m?.[i] ?? null,
+          visibility: hourly.visibility?.[i] != null ? Number(hourly.visibility[i]) / 1000 : null,
+          solarRadiation: hourly.shortwave_radiation?.[i] ?? null,
+          cloudLow: hourly.cloud_cover_low?.[i] ?? null,
+          cloudMid: hourly.cloud_cover_mid?.[i] ?? null,
+          cloudHigh: hourly.cloud_cover_high?.[i] ?? null,
+          snowfall: hourly.snowfall?.[i] ?? null,
         });
       }
 
@@ -768,6 +822,14 @@ export async function collectHourlyForecastAllModels(
               pressure: getUnit("surface_pressure"),
               cloudCover: getUnit("cloud_cover"),
               weatherCode: getUnit("weather_code"),
+              uvIndex: getUnit("uv_index"),
+              dewPoint: getUnit("dew_point_2m"),
+              visibility: getUnit("visibility"),
+              solarRadiation: getUnit("shortwave_radiation"),
+              cloudLow: getUnit("cloud_cover_low"),
+              cloudMid: getUnit("cloud_cover_mid"),
+              cloudHigh: getUnit("cloud_cover_high"),
+              snowfall: getUnit("snowfall"),
             },
           },
         };

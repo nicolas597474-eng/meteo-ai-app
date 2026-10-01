@@ -4,7 +4,9 @@ import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDate } from "./weatherTime";
 import { calculateStabilityIndex } from "./statsEngine";
 import { computeOfficialDailyForecast } from "./officialForecast";
-import { WEATHER_SERVICES, collectExpertForecasts, collectHourlyForecast, collectHourlyForecastAllModels, type HourlyPoint } from "./weatherServices";
+import { WEATHER_SERVICES, collectExpertForecasts } from "./weatherServices";
+import { collectOfficialHourlyForecast, OFFICIAL_HOURLY_MODEL_NAMES } from "./officialHourlyForecast";
+import { getParisDateAndHour } from "./parisHourlyTime";
 import { cacheManualHourlyForecast } from "./officialWeatherSnapshot";
 import { acquireForecastRefreshLock, getMeteoAIForecastByDate, getQualifiedCumulativeRankingForLocation, getQualifiedLeadTimeScoresForLocation, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
 import { getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
@@ -255,40 +257,22 @@ function toHourlyRows(locationKey: string, date: string, modelName: string, hour
 }
 
 async function refreshHourlyForecast(favorite: ManualFusionFavorite, today: string, locationKey: string): Promise<GranularityResult> {
-  const expectedModelCount = WEATHER_SERVICES.expert.length;
+  const expectedModelCount = OFFICIAL_HOURLY_MODEL_NAMES.length;
   try {
     const coords = { lat: favorite.lat, lon: favorite.lon };
-    const [displayHours, hourlyModels] = await Promise.all([
-      // This collector omits Open-Meteo's separate current snapshot; only forecast
-      // hours are refreshed, and the cached current-hour value is preserved below.
-      collectHourlyForecast(today, coords, 2, { includeCurrentSnapshot: false }),
-      collectHourlyForecastAllModels(today, coords, { includeBestMatch: false }),
-    ]);
-    const bestMatchHours: HourlyPoint[] = displayHours.filter((hour) => hour.date === today);
+    const officialHourly = await collectOfficialHourlyForecast(today, coords);
+    const hourlyModels = officialHourly.modelForecasts;
     const collectedAt = new Date();
     const candidates = hourlyModels
-      .filter((model) => model.modelName !== "best_match")
-      .map((model) => ({ modelName: model.modelName, rows: toHourlyRows(locationKey, today, model.modelName, model.hours, collectedAt) }))
+      .filter((model) => (OFFICIAL_HOURLY_MODEL_NAMES as readonly string[]).includes(model.modelName))
+      .map((model) => ({
+        modelName: model.modelName,
+        rows: toHourlyRows(locationKey, today, model.modelName, model.hours.filter((hour) => {
+          if (hour.validAt == null) return true;
+          return getParisDateAndHour(hour.validAt)?.date === today;
+        }), collectedAt),
+      }))
       .filter((candidate) => candidate.rows.length > 0);
-
-    if (bestMatchHours.length > 0) {
-      candidates.push({
-        modelName: "best_match",
-        rows: toHourlyRows(locationKey, today, "best_match", bestMatchHours.map((hour) => ({
-          hour: Number(hour.hour.slice(0, 2)),
-          temperature: hour.temp,
-          apparentTemperature: hour.apparentTemp,
-          precipitation: hour.precipitation,
-          windSpeed: hour.windSpeed,
-          windGusts: hour.windGust,
-          windDirection: hour.windDirection,
-          humidity: hour.humidity,
-          pressure: hour.pressure,
-          cloudCover: hour.cloudCover,
-          weatherCode: hour.weatherCode,
-        })), collectedAt),
-      });
-    }
 
     if (candidates.length === 0) {
       return granularityResult(0, expectedModelCount, null, "Aucun modèle horaire n’a renvoyé de prévision exploitable.");
@@ -314,8 +298,8 @@ async function refreshHourlyForecast(favorite: ManualFusionFavorite, today: stri
     }
 
     const updatedAt = persistedModels.size > 0 ? new Date() : null;
-    if (persistedModels.has("best_match") && updatedAt) {
-      cacheManualHourlyForecast(coords, today, displayHours, updatedAt);
+    if (persistedModels.size > 0 && updatedAt) {
+      cacheManualHourlyForecast(coords, today, officialHourly.hours, updatedAt, officialHourly.weighting);
     }
     const error = persistedModels.size === 0
       ? "Les données horaires n’ont pas pu être confirmées après leur enregistrement."
