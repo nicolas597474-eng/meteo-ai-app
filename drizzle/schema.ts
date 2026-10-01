@@ -562,6 +562,38 @@ export const hourlyForecastEvaluationScores = mysqlTable("hourly_forecast_evalua
 export type HourlyForecastEvaluationScore = typeof hourlyForecastEvaluationScores.$inferSelect;
 export type InsertHourlyForecastEvaluationScore = typeof hourlyForecastEvaluationScores.$inferInsert;
 
+/** Per-provider scheduled collection evidence; it never participates in scoring or fusion. */
+export const hourlyForecastCollectionResults = mysqlTable("hourly_forecast_collection_results", {
+  id: int("id").autoincrement().primaryKey(),
+  collectionJobId: int("collectionJobId").notNull(),
+  scheduleRunKey: varchar("scheduleRunKey", { length: 48 }).notNull(),
+  batchAttemptId: varchar("batchAttemptId", { length: 36 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  targetDate: varchar("targetDate", { length: 10 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }),
+  isOfficialModel: int("isOfficialModel").notNull().default(0),
+  sourceName: varchar("sourceName", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["attempting", "succeeded", "partial", "failed", "safe_error"]).notNull(),
+  requestAttempts: int("requestAttempts").notNull().default(0),
+  hoursReceived: int("hoursReceived").notNull().default(0),
+  valuesReceived: int("valuesReceived").notNull().default(0),
+  expectedValueCount: int("expectedValueCount").notNull().default(0),
+  archiveRowsWritten: int("archiveRowsWritten").notNull().default(0),
+  projectionRowsWritten: int("projectionRowsWritten").notNull().default(0),
+  errorCode: varchar("errorCode", { length: 32 }),
+  attemptedAt: bigint("attemptedAt", { mode: "number" }).notNull(),
+  completedAt: bigint("completedAt", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("hourly_collection_attempt_source_unique").on(table.batchAttemptId, table.locationKey, table.modelName),
+  index("hourly_collection_location_time_idx").on(table.locationKey, table.attemptedAt),
+  index("hourly_collection_schedule_slot_idx").on(table.scheduleRunKey, table.locationKey),
+]);
+export type HourlyForecastCollectionResult = typeof hourlyForecastCollectionResults.$inferSelect;
+export type InsertHourlyForecastCollectionResult = typeof hourlyForecastCollectionResults.$inferInsert;
+
 /**
  * Lead-time scoring — per-model, per-location, per-horizon error metrics.
  * Populated during observation collection by comparing forecasts issued N days

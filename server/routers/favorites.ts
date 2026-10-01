@@ -531,7 +531,7 @@ export const favoritesRouter = router({
     }),
 
   /**
-   * Get pre-loaded forecasts for all of the user's favorites (from 05h00 cron).
+   * Get pre-loaded forecasts for all of the user's favorites (from the active scheduled cycle).
    * Returns null for favorites that haven't been collected yet.
    */
   getPreloadedForecasts: protectedProcedure.query(async ({ ctx }) => {

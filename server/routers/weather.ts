@@ -16,6 +16,9 @@ import {
   getCumulativeRankingForLocation,
   getRecentCollectionJobs,
   getRecentScheduledForecastCollectionJobs,
+  getLatestHourlyForecastCollectionResults,
+  getHourlyForecastEvaluationHistory,
+  getHourlyForecastRunValues,
   insertForecasts,
   insertObservation,
   insertReliabilityScores,
@@ -26,7 +29,6 @@ import {
   getQualifiedLeadTimeScoresForLocation,
   makeLocationKey,
   getPhysicalStationHistory,
-  getStoredHourlyForecasts,
   getStationCollectionSnapshots,
   getQualifiedObservationSnapshotsByDateRange,
   getStationCollectionSnapshotsByDateRange,
@@ -35,7 +37,7 @@ import {
   getStationQualityProfiles,
   getFavoriteLocations,
 } from "../db";
-import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
+import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
@@ -69,6 +71,8 @@ import { buildForecastFlowStatuses } from "../forecastFlowStatus";
 import { getShadowDataHubObservability } from "../weatherDataHubShadow";
 import { getP1ObservationClosure } from "../weatherP1Closure";
 import { runHondeghemAromeShadowComparison } from "../aromeHondeghemShadow";
+import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
+import { buildStationForecastComparison24h } from "../stationForecastComparison";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -280,11 +284,32 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
       const sinceMs = Date.now() - 24 * 60 * 60 * 1000;
       const locationKey = makeLocationKey(input.lat, input.lon);
-      const [physicalHistory, todayRows, yesterdayRows] = await Promise.all([
+      const today = getTodayParis();
+      const yesterday = getParisDateDaysAgo(1);
+      const [physicalHistory, todayRows, yesterdayRows, hourlyScoreHistory] = await Promise.all([
         getPhysicalStationHistory(input.lat, input.lon, sinceMs),
-        getStoredHourlyForecasts(locationKey, getTodayParis()),
-        getStoredHourlyForecasts(locationKey, getParisDateDaysAgo(1)),
+        getHourlyForecastRunValues(locationKey, today),
+        getHourlyForecastRunValues(locationKey, yesterday),
+        getHourlyForecastEvaluationHistory(
+          locationKey,
+          getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
+          getParisDateDaysAgo(1),
+        ),
       ]);
+      const todayOfficialForecast = computeOfficialHourlyForecast(
+        reconstructOfficialHourlyModelsFromArchive(todayRows, today),
+        hourlyScoreHistory.rows,
+        { historyAvailable: hourlyScoreHistory.available },
+      );
+      const yesterdayOfficialForecast = computeOfficialHourlyForecast(
+        reconstructOfficialHourlyModelsFromArchive(yesterdayRows, yesterday),
+        hourlyScoreHistory.rows,
+        { historyAvailable: hourlyScoreHistory.available },
+      );
+      const officialHourlyTemperatures = [...todayOfficialForecast.hours, ...yesterdayOfficialForecast.hours]
+        .flatMap((hour) => typeof hour.validAt === "number" && Number.isFinite(hour.validAt) && hour.temp != null
+          ? [{ validAt: hour.validAt, temperature: hour.temp }]
+          : []);
       const readings = physicalHistory.stations.flatMap((station) => station.readings.map((reading) => ({
         stationId: station.stationId,
         observedAt: reading.observedAt,
@@ -292,12 +317,7 @@ export const weatherRouter = router({
         distanceKm: Number(station.distanceKm),
         reliabilityScore: Number(station.reliabilityScore),
       })));
-      return buildLocalOfficialDeltaHistory(readings, [...todayRows, ...yesterdayRows].map((row) => ({
-        date: row.date,
-        hour: row.hour,
-        modelName: row.modelName,
-        temperature: row.temperature,
-      })));
+      return buildLocalOfficialDeltaHistory(readings, officialHourlyTemperatures);
     }),
 
   /** Écarts de poids, source par source, entre deux snapshots du même lieu. */
@@ -651,6 +671,7 @@ export const weatherRouter = router({
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, getParisDateDaysAgo(1), getTodayParis()),
         getRecentScheduledForecastCollectionJobs(2),
       ]);
+      const latestHourlyModelCollection = await getLatestHourlyForecastCollectionResults(locationKey);
       const latestCollection = recentCollections[0] ?? null;
       const recentForecastRuns = recentJobs.map((job) => ({
         status: getForecastRunDisplayStatus(job),
@@ -686,10 +707,16 @@ export const weatherRouter = router({
         .map((trace) => ({ date: trace.date, hour: trace.hour, attempts: trace.attempts, reason: trace.reason }));
       const missingSnapshotSlots = hourlyHistory.filter((trace) => trace.status === "missing").length;
       const expectedModels = WEATHER_SERVICES.expert.map((model) => model.name);
+      const expectedHourlyModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
       const dailyMissingModels = latestCollection ? getMissingModelNames(latestCollection.dailyMissingModels) : [];
       const hourlyMissingModels = latestCollection ? getMissingModelNames(latestCollection.hourlyMissingModels) : [];
       const dailyCollectedModels = latestCollection ? getCollectedModelNames(expectedModels, dailyMissingModels) : [];
-      const hourlyCollectedModels = latestCollection ? getCollectedModelNames(expectedModels, hourlyMissingModels) : [];
+      const hourlyCollectedModels = latestCollection ? getCollectedModelNames(expectedHourlyModels, hourlyMissingModels) : [];
+      const bestMatchAudit = latestHourlyModelCollection.results.find((result) => result.modelName === "best_match");
+      if (bestMatchAudit && bestMatchAudit.archiveRowsWritten > 0 && !hourlyCollectedModels.includes("Open-Meteo")) {
+        // Visible as a separately archived reference only; it never counts toward the seven-model hourly coverage.
+        hourlyCollectedModels.push("Open-Meteo");
+      }
       const flowStatuses = buildForecastFlowStatuses({
         expectedModels,
         dailyCollectedModels,
@@ -706,8 +733,8 @@ export const weatherRouter = router({
         requiredHeartbeatCronUtc: cadence === "every-4-hours" ? getRequiredFavoritesForecastHeartbeatCron() : null,
         scheduleManagedExternally: true,
         scheduleCoverage: cadence === "every-4-hours"
-          ? `Mode 4 h actif dans la configuration runtime : ${scheduleLabel} heure de Paris. Le Heartbeat externe doit utiliser ${getRequiredFavoritesForecastHeartbeatCron()} UTC; les appels hors créneaux parisiens autorisés sont ignorés.`
-          : "Le mode sûr reste la collecte de 05:00 Europe/Paris. Le Heartbeat est configuré hors dépôt; l’activation 4 h nécessite de mettre à jour ensemble sa cadence et la configuration runtime après déploiement.",
+          ? `Mode applicatif 4 h actif : ${scheduleLabel} heure de Paris. Le Heartbeat externe doit utiliser ${getRequiredFavoritesForecastHeartbeatCron()} UTC et être mis à jour séparément; son état live n’est pas vérifiable depuis ce dépôt. Les appels hors créneaux parisiens autorisés sont ignorés.`
+          : "Override explicite en mode quotidien 05:00 Europe/Paris. Le Heartbeat est configuré hors dépôt; retirer cet override et utiliser la cadence UTC documentée après déploiement pour activer les six créneaux.",
         lastForecastRun: latestForecastJob ? {
           status: latestForecastJob.status,
           startedAt: latestForecastJob.startedAt,
@@ -718,6 +745,23 @@ export const weatherRouter = router({
         } : null,
         recentForecastRuns,
         expectedModels,
+        expectedHourlyModels,
+        hourlyModelCollectionAvailable: latestHourlyModelCollection.available,
+        hourlyModelCollection: latestHourlyModelCollection.results.map((result) => ({
+          model: result.modelName === "best_match" ? "Open-Meteo" : result.modelName,
+          modelId: result.modelId,
+          isOfficialModel: result.isOfficialModel === 1,
+          status: result.status,
+          requestAttempts: result.requestAttempts,
+          hoursReceived: result.hoursReceived,
+          valuesReceived: result.valuesReceived,
+          expectedValueCount: result.expectedValueCount,
+          archiveRowsWritten: result.archiveRowsWritten,
+          projectionRowsWritten: result.projectionRowsWritten,
+          errorCode: result.errorCode,
+          attemptedAt: result.attemptedAt,
+          completedAt: result.completedAt,
+        })),
         flowStatuses,
         lastForecastSuccess: lastForecastCoverage ? {
           status: lastForecastCoverage.status,
@@ -1637,45 +1681,26 @@ export const weatherRouter = router({
       const sinceMs = now - periodDays * 24 * 60 * 60 * 1000;
       const locationKey = makeLocationKey(lat, lon);
       const date = getTodayParis();
-      const [stationData, hourlyRows, collectionSnapshots] = await Promise.all([
+      const [stationData, hourlyRunValues, collectionSnapshots] = await Promise.all([
         getPhysicalStationHistory(lat, lon, sinceMs),
-        getStoredHourlyForecasts(locationKey, date),
+        getHourlyForecastRunValues(locationKey, date),
         getStationCollectionSnapshots(locationKey, 14),
       ]);
       const qualityProfiles = await getStationQualityProfiles(stationData.stations.map((station) => station.stationId));
       const qualityByStationId = new Map(qualityProfiles.map((profile) => [profile.stationId, profile]));
-
-      const officialRows = hourlyRows.filter((row) => row.modelName === "best_match");
-      const byHour = new Map<number, Array<{ temperature: number | null; windSpeed: number | null; precipitation: number | null }>>();
-      for (const station of stationData.stations) {
-        for (const reading of station.readings) {
-          const hour = Number(new Intl.DateTimeFormat("fr-FR", {
-            timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23",
-          }).format(new Date(reading.observedAt)));
-          const list = byHour.get(hour) ?? [];
-          list.push(reading);
-          byHour.set(hour, list);
-        }
-      }
-
-      const comparison24h = Array.from({ length: 24 }, (_, hour) => {
-        const readings = byHour.get(hour) ?? [];
-        const average = (key: "temperature" | "windSpeed" | "precipitation") => {
-          const values = readings.map((reading) => reading[key]).filter((value): value is number => value !== null);
-          return values.length ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10 : null;
-        };
-        const forecast = officialRows.find((row) => row.hour === hour);
-        return {
-          hour,
-          stationTemperature: average("temperature"),
-          stationWindSpeed: average("windSpeed"),
-          stationPrecipitation: average("precipitation"),
-          stationSampleCount: readings.length,
-          officialTemperature: forecast?.temperature ?? null,
-          officialWindSpeed: forecast?.windSpeed ?? null,
-          officialPrecipitation: forecast?.precipitation ?? null,
-        };
-      });
+      const archivedOfficialModels = reconstructOfficialHourlyModelsFromArchive(hourlyRunValues, date);
+      const hourlyScoreHistory = await getHourlyForecastEvaluationHistory(
+        locationKey,
+        getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
+        getParisDateDaysAgo(1),
+      );
+      const officialHourlyForecast = computeOfficialHourlyForecast(
+        archivedOfficialModels,
+        hourlyScoreHistory.rows,
+        { historyAvailable: hourlyScoreHistory.available },
+      );
+      const stationHourlyReadings = stationData.stations.flatMap((station) => station.readings);
+      const comparison24h = buildStationForecastComparison24h(date, officialHourlyForecast.hours, stationHourlyReadings);
 
       const parisDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
       const dateFormatter = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "short" });
@@ -1706,10 +1731,8 @@ export const weatherRouter = router({
         };
       });
 
-      const currentParisHour = Number(new Intl.DateTimeFormat("fr-FR", {
-        timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23",
-      }).format(new Date())) % 24;
-      const instant = comparison24h[currentParisHour];
+      const currentUtcHour = Math.floor(now / (60 * 60_000)) * 60 * 60_000;
+      const instant = comparison24h.find((point) => point.validAt === currentUtcHour);
       const instantDeltaC = instant && instant.stationTemperature !== null && instant.officialTemperature !== null
         ? Math.round((instant.stationTemperature - instant.officialTemperature) * 10) / 10
         : null;
@@ -1752,6 +1775,7 @@ export const weatherRouter = router({
           };
         }),
         comparison24h,
+        officialHourlyWeighting: officialHourlyForecast.weighting,
         comparison7d,
         instantDeltaC,
       };

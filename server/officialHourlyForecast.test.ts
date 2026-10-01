@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { OFFICIAL_HOURLY_MODELS, type HourlyModelForecast } from "./weatherServices";
-import { computeOfficialHourlyForecast, type OfficialHourlyEvaluationHistoryScore } from "./officialHourlyForecast";
+import type { HourlyForecastRunValue } from "../drizzle/schema";
+import { computeOfficialHourlyForecast, reconstructOfficialHourlyModelsFromArchive, type OfficialHourlyEvaluationHistoryScore } from "./officialHourlyForecast";
 
 const validAt = Date.parse("2026-10-01T12:00:00.000Z");
 const availableAt = validAt - 12 * 60 * 60_000;
@@ -75,6 +76,46 @@ function bestMatchForecast(): HourlyModelForecast {
 function variableWeighting(result: ReturnType<typeof computeOfficialHourlyForecast>, variable: string) {
   return result.hours[0]?.forecastWeighting?.variableWeightings.find((item) => item.variable === variable);
 }
+
+describe("reconstructOfficialHourlyModelsFromArchive", () => {
+  it("retient les derniers runs exacts des sept modèles, ignore Best Match et garde les epochs répétés", () => {
+    const targetDate = "2026-10-25";
+    const model = OFFICIAL_HOURLY_MODELS[0]!;
+    const firstValidAt = Date.parse("2026-10-25T00:00:00Z");
+    const secondValidAt = Date.parse("2026-10-25T01:00:00Z");
+    const row = (values: Partial<HourlyForecastRunValue>): HourlyForecastRunValue => ({
+      id: 1,
+      captureRunId: "latest-run",
+      locationKey: "50.7,2.5",
+      targetDate,
+      sourceName: "open-meteo",
+      modelName: model.name,
+      modelId: model.modelId,
+      requestStartedAt: Date.parse("2026-10-25T07:00:00Z"),
+      availableAt: Date.parse("2026-10-25T07:01:00Z"),
+      validTime: firstValidAt,
+      variable: "temperature",
+      value: 8,
+      unit: "°C",
+      capturedAt: new Date("2026-10-25T07:01:00Z"),
+      ...values,
+    });
+    const archives = [
+      row({ id: 1, captureRunId: "older-run", requestStartedAt: 1, availableAt: 2, value: 99 }),
+      row({ id: 2, validTime: firstValidAt, value: 8 }),
+      row({ id: 3, validTime: secondValidAt, value: 12 }),
+      row({ id: 4, captureRunId: "aggregate-run", modelName: "best_match", modelId: null, value: 99 }),
+    ];
+
+    const forecasts = reconstructOfficialHourlyModelsFromArchive(archives, targetDate);
+
+    expect(forecasts).toHaveLength(1);
+    expect(forecasts[0]?.modelName).toBe(model.name);
+    expect(forecasts[0]?.hours.map((hour) => hour.validAt)).toEqual([firstValidAt, secondValidAt]);
+    expect(forecasts[0]?.hours.map((hour) => hour.hour)).toEqual([2, 2]);
+    expect(forecasts[0]?.hours.map((hour) => hour.temperature)).toEqual([8, 12]);
+  });
+});
 
 describe("computeOfficialHourlyForecast", () => {
   it("pondère la température avec ses MAE historiques et exclut Best Match et les variables non calibrées", () => {

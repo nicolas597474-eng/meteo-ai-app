@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
-import { WEATHER_SERVICES, collectExpertForecasts, collectObservations, collectHourlyForecastAllModels, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
+import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, collectExpertForecasts, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
 import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour } from "./weatherTime";
 import { getActiveParisForecastHours } from "./forecastScheduleConfig";
 import { FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, FORECAST_REFRESH_LOCK_LEASE_MS, getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
@@ -40,6 +40,8 @@ import {
 import {
   insertForecasts,
   insertForecastRuns,
+  HourlyForecastPersistenceError,
+  upsertHourlyForecastCollectionResults,
   claimScheduledForecastCollectionJob,
   acquireForecastRefreshLock,
   releaseForecastRefreshLock,
@@ -91,8 +93,13 @@ function getYesterdayParis(): string {
   return getParisDateDaysAgo(1);
 }
 
-export function getModelCoverage(receivedNames: string[]) {
-  const expectedNames = WEATHER_SERVICES.expert.map((service) => service.name);
+const OFFICIAL_HOURLY_COVERAGE_MODELS = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+const OFFICIAL_HOURLY_COVERAGE_MODEL_SET = new Set<string>(OFFICIAL_HOURLY_COVERAGE_MODELS);
+
+export function getModelCoverage(
+  receivedNames: string[],
+  expectedNames = WEATHER_SERVICES.expert.map((service) => service.name),
+) {
   const received = new Set(receivedNames);
   return {
     expected: expectedNames,
@@ -895,6 +902,7 @@ function determineMajorityCondition(forecasts: any[]): string {
  */
 export async function collectFavoritesForecastsHandler(req: Request, res: Response) {
   let jobId = -1;
+  let hourlyBatchAttemptId = "";
   let scheduledLockOwnerToken: string | null = null;
   let today = "";
   let locationsProcessed = 0;
@@ -930,6 +938,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       return res.json({ ok: true, skipped: jobClaim.reason, slot: slot.key });
     }
     jobId = jobClaim.jobId;
+    hourlyBatchAttemptId = randomUUID();
 
     today = slot.date;
     console.log(`[MeteoAI] Starting favorites forecast collection for ${today}`);
@@ -965,7 +974,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     console.log(`[MeteoAI] Processing ${uniqueLocations.length} unique locations (${allFavorites.length} total favorites)`);
     const expectedModelsPerLocation = getModelCoverage([]).expected.length;
     dailyModelsExpected = uniqueLocations.length * expectedModelsPerLocation;
-    hourlyModelsExpected = uniqueLocations.length * expectedModelsPerLocation;
+    hourlyModelsExpected = uniqueLocations.length * OFFICIAL_HOURLY_COVERAGE_MODELS.length;
     await updateCollectionJob(jobId, { dailyModelsExpected, hourlyModelsExpected });
 
     // Get only qualified evidence for operational model weights.
@@ -1135,9 +1144,251 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           console.warn(`[Models] ${fav.name}: quotidien indisponible — ${dailyCoverage.missing.join(", ")}`);
           errors.push(`${fav.name}: couverture quotidienne partielle — modèles manquants : ${dailyCoverage.missing.join(", ")}.`);
         }
-        let hourlyCoverage = getModelCoverage([]);
+        let hourlyCoverage = getModelCoverage([], OFFICIAL_HOURLY_COVERAGE_MODELS);
         const persistedHourlyModelNames = new Set<string>();
 
+        // Each scheduled attempt is recorded before its provider request. Best Match is
+        // retained as an explicitly non-official reference; only these seven named
+        // model ids are eligible for the official hourly engine.
+        const hourlyShadowRequestStartedAt = Date.now();
+        const hourlyAttemptedAt = Date.now();
+        const officialModelNames = new Set<string>(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
+        const hourlyCollectionCatalog = WEATHER_SERVICES.expert.map((service) => ({
+          modelName: service.name === "Open-Meteo" ? "best_match" : service.name,
+          modelId: service.name === "Open-Meteo" ? null : service.modelId ?? null,
+        }));
+        const initialHourlyResults = hourlyCollectionCatalog.map((model) => ({
+          collectionJobId: jobId,
+          scheduleRunKey: slot.key,
+          batchAttemptId: hourlyBatchAttemptId,
+          locationKey: locKey,
+          targetDate: today,
+          modelName: model.modelName,
+          modelId: model.modelId,
+          isOfficialModel: officialModelNames.has(model.modelName) ? 1 : 0,
+          sourceName: "open-meteo",
+          status: "attempting" as const,
+          requestAttempts: 0,
+          hoursReceived: 0,
+          valuesReceived: 0,
+          expectedValueCount: 0,
+          archiveRowsWritten: 0,
+          projectionRowsWritten: 0,
+          errorCode: null,
+          attemptedAt: hourlyAttemptedAt,
+          completedAt: null,
+        }));
+        try {
+          await upsertHourlyForecastCollectionResults(initialHourlyResults);
+        } catch {
+          errors.push(`${fav.name}: journal des tentatives horaires indisponible.`);
+          console.warn(`[HourlyAudit] ${fav.name}: could not persist provider-attempt start records.`);
+        }
+
+        try {
+          const collection = await collectHourlyForecastAllModelsWithDiagnostics(today, { lat: fav.lat, lon: fav.lon });
+          const hourlyAllModels = collection.forecasts;
+          const hourlyShadowReceivedAt = Date.now();
+          const forecastsByModel = new Map(hourlyAllModels.map((forecast) => [forecast.modelName, forecast]));
+          const diagnosticsByModel = new Map(collection.diagnostics.map((diagnostic) => [diagnostic.modelName, diagnostic]));
+
+          for (const model of hourlyCollectionCatalog) {
+            const diagnostic = diagnosticsByModel.get(model.modelName) ?? {
+              modelName: model.modelName,
+              modelId: model.modelId,
+              status: "safe_error" as const,
+              attemptCount: 0,
+              hoursReceived: 0,
+              valuesReceived: 0,
+              expectedValueCount: 0,
+              errorCode: "collection_failed",
+            };
+            const forecast = forecastsByModel.get(model.modelName);
+            let archiveRowsWritten = 0;
+            let projectionRowsWritten = 0;
+            let finalStatus: "succeeded" | "partial" | "failed" | "safe_error" = diagnostic.status;
+            let errorCode = diagnostic.errorCode;
+
+            if (forecast && forecast.hours.length > 0) {
+              const captureRunId = forecast.captureRunId ?? randomUUID();
+              const rows = forecast.hours.map((hour) => ({
+                locationKey: locKey,
+                date: today,
+                hour: hour.hour,
+                validTime: hour.validAt,
+                captureRun: {
+                  captureRunId,
+                  sourceName: forecast.sourceName ?? "open-meteo",
+                  modelId: forecast.modelId ?? null,
+                  requestStartedAt: forecast.requestStartedAt ?? hourlyShadowRequestStartedAt,
+                  availableAt: forecast.availableAt ?? hourlyShadowReceivedAt,
+                  units: {
+                    temperature: forecast.sourceMetadata?.units.temperature,
+                    precipitation: forecast.sourceMetadata?.units.precipitation,
+                    windSpeed: forecast.sourceMetadata?.units.windSpeed,
+                    windGusts: forecast.sourceMetadata?.units.windGusts,
+                    humidity: forecast.sourceMetadata?.units.humidity,
+                    pressure: forecast.sourceMetadata?.units.pressure,
+                  },
+                },
+                modelName: forecast.modelName,
+                temperature: hour.temperature,
+                apparentTemperature: hour.apparentTemperature,
+                precipitation: hour.precipitation,
+                windSpeed: hour.windSpeed,
+                windGusts: hour.windGusts,
+                windDirection: hour.windDirection,
+                humidity: hour.humidity,
+                pressure: hour.pressure,
+                cloudCover: hour.cloudCover,
+                weatherCode: hour.weatherCode,
+              }));
+              try {
+                const writeResult = await insertHourlyForecasts(rows);
+                archiveRowsWritten = writeResult.archiveRowsWritten;
+                projectionRowsWritten = writeResult.projectionRowsWritten;
+                finalStatus = diagnostic.status === "succeeded"
+                  && archiveRowsWritten === forecast.hours.length * 6
+                  && projectionRowsWritten === forecast.hours.length
+                  ? "succeeded"
+                  : "partial";
+              } catch (writeError) {
+                if (writeError instanceof HourlyForecastPersistenceError) {
+                  archiveRowsWritten = writeError.archiveRowsWritten;
+                  projectionRowsWritten = writeError.projectionRowsWritten;
+                  errorCode = writeError.errorCode;
+                } else {
+                  errorCode = "write_failed";
+                }
+                finalStatus = archiveRowsWritten > 0 ? "partial" : "safe_error";
+                errors.push(`${fav.name}: archivage horaire de ${model.modelName} non confirmé (${errorCode}).`);
+                console.warn(`[HourlyArchive] ${fav.name}/${model.modelName}: write not confirmed (${errorCode}).`);
+              }
+            }
+
+            if (archiveRowsWritten > 0 && OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName) && !persistedHourlyModelNames.has(model.modelName)) {
+              persistedHourlyModelNames.add(model.modelName);
+              hourlyModelsCollected++;
+            }
+            try {
+              await upsertHourlyForecastCollectionResults([{
+                collectionJobId: jobId,
+                scheduleRunKey: slot.key,
+                batchAttemptId: hourlyBatchAttemptId,
+                locationKey: locKey,
+                targetDate: today,
+                modelName: model.modelName,
+                modelId: model.modelId,
+                isOfficialModel: officialModelNames.has(model.modelName) ? 1 : 0,
+                sourceName: "open-meteo",
+                status: finalStatus,
+                requestAttempts: diagnostic.attemptCount,
+                hoursReceived: diagnostic.hoursReceived,
+                valuesReceived: diagnostic.valuesReceived,
+                expectedValueCount: diagnostic.expectedValueCount,
+                archiveRowsWritten,
+                projectionRowsWritten,
+                errorCode: finalStatus === "succeeded" ? null : errorCode,
+                attemptedAt: hourlyAttemptedAt,
+                completedAt: Date.now(),
+              }]);
+            } catch {
+              errors.push(`${fav.name}: résultat horaire de ${model.modelName} non journalisé.`);
+              console.warn(`[HourlyAudit] ${fav.name}/${model.modelName}: could not persist final result.`);
+            }
+          }
+
+          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
+          console.log(`[Models] ${fav.name}: horaire archivé ${hourlyCoverage.collected.length}/${hourlyCoverage.expected.length}`);
+          if (hourlyCoverage.missing.length > 0) {
+            console.warn(`[Models] ${fav.name}: horaire indisponible — ${hourlyCoverage.missing.join(", ")}`);
+          }
+          await executeShadowWriteSafely(`hourly:${locKey}`, async () => {
+            const shadowResult = await persistHourlyForecastsToShadow(hourlyAllModels, {
+              locationKey: locKey,
+              latitude: fav.lat,
+              longitude: fav.lon,
+              targetDate: today,
+              requestStartedAt: hourlyShadowRequestStartedAt,
+              receivedAt: hourlyShadowReceivedAt,
+            });
+            if (!shadowResult.ok) {
+              console.warn(`[DataHubShadow] ${fav.name}: hourly partial — ${shadowResult.errors.join(" | ")}`);
+            } else {
+              console.log(`[DataHubShadow] ${fav.name}: hourly ${shadowResult.sourceCount} source(s), ${shadowResult.valueCount} value(s)`);
+            }
+            return shadowResult;
+          });
+
+          try {
+            const validationHourly = await collectValidationHourlyForecasts(today, { lat: fav.lat, lon: fav.lon });
+            for (const forecast of validationHourly) {
+              const { modelName, hours } = forecast;
+              await insertHourlyForecasts(hours.map((hour) => ({
+                locationKey: locKey,
+                date: today,
+                hour: hour.hour,
+                validTime: hour.validAt,
+                captureRun: {
+                  captureRunId: forecast.captureRunId,
+                  sourceName: forecast.sourceName,
+                  modelId: forecast.modelId,
+                  requestStartedAt: forecast.requestStartedAt,
+                  availableAt: forecast.availableAt,
+                },
+                modelName: `${modelName} · validation`,
+                temperature: hour.temperature,
+                apparentTemperature: hour.apparentTemperature,
+                precipitation: hour.precipitation,
+                windSpeed: hour.windSpeed,
+                windGusts: hour.windGusts,
+                windDirection: hour.windDirection,
+                humidity: hour.humidity,
+                cloudCover: hour.cloudCover,
+                weatherCode: hour.weatherCode,
+              })));
+            }
+            console.log(`[Validation] ${fav.name}: ${validationHourly.length} source(s) horaire(s) candidate(s)`);
+          } catch {
+            errors.push(`${fav.name}: collecte des modèles candidats partielle.`);
+            console.warn(`[Validation] ${fav.name}: candidate hourly collection or write failed.`);
+          }
+          console.log(`[HourlyAll] Received ${hourlyAllModels.length} model response(s) for ${fav.name}`);
+        } catch {
+          errors.push(`${fav.name}: collecte horaire partielle; résultat non confirmé.`);
+          console.warn(`[HourlyAll] ${fav.name}: collection failed before per-model completion.`);
+          for (const model of hourlyCollectionCatalog) {
+            try {
+              await upsertHourlyForecastCollectionResults([{
+                collectionJobId: jobId,
+                scheduleRunKey: slot.key,
+                batchAttemptId: hourlyBatchAttemptId,
+                locationKey: locKey,
+                targetDate: today,
+                modelName: model.modelName,
+                modelId: model.modelId,
+                isOfficialModel: officialModelNames.has(model.modelName) ? 1 : 0,
+                sourceName: "open-meteo",
+                status: "safe_error",
+                requestAttempts: 0,
+                hoursReceived: 0,
+                valuesReceived: 0,
+                expectedValueCount: 0,
+                archiveRowsWritten: 0,
+                projectionRowsWritten: 0,
+                errorCode: "collection_failed",
+                attemptedAt: hourlyAttemptedAt,
+                completedAt: Date.now(),
+              }]);
+            } catch {
+              // A failed audit write cannot suppress the other provider attempts.
+            }
+          }
+          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
+        }
+        if (hourlyCoverage.missing.length > 0) {
+          errors.push(`${fav.name}: couverture horaire partielle — modèles manquants : ${hourlyCoverage.missing.join(", ")}.`);
+        }
         if (expertData.length === 0) {
           console.warn(`[MeteoAI] No data for ${fav.name}`);
           errors.push(`${fav.name}: aucun modèle quotidien n'a fourni de prévision.`);
@@ -1362,113 +1613,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           });
         }
 
-        // Collect hourly forecasts for all models for this location
-        try {
-          const hourlyShadowRequestStartedAt = Date.now();
-          const hourlyAllModels = await collectHourlyForecastAllModels(today, { lat: fav.lat, lon: fav.lon });
-          const hourlyShadowReceivedAt = Date.now();
-          hourlyCoverage = getModelCoverage(hourlyAllModels.map((forecast) => forecast.modelName === "best_match" ? "Open-Meteo" : forecast.modelName));
-          console.log(`[Models] ${fav.name}: horaire ${hourlyCoverage.collected.length}/${hourlyCoverage.expected.length}`);
-          if (hourlyCoverage.missing.length > 0) {
-            console.warn(`[Models] ${fav.name}: horaire indisponible — ${hourlyCoverage.missing.join(", ")}`);
-          }
-          for (const forecast of hourlyAllModels) {
-            const { modelName, hours } = forecast;
-            const captureRunId = forecast.captureRunId ?? randomUUID();
-            const rows = hours.map((h) => ({
-              locationKey: locKey,
-              date: today,
-              hour: h.hour,
-              validTime: h.validAt,
-              captureRun: {
-                captureRunId,
-                sourceName: forecast.sourceName ?? "open-meteo",
-                modelId: forecast.modelId ?? null,
-                requestStartedAt: forecast.requestStartedAt ?? hourlyShadowRequestStartedAt,
-                availableAt: forecast.availableAt ?? hourlyShadowReceivedAt,
-                units: {
-                  temperature: forecast.sourceMetadata?.units.temperature,
-                  precipitation: forecast.sourceMetadata?.units.precipitation,
-                  windSpeed: forecast.sourceMetadata?.units.windSpeed,
-                  windGusts: forecast.sourceMetadata?.units.windGusts,
-                  humidity: forecast.sourceMetadata?.units.humidity,
-                  pressure: forecast.sourceMetadata?.units.pressure,
-                },
-              },
-              modelName,
-              temperature: h.temperature,
-              apparentTemperature: h.apparentTemperature,
-              precipitation: h.precipitation,
-              windSpeed: h.windSpeed,
-              windGusts: h.windGusts,
-              windDirection: h.windDirection,
-              humidity: h.humidity,
-              pressure: h.pressure,
-              cloudCover: h.cloudCover,
-              weatherCode: h.weatherCode,
-            }));
-            await insertHourlyForecasts(rows);
-            const coverageName = modelName === "best_match" ? "Open-Meteo" : modelName;
-            if (rows.length > 0 && hourlyCoverage.expected.includes(coverageName) && !persistedHourlyModelNames.has(coverageName)) {
-              persistedHourlyModelNames.add(coverageName);
-              hourlyModelsCollected++;
-            }
-          }
-          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames));
-          await executeShadowWriteSafely(`hourly:${locKey}`, async () => {
-            const shadowResult = await persistHourlyForecastsToShadow(hourlyAllModels, {
-              locationKey: locKey,
-              latitude: fav.lat,
-              longitude: fav.lon,
-              targetDate: today,
-              requestStartedAt: hourlyShadowRequestStartedAt,
-              receivedAt: hourlyShadowReceivedAt,
-            });
-            if (!shadowResult.ok) {
-              console.warn(`[DataHubShadow] ${fav.name}: hourly partial — ${shadowResult.errors.join(" | ")}`);
-            } else {
-              console.log(`[DataHubShadow] ${fav.name}: hourly ${shadowResult.sourceCount} source(s), ${shadowResult.valueCount} value(s)`);
-            }
-            return shadowResult;
-          });
-          const validationHourly = await collectValidationHourlyForecasts(today, { lat: fav.lat, lon: fav.lon });
-          for (const forecast of validationHourly) {
-            const { modelName, hours } = forecast;
-            const captureRunId = forecast.captureRunId;
-            await insertHourlyForecasts(hours.map((h) => ({
-              locationKey: locKey,
-              date: today,
-              hour: h.hour,
-              validTime: h.validAt,
-              captureRun: {
-                captureRunId,
-                sourceName: forecast.sourceName,
-                modelId: forecast.modelId,
-                requestStartedAt: forecast.requestStartedAt,
-                availableAt: forecast.availableAt,
-              },
-              modelName: `${modelName} · validation`,
-              temperature: h.temperature,
-              apparentTemperature: h.apparentTemperature,
-              precipitation: h.precipitation,
-              windSpeed: h.windSpeed,
-              windGusts: h.windGusts,
-              windDirection: h.windDirection,
-              humidity: h.humidity,
-              cloudCover: h.cloudCover,
-              weatherCode: h.weatherCode,
-            })));
-          }
-          console.log(`[Validation] ${fav.name}: ${validationDaily.length} quotidien(s), ${validationHourly.length} horaire(s) candidat(s)`);
-          console.log(`[HourlyAll] Stored ${hourlyAllModels.length} models for ${fav.name}`);
-        } catch (hourlyErr: any) {
-          console.warn(`[HourlyAll] Failed for ${fav.name}:`, hourlyErr.message);
-          errors.push(`${fav.name}: collecte horaire partielle — ${hourlyErr.message}`);
-          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames));
-        }
-        if (hourlyCoverage.missing.length > 0) {
-          errors.push(`${fav.name}: couverture horaire partielle — modèles manquants : ${hourlyCoverage.missing.join(", ")}.`);
-        }
 
         coverageByLocation.push({
           location: fav.customName ?? fav.name,

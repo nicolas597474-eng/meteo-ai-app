@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchWeather, getWeatherFetchCacheMetrics, getWeatherProviderDiagnostics, isTransientWeatherStatus, resetWeatherFetchCache, resetWeatherProviderDiagnostics } from "./weatherFetch";
+import { fetchWeather, getWeatherFetchCacheMetrics, getWeatherProviderDiagnostics, getWeatherResponseAttemptCount, isTransientWeatherStatus, resetWeatherFetchCache, resetWeatherProviderDiagnostics } from "./weatherFetch";
 
 afterEach(() => {
   resetWeatherFetchCache();
@@ -19,9 +19,11 @@ describe("reprises des sources météo", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchWeather("https://api.example.test/weather", {}, { cacheTtlMs: 10_000 });
+    const first = await fetchWeather("https://api.example.test/weather", {}, { cacheTtlMs: 10_000 });
     const second = await fetchWeather("https://api.example.test/weather", {}, { cacheTtlMs: 10_000 });
 
+    expect(getWeatherResponseAttemptCount(first)).toBe(1);
+    expect(getWeatherResponseAttemptCount(second)).toBe(0);
     expect(await second.json()).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(getWeatherFetchCacheMetrics()).toMatchObject({ entries: 1, hits: 1, misses: 1 });
@@ -48,8 +50,9 @@ describe("reprises des sources météo", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchWeather("https://api.example.test/hourly", {}, { attempts: 2, cacheTtlMs: 0 });
+    const response = await fetchWeather("https://api.example.test/hourly", {}, { attempts: 2, cacheTtlMs: 0 });
 
+    expect(getWeatherResponseAttemptCount(response)).toBe(2);
     expect(getWeatherProviderDiagnostics()).toMatchObject([{
       provider: "api.example.test",
       lastOutcome: "success",
@@ -78,6 +81,28 @@ describe("reprises des sources météo", () => {
       lastRetries: 1,
       lastError: null,
     }]);
+  });
+
+  it("garde un compteur exact par réponse lorsque deux appels parallèles partagent le fournisseur", async () => {
+    let retryCallCount = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/once")) return new Response("not found", { status: 404 });
+      retryCallCount += 1;
+      if (retryCallCount === 1) return new Response("temporary", { status: 503 });
+      return new Response(JSON.stringify({ recovered: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const [singleAttempt, retried] = await Promise.all([
+      fetchWeather("https://api.example.test/once", {}, { attempts: 2, cacheTtlMs: 0 }),
+      fetchWeather("https://api.example.test/retry", {}, { attempts: 2, cacheTtlMs: 0 }),
+    ]);
+
+    expect(singleAttempt.status).toBe(404);
+    expect(getWeatherResponseAttemptCount(singleAttempt)).toBe(1);
+    expect(retried.status).toBe(200);
+    expect(getWeatherResponseAttemptCount(retried)).toBe(2);
   });
 
   it("expose une erreur HTTP réelle sans fraîcheur ni statut fictifs", async () => {

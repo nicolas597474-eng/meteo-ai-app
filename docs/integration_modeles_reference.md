@@ -2,7 +2,7 @@
 
 ## Décision
 
-Les modèles ajoutés ne rejoignent pas le tableau `forecasts` ni la fusion officielle au départ. Ils sont archivés comme **modèles en validation** dans `forecast_runs` et `hourly_forecasts`, avec un statut explicite dans leurs métadonnées. Les huit modèles experts actifs et les compteurs de couverture du cycle de 05h00 restent inchangés.
+Les modèles ajoutés ne rejoignent pas le tableau `forecasts` ni la fusion officielle au départ. Ils sont archivés comme **modèles en validation** dans `forecast_runs` et `hourly_forecasts`, avec un statut explicite dans leurs métadonnées. Les huit sources expertes quotidiennes restent inchangées. Pour l’horaire, les sept identifiants distincts (AROME, ARPEGE, ICON, ECMWF, GFS, GEM et UKMET) alimentent seuls le moteur officiel; Best Match est archivé comme référence agrégée non officielle. Les favoris suivent le cycle de quatre heures décrit dans [la configuration de collecte](favorites-forecast-schedule.md).
 
 | Modèle de la référence | Statut d’intégration | Identifiant vérifié | Raison |
 |---|---|---|---|
@@ -29,7 +29,7 @@ AI Lab doit exposer les candidats dans une source séparée intitulée « Modèl
 
 ## Contrôle opérationnel planifié
 
-Le job quotidien actif `meteoai-collect-favorites-forecasts-v4` est configuré à `03:00 UTC` (05:00 Paris en heure d’été) avec une autorisation cron fraîche. Le prochain cycle normal est le contrôle opérationnel de référence : il doit archiver les sorties disponibles sous les suffixes `· validation` et conserver les absences AIFS/AIFS ENS sans les remplir. Les tentatives ponctuelles créées trop près de leur horaire n’ont pas été exécutées par le planificateur et ont été supprimées ; aucun résultat n’a été simulé.
+À la rédaction initiale de cette note (14 août 2026), le job `meteoai-collect-favorites-forecasts-v4` avait été observé à `03:00 UTC` (05:00 Paris en heure d’été). Cette trace historique atteste l’archivage des sorties candidates et l’absence de remplissage AIFS/AIFS ENS; elle ne décrit pas la cadence actuelle. La cadence applicative actuelle et l’unique réglage Heartbeat restant sont documentés dans [la configuration de collecte](favorites-forecast-schedule.md). Aucun résultat n’a été simulé.
 
 ## Première collecte observée
 

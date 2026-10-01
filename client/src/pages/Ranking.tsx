@@ -84,7 +84,7 @@ function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint
   if (usable.length === 0) {
     return (
       <MeteoSurface className="rounded-xl border-dashed border-slate-800 bg-transparent px-4 py-8 text-center text-sm text-slate-500">
-        La comparaison apparaîtra après les premiers relevés physiques collectés à 05h00.
+        La comparaison apparaîtra lorsque des prévisions horaires officielles et des relevés physiques alignés seront tous deux disponibles.
       </MeteoSurface>
     );
   }
