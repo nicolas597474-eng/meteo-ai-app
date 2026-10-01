@@ -248,14 +248,33 @@ export type DayForecast = {
   sunset?: string | null;
 };
 
-export type HourlyPointWeighting = {
-  method: "historical_skill" | "equal_fallback";
-  horizonBucket: string | null;
-  fallbackReason: "insufficient_historical_evidence" | "history_unavailable" | "horizon_not_scored" | null;
-  scoredVariables: string[];
+export type HourlyWeightingUnavailableReason =
+  | "insufficient_historical_evidence"
+  | "history_unavailable"
+  | "horizon_not_scored"
+  | "incomparable_horizons"
+  | "no_model_data";
+
+export type HourlyVariableWeighting = {
+  variable: string;
+  method: "historical_skill" | "unavailable";
+  unavailableReason: HourlyWeightingUnavailableReason | null;
+  modelsWithData: string[];
+  modelWeights: Array<{ modelName: string; weight: number }>;
   minimumComparisons: number | null;
   minimumComparableDays: number | null;
-  modelWeights: Array<{ modelName: string; weight: number }>;
+};
+
+export type HourlyPointWeighting = {
+  method: "historical_skill" | "mixed" | "unavailable";
+  horizonBucket: string | null;
+  unavailableReason: HourlyWeightingUnavailableReason | null;
+  scoredVariables: string[];
+  unavailableVariables: string[];
+  minimumComparisons: number | null;
+  minimumComparableDays: number | null;
+  variableWeightings: HourlyVariableWeighting[];
+  modelsWithData: string[];
 };
 
 export type HourlyPoint = {

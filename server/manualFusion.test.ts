@@ -118,14 +118,15 @@ function hourlyModels(names = serviceNames.filter((name) => name !== "Open-Meteo
   }));
 }
 
-const equalWeighting = {
-  status: "equal_fallback" as const,
+const unavailableWeighting = {
+  status: "unavailable" as const,
   historyStatus: "available" as const,
   historyWindowDays: 365,
   minimumComparisons: 30,
   minimumComparableDays: 7,
   bestMatchIncluded: false as const,
   modelsConsidered: ["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"] as const,
+  modelsWithData: [],
   horizons: [],
 };
 
@@ -135,7 +136,7 @@ beforeEach(() => {
   mocks.storedHourlyRows = [];
   mocks.failingHourlyModels.clear();
   mocks.collectExpertForecasts.mockResolvedValue(dailyModels());
-  mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: hourlyModels(), hours: displayHours(), weighting: equalWeighting });
+  mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: hourlyModels(), hours: displayHours(), weighting: unavailableWeighting });
   mocks.acquireForecastRefreshLock.mockResolvedValue(true);
   mocks.releaseForecastRefreshLock.mockResolvedValue(undefined);
   mocks.getMeteoAIForecastByDate.mockImplementation(async () => mocks.persistedDailySnapshot);
@@ -194,7 +195,7 @@ describe("relance manuelle des prévisions", () => {
       "2026-09-30",
       displayHours(),
       expect.any(Date),
-      equalWeighting,
+      unavailableWeighting,
     );
     expect(mocks.acquireForecastRefreshLock).toHaveBeenCalledWith("forecast-location:50.757_2.52", expect.any(String));
     expect(mocks.releaseForecastRefreshLock).toHaveBeenCalledWith("forecast-location:50.757_2.52", expect.any(String));
@@ -207,7 +208,7 @@ describe("relance manuelle des prévisions", () => {
 
   it("rapporte un succès partiel sans horodatage pour la granularité échouée", async () => {
     mocks.collectExpertForecasts.mockResolvedValue([]);
-    mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: hourlyModels(), hours: displayHours(), weighting: equalWeighting });
+    mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: hourlyModels(), hours: displayHours(), weighting: unavailableWeighting });
 
     const result = await refreshManualFusionForFavorite(favorite);
 
@@ -222,7 +223,7 @@ describe("relance manuelle des prévisions", () => {
 
   it("rapporte un échec global sans horodatage récent quand aucune granularité ne s’enregistre", async () => {
     mocks.collectExpertForecasts.mockResolvedValue([]);
-    mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: [], hours: [], weighting: equalWeighting });
+    mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: [], hours: [], weighting: unavailableWeighting });
 
     const result = await refreshManualFusionForFavorite(favorite);
 

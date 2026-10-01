@@ -30,7 +30,9 @@ function modelForecasts(at = validAt, available = at - 12 * 60 * 60_000): Hourly
 }
 
 function historicalScores(
+  variable = "temperature",
   horizonBucket = "6_24h",
+  maeForModel: (modelIndex: number) => number = (modelIndex) => 0.5 + modelIndex * 0.35,
   sampleSize = 5,
 ): OfficialHourlyEvaluationHistoryScore[] {
   return OFFICIAL_HOURLY_MODELS.flatMap((model, modelIndex) =>
@@ -39,10 +41,10 @@ function historicalScores(
       sourceName: "open-meteo",
       modelName: model.name,
       modelId: model.modelId,
-      variable: "temperature",
+      variable,
       horizonBucket,
       sampleSize,
-      mae: 0.5 + modelIndex * 0.35,
+      mae: maeForModel(modelIndex),
     })),
   );
 }
@@ -70,8 +72,12 @@ function bestMatchForecast(): HourlyModelForecast {
   };
 }
 
+function variableWeighting(result: ReturnType<typeof computeOfficialHourlyForecast>, variable: string) {
+  return result.hours[0]?.forecastWeighting?.variableWeightings.find((item) => item.variable === variable);
+}
+
 describe("computeOfficialHourlyForecast", () => {
-  it("applique des poids par modèle issus des MAE seulement après le seuil, sans Best Match", () => {
+  it("pondère la température avec ses MAE historiques et exclut Best Match et les variables non calibrées", () => {
     const validArome = modelForecasts()[0]!;
     const mislabeledArome: HourlyModelForecast = {
       ...validArome,
@@ -88,34 +94,115 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.hours).toHaveLength(1);
     expect(result.hours[0].modelCount).toBe(7);
     expect(result.hours[0].temp).toBeLessThan(11);
-    expect(result.hours[0].forecastWeighting?.method).toBe("historical_skill");
+    expect(result.hours[0].forecastWeighting?.method).toBe("mixed");
     expect(result.hours[0].forecastWeighting?.horizonBucket).toBe("6_24h");
     expect(result.hours[0].forecastWeighting?.scoredVariables).toEqual(["temperature"]);
-    const weights = result.hours[0].forecastWeighting?.modelWeights ?? [];
+    expect(result.hours[0].forecastWeighting?.unavailableVariables).toContain("wind_speed");
+    expect(result.hours[0].forecastWeighting?.variableWeightings).toHaveLength(6);
+    expect(result.hours[0].precipitation).toBeNull();
+    expect(result.hours[0].windSpeed).toBeNull();
+    expect(result.hours[0].apparentTemp).toBeNull();
+    const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
     expect(weights).toHaveLength(7);
     expect(weights.reduce((sum, item) => sum + item.weight, 0)).toBeCloseTo(1, 10);
     expect(weights.find((item) => item.modelName === "AROME")!.weight)
       .toBeGreaterThan(weights.find((item) => item.modelName === "UKMET")!.weight);
+    expect(Math.max(...weights.map((item) => item.weight))).toBeLessThan(0.25);
+    expect(Math.min(...weights.map((item) => item.weight))).toBeGreaterThan(0.08);
     expect(result.weighting.bestMatchIncluded).toBe(false);
+    expect(result.weighting.modelsConsidered).toEqual(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
     expect(result.weighting.modelsConsidered).not.toContain("best_match");
-    expect(result.weighting.status).toBe("historical_skill");
+    expect(result.weighting.modelsWithData).toHaveLength(7);
+    expect(result.weighting.status).toBe("mixed");
   });
 
-  it("utilise des poids égaux si l’échantillon n’atteint pas 30 comparaisons sur 7 jours", () => {
-    const result = computeOfficialHourlyForecast(modelForecasts(), historicalScores("6_24h", 4));
+  it("laisse la valeur officielle indisponible sous le seuil et n’émet aucun poids arbitraire", () => {
+    const result = computeOfficialHourlyForecast(modelForecasts(), historicalScores("temperature", "6_24h", undefined, 4));
+    const temperatureWeighting = variableWeighting(result, "temperature");
 
-    expect(result.weighting.status).toBe("equal_fallback");
-    expect(result.hours[0].forecastWeighting?.method).toBe("equal_fallback");
-    expect(result.hours[0].forecastWeighting?.fallbackReason).toBe("insufficient_historical_evidence");
-    expect(result.hours[0].forecastWeighting?.modelWeights.every((item) => item.weight === 1 / 7)).toBe(true);
+    expect(result.weighting.status).toBe("unavailable");
+    expect(result.hours[0].temp).toBeNull();
+    expect(temperatureWeighting?.method).toBe("unavailable");
+    expect(temperatureWeighting?.unavailableReason).toBe("insufficient_historical_evidence");
+    expect(temperatureWeighting?.modelsWithData).toHaveLength(7);
+    expect(temperatureWeighting?.modelWeights).toEqual([]);
+    expect(result.hours[0].forecastWeighting?.method).toBe("unavailable");
+  });
+
+  it("n’agrège pas les autres modèles si un modèle manque d’historique qualifié", () => {
+    const scores = historicalScores().filter((score) => score.modelName !== "UKMET");
+    const result = computeOfficialHourlyForecast(modelForecasts(), scores);
+
+    expect(result.hours[0].temp).toBeNull();
+    expect(variableWeighting(result, "temperature")?.unavailableReason).toBe("insufficient_historical_evidence");
+    expect(variableWeighting(result, "temperature")?.modelWeights).toEqual([]);
+    expect(variableWeighting(result, "temperature")?.modelsWithData).toHaveLength(7);
   });
 
   it("n’emprunte pas les scores d’un autre bucket d’échéance", () => {
     const nearForecasts = modelForecasts(validAt, validAt - 60 * 60_000);
-    const result = computeOfficialHourlyForecast(nearForecasts, historicalScores("6_24h"));
+    const result = computeOfficialHourlyForecast(nearForecasts, historicalScores());
 
     expect(result.hours[0].forecastWeighting?.horizonBucket).toBe("0_2h");
-    expect(result.hours[0].forecastWeighting?.method).toBe("equal_fallback");
+    expect(result.hours[0].temp).toBeNull();
+    expect(variableWeighting(result, "temperature")?.unavailableReason).toBe("insufficient_historical_evidence");
+  });
+
+  it("calcule des poids propres à chaque variable et conserve le seuil de régularisation", () => {
+    const scores = [
+      ...historicalScores("temperature", "6_24h", (index) => 0.5 + index * 0.35),
+      ...historicalScores("wind_speed", "6_24h", (index) => 0.5 + (6 - index) * 0.35),
+    ];
+    const result = computeOfficialHourlyForecast(modelForecasts(), scores);
+    const temperatureWeights = variableWeighting(result, "temperature")?.modelWeights ?? [];
+    const windWeights = variableWeighting(result, "wind_speed")?.modelWeights ?? [];
+    const aromeTemperature = temperatureWeights.find((item) => item.modelName === "AROME")!.weight;
+    const ukmetTemperature = temperatureWeights.find((item) => item.modelName === "UKMET")!.weight;
+    const aromeWind = windWeights.find((item) => item.modelName === "AROME")!.weight;
+    const ukmetWind = windWeights.find((item) => item.modelName === "UKMET")!.weight;
+
+    expect(result.hours[0].temp).not.toBeNull();
+    expect(result.hours[0].windSpeed).not.toBeNull();
+    expect(aromeTemperature).toBeGreaterThan(ukmetTemperature);
+    expect(aromeWind).toBeLessThan(ukmetWind);
+    expect(temperatureWeights).not.toEqual(windWeights);
+    expect(variableWeighting(result, "wind_speed")?.minimumComparisons).toBe(35);
+    expect(variableWeighting(result, "wind_speed")?.minimumComparableDays).toBe(7);
+  });
+
+  it("n’utilise pas l’historique d’une autre variable ou échéance pour pondérer le vent", () => {
+    const scores = [
+      ...historicalScores("temperature", "6_24h"),
+      ...historicalScores("wind_speed", "0_2h", (index) => 0.5 + index * 0.35),
+    ];
+    const result = computeOfficialHourlyForecast(modelForecasts(), scores);
+
+    expect(result.hours[0].temp).not.toBeNull();
+    expect(result.hours[0].windSpeed).toBeNull();
+    expect(variableWeighting(result, "wind_speed")?.unavailableReason).toBe("insufficient_historical_evidence");
+  });
+
+  it("renormalise uniquement les poids historiques des modèles présents et liste les modèles manquants", () => {
+    const forecasts = modelForecasts().filter((model) => model.modelName !== "UKMET");
+    const result = computeOfficialHourlyForecast(forecasts, historicalScores());
+    const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
+
+    expect(result.hours[0].modelCount).toBe(6);
+    expect(weights).toHaveLength(6);
+    expect(weights.some((item) => item.modelName === "UKMET")).toBe(false);
+    expect(variableWeighting(result, "temperature")?.modelsWithData).not.toContain("UKMET");
+    expect(weights.reduce((sum, item) => sum + item.weight, 0)).toBeCloseTo(1, 10);
+  });
+
+  it("déclare les échéances incompatibles indisponibles au lieu d’utiliser un bucket commun arbitraire", () => {
+    const forecasts = modelForecasts().map((model) => model.modelName === "UKMET"
+      ? { ...model, availableAt: validAt - 60 * 60_000 }
+      : model);
+    const result = computeOfficialHourlyForecast(forecasts, historicalScores());
+
+    expect(result.hours[0].forecastWeighting?.horizonBucket).toBeNull();
+    expect(result.hours[0].temp).toBeNull();
+    expect(variableWeighting(result, "temperature")?.unavailableReason).toBe("incomparable_horizons");
   });
 
   it("écarte les évaluations contemporaines ou futures pour éviter les fuites d’information", () => {
@@ -132,8 +219,8 @@ describe("computeOfficialHourlyForecast", () => {
     })));
     const result = computeOfficialHourlyForecast(modelForecasts(), scores);
 
-    expect(result.hours[0].forecastWeighting?.modelWeights.find((item) => item.modelName === "AROME")!.weight)
-      .toBeGreaterThan(result.hours[0].forecastWeighting?.modelWeights.find((item) => item.modelName === "UKMET")!.weight ?? 0);
+    expect(variableWeighting(result, "temperature")?.modelWeights.find((item) => item.modelName === "AROME")!.weight)
+      .toBeGreaterThan(variableWeighting(result, "temperature")?.modelWeights.find((item) => item.modelName === "UKMET")!.weight ?? 0);
   });
 
   it("signale l’indisponibilité de l’historique et conserve les deux instants de l’heure répétée", () => {
@@ -161,10 +248,11 @@ describe("computeOfficialHourlyForecast", () => {
     }));
     const result = computeOfficialHourlyForecast(repeatedForecasts, [], { historyAvailable: false });
 
+    expect(result.weighting.status).toBe("unavailable");
     expect(result.hours).toHaveLength(2);
     expect(result.hours.map((hour) => hour.hour)).toEqual(["02:00", "02:00"]);
     expect(result.hours.map((hour) => hour.validAt)).toEqual([firstRepeatedHour, secondRepeatedHour]);
-    expect(result.weighting.historyStatus).toBe("unavailable");
-    expect(result.hours.every((hour) => hour.forecastWeighting?.fallbackReason === "history_unavailable")).toBe(true);
+    expect(result.hours.every((hour) => hour.temp == null)).toBe(true);
+    expect(result.hours.every((hour) => hour.forecastWeighting?.variableWeightings.every((item) => item.unavailableReason === "history_unavailable"))).toBe(true);
   });
 });

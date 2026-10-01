@@ -1,7 +1,7 @@
 import { getPhase3HorizonWindow } from "../shared/weatherDataHub";
 import { HOURLY_FORECAST_VARIABLES } from "./hourlyForecastRunScoring";
 import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
-import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weatherConditionLabels";
+import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { getParisDateDaysAgo } from "./weatherTime";
 import {
@@ -11,6 +11,8 @@ import {
   type HourlyModelForecast,
   type HourlyPoint,
   type HourlyPointWeighting,
+  type HourlyVariableWeighting,
+  type HourlyWeightingUnavailableReason,
 } from "./weatherServices";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 
@@ -21,6 +23,16 @@ export const OFFICIAL_HOURLY_HISTORY_DAYS = 365;
 const MODEL_NAME_SET = new Set<string>(OFFICIAL_HOURLY_MODEL_NAMES);
 const MODEL_ID_BY_NAME = new Map<string, string>(OFFICIAL_HOURLY_MODELS.map((model) => [model.name, model.modelId] as const));
 const HISTORY_VARIABLES = HOURLY_FORECAST_VARIABLES;
+type OfficialHourlyVariable = (typeof HISTORY_VARIABLES)[number];
+
+const FORECAST_FIELD_BY_VARIABLE: Record<OfficialHourlyVariable, keyof HourlyModelForecast["hours"][number]> = {
+  temperature: "temperature",
+  precipitation: "precipitation",
+  wind_speed: "windSpeed",
+  wind_gust: "windGusts",
+  humidity: "humidity",
+  pressure: "pressure",
+};
 
 export type OfficialHourlyEvaluationHistoryScore = {
   date: string;
@@ -34,18 +46,21 @@ export type OfficialHourlyEvaluationHistoryScore = {
 };
 
 export type OfficialHourlyWeightingSummary = {
-  status: "historical_skill" | "equal_fallback" | "mixed" | "unavailable";
+  status: "historical_skill" | "mixed" | "unavailable";
   historyStatus: "available" | "unavailable";
   historyWindowDays: number;
   minimumComparisons: number;
   minimumComparableDays: number;
   bestMatchIncluded: false;
   modelsConsidered: readonly OfficialHourlyModelName[];
+  modelsWithData: readonly OfficialHourlyModelName[];
   horizons: Array<{
+    variable: string;
     horizonBucket: string | null;
-    method: HourlyPointWeighting["method"];
-    fallbackReason: HourlyPointWeighting["fallbackReason"];
+    method: "historical_skill" | "unavailable";
+    unavailableReason: HourlyWeightingUnavailableReason | null;
     hourCount: number;
+    modelNamesWithData: readonly OfficialHourlyModelName[];
   }>;
 };
 
@@ -77,12 +92,16 @@ type HourlyModelValue = {
 };
 
 type HorizonWeights = {
-  method: HourlyPointWeighting["method"];
-  fallbackReason: HourlyPointWeighting["fallbackReason"];
+  method: "historical_skill" | "unavailable";
+  unavailableReason: HourlyWeightingUnavailableReason | null;
   weights: Map<OfficialHourlyModelName, number>;
-  scoredVariables: string[];
   minimumComparisons: number | null;
   minimumComparableDays: number | null;
+};
+
+type VariableForecastValue = {
+  value: number | null;
+  weighting: HourlyVariableWeighting;
 };
 
 function isFiniteNumber(value: unknown): value is number {
@@ -98,19 +117,12 @@ function median(values: number[]): number | null {
     : ordered[middle];
 }
 
-function normalizeWeights(values: Map<OfficialHourlyModelName, number>): Map<OfficialHourlyModelName, number> {
-  const total = Array.from(values.values()).reduce((sum, value) => sum + value, 0);
-  if (total <= 0 || !Number.isFinite(total)) {
-    const equal = 1 / Math.max(1, values.size);
-    return new Map(Array.from(values.keys(), (name) => [name, equal] as const));
-  }
-  return new Map(Array.from(values, ([name, value]) => [name, value / total] as const));
-}
-
-function equalWeights(names: OfficialHourlyModelName[]): Map<OfficialHourlyModelName, number> {
-  const uniqueNames = Array.from(new Set(names));
-  const weight = uniqueNames.length > 0 ? 1 / uniqueNames.length : 0;
-  return new Map(uniqueNames.map((name) => [name, weight] as const));
+/** Returns null on invalid or empty evidence; never manufactures equal weights. */
+function normalizeWeights(values: Map<OfficialHourlyModelName, number>): Map<OfficialHourlyModelName, number> | null {
+  const positive = Array.from(values).filter(([, value]) => isFiniteNumber(value) && value > 0);
+  const total = positive.reduce((sum, [, value]) => sum + value, 0);
+  if (positive.length === 0 || total <= 0 || !Number.isFinite(total)) return null;
+  return new Map(positive.map(([name, value]) => [name, value / total] as const));
 }
 
 function collectHistoryAggregates(
@@ -126,9 +138,11 @@ function collectHistoryAggregates(
     if (!(HISTORY_VARIABLES as readonly string[]).includes(score.variable)) continue;
     if (!Number.isInteger(score.sampleSize) || score.sampleSize <= 0 || !isFiniteNumber(score.mae) || score.mae < 0) continue;
 
+    const weightedError = score.mae * score.sampleSize;
+    if (!Number.isFinite(weightedError)) continue;
     const key = [score.modelName, score.variable, score.horizonBucket].join("|");
     const aggregate = aggregates.get(key) ?? { weightedAbsoluteError: 0, sampleSize: 0, dates: new Set<string>() };
-    aggregate.weightedAbsoluteError += score.mae * score.sampleSize;
+    aggregate.weightedAbsoluteError += weightedError;
     aggregate.sampleSize += score.sampleSize;
     aggregate.dates.add(score.date);
     aggregates.set(key, aggregate);
@@ -145,67 +159,69 @@ function getQualifiedHistory(
   const aggregate = aggregates.get([modelName, variable, horizonBucket].join("|"));
   if (!aggregate || aggregate.sampleSize < PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons
     || aggregate.dates.size < PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays) return null;
+  const mae = aggregate.weightedAbsoluteError / aggregate.sampleSize;
+  if (!Number.isFinite(mae) || mae < 0) return null;
   return {
-    mae: aggregate.weightedAbsoluteError / aggregate.sampleSize,
+    mae,
     sampleSize: aggregate.sampleSize,
     evaluatedDays: aggregate.dates.size,
   };
 }
 
+function unavailableWeights(unavailableReason: HourlyWeightingUnavailableReason): HorizonWeights {
+  return {
+    method: "unavailable",
+    unavailableReason,
+    weights: new Map(),
+    minimumComparisons: null,
+    minimumComparableDays: null,
+  };
+}
+
+/** Uses only one variable's comparable, location-filtered, matching-horizon MAE evidence. */
 function historicalWeights(
   aggregates: Map<string, HistoryAggregate>,
+  variable: OfficialHourlyVariable,
   horizonBucket: string,
 ): HorizonWeights {
-  const modelErrors = new Map<OfficialHourlyModelName, number[]>();
-  for (const modelName of OFFICIAL_HOURLY_MODEL_NAMES) modelErrors.set(modelName, []);
-  const scoredVariables: string[] = [];
-  const evidence: QualifiedHistory[] = [];
+  const scores = OFFICIAL_HOURLY_MODEL_NAMES.map((modelName) => getQualifiedHistory(aggregates, modelName, variable, horizonBucket));
+  if (scores.some((score) => score == null)) return unavailableWeights("insufficient_historical_evidence");
 
-  for (const variable of HISTORY_VARIABLES) {
-    const scores = OFFICIAL_HOURLY_MODEL_NAMES.map((modelName) => getQualifiedHistory(aggregates, modelName, variable, horizonBucket));
-    if (scores.some((score) => score == null)) continue;
-    const qualified = scores as QualifiedHistory[];
-    const baseline = median(qualified.map((score) => score.mae));
-    // A zero median cannot be used as a relative scale without creating an
-    // artificial advantage; that variable is omitted instead of epsilon-tuned.
-    if (baseline == null || baseline <= 0) continue;
-
-    scoredVariables.push(variable);
-    evidence.push(...qualified);
-    qualified.forEach((score, index) => {
-      const modelName = OFFICIAL_HOURLY_MODEL_NAMES[index];
-      modelErrors.get(modelName)!.push(score.mae / baseline);
-    });
-  }
-
-  if (scoredVariables.length === 0) {
-    return {
-      method: "equal_fallback",
-      fallbackReason: "insufficient_historical_evidence",
-      weights: new Map(),
-      scoredVariables,
-      minimumComparisons: null,
-      minimumComparableDays: null,
-    };
-  }
+  const qualified = scores as QualifiedHistory[];
+  const baseline = median(qualified.map((score) => score.mae));
+  // A zero median cannot provide a meaningful relative scale; do not tune an artificial epsilon.
+  if (baseline == null || baseline <= 0) return unavailableWeights("insufficient_historical_evidence");
 
   const rawWeights = new Map<OfficialHourlyModelName, number>();
-  for (const modelName of OFFICIAL_HOURLY_MODEL_NAMES) {
-    const relativeErrors = modelErrors.get(modelName)!;
-    const meanRelativeError = relativeErrors.reduce((sum, error) => sum + error, 0) / relativeErrors.length;
-    // Inverse normalized MAE: one unit equals the seven-model median error.
-    // The +1 regularizes the ratio and prevents one model dominating the line.
-    rawWeights.set(modelName, 1 / (1 + meanRelativeError));
+  for (let index = 0; index < qualified.length; index++) {
+    const score = qualified[index];
+    const relativeError = score.mae / baseline;
+    if (!Number.isFinite(relativeError) || relativeError < 0) return unavailableWeights("insufficient_historical_evidence");
+    // The +1 regularizes relative MAE so a small evidence set cannot dominate the result.
+    rawWeights.set(OFFICIAL_HOURLY_MODEL_NAMES[index], 1 / (1 + relativeError));
   }
+  const weights = normalizeWeights(rawWeights);
+  if (!weights) return unavailableWeights("insufficient_historical_evidence");
 
   return {
     method: "historical_skill",
-    fallbackReason: null,
-    weights: normalizeWeights(rawWeights),
-    scoredVariables,
-    minimumComparisons: Math.min(...evidence.map((item) => item.sampleSize)),
-    minimumComparableDays: Math.min(...evidence.map((item) => item.evaluatedDays)),
+    unavailableReason: null,
+    weights,
+    minimumComparisons: Math.min(...qualified.map((item) => item.sampleSize)),
+    minimumComparableDays: Math.min(...qualified.map((item) => item.evaluatedDays)),
   };
+}
+
+function findCommonHorizon(modelValues: HourlyModelValue[], validAt: number): { bucket: string | null; unavailableReason: HourlyWeightingUnavailableReason | null } {
+  const buckets = modelValues.map(({ availableAt }) => {
+    if (!isFiniteNumber(availableAt)) return null;
+    const minutes = Math.round((validAt - availableAt) / 60_000);
+    return getPhase3HorizonWindow(minutes)?.key ?? null;
+  });
+  if (buckets.some((bucket) => bucket == null)) return { bucket: null, unavailableReason: "horizon_not_scored" };
+  const uniqueBuckets = new Set(buckets as string[]);
+  if (uniqueBuckets.size !== 1) return { bucket: null, unavailableReason: "incomparable_horizons" };
+  return { bucket: buckets[0]!, unavailableReason: null };
 }
 
 function weightedMean(values: Array<{ value: unknown; weight: number }>): number | null {
@@ -217,32 +233,6 @@ function weightedMean(values: Array<{ value: unknown; weight: number }>): number
     availableWeight += entry.weight;
   }
   return availableWeight > 0 ? weightedTotal / availableWeight : null;
-}
-
-function weightedCircularMean(values: Array<{ value: unknown; weight: number }>): number | null {
-  let sine = 0;
-  let cosine = 0;
-  let totalWeight = 0;
-  for (const entry of values) {
-    if (!isFiniteNumber(entry.value) || !isFiniteNumber(entry.weight) || entry.weight <= 0) continue;
-    const radians = (entry.value * Math.PI) / 180;
-    sine += Math.sin(radians) * entry.weight;
-    cosine += Math.cos(radians) * entry.weight;
-    totalWeight += entry.weight;
-  }
-  if (totalWeight === 0 || Math.hypot(sine, cosine) < 1e-8) return null;
-  return (((Math.atan2(sine, cosine) * 180) / Math.PI + 360) % 360 + 360) % 360;
-}
-
-function weightedWeatherCode(values: Array<{ value: unknown; weight: number }>): number | null {
-  const totals = new Map<number, number>();
-  for (const entry of values) {
-    if (!isFiniteNumber(entry.value) || !isFiniteNumber(entry.weight) || entry.weight <= 0) continue;
-    const code = Math.round(entry.value);
-    totals.set(code, (totals.get(code) ?? 0) + entry.weight);
-  }
-  const winner = Array.from(totals.entries()).sort((left, right) => right[1] - left[1] || left[0] - right[0])[0];
-  return winner?.[0] ?? null;
 }
 
 function numericRange(values: unknown[]): number | null {
@@ -276,46 +266,122 @@ function hasForecastValue(hour: HourlyModelForecast["hours"][number]): boolean {
   ].some(isFiniteNumber);
 }
 
+function computeVariableForecastValue(
+  variable: OfficialHourlyVariable,
+  modelValues: HourlyModelValue[],
+  horizonWeights: HorizonWeights,
+): VariableForecastValue {
+  const field = FORECAST_FIELD_BY_VARIABLE[variable];
+  const modelValuesWithData = modelValues.filter(({ hour }) => isFiniteNumber(hour[field]));
+  const modelsWithData = modelValuesWithData.map(({ modelName }) => modelName);
+  if (horizonWeights.method !== "historical_skill") {
+    return {
+      value: null,
+      weighting: {
+        variable,
+        method: "unavailable",
+        unavailableReason: horizonWeights.unavailableReason,
+        modelsWithData,
+        modelWeights: [],
+        minimumComparisons: null,
+        minimumComparableDays: null,
+      },
+    };
+  }
+  if (modelValuesWithData.length === 0) {
+    return {
+      value: null,
+      weighting: {
+        variable,
+        method: "unavailable",
+        unavailableReason: "no_model_data",
+        modelsWithData,
+        modelWeights: [],
+        minimumComparisons: horizonWeights.minimumComparisons,
+        minimumComparableDays: horizonWeights.minimumComparableDays,
+      },
+    };
+  }
+
+  const availableWeights = normalizeWeights(new Map(modelValuesWithData.flatMap(({ modelName }) => {
+    const weight = horizonWeights.weights.get(modelName);
+    return weight == null ? [] : [[modelName, weight] as const];
+  })));
+  if (!availableWeights) {
+    return {
+      value: null,
+      weighting: {
+        variable,
+        method: "unavailable",
+        unavailableReason: "insufficient_historical_evidence",
+        modelsWithData,
+        modelWeights: [],
+        minimumComparisons: null,
+        minimumComparableDays: null,
+      },
+    };
+  }
+
+  const value = weightedMean(modelValuesWithData.map(({ modelName, hour }) => ({
+    value: hour[field],
+    weight: availableWeights.get(modelName) ?? 0,
+  })));
+  if (value == null) {
+    return {
+      value: null,
+      weighting: {
+        variable,
+        method: "unavailable",
+        unavailableReason: "no_model_data",
+        modelsWithData,
+        modelWeights: [],
+        minimumComparisons: horizonWeights.minimumComparisons,
+        minimumComparableDays: horizonWeights.minimumComparableDays,
+      },
+    };
+  }
+
+  return {
+    value,
+    weighting: {
+      variable,
+      method: "historical_skill",
+      unavailableReason: null,
+      modelsWithData,
+      modelWeights: modelValuesWithData.flatMap(({ modelName }) => {
+        const weight = availableWeights.get(modelName);
+        return weight == null ? [] : [{ modelName, weight }];
+      }),
+      minimumComparisons: horizonWeights.minimumComparisons,
+      minimumComparableDays: horizonWeights.minimumComparableDays,
+    },
+  };
+}
+
 function makePoint(
   validAt: number,
   modelValues: HourlyModelValue[],
-  weights: Map<OfficialHourlyModelName, number>,
-  pointWeighting: HourlyPointWeighting,
+  variableValues: Map<OfficialHourlyVariable, VariableForecastValue>,
+  horizonBucket: string | null,
   now: number,
 ): HourlyPoint | null {
   const parisTime = getParisDateAndHour(validAt);
   if (!parisTime) return null;
   const available = modelValues.filter(({ hour }) => hasForecastValue(hour));
   if (available.length === 0) return null;
-  const entriesFor = (field: keyof HourlyModelForecast["hours"][number]) => available.map((model) => ({
-    value: model.hour[field],
-    weight: weights.get(model.modelName) ?? 0,
-  }));
-  const temperatureValues = available.map((model) => model.hour.temperature).filter(isFiniteNumber);
-  const precipitation = weightedMean(entriesFor("precipitation"));
-  const snowfall = weightedMean(entriesFor("snowfall"));
-  const cloudCover = weightedMean(entriesFor("cloudCover"));
-  const temperature = weightedMean(entriesFor("temperature"));
-  const weatherCode = weightedWeatherCode(entriesFor("weatherCode"));
-  const hasPrecipitation = (precipitation ?? 0) > 0 || (snowfall ?? 0) > 0;
-  const validPrecipitation = available.map((model) => model.hour.precipitation).filter(isFiniteNumber);
-  const precipAgreement = validPrecipitation.length > 0
-    ? (validPrecipitation.filter((value) => value >= 0.1).length / validPrecipitation.length) * 100
-    : null;
-  const precipitationType = !hasPrecipitation
-    ? null
-    : (snowfall ?? 0) > 0
-      ? "snow"
-      : (temperature ?? 0) <= 0 ? "freezing_rain" : "rain";
-  const precipitationIntensity = !hasPrecipitation
-    ? null
-    : (precipitation ?? 0) > 5 ? "heavy" : (precipitation ?? 0) > 1 ? "moderate" : "light";
-  const condition = weatherCode != null
-    ? conditionFromWmoWeatherCode(weatherCode, precipitation, cloudCover)
-    : conditionFromWeatherValues(precipitation, cloudCover);
-  const temperatureExtremes = available.flatMap((model) => isFiniteNumber(model.hour.temperature)
-    ? [{ name: model.modelName, temperature: model.hour.temperature }]
-    : []).sort((left, right) => left.temperature - right.temperature || left.name.localeCompare(right.name));
+
+  const valueFor = (variable: OfficialHourlyVariable) => variableValues.get(variable)?.value ?? null;
+  const temperature = valueFor("temperature");
+  const precipitation = valueFor("precipitation");
+  const windSpeed = valueFor("wind_speed");
+  const windGust = valueFor("wind_gust");
+  const humidity = valueFor("humidity");
+  const pressure = valueFor("pressure");
+  const rawTemperatures = modelValues.flatMap(({ modelName, hour }) => isFiniteNumber(hour.temperature)
+    ? [{ name: modelName, temperature: hour.temperature }]
+    : []);
+  const temperatureValues = rawTemperatures.map((model) => model.temperature);
+  const temperatureExtremes = [...rawTemperatures].sort((left, right) => left.temperature - right.temperature || left.name.localeCompare(right.name));
   const temperatureComparison = temperatureExtremes.length > 1
     ? {
         lower: temperatureExtremes[0],
@@ -324,55 +390,82 @@ function makePoint(
       }
     : null;
 
+  const variableWeightings = HISTORY_VARIABLES.map((variable) => variableValues.get(variable)!.weighting);
+  const scoredVariables = variableWeightings.filter((item) => item.method === "historical_skill").map((item) => item.variable);
+  const unavailableVariables = variableWeightings.filter((item) => item.method === "unavailable").map((item) => item.variable);
+  const hasScoredVariable = scoredVariables.length > 0;
+  const pointMethod: HourlyPointWeighting["method"] = !hasScoredVariable
+    ? "unavailable"
+    : unavailableVariables.length > 0 ? "mixed" : "historical_skill";
+  const unavailableReason = hasScoredVariable
+    ? null
+    : variableWeightings.find((item) => item.unavailableReason != null)?.unavailableReason ?? "insufficient_historical_evidence";
+  const comparisonCounts = variableWeightings.flatMap((item) => item.method === "historical_skill" && item.minimumComparisons != null ? [item.minimumComparisons] : []);
+  const comparableDayCounts = variableWeightings.flatMap((item) => item.method === "historical_skill" && item.minimumComparableDays != null ? [item.minimumComparableDays] : []);
+  const modelsWithData = Array.from(new Set(available.map(({ modelName }) => modelName)));
+  const precipValues = modelValues.map(({ hour }) => hour.precipitation).filter(isFiniteNumber);
+  const precipAgreement = precipValues.length > 0
+    ? (precipValues.filter((value) => value >= 0.1).length / precipValues.length) * 100
+    : null;
+  const condition = precipitation == null ? null : conditionFromWeatherValues(precipitation, null);
+  const precipIntensity = precipitation == null || precipitation <= 0
+    ? null
+    : precipitation > 5 ? "heavy" : precipitation > 1 ? "moderate" : "light";
+
   return {
     date: parisTime.date,
     hour: `${String(parisTime.hour).padStart(2, "0")}:00`,
     validAt,
     temp: temperature,
-    apparentTemp: weightedMean(entriesFor("apparentTemperature")),
+    // No historical run scores exist for these fields, so they are not published as official values.
+    apparentTemp: null,
     precipitation,
-    windSpeed: weightedMean(entriesFor("windSpeed")),
-    windGust: weightedMean(entriesFor("windGusts")),
-    windDirection: weightedCircularMean(entriesFor("windDirection")),
-    cloudCover,
-    humidity: weightedMean(entriesFor("humidity")),
-    uvIndex: weightedMean(entriesFor("uvIndex")),
+    windSpeed,
+    windGust,
+    windDirection: null,
+    cloudCover: null,
+    humidity,
+    uvIndex: null,
     condition,
-    weatherCode,
-    pressure: weightedMean(entriesFor("pressure")),
-    dewPoint: weightedMean(entriesFor("dewPoint")),
-    visibility: weightedMean(entriesFor("visibility")),
-    solarRadiation: weightedMean(entriesFor("solarRadiation")),
-    cloudLow: weightedMean(entriesFor("cloudLow")),
-    cloudMid: weightedMean(entriesFor("cloudMid")),
-    cloudHigh: weightedMean(entriesFor("cloudHigh")),
-    precipType: precipitationType,
-    precipIntensity: precipitationIntensity,
+    weatherCode: null,
+    pressure,
+    dewPoint: null,
+    visibility: null,
+    solarRadiation: null,
+    cloudLow: null,
+    cloudMid: null,
+    cloudHigh: null,
+    precipType: null,
+    precipIntensity,
     tempSpread: numericRange(temperatureValues),
-    windSpeedSpread: numericRange(available.map((model) => model.hour.windSpeed)),
-    windGustSpread: numericRange(available.map((model) => model.hour.windGusts)),
-    windDirectionDifference: maximumCircularSpread(available.map((model) => model.hour.windDirection)),
-    humiditySpread: numericRange(available.map((model) => model.hour.humidity)),
-    cloudCoverSpread: numericRange(available.map((model) => model.hour.cloudCover)),
+    windSpeedSpread: numericRange(modelValues.map(({ hour }) => hour.windSpeed)),
+    windGustSpread: numericRange(modelValues.map(({ hour }) => hour.windGusts)),
+    windDirectionDifference: maximumCircularSpread(modelValues.map(({ hour }) => hour.windDirection)),
+    humiditySpread: numericRange(modelValues.map(({ hour }) => hour.humidity)),
+    cloudCoverSpread: numericRange(modelValues.map(({ hour }) => hour.cloudCover)),
     precipAgreement,
-    modelCount: available.length,
+    modelCount: temperatureValues.length,
     temperatureComparison,
     isCurrent: validAt <= now && now < validAt + 60 * 60_000,
     forecastWeighting: {
-      ...pointWeighting,
-      modelWeights: available.flatMap(({ modelName }) => {
-        const weight = weights.get(modelName);
-        return weight == null ? [] : [{ modelName, weight }];
-      }),
+      method: pointMethod,
+      horizonBucket,
+      unavailableReason,
+      scoredVariables,
+      unavailableVariables,
+      minimumComparisons: comparisonCounts.length > 0 ? Math.min(...comparisonCounts) : null,
+      minimumComparableDays: comparableDayCounts.length > 0 ? Math.min(...comparableDayCounts) : null,
+      variableWeightings,
+      modelsWithData,
     },
   };
 }
 
 /**
- * Produces one hourly point per absolute valid time from the seven named models.
- * For each existing horizon bucket it uses relative MAE only when every named
- * model meets the existing 30-comparison / 7-day evidence threshold. Otherwise
- * it marks and returns an equal-weight mean; Best Match is always excluded.
+ * Builds a single series from the seven named forecast models. Each published
+ * metric must have its own qualified historical MAE weights for the same lead
+ * bucket. Unsupported or under-calibrated metrics remain null; Best Match is
+ * always excluded and no equal-weight fallback is ever emitted.
  */
 export function computeOfficialHourlyForecast(
   modelForecasts: readonly HourlyModelForecast[],
@@ -386,8 +479,7 @@ export function computeOfficialHourlyForecast(
   for (const forecast of modelForecasts) {
     if (!MODEL_NAME_SET.has(forecast.modelName)) continue;
     const modelName = forecast.modelName as OfficialHourlyModelName;
-    const expectedModelId = MODEL_ID_BY_NAME.get(modelName);
-    if (forecast.modelId !== expectedModelId) continue;
+    if (forecast.modelId !== MODEL_ID_BY_NAME.get(modelName)) continue;
     if (forecast.sourceName !== "open-meteo") continue;
     for (const hour of forecast.hours) {
       if (!isFiniteNumber(hour.validAt) || !hasForecastValue(hour)) continue;
@@ -412,62 +504,60 @@ export function computeOfficialHourlyForecast(
   const beforeDate = forecastDates[0] ?? null;
   const historyAggregates = collectHistoryAggregates(historyAvailable ? historyScores : [], beforeDate);
   const hours: HourlyPoint[] = [];
-  const horizonStats = new Map<string, { horizonBucket: string | null; method: HourlyPointWeighting["method"]; fallbackReason: HourlyPointWeighting["fallbackReason"]; hourCount: number }>();
+  const summaryRows = new Map<string, {
+    variable: string;
+    horizonBucket: string | null;
+    method: "historical_skill" | "unavailable";
+    unavailableReason: HourlyWeightingUnavailableReason | null;
+    hourCount: number;
+    modelNamesWithData: Set<OfficialHourlyModelName>;
+  }>();
+  const allModelsWithData = new Set<OfficialHourlyModelName>();
 
   for (const [validAt, modelMap] of Array.from(byValidTime.entries()).sort((left, right) => left[0] - right[0])) {
     const modelValues = Array.from(modelMap.values());
     if (modelValues.length === 0) continue;
-    const availabilityTimes = modelValues.map((model) => model.availableAt).filter(isFiniteNumber);
-    const officialAvailableAt = availabilityTimes.length > 0 ? Math.max(...availabilityTimes) : null;
-    const horizonMinutes = officialAvailableAt == null ? null : Math.round((validAt - officialAvailableAt) / 60_000);
-    const horizon = getPhase3HorizonWindow(horizonMinutes);
-    const historyWeight = historyAvailable && horizon
-      ? historicalWeights(historyAggregates, horizon.key)
-      : {
-          method: "equal_fallback" as const,
-          fallbackReason: historyAvailable ? "horizon_not_scored" as const : "history_unavailable" as const,
-          weights: new Map<OfficialHourlyModelName, number>(),
-          scoredVariables: [] as string[],
-          minimumComparisons: null,
-          minimumComparableDays: null,
-        };
-    const availableModelNames = modelValues.map((model) => model.modelName);
-    const weights = historyWeight.method === "historical_skill"
-      ? normalizeWeights(new Map(availableModelNames.map((name) => [name, historyWeight.weights.get(name) ?? 0] as const)))
-      : equalWeights(availableModelNames);
-    const fallbackReason = historyWeight.fallbackReason
-      ?? (historyWeight.method === "equal_fallback" ? "insufficient_historical_evidence" : null);
-    const pointWeighting: HourlyPointWeighting = {
-      method: historyWeight.method,
-      horizonBucket: horizon?.key ?? null,
-      fallbackReason,
-      scoredVariables: historyWeight.scoredVariables,
-      minimumComparisons: historyWeight.minimumComparisons,
-      minimumComparableDays: historyWeight.minimumComparableDays,
-      modelWeights: [],
-    };
-    const point = makePoint(validAt, modelValues, weights, pointWeighting, now);
+    const horizon = findCommonHorizon(modelValues, validAt);
+    const variableValues = new Map<OfficialHourlyVariable, VariableForecastValue>();
+
+    for (const variable of HISTORY_VARIABLES) {
+      const horizonWeights = !historyAvailable
+        ? unavailableWeights("history_unavailable")
+        : horizon.bucket == null
+          ? unavailableWeights(horizon.unavailableReason ?? "horizon_not_scored")
+          : historicalWeights(historyAggregates, variable, horizon.bucket);
+      const result = computeVariableForecastValue(variable, modelValues, horizonWeights);
+      variableValues.set(variable, result);
+    }
+    modelValues.filter(({ hour }) => hasForecastValue(hour)).forEach(({ modelName }) => allModelsWithData.add(modelName));
+
+    const point = makePoint(validAt, modelValues, variableValues, horizon.bucket, now);
     if (!point) continue;
     hours.push(point);
 
-    const horizonKey = horizon?.key ?? "unsupported";
-    const key = `${horizonKey}|${historyWeight.method}|${fallbackReason ?? ""}`;
-    const statistic = horizonStats.get(key) ?? {
-      horizonBucket: horizon?.key ?? null,
-      method: historyWeight.method,
-      fallbackReason,
-      hourCount: 0,
-    };
-    statistic.hourCount++;
-    horizonStats.set(key, statistic);
+    for (const variable of HISTORY_VARIABLES) {
+      const variableWeighting = variableValues.get(variable)!.weighting;
+      const key = `${variable}|${horizon.bucket ?? "unknown"}|${variableWeighting.method}|${variableWeighting.unavailableReason ?? ""}`;
+      const row = summaryRows.get(key) ?? {
+        variable,
+        horizonBucket: horizon.bucket,
+        method: variableWeighting.method,
+        unavailableReason: variableWeighting.unavailableReason,
+        hourCount: 0,
+        modelNamesWithData: new Set<OfficialHourlyModelName>(),
+      };
+      row.hourCount++;
+      variableWeighting.modelsWithData.forEach((name) => row.modelNamesWithData.add(name as OfficialHourlyModelName));
+      summaryRows.set(key, row);
+    }
   }
 
-  const methods = new Set(hours.map((hour) => hour.forecastWeighting?.method).filter(Boolean));
-  const status: OfficialHourlyWeightingSummary["status"] = hours.length === 0
+  const summaryMethods = Array.from(summaryRows.values()).map((row) => row.method);
+  const hasHistoricalSkill = summaryMethods.includes("historical_skill");
+  const hasUnavailableMetrics = summaryMethods.includes("unavailable");
+  const status: OfficialHourlyWeightingSummary["status"] = !hasHistoricalSkill
     ? "unavailable"
-    : methods.size > 1
-      ? "mixed"
-      : methods.has("historical_skill") ? "historical_skill" : "equal_fallback";
+    : hasUnavailableMetrics ? "mixed" : "historical_skill";
   return {
     hours,
     weighting: {
@@ -478,7 +568,11 @@ export function computeOfficialHourlyForecast(
       minimumComparableDays: PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays,
       bestMatchIncluded: false,
       modelsConsidered: OFFICIAL_HOURLY_MODEL_NAMES,
-      horizons: Array.from(horizonStats.values()),
+      modelsWithData: Array.from(allModelsWithData),
+      horizons: Array.from(summaryRows.values()).map((row) => ({
+        ...row,
+        modelNamesWithData: Array.from(row.modelNamesWithData),
+      })),
     },
   };
 }
@@ -504,7 +598,7 @@ export async function collectOfficialHourlyForecast(
     historyAvailable = history.available;
     historyScores = history.rows;
   } catch (error) {
-    console.warn("[OfficialHourly] Historical scores unavailable; using equal weights:", error);
+    console.warn("[OfficialHourly] Historical scores unavailable; official metrics will remain unavailable:", error);
   }
   return {
     ...computeOfficialHourlyForecast(modelForecasts, historyScores, { historyAvailable }),
