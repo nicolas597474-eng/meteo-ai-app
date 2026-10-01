@@ -1486,6 +1486,32 @@ export async function getHourlyForecastEvaluationScores(locationKey: string, dat
   )).orderBy(hourlyForecastEvaluationScores.sourceName, hourlyForecastEvaluationScores.modelName, hourlyForecastEvaluationScores.variable, hourlyForecastEvaluationScores.horizonBucket);
 }
 
+/** Read only the fields needed to weight hourly models over a bounded history window. */
+export async function getHourlyForecastEvaluationHistory(locationKey: string, fromDate: string, throughDate: string) {
+  const db = await getDb();
+  if (!db) return { available: false as const, rows: [] };
+  try {
+    const rows = await db.select({
+      date: hourlyForecastEvaluationScores.date,
+      sourceName: hourlyForecastEvaluationScores.sourceName,
+      modelName: hourlyForecastEvaluationScores.modelName,
+      modelId: hourlyForecastEvaluationScores.modelId,
+      variable: hourlyForecastEvaluationScores.variable,
+      horizonBucket: hourlyForecastEvaluationScores.horizonBucket,
+      sampleSize: hourlyForecastEvaluationScores.sampleSize,
+      mae: hourlyForecastEvaluationScores.mae,
+    }).from(hourlyForecastEvaluationScores).where(and(
+      eq(hourlyForecastEvaluationScores.locationKey, locationKey),
+      gte(hourlyForecastEvaluationScores.date, fromDate),
+      lte(hourlyForecastEvaluationScores.date, throughDate),
+    )).orderBy(hourlyForecastEvaluationScores.date, hourlyForecastEvaluationScores.modelName);
+    return { available: true as const, rows };
+  } catch (error) {
+    console.warn("[Database] Unable to read hourly forecast evaluation history:", error);
+    return { available: false as const, rows: [] };
+  }
+}
+
 // ─── OBSERVATIONS PERSONNELLES ET CALIBRATION ──────────────────────────────
 
 export async function insertPersonalWeatherObservation(data: InsertPersonalWeatherObservation): Promise<number | null> {

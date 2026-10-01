@@ -18,6 +18,7 @@ import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
+import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
 import { getCollectionHealth, formatCollectionDuration } from "@/lib/collectionHealth";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
@@ -370,7 +371,6 @@ export default function Dashboard() {
       retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     }
   );
-  const hourlySnapshot = officialForecast ? { hours: officialForecast.hours } : null;
   const hourlyLoading = officialLoading;
   const hourlyError = officialError;
   const hourlyFetching = officialFetching;
@@ -557,11 +557,8 @@ export default function Dashboard() {
   const officialPrimaryRegime = officialRegime?.primary as any;
   const days: any[] = officialForecast?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
-  const officialHours: any[] = hourlySnapshot?.hours ?? officialForecast?.hours ?? (lw ? lw.hourly : []);
-  const personalizedByHour = new Map((personalizedHourly?.hours ?? []).map((hour) => [hour.hour, hour]));
-  const hours: any[] = personalizedHourly?.applied
-    ? officialHours.map((hour) => hour.isCurrent ? hour : (personalizedByHour.get(hour.hour) ?? hour))
-    : officialHours;
+  const officialHours: any[] = officialForecast?.hours ?? [];
+  const hours: any[] = officialHours;
   const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const panelDate = formatDashboardCompactDate(officialForecast?.today ?? dash?.today);
@@ -1074,7 +1071,7 @@ export default function Dashboard() {
             <button type="button" onClick={handlePersonalObservationSubmit} disabled={submitPersonalObservation.isPending} className="mt-3 min-h-10 w-full rounded-lg border border-sky-300/45 bg-sky-400/15 px-3 text-xs font-semibold text-sky-100 disabled:cursor-wait disabled:opacity-60">{submitPersonalObservation.isPending ? "Comparaison des modèles…" : "Enregistrer et comparer aux modèles"}</button>
             {submitPersonalObservation.isError ? <p className="mt-2 text-[11px] text-red-300">L’observation n’a pas pu être enregistrée. Vérifiez les valeurs puis réessayez.</p> : null}
             {personalSubmitResult ? <div className="mt-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-100"><p>{personalSubmitResult.notice}</p>{personalSubmitResult.topModel ? <p className="mt-1 font-semibold">Meilleur accord sur cette observation : {personalSubmitResult.topModel.modelName} — {Math.round(personalSubmitResult.topModel.overallScore)}/100.</p> : null}</div> : null}
-            <div className="mt-3 border-t border-sky-300/15 pt-2 text-[11px] text-slate-400">{personalizedHourly?.applied ? `Calibration qualifiée active : les heures à venir sont pondérées selon ${personalizedHourly.comparedModels.join(", ")}. La condition actuelle reste la source à 15 minutes.` : personalObservationState?.evidence.state === "qualified" ? "Calibration qualifiée : mise à jour de la fusion en cours." : personalObservationState?.evidence.state === "provisional" ? `Tendance provisoire : ${personalObservationState.evidence.comparisonCount}/50 comparaisons avant une influence sur les poids.` : `Données insuffisantes : ${personalObservationState?.evidence.comparisonCount ?? 0}/20 comparaisons pour une première tendance, 50 pour influencer les poids.`}</div>
+            <div className="mt-3 border-t border-sky-300/15 pt-2 text-[11px] text-slate-400">{personalizedHourly?.applied ? `Calibration qualifiée disponible pour l’analyse personnelle (${personalizedHourly.comparedModels.join(", ")}); elle reste séparée de la série horaire officielle.` : personalObservationState?.evidence.state === "qualified" ? "Calibration qualifiée disponible en analyse personnelle; elle ne remplace pas la série horaire officielle." : personalObservationState?.evidence.state === "provisional" ? `Tendance personnelle provisoire : ${personalObservationState.evidence.comparisonCount}/50 comparaisons avant qualification. Elle ne modifie pas la série horaire officielle.` : `Données insuffisantes : ${personalObservationState?.evidence.comparisonCount ?? 0}/20 comparaisons pour une première tendance personnelle; la calibration reste séparée de la série horaire officielle.`}</div>
             <button type="button" onClick={() => setIsPersonalHistoryOpen(true)} className="mt-3 min-h-10 w-full rounded-lg border border-slate-600 bg-black/15 px-3 text-xs font-semibold text-slate-200">Consulter l’historique complet</button>
           </>}
           </div> : null}
@@ -1178,6 +1175,7 @@ export default function Dashboard() {
 
         {/* Hourly Chart */}
         <div className="overflow-visible rounded-[22px]">
+          <HourlyWeightingNotice weighting={officialForecast?.officialSnapshot?.hourlyWeighting} />
           {hourlyLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (

@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, mergeManualHourlyForecast } from "./officialWeatherSnapshot";
 
+const unavailableWeighting = {
+  status: "unavailable" as const,
+  historyStatus: "available" as const,
+  historyWindowDays: 365,
+  minimumComparisons: 30,
+  minimumComparableDays: 7,
+  bestMatchIncluded: false as const,
+  modelsConsidered: ["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"] as const,
+  modelsWithData: [],
+  horizons: [],
+};
+
 describe("buildOfficialWeatherSnapshot", () => {
   it("sélectionne une unique valeur officielle pour le même lieu et la même heure", () => {
     const snapshot = buildOfficialWeatherSnapshot({
@@ -8,6 +20,7 @@ describe("buildOfficialWeatherSnapshot", () => {
       lon: 2.52085,
       weatherDate: "2026-08-12",
       computedAt: new Date("2026-08-12T12:01:00.000Z"),
+      hourlyWeighting: unavailableWeighting,
       parisHour: "14",
       hourly: [
         { hour: "13:00", temp: 21.1, apparentTemp: 21.1, precipitation: 0, windSpeed: 8, windGust: 12, windDirection: 180, cloudCover: 10, humidity: 55, uvIndex: 5, condition: "Ensoleillé" },
@@ -20,6 +33,8 @@ describe("buildOfficialWeatherSnapshot", () => {
     expect(snapshot.current?.temp).toBe(23.4);
     expect(snapshot.validAt).toBe("2026-08-12T14:00");
     expect(snapshot.sourceKind).toBe("official_forecast");
+    expect(snapshot.source).toBe("open-meteo");
+    expect(snapshot.hourlyWeighting.bestMatchIncluded).toBe(false);
   });
 
   it("raccourcit le cache uniquement lorsque la source horaire ne renvoie aucune donnée", () => {
@@ -29,12 +44,33 @@ describe("buildOfficialWeatherSnapshot", () => {
     ])).toBe(120_000);
   });
 
+  it("sélectionne l’instant courant exact lorsque l’heure locale se répète au changement d’heure", () => {
+    const snapshot = buildOfficialWeatherSnapshot({
+      lat: 50.75646,
+      lon: 2.52085,
+      weatherDate: "2026-10-25",
+      computedAt: new Date("2026-10-25T01:30:00.000Z"),
+      hourlyWeighting: unavailableWeighting,
+      parisHour: "02",
+      hourly: [
+        { date: "2026-10-25", hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), temp: 10, apparentTemp: 10, precipitation: 0, windSpeed: 5, windGust: 8, windDirection: 180, cloudCover: 50, humidity: 80, uvIndex: 0, condition: "Nuageux" },
+        { date: "2026-10-25", hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 11, apparentTemp: 11, precipitation: 0, windSpeed: 5, windGust: 8, windDirection: 180, cloudCover: 50, humidity: 80, uvIndex: 0, condition: "Nuageux", isCurrent: true },
+      ],
+      daily: [],
+      modelsUsed: [],
+    });
+
+    expect(snapshot.current?.temp).toBe(11);
+    expect(snapshot.current?.validAt).toBe(Date.parse("2026-10-25T01:00:00.000Z"));
+  });
+
   it("actualise les heures prévisionnelles sans modifier le point courant officiel", () => {
     const snapshot = buildOfficialWeatherSnapshot({
       lat: 50.75646,
       lon: 2.52085,
       weatherDate: "2026-08-12",
       computedAt: new Date("2026-08-12T12:01:00.000Z"),
+      hourlyWeighting: unavailableWeighting,
       parisHour: "14",
       hourly: [
         { date: "2026-08-12", hour: "14:00", temp: 23.4, apparentTemp: 23.2, precipitation: 0, windSpeed: 9, windGust: 14, windDirection: 180, cloudCover: 12, humidity: 50, uvIndex: 6, condition: "Ensoleillé", isCurrent: true, observedAt: "2026-08-12T12:01:00.000Z" },

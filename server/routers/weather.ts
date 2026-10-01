@@ -615,7 +615,7 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
-      return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
+      return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting } };
     }),
 
   /** Comparaison manuelle AROME en lecture seule, limitée à Hondeghem et sans effet sur la production. */
@@ -872,7 +872,7 @@ export const weatherRouter = router({
 
       return {
         today: snapshot.weatherDate,
-        officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source },
+        officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting },
         hours,
         periodHours,
         days,

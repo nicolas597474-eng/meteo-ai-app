@@ -63,4 +63,27 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
     expect(requestUrls.every((url) => url.searchParams.get("timeformat") === "unixtime")).toBe(true);
     expect(requestUrls.every((url) => url.searchParams.get("timezone") === "Europe/Paris")).toBe(true);
   });
+
+  it("can return the target and next Paris day for the official 48-hour composite", async () => {
+    const unixTimes = [
+      Date.parse("2026-10-01T22:00:00Z") / 1000,
+      Date.parse("2026-10-02T22:00:00Z") / 1000,
+    ];
+    mockedFetchWeather.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ hourly: { time: unixTimes, temperature_2m: [8, 9] } }),
+    } as Response);
+
+    const forecasts = await collectHourlyForecastAllModels(
+      "2026-10-02",
+      { lat: 50.7567, lon: 2.5204 },
+      { includeBestMatch: false, includeNextDay: true },
+    );
+
+    expect(forecasts).toHaveLength(7);
+    expect(forecasts[0].hours.map((hour) => hour.validAt)).toEqual(unixTimes.map((value) => value * 1000));
+    expect(forecasts[0].hours.map((hour) => hour.hour)).toEqual([0, 0]);
+    expect(mockedFetchWeather.mock.calls.map(([input]) => new URL(String(input))).every((url) => url.searchParams.get("hourly")?.includes("uv_index"))).toBe(true);
+  });
 });

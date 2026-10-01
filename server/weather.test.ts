@@ -102,7 +102,10 @@ describe("contrat de snapshot officiel inter-pages", () => {
     expect(details.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
     expect(hourly.officialSnapshot.source).toBe(daily.officialSnapshot.source);
     expect(details.officialSnapshot.source).toBe(daily.officialSnapshot.source);
-  }, 25_000);
+    expect(hourly.officialSnapshot.hourlyWeighting).toEqual(details.officialSnapshot.hourlyWeighting);
+    expect(hourly.officialSnapshot.hourlyWeighting.bestMatchIncluded).toBe(false);
+    expect(hourly.officialSnapshot.hourlyWeighting.modelsConsidered).toEqual(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"]);
+  }, 60_000);
 });
 
 describe("weather.getAILab", () => {

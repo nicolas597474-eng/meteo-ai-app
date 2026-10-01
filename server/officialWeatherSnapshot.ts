@@ -1,6 +1,7 @@
 import { makeLocationKey } from "./db";
 import { getParisDate, getParisHour } from "./weatherTime";
-import { collect15DayForecast, collectHourlyForecast, type DayForecast, type HourlyPoint } from "./weatherServices";
+import { collect15DayForecast, type DayForecast, type HourlyPoint } from "./weatherServices";
+import { collectOfficialHourlyForecast, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
 
 export type OfficialWeatherSnapshot = {
   locationKey: string;
@@ -9,7 +10,8 @@ export type OfficialWeatherSnapshot = {
   computedAt: string;
   hourlyComputedAt: string;
   sourceKind: "official_forecast";
-  source: "open-meteo_best_match";
+  source: "open-meteo";
+  hourlyWeighting: OfficialHourlyWeightingSummary;
   current: HourlyPoint | null;
   hourly: HourlyPoint[];
   daily: DayForecast[];
@@ -61,7 +63,7 @@ export function buildDatedDailyFusionFallback(source: DailyFusionSource | null |
 }
 
 type CacheEntry = { expiresAt: number; value: Promise<OfficialWeatherSnapshot> };
-type ManualHourlyForecast = { expiresAt: number; hours: HourlyPoint[]; computedAt: string };
+type ManualHourlyForecast = { expiresAt: number; hours: HourlyPoint[]; computedAt: string; weighting?: OfficialHourlyWeightingSummary };
 const snapshotCache = new Map<string, CacheEntry>();
 const manualHourlyForecastCache = new Map<string, ManualHourlyForecast>();
 const SNAPSHOT_TTL_MS = 2 * 60_000;
@@ -77,11 +79,15 @@ export function buildOfficialWeatherSnapshot(input: {
   weatherDate: string;
   computedAt: Date;
   hourly: HourlyPoint[];
+  hourlyWeighting: OfficialHourlyWeightingSummary;
   daily: DayForecast[];
   modelsUsed: string[];
   parisHour: string;
 }): OfficialWeatherSnapshot {
-  const current = input.hourly.find((hour) => hour.hour === `${input.parisHour}:00`) ?? input.hourly[0] ?? null;
+  const current = input.hourly.find((hour) => hour.isCurrent)
+    ?? input.hourly.find((hour) => hour.hour === `${input.parisHour}:00`)
+    ?? input.hourly[0]
+    ?? null;
   return {
     locationKey: makeLocationKey(input.lat, input.lon),
     weatherDate: input.weatherDate,
@@ -89,7 +95,8 @@ export function buildOfficialWeatherSnapshot(input: {
     computedAt: input.computedAt.toISOString(),
     hourlyComputedAt: input.computedAt.toISOString(),
     sourceKind: "official_forecast",
-    source: "open-meteo_best_match",
+    source: "open-meteo",
+    hourlyWeighting: input.hourlyWeighting,
     current,
     hourly: input.hourly,
     daily: input.daily,
@@ -102,6 +109,7 @@ export function mergeManualHourlyForecast(
   snapshot: OfficialWeatherSnapshot,
   hours: HourlyPoint[],
   computedAt: Date,
+  weighting?: OfficialHourlyWeightingSummary,
 ): OfficialWeatherSnapshot {
   const preservedCurrent = snapshot.current
     ?? snapshot.hourly.find((hour) => hour.isCurrent)
@@ -112,6 +120,7 @@ export function mergeManualHourlyForecast(
   return {
     ...snapshot,
     hourly,
+    hourlyWeighting: weighting ?? snapshot.hourlyWeighting,
     current: snapshot.current,
     // Keep the snapshot/current timestamp truthful; forecast hours have their own timestamp.
     hourlyComputedAt: computedAt.toISOString(),
@@ -130,7 +139,7 @@ function applyManualHourlyForecast(snapshot: OfficialWeatherSnapshot): OfficialW
     manualHourlyForecastCache.delete(key);
     return snapshot;
   }
-  return mergeManualHourlyForecast(snapshot, cached.hours, new Date(cached.computedAt));
+  return mergeManualHourlyForecast(snapshot, cached.hours, new Date(cached.computedAt), cached.weighting);
 }
 
 /** Cache a completed manual forecast refresh while preserving the official current snapshot. */
@@ -139,11 +148,12 @@ export function cacheManualHourlyForecast(
   weatherDate: string,
   hours: HourlyPoint[],
   computedAt: Date,
+  weighting?: OfficialHourlyWeightingSummary,
 ): void {
   const locationKey = makeLocationKey(coords.lat, coords.lon);
   const manualKey = manualForecastCacheKey(locationKey, weatherDate);
   const expiresAt = Date.now() + getOfficialSnapshotTtlMs(hours);
-  manualHourlyForecastCache.set(manualKey, { expiresAt, hours, computedAt: computedAt.toISOString() });
+  manualHourlyForecastCache.set(manualKey, { expiresAt, hours, computedAt: computedAt.toISOString(), weighting });
 
   const snapshotPrefix = `${locationKey}:${weatherDate}:`;
   snapshotCache.forEach((cached, cacheKey) => {
@@ -152,7 +162,7 @@ export function cacheManualHourlyForecast(
       snapshotCache.delete(cacheKey);
       return;
     }
-    const value = cached.value.then((snapshot: OfficialWeatherSnapshot) => mergeManualHourlyForecast(snapshot, hours, computedAt));
+    const value = cached.value.then((snapshot: OfficialWeatherSnapshot) => mergeManualHourlyForecast(snapshot, hours, computedAt, weighting));
     snapshotCache.set(cacheKey, { expiresAt, value });
     void value.catch(() => {
       if (snapshotCache.get(cacheKey)?.value === value) snapshotCache.delete(cacheKey);
@@ -175,8 +185,8 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
 
   const value = (async () => {
     const weatherDate = getParisDate();
-    const [hourly, dailyResult] = await Promise.all([
-      collectHourlyForecast(weatherDate, coords),
+    const [hourlyResult, dailyResult] = await Promise.all([
+      collectOfficialHourlyForecast(weatherDate, coords),
       collect15DayForecast(coords),
     ]);
     return applyManualHourlyForecast(buildOfficialWeatherSnapshot({
@@ -184,7 +194,8 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
       lon: coords.lon,
       weatherDate,
       computedAt: new Date(),
-      hourly,
+      hourly: hourlyResult.hours,
+      hourlyWeighting: hourlyResult.weighting,
       daily: dailyResult.days,
       modelsUsed: dailyResult.modelsUsed,
       parisHour: String(getParisHour()).padStart(2, "0"),

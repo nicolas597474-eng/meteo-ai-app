@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
+import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getCenteredHourScrollLeft, getHourCenterX, getNearestCenteredHourIndex, getNearestHourIndex } from "@/lib/hourlyScrollSync";
 import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
@@ -287,6 +288,7 @@ export default function WeatherDetails() {
             </div>
             <span className="rounded-full border border-sky-200/20 bg-sky-300/10 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-sky-100">48 h</span>
           </div>
+          <HourlyWeightingNotice weighting={data?.officialSnapshot?.hourlyWeighting} />
           
           {/* Horizontal scrollable hourly cards */}
           <div ref={hourlyRef} className="-mx-2 overflow-x-auto overscroll-x-contain px-2 pb-1 scrollbar-hide snap-x snap-mandatory scroll-px-2">

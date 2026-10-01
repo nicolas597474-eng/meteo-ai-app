@@ -29,6 +29,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('return "text-amber-200"');
     expect(source).toContain('return "text-orange-300"');
     expect(source).toContain("Déroulé temporel");
+    expect(source).toContain("HourlyWeightingNotice");
     expect(source).toContain("Glissez pour voir les heures suivantes");
     expect(source).toContain("const periodHours = data?.periodHours ?? hours");
     expect(source).toContain("hours={periodHours}");
