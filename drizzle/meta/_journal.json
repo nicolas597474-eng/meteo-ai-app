@@ -316,6 +316,13 @@
       "when": 1790926131232,
       "tag": "0044_new_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "5",
+      "when": 1790935544859,
+      "tag": "0045_daily_fusion_performance",
+      "breakpoints": true
     }
   ]
 }

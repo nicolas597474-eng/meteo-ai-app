@@ -16,4 +16,24 @@ describe("buildQualifiedDailyObservation", () => {
     expect(result.tempMin).toBe(10);
     expect(result.tempMax).toBe(18.5);
   });
+
+  it("somme les précipitations horaires seulement lorsque les 24 heures sont présentes", () => {
+    const fullDay = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      stationCount: 1,
+      temperature: 12,
+      windSpeed: 8,
+      windGust: 13,
+      precipitation: 0.5,
+    }));
+    const complete = buildQualifiedDailyObservation(fullDay);
+    const partial = buildQualifiedDailyObservation(fullDay.slice(0, 23));
+
+    expect(complete.isQualified).toBe(true);
+    expect(complete.precipitationCoverageHours).toBe(24);
+    expect(complete.precipitationSum).toBe(12);
+    expect(partial.isQualified).toBe(true);
+    expect(partial.precipitationCoverageHours).toBe(23);
+    expect(partial.precipitationSum).toBeNull();
+  });
 });

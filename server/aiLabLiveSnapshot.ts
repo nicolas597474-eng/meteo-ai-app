@@ -1,4 +1,3 @@
-import { computeConfidenceScore } from "./fusionEngine";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { calculateStabilityIndex } from "./statsEngine";
 
@@ -18,9 +17,8 @@ export type LiveModelForecast = {
 
 /**
  * Produces a non-persisted, inspectable fusion for an arbitrary geolocated
- * position. No historical score or station coherence is substituted when the
- * position is not a saved favourite: computeConfidenceScore deliberately caps
- * the result in that case.
+ * position. No saved-place evidence exists for this request, so the official
+ * numerical fields stay unavailable instead of substituting a global score.
  */
 export function buildLiveAILabSnapshot(
   date: string,
@@ -29,25 +27,26 @@ export function buildLiveAILabSnapshot(
 ) {
   if (forecasts.length === 0) return null;
 
-  const fusion = computeOfficialDailyForecast(forecasts, {});
+  const fusion = computeOfficialDailyForecast(forecasts, {
+    locationKey: `unsaved-live-position:${date}`,
+    targetDate: date,
+    issuedAt: computedAt.getTime(),
+    evidenceStoreAvailable: true,
+    evidence: [],
+  });
   const stability = calculateStabilityIndex(forecasts.map((forecast) => ({
     tempMax: forecast.tempMax,
     tempMin: forecast.tempMin,
     precipitation: forecast.precipitation,
     windSpeed: forecast.windSpeed,
   })));
-  const confidenceScore = computeConfidenceScore({
-    forecasts,
-    leadTimeBucket: "0-6h",
-  });
-
   return {
     date,
     tempMax: fusion.tempMax,
     tempMin: fusion.tempMin,
     precipitation: fusion.precipitation,
     windSpeed: fusion.windSpeed,
-    confidenceScore,
+    confidenceScore: fusion.confidenceScore,
     stabilityIndex: stability.index,
     computedAt,
     weights: {

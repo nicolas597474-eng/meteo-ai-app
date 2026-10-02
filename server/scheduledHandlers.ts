@@ -16,6 +16,7 @@ import { FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, FORECAST_REFRESH_LOCK_LEASE_MS, 
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { isOperationalObservation } from "./observationProvenance";
 import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
+import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { evaluateHourlyForecastRuns, isHourlyForecastVariable, type HourlyForecastVariable } from "./hourlyForecastRunScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
@@ -28,14 +29,9 @@ import { recordP1ObservationDay } from "./weatherP1Observation";
 import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
 import {
-  classifyLeadTime,
   applyBiasCorrection,
   computeConfidenceScore,
-  isEligibleGlobalReliabilityScore,
-  getLeadTimeWeights,
-  type LeadTimeBucket,
   type ServiceBias,
-  type LeadTimePerf,
 } from "./fusionEngine";
 import {
   insertForecasts,
@@ -61,7 +57,9 @@ import {
   insertLeadTimeScores,
   getLeadTimeScoresForLocation,
   getQualifiedCumulativeRankingForLocation,
-  getQualifiedLeadTimeScoresForLocation,
+  getForecastRunsForValidDate,
+  getDailyFusionPerformanceEvidence,
+  upsertDailyForecastObservationComparisons,
   upsertWeatherStation,
   upsertStationObservation,
   insertStationObservationIfMissing,
@@ -509,24 +507,6 @@ export async function collectForecastsHandler(req: Request, res: Response) {
 
       await insertForecasts(forecastRows);
       const issuedAt = Date.now();
-      await insertForecastRuns(expertData.map((f) => ({
-        locationKey: defaultLocKey,
-        validDate: today,
-        serviceName: f.serviceName,
-        provider: "open-meteo",
-        modelId: WEATHER_SERVICES.expert.find((service) => service.name === f.serviceName)?.modelId ?? null,
-        sourceKind: "model_forecast" as const,
-        issuedAt,
-        tempMax: f.tempMax,
-        tempMin: f.tempMin,
-        precipitation: f.precipitation,
-        windSpeed: f.windSpeed,
-        windGust: f.windGust,
-        humidity: f.humidity,
-        cloudCover: f.cloudCover,
-        condition: f.condition,
-        rawData: f.rawData as any,
-      })));
 
       // La fusion de ce passage utilise explicitement les sept modèles actifs et
       // Best Match. Les anciennes lignes publiques restent archivées mais ne sont
@@ -546,11 +526,6 @@ export async function collectForecastsHandler(req: Request, res: Response) {
 
         // Get cumulative ranking for weights
         const ranking = await getQualifiedCumulativeRankingForLocation(defaultLocKey);
-        const reliabilityMap: Record<string, number> = {};
-        ranking.forEach((r) => {
-          reliabilityMap[r.serviceName] = r.avgScore ?? 50;
-        });
-
         // ── Correction automatique des biais ─────────────────────────────────
         // Récupérer les biais historiques par modèle et les appliquer avant fusion
         const biases: ServiceBias[] = ranking
@@ -577,71 +552,48 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           ? applyBiasCorrection(rawForecastsForFusion, biases)
           : rawForecastsForFusion;
 
-        // ── Scoring par échéance (lead-time) ──────────────────────────────────
-        // Utiliser les scores par horizon pour pondérer les modèles selon J+0
-        const leadTimeData = await getQualifiedLeadTimeScoresForLocation(defaultLocKey, 14);
-        const leadTimePerfs: LeadTimePerf[] = leadTimeData.map((d) => ({
-          serviceName: d.serviceName,
-          bucket: d.bucket as LeadTimeBucket,
-          avgMaeTemp: d.avgMaeTemp != null ? Number(d.avgMaeTemp) : null,
-          avgMaePrecip: d.avgMaePrecip != null ? Number(d.avgMaePrecip) : null,
-          avgMaeWind: d.avgMaeWind != null ? Number(d.avgMaeWind) : null,
-          sampleSize: d.totalSamples != null ? Number(d.totalSamples) : 0,
-          latestScoreDate: d.latestScoreDate ?? null,
-        }));
-
-        // Merge lead-time weights with global performance map (lead-time takes priority)
-        const leadTimeWeights = getLeadTimeWeights(leadTimePerfs, "6-24h"); // today = 6-24h horizon
-        const performanceMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; maeHumidity?: number; maeCloud?: number; weightedScore?: number }> = {};
-        ranking.filter((r) => isEligibleGlobalReliabilityScore(Number(r.daysTracked ?? 0), r.latestScoreDate ?? null)).forEach((r) => {
-          const ltw = leadTimeWeights[r.serviceName];
-          performanceMap[r.serviceName] = {
-            // Lead-time MAE takes priority over global MAE if available
-            maeTemp: ltw?.maeTemp ?? (r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined),
-            maePrecip: ltw?.maePrecip ?? (r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined),
-            maeWind: ltw?.maeWind ?? (r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined),
-            maeHumidity: r.avgMaeHumidity != null ? Number(r.avgMaeHumidity) : undefined,
-            maeCloud: r.avgCondMaeCloud != null ? Number(r.avgCondMaeCloud) : undefined,
-            weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
-          };
+        await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt, biases));
+        const fusionEvidence = await getDailyFusionPerformanceEvidence(defaultLocKey, today, issuedAt);
+        const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, {
+          locationKey: defaultLocKey,
+          targetDate: today,
+          issuedAt,
+          evidenceStoreAvailable: fusionEvidence.available,
+          evidence: fusionEvidence.evidence,
         });
 
-        const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, performanceMap);
-
-        // Generate AI explanation
-        let explanation = "";
-        try {
-          const llmResult = await invokeLLM({
-            messages: [
-              {
-                role: "system",
-                content:
-                  "Tu es MeteoAI, un assistant météo expert pour Hondeghem (Nord). Génère une explication concise (3-4 phrases) de la prévision du jour en français, en mentionnant la confiance et les sources principales.",
-              },
-              {
-                role: "user",
-                content: `Prévision MeteoAI pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- Indice de stabilité: ${stability.index}/100 (${stability.label === "stable" ? "🟢 Stable" : "🔴 Instable"})\n- ${allForecasts.length} services consultés\n\nGénère une explication naturelle et concise.`,
-              },
-            ],
-            maxTokens: 300,
-          });
-          const rawContent = llmResult.choices?.[0]?.message?.content;
-          explanation = typeof rawContent === "string" ? rawContent : "";
-        } catch (e) {
-          console.warn("[MeteoAI] LLM explanation failed:", e);
-          explanation = `Prévision synthétisée à partir de ${allForecasts.length} modèles. Indice de stabilité: ${stability.index}/100.`;
+        // Do not ask the LLM to narrate an uncalibrated equal-source ensemble.
+        let explanation = meteoAI.coreCalibrationComplete
+          ? ""
+          : `${meteoAI.methodNote} Aucune prévision officielle n’est publiée tant que les quatre variables principales ne disposent pas d’effectifs suffisants par modèle, lieu, variable et horizon.`;
+        if (meteoAI.coreCalibrationComplete) {
+          try {
+            const llmResult = await invokeLLM({
+              messages: [
+                {
+                  role: "system",
+                  content: "Tu es MeteoAI, un assistant météo expert pour Hondeghem (Nord). Génère une explication concise (3-4 phrases) de la prévision du jour calibrée en français, en mentionnant la confiance et les sources principales.",
+                },
+                {
+                  role: "user",
+                  content: `Prévision MeteoAI calibrée pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- Indice de stabilité: ${stability.index}/100 (${stability.label === "stable" ? "Stable" : "Instable"})\n- ${allForecasts.length} services consultés\n\nGénère une explication naturelle et concise.`,
+                },
+              ],
+              maxTokens: 300,
+            });
+            const rawContent = llmResult.choices?.[0]?.message?.content;
+            explanation = typeof rawContent === "string" ? rawContent : "";
+          } catch (e) {
+            console.warn("[MeteoAI] LLM explanation failed:", e);
+            explanation = `Prévision calibrée à partir de preuves physiques récentes. Indice de stabilité: ${stability.index}/100.`;
+          }
         }
 
         // Determine condition from majority
-        const condition = determineMajorityCondition(allForecasts);
+        const condition = meteoAI.coreCalibrationComplete ? determineMajorityCondition(allForecasts) : null;
 
         // Compute true confidence score (accord modèles + performances historiques + échéance)
-        const bestModelScore = ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60;
-        const trueConfidenceScore = computeConfidenceScore({
-          forecasts: biasCorrectedForecasts,
-          bestModelScore,
-          leadTimeBucket: "6-24h",
-        });
+        const trueConfidenceScore = meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null;
 
         // Save MeteoAI forecast with locationKey
         await upsertMeteoAIForecast({
@@ -656,7 +608,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
           confidenceScore: trueConfidenceScore,
-          weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
+          weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         });
       }
@@ -768,6 +720,13 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             isQualified: 1,
             rawData: { coverageHours: dailyObservation.coverageHours, aggregation: dailyObservation.reason } as any,
           });
+
+          const dailyForecastRuns = await getForecastRunsForValidDate(locKey, yesterday);
+          const dailyComparisons = buildDailyForecastObservationComparisons(locKey, yesterday, dailyForecastRuns, snapshots);
+          if (dailyComparisons.length > 0) {
+            const comparisonsStored = await upsertDailyForecastObservationComparisons(dailyComparisons);
+            console.log(`[MeteoAI] ${locName}: ${dailyComparisons.length} comparaison(s) physique(s) ${comparisonsStored ? "archivée(s)" : "en attente de migration"}`);
+          }
 
           const hourlyForecastRuns = await getHourlyForecastRunValues(locKey, yesterday);
           if (hourlyForecastRuns.length === 0) {
@@ -1443,26 +1402,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         await insertForecasts(forecastRowsForLoc);
         dailyModelsCollected += dailyCoverage.collected.length;
         const issuedAt = Date.now();
-        await insertForecastRuns(
-          expertData.map((f) => ({
-            locationKey: locKey,
-            validDate: today,
-            serviceName: f.serviceName,
-            provider: "open-meteo",
-            modelId: WEATHER_SERVICES.expert.find((service) => service.name === f.serviceName)?.modelId ?? null,
-            sourceKind: "model_forecast" as const,
-            issuedAt,
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-            windGust: f.windGust,
-            humidity: f.humidity,
-            cloudCover: f.cloudCover,
-            condition: f.condition,
-            rawData: f.rawData as any,
-          }))
-        );
 
         await executeShadowWriteSafely(`daily:${locKey}`, async () => {
           const shadowResult = await persistDailyForecastsToShadow(expertData, {
@@ -1523,6 +1462,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           precipitation: f.precipitation,
           windSpeed: f.windSpeed,
           windGust: null as number | null,
+          humidity: f.humidity ?? null,
           cloudCover: f.cloudCover ?? null,
         }));
 
@@ -1530,39 +1470,22 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           ? applyBiasCorrection(rawLocForecasts, locBiases)
           : rawLocForecasts;
 
-        // ── Scoring par échéance (favoris) ─────────────────────────────────────
-        const locLeadTimeData = await getQualifiedLeadTimeScoresForLocation(locKey, 14);
-        const locLeadTimePerfs: LeadTimePerf[] = locLeadTimeData.map((d) => ({
-          serviceName: d.serviceName,
-          bucket: d.bucket as LeadTimeBucket,
-          avgMaeTemp: d.avgMaeTemp != null ? Number(d.avgMaeTemp) : null,
-          avgMaePrecip: d.avgMaePrecip != null ? Number(d.avgMaePrecip) : null,
-          avgMaeWind: d.avgMaeWind != null ? Number(d.avgMaeWind) : null,
-          sampleSize: d.totalSamples != null ? Number(d.totalSamples) : 0,
-          latestScoreDate: d.latestScoreDate ?? null,
-        }));
-
-        const locLeadTimeWeights = getLeadTimeWeights(locLeadTimePerfs, "6-24h");
-        const locPerfMap: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; maeCloud?: number; weightedScore?: number }> = {};
-        activeRanking.filter((r) => isEligibleGlobalReliabilityScore(Number(r.daysTracked ?? 0), r.latestScoreDate ?? null)).forEach((r) => {
-          const ltw = locLeadTimeWeights[r.serviceName];
-          locPerfMap[r.serviceName] = {
-            maeTemp: ltw?.maeTemp ?? (r.avgMaeTemp != null ? Number(r.avgMaeTemp) : undefined),
-            maePrecip: ltw?.maePrecip ?? (r.avgMaePrecip != null ? Number(r.avgMaePrecip) : undefined),
-            maeWind: ltw?.maeWind ?? (r.avgMaeWind != null ? Number(r.avgMaeWind) : undefined),
-            maeCloud: r.avgCondMaeCloud != null ? Number(r.avgCondMaeCloud) : undefined,
-            weightedScore: r.avgScore != null ? Number(r.avgScore) : 50,
-          };
+        await insertForecastRuns(buildForecastRunArchiveRows(expertData, locKey, today, issuedAt, locBiases));
+        const fusionEvidence = await getDailyFusionPerformanceEvidence(locKey, today, issuedAt);
+        const meteoAI = computeOfficialDailyForecast(biasCorrectedLocForecasts, {
+          locationKey: locKey,
+          targetDate: today,
+          issuedAt,
+          evidenceStoreAvailable: fusionEvidence.available,
+          evidence: fusionEvidence.evidence,
         });
 
-        const meteoAI = computeOfficialDailyForecast(biasCorrectedLocForecasts, locPerfMap);
+        // Cloud cover has no qualified physical daily evidence yet; do not infer a condition from an equal-source average.
+        const condition = null;
 
-        // Determine condition
-        const avgPrecip = expertData.reduce((s, f) => s + (f.precipitation ?? 0), 0) / expertData.length;
-        const avgCloud = expertData.reduce((s, f) => s + (f.cloudCover ?? 50), 0) / expertData.length;
-        const condition = conditionFromWeatherValues(avgPrecip, avgCloud);
-
-        const explanation = `Prévision officielle pour ${fav.customName ?? fav.name}, fusionnée à partir de ${dailyCoverage.collected.length}/${dailyCoverage.expected.length} modèles experts disponibles. Indice de stabilité : ${stability.index}/100. La température actuelle est résolue en direct lors de la consultation et n’est pas interpolée depuis Tmin/Tmax.`;
+        const explanation = meteoAI.coreCalibrationComplete
+          ? `Prévision quotidienne calibrée pour ${fav.customName ?? fav.name} : les quatre métriques principales disposent de preuves physiques récentes par modèle, variable et horizon. Indice de stabilité : ${stability.index}/100. La température actuelle est résolue en direct lors de la consultation et n’est pas interpolée depuis Tmin/Tmax.`
+          : `${meteoAI.methodNote} Pour ${fav.customName ?? fav.name}, les valeurs numériques officielles et leur confiance restent indisponibles jusqu’à qualification des preuves physiques. La température actuelle reste résolue séparément en direct.`;
 
         // Find all favorites with this location (same lat/lon) and upsert for each
         const matchingFavorites = allFavorites.filter(
@@ -1570,12 +1493,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         );
 
         // Compute true confidence score (accord modèles + performances historiques + échéance)
-        const locBestModelScore = activeRanking.length > 0 ? Number(activeRanking[0].avgScore ?? 60) : 60;
-        const favConfidenceScore = computeConfidenceScore({
-          forecasts: biasCorrectedLocForecasts,
-          bestModelScore: locBestModelScore,
-          leadTimeBucket: "6-24h",
-        });
+        const favConfidenceScore = meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null;
 
         // Also save MeteoAI forecast for this location
         await upsertMeteoAIForecast({
@@ -1589,7 +1507,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
           confidenceScore: favConfidenceScore,
-          weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
+          weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         }, { refreshComputedAt: true });
 

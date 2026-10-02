@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getMeteoAIForecastByDate: vi.fn(),
   getQualifiedCumulativeRankingForLocation: vi.fn(),
   getQualifiedLeadTimeScoresForLocation: vi.fn(),
+  getDailyFusionPerformanceEvidence: vi.fn(),
   getStoredHourlyForecasts: vi.fn(),
   insertForecastRuns: vi.fn(),
   insertForecasts: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("./db", () => ({
   getMeteoAIForecastByDate: mocks.getMeteoAIForecastByDate,
   getQualifiedCumulativeRankingForLocation: mocks.getQualifiedCumulativeRankingForLocation,
   getQualifiedLeadTimeScoresForLocation: mocks.getQualifiedLeadTimeScoresForLocation,
+  getDailyFusionPerformanceEvidence: mocks.getDailyFusionPerformanceEvidence,
   getStoredHourlyForecasts: mocks.getStoredHourlyForecasts,
   insertForecastRuns: mocks.insertForecastRuns,
   insertForecasts: mocks.insertForecasts,
@@ -50,7 +52,7 @@ vi.mock("./weatherTime", () => ({ getParisDate: () => "2026-09-30" }));
 vi.mock("./weatherConditionLabels", () => ({ conditionFromWeatherValues: () => "Nuageux" }));
 vi.mock("./statsEngine", () => ({ calculateStabilityIndex: () => ({ index: 72, label: "stable" }) }));
 vi.mock("./officialForecast", () => ({
-  computeOfficialDailyForecast: () => ({ tempMax: 23, tempMin: 12, precipitation: 0.4, windSpeed: 12, weights: {}, trace: {} }),
+  computeOfficialDailyForecast: () => ({ tempMax: 23, tempMin: 12, precipitation: 0.4, windSpeed: 12, confidenceScore: 84, coreCalibrationComplete: true, methodNote: "Fusion calibrée", weights: {}, trace: {} }),
 }));
 vi.mock("./fusionEngine", () => ({
   applyBiasCorrection: (forecasts: unknown[]) => forecasts,
@@ -142,6 +144,7 @@ beforeEach(() => {
   mocks.getMeteoAIForecastByDate.mockImplementation(async () => mocks.persistedDailySnapshot);
   mocks.getQualifiedCumulativeRankingForLocation.mockResolvedValue([]);
   mocks.getQualifiedLeadTimeScoresForLocation.mockResolvedValue([]);
+  mocks.getDailyFusionPerformanceEvidence.mockResolvedValue({ available: true, evidence: [], horizonBucket: "6-24h" });
   mocks.getStoredHourlyForecasts.mockImplementation(async () => mocks.storedHourlyRows.slice());
   mocks.insertForecasts.mockResolvedValue(undefined);
   mocks.insertForecastRuns.mockResolvedValue(undefined);

@@ -20,6 +20,7 @@ import {
   getHourlyForecastEvaluationHistory,
   getHourlyForecastRunValues,
   insertForecasts,
+  insertForecastRuns,
   insertObservation,
   insertReliabilityScores,
   upsertMeteoAIForecast,
@@ -27,6 +28,7 @@ import {
   getLeadTimeScoresForLocation,
   getQualifiedCumulativeRankingForLocation,
   getQualifiedLeadTimeScoresForLocation,
+  getDailyFusionPerformanceEvidence,
   makeLocationKey,
   getPhysicalStationHistory,
   getStationCollectionSnapshots,
@@ -41,13 +43,13 @@ import { collectExpertForecasts, collectObservations, collect15DayForecast, coll
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
-import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, computeConfidenceScore, applyBiasCorrection, getLeadTimeWeights, type ExtendedRegime, type MultiRegimeResult, type ServiceBias, type LeadTimePerf, type LeadTimeBucket } from "../fusionEngine";
+import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, applyBiasCorrection, type ExtendedRegime, type MultiRegimeResult, type ServiceBias } from "../fusionEngine";
 import { getParisDate, getParisDateDaysAgo, getParisHour, getNextParisForecastRun } from "../weatherTime";
 import { getActiveParisForecastHours, getFavoritesForecastCadence, getFavoritesForecastScheduleLabel, getRequiredFavoritesForecastHeartbeatCron } from "../forecastScheduleConfig";
 import { getForecastRunDisplayStatus } from "../forecastRunSummary";
 import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
-import { conditionFromWeatherValues } from "../weatherConditionLabels";
 import { computeOfficialDailyForecast } from "../officialForecast";
+import { buildForecastRunArchiveRows } from "../dailyForecastPerformance";
 import { compareTraceWeights } from "../weightComparison";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
@@ -873,28 +875,8 @@ export const weatherRouter = router({
       // Best model
       const ranking = await getCumulativeRankingForLocation(locKey);
       const bestModel = ranking[0] ?? null;
-      const dailyModelForecasts = await getForecastsByDate(today, locKey);
-      const confidenceForecasts = dailyModelForecasts.map((forecast) => ({
-        tempMax: forecast.tempMax,
-        tempMin: forecast.tempMin,
-        precipitation: forecast.precipitation,
-        windSpeed: forecast.windSpeed,
-      }));
-      const bestModelScore = bestModel?.avgScore != null ? Number(bestModel.avgScore) : undefined;
-      // La confiance courante stockée par le cron combine accord, historique,
-      // stations et horizon. Le repli conserve exactement la même formule.
-      const todayConfidence = meteoAI?.confidenceScore ?? computeConfidenceScore({
-        forecasts: confidenceForecasts,
-        bestModelScore,
-        leadTimeBucket: "6-24h",
-      });
-      // À J+4/J+7, le facteur d'échéance réduit la confiance de manière
-      // explicite sans usurper l'indice de stabilité des modèles.
-      const weekConfidence = computeConfidenceScore({
-        forecasts: confidenceForecasts,
-        bestModelScore,
-        leadTimeBucket: "4-7d",
-      });
+      const todayConfidence = meteoAI?.confidenceScore ?? null;
+      const weekConfidence = null;
       const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
       const qualifiedHistoricalModels = qualifiedRanking
         .filter((row) => row.avgScore != null && row.totalSamples != null)
@@ -987,6 +969,7 @@ export const weatherRouter = router({
           rawData: f.rawData as any,
         }));
         await insertForecasts(forecastRows);
+        const issuedAt = Date.now();
 
         // Compute MeteoAI
         const allForecasts = await getForecastsByDate(targetDate, locationKey);
@@ -1017,37 +1000,23 @@ export const weatherRouter = router({
           precipitation: forecast.precipitation,
           windSpeed: forecast.windSpeed,
           windGust: forecast.windGust,
+          humidity: forecast.humidity ?? null,
           cloudCover: forecast.cloudCover ?? null,
         }));
         const correctedForecasts = biases.length > 0
           ? applyBiasCorrection(rawForecasts, biases)
           : rawForecasts;
 
-        const leadTimeRows = await getQualifiedLeadTimeScoresForLocation(locationKey, 14);
-        const leadTimePerfs: LeadTimePerf[] = leadTimeRows.map((row) => ({
-          serviceName: row.serviceName,
-          bucket: row.bucket as LeadTimeBucket,
-          avgMaeTemp: row.avgMaeTemp != null ? Number(row.avgMaeTemp) : null,
-          avgMaePrecip: row.avgMaePrecip != null ? Number(row.avgMaePrecip) : null,
-          avgMaeWind: row.avgMaeWind != null ? Number(row.avgMaeWind) : null,
-        }));
-        const leadTimeWeights = getLeadTimeWeights(leadTimePerfs, "6-24h");
-        const performanceByService: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; weightedScore?: number }> = {};
-        ranking.forEach((row) => {
-          const leadTime = leadTimeWeights[row.serviceName];
-          performanceByService[row.serviceName] = {
-            maeTemp: leadTime?.maeTemp ?? (row.avgMaeTemp != null ? Number(row.avgMaeTemp) : undefined),
-            maePrecip: leadTime?.maePrecip ?? (row.avgMaePrecip != null ? Number(row.avgMaePrecip) : undefined),
-            maeWind: leadTime?.maeWind ?? (row.avgMaeWind != null ? Number(row.avgMaeWind) : undefined),
-            weightedScore: row.avgScore != null ? Number(row.avgScore) : 50,
-          };
+        await insertForecastRuns(buildForecastRunArchiveRows(expertData, locationKey, targetDate, issuedAt, biases));
+        const fusionEvidence = await getDailyFusionPerformanceEvidence(locationKey, targetDate, issuedAt);
+        const meteoAI = computeOfficialDailyForecast(correctedForecasts, {
+          locationKey,
+          targetDate,
+          issuedAt,
+          evidenceStoreAvailable: fusionEvidence.available,
+          evidence: fusionEvidence.evidence,
         });
-        const meteoAI = computeOfficialDailyForecast(correctedForecasts, performanceByService);
-
-        // Determine condition
-        const avgPrecip = allForecasts.reduce((sum, f) => sum + (f.precipitation ?? 0), 0) / allForecasts.length;
-        const avgCloud = allForecasts.reduce((sum, f) => sum + (f.cloudCover ?? 50), 0) / allForecasts.length;
-        const condition = conditionFromWeatherValues(avgPrecip, avgCloud);
+        const condition = null;
 
         await upsertMeteoAIForecast({
           locationKey,
@@ -1059,13 +1028,11 @@ export const weatherRouter = router({
           condition,
           stabilityIndex: stability.index,
           stabilityLabel: stability.label,
-          confidenceScore: computeConfidenceScore({
-            forecasts: correctedForecasts.map(f => ({ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed })),
-            bestModelScore: ranking[0]?.avgScore != null ? Number(ranking[0].avgScore) : undefined,
-            leadTimeBucket: "6-24h",
-          }),
-          weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
-          explanation: `Prévision synthétisée à partir de ${allForecasts.length} modèles.`,
+          confidenceScore: meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null,
+          weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
+          explanation: meteoAI.coreCalibrationComplete
+            ? "Prévision calibrée à partir de preuves physiques récentes par modèle, variable et horizon."
+            : `${meteoAI.methodNote} Les valeurs officielles restent indisponibles jusqu’à qualification de preuves suffisantes.`,
         });
 
         return { success: true, collected: forecastRows.length, date: targetDate };

@@ -1,11 +1,13 @@
-import { eq, desc, and, gte, lte, sql, isNull, isNotNull, inArray, or } from "drizzle-orm";
+import { eq, desc, and, gte, lte, lt, sql, isNull, isNotNull, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { acquireForecastLease, decideScheduledForecastJobDisposition, FORECAST_REFRESH_LOCK_LEASE_MS } from "./forecastRefreshLock";
+import { getParisDate } from "./weatherTime";
 import {
   InsertUser,
   users,
   forecasts,
   forecastRuns,
+  dailyForecastObservationComparisons,
   observations,
   reliabilityScores,
   meteoaiForecast,
@@ -20,6 +22,7 @@ import {
   leadTimeScores,
   InsertForecast,
   InsertForecastRun,
+  InsertDailyForecastObservationComparison,
   InsertObservation,
   InsertReliabilityScore,
   InsertMeteoAIForecast,
@@ -61,6 +64,8 @@ import { deriveStationQualityProfile } from "./stationQualityService";
 import { getGroundTruthReferenceBounds } from "./groundTruthReference";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 import { HourlyForecastPersistenceError, withHourlyForecastPersistenceStages } from "./hourlyForecastPersistence";
+import { aggregateDailyForecastPerformance, getDailyForecastHorizon } from "./dailyForecastPerformance";
+import type { DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
 export { HourlyForecastPersistenceError } from "./hourlyForecastPersistence";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -479,6 +484,35 @@ export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast, options
   });
 }
 
+export function hideUncalibratedCurrentDailyForecast<T extends { date: string; weights: unknown }>(row: T, today = getParisDate()): T {
+  if (row.date !== today) return row;
+  const weights = row.weights && typeof row.weights === "object" ? row.weights as Record<string, any> : null;
+  const statuses = weights?.version === 2 && weights.trace && typeof weights.trace === "object"
+    ? weights.trace.calibrationStatus as Record<string, unknown> | undefined
+    : undefined;
+  const hasQualifiedCore = statuses?.tempMax === "calibrated"
+    && statuses.tempMin === "calibrated"
+    && statuses.precipitation === "calibrated"
+    && statuses.windSpeed === "calibrated"
+    && (row as any).tempMax != null
+    && (row as any).tempMin != null
+    && (row as any).precipitation != null
+    && (row as any).windSpeed != null;
+  if (hasQualifiedCore) return row;
+  return {
+    ...row,
+    tempMax: null,
+    tempMin: null,
+    precipitation: null,
+    windSpeed: null,
+    windGust: null,
+    humidity: null,
+    cloudCover: null,
+    condition: null,
+    confidenceScore: null,
+  };
+}
+
 export async function getMeteoAIForecastByDate(date: string, locationKey = "default") {
   const db = await getDb();
   if (!db) return null;
@@ -488,18 +522,19 @@ export async function getMeteoAIForecastByDate(date: string, locationKey = "defa
     .where(and(eq(meteoaiForecast.date, date), eq(meteoaiForecast.locationKey, locationKey)))
     .orderBy(desc(meteoaiForecast.computedAt))
     .limit(1);
-  return result.length > 0 ? result[0] : null;
+  return result.length > 0 ? hideUncalibratedCurrentDailyForecast(result[0]) : null;
 }
 
 export async function getLatestMeteoAIForecasts(limit = 7, locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
-  return db
+  const rows = await db
     .select()
     .from(meteoaiForecast)
     .where(eq(meteoaiForecast.locationKey, locationKey))
     .orderBy(desc(meteoaiForecast.date))
     .limit(limit);
+  return rows.map((row) => hideUncalibratedCurrentDailyForecast(row));
 }
 
 /** Get successive MeteoAI snapshots for trace and weight comparisons. */
@@ -1061,6 +1096,94 @@ export async function getForecastRunsForValidDate(locationKey: string, validDate
     eq(forecastRuns.locationKey, locationKey),
     eq(forecastRuns.validDate, validDate),
   )).orderBy(desc(forecastRuns.issuedAt));
+}
+
+let dailyComparisonTableWarningLogged = false;
+
+function isDailyComparisonTableUnavailable(error: unknown): boolean {
+  let current: any = error;
+  for (let depth = 0; current && depth < 4; depth++, current = current.cause) {
+    const code = String(current.code ?? current.sqlState ?? "");
+    const message = String(current.message ?? "").toLowerCase();
+    if (code === "ER_NO_SUCH_TABLE" || code === "42S02" || current.errno === 1146) return true;
+    if ((code === "ER_BAD_FIELD_ERROR" || code === "42S22" || current.errno === 1054) && message.includes("daily_forecast_observation_comparisons")) return true;
+  }
+  return false;
+}
+
+function warnDailyComparisonTableUnavailable(): void {
+  if (dailyComparisonTableWarningLogged) return;
+  dailyComparisonTableWarningLogged = true;
+  console.warn("[MeteoAI] La table daily_forecast_observation_comparisons n’est pas encore migrée; les comparaisons restent indisponibles et aucune pondération calibrée ne sera publiée.");
+}
+
+/** Persist exact production forecast/physical-observation pairs; no shadow table is read or written. */
+export async function upsertDailyForecastObservationComparisons(
+  rows: InsertDailyForecastObservationComparison[],
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  if (rows.length === 0) return true;
+  try {
+    for (const row of rows) {
+      await db.insert(dailyForecastObservationComparisons).values(row).onDuplicateKeyUpdate({
+        set: {
+          forecastRunId: row.forecastRunId,
+          locationKey: row.locationKey,
+          validDate: row.validDate,
+          serviceName: row.serviceName,
+          provider: row.provider,
+          modelId: row.modelId,
+          horizonBucket: row.horizonBucket,
+          leadTimeMinutes: row.leadTimeMinutes,
+          variable: row.variable,
+          forecastValue: row.forecastValue,
+          observedValue: row.observedValue,
+          signedError: row.signedError,
+          absoluteError: row.absoluteError,
+          evidenceType: row.evidenceType,
+          observationIsQualified: row.observationIsQualified,
+          observationCoverageHours: row.observationCoverageHours,
+        },
+      });
+    }
+    return true;
+  } catch (error) {
+    if (!isDailyComparisonTableUnavailable(error)) throw error;
+    warnDailyComparisonTableUnavailable();
+    return false;
+  }
+}
+
+/** Exact location/horizon evidence, with no current-day leakage or adjacent-horizon fallback. */
+export async function getDailyFusionPerformanceEvidence(
+  locationKey: string,
+  targetDate: string,
+  issuedAt: number,
+): Promise<{ available: boolean; evidence: ModelPerformanceEvidence[]; horizonBucket: DailyFusionHorizon | null }> {
+  const db = await getDb();
+  if (!db) return { available: false, evidence: [], horizonBucket: null };
+  const horizon = getDailyForecastHorizon(issuedAt, targetDate);
+  if (!horizon) return { available: true, evidence: [], horizonBucket: null };
+  const from = new Date(`${targetDate}T12:00:00.000Z`);
+  if (Number.isNaN(from.getTime())) return { available: false, evidence: [], horizonBucket: null };
+  from.setUTCDate(from.getUTCDate() - 120);
+  const fromDate = from.toISOString().slice(0, 10);
+  try {
+    const rows = await db.select().from(dailyForecastObservationComparisons).where(and(
+      eq(dailyForecastObservationComparisons.locationKey, locationKey),
+      gte(dailyForecastObservationComparisons.validDate, fromDate),
+      lt(dailyForecastObservationComparisons.validDate, targetDate),
+      eq(dailyForecastObservationComparisons.horizonBucket, horizon.bucket),
+      eq(dailyForecastObservationComparisons.evidenceType, "physical_observation"),
+      eq(dailyForecastObservationComparisons.observationIsQualified, 1),
+    ));
+    return { available: true, evidence: aggregateDailyForecastPerformance(rows), horizonBucket: horizon.bucket };
+  } catch (error) {
+    if (!isDailyComparisonTableUnavailable(error)) throw error;
+    warnDailyComparisonTableUnavailable();
+    return { available: false, evidence: [], horizonBucket: horizon.bucket };
+  }
 }
 
 /** Upsert the daily local synthesis for one reference location. */
