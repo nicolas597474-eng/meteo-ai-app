@@ -98,12 +98,19 @@ describe("HourlyChart", () => {
   });
 
   it("inclut tous les accords multi-paramètres réellement disponibles", () => {
-    expect(source).toContain("Accord global");
-    expect(source).toContain("windSpeedSpread");
-    expect(source).toContain("windGustSpread");
-    expect(source).toContain("windDirectionDifference");
-    expect(source).toContain("humiditySpread");
-    expect(source).toContain("cloudCoverSpread");
+    expect(source).toContain("Indice d’accord des modèles");
+    expect(source).toContain("multiModelMetrics");
+    expect(source).toContain("dispersion?.windSpeed.range");
+    expect(source).toContain("dispersion?.windGust.range");
+    expect(source).toContain("dispersion?.windDirection.range");
+    expect(source).toContain("dispersion?.humidity.range");
+    expect(source).toContain("dispersion?.cloudCover.range");
+    expect(source).toContain("Fréquence modèle pluie");
+    expect(source).toContain("rainModelCount");
+    expect(source).toContain("frequencyPercent");
+    expect(source).toContain("non calibrée comme probabilité");
+    expect(source).not.toContain("tempSpread");
+    expect(source).not.toContain("precipAgreement");
     expect(source).toContain("Humidité & nuages");
     expect(source).toContain("windAgreementParts");
     expect(source).toContain("Repères d’accord");

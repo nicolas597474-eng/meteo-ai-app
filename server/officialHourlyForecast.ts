@@ -340,9 +340,24 @@ function weightedMean(values: Array<{ value: unknown; weight: number }>): number
   return availableWeight > 0 ? weightedTotal / availableWeight : null;
 }
 
-function numericRange(values: unknown[]): number | null {
-  const finite = values.filter(isFiniteNumber);
-  return finite.length > 1 ? Math.max(...finite) - Math.min(...finite) : null;
+function summarizeModelValues(values: unknown[]) {
+  const finite = values.filter(isFiniteNumber).sort((left, right) => left - right);
+  const availableModelCount = finite.length;
+  const min = finite[0] ?? null;
+  const max = finite[availableModelCount - 1] ?? null;
+  const mean = availableModelCount > 0
+    ? finite.reduce((sum, value) => sum + value, 0) / availableModelCount
+    : null;
+  return {
+    min,
+    max,
+    median: availableModelCount > 0 ? median(finite) : null,
+    standardDeviation: availableModelCount > 1 && mean != null
+      ? Math.sqrt(finite.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / availableModelCount)
+      : null,
+    range: availableModelCount > 1 && min != null && max != null ? max - min : null,
+    availableModelCount,
+  };
 }
 
 function circularDifference(left: number, right: number): number {
@@ -486,14 +501,8 @@ function makePoint(
     ? [{ name: modelName, temperature: hour.temperature }]
     : []);
   const temperatureValues = rawTemperatures.map((model) => model.temperature);
+  const temperatureSummary = summarizeModelValues(temperatureValues);
   const temperatureExtremes = [...rawTemperatures].sort((left, right) => left.temperature - right.temperature || left.name.localeCompare(right.name));
-  const temperatureComparison = temperatureExtremes.length > 1
-    ? {
-        lower: temperatureExtremes[0],
-        higher: temperatureExtremes[temperatureExtremes.length - 1],
-        rationale: "Écart entre les modèles horaires indépendants; ce n’est pas un classement de fiabilité.",
-      }
-    : null;
 
   const variableWeightings = HISTORY_VARIABLES.map((variable) => variableValues.get(variable)!.weighting);
   const scoredVariables = variableWeightings.filter((item) => item.method === "historical_skill").map((item) => item.variable);
@@ -508,10 +517,24 @@ function makePoint(
   const comparisonCounts = variableWeightings.flatMap((item) => item.method === "historical_skill" && item.minimumComparisons != null ? [item.minimumComparisons] : []);
   const comparableDayCounts = variableWeightings.flatMap((item) => item.method === "historical_skill" && item.minimumComparableDays != null ? [item.minimumComparableDays] : []);
   const modelsWithData = Array.from(new Set(available.map(({ modelName }) => modelName)));
-  const precipValues = modelValues.map(({ hour }) => hour.precipitation).filter(isFiniteNumber);
-  const precipAgreement = precipValues.length > 0
-    ? (precipValues.filter((value) => value >= 0.1).length / precipValues.length) * 100
+  const precipitationModels = modelValues.filter(({ hour }) => isFiniteNumber(hour.precipitation));
+  const wetPrecipitationModels = precipitationModels.filter(({ hour }) => hour.precipitation! >= 0.1);
+  const precipitationAgreementFrequency = precipitationModels.length > 0
+    ? (wetPrecipitationModels.length / precipitationModels.length) * 100
     : null;
+  const precipitationWeighting = variableValues.get("precipitation")!.weighting;
+  const precipitationWeights = new Map(precipitationWeighting.modelWeights.map(({ modelName, weight }) => [modelName as OfficialHourlyModelName, weight] as const));
+  const conditionalWeightedPrecipitation = precipitationWeighting.method === "historical_skill" && wetPrecipitationModels.length > 0
+    ? weightedMean(wetPrecipitationModels.map(({ modelName, hour }) => ({
+        value: hour.precipitation,
+        weight: precipitationWeights.get(modelName) ?? 0,
+      })))
+    : null;
+  const windSpeedSummary = summarizeModelValues(modelValues.map(({ hour }) => hour.windSpeed));
+  const windGustSummary = summarizeModelValues(modelValues.map(({ hour }) => hour.windGusts));
+  const windDirectionValues = modelValues.map(({ hour }) => hour.windDirection);
+  const humiditySummary = summarizeModelValues(modelValues.map(({ hour }) => hour.humidity));
+  const cloudCoverSummary = summarizeModelValues(modelValues.map(({ hour }) => hour.cloudCover));
   const condition = precipitation == null ? null : conditionFromWeatherValues(precipitation, null);
   const precipIntensity = precipitation == null || precipitation <= 0
     ? null
@@ -542,15 +565,38 @@ function makePoint(
     cloudHigh: null,
     precipType: null,
     precipIntensity,
-    tempSpread: numericRange(temperatureValues),
-    windSpeedSpread: numericRange(modelValues.map(({ hour }) => hour.windSpeed)),
-    windGustSpread: numericRange(modelValues.map(({ hour }) => hour.windGusts)),
-    windDirectionDifference: maximumCircularSpread(modelValues.map(({ hour }) => hour.windDirection)),
-    humiditySpread: numericRange(modelValues.map(({ hour }) => hour.humidity)),
-    cloudCoverSpread: numericRange(modelValues.map(({ hour }) => hour.cloudCover)),
-    precipAgreement,
-    modelCount: temperatureValues.length,
-    temperatureComparison,
+    multiModelMetrics: {
+      source: "official_seven_models",
+      bestMatchIncluded: false,
+      expectedModelCount: OFFICIAL_HOURLY_MODEL_NAMES.length,
+      modelsExpected: OFFICIAL_HOURLY_MODEL_NAMES,
+      temperature: {
+        ...temperatureSummary,
+        weightedMean: temperature,
+        modelsWithData: rawTemperatures.map(({ name }) => name),
+        minModel: temperatureExtremes[0]?.name ?? null,
+        maxModel: temperatureExtremes.at(-1)?.name ?? null,
+      },
+      precipitation: {
+        rainThresholdMm: 0.1,
+        rainModelCount: wetPrecipitationModels.length,
+        availableModelCount: precipitationModels.length,
+        frequencyPercent: precipitationAgreementFrequency,
+        conditionalWeightedMean: conditionalWeightedPrecipitation,
+        modelsWithData: precipitationModels.map(({ modelName }) => modelName),
+        modelsPredictingRain: wetPrecipitationModels.map(({ modelName }) => modelName),
+      },
+      dispersion: {
+        windSpeed: { range: windSpeedSummary.range, availableModelCount: windSpeedSummary.availableModelCount },
+        windGust: { range: windGustSummary.range, availableModelCount: windGustSummary.availableModelCount },
+        windDirection: {
+          range: maximumCircularSpread(windDirectionValues),
+          availableModelCount: windDirectionValues.filter(isFiniteNumber).length,
+        },
+        humidity: { range: humiditySummary.range, availableModelCount: humiditySummary.availableModelCount },
+        cloudCover: { range: cloudCoverSummary.range, availableModelCount: cloudCoverSummary.availableModelCount },
+      },
+    },
     isCurrent: validAt <= now && now < validAt + 60 * 60_000,
     forecastWeighting: {
       method: pointMethod,
