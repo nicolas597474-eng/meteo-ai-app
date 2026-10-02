@@ -78,4 +78,17 @@ describe("mise en page mobile des panneaux environnementaux", () => {
     expect(markup).not.toContain("conic-gradient(from");
     expect(markup).not.toContain("celestial-arc-scene--night relative mx-auto mt-7");
   });
+
+  it("rend le disque HMI dans les deux tailles solaires avec un fallback 2D étiqueté", () => {
+    const markup = renderToStaticMarkup(createElement(EnvironmentalPanels, { data: fixture, isLoading: false }));
+
+    expect(markup).toContain('data-solar-size="header"');
+    expect(markup).toContain('data-solar-size="marker"');
+    expect(markup).toContain('class="solar-hmi-globe relative grid h-8 w-8 shrink-0 place-items-center"');
+    expect(markup).toContain('class="solar-hmi-globe relative grid h-12 w-12 shrink-0 place-items-center"');
+    expect(markup).toContain('data-render-mode="loading"');
+    expect(markup).toContain(">2D</span>");
+    expect(markup).toContain("Image HMI fixe · 23 août 2011, 04:00 UTC");
+    expect(markup).toContain("NASA/Goddard Space Flight Center Scientific Visualization Studio");
+  });
 });

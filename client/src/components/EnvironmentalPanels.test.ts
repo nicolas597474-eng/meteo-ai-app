@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
 const lunarGlobeSource = readFileSync(new URL("./LunarPhaseGlobe.tsx", import.meta.url), "utf8");
 const lunarWebglSource = readFileSync(new URL("../lib/lunarWebgl.ts", import.meta.url), "utf8");
+const solarGlobeSource = readFileSync(new URL("./SolarGlobe.tsx", import.meta.url), "utf8");
+const solarWebglSource = readFileSync(new URL("../lib/solarWebgl.ts", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const celestialSvgPathsSource = readFileSync(new URL("../lib/celestialSvgPaths.ts", import.meta.url), "utf8");
 const apparentSunMoonSource = source.slice(source.indexOf("function SunMoonPanelApparent"), source.indexOf("export function EnvironmentalPanels"));
@@ -378,5 +380,22 @@ describe("EnvironmentalPanels", () => {
     expect(lunarGlobeSource).not.toContain("box-shadow");
     expect(lunarGlobeSource).not.toContain("filter:");
     expect(lunarWebglSource).toContain("gl.clearColor(0, 0, 0, 0)");
+  });
+
+  it("présente uniquement la face HMI solaire fixe sur une sphère et identifie tout fallback 2D", () => {
+    expect(temporalSunMoonSource).toContain('const sunHeader = <SolarGlobe size="header" />;');
+    expect(temporalSunMoonSource).toContain('const sunMarker = <SolarGlobe size="marker" />;');
+    expect(temporalSunMoonSource).toContain("face observée uniquement, sans texture globale ni couronne");
+    expect(temporalSunMoonSource).toContain("NASA/Goddard Space Flight Center Scientific Visualization Studio");
+    expect(temporalSunMoonSource).toContain('href="https://svs.gsfc.nasa.gov/3933/"');
+    expect(solarGlobeSource).toContain('prefers-reduced-motion: reduce');
+    expect(solarGlobeSource).toContain('loading="lazy"');
+    expect(solarGlobeSource).toContain('>2D</span>');
+    expect(solarGlobeSource).toContain('data-render-mode={mode}');
+    expect(solarWebglSource).toContain("createSolarSphereVertices");
+    expect(solarWebglSource).toContain("aPosition.xy * 0.5 + 0.5");
+    expect(solarWebglSource).toContain("if (vNormal.z <= 0.0) discard");
+    expect(solarWebglSource).not.toContain("uSunDirection");
+    expect(solarWebglSource).not.toContain("generateCorona");
   });
 });
