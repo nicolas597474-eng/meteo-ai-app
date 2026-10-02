@@ -78,6 +78,42 @@ describe("environmentalData", () => {
     expect(position.lunar.brightLimbAngleDeg).toBeCloseTo(41.3, 1);
   });
 
+  it("couvre les huit phases géométriques sans angle arrondi à 360°", () => {
+    const coords = { lat: 50.89, lon: 2.56 };
+    const cases = [
+      { at: "2026-09-11T03:27:28.467Z", angle: 0, label: "Nouvelle lune", illumination: 0, waxing: false },
+      { at: "2026-09-14T20:02:19.512Z", angle: 45, label: "Premier croissant", illumination: 15, waxing: true },
+      { at: "2026-09-18T20:44:24.674Z", angle: 90, label: "Premier quartier", illumination: 50, waxing: true },
+      { at: "2026-09-22T22:34:40.592Z", angle: 135, label: "Gibbeuse croissante", illumination: 85, waxing: true },
+      { at: "2026-09-26T16:49:32.233Z", angle: 180, label: "Pleine lune", illumination: 100, waxing: false },
+      { at: "2026-09-30T04:00:45.794Z", angle: 225, label: "Gibbeuse décroissante", illumination: 85, waxing: false },
+      { at: "2026-09-04T07:51:42.224Z", angle: 270, label: "Dernier quartier", illumination: 50, waxing: false },
+      { at: "2026-09-07T16:59:16.023Z", angle: 315, label: "Dernier croissant", illumination: 15, waxing: false },
+    ] as const;
+
+    for (const expected of cases) {
+      const { lunar } = getApparentAstronomyPosition(coords, new Date(expected.at));
+      expect(lunar.angleDeg).toBeCloseTo(expected.angle, 0);
+      expect(lunar.angleDeg).toBeGreaterThanOrEqual(0);
+      expect(lunar.angleDeg).toBeLessThan(360);
+      expect(lunar.label).toBe(expected.label);
+      expect(lunar.illuminationPct).toBe(expected.illumination);
+      expect(lunar.waxing).toBe(expected.waxing);
+    }
+  });
+
+  it("oriente le limbe brillant selon la position locale de l’observateur", () => {
+    const instant = new Date("2026-09-22T22:34:40.592Z");
+    const northern = getApparentAstronomyPosition({ lat: 50.89, lon: 2.56 }, instant).lunar;
+    const southern = getApparentAstronomyPosition({ lat: -50.89, lon: 2.56 }, instant).lunar;
+
+    expect(northern.illuminationPct).toBe(85);
+    expect(southern.illuminationPct).toBe(85);
+    expect(northern.waxing).toBe(true);
+    expect(southern.waxing).toBe(true);
+    expect(Math.abs(northern.brightLimbAngleDeg - southern.brightLimbAngleDeg)).toBeGreaterThan(45);
+  });
+
   it("respecte les variations de lieu, de saison et de latitude dans l’état d’horizon", () => {
     const equatorEquinox = getApparentAstronomyPosition({ lat: 0, lon: 0 }, new Date("2026-03-20T12:00:00.000Z"));
     const northPoleSummer = getApparentAstronomyPosition({ lat: 89, lon: 0 }, new Date("2026-06-21T12:00:00.000Z"));
