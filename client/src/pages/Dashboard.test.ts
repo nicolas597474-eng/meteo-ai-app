@@ -23,6 +23,10 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Enregistrer et comparer aux modèles");
     expect(source).toContain("personalObservations.submit.useMutation");
     expect(source).toContain("Données insuffisantes");
+    expect(source).toContain("PrecipitationConsensusChart");
+    expect(source).toContain(
+      "summary={isDailyFallback ? dailyFallback.precipitationConsensus : today?.precipitationConsensus}"
+    );
     expect(source).toContain("aria-expanded={isPersonalObservationOpen}");
     expect(source).toContain("Consulter l’historique complet");
     expect(source).toContain("Modifier mon observation");

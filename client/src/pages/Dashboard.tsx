@@ -19,7 +19,7 @@ import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
-import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
+import { PrecipitationConsensusChart } from "@/components/weather/PrecipitationConsensusChart";
 import { getCollectionHealth, formatCollectionDuration } from "@/lib/collectionHealth";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
@@ -923,12 +923,6 @@ export default function Dashboard() {
                   <Droplets className="h-3 w-3" />Pluie prévue
                 </p>
                 <p className="text-sm font-semibold sm:text-lg">{isDailyFallback ? dailyFallback.precipitation ?? "—" : today?.precipitation ?? meteoAI?.precipitation ?? "—"} mm</p>
-                <div className="mt-1 text-left">
-                  <PrecipitationConsensusSummary
-                    summary={isDailyFallback ? dailyFallback.precipitationConsensus : today?.precipitationConsensus}
-                    compact
-                  />
-                </div>
               </div>
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
@@ -977,6 +971,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <PrecipitationConsensusChart
+          summary={isDailyFallback ? dailyFallback.precipitationConsensus : today?.precipitationConsensus}
+        />
 
         <Dialog open={isCollectionHealthOpen} onOpenChange={setIsCollectionHealthOpen}>
           <DialogContent id="collection-health-panel" showCloseButton={false} className="max-h-[calc(100dvh-1rem)] overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:max-w-xl" aria-label="Santé des collectes automatiques">
