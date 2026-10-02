@@ -1499,7 +1499,7 @@ export type Phase8MetricReportRow = {
   bias: number | null; medianAbsoluteError: number | null; rainHitRate: number | null; rainHits: number;
   rainMisses: number; rainFalseAlarms: number; windDirectionMeanAbsoluteError: number | null;
   brierScore: number | null; crps: number | null; calibrationError: number | null; metricAvailability: string;
-  missingEvidence: unknown; productionReadsEnabled: number; appliedToProduction: number; evaluatedAt: number;
+  missingEvidence: unknown; productionReadsEnabled: number; shadowMode?: number; appliedToProduction: number; evaluatedAt: number;
 };
 export function buildPhase8MetricsReport(rows: Phase8MetricReportRow[]) {
   const statuses = { INSUFFICIENT: 0, OBSERVING: 0, VALIDABLE: 0, INVALID: 0 };
@@ -1510,7 +1510,7 @@ export function buildPhase8MetricsReport(rows: Phase8MetricReportRow[]) {
     productionReadsEnabled += Number(row.productionReadsEnabled ?? 0);
     appliedToProduction += Number(row.appliedToProduction ?? 0);
     if (row.metricAvailability === "PROBABILISTIC_AVAILABLE") probabilisticRecordCount += 1;
-    if (Number(row.productionReadsEnabled ?? 0) !== 0 || Number(row.appliedToProduction ?? 0) !== 0) shadowModeViolations += 1;
+    if (Number(row.productionReadsEnabled ?? 0) !== 0 || Number(row.appliedToProduction ?? 0) !== 0 || (row.shadowMode != null && Number(row.shadowMode) !== 1)) shadowModeViolations += 1;
   }
   return { version: PHASE8_METRICS_VERSION, metricCount: rows.length, statuses, variables: [...PHASE8_METRIC_VARIABLES],
     physicalEvidenceComparisons: rows.reduce((n, row) => n + Number(row.physicalComparisonCount ?? 0), 0),
@@ -1527,6 +1527,73 @@ export function buildPhase8MetricsReport(rows: Phase8MetricReportRow[]) {
         : ["Aucune probabilité d’événement, distribution d’ensemble ou issue binaire traçable n’est ingérée.", "Brier, CRPS et calibration restent non calculés ; aucune valeur zéro ne représente une performance."],
     },
     valid: productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0, records: rows } as const;
+}
+
+/**
+ * Suivi lisible des seuils Phase 8. Les seuils s’appliquent à chaque périmètre
+ * modèle + variable + horizon, jamais au total global qui mélangerait des preuves hétérogènes.
+ */
+export function buildPhase8ValidationProgress(rows: readonly Phase8MetricReportRow[]) {
+  const eligibleRows = rows.filter(row => Number(row.physicalComparisonCount ?? 0) > 0 && row.status !== "INVALID");
+  const scopesAt18 = eligibleRows.filter(row => Number(row.comparisonCount) >= 18 && Number(row.evaluatedDays) >= 2);
+  const scopesAt30 = eligibleRows.filter(row => Number(row.comparisonCount) >= 30 && Number(row.evaluatedDays) >= 7);
+  const highestScope = eligibleRows.reduce<Phase8MetricReportRow | null>((best, row) =>
+    best == null || Number(row.comparisonCount) > Number(best.comparisonCount) ? row : best
+  , null);
+  const sourceKeys = Array.from(new Set(eligibleRows.map(row => row.sourceKey))).sort();
+  const variables = Array.from(new Set(eligibleRows.map(row => row.variable))).sort();
+  const horizons = Array.from(new Set(eligibleRows.map(row => row.horizonKey))).sort();
+  const productionReadsEnabled = rows.reduce((sum, row) => sum + Number(row.productionReadsEnabled ?? 0), 0);
+  const appliedToProduction = rows.reduce((sum, row) => sum + Number(row.appliedToProduction ?? 0), 0);
+  const shadowModeViolations = rows.filter(row =>
+    Number(row.productionReadsEnabled ?? 0) !== 0
+      || Number(row.appliedToProduction ?? 0) !== 0
+      || (row.shadowMode != null && Number(row.shadowMode) !== 1),
+  ).length;
+  const integrityValid = productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0;
+  const intermediateReportReady = integrityValid && scopesAt18.length > 0;
+  const fullValidationReportReady = integrityValid && scopesAt30.length > 0;
+  const target18Progress = Math.min(100, Math.round(((highestScope?.comparisonCount ?? 0) / 18) * 100));
+  const target30Progress = Math.min(100, Math.round(((highestScope?.comparisonCount ?? 0) / 30) * 100));
+  const blockers = [
+    eligibleRows.length === 0 ? "Aucune comparaison physique qualifiée n’est disponible dans la fenêtre de suivi." : null,
+    scopesAt18.length === 0 && eligibleRows.length > 0
+      ? `Aucun périmètre modèle + variable + horizon n’atteint encore 18 comparaisons sur au moins 2 jours distincts.`
+      : null,
+    scopesAt30.length === 0 && eligibleRows.length > 0
+      ? `Aucun périmètre modèle + variable + horizon n’atteint encore 30 comparaisons sur au moins 7 jours distincts.`
+      : null,
+    !integrityValid ? "Une violation de l’isolation shadow doit être résolue avant toute lecture de validation." : null,
+    "Les métriques probabilistes restent hors périmètre tant qu’aucune probabilité ou distribution d’ensemble traçable n’est ingérée.",
+  ].filter((item): item is string => item != null);
+  return {
+    version: "phase8-validation-progress-v1" as const,
+    thresholds: { intermediateComparisons: 18, intermediateDays: 2, fullComparisons: 30, fullDays: 7 },
+    scopeDefinition: "modèle + variable + horizon",
+    physicalComparisonCount: eligibleRows.reduce((sum, row) => sum + Number(row.physicalComparisonCount ?? 0), 0),
+    scopeCount: eligibleRows.length,
+    scopesAt18: scopesAt18.length,
+    scopesAt30: scopesAt30.length,
+    intermediateReportReady,
+    fullValidationReportReady,
+    decisionStatus: fullValidationReportReady ? "HUMAN_REVIEW_REQUIRED" as const : "COLLECTING" as const,
+    target18Progress,
+    target30Progress,
+    highestScope: highestScope == null ? null : {
+      sourceKey: highestScope.sourceKey,
+      variable: highestScope.variable,
+      horizonKey: highestScope.horizonKey,
+      comparisonCount: Number(highestScope.comparisonCount),
+      evaluatedDays: Number(highestScope.evaluatedDays),
+      status: highestScope.status,
+    },
+    sources: sourceKeys,
+    variables,
+    horizons,
+    blockers,
+    integrity: { productionReadsEnabled, appliedToProduction, shadowModeViolations, valid: integrityValid },
+    automaticProductionPromotion: false as const,
+  };
 }
 type Phase8ReplayOptions = {
   locationKey?: string;
@@ -1948,9 +2015,11 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
   const phase8Filters = locationKey ? [eq(shadowWeatherPhase8Metrics.locationKey, locationKey)] : [];
   const phase8Rows = await db.select().from(shadowWeatherPhase8Metrics).where(and(...phase8Filters,
     gte(shadowWeatherPhase8Metrics.periodEnd, Date.now() - Math.max(1, lookbackDays) * 86_400_000)));
-  const phase8Metrics = buildPhase8MetricsReport(phase8Rows.map(row => ({ ...row,
+  const phase8MetricRows = phase8Rows.map(row => ({ ...row,
     periodStart: Number(row.periodStart), periodEnd: Number(row.periodEnd), evaluatedAt: Number(row.evaluatedAt),
-    horizonKey: row.phase3WindowKey, status: row.metricStatus })));
+    horizonKey: row.phase3WindowKey, status: row.metricStatus, shadowMode: Number(row.shadowMode) }));
+  const phase8Metrics = buildPhase8MetricsReport(phase8MetricRows);
+  const phase8ValidationProgress = buildPhase8ValidationProgress(phase8MetricRows);
   const phase5QualityControl = buildPhase5QualityControlReport(horizonValues.map(value => ({
     ingestionRunId: Number(value.ingestionRunId),
     sourceKey: value.sourceKey,
@@ -2017,6 +2086,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     dailyUnifiedShadow,
     phase7LocalPerformance,
     phase8Metrics,
+    phase8ValidationProgress,
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),
