@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildStationCollectionSnapshot, getForecastCollectionJobStatus, getModelCoverage, processWithConcurrency } from "./scheduledHandlers";
+import { requireDatabaseForWrite } from "./db";
 import { OFFICIAL_HOURLY_MODELS, VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
 describe("getModelCoverage", () => {
@@ -152,5 +153,38 @@ describe("buildStationCollectionSnapshot", () => {
     expect(partialSnapshot.status).toBe("partial");
     expect(partialSnapshot.dailyMissingModels).toHaveLength(6);
     expect(failedSnapshot.status).toBe("failed");
+  });
+});
+
+describe("persistance stricte de la collecte legacy", () => {
+  it("échoue explicitement lorsqu’une écriture requise ne dispose pas de base", () => {
+    expect(() => requireDatabaseForWrite(null, "créer le journal de collecte")).toThrow(
+      "Base de données indisponible : impossible de créer le journal de collecte.",
+    );
+    expect(() => requireDatabaseForWrite({}, "créer le journal de collecte")).not.toThrow();
+  });
+
+  it("exige les écritures quotidiennes et le journal avant toute réponse de succès", () => {
+    const source = readFileSync(new URL("./scheduledHandlers.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export async function collectForecastsHandler");
+    const end = source.indexOf("export async function collectObservationsHandler", start);
+    const handler = source.slice(start, end);
+    const jobCreation = handler.indexOf("const jobId = await createCollectionJob({");
+    const forecastWrite = handler.indexOf("await insertForecasts(forecastRows, { requireDatabase: true });");
+    const runWrite = handler.indexOf("await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt, biases), { requireDatabase: true });");
+    const fusionWrite = handler.indexOf("await upsertMeteoAIForecast({");
+    const completedStatus = handler.indexOf('status: "completed"');
+    const completedWrite = handler.indexOf("{ requireDatabase: true });", completedStatus);
+
+    expect(handler).toContain("}, { requireDatabase: true });");
+    expect(handler).toContain("if (jobId <= 0)");
+    expect(handler).toContain("if (forecastRows.length === 0)");
+    expect(handler.slice(jobCreation, forecastWrite)).toContain("{ requireDatabase: true }");
+    expect(forecastWrite).toBeGreaterThan(-1);
+    expect(runWrite).toBeGreaterThan(forecastWrite);
+    expect(fusionWrite).toBeGreaterThan(runWrite);
+    expect(handler.slice(fusionWrite, completedStatus)).toContain("}, { requireDatabase: true });");
+    expect(completedStatus).toBeGreaterThan(fusionWrite);
+    expect(completedWrite).toBeGreaterThan(completedStatus);
   });
 });

@@ -478,7 +478,8 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       jobType: "forecast",
       status: "running",
       scheduleCronTaskUid: user.taskUid,
-    });
+    }, { requireDatabase: true });
+    if (jobId <= 0) throw new Error("Impossible de créer le journal de collecte quotidien.");
 
     try {
       // Default location key for Hondeghem (legacy)
@@ -505,7 +506,10 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         rawData: f.rawData as any,
       }));
 
-      await insertForecasts(forecastRows);
+      if (forecastRows.length === 0) {
+        throw new Error("Aucune prévision quotidienne exploitable à persister.");
+      }
+      await insertForecasts(forecastRows, { requireDatabase: true });
       const issuedAt = Date.now();
 
       // La fusion de ce passage utilise explicitement les sept modèles actifs et
@@ -542,7 +546,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           ? applyBiasCorrection(rawForecastsForFusion, biases)
           : rawForecastsForFusion;
 
-        await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt, biases));
+        await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt, biases), { requireDatabase: true });
         const fusionEvidence = await getDailyFusionPerformanceEvidence(defaultLocKey, today, issuedAt);
         const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, {
           locationKey: defaultLocKey,
@@ -595,7 +599,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           stabilityLabel: legacyStabilityLabelForStorage(allForecasts),
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
-        });
+        }, { requireDatabase: true });
       }
 
       // Update job as completed
@@ -603,7 +607,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         status: "completed",
         servicesCollected: forecastRows.length,
         completedAt: new Date(),
-      });
+      }, { requireDatabase: true });
 
       res.json({ ok: true, servicesCollected: forecastRows.length });
     } catch (err: any) {
@@ -611,7 +615,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         status: "failed",
         errorMessage: err.message,
         completedAt: new Date(),
-      });
+      }, { requireDatabase: true });
       throw err;
     }
   } catch (error: any) {

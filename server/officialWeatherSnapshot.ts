@@ -139,12 +139,24 @@ export function mergeManualHourlyForecast(
   };
 }
 
-function manualForecastCacheKey(locationKey: string, weatherDate: string) {
-  return `${locationKey}:${weatherDate}`;
+function preciseCacheLocationKey(coords: { lat: number; lon: number }) {
+  return `${makeLocationKey(coords.lat, coords.lon)}:${coords.lat.toString()}:${coords.lon.toString()}`;
 }
 
-function applyManualHourlyForecast(snapshot: OfficialWeatherSnapshot): OfficialWeatherSnapshot {
-  const key = manualForecastCacheKey(snapshot.locationKey, snapshot.weatherDate);
+export function getOfficialWeatherSnapshotCacheKey(
+  coords: { lat: number; lon: number },
+  weatherDate: string,
+  hourBucket: number,
+): string {
+  return `${preciseCacheLocationKey(coords)}:${weatherDate}:${hourBucket}`;
+}
+
+function manualForecastCacheKey(cacheLocationKey: string, weatherDate: string) {
+  return `${cacheLocationKey}:${weatherDate}`;
+}
+
+function applyManualHourlyForecast(snapshot: OfficialWeatherSnapshot, coords: { lat: number; lon: number }): OfficialWeatherSnapshot {
+  const key = manualForecastCacheKey(preciseCacheLocationKey(coords), snapshot.weatherDate);
   const cached = manualHourlyForecastCache.get(key);
   if (!cached) return snapshot;
   if (cached.expiresAt <= Date.now()) {
@@ -162,12 +174,12 @@ export function cacheManualHourlyForecast(
   computedAt: Date,
   weighting?: OfficialHourlyWeightingSummary,
 ): void {
-  const locationKey = makeLocationKey(coords.lat, coords.lon);
-  const manualKey = manualForecastCacheKey(locationKey, weatherDate);
+  const cacheLocationKey = preciseCacheLocationKey(coords);
+  const manualKey = manualForecastCacheKey(cacheLocationKey, weatherDate);
   const expiresAt = Date.now() + getOfficialSnapshotTtlMs(hours);
   manualHourlyForecastCache.set(manualKey, { expiresAt, hours, computedAt: computedAt.toISOString(), weighting });
 
-  const snapshotPrefix = `${locationKey}:${weatherDate}:`;
+  const snapshotPrefix = `${cacheLocationKey}:${weatherDate}:`;
   snapshotCache.forEach((cached, cacheKey) => {
     if (!cacheKey.startsWith(snapshotPrefix)) return;
     if (cached.expiresAt <= Date.now()) {
@@ -190,15 +202,14 @@ export function cacheManualHourlyForecast(
  * within one minute share one payload, preventing presentation-level drift.
  */
 export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: number }): Promise<OfficialWeatherSnapshot> {
-  const locationKey = makeLocationKey(coords.lat, coords.lon);
-  const cacheKey = `${locationKey}:${getParisDate()}:${Math.floor(Date.now() / (60 * 60_000))}`;
+  const weatherDate = getParisDate();
+  const cacheKey = getOfficialWeatherSnapshotCacheKey(coords, weatherDate, Math.floor(Date.now() / (60 * 60_000)));
   const cached = snapshotCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
   }
 
   const value = (async () => {
-    const weatherDate = getParisDate();
     const [hourlyResult, currentSnapshot, dailyResult] = await Promise.all([
       collectOfficialHourlyForecast(weatherDate, coords),
       collectCurrentWeatherSnapshot(coords),
@@ -215,7 +226,7 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
       daily: dailyResult.days,
       modelsUsed: dailyResult.modelsUsed,
       parisHour: String(getParisHour()).padStart(2, "0"),
-    }));
+    }), coords);
   })().then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
   snapshotCache.set(cacheKey, { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value });
   void value.then((snapshot) => {

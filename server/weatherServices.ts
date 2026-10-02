@@ -66,6 +66,18 @@ export type ForecastData = {
   rawData?: unknown;
 };
 
+export function hasUsableForecastValue(forecast: Pick<ForecastData, "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "windGust" | "humidity" | "cloudCover">): boolean {
+  return [
+    forecast.tempMax,
+    forecast.tempMin,
+    forecast.precipitation,
+    forecast.windSpeed,
+    forecast.windGust,
+    forecast.humidity,
+    forecast.cloudCover,
+  ].some((value) => typeof value === "number" && Number.isFinite(value));
+}
+
 export type ValidationForecastData = ForecastData & {
   modelId: string;
   validationStatus: "candidate";
@@ -107,7 +119,7 @@ export async function collectExpertForecasts(
         const dateIndex = daily.time.indexOf(targetDate);
         if (dateIndex === -1) return null;
 
-        return {
+        const forecast: ForecastData = {
           serviceName: service.name,
           serviceCategory: service.category,
           tempMax: daily.temperature_2m_max?.[dateIndex] ?? null,
@@ -120,6 +132,7 @@ export async function collectExpertForecasts(
           condition: null,
           rawData: data,
         };
+        return hasUsableForecastValue(forecast) ? forecast : null;
       } catch (err) {
         console.warn(`[Collector] Error fetching ${service.name}:`, err);
         return null;

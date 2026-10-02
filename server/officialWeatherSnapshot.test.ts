@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, mergeManualHourlyForecast, refreshOfficialWeatherSnapshotForecastWindow } from "./officialWeatherSnapshot";
+import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, getOfficialWeatherSnapshotCacheKey, mergeManualHourlyForecast, refreshOfficialWeatherSnapshotForecastWindow } from "./officialWeatherSnapshot";
+import { makeLocationKey } from "./db";
 
 const unavailableWeighting = {
   status: "unavailable" as const,
@@ -30,6 +31,16 @@ const modelCurrentSnapshot = {
 };
 
 describe("buildOfficialWeatherSnapshot", () => {
+  it("isole les coordonnées précises en cache sans changer la clé DB canonique arrondie", () => {
+    const first = { lat: 50.75631, lon: 2.52031 };
+    const second = { lat: 50.75649, lon: 2.52049 };
+
+    expect(makeLocationKey(first.lat, first.lon)).toBe(makeLocationKey(second.lat, second.lon));
+    expect(getOfficialWeatherSnapshotCacheKey(first, "2026-08-12", 492)).not.toBe(
+      getOfficialWeatherSnapshotCacheKey(second, "2026-08-12", 492),
+    );
+  });
+
   it("conserve séparément le snapshot du modèle et la prévision horaire active", () => {
     const snapshot = buildOfficialWeatherSnapshot({
       lat: 50.75646,
