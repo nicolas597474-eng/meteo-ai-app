@@ -772,8 +772,8 @@ export function computeFusion(
 
   function performanceMultiplier(source: FusionSource): number {
     if (cfg.performanceContext) return regularizedPerformance?.get(source.name)?.performanceMultiplier ?? 0;
-    if (!cfg.adaptiveWeightingEnabled || source.maeTemp == null || source.maeTemp <= 0) return 1;
-    return Math.min(2.0, Math.max(0.3, 1.0 / source.maeTemp));
+    // A bare MAE has no sample size, location, variable, or horizon; never use it to alter a weight.
+    return 1;
   }
 
   // Le noyau commun applique IDW p=2, qualité et fraîcheur normalisées (50/30/20),

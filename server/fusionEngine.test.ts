@@ -168,6 +168,17 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
     performanceContext,
   };
 
+  it("n’utilise pas un MAE brut sans effectif ni contexte lieu/variable/horizon", () => {
+    const sources = [
+      { ...modelSource("mae-brut-faible", 10, modelEvidence("mae-brut-faible", 0.6, 500)), maeTemp: 0.6, performanceEvidence: undefined },
+      { ...modelSource("mae-brut-fort", 20, modelEvidence("mae-brut-fort", 0.8, 500)), maeTemp: 0.8, performanceEvidence: undefined },
+    ];
+    const result = computeFusion(sources, { ...config, performanceContext: undefined });
+
+    expect(result.performanceEvidenceStatus).toBe("not_requested");
+    expect(result.usedSources.map((source) => source.performanceWeight)).toEqual([1, 1]);
+  });
+
   it("n’accorde pas d’avantage excessif à 0,6 °C sur 12 cas face à 0,8 °C sur 500", () => {
     const lowN = modelEvidence("faible-effectif", 0.6, 12);
     const highN = modelEvidence("grand-effectif", 0.8, 500);
