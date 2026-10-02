@@ -5,6 +5,7 @@ import { getHourlyConditionLabel } from "@/lib/hourlyConditionLabel";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLabelLanes";
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
+import type { HourlyMultiModelMetrics } from "@shared/hourlyModelMetrics";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
@@ -28,20 +29,7 @@ export interface HourData {
   cloudHigh?: number | null;
   precipType?: string | null;
   precipIntensity?: string | null;
-  // Multi-model spread
-  tempSpread?: number | null;
-  precipAgreement?: number | null;
-  windSpeedSpread?: number | null;
-  windGustSpread?: number | null;
-  windDirectionDifference?: number | null;
-  humiditySpread?: number | null;
-  cloudCoverSpread?: number | null;
-  modelCount?: number;
-  temperatureComparison?: {
-    lower: { name: string; temperature: number };
-    higher: { name: string; temperature: number };
-    rationale: string;
-  } | null;
+  multiModelMetrics?: HourlyMultiModelMetrics | null;
 }
 
 interface Props {
@@ -126,14 +114,17 @@ function HourlyScaleLabels({
 // ─── Detail Overlay ──────────────────────────────────────────────────────────
 function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => void }) {
   const cond = getConditionLabel(hour.cloudCover, hour.precipitation, hour.condition);
-  const hasSpread = hour.tempSpread != null && hour.tempSpread > 0;
-  const hasPrecipAgreement = hour.precipAgreement != null;
+  const metrics = hour.multiModelMetrics ?? null;
+  const temperatureMetrics = metrics?.temperature;
+  const precipitationMetrics = metrics?.precipitation;
+  const dispersion = metrics?.dispersion;
+  const hasSpread = typeof temperatureMetrics?.range === "number";
+  const hasPrecipAgreement = typeof precipitationMetrics?.frequencyPercent === "number";
   const hasGust = hour.windGust != null && hour.windGust > 0;
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementContentMounted, setAgreementContentMounted] = useState(false);
   const [agreementClosing, setAgreementClosing] = useState(false);
-  const temperatureComparison = hour.temperatureComparison ?? null;
 
   useEffect(() => {
     if (agreementOpen) {
@@ -150,20 +141,25 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
     return () => window.clearTimeout(timeoutId);
   }, [agreementOpen, agreementContentMounted]);
 
-  // Confidence from spread: low spread = high confidence
+  // This is a descriptive agreement index, not a calibrated probability.
   const spreadConfidence = hasSpread
-    ? Math.max(0, Math.round(100 - (hour.tempSpread! * 25)))
+    ? Math.max(0, Math.round(100 - (temperatureMetrics!.range! * 25)))
     : null;
   const boundAgreement = (value: number) => Math.max(0, Math.min(100, value));
-  const agreementParts = [
+  type AgreementPart = { label: string; value: number; detail?: string };
+  const agreementParts: AgreementPart[] = [
     spreadConfidence == null ? null : { label: "Température", value: spreadConfidence },
-    hasPrecipAgreement ? { label: "Pluie", value: hour.precipAgreement! } : null,
-    typeof hour.windSpeedSpread === "number" ? { label: "Vent", value: boundAgreement(100 - hour.windSpeedSpread * 10) } : null,
-    typeof hour.windGustSpread === "number" ? { label: "Rafales", value: boundAgreement(100 - hour.windGustSpread * 8) } : null,
-    typeof hour.windDirectionDifference === "number" ? { label: "Direction", value: boundAgreement(100 - hour.windDirectionDifference / 1.8) } : null,
-    typeof hour.humiditySpread === "number" ? { label: "Humidité", value: boundAgreement(100 - hour.humiditySpread) } : null,
-    typeof hour.cloudCoverSpread === "number" ? { label: "Nuages", value: boundAgreement(100 - hour.cloudCoverSpread) } : null,
-  ].filter((part): part is { label: string; value: number } => part != null).map((part) => ({ ...part, value: Math.round(part.value) }));
+    hasPrecipAgreement ? {
+      label: "Fréquence modèle pluie",
+      value: precipitationMetrics!.frequencyPercent!,
+      detail: `${precipitationMetrics!.rainModelCount}/${precipitationMetrics!.availableModelCount} modèles`,
+    } : null,
+    typeof dispersion?.windSpeed.range === "number" ? { label: "Vent", value: boundAgreement(100 - dispersion.windSpeed.range * 10) } : null,
+    typeof dispersion?.windGust.range === "number" ? { label: "Rafales", value: boundAgreement(100 - dispersion.windGust.range * 8) } : null,
+    typeof dispersion?.windDirection.range === "number" ? { label: "Direction", value: boundAgreement(100 - dispersion.windDirection.range / 1.8) } : null,
+    typeof dispersion?.humidity.range === "number" ? { label: "Humidité", value: boundAgreement(100 - dispersion.humidity.range) } : null,
+    typeof dispersion?.cloudCover.range === "number" ? { label: "Nuages", value: boundAgreement(100 - dispersion.cloudCover.range) } : null,
+  ].filter((part): part is AgreementPart => part != null).map((part) => ({ ...part, value: Math.round(part.value) }));
   const globalAgreement = agreementParts.length > 0
     ? Math.round(agreementParts.reduce((sum, part) => sum + part.value, 0) / agreementParts.length)
     : null;
@@ -198,12 +194,13 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
         {/* L’accord global est prioritaire ; l’écart thermique reste un détail explicable. */}
         {globalAgreement != null && <div className="mb-2 rounded-xl border border-white/10 bg-slate-900/35">
           <button type="button" onClick={() => setAgreementOpen((open) => !open)} aria-expanded={agreementOpen} className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left active:scale-[0.99] ${agreementTone}`}>
-            <span><span className="block text-[13px] font-bold">Accord global {globalAgreement}%</span><span className="block text-[10px] opacity-80">{agreementLevel} · {agreementParts.length} paramètre{agreementParts.length > 1 ? "s" : ""} comparé{agreementParts.length > 1 ? "s" : ""}</span></span>
+            <span><span className="block text-[13px] font-bold">Indice d’accord des modèles {globalAgreement}%</span><span className="block text-[10px] opacity-80">{agreementLevel} · {agreementParts.length} paramètre{agreementParts.length > 1 ? "s" : ""} comparé{agreementParts.length > 1 ? "s" : ""} · indicateur descriptif non calibré</span></span>
             <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${agreementOpen ? "rotate-180" : ""}`} />
           </button>
           {agreementContentMounted && <div className={`${agreementClosing ? "animate-out fade-out slide-out-to-top-1 duration-200 motion-reduce:animate-none" : "animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none"} space-y-2 border-t border-white/10 px-3 py-2 text-[11px] text-slate-200`}>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Accord par paramètre</p>
-            {otherAgreementParts.length > 0 && <div className="space-y-1">{otherAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
+            {otherAgreementParts.length > 0 && <div className="space-y-1">{otherAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.detail ? `${part.detail} · ` : ""}{part.value}%</span></div>)}</div>}
+            {hasPrecipAgreement && <p className="text-[10px] text-slate-400">La fréquence des modèles prévoyant de la pluie n’est pas une probabilité météorologique calibrée.</p>}
             {windAgreementParts.length > 0 && <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-cyan-100">Vent</p>{windAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
             {humidityAgreementParts.length > 0 && <div className="rounded-lg border border-sky-300/15 bg-sky-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-sky-100">Humidité & nuages</p>{humidityAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
             <div className="animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none border-t border-white/10 pt-2" aria-label="Légende des seuils d’accord global">
@@ -216,20 +213,25 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
             </div>
           </div>}
         </div>}
-        {temperatureComparison && (
+        {metrics && (
           <div className="mb-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06]">
             <button type="button" onClick={() => setComparisonOpen((open) => !open)} aria-expanded={comparisonOpen} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-amber-50 active:scale-[0.99]">
-              <span><span className="font-semibold">Écart température ±{hour.tempSpread?.toFixed(1) ?? "—"}°C</span><span className="ml-1 text-[10px] text-amber-100/70">· {hour.modelCount ?? 2} contributeurs</span></span>
-              <span className="flex items-center gap-1 text-[10px]">Comparer <ChevronDown className={`h-3.5 w-3.5 transition-transform ${comparisonOpen ? "rotate-180" : ""}`} /></span>
+              <span><span className="font-semibold">Dispersion thermique · étendue {temperatureMetrics?.range == null ? "—" : `${temperatureMetrics.range.toFixed(1)}°C`}</span><span className="ml-1 text-[10px] text-amber-100/70">· {temperatureMetrics?.availableModelCount ?? 0}/{metrics.expectedModelCount} modèles</span></span>
+              <span className="flex items-center gap-1 text-[10px]">Statistiques <ChevronDown className={`h-3.5 w-3.5 transition-transform ${comparisonOpen ? "rotate-180" : ""}`} /></span>
             </button>
             {comparisonOpen && (
               <div className="border-t border-slate-600/30 px-3 pb-3 pt-2.5 text-[11px]">
-                <p className="font-semibold text-slate-100">Modèles comparés pour l’écart de température</p>
+                <p className="font-semibold text-slate-100">Statistiques descriptives des valeurs valides · Best Match exclu</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div className="rounded-lg border border-sky-400/20 bg-sky-400/5 px-2.5 py-2"><p className="text-[9px] uppercase tracking-wide text-sky-200/75">Plus bas</p><p className="mt-1 font-semibold text-slate-100">{temperatureComparison.lower.name}</p><p className="text-sky-200">{temperatureComparison.lower.temperature.toFixed(1)}°C</p></div>
-                  <div className="rounded-lg border border-orange-400/20 bg-orange-400/5 px-2.5 py-2"><p className="text-[9px] uppercase tracking-wide text-orange-200/75">Plus haut</p><p className="mt-1 font-semibold text-slate-100">{temperatureComparison.higher.name}</p><p className="text-orange-200">{temperatureComparison.higher.temperature.toFixed(1)}°C</p></div>
+                  <div className="rounded-lg border border-sky-400/20 bg-sky-400/5 px-2.5 py-2"><p className="text-[9px] uppercase tracking-wide text-sky-200/75">Minimum</p><p className="mt-1 font-semibold text-slate-100">{temperatureMetrics?.min == null ? "—" : `${temperatureMetrics.min.toFixed(1)}°C`}</p><p className="text-sky-200">{temperatureMetrics?.minModel ?? "modèle indisponible"}</p></div>
+                  <div className="rounded-lg border border-orange-400/20 bg-orange-400/5 px-2.5 py-2"><p className="text-[9px] uppercase tracking-wide text-orange-200/75">Maximum</p><p className="mt-1 font-semibold text-slate-100">{temperatureMetrics?.max == null ? "—" : `${temperatureMetrics.max.toFixed(1)}°C`}</p><p className="text-orange-200">{temperatureMetrics?.maxModel ?? "modèle indisponible"}</p></div>
                 </div>
-                <p className="mt-2 leading-relaxed text-slate-400">{temperatureComparison.rationale}</p>
+                <div className="mt-2 space-y-1 leading-relaxed text-slate-300">
+                  <p>Moyenne pondérée officielle : <b>{temperatureMetrics?.weightedMean == null ? "—" : `${temperatureMetrics.weightedMean.toFixed(1)}°C`}</b></p>
+                  <p>Médiane : <b>{temperatureMetrics?.median == null ? "—" : `${temperatureMetrics.median.toFixed(1)}°C`}</b> · écart-type population : <b>{temperatureMetrics?.standardDeviation == null ? "—" : `${temperatureMetrics.standardDeviation.toFixed(1)}°C`}</b></p>
+                  <p>Modèles température disponibles ({temperatureMetrics?.availableModelCount ?? 0}/{metrics.expectedModelCount}) : {temperatureMetrics?.modelsWithData.join(", ") || "aucun"}</p>
+                  {temperatureMetrics?.availableModelCount != null && temperatureMetrics.availableModelCount < 2 && <p>Dispersion non calculable avec moins de deux valeurs valides.</p>}
+                </div>
               </div>
             )}
           </div>
@@ -239,9 +241,10 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
         <div className="grid grid-cols-2 gap-2">
           {/* Temperature */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
-            <div className="flex items-center gap-1.5 mb-1"><Thermometer className="h-3.5 w-3.5 text-orange-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Température</span></div>
-            <p className="text-sm font-bold text-white">{hour.temp != null ? `${hour.temp.toFixed(1)}°C` : "—"}</p>
-            {hasSpread && <p className="text-[10px] text-slate-500 mt-0.5">±{hour.tempSpread!.toFixed(1)}°C entre modèles</p>}
+            <div className="flex items-center gap-1.5 mb-1"><Thermometer className="h-3.5 w-3.5 text-orange-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Moyenne pondérée officielle</span></div>
+            <p className="text-sm font-bold text-white">{temperatureMetrics?.weightedMean != null ? `${temperatureMetrics.weightedMean.toFixed(1)}°C` : "—"}</p>
+            {hasSpread && <p className="text-[10px] text-slate-500 mt-0.5">Étendue des modèles : {temperatureMetrics!.range!.toFixed(1)}°C</p>}
+            {temperatureMetrics && <p className="text-[10px] text-slate-500 mt-0.5">Valeurs disponibles : {temperatureMetrics.availableModelCount}/{metrics!.expectedModelCount}</p>}
           </div>
 
           {/* Ressenti */}
@@ -266,18 +269,18 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
 
           {/* Précipitations */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
-            <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Précipitations</span></div>
-            <p className="text-sm font-bold text-blue-400">{hour.precipitation ?? 0} mm</p>
+            <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Quantité officielle pondérée</span></div>
+            <p className="text-sm font-bold text-blue-400">{hour.precipitation != null ? `${hour.precipitation.toFixed(1)} mm` : "—"}</p>
             {hour.precipType ? <p className="mt-0.5 text-[10px] text-slate-500">{hour.precipType === "snow" ? "Neige" : hour.precipType === "freezing_rain" ? "Pluie verglaçante" : "Pluie"}{hour.precipIntensity ? ` · ${hour.precipIntensity === "heavy" ? "forte" : hour.precipIntensity === "moderate" ? "modérée" : "faible"}` : ""}</p> : null}
-            {hasPrecipAgreement && (
+            {precipitationMetrics && (
               <div className="mt-1">
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[9px] text-slate-500">Accord pluie · {hour.modelCount ?? 1} modèle{(hour.modelCount ?? 1) > 1 ? "s" : ""}</span>
-                  <span className={`text-[10px] font-bold ${(hour.precipAgreement! >= 70) ? 'text-blue-400' : (hour.precipAgreement! >= 30) ? 'text-yellow-400' : 'text-slate-400'}`}>{hour.precipAgreement}%</span>
+                  <span className="text-[9px] text-slate-500">Modèles avec pluie (≥0,1 mm)</span>
+                  <span className={`text-[10px] font-bold ${((precipitationMetrics.frequencyPercent ?? 0) >= 70) ? 'text-blue-400' : ((precipitationMetrics.frequencyPercent ?? 0) >= 30) ? 'text-yellow-400' : 'text-slate-400'}`}>{precipitationMetrics.rainModelCount}/{precipitationMetrics.availableModelCount} · {precipitationMetrics.frequencyPercent == null ? "—" : `${precipitationMetrics.frequencyPercent.toFixed(0)}%`}</span>
                 </div>
-                <div className="bg-slate-700 rounded-full h-1 overflow-hidden">
-                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${hour.precipAgreement}%` }} />
-                </div>
+                <p className="text-[9px] text-slate-400">Fréquence modèle, non calibrée comme probabilité · valeurs valides {precipitationMetrics.availableModelCount}/{metrics?.expectedModelCount ?? 7}</p>
+                {precipitationMetrics.frequencyPercent != null && <div className="mt-1 bg-slate-700 rounded-full h-1 overflow-hidden"><div className="h-full bg-blue-400 rounded-full" style={{ width: `${precipitationMetrics.frequencyPercent}%` }} /></div>}
+                <p className="mt-1 text-[9px] text-slate-400">Quantité conditionnelle pondérée : {precipitationMetrics.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics.conditionalWeightedMean == null ? "indisponible sans poids historiques qualifiés" : `${precipitationMetrics.conditionalWeightedMean.toFixed(1)} mm`}</p>
               </div>
             )}
           </div>

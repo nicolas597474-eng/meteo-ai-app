@@ -919,6 +919,7 @@ export const weatherRouter = router({
         officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting },
         hours,
         periodHours,
+        periodHoursSource: includeExtendedPeriods ? "open_meteo_best_match_reference" as const : "official_seven_models" as const,
         days,
         modelsUsed,
         dailyFallback,
