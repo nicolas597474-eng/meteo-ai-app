@@ -67,6 +67,23 @@ describe("computeOfficialDailyForecast", () => {
     expect(first.trace.horizonBucket).toBe("6-24h");
     expect(first.trace.calibrationStatus.tempMax).toBe("calibrated");
     expect(first.trace.calibrationStatus.precipitation).toBe("calibrated");
+    expect(first.trace.precipitationConsensus).toMatchObject({
+      thresholdMm: 0.1,
+      expectedModelCount: 7,
+      availableModelCount: 4,
+      rainModelCount: 4,
+      frequencyPercent: 100,
+      conditionalMeanMethod: "historical_skill",
+      consensusEstimateMm: first.precipitation,
+      modelsWithData: serviceNames,
+      modelsPredictingRain: serviceNames,
+      isProbabilityCalibrated: false,
+    });
+    expect(first.precipitation).toBeCloseTo(
+      (first.trace.precipitationConsensus.rainModelCount / first.trace.precipitationConsensus.availableModelCount)
+        * first.trace.precipitationConsensus.conditionalMeanMm!,
+      10,
+    );
     expect(first.trace.calibrationStatus.humidity).toBe("insufficient_data");
     expect(first.humidity).toBeNull();
     expect(first.cloudCover).toBeNull();
@@ -95,7 +112,40 @@ describe("computeOfficialDailyForecast", () => {
     expect(result.confidenceScore).toBeNull();
     expect(result.trace.calibrationStatus.tempMax).toBe("insufficient_data");
     expect(result.trace.parameterSources.temperature).toEqual([]);
+    expect(result.trace.precipitationConsensus).toMatchObject({
+      availableModelCount: 4,
+      rainModelCount: 4,
+      frequencyPercent: 100,
+      conditionalMeanMm: 2,
+      conditionalMeanMethod: "arithmetic_mean",
+      consensusEstimateMm: 2,
+      isProbabilityCalibrated: false,
+    });
     expect(Object.values(result.weights).every((weight) => weight.tempWeight === 0 && weight.precipWeight === 0 && weight.windWeight === 0)).toBe(true);
+  });
+
+  it("exclut les modèles sous 0,1 mm de la quantité conditionnelle et du poids officiel de pluie", () => {
+    const mixedRainForecasts = forecasts.map((forecast, index) => ({
+      ...forecast,
+      precipitation: [0, 0.1, 0.4, 1][index]!,
+    }));
+    const result = computeOfficialDailyForecast(mixedRainForecasts, options());
+    const summary = result.trace.precipitationConsensus;
+
+    expect(summary).toMatchObject({
+      thresholdMm: 0.1,
+      expectedModelCount: 7,
+      availableModelCount: 4,
+      rainModelCount: 3,
+      frequencyPercent: 75,
+      conditionalMeanMethod: "historical_skill",
+      isProbabilityCalibrated: false,
+    });
+    expect(summary.modelsPredictingRain).toEqual(["ARPEGE", "ICON", "ECMWF"]);
+    expect(result.weights.AROME!.precipWeight).toBe(0);
+    expect(result.weights.ARPEGE!.precipWeight).toBeGreaterThan(0);
+    expect(result.precipitation).toBeCloseTo((3 / 4) * summary.conditionalMeanMm!, 10);
+    expect(result.precipitation).toBeCloseTo(summary.consensusEstimateMm!, 10);
   });
 
   it("signale distinctement un schéma non migré sans tenter de fusion de repli", () => {

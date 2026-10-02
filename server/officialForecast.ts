@@ -2,6 +2,7 @@ import { computeFusion, type FusionResult, type FusionSource } from "./fusionEng
 import { getDailyForecastHorizon } from "./dailyForecastPerformance";
 import { WEATHER_SERVICES, type ForecastData } from "./weatherServices";
 import type { DailyFusionMetric, DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
+import { PRECIPITATION_RAIN_THRESHOLD_MM, summarizePrecipitationModels, type PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
 export type OfficialDailyForecastInput = Pick<ForecastData, "serviceName" | "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "windGust" | "humidity" | "cloudCover">;
 export type DailyCalibrationStatus = "calibrated" | "insufficient_data" | "schema_unavailable";
@@ -58,6 +59,7 @@ export type ForecastTrace = {
     wind: ForecastTraceSource[];
     humidity: ForecastTraceSource[];
   };
+  precipitationConsensus: PrecipitationModelConsensus;
   excludedSources: Array<{ id: string; name: string; reason: string }>;
 };
 
@@ -92,6 +94,10 @@ function toTraceSources(result: FusionResult): ForecastTraceSource[] {
 }
 
 const SERVICE_BY_NAME = new Map(WEATHER_SERVICES.expert.map((service) => [service.name, service]));
+const DAILY_PRECIPITATION_MODEL_NAMES = WEATHER_SERVICES.expert
+  .filter((service) => service.modelId !== "best_match")
+  .map((service) => service.name);
+const DAILY_PRECIPITATION_MODEL_SET = new Set(DAILY_PRECIPITATION_MODEL_NAMES);
 
 function forecastValue(forecast: OfficialDailyForecastInput, metric: DailyFusionMetric): number | null {
   switch (metric) {
@@ -132,11 +138,24 @@ export function computeOfficialDailyForecast(
     adaptiveWeightingEnabled: true,
     modelWeightFraction: 1,
   };
+  const precipitationInputs = forecasts
+    .filter((forecast) => DAILY_PRECIPITATION_MODEL_SET.has(forecast.serviceName))
+    .map((forecast) => ({ modelName: forecast.serviceName, amountMm: forecast.precipitation }));
+  const rawPrecipitationConsensus = summarizePrecipitationModels(
+    precipitationInputs,
+    DAILY_PRECIPITATION_MODEL_NAMES,
+  );
 
   const fusions = new Map<DailyFusionMetric, FusionResult>();
   for (const { key } of metrics) {
     const expected = horizonBucket ? { locationKey: options.locationKey, variable: key, horizonBucket } : null;
-    const sources: FusionSource[] = expected ? forecasts.map((forecast) => {
+    const metricForecasts = key === "precipitation_sum"
+      ? forecasts.filter((forecast) => DAILY_PRECIPITATION_MODEL_SET.has(forecast.serviceName)
+        && typeof forecast.precipitation === "number"
+        && Number.isFinite(forecast.precipitation)
+        && forecast.precipitation >= PRECIPITATION_RAIN_THRESHOLD_MM)
+      : forecasts;
+    const sources: FusionSource[] = expected ? metricForecasts.map((forecast) => {
       const service = SERVICE_BY_NAME.get(forecast.serviceName);
       const evidence = options.evidence.find((item) => item.serviceName === forecast.serviceName
         && item.locationKey === options.locationKey
@@ -167,6 +186,12 @@ export function computeOfficialDailyForecast(
   const maxFusion = getFusion("temperature_max");
   const minFusion = getFusion("temperature_min");
   const precipFusion = getFusion("precipitation_sum");
+  const precipitationConsensus = precipFusion.performanceEvidenceStatus === "qualified" && precipFusion.temperature != null
+    ? summarizePrecipitationModels(precipitationInputs, DAILY_PRECIPITATION_MODEL_NAMES, {
+        conditionalMeanMm: precipFusion.temperature,
+        conditionalMeanMethod: "historical_skill",
+      })
+    : rawPrecipitationConsensus;
   const windFusion = getFusion("wind_speed_max");
   const gustFusion = getFusion("wind_gust_max");
   const calibrationStatus = {
@@ -215,6 +240,7 @@ export function computeOfficialDailyForecast(
       wind: toTraceSources(windFusion),
       humidity: [],
     },
+    precipitationConsensus,
     excludedSources,
   };
 
@@ -225,7 +251,7 @@ export function computeOfficialDailyForecast(
   return {
     tempMax: calibrationStatus.tempMax === "calibrated" ? maxFusion.temperature : null,
     tempMin: calibrationStatus.tempMin === "calibrated" ? minFusion.temperature : null,
-    precipitation: calibrationStatus.precipitation === "calibrated" ? precipFusion.temperature : null,
+    precipitation: calibrationStatus.precipitation === "calibrated" ? precipitationConsensus.consensusEstimateMm : null,
     windSpeed: calibrationStatus.windSpeed === "calibrated" ? windFusion.temperature : null,
     windGust: calibrationStatus.windGust === "calibrated" ? gustFusion.temperature : null,
     humidity: null,
@@ -235,6 +261,6 @@ export function computeOfficialDailyForecast(
     coreCalibrationComplete: coreReady,
     weights,
     trace,
-    methodNote: `Fusion quotidienne ${coreReady ? "calibrée" : "non calibrée"} : ${calibratedCount}/7 variables disposent d’une preuve qualifiée; horizon ${horizon?.bucket ?? "indisponible"}.`,
+    methodNote: `Fusion quotidienne ${coreReady ? "calibrée" : "non calibrée"} : ${calibratedCount}/7 variables disposent d’une preuve qualifiée; horizon ${horizon?.bucket ?? "indisponible"}. La pluie est calculée par fréquence brute × quantité conditionnelle et n’est jamais une probabilité calibrée.`,
   };
 }

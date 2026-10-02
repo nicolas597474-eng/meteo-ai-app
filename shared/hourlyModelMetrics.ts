@@ -1,3 +1,5 @@
+import type { PrecipitationModelConsensus } from "./precipitationConsensus";
+
 /**
  * Descriptive summaries of the seven independent hourly forecast models.
  * Null means no valid observations (or no qualified historical weights for an
@@ -33,18 +35,7 @@ export type HourlyMultiModelMetrics = {
     minModel: string | null;
     maxModel: string | null;
   };
-  precipitation: {
-    /** A model is counted as wet at or above this threshold. */
-    rainThresholdMm: 0.1;
-    rainModelCount: number;
-    availableModelCount: number;
-    /** Raw share of valid model values predicting rain; not a calibrated probability. */
-    frequencyPercent: number | null;
-    /** Historical-skill weighted mean among wet models; null without qualified weights or wet models. */
-    conditionalWeightedMean: number | null;
-    modelsWithData: readonly string[];
-    modelsPredictingRain: readonly string[];
-  };
+  precipitation: PrecipitationModelConsensus;
   dispersion: {
     windSpeed: HourlyModelRange;
     windGust: HourlyModelRange;

@@ -10,6 +10,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
+import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getCenteredHourScrollLeft, getHourCenterX, getNearestCenteredHourIndex, getNearestHourIndex } from "@/lib/hourlyScrollSync";
 import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
@@ -160,8 +161,9 @@ function SlotConfidenceBadge({ details, historicalModels = [] }: { details: Agre
       : "border-amber-300/25 bg-amber-300/10 text-amber-100";
   const level = value >= 75 ? "élevé" : value >= 55 ? "modéré" : "faible";
   return <span className="relative inline-block">
-    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} className={`!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px] ${tone}`}>Accord des modèles {value}% · {level}</button>
+    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} title="Indice descriptif, pas une probabilité calibrée" className={`!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px] ${tone}`}>Indice d’accord descriptif {value}% · {level}</button>
     {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
+      <span className="mb-1 block text-slate-400">Indice descriptif, non probabilité météorologique calibrée</span>
       <span className="mb-1 block text-slate-300">Accord par paramètre</span>
       {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.detail ? `${detail.detail} · ` : ""}{detail.value}%</span></span>)}
       {historicalModels.length > 0 && <span className="mt-1 block border-t border-white/10 pt-1 text-slate-300">
@@ -346,8 +348,8 @@ export default function WeatherDetails() {
                       {precipitationMetrics && <div className="mt-1 border-t border-white/10 pt-1">
                         <p>Modèles pluvieux (≥0,1 mm) : <b>{precipitationMetrics.rainModelCount}/{precipitationMetrics.availableModelCount}</b> · fréquence modèle <b>{precipitationMetrics.frequencyPercent == null ? "—" : `${precipitationMetrics.frequencyPercent.toFixed(0)}%`}</b></p>
                         <p>Valeurs pluie valides : {precipitationMetrics.availableModelCount}/{multiModelMetrics.expectedModelCount} · fréquence non calibrée comme probabilité météorologique.</p>
-                        <p>Quantité officielle pondérée : <b>{h.precipitation == null ? "—" : `${h.precipitation.toFixed(1)} mm`}</b></p>
-                        <p>Quantité conditionnelle pondérée parmi les modèles pluvieux : <b>{precipitationMetrics.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics.conditionalWeightedMean == null ? "indisponible sans poids historiques qualifiés" : `${precipitationMetrics.conditionalWeightedMean.toFixed(1)} mm`}</b></p>
+                        <p>Quantité conditionnelle pondérée parmi les modèles pluvieux : <b>{precipitationMetrics.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics.conditionalMeanMm == null ? "indisponible sans poids historiques qualifiés" : `${precipitationMetrics.conditionalMeanMm.toFixed(1)} mm`}</b></p>
+                        <p>Estimation de quantité = fréquence brute × quantité conditionnelle : <b>{precipitationMetrics.consensusEstimateMm == null ? "—" : `${precipitationMetrics.consensusEstimateMm.toFixed(1)} mm`}</b></p>
                         <p>Modèles pluvieux : {precipitationMetrics.modelsPredictingRain.join(", ") || "aucun"}</p>
                       </div>}
                     </div>}
@@ -510,9 +512,10 @@ export default function WeatherDetails() {
                       <div className="flex items-center gap-3 mt-0.5">
                         <span className="text-white font-bold text-sm">{day.tempMax?.toFixed(0)}°</span>
                         <span className="text-slate-400 text-sm">{day.tempMin?.toFixed(0)}°</span>
-                        {(day.precipitation ?? 0) > 0 && (
+                        {day.precipitation != null && day.precipitation > 0 && (
                           <span className="text-blue-400 text-xs">{day.precipitation?.toFixed(1)} mm</span>
                         )}
+                        {day.precipitationConsensus && <span className="text-blue-300 text-[9px]">{day.precipitationConsensus.rainModelCount}/{day.precipitationConsensus.availableModelCount} modèles au seuil</span>}
                         <span className="text-slate-500 text-xs">{day.windSpeed?.toFixed(0)} km/h</span>
                       </div>
                     </div>
@@ -529,9 +532,10 @@ export default function WeatherDetails() {
                         <DetailCell label="Coucher" value={day.sunset ?? "—"} />
                         <DetailCell label="Humidité" value={`${day.humidity?.toFixed(0) ?? "—"}%`} />
                         <DetailCell className="col-span-2" label="Vent" value={`${day.windSpeed?.toFixed(0) ?? "—"} km/h${day.windGust != null ? ` · raf. ${day.windGust.toFixed(0)}` : ""}`} />
-                        <DetailCell label="Précip." value={`${day.precipitation?.toFixed(1) ?? "0"} mm`} />
+                        <DetailCell label="Estimation pluie (consensus)" value={day.precipitation == null ? "—" : `${day.precipitation.toFixed(1)} mm`} />
                         <DetailCell label="UV" value={`${(day as any).uvIndex?.toFixed(0) ?? "—"}`} />
                       </div>
+                      <PrecipitationConsensusSummary summary={day.precipitationConsensus} />
                       
                       {/* Duration of sunshine */}
                       {day.sunrise && day.sunset && (
@@ -645,7 +649,12 @@ function DayPeriodBreakdown({ dayDate, hours, regime, historicalPerformance }: {
         const avgTemp = Math.round(periodHours.reduce((s: number, h: any) => s + (h.temp ?? 0), 0) / periodHours.length);
         const avgWind = Math.round(periodHours.reduce((s: number, h: any) => s + (h.windSpeed ?? 0), 0) / periodHours.length);
         const maxGust = Math.round(Math.max(...periodHours.map((h: any) => h.windGust ?? 0)));
-        const totalPrecip = periodHours.reduce((s: number, h: any) => s + (h.precipitation ?? 0), 0);
+        const availablePrecipitation = periodHours
+          .map((hour) => hour.precipitation)
+          .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+        const totalPrecip = availablePrecipitation.length > 0
+          ? availablePrecipitation.reduce((sum, value) => sum + value, 0)
+          : null;
         const avgHumidity = Math.round(periodHours.reduce((s: number, h: any) => s + (h.humidity ?? 0), 0) / periodHours.length);
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
@@ -669,7 +678,7 @@ function DayPeriodBreakdown({ dayDate, hours, regime, historicalPerformance }: {
               <div className="flex justify-between"><span>Temp.</span><span className="text-white font-medium">{avgTemp}°C</span></div>
               <div className="flex justify-between"><span>Vent</span><span>{avgWind} km/h</span></div>
               <div className="flex justify-between"><span>Rafales</span><span>{maxGust} km/h</span></div>
-              <div className="flex justify-between"><span>Précip.</span><span>{totalPrecip.toFixed(1)} mm</span></div>
+              <div className="flex justify-between"><span>Estimation pluie</span><span>{totalPrecip == null ? "—" : `${totalPrecip.toFixed(1)} mm`}</span></div>
               <div className="flex justify-between"><span>Humidité</span><span>{avgHumidity}%</span></div>
               <div className="flex justify-between"><span>Nuages</span><span>{avgCloud}%</span></div>
             </div>
@@ -875,9 +884,9 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
                     <span>Ress. <b className="text-white">{h.apparentTemp?.toFixed(1) ?? "—"}°</b></span>
                     <span>Vent <b className="text-white">{h.windSpeed?.toFixed(0) ?? "—"}</b> km/h</span>
                     <span>Raf. <b className="text-white">{h.windGust?.toFixed(0) ?? "—"}</b> km/h</span>
-                    <span>Pluie pondérée <b className="text-blue-300">{h.precipitation?.toFixed(1) ?? "—"}</b> mm</span>
+                    <span>Estimation pluie (consensus) <b className="text-blue-300">{h.precipitation?.toFixed(1) ?? "—"}</b> mm</span>
                     <span title="Fréquence des modèles, non probabilité calibrée">Fréquence pluie <b className="text-blue-300">{precipitationMetrics ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} · ${precipitationMetrics.frequencyPercent == null ? "—" : `${precipitationMetrics.frequencyPercent.toFixed(0)}%`}` : "—"}</b></span>
-                    <span className="col-span-2">Quantité conditionnelle pondérée <b className="text-blue-300">{precipitationMetrics?.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics?.conditionalWeightedMean == null ? "indisponible" : `${precipitationMetrics.conditionalWeightedMean.toFixed(1)} mm`}</b></span>
+                    <span className="col-span-2">Quantité conditionnelle <b className="text-blue-300">{precipitationMetrics?.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics?.conditionalMeanMm == null ? "indisponible sans poids historiques qualifiés" : `${precipitationMetrics.conditionalMeanMm.toFixed(1)} mm`}</b></span>
                     <span>Hum. <b className="text-white">{h.humidity ?? "—"}%</b></span>
                     <span>Press. <b className="text-white">{h.pressure?.toFixed(0) ?? "—"}</b></span>
                   </div>

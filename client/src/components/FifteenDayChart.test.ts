@@ -24,6 +24,10 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("const precipLabelBand = 18");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, barTop - 5)");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, precipZoneBot - 5)");
+    expect(source).toContain("PrecipitationConsensusSummary");
+    expect(source).toContain("summary={day.precipitationConsensus}");
+    expect(source).toContain("if (p == null) return");
+    expect(source).toContain("day.precipitation == null ? \"—\"");
     expect(source).not.toContain("getFeltLabelY");
     expect(source).toContain("TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE");
     expect(source).toContain("TEMPERATURE_LABEL_ABOVE_GAP");
