@@ -33,6 +33,7 @@ const REASON_LABELS: Record<string, string> = {
   history_unavailable: "historique de calibration indisponible",
   horizon_not_scored: "échéance non classée",
   incomparable_horizons: "horizons des modèles incompatibles",
+  no_wet_models: "aucun modèle disponible ne prévoit au moins 0,1 mm",
   no_model_data: "aucune donnée modèle pour cette variable",
 };
 
@@ -88,12 +89,12 @@ export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps)
     <div role="note" className="rounded-lg border border-sky-200/10 bg-sky-200/[0.035] px-2.5 py-2 text-[10px] leading-relaxed text-slate-400">
       {weighting.status === "unavailable" ? (
         <>
-          <p><span className="font-semibold text-amber-100">Prévision officielle horaire indisponible.</span> {evidenceLabel} Aucune valeur non calibrée ni pondération égale n’est utilisée. Modèles avec données : {modelsLabel}. Best Match est exclu.</p>
+          <p><span className="font-semibold text-amber-100">Prévision officielle horaire indisponible.</span> {evidenceLabel} Aucune valeur non calibrée ni pondération égale n’est utilisée pour les champs officiels pondérés. La pluie reste présentée séparément comme fréquence / estimation de consensus des modèles, jamais comme probabilité calibrée. Modèles avec données : {modelsLabel}. Best Match est exclu.</p>
           {unavailable && <p className="mt-1">Détail : {unavailable}.</p>}
         </>
       ) : weighting.status === "mixed" ? (
         <>
-          <p><span className="font-semibold text-sky-100">Seules les valeurs appuyées par une calibration historique comparable sont présentées comme prévisions officielles.</span> {evidenceLabel} Les autres restent indisponibles; aucune moyenne de secours n’est calculée. Modèles avec données : {modelsLabel}. Best Match est exclu.</p>
+          <p><span className="font-semibold text-sky-100">Seules les valeurs appuyées par une calibration historique comparable sont présentées comme prévisions officielles.</span> {evidenceLabel} Les autres restent indisponibles; aucune moyenne de secours n’est calculée. La pluie est séparée en fréquence / estimation de consensus des modèles, jamais en probabilité calibrée. Modèles avec données : {modelsLabel}. Best Match est exclu.</p>
           {available && <p className="mt-1">Calibrées : {available}.</p>}
           {unavailable && <p className="mt-1">Indisponibles : {unavailable}.</p>}
         </>

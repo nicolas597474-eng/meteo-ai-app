@@ -8,6 +8,7 @@ import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weath
 import { fetchWeather, getWeatherResponseAttemptCount } from "./weatherFetch";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import type { HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
+import { summarizePrecipitationModels, type PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
 // Hondeghem coordinates
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
@@ -234,6 +235,7 @@ export type DayForecast = {
   tempMax: number | null;
   tempMin: number | null;
   precipitation: number | null;
+  precipitationConsensus?: PrecipitationModelConsensus;
   windSpeed: number | null;
   windGust: number | null;
   windDirection?: number | null;
@@ -254,6 +256,7 @@ export type HourlyWeightingUnavailableReason =
   | "history_unavailable"
   | "horizon_not_scored"
   | "incomparable_horizons"
+  | "no_wet_models"
   | "no_model_data";
 
 export type HourlyVariableWeighting = {
@@ -344,8 +347,10 @@ export async function collect15DayForecast(
     { name: "ICON", modelId: "dwd_icon_eu" },
     { name: "Open-Meteo", modelId: null },
   ];
+  const precipitationModelNames = models.filter((model) => model.modelId != null).map((model) => model.name);
 
   const allModelData: Record<string, { tempMax: number[]; tempMin: number[]; precip: number[]; wind: number[]; windGust: number[]; windDir: number[]; humidity: number[]; cloud: number[]; uv: number[]; feelsMax: number[]; feelsMin: number[] }> = {};
+  const precipitationInputsByDate = new Map<string, Array<{ modelName: string; amountMm: number }>>();
   const sunData: Record<string, { sunrise: string | null; sunset: string | null }> = {};
   const modelsUsed: string[] = [];
   let dates: string[] = [];
@@ -366,7 +371,7 @@ export async function collect15DayForecast(
       const data = await response.json();
       const daily = data.daily;
       if (!daily?.time) return null;
-      return { name: model.name, daily };
+      return { name: model.name, modelId: model.modelId, daily };
     } catch (err) {
       console.error(`[15Day] Error fetching ${model.name}:`, err);
       return null;
@@ -375,7 +380,7 @@ export async function collect15DayForecast(
 
   for (const result of modelResults) {
     if (!result) continue;
-    const { name, daily } = result;
+    const { name, modelId, daily } = result;
     if (dates.length === 0) dates = daily.time.slice(0, 16);
     modelsUsed.push(name);
 
@@ -386,7 +391,13 @@ export async function collect15DayForecast(
       }
       if (daily.temperature_2m_max?.[i] != null) allModelData[d].tempMax.push(daily.temperature_2m_max[i]);
       if (daily.temperature_2m_min?.[i] != null) allModelData[d].tempMin.push(daily.temperature_2m_min[i]);
-      if (daily.precipitation_sum?.[i] != null) allModelData[d].precip.push(daily.precipitation_sum[i]);
+      const precipitation = daily.precipitation_sum?.[i];
+      if (typeof precipitation === "number" && Number.isFinite(precipitation) && modelId != null) {
+        allModelData[d].precip.push(precipitation);
+        const inputs = precipitationInputsByDate.get(d) ?? [];
+        inputs.push({ modelName: name, amountMm: precipitation });
+        precipitationInputsByDate.set(d, inputs);
+      }
       if (daily.wind_speed_10m_max?.[i] != null) allModelData[d].wind.push(daily.wind_speed_10m_max[i]);
       if (daily.wind_gusts_10m_max?.[i] != null) allModelData[d].windGust.push(daily.wind_gusts_10m_max[i]);
       if (daily.wind_direction_10m_dominant?.[i] != null) allModelData[d].windDir.push(daily.wind_direction_10m_dominant[i]);
@@ -408,7 +419,12 @@ export async function collect15DayForecast(
   const days: DayForecast[] = dates.map((date, i) => {
     const d = allModelData[date];
     if (!d) return null;
-    const avgPrecip = avg(d.precip);
+    const precipitationConsensus = summarizePrecipitationModels(
+      precipitationInputsByDate.get(date) ?? [],
+      precipitationModelNames,
+    );
+    const consensusAmount = precipitationConsensus.consensusEstimateMm;
+    const avgPrecip = consensusAmount == null ? null : Math.round(consensusAmount * 10) / 10;
     const avgCloud = avg(d.cloud);
     // Stability: higher for near-term, lower for far future + model agreement
     const spread = d.tempMax.length > 1
@@ -423,6 +439,7 @@ export async function collect15DayForecast(
       tempMax: avg(d.tempMax),
       tempMin: avg(d.tempMin),
       precipitation: avgPrecip,
+      precipitationConsensus,
       windSpeed: avg(d.wind),
       windGust: avg(d.windGust),
       windDirection: circularMeanDegrees(d.windDir),

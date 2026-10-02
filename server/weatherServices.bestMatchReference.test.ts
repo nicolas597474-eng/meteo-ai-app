@@ -6,7 +6,7 @@ vi.mock("./weatherFetch", () => ({
 }));
 
 import { fetchWeather } from "./weatherFetch";
-import { collectHourlyForecast } from "./weatherServices";
+import { collect15DayForecast, collectHourlyForecast } from "./weatherServices";
 
 const mockedFetchWeather = vi.mocked(fetchWeather);
 
@@ -53,5 +53,49 @@ describe("collectHourlyForecast auxiliaire", () => {
     expect(hours).toHaveLength(1);
     expect(hours[0]).toMatchObject({ temp: 0, precipitation: 0, windSpeed: 0, humidity: 0 });
     expect(hours[0]?.multiModelMetrics).toBeUndefined();
+  });
+});
+
+describe("collect15DayForecast consensus de précipitations", () => {
+  beforeEach(() => mockedFetchWeather.mockReset());
+
+  it("compte les seuls modèles indépendants avec des données et expose le calcul dérivé", async () => {
+    const dailyResponse = (amount: number) => response({
+      daily: {
+        time: ["2026-10-03"],
+        precipitation_sum: [amount],
+      },
+    });
+    mockedFetchWeather
+      .mockResolvedValueOnce(dailyResponse(0))
+      .mockResolvedValueOnce(dailyResponse(0.1))
+      .mockResolvedValueOnce(dailyResponse(0.4))
+      .mockResolvedValueOnce(dailyResponse(99));
+
+    const result = await collect15DayForecast();
+    const day = result.days[0]!;
+    const summary = day.precipitationConsensus!;
+
+    expect(result.modelsUsed).toContain("Open-Meteo");
+    expect(summary).toMatchObject({
+      thresholdMm: 0.1,
+      expectedModelCount: 3,
+      availableModelCount: 3,
+      rainModelCount: 2,
+      frequencyPercent: (2 / 3) * 100,
+      conditionalMeanMm: 0.25,
+      conditionalMeanMethod: "arithmetic_mean",
+      modelsExpected: ["ECMWF", "GFS", "ICON"],
+      modelsWithData: ["ECMWF", "GFS", "ICON"],
+      modelsPredictingRain: ["GFS", "ICON"],
+      isProbabilityCalibrated: false,
+    });
+    expect(summary.consensusEstimateMm).toBeCloseTo((2 / 3) * 0.25, 12);
+    expect(summary.modelValues.map(({ modelName, amountMm }) => [modelName, amountMm])).toEqual([
+      ["ECMWF", 0],
+      ["GFS", 0.1],
+      ["ICON", 0.4],
+    ]);
+    expect(day.precipitation).toBe(0.2);
   });
 });

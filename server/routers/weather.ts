@@ -228,8 +228,10 @@ export const weatherRouter = router({
 
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
+    const dailyFallbackSource = meteoAI ?? recentForecasts[0];
+    const dailyFallbackTrace = getPersistedForecastTrace(dailyFallbackSource?.weights, dailyFallbackSource?.computedAt);
     const dailyFallback = officialSnapshot.hourly.length === 0
-      ? buildDatedDailyFusionFallback(meteoAI ?? recentForecasts[0])
+      ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
       : null;
 
     const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly, getParisHour(), new Date(officialSnapshot.computedAt)));
@@ -657,8 +659,10 @@ export const weatherRouter = router({
       const latestFusion = snapshot.hourly.length === 0 && !currentFusion
         ? (await getLatestMeteoAIForecasts(1, locationKey))[0] ?? null
         : null;
+      const dailyFallbackSource = currentFusion ?? latestFusion;
+      const dailyFallbackTrace = getPersistedForecastTrace(dailyFallbackSource?.weights, dailyFallbackSource?.computedAt);
       const dailyFallback = snapshot.hourly.length === 0
-        ? buildDatedDailyFusionFallback(currentFusion ?? latestFusion)
+        ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
         : null;
       return buildWeatherProvenance(snapshot, dailyFallback);
     }),
@@ -866,8 +870,10 @@ export const weatherRouter = router({
         getQualifiedCumulativeRankingForLocation(locKey),
         getLatestMeteoAIForecasts(1, locKey),
       ]);
+      const dailyFallbackSource = meteoAI ?? recentForecasts[0];
+      const dailyFallbackTrace = getPersistedForecastTrace(dailyFallbackSource?.weights, dailyFallbackSource?.computedAt);
       const dailyFallback = hours.length === 0
-        ? buildDatedDailyFusionFallback(meteoAI ?? recentForecasts[0])
+        ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
         : null;
       const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt)));
       const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id);

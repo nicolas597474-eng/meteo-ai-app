@@ -151,10 +151,12 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.hours[0].forecastWeighting?.variableWeightings).toHaveLength(6);
     expect(result.hours[0].precipitation).toBeNull();
     expect(result.hours[0].multiModelMetrics?.precipitation).toMatchObject({
-      rainThresholdMm: 0.1,
+      thresholdMm: 0.1,
       rainModelCount: 1,
       availableModelCount: 7,
-      conditionalWeightedMean: null,
+      conditionalMeanMm: null,
+      consensusEstimateMm: null,
+      isProbabilityCalibrated: false,
     });
     expect(result.hours[0].multiModelMetrics?.precipitation.frequencyPercent).toBeCloseTo(100 / 7, 10);
     expect(result.hours[0].windSpeed).toBeNull();
@@ -193,7 +195,9 @@ describe("computeOfficialHourlyForecast", () => {
       frequencyPercent: (2 / 7) * 100,
       modelsPredictingRain: [OFFICIAL_HOURLY_MODELS[1]!.name, OFFICIAL_HOURLY_MODELS[6]!.name],
     });
-    expect(metrics.conditionalWeightedMean).toBeCloseTo((0.1 * arpegeWeight + 0.4 * ukmetWeight) / (arpegeWeight + ukmetWeight), 10);
+    expect(metrics.conditionalMeanMm).toBeCloseTo((0.1 * arpegeWeight + 0.4 * ukmetWeight) / (arpegeWeight + ukmetWeight), 10);
+    expect(metrics.consensusEstimateMm).toBeCloseTo((2 / 7) * metrics.conditionalMeanMm!, 10);
+    expect(result.hours[0]!.precipitation).toBeCloseTo(metrics.consensusEstimateMm!, 10);
   });
 
   it("exclut null et non-finis, mais conserve zéro et le seuil de pluie de 0,1 mm", () => {
@@ -226,7 +230,7 @@ describe("computeOfficialHourlyForecast", () => {
       modelsWithData: OFFICIAL_HOURLY_MODELS.filter((_, index) => index !== 3).map((model) => model.name),
       modelsPredictingRain: [OFFICIAL_HOURLY_MODELS[1]!.name, OFFICIAL_HOURLY_MODELS[2]!.name],
     });
-    expect(metrics.precipitation.conditionalWeightedMean).not.toBeNull();
+    expect(metrics.precipitation.conditionalMeanMm).not.toBeNull();
   });
 
   it("ne calcule pas de dispersion avec un seul modèle température valide", () => {

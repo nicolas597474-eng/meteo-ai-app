@@ -111,6 +111,7 @@ describe("buildOfficialWeatherSnapshot", () => {
       tempMax: 24.1,
       tempMin: 13.2,
       precipitation: 1.4,
+      precipitationConsensus: null,
       windSpeed: 18,
       condition: "Nuageux",
       confidenceScore: 72,

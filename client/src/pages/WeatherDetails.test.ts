@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url), "utf8");
+const precipitationSummarySource = readFileSync(new URL("../components/weather/PrecipitationConsensusSummary.tsx", import.meta.url), "utf8");
 
 describe("page Prévisions détaillées", () => {
   it("conserve le déroulé horaire sans afficher de section Graphiques", () => {
@@ -38,7 +39,7 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("n’est pas comptée parmi les sept modèles horaires officiels");
     expect(source).toContain("Détail horaire non disponible pour cette journée.");
     expect(source).toContain("getSlotAgreementConfidence");
-    expect(source).toContain("Accord des modèles {value}%");
+    expect(source).toContain("Indice d’accord descriptif {value}%");
     expect(source).toContain("!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px]");
     expect(source).toContain('border px-3 pb-4 pt-3 transition-colors');
     expect(source).toContain('px-2 pb-1 scrollbar-hide snap-x');
@@ -78,8 +79,15 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("Moyenne pondérée officielle");
     expect(source).toContain("écart-type population");
     expect(source).toContain("Fréquence modèle pluie");
-    expect(source).toContain("Quantité conditionnelle pondérée");
+    expect(source).toContain("Quantité conditionnelle pondérée parmi les modèles pluvieux");
+    expect(source).toContain("Estimation de quantité = fréquence brute × quantité conditionnelle");
     expect(source).toContain("non calibrée comme probabilité météorologique");
+    expect(source).toContain("PrecipitationConsensusSummary");
+    expect(precipitationSummarySource).toContain("Seuil : ≥");
+    expect(precipitationSummarySource).toContain("summary.rainModelCount");
+    expect(precipitationSummarySource).toContain("summary.availableModelCount");
+    expect(precipitationSummarySource).toMatch(/modèles\s+disponibles/);
+    expect(precipitationSummarySource).toContain("ce ne sont pas des probabilités météorologiques calibrées");
     expect(source).not.toContain("precipAgreement");
     expect(source).not.toContain("tempSpread");
     expect(source).toContain("Accord par paramètre");

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./HourlyChart.tsx", import.meta.url), "utf8");
+const precipitationSummarySource = readFileSync(new URL("./weather/PrecipitationConsensusSummary.tsx", import.meta.url), "utf8");
 
 describe("HourlyChart", () => {
   it("présente les échelles avec une seule courbe de température par heure", () => {
@@ -105,10 +106,12 @@ describe("HourlyChart", () => {
     expect(source).toContain("dispersion?.windDirection.range");
     expect(source).toContain("dispersion?.humidity.range");
     expect(source).toContain("dispersion?.cloudCover.range");
-    expect(source).toContain("Fréquence modèle pluie");
+    expect(source).toContain("PrecipitationConsensusSummary");
+    expect(precipitationSummarySource).toContain("Fréquence / estimation de consensus des modèles");
     expect(source).toContain("rainModelCount");
     expect(source).toContain("frequencyPercent");
-    expect(source).toContain("non calibrée comme probabilité");
+    expect(source).toContain("n’est pas une probabilité météorologique calibrée");
+    expect(precipitationSummarySource).toContain("ce ne sont pas des probabilités météorologiques calibrées");
     expect(source).not.toContain("tempSpread");
     expect(source).not.toContain("precipAgreement");
     expect(source).toContain("Humidité & nuages");

@@ -5,6 +5,7 @@ import { getHourlyConditionLabel } from "@/lib/hourlyConditionLabel";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLabelLanes";
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
+import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import type { HourlyMultiModelMetrics } from "@shared/hourlyModelMetrics";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -269,20 +270,10 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
 
           {/* Précipitations */}
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
-            <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Quantité officielle pondérée</span></div>
+            <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Estimation de consensus</span></div>
             <p className="text-sm font-bold text-blue-400">{hour.precipitation != null ? `${hour.precipitation.toFixed(1)} mm` : "—"}</p>
             {hour.precipType ? <p className="mt-0.5 text-[10px] text-slate-500">{hour.precipType === "snow" ? "Neige" : hour.precipType === "freezing_rain" ? "Pluie verglaçante" : "Pluie"}{hour.precipIntensity ? ` · ${hour.precipIntensity === "heavy" ? "forte" : hour.precipIntensity === "moderate" ? "modérée" : "faible"}` : ""}</p> : null}
-            {precipitationMetrics && (
-              <div className="mt-1">
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[9px] text-slate-500">Modèles avec pluie (≥0,1 mm)</span>
-                  <span className={`text-[10px] font-bold ${((precipitationMetrics.frequencyPercent ?? 0) >= 70) ? 'text-blue-400' : ((precipitationMetrics.frequencyPercent ?? 0) >= 30) ? 'text-yellow-400' : 'text-slate-400'}`}>{precipitationMetrics.rainModelCount}/{precipitationMetrics.availableModelCount} · {precipitationMetrics.frequencyPercent == null ? "—" : `${precipitationMetrics.frequencyPercent.toFixed(0)}%`}</span>
-                </div>
-                <p className="text-[9px] text-slate-400">Fréquence modèle, non calibrée comme probabilité · valeurs valides {precipitationMetrics.availableModelCount}/{metrics?.expectedModelCount ?? 7}</p>
-                {precipitationMetrics.frequencyPercent != null && <div className="mt-1 bg-slate-700 rounded-full h-1 overflow-hidden"><div className="h-full bg-blue-400 rounded-full" style={{ width: `${precipitationMetrics.frequencyPercent}%` }} /></div>}
-                <p className="mt-1 text-[9px] text-slate-400">Quantité conditionnelle pondérée : {precipitationMetrics.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics.conditionalWeightedMean == null ? "indisponible sans poids historiques qualifiés" : `${precipitationMetrics.conditionalWeightedMean.toFixed(1)} mm`}</p>
-              </div>
-            )}
+            <div className="mt-2"><PrecipitationConsensusSummary summary={precipitationMetrics} compact={false} /></div>
           </div>
 
           {/* Humidité */}

@@ -2,6 +2,7 @@ import { makeLocationKey } from "./db";
 import { getParisDate, getParisHour } from "./weatherTime";
 import { collect15DayForecast, type DayForecast, type HourlyPoint } from "./weatherServices";
 import { collectOfficialHourlyForecast, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
+import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
 export type OfficialWeatherSnapshot = {
   locationKey: string;
@@ -25,6 +26,7 @@ export type DatedDailyFusionFallback = {
   tempMax: number | null;
   tempMin: number | null;
   precipitation: number | null;
+  precipitationConsensus: PrecipitationModelConsensus | null;
   windSpeed: number | null;
   condition: string | null;
   confidenceScore: number | null;
@@ -45,7 +47,10 @@ type DailyFusionSource = {
  * Keeps a persisted daily fusion distinct from the live hourly forecast. The
  * caller must expose this object only when no hourly point is available.
  */
-export function buildDatedDailyFusionFallback(source: DailyFusionSource | null | undefined): DatedDailyFusionFallback | null {
+export function buildDatedDailyFusionFallback(
+  source: DailyFusionSource | null | undefined,
+  precipitationConsensus?: PrecipitationModelConsensus | null,
+): DatedDailyFusionFallback | null {
   if (!source) return null;
   const computedAt = source.computedAt instanceof Date ? source.computedAt : new Date(source.computedAt);
   if (!Number.isFinite(computedAt.getTime())) return null;
@@ -56,6 +61,7 @@ export function buildDatedDailyFusionFallback(source: DailyFusionSource | null |
     tempMax: source.tempMax,
     tempMin: source.tempMin,
     precipitation: source.precipitation,
+    precipitationConsensus: precipitationConsensus ?? null,
     windSpeed: source.windSpeed,
     condition: source.condition,
     confidenceScore: source.confidenceScore,

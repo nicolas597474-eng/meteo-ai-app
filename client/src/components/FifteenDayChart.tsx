@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset, Gauge, Navigation, Eye, MapPin } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
+import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
+import type { PrecipitationModelConsensus } from "@shared/precipitationConsensus";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, getLabelBelowCurveY, TEMPERATURE_LABEL_ABOVE_GAP, TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE } from "@/lib/chartLabelLanes";
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
@@ -12,6 +14,7 @@ export interface DayData {
   tempMax: number | null;
   tempMin: number | null;
   precipitation: number | null;
+  precipitationConsensus?: PrecipitationModelConsensus;
   windSpeed: number | null;
   windGust: number | null;
   windDirection: number | null;
@@ -162,7 +165,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
         <div className="mb-4 grid grid-cols-3 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03]">
           <div className="border-r border-white/8 px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Max.</p><p className="mt-0.5 text-base font-bold text-orange-300">{day.tempMax != null ? `${day.tempMax}°` : "—"}</p></div>
           <div className="border-r border-white/8 px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Min.</p><p className="mt-0.5 text-base font-bold text-blue-300">{day.tempMin != null ? `${day.tempMin}°` : "—"}</p></div>
-          <div className="px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Pluie</p><p className="mt-0.5 text-base font-bold text-sky-300">{day.precipitation ?? 0} mm</p></div>
+          <div className="px-3 py-2.5 text-center"><p className="text-[9px] uppercase tracking-wide text-slate-500">Estimation pluie</p><p className="mt-0.5 text-base font-bold text-sky-300">{day.precipitation == null ? "—" : `${day.precipitation.toFixed(1)} mm`}</p></div>
         </div>
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Paramètres météo</p>
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
@@ -171,7 +174,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           <DetailCard icon={<MeteoIcon name="wind_param" size={17} className="shrink-0" />} label="Vent moyen" value={<>{day.windSpeed ?? "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
           <DetailCard icon={<Wind className="h-3.5 w-3.5 text-orange-400" />} label="Rafales" value={<>{day.windGust != null ? Math.round(day.windGust) : "—"} <span className="text-[10px] text-slate-400">km/h</span></>} />
           <DetailCard icon={<Navigation className="h-3.5 w-3.5 text-sky-400" style={{ transform: `rotate(${(day.windDirection ?? 0) + 180}deg)` }} />} label="Direction" value={<>{degToCompass(day.windDirection)} <span className="text-[10px] text-slate-500">{day.windDirection != null ? `${Math.round(day.windDirection)}°` : ""}</span></>} />
-          <DetailCard icon={<Droplets className="h-3.5 w-3.5 text-blue-400" />} label="Précipitations" value={<span className="text-blue-400">{day.precipitation ?? 0} mm</span>} />
+          <DetailCard icon={<Droplets className="h-3.5 w-3.5 text-blue-400" />} label="Estimation pluie (consensus)" value={<span className="text-blue-400">{day.precipitation == null ? "—" : `${day.precipitation.toFixed(1)} mm`}</span>} />
           <DetailCard icon={<MeteoIcon name="humidity" size={17} className="shrink-0" />} label="Humidité" value={<span className="text-cyan-400">{day.humidity != null ? `${Math.round(day.humidity)}%` : "—"}</span>} />
           <DetailCard icon={<Sun className="h-3.5 w-3.5 text-yellow-400" />} label="Indice UV" value={<><span className={uv.color}>{day.uvIndex != null ? Math.round(day.uvIndex) : "—"}</span> <span className={`text-[10px] ${uv.color}`}>{uv.text}</span></>} />
           <DetailCard icon={<Cloud className="h-3.5 w-3.5 text-slate-400" />} label="Nébulosité" value={<>{day.cloudCover != null ? `${Math.round(day.cloudCover)}%` : "—"}</>} />
@@ -188,6 +191,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
             </div>
           </div>
         </div>
+        <div className="mt-3"><PrecipitationConsensusSummary summary={day.precipitationConsensus} /></div>
     </section>
   );
 }
@@ -404,7 +408,8 @@ export default function FifteenDayChart({ days, locationName }: Props) {
     const precipBarTop = precipZoneTop + precipLabelBand;
     const precipH = precipZoneBot - precipBarTop;
     displayDays.slice(0, visibleN).forEach((d, i) => {
-      const p = d.precipitation ?? 0;
+      const p = d.precipitation;
+      if (p == null) return;
       const x = colX(i);
       ctx.fillStyle = p > 0 ? "#93c5fd" : "rgba(147,197,253,0.66)";
       ctx.font = "bold 11px system-ui";

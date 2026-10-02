@@ -5,6 +5,7 @@ import type { HourlyForecastRunValue } from "../drizzle/schema";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { getParisDateDaysAgo } from "./weatherTime";
+import { PRECIPITATION_RAIN_THRESHOLD_MM, summarizePrecipitationModels } from "../shared/precipitationConsensus";
 import {
   HONDEGHEM,
   OFFICIAL_HOURLY_MODELS,
@@ -392,8 +393,10 @@ function computeVariableForecastValue(
   horizonWeights: HorizonWeights,
 ): VariableForecastValue {
   const field = FORECAST_FIELD_BY_VARIABLE[variable];
-  const modelValuesWithData = modelValues.filter(({ hour }) => isFiniteNumber(hour[field]));
-  const modelsWithData = modelValuesWithData.map(({ modelName }) => modelName);
+  const availableModelValues = modelValues.filter(({ hour }) => isFiniteNumber(hour[field]));
+  const modelValuesWithData = availableModelValues.filter(({ hour }) => variable !== "precipitation"
+    || hour.precipitation! >= PRECIPITATION_RAIN_THRESHOLD_MM);
+  const modelsWithData = availableModelValues.map(({ modelName }) => modelName);
   if (horizonWeights.method !== "historical_skill") {
     return {
       value: null,
@@ -414,7 +417,7 @@ function computeVariableForecastValue(
       weighting: {
         variable,
         method: "unavailable",
-        unavailableReason: "no_model_data",
+        unavailableReason: variable === "precipitation" && modelsWithData.length > 0 ? "no_wet_models" : "no_model_data",
         modelsWithData,
         modelWeights: [],
         minimumComparisons: horizonWeights.minimumComparisons,
@@ -492,7 +495,16 @@ function makePoint(
 
   const valueFor = (variable: OfficialHourlyVariable) => variableValues.get(variable)?.value ?? null;
   const temperature = valueFor("temperature");
-  const precipitation = valueFor("precipitation");
+  const precipitationWeighting = variableValues.get("precipitation")!.weighting;
+  const precipitationMetrics = summarizePrecipitationModels(
+    modelValues.map(({ modelName, hour }) => ({ modelName, amountMm: hour.precipitation })),
+    OFFICIAL_HOURLY_MODEL_NAMES,
+    {
+      conditionalMeanMm: valueFor("precipitation"),
+      conditionalMeanMethod: precipitationWeighting.method === "historical_skill" ? "historical_skill" : "unavailable",
+    },
+  );
+  const precipitation = precipitationMetrics.consensusEstimateMm;
   const windSpeed = valueFor("wind_speed");
   const windGust = valueFor("wind_gust");
   const humidity = valueFor("humidity");
@@ -517,19 +529,6 @@ function makePoint(
   const comparisonCounts = variableWeightings.flatMap((item) => item.method === "historical_skill" && item.minimumComparisons != null ? [item.minimumComparisons] : []);
   const comparableDayCounts = variableWeightings.flatMap((item) => item.method === "historical_skill" && item.minimumComparableDays != null ? [item.minimumComparableDays] : []);
   const modelsWithData = Array.from(new Set(available.map(({ modelName }) => modelName)));
-  const precipitationModels = modelValues.filter(({ hour }) => isFiniteNumber(hour.precipitation));
-  const wetPrecipitationModels = precipitationModels.filter(({ hour }) => hour.precipitation! >= 0.1);
-  const precipitationAgreementFrequency = precipitationModels.length > 0
-    ? (wetPrecipitationModels.length / precipitationModels.length) * 100
-    : null;
-  const precipitationWeighting = variableValues.get("precipitation")!.weighting;
-  const precipitationWeights = new Map(precipitationWeighting.modelWeights.map(({ modelName, weight }) => [modelName as OfficialHourlyModelName, weight] as const));
-  const conditionalWeightedPrecipitation = precipitationWeighting.method === "historical_skill" && wetPrecipitationModels.length > 0
-    ? weightedMean(wetPrecipitationModels.map(({ modelName, hour }) => ({
-        value: hour.precipitation,
-        weight: precipitationWeights.get(modelName) ?? 0,
-      })))
-    : null;
   const windSpeedSummary = summarizeModelValues(modelValues.map(({ hour }) => hour.windSpeed));
   const windGustSummary = summarizeModelValues(modelValues.map(({ hour }) => hour.windGusts));
   const windDirectionValues = modelValues.map(({ hour }) => hour.windDirection);
@@ -577,15 +576,7 @@ function makePoint(
         minModel: temperatureExtremes[0]?.name ?? null,
         maxModel: temperatureExtremes.at(-1)?.name ?? null,
       },
-      precipitation: {
-        rainThresholdMm: 0.1,
-        rainModelCount: wetPrecipitationModels.length,
-        availableModelCount: precipitationModels.length,
-        frequencyPercent: precipitationAgreementFrequency,
-        conditionalWeightedMean: conditionalWeightedPrecipitation,
-        modelsWithData: precipitationModels.map(({ modelName }) => modelName),
-        modelsPredictingRain: wetPrecipitationModels.map(({ modelName }) => modelName),
-      },
+      precipitation: precipitationMetrics,
       dispersion: {
         windSpeed: { range: windSpeedSummary.range, availableModelCount: windSpeedSummary.availableModelCount },
         windGust: { range: windGustSummary.range, availableModelCount: windGustSummary.availableModelCount },

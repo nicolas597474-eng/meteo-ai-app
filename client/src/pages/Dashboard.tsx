@@ -19,6 +19,7 @@ import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
+import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import { getCollectionHealth, formatCollectionDuration } from "@/lib/collectionHealth";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
@@ -933,9 +934,15 @@ export default function Dashboard() {
             <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700`}>
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                  <Droplets className="h-3 w-3" />Précip.
+                  <Droplets className="h-3 w-3" />Estimation pluie
                 </p>
                 <p className="text-sm font-semibold sm:text-lg">{isDailyFallback ? dailyFallback.precipitation ?? "—" : today?.precipitation ?? meteoAI?.precipitation ?? "—"} mm</p>
+                <div className="mt-1 text-left">
+                  <PrecipitationConsensusSummary
+                    summary={isDailyFallback ? dailyFallback.precipitationConsensus : today?.precipitationConsensus}
+                    compact
+                  />
+                </div>
               </div>
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
