@@ -3821,5 +3821,5 @@
 - [x] Rendre les sorties officielles et leur confiance nulles avant qualification ; masquer les anciennes traces v1 du jour courant sans altérer l’historique.
 - [x] Ajouter la migration additive `0045_daily_fusion_performance.sql` et ses métadonnées Drizzle. Migration seulement générée localement ; aucune base de données n’a été migrée.
 - [x] Ajouter les tests ciblés, dont 0,6 °C/12 dates contre 0,8 °C/500, horizons/variables distincts, plafonnement, normalisation, absence de modèle, archives et compatibilité v1/v2.
-- [x] `pnpm check` et build réussis ; 36 tests ciblés réussis. Vitest complet : 653 réussis, 2 ignorés, 7 échecs préexistants reproduits sur `main` (secrets Netatmo absents et données semées manquantes dans `weather.test.ts`).
-- [x] Commit français `3ae00c6`, push de la branche dédiée et PR [#17](https://github.com/nicolas597474-eng/meteo-ai-app/pull/17) ouverte ; aucune fusion ni aucun déploiement.
+- [x] `pnpm check` et build réussis ; 37 tests ciblés réussis. Vitest complet : 654 réussis, 2 ignorés, 7 échecs préexistants reproduits sur `main` (secrets Netatmo absents et données semées manquantes dans `weather.test.ts`).
+- [x] Commits français `3ae00c6`, `29ca366`, `5a99534`, branche dédiée poussée et PR [#17](https://github.com/nicolas597474-eng/meteo-ai-app/pull/17) ouverte ; aucune fusion ni aucun déploiement.
