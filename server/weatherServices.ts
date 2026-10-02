@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weatherConditionLabels";
 import { fetchWeather, getWeatherResponseAttemptCount } from "./weatherFetch";
 import { getParisDateAndHour } from "./parisHourlyTime";
+import type { HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
 
 // Hondeghem coordinates
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
@@ -305,40 +306,9 @@ export type HourlyPoint = {
   cloudHigh?: number | null;       // %
   precipType?: string | null;      // rain, snow, freezing_rain, etc.
   precipIntensity?: string | null; // light, moderate, heavy
-  // Multi-model spread (optional, populated when available)
-  tempSpread?: number | null;    // Max - Min across models (°C)
-  windSpeedSpread?: number | null; // Écart de vent moyen entre modèles (km/h)
-  windGustSpread?: number | null; // Écart de rafales entre modèles (km/h)
-  windDirectionDifference?: number | null; // Écart angulaire minimal entre modèles (°)
-  humiditySpread?: number | null;  // Écart d’humidité relative entre modèles (points %)
-  cloudCoverSpread?: number | null; // Écart de nébulosité entre modèles (points %)
-  precipAgreement?: number | null; // % de modèles comparés prévoyant de la pluie
-  modelCount?: number;           // Number of models contributing
-  temperatureComparison?: {
-    lower: { name: string; temperature: number };
-    higher: { name: string; temperature: number };
-    rationale: string;
-  } | null;
+  /** Only the official seven-model engine populates these source-tagged metrics. */
+  multiModelMetrics?: HourlyMultiModelMetrics | null;
 };
-
-export function buildHourlyTemperatureComparison(bestTemp: number | null, aromeTemp: number | null) {
-  if (bestTemp == null || aromeTemp == null) return null;
-  const compared = [
-    {
-      name: "Open-Meteo Best Match",
-      temperature: bestTemp,
-    },
-    {
-      name: "AROME",
-      temperature: aromeTemp,
-    },
-  ].sort((left, right) => left.temperature - right.temperature);
-  return {
-    lower: compared[0],
-    higher: compared[1],
-    rationale: "Ces deux contributeurs horaires sont les seules valeurs effectivement reçues par la collecte live pour mesurer l’écart thermique. Cette comparaison n’est pas un classement de fiabilité.",
-  };
-}
 
 /** Une direction est circulaire : 350° et 10° sont proches du nord, pas du sud. */
 export function circularMeanDegrees(values: readonly number[]): number | null {
@@ -494,15 +464,6 @@ export async function collectHourlyForecast(
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
 
-    const aromeUrl = new URL("https://api.open-meteo.com/v1/forecast");
-    aromeUrl.searchParams.set("latitude", location.lat.toString());
-    aromeUrl.searchParams.set("longitude", location.lon.toString());
-    aromeUrl.searchParams.set("hourly", "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,cloud_cover");
-    aromeUrl.searchParams.set("timezone", "Europe/Paris");
-    aromeUrl.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
-    aromeUrl.searchParams.set("models", "meteofrance_arome_france_hd");
-    const aromeResponse = fetchWeather(aromeUrl.toString(), {}, { timeoutMs: 5_000, attempts: 1 }).catch(() => null);
-
     const response = await fetchWeather(url.toString(), {}, { timeoutMs: 8_000, attempts: 1 });
     if (!response.ok) return [];
 
@@ -510,34 +471,7 @@ export async function collectHourlyForecast(
     const hourly = data.hourly;
     if (!hourly?.time) return [];
 
-    // Fetch a second model (AROME) for spread estimation
-    let aromeTemps: (number | null)[] = [];
-    let aromePrecips: (number | null)[] = [];
-    let aromeWinds: (number | null)[] = [];
-    let aromeGusts: (number | null)[] = [];
-    let aromeDirections: (number | null)[] = [];
-    let aromeHumidities: (number | null)[] = [];
-    let aromeClouds: (number | null)[] = [];
-    try {
-      const aromeResp = await aromeResponse;
-      if (aromeResp?.ok) {
-        const aromeData = await aromeResp.json();
-        if (aromeData.hourly?.time) {
-          for (let j = 0; j < aromeData.hourly.time.length; j++) {
-            aromeTemps.push(aromeData.hourly.temperature_2m?.[j] ?? null);
-            aromePrecips.push(aromeData.hourly.precipitation?.[j] ?? null);
-            aromeWinds.push(aromeData.hourly.wind_speed_10m?.[j] ?? null);
-            aromeGusts.push(aromeData.hourly.wind_gusts_10m?.[j] ?? null);
-            aromeDirections.push(aromeData.hourly.wind_direction_10m?.[j] ?? null);
-            aromeHumidities.push(aromeData.hourly.relative_humidity_2m?.[j] ?? null);
-            aromeClouds.push(aromeData.hourly.cloud_cover?.[j] ?? null);
-          }
-        }
-      }
-    } catch { /* AROME optional */ }
-
     const points: HourlyPoint[] = [];
-    let aromeIdx = 0;
     for (let i = 0; i < hourly.time.length; i++) {
       const dt = hourly.time[i]; // "2026-07-05T14:00"
       const date = dt.slice(0, 10);
@@ -546,37 +480,10 @@ export async function collectHourlyForecast(
       const cloud = hourly.cloud_cover?.[i] ?? null;
       const weatherCode = hourly.weather_code?.[i] ?? null;
       const bestTemp = hourly.temperature_2m?.[i] ?? null;
-      const aromeTemp = aromeTemps[aromeIdx] ?? null;
-      const aromePrecip = aromePrecips[aromeIdx] ?? null;
-      const aromeWind = aromeWinds[aromeIdx] ?? null;
-      const aromeGust = aromeGusts[aromeIdx] ?? null;
-      const aromeDirection = aromeDirections[aromeIdx] ?? null;
-      const aromeHumidity = aromeHumidities[aromeIdx] ?? null;
-      const aromeCloud = aromeClouds[aromeIdx] ?? null;
-      aromeIdx++;
-
-      // Spread: difference between best_match and AROME
-      const tempSpread = (bestTemp != null && aromeTemp != null)
-        ? Math.abs(bestTemp - aromeTemp)
-        : null;
-      const temperatureComparison = buildHourlyTemperatureComparison(bestTemp, aromeTemp);
       const windSpeed = hourly.wind_speed_10m?.[i] ?? null;
       const windGust = hourly.wind_gusts_10m?.[i] ?? null;
       const windDirection = hourly.wind_direction_10m?.[i] ?? null;
       const humidity = hourly.relative_humidity_2m?.[i] ?? null;
-      const windSpeedSpread = windSpeed != null && aromeWind != null ? Math.abs(windSpeed - aromeWind) : null;
-      const windGustSpread = windGust != null && aromeGust != null ? Math.abs(windGust - aromeGust) : null;
-      const windDirectionDifference = circularDifferenceDegrees(windDirection, aromeDirection);
-      const humiditySpread = humidity != null && aromeHumidity != null ? Math.abs(humidity - aromeHumidity) : null;
-      const cloudCoverSpread = cloud != null && aromeCloud != null ? Math.abs(cloud - aromeCloud) : null;
-      // Accord de détection de pluie entre les deux modèles réellement comparés.
-      // Ce n'est pas une probabilité calibrée ni une probabilité d'ensemble.
-      const bestRain = (precip ?? 0) >= 0.1;
-      const aromeRain = (aromePrecip ?? 0) >= 0.1;
-      const modelCount = aromeTemp != null ? 2 : 1;
-      const precipAgreement = modelCount === 2
-        ? (bestRain && aromeRain ? 100 : (bestRain || aromeRain ? 50 : 0))
-        : (bestRain ? 100 : 0);
 
       // Derive precipitation type and intensity
       const snowfall = hourly.snowfall?.[i] ?? 0;
@@ -612,16 +519,6 @@ export async function collectHourlyForecast(
         cloudHigh: hourly.cloud_cover_high?.[i] ?? null,
         precipType,
         precipIntensity,
-        // Multi-model
-        tempSpread,
-        windSpeedSpread,
-        windGustSpread,
-        windDirectionDifference,
-        humiditySpread,
-        cloudCoverSpread,
-        precipAgreement,
-        modelCount,
-        temperatureComparison,
       });
     }
 

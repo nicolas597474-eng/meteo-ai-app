@@ -133,7 +133,16 @@ describe("computeOfficialHourlyForecast", () => {
     );
 
     expect(result.hours).toHaveLength(1);
-    expect(result.hours[0].modelCount).toBe(7);
+    expect(result.hours[0].multiModelMetrics?.temperature.availableModelCount).toBe(7);
+    expect(result.hours[0].multiModelMetrics?.source).toBe("official_seven_models");
+    expect(result.hours[0].multiModelMetrics?.bestMatchIncluded).toBe(false);
+    expect(result.hours[0].multiModelMetrics?.temperature.min).toBe(8);
+    expect(result.hours[0].multiModelMetrics?.temperature.max).toBe(14);
+    expect(result.hours[0].multiModelMetrics?.temperature.median).toBe(11);
+    expect(result.hours[0].multiModelMetrics?.temperature.standardDeviation).toBeCloseTo(2, 10);
+    expect(result.hours[0].multiModelMetrics?.temperature.range).toBe(6);
+    expect(result.hours[0].multiModelMetrics?.temperature.weightedMean).toBe(result.hours[0].temp);
+    expect(result.hours[0].multiModelMetrics?.modelsExpected).toEqual(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
     expect(result.hours[0].temp).toBeLessThan(11);
     expect(result.hours[0].forecastWeighting?.method).toBe("mixed");
     expect(result.hours[0].forecastWeighting?.horizonBucket).toBe("6_24h");
@@ -141,6 +150,13 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.hours[0].forecastWeighting?.unavailableVariables).toContain("wind_speed");
     expect(result.hours[0].forecastWeighting?.variableWeightings).toHaveLength(6);
     expect(result.hours[0].precipitation).toBeNull();
+    expect(result.hours[0].multiModelMetrics?.precipitation).toMatchObject({
+      rainThresholdMm: 0.1,
+      rainModelCount: 1,
+      availableModelCount: 7,
+      conditionalWeightedMean: null,
+    });
+    expect(result.hours[0].multiModelMetrics?.precipitation.frequencyPercent).toBeCloseTo(100 / 7, 10);
     expect(result.hours[0].windSpeed).toBeNull();
     expect(result.hours[0].apparentTemp).toBeNull();
     const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
@@ -155,6 +171,80 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.weighting.modelsConsidered).not.toContain("best_match");
     expect(result.weighting.modelsWithData).toHaveLength(7);
     expect(result.weighting.status).toBe("mixed");
+  });
+
+  it("calcule la quantité conditionnelle uniquement parmi les modèles pluvieux et avec leurs poids historiques", () => {
+    const forecasts = modelForecasts().map((model, index) => ({
+      ...model,
+      hours: [{ ...model.hours[0], precipitation: index === 1 ? 0.1 : index === 6 ? 0.4 : 0 }],
+    }));
+    const result = computeOfficialHourlyForecast(forecasts, [
+      ...historicalScores("temperature"),
+      ...historicalScores("precipitation"),
+    ]);
+    const metrics = result.hours[0].multiModelMetrics!.precipitation;
+    const weights = variableWeighting(result, "precipitation")!.modelWeights;
+    const arpegeWeight = weights.find((item) => item.modelName === OFFICIAL_HOURLY_MODELS[1]!.name)!.weight;
+    const ukmetWeight = weights.find((item) => item.modelName === OFFICIAL_HOURLY_MODELS[6]!.name)!.weight;
+
+    expect(metrics).toMatchObject({
+      rainModelCount: 2,
+      availableModelCount: 7,
+      frequencyPercent: (2 / 7) * 100,
+      modelsPredictingRain: [OFFICIAL_HOURLY_MODELS[1]!.name, OFFICIAL_HOURLY_MODELS[6]!.name],
+    });
+    expect(metrics.conditionalWeightedMean).toBeCloseTo((0.1 * arpegeWeight + 0.4 * ukmetWeight) / (arpegeWeight + ukmetWeight), 10);
+  });
+
+  it("exclut null et non-finis, mais conserve zéro et le seuil de pluie de 0,1 mm", () => {
+    const forecasts = modelForecasts().map((model, index) => ({
+      ...model,
+      hours: [{
+        ...model.hours[0],
+        temperature: index === 0 ? 0 : index === 1 ? null : index === 2 ? Number.NaN : 10 + index,
+        precipitation: index === 0 ? 0 : index === 1 ? 0.1 : index === 2 ? 0.3 : index === 3 ? null : 0,
+      }],
+    }));
+    const result = computeOfficialHourlyForecast(forecasts, [
+      ...historicalScores("temperature"),
+      ...historicalScores("precipitation"),
+    ]);
+    const metrics = result.hours[0].multiModelMetrics!;
+
+    expect(metrics.temperature).toMatchObject({ min: 0, max: 16, median: 14, range: 16, availableModelCount: 5 });
+    expect(metrics.temperature.modelsWithData).toEqual([
+      OFFICIAL_HOURLY_MODELS[0]!.name,
+      OFFICIAL_HOURLY_MODELS[3]!.name,
+      OFFICIAL_HOURLY_MODELS[4]!.name,
+      OFFICIAL_HOURLY_MODELS[5]!.name,
+      OFFICIAL_HOURLY_MODELS[6]!.name,
+    ]);
+    expect(metrics.precipitation).toMatchObject({
+      rainModelCount: 2,
+      availableModelCount: 6,
+      frequencyPercent: (2 / 6) * 100,
+      modelsWithData: OFFICIAL_HOURLY_MODELS.filter((_, index) => index !== 3).map((model) => model.name),
+      modelsPredictingRain: [OFFICIAL_HOURLY_MODELS[1]!.name, OFFICIAL_HOURLY_MODELS[2]!.name],
+    });
+    expect(metrics.precipitation.conditionalWeightedMean).not.toBeNull();
+  });
+
+  it("ne calcule pas de dispersion avec un seul modèle température valide", () => {
+    const forecasts = modelForecasts().map((model, index) => ({
+      ...model,
+      hours: [{ ...model.hours[0], temperature: index === 0 ? 0 : null }],
+    }));
+    const result = computeOfficialHourlyForecast(forecasts, historicalScores());
+
+    expect(result.hours[0].multiModelMetrics?.temperature).toMatchObject({
+      min: 0,
+      max: 0,
+      median: 0,
+      weightedMean: 0,
+      standardDeviation: null,
+      range: null,
+      availableModelCount: 1,
+    });
   });
 
   it("laisse la valeur officielle indisponible sous le seuil et n’émet aucun poids arbitraire", () => {
@@ -228,7 +318,7 @@ describe("computeOfficialHourlyForecast", () => {
     const result = computeOfficialHourlyForecast(forecasts, historicalScores());
     const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
 
-    expect(result.hours[0].modelCount).toBe(6);
+    expect(result.hours[0].multiModelMetrics?.temperature.availableModelCount).toBe(6);
     expect(weights).toHaveLength(6);
     expect(weights.some((item) => item.modelName === "UKMET")).toBe(false);
     expect(variableWeighting(result, "temperature")?.modelsWithData).not.toContain("UKMET");
