@@ -18,8 +18,12 @@ describe("History", () => {
     expect(source).toContain("showAllDays");
     expect(source).toContain("Afficher les");
     expect(source).toContain("Référence réelle");
-    expect(source).toContain("Observation indisponible");
     expect(source).toContain("Comparaison en attente");
+  });
+
+  it("n’affiche pas un écart MeteoAI nul lorsque la prévision est absente", () => {
+    expect(source).toContain("getMeteoAIComparisonLabel");
+    expect(source).not.toContain("Math.abs(meteoAIErr ?? 0)");
   });
 
   it("conserve l’état d’historique en constitution sans réintroduire des scores par échéance", () => {

@@ -35,4 +35,25 @@ describe("compareTraceWeights", () => {
     expect(icon.status).toBe("added");
     expect(icon.delta).toBeCloseTo(0.5);
   });
+
+  it("utilise la présence de la source plutôt que son poids pour qualifier ajout ou retrait", () => {
+    const comparison = compareTraceWeights(
+      { parameterSources: { temperature: [
+        { id: "a", name: "AROME", finalWeight: 0 },
+        { id: "b", name: "ECMWF", finalWeight: 0.4 },
+        { id: "d", name: "GEM", finalWeight: 0 },
+      ] } },
+      { parameterSources: { temperature: [
+        { id: "a", name: "AROME", finalWeight: 0 },
+        { id: "b", name: "ECMWF", finalWeight: 0 },
+        { id: "c", name: "ICON", finalWeight: 0 },
+      ] } },
+    );
+    const temperature = comparison.find((entry) => entry.parameter === "temperature")!;
+
+    expect(temperature.sourceChanges.find((source) => source.name === "AROME")?.status).toBe("retained");
+    expect(temperature.sourceChanges.find((source) => source.name === "ECMWF")?.status).toBe("retained");
+    expect(temperature.sourceChanges.find((source) => source.name === "GEM")?.status).toBe("removed");
+    expect(temperature.sourceChanges.find((source) => source.name === "ICON")?.status).toBe("added");
+  });
 });
