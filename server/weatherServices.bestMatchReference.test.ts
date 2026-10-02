@@ -6,7 +6,7 @@ vi.mock("./weatherFetch", () => ({
 }));
 
 import { fetchWeather } from "./weatherFetch";
-import { collect15DayForecast, collectHourlyForecast } from "./weatherServices";
+import { collect15DayForecast, collectCurrentWeatherSnapshot, collectHourlyForecast } from "./weatherServices";
 
 const mockedFetchWeather = vi.mocked(fetchWeather);
 
@@ -21,24 +21,32 @@ function response(body: unknown) {
 describe("collectHourlyForecast auxiliaire", () => {
   beforeEach(() => mockedFetchWeather.mockReset());
 
-  it("ne publie aucune métrique multi-modèle depuis Best Match et conserve les zéros valides", async () => {
+  it("préserve les prévisions des échéances active et future sans demander ni injecter current", async () => {
     mockedFetchWeather.mockResolvedValue(response({
+      current: {
+        time: Date.parse("2026-10-01T09:45:00.000Z") / 1000,
+        temperature_2m: 99,
+      },
       hourly: {
-        time: ["2026-10-01T12:00"],
-        temperature_2m: [0],
-        apparent_temperature: [0],
-        precipitation: [0],
-        wind_speed_10m: [0],
-        wind_gusts_10m: [0],
-        wind_direction_10m: [0],
-        cloud_cover: [0],
-        relative_humidity_2m: [0],
-        uv_index: [0],
-        surface_pressure: [1013],
-        dew_point_2m: [0],
-        visibility: [0],
-        shortwave_radiation: [0],
-        weather_code: [0],
+        time: [
+          Date.parse("2026-10-01T08:00:00.000Z") / 1000,
+          Date.parse("2026-10-01T09:00:00.000Z") / 1000,
+          Date.parse("2026-10-01T10:00:00.000Z") / 1000,
+        ],
+        temperature_2m: [9, 11, 12],
+        apparent_temperature: [9, 11, 12],
+        precipitation: [0, 0, 0],
+        wind_speed_10m: [0, 0, 0],
+        wind_gusts_10m: [0, 0, 0],
+        wind_direction_10m: [0, 0, 0],
+        cloud_cover: [0, 0, 0],
+        relative_humidity_2m: [0, 0, 0],
+        uv_index: [0, 0, 0],
+        surface_pressure: [1013, 1013, 1013],
+        dew_point_2m: [0, 0, 0],
+        visibility: [0, 0, 0],
+        shortwave_radiation: [0, 0, 0],
+        weather_code: [0, 0, 0],
       },
     }));
 
@@ -46,13 +54,73 @@ describe("collectHourlyForecast auxiliaire", () => {
       "2026-10-01",
       { lat: 50.7567, lon: 2.5204 },
       1,
-      { includeCurrentSnapshot: false },
+      { now: Date.parse("2026-10-01T09:30:00.000Z") },
     );
 
     expect(mockedFetchWeather).toHaveBeenCalledTimes(1);
-    expect(hours).toHaveLength(1);
-    expect(hours[0]).toMatchObject({ temp: 0, precipitation: 0, windSpeed: 0, humidity: 0 });
+    const request = new URL(String(mockedFetchWeather.mock.calls[0]?.[0]));
+    expect(request.searchParams.has("current")).toBe(false);
+    expect(request.searchParams.get("timeformat")).toBe("unixtime");
+    expect(hours.map(({ hour, temp, validAt }) => [hour, temp, validAt])).toEqual([
+      ["11:00", 11, Date.parse("2026-10-01T09:00:00.000Z")],
+      ["12:00", 12, Date.parse("2026-10-01T10:00:00.000Z")],
+    ]);
     expect(hours[0]?.multiModelMetrics).toBeUndefined();
+  });
+
+  it("retourne le snapshot current avec une provenance modèle explicite", async () => {
+    mockedFetchWeather.mockResolvedValue(response({
+      current: {
+        time: Date.parse("2026-10-01T09:45:00.000Z") / 1000,
+        temperature_2m: 19,
+        apparent_temperature: 18,
+        precipitation: 0,
+        wind_speed_10m: 6,
+        wind_gusts_10m: 9,
+        wind_direction_10m: 180,
+        cloud_cover: 20,
+        relative_humidity_2m: 60,
+        weather_code: 1,
+      },
+    }));
+
+    const snapshot = await collectCurrentWeatherSnapshot({ lat: 50.7567, lon: 2.5204 });
+    const request = new URL(String(mockedFetchWeather.mock.calls[0]?.[0]));
+
+    expect(request.searchParams.has("current")).toBe(true);
+    expect(request.searchParams.has("hourly")).toBe(false);
+    expect(snapshot).toMatchObject({
+      sourceKind: "model_current_snapshot",
+      source: "open-meteo",
+      capturedAt: "2026-10-01T09:45:00.000Z",
+      temp: 19,
+      apparentTemp: 18,
+    });
+  });
+
+  it("conserve les deux échéances 02:00 distinctes lors du retour à l’heure d’hiver", async () => {
+    mockedFetchWeather.mockResolvedValue(response({
+      hourly: {
+        time: [
+          Date.parse("2026-10-24T23:00:00.000Z") / 1000,
+          Date.parse("2026-10-25T00:00:00.000Z") / 1000,
+          Date.parse("2026-10-25T01:00:00.000Z") / 1000,
+        ],
+        temperature_2m: [9, 10, 11],
+      },
+    }));
+
+    const hours = await collectHourlyForecast(
+      "2026-10-25",
+      { lat: 50.7567, lon: 2.5204 },
+      1,
+      { now: Date.parse("2026-10-25T00:30:00.000Z") },
+    );
+
+    expect(hours.map(({ date, hour, temp, validAt }) => [date, hour, temp, validAt])).toEqual([
+      ["2026-10-25", "02:00", 10, Date.parse("2026-10-25T00:00:00.000Z")],
+      ["2026-10-25", "02:00", 11, Date.parse("2026-10-25T01:00:00.000Z")],
+    ]);
   });
 });
 

@@ -21,12 +21,39 @@ describe("validation weather models", () => {
     expect(source).toContain("fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 })");
   });
 
-  it("privilégie les conditions actuelles à 15 minutes et le code météo WMO", () => {
-    const source = readFileSync(new URL("./weatherServices.ts", import.meta.url), "utf8");
-    expect(source).toContain('url.searchParams.set("current"');
-    expect(source).toContain("weather_code");
-    expect(source).toContain("conditionFromWmoWeatherCode");
-    expect(source).toContain('`${current.time.slice(11, 13)}:00`');
-    expect(source).toContain("points[currentIndex]");
+  it("sépare le snapshot modèle current de la série horaire et conserve le code WMO", () => {
+    const source = readFileSync(
+      new URL("./weatherServices.ts", import.meta.url),
+      "utf8"
+    );
+    const hourlyStart = source.indexOf(
+      "export async function collectHourlyForecast("
+    );
+    const currentStart = source.indexOf(
+      "export async function collectCurrentWeatherSnapshot("
+    );
+    const currentEnd = source.indexOf(
+      "export type HourlyModelForecast",
+      currentStart
+    );
+    const hourlySource = source.slice(hourlyStart, currentStart);
+    const currentSnapshotSource = source.slice(currentStart, currentEnd);
+
+    expect(hourlySource).toContain('url.searchParams.set("hourly"');
+    expect(hourlySource).toContain(
+      'url.searchParams.set("timeformat", "unixtime")'
+    );
+    expect(hourlySource).toContain("validAt + 60 * 60_000 <= now");
+    expect(hourlySource).not.toContain('url.searchParams.set("current"');
+    expect(hourlySource).not.toContain("isCurrent");
+    expect(currentSnapshotSource).toContain('url.searchParams.set("current"');
+    expect(currentSnapshotSource).not.toContain(
+      'url.searchParams.set("hourly"'
+    );
+    expect(currentSnapshotSource).toContain(
+      'sourceKind: "model_current_snapshot"'
+    );
+    expect(currentSnapshotSource).toContain("capturedAt");
+    expect(currentSnapshotSource).toContain("conditionFromWmoWeatherCode");
   });
 });

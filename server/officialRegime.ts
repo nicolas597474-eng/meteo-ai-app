@@ -32,6 +32,7 @@ export type CurrentHourlyRegimeForecast = {
 
 export type HourlyRegimePoint = {
   hour: string;
+  validAt?: number | null;
   temp?: number | null;
   precipitation?: number | null;
   windSpeed?: number | null;
@@ -198,11 +199,17 @@ export function findNextHourlyRegimeChange(
   hours: HourlyRegimePoint[],
   currentHour: string,
   currentRegimeId: string,
+  currentValidAt?: number | null,
 ) {
   const currentMinutes = hourToMinutes(currentHour);
-  const currentIndex = currentMinutes == null
-    ? -1
-    : hours.findIndex((point) => hourToMinutes(point.hour) === currentMinutes);
+  const validAtIndex = currentValidAt != null && Number.isFinite(currentValidAt)
+    ? hours.findIndex((point) => point.validAt === currentValidAt)
+    : -1;
+  const currentIndex = validAtIndex >= 0
+    ? validAtIndex
+    : currentMinutes == null
+      ? -1
+      : hours.findIndex((point) => hourToMinutes(point.hour) === currentMinutes);
   const startIndex = currentIndex >= 0
     ? currentIndex
     : currentMinutes == null

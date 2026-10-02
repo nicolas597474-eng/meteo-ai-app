@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, mergeManualHourlyForecast } from "./officialWeatherSnapshot";
+import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, mergeManualHourlyForecast, refreshOfficialWeatherSnapshotForecastWindow } from "./officialWeatherSnapshot";
 
 const unavailableWeighting = {
   status: "unavailable" as const,
@@ -13,8 +13,24 @@ const unavailableWeighting = {
   horizons: [],
 };
 
+const modelCurrentSnapshot = {
+  sourceKind: "model_current_snapshot" as const,
+  source: "open-meteo" as const,
+  capturedAt: "2026-08-12T12:00:00.000Z",
+  temp: 25,
+  apparentTemp: 24,
+  precipitation: 0,
+  windSpeed: 7,
+  windGust: 10,
+  windDirection: 180,
+  cloudCover: 20,
+  humidity: 55,
+  weatherCode: 1,
+  condition: "Ensoleillé",
+};
+
 describe("buildOfficialWeatherSnapshot", () => {
-  it("sélectionne une unique valeur officielle pour le même lieu et la même heure", () => {
+  it("conserve séparément le snapshot du modèle et la prévision horaire active", () => {
     const snapshot = buildOfficialWeatherSnapshot({
       lat: 50.75646,
       lon: 2.52085,
@@ -23,14 +39,18 @@ describe("buildOfficialWeatherSnapshot", () => {
       hourlyWeighting: unavailableWeighting,
       parisHour: "14",
       hourly: [
-        { hour: "13:00", temp: 21.1, apparentTemp: 21.1, precipitation: 0, windSpeed: 8, windGust: 12, windDirection: 180, cloudCover: 10, humidity: 55, uvIndex: 5, condition: "Ensoleillé" },
-        { hour: "14:00", temp: 23.4, apparentTemp: 23.2, precipitation: 0, windSpeed: 9, windGust: 14, windDirection: 180, cloudCover: 12, humidity: 50, uvIndex: 6, condition: "Ensoleillé" },
+        { date: "2026-08-12", hour: "13:00", validAt: Date.parse("2026-08-12T11:00:00.000Z"), temp: 21.1, apparentTemp: 21.1, precipitation: 0, windSpeed: 8, windGust: 12, windDirection: 180, cloudCover: 10, humidity: 55, uvIndex: 5, condition: "Ensoleillé" },
+        { date: "2026-08-12", hour: "14:00", validAt: Date.parse("2026-08-12T12:00:00.000Z"), temp: 23.4, apparentTemp: 23.2, precipitation: 0, windSpeed: 9, windGust: 14, windDirection: 180, cloudCover: 12, humidity: 50, uvIndex: 6, condition: "Ensoleillé" },
+        { date: "2026-08-12", hour: "15:00", validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 24, apparentTemp: 24, precipitation: 0, windSpeed: 8, windGust: 12, windDirection: 10, cloudCover: 10, humidity: 48, uvIndex: 6, condition: "Ensoleillé" },
       ],
+      currentSnapshot: modelCurrentSnapshot,
       daily: [],
       modelsUsed: ["ECMWF"],
     });
 
-    expect(snapshot.current?.temp).toBe(23.4);
+    expect(snapshot.currentSnapshot?.temp).toBe(25);
+    expect(snapshot.currentSnapshot?.sourceKind).toBe("model_current_snapshot");
+    expect(snapshot.hourly.map(({ hour, temp }) => [hour, temp])).toEqual([["14:00", 23.4], ["15:00", 24]]);
     expect(snapshot.validAt).toBe("2026-08-12T14:00");
     expect(snapshot.sourceKind).toBe("official_forecast");
     expect(snapshot.source).toBe("open-meteo");
@@ -54,14 +74,16 @@ describe("buildOfficialWeatherSnapshot", () => {
       parisHour: "02",
       hourly: [
         { date: "2026-10-25", hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), temp: 10, apparentTemp: 10, precipitation: 0, windSpeed: 5, windGust: 8, windDirection: 180, cloudCover: 50, humidity: 80, uvIndex: 0, condition: "Nuageux" },
-        { date: "2026-10-25", hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 11, apparentTemp: 11, precipitation: 0, windSpeed: 5, windGust: 8, windDirection: 180, cloudCover: 50, humidity: 80, uvIndex: 0, condition: "Nuageux", isCurrent: true },
+        { date: "2026-10-25", hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 11, apparentTemp: 11, precipitation: 0, windSpeed: 5, windGust: 8, windDirection: 180, cloudCover: 50, humidity: 80, uvIndex: 0, condition: "Nuageux" },
       ],
+      currentSnapshot: modelCurrentSnapshot,
       daily: [],
       modelsUsed: [],
     });
 
-    expect(snapshot.current?.temp).toBe(11);
-    expect(snapshot.current?.validAt).toBe(Date.parse("2026-10-25T01:00:00.000Z"));
+    expect(snapshot.currentSnapshot?.temp).toBe(25);
+    expect(snapshot.hourly).toMatchObject([{ validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 11 }]);
+    expect(snapshot.hourly).toHaveLength(1);
   });
 
   it("actualise les heures prévisionnelles sans modifier le point courant officiel", () => {
@@ -73,23 +95,48 @@ describe("buildOfficialWeatherSnapshot", () => {
       hourlyWeighting: unavailableWeighting,
       parisHour: "14",
       hourly: [
-        { date: "2026-08-12", hour: "14:00", temp: 23.4, apparentTemp: 23.2, precipitation: 0, windSpeed: 9, windGust: 14, windDirection: 180, cloudCover: 12, humidity: 50, uvIndex: 6, condition: "Ensoleillé", isCurrent: true, observedAt: "2026-08-12T12:01:00.000Z" },
-        { date: "2026-08-12", hour: "15:00", temp: 24, apparentTemp: 24, precipitation: 0, windSpeed: 8, windGust: 12, windDirection: 180, cloudCover: 10, humidity: 48, uvIndex: 6, condition: "Ensoleillé" },
+        { date: "2026-08-12", hour: "14:00", validAt: Date.parse("2026-08-12T12:00:00.000Z"), temp: 23.4, apparentTemp: 23.2, precipitation: 0, windSpeed: 9, windGust: 14, windDirection: 180, cloudCover: 12, humidity: 50, uvIndex: 6, condition: "Ensoleillé" },
+        { date: "2026-08-12", hour: "15:00", validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 24, apparentTemp: 24, precipitation: 0, windSpeed: 8, windGust: 12, windDirection: 180, cloudCover: 10, humidity: 48, uvIndex: 6, condition: "Ensoleillé" },
       ],
+      currentSnapshot: modelCurrentSnapshot,
       daily: [],
       modelsUsed: ["Open-Meteo Best Match"],
     });
     const refreshedAt = new Date("2026-08-12T12:10:00.000Z");
     const refreshed = mergeManualHourlyForecast(snapshot, [
-      { date: "2026-08-12", hour: "14:00", temp: 99, apparentTemp: 99, precipitation: 1, windSpeed: 99, windGust: 99, windDirection: 0, cloudCover: 99, humidity: 99, uvIndex: 0, condition: "Pluie" },
-      { date: "2026-08-12", hour: "15:00", temp: 25.2, apparentTemp: 25.2, precipitation: 0.1, windSpeed: 11, windGust: 14, windDirection: 190, cloudCover: 20, humidity: 45, uvIndex: 5, condition: "Nuageux" },
+      { date: "2026-08-12", hour: "14:00", validAt: Date.parse("2026-08-12T12:00:00.000Z"), temp: 99, apparentTemp: 99, precipitation: 1, windSpeed: 99, windGust: 99, windDirection: 0, cloudCover: 99, humidity: 99, uvIndex: 0, condition: "Pluie" },
+      { date: "2026-08-12", hour: "15:00", validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 25.2, apparentTemp: 25.2, precipitation: 0.1, windSpeed: 11, windGust: 14, windDirection: 190, cloudCover: 20, humidity: 45, uvIndex: 5, condition: "Nuageux" },
     ], refreshedAt);
 
-    expect(refreshed.current).toEqual(snapshot.current);
+    expect(refreshed.currentSnapshot).toEqual(snapshot.currentSnapshot);
     expect(refreshed.computedAt).toBe(snapshot.computedAt);
     expect(refreshed.hourlyComputedAt).toBe(refreshedAt.toISOString());
-    expect(refreshed.hourly.find((hour) => hour.hour === "14:00")).toEqual(snapshot.current);
-    expect(refreshed.hourly.find((hour) => hour.hour === "15:00")?.temp).toBe(25.2);
+    expect(refreshed.hourly.find((hour) => hour.validAt === Date.parse("2026-08-12T12:00:00.000Z"))?.temp).toBe(99);
+    expect(refreshed.hourly.find((hour) => hour.validAt === Date.parse("2026-08-12T13:00:00.000Z"))?.temp).toBe(25.2);
+  });
+
+  it("retire à la relecture du cache l’échéance qui vient de se terminer", () => {
+    const snapshot = buildOfficialWeatherSnapshot({
+      lat: 50.75646,
+      lon: 2.52085,
+      weatherDate: "2026-08-12",
+      computedAt: new Date("2026-08-12T12:45:00.000Z"),
+      hourlyWeighting: unavailableWeighting,
+      parisHour: "14",
+      hourly: [
+        { date: "2026-08-12", hour: "14:00", validAt: Date.parse("2026-08-12T12:00:00.000Z"), temp: 23.4, apparentTemp: 23.2, precipitation: 0, windSpeed: 9, windGust: 14, windDirection: 180, cloudCover: 12, humidity: 50, uvIndex: 6, condition: "Ensoleillé" },
+        { date: "2026-08-12", hour: "15:00", validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 24, apparentTemp: 24, precipitation: 0, windSpeed: 8, windGust: 12, windDirection: 10, cloudCover: 10, humidity: 48, uvIndex: 6, condition: "Ensoleillé" },
+      ],
+      currentSnapshot: modelCurrentSnapshot,
+      daily: [],
+      modelsUsed: ["ECMWF"],
+    });
+
+    const refreshed = refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.parse("2026-08-12T13:05:00.000Z"));
+
+    expect(refreshed.hourly).toMatchObject([{ validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 24 }]);
+    expect(refreshed.validAt).toBe("2026-08-12T15:00");
+    expect(refreshed.currentSnapshot).toEqual(modelCurrentSnapshot);
   });
 
   it("conserve la date et l’horodatage d’une fusion quotidienne sans la présenter comme horaire", () => {

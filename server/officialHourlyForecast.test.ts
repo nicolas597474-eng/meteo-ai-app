@@ -129,7 +129,6 @@ describe("computeOfficialHourlyForecast", () => {
     const result = computeOfficialHourlyForecast(
       [...modelForecasts(), bestMatchForecast(), mislabeledArome],
       historicalScores(),
-      { now: validAt - 30 * 60_000 },
     );
 
     expect(result.hours).toHaveLength(1);

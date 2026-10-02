@@ -50,6 +50,7 @@ import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { buildForecastRunArchiveRows } from "../dailyForecastPerformance";
 import { compareTraceWeights } from "../weightComparison";
+import { findActiveHourlyForecastIndex } from "../../shared/hourlyForecastTime";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
@@ -81,7 +82,11 @@ function getTodayParis(): string {
 
 export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), sourceUpdatedAt?: Date | string) {
   const hourNumber = Number(currentHour);
-  const current = hours.find((hour) => {
+  const updatedAt = sourceUpdatedAt == null ? new Date() : new Date(sourceUpdatedAt);
+  const activeIndex = Number.isFinite(updatedAt.getTime())
+    ? findActiveHourlyForecastIndex(hours, updatedAt.getTime())
+    : -1;
+  const current = hours[activeIndex] ?? hours.find((hour) => {
     const match = String(hour?.hour ?? "").match(/^(\d{1,2}):/);
     return match != null && Number(match[1]) === hourNumber;
   }) ?? null;
@@ -92,7 +97,7 @@ export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = get
     windSpeed: current.windSpeed ?? null,
     humidity: current.humidity ?? null,
     cloudCover: current.cloudCover ?? null,
-    updatedAt: sourceUpdatedAt == null ? new Date() : new Date(sourceUpdatedAt),
+    updatedAt,
   };
 }
 
@@ -236,6 +241,7 @@ export const weatherRouter = router({
 
     return {
       today,
+      currentSnapshot: officialSnapshot.currentSnapshot,
       meteoAI: meteoAI ? {
         date: meteoAI.date,
         tempMax: meteoAI.tempMax,
@@ -615,7 +621,7 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
-      return { today: snapshot.weatherDate, days: snapshot.daily, modelsUsed: snapshot.modelsUsed, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
+      return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, days: snapshot.daily, modelsUsed: snapshot.modelsUsed, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
 
   /**
@@ -626,7 +632,7 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
-      return { today: snapshot.weatherDate, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting } };
+      return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting } };
     }),
 
   /** Comparaison manuelle AROME en lecture seule, limitée à Hondeghem et sans effet sur la production. */
@@ -862,12 +868,14 @@ export const weatherRouter = router({
         ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
         : null;
       const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt)));
-      const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id);
+      const activeForecast = hours[findActiveHourlyForecastIndex(hours, new Date(snapshot.computedAt).getTime())];
+      const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id, activeForecast?.validAt);
 
       const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
       return {
         today: snapshot.weatherDate,
+        currentSnapshot: snapshot.currentSnapshot,
         officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting },
         hours,
         periodHours,

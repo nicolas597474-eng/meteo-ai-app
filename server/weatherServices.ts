@@ -298,8 +298,6 @@ export type HourlyPoint = {
   uvIndex: number | null;
   condition: string | null;
   weatherCode?: number | null;     // code WMO de la source, lorsqu’il est disponible
-  observedAt?: string | null;      // heure de la condition courante à 15 minutes
-  isCurrent?: boolean;
   // Extended fields for details page
   pressure?: number | null;        // hPa
   dewPoint?: number | null;        // °C
@@ -312,6 +310,22 @@ export type HourlyPoint = {
   precipIntensity?: string | null; // light, moderate, heavy
   /** Only the official seven-model engine populates these source-tagged metrics. */
   multiModelMetrics?: HourlyMultiModelMetrics | null;
+};
+
+export type CurrentWeatherSnapshot = {
+  sourceKind: "model_current_snapshot";
+  source: "open-meteo";
+  capturedAt: string;
+  temp: number | null;
+  apparentTemp: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGust: number | null;
+  windDirection: number | null;
+  cloudCover: number | null;
+  humidity: number | null;
+  weatherCode: number | null;
+  condition: string | null;
 };
 
 /** Une direction est circulaire : 350° et 10° sont proches du nord, pas du sud. */
@@ -477,19 +491,17 @@ export async function collectHourlyForecast(
   targetDate: string,
   coords?: { lat: number; lon: number },
   forecastDays = 2,
-  options: { includeCurrentSnapshot?: boolean } = {},
+  options: { now?: number } = {},
 ): Promise<HourlyPoint[]> {
   const location = coords ?? HONDEGHEM;
-  const includeCurrentSnapshot = options.includeCurrentSnapshot !== false;
+  const now = options.now ?? Date.now();
   try {
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", location.lat.toString());
     url.searchParams.set("longitude", location.lon.toString());
     url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,uv_index,surface_pressure,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall,weather_code");
-    if (includeCurrentSnapshot) {
-      url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,weather_code");
-    }
     url.searchParams.set("timezone", "Europe/Paris");
+    url.searchParams.set("timeformat", "unixtime");
     url.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
 
     const response = await fetchWeather(url.toString(), {}, { timeoutMs: 8_000, attempts: 1 });
@@ -501,9 +513,11 @@ export async function collectHourlyForecast(
 
     const points: HourlyPoint[] = [];
     for (let i = 0; i < hourly.time.length; i++) {
-      const dt = hourly.time[i]; // "2026-07-05T14:00"
-      const date = dt.slice(0, 10);
-      const hour = dt.slice(11, 16); // "14:00"
+      const validAt = Number(hourly.time[i]) * 1000;
+      const parisTime = getParisDateAndHour(validAt);
+      if (!Number.isFinite(validAt) || !parisTime || parisTime.date < targetDate || validAt + 60 * 60_000 <= now) continue;
+      const date = parisTime.date;
+      const hour = `${String(parisTime.hour).padStart(2, "0")}:00`;
       const precip = hourly.precipitation?.[i] ?? null;
       const cloud = hourly.cloud_cover?.[i] ?? null;
       const weatherCode = hourly.weather_code?.[i] ?? null;
@@ -526,6 +540,7 @@ export async function collectHourlyForecast(
       points.push({
         date,
         hour,
+        validAt,
         temp: bestTemp,
         apparentTemp: hourly.apparent_temperature?.[i] ?? null,
         precipitation: precip,
@@ -549,39 +564,53 @@ export async function collectHourlyForecast(
         precipIntensity,
       });
     }
-
-    // La condition actuelle est produite à un pas de 15 minutes par la source.
-    // Elle remplace l’instant horaire équivalent pour éviter de présenter à 11h30
-    // une valeur ou un ciel calculé pour 11h00.
-    if (includeCurrentSnapshot) {
-      const current = data.current;
-      const currentHour = typeof current?.time === "string" ? `${current.time.slice(11, 13)}:00` : null;
-      const currentIndex = currentHour ? points.findIndex((point) => point.hour === currentHour) : -1;
-      if (currentIndex >= 0) {
-        const currentPrecipitation = current.precipitation ?? points[currentIndex].precipitation;
-        const currentCloudCover = current.cloud_cover ?? points[currentIndex].cloudCover;
-        const currentWeatherCode = current.weather_code ?? points[currentIndex].weatherCode ?? null;
-        points[currentIndex] = {
-          ...points[currentIndex],
-          temp: current.temperature_2m ?? points[currentIndex].temp,
-          apparentTemp: current.apparent_temperature ?? points[currentIndex].apparentTemp,
-          precipitation: currentPrecipitation,
-          windSpeed: current.wind_speed_10m ?? points[currentIndex].windSpeed,
-          windGust: current.wind_gusts_10m ?? points[currentIndex].windGust,
-          windDirection: current.wind_direction_10m ?? points[currentIndex].windDirection,
-          cloudCover: currentCloudCover,
-          humidity: current.relative_humidity_2m ?? points[currentIndex].humidity,
-          weatherCode: currentWeatherCode,
-          condition: conditionFromWmoWeatherCode(currentWeatherCode, currentPrecipitation, currentCloudCover),
-          observedAt: current.time ?? null,
-          isCurrent: true,
-        };
-      }
-    }
     return points;
   } catch (err) {
     console.error("[Hourly] Error fetching hourly forecast:", err);
     return [];
+  }
+}
+
+/** Fetches Open-Meteo's model-provided current snapshot separately from hourly forecast values. */
+export async function collectCurrentWeatherSnapshot(
+  coords?: { lat: number; lon: number },
+): Promise<CurrentWeatherSnapshot | null> {
+  const location = coords ?? HONDEGHEM;
+  try {
+    const url = new URL("https://api.open-meteo.com/v1/forecast");
+    url.searchParams.set("latitude", location.lat.toString());
+    url.searchParams.set("longitude", location.lon.toString());
+    url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,relative_humidity_2m,weather_code");
+    url.searchParams.set("timezone", "Europe/Paris");
+    url.searchParams.set("timeformat", "unixtime");
+
+    const response = await fetchWeather(url.toString(), {}, { timeoutMs: 8_000, attempts: 1 });
+    if (!response.ok) return null;
+    const current = (await response.json()).current;
+    if (!current || typeof current.time !== "number" || !Number.isFinite(current.time)) return null;
+    const capturedAt = Number(current?.time) * 1000;
+    if (!Number.isFinite(capturedAt)) return null;
+    const weatherCode = current.weather_code ?? null;
+    const precipitation = current.precipitation ?? null;
+    const cloudCover = current.cloud_cover ?? null;
+    return {
+      sourceKind: "model_current_snapshot",
+      source: "open-meteo",
+      capturedAt: new Date(capturedAt).toISOString(),
+      temp: current.temperature_2m ?? null,
+      apparentTemp: current.apparent_temperature ?? null,
+      precipitation,
+      windSpeed: current.wind_speed_10m ?? null,
+      windGust: current.wind_gusts_10m ?? null,
+      windDirection: current.wind_direction_10m ?? null,
+      cloudCover,
+      humidity: current.relative_humidity_2m ?? null,
+      weatherCode,
+      condition: conditionFromWmoWeatherCode(weatherCode, precipitation, cloudCover),
+    };
+  } catch (error) {
+    console.error("[CurrentSnapshot] Error fetching Open-Meteo current model snapshot:", error);
+    return null;
   }
 }
 

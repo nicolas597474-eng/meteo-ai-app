@@ -1,6 +1,7 @@
 import { makeLocationKey } from "./db";
 import { getParisDate, getParisHour } from "./weatherTime";
-import { collect15DayForecast, type DayForecast, type HourlyPoint } from "./weatherServices";
+import { collect15DayForecast, collectCurrentWeatherSnapshot, type CurrentWeatherSnapshot, type DayForecast, type HourlyPoint } from "./weatherServices";
+import { findActiveHourlyForecastIndex, keepCurrentAndFutureHourlyForecasts } from "../shared/hourlyForecastTime";
 import { collectOfficialHourlyForecast, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
@@ -13,7 +14,7 @@ export type OfficialWeatherSnapshot = {
   sourceKind: "official_forecast";
   source: "open-meteo";
   hourlyWeighting: OfficialHourlyWeightingSummary;
-  current: HourlyPoint | null;
+  currentSnapshot: CurrentWeatherSnapshot | null;
   hourly: HourlyPoint[];
   daily: DayForecast[];
   modelsUsed: string[];
@@ -82,50 +83,58 @@ export function buildOfficialWeatherSnapshot(input: {
   weatherDate: string;
   computedAt: Date;
   hourly: HourlyPoint[];
+  currentSnapshot: CurrentWeatherSnapshot | null;
   hourlyWeighting: OfficialHourlyWeightingSummary;
   daily: DayForecast[];
   modelsUsed: string[];
   parisHour: string;
 }): OfficialWeatherSnapshot {
-  const current = input.hourly.find((hour) => hour.isCurrent)
-    ?? input.hourly.find((hour) => hour.hour === `${input.parisHour}:00`)
-    ?? input.hourly[0]
+  const hourly = keepCurrentAndFutureHourlyForecasts(input.hourly, input.computedAt.getTime());
+  const currentForecast = hourly[findActiveHourlyForecastIndex(hourly, input.computedAt.getTime())]
+    ?? hourly.find((hour) => hour.hour === `${input.parisHour}:00`)
+    ?? hourly[0]
     ?? null;
   return {
     locationKey: makeLocationKey(input.lat, input.lon),
     weatherDate: input.weatherDate,
-    validAt: current ? `${input.weatherDate}T${current.hour}` : null,
+    validAt: currentForecast ? `${currentForecast.date ?? input.weatherDate}T${currentForecast.hour}` : null,
     computedAt: input.computedAt.toISOString(),
     hourlyComputedAt: input.computedAt.toISOString(),
     sourceKind: "official_forecast",
     source: "open-meteo",
     hourlyWeighting: input.hourlyWeighting,
-    current,
-    hourly: input.hourly,
+    currentSnapshot: input.currentSnapshot,
+    hourly,
     daily: input.daily,
     modelsUsed: input.modelsUsed,
   };
 }
 
-/** Replace forecast hours without changing the separately sourced current point. */
+export function refreshOfficialWeatherSnapshotForecastWindow(
+  snapshot: OfficialWeatherSnapshot,
+  nowMs = Date.now(),
+): OfficialWeatherSnapshot {
+  const hourly = keepCurrentAndFutureHourlyForecasts(snapshot.hourly, nowMs);
+  const currentForecast = hourly[findActiveHourlyForecastIndex(hourly, nowMs)] ?? hourly[0] ?? null;
+  return {
+    ...snapshot,
+    validAt: currentForecast ? `${currentForecast.date ?? snapshot.weatherDate}T${currentForecast.hour}` : null,
+    hourly,
+  };
+}
+
+/** Replace only forecast hours; the model current snapshot remains a separate object. */
 export function mergeManualHourlyForecast(
   snapshot: OfficialWeatherSnapshot,
   hours: HourlyPoint[],
   computedAt: Date,
   weighting?: OfficialHourlyWeightingSummary,
 ): OfficialWeatherSnapshot {
-  const preservedCurrent = snapshot.current
-    ?? snapshot.hourly.find((hour) => hour.isCurrent)
-    ?? null;
-  const hourly = hours.map((hour) => hour.date === snapshot.weatherDate && hour.hour === preservedCurrent?.hour
-    ? preservedCurrent
-    : hour);
   return {
     ...snapshot,
-    hourly,
+    hourly: keepCurrentAndFutureHourlyForecasts(hours, computedAt.getTime()),
     hourlyWeighting: weighting ?? snapshot.hourlyWeighting,
-    current: snapshot.current,
-    // Keep the snapshot/current timestamp truthful; forecast hours have their own timestamp.
+    // The current snapshot has its own capturedAt; this timestamp belongs only to the hourly series.
     hourlyComputedAt: computedAt.toISOString(),
   };
 }
@@ -182,14 +191,17 @@ export function cacheManualHourlyForecast(
  */
 export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: number }): Promise<OfficialWeatherSnapshot> {
   const locationKey = makeLocationKey(coords.lat, coords.lon);
-  const cacheKey = `${locationKey}:${getParisDate()}:${getParisHour()}`;
+  const cacheKey = `${locationKey}:${getParisDate()}:${Math.floor(Date.now() / (60 * 60_000))}`;
   const cached = snapshotCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
+  }
 
   const value = (async () => {
     const weatherDate = getParisDate();
-    const [hourlyResult, dailyResult] = await Promise.all([
+    const [hourlyResult, currentSnapshot, dailyResult] = await Promise.all([
       collectOfficialHourlyForecast(weatherDate, coords),
+      collectCurrentWeatherSnapshot(coords),
       collect15DayForecast(coords),
     ]);
     return applyManualHourlyForecast(buildOfficialWeatherSnapshot({
@@ -198,12 +210,13 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
       weatherDate,
       computedAt: new Date(),
       hourly: hourlyResult.hours,
+      currentSnapshot,
       hourlyWeighting: hourlyResult.weighting,
       daily: dailyResult.days,
       modelsUsed: dailyResult.modelsUsed,
       parisHour: String(getParisHour()).padStart(2, "0"),
     }));
-  })();
+  })().then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
   snapshotCache.set(cacheKey, { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value });
   void value.then((snapshot) => {
     const current = snapshotCache.get(cacheKey);

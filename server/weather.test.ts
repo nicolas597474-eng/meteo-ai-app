@@ -50,6 +50,16 @@ describe("weather.getDashboard", () => {
     expect(current?.updatedAt).toEqual(sourceUpdatedAt);
   });
 
+  it("utilise validAt pour distinguer les deux heures locales répétées", () => {
+    const sourceUpdatedAt = new Date("2026-10-25T01:30:00.000Z");
+    const current = getCurrentHourlyRegimeInput([
+      { hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), temp: 11, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 10 },
+      { hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 22, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 10 },
+    ], 2, sourceUpdatedAt);
+
+    expect(current?.temp).toBe(22);
+  });
+
   it("returns dashboard data with today's date", async () => {
     const ctx = createPublicContext();
     const caller = appRouter.createCaller(ctx);
@@ -72,6 +82,7 @@ describe("weather.getDashboard", () => {
 
     const result = await caller.weather.getDashboard();
 
+    expect(result).toHaveProperty("currentSnapshot");
     // meteoAI may be null if no forecast for today, or an object
     if (result.meteoAI) {
       expect(result.meteoAI).toHaveProperty("tempMax");
@@ -103,6 +114,19 @@ describe("contrat de snapshot officiel inter-pages", () => {
     expect(details.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
     expect(hourly.officialSnapshot.source).toBe(daily.officialSnapshot.source);
     expect(details.officialSnapshot.source).toBe(daily.officialSnapshot.source);
+    expect(daily).toHaveProperty("currentSnapshot");
+    expect(hourly.currentSnapshot).toEqual(daily.currentSnapshot);
+    expect(details.currentSnapshot).toEqual(daily.currentSnapshot);
+    expect(daily.officialSnapshot).not.toHaveProperty("currentSnapshot");
+    if (daily.currentSnapshot) {
+      expect(daily.currentSnapshot).toMatchObject({
+        sourceKind: "model_current_snapshot",
+        source: "open-meteo",
+        capturedAt: expect.any(String),
+      });
+      expect(hourly.hours).not.toContainEqual(daily.currentSnapshot);
+      expect(details.hours).not.toContainEqual(daily.currentSnapshot);
+    }
     expect(JSON.stringify(details)).not.toMatch(/stability(Index|Label)/i);
     expect(hourly.officialSnapshot.hourlyWeighting).toEqual(details.officialSnapshot.hourlyWeighting);
     expect(hourly.officialSnapshot.hourlyWeighting.bestMatchIncluded).toBe(false);

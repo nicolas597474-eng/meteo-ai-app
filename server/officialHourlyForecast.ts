@@ -478,7 +478,6 @@ function makePoint(
   modelValues: HourlyModelValue[],
   variableValues: Map<OfficialHourlyVariable, VariableForecastValue>,
   horizonBucket: string | null,
-  now: number,
 ): HourlyPoint | null {
   const parisTime = getParisDateAndHour(validAt);
   if (!parisTime) return null;
@@ -581,7 +580,6 @@ function makePoint(
         cloudCover: { range: cloudCoverSummary.range, standardDeviation: cloudCoverSummary.standardDeviation, availableModelCount: cloudCoverSummary.availableModelCount },
       },
     },
-    isCurrent: validAt <= now && now < validAt + 60 * 60_000,
     forecastWeighting: {
       method: pointMethod,
       horizonBucket,
@@ -605,9 +603,8 @@ function makePoint(
 export function computeOfficialHourlyForecast(
   modelForecasts: readonly HourlyModelForecast[],
   historyScores: readonly OfficialHourlyEvaluationHistoryScore[],
-  options: { now?: number; historyAvailable?: boolean } = {},
+  options: { historyAvailable?: boolean } = {},
 ): OfficialHourlyForecastResult {
-  const now = options.now ?? Date.now();
   const historyAvailable = options.historyAvailable !== false;
   const byValidTime = new Map<number, Map<OfficialHourlyModelName, HourlyModelValue>>();
 
@@ -685,7 +682,7 @@ export function computeOfficialHourlyForecast(
     }
     modelValues.filter(({ hour }) => hasForecastValue(hour)).forEach(({ modelName }) => allModelsWithData.add(modelName));
 
-    const point = makePoint(validAt, modelValues, variableValues, horizon.bucket, now);
+    const point = makePoint(validAt, modelValues, variableValues, horizon.bucket);
     if (!point) continue;
     hours.push(point);
 
