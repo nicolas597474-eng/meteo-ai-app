@@ -944,12 +944,12 @@ function ConfidenceSection({
   confidence,
   regime,
 }: {
-  confidence?: { current?: number; today?: number; week?: number; stabilityIndex?: number | null };
+  confidence?: { current?: number | null; today?: number | null; week?: number | null; stabilityIndex?: number | null };
   regime: any;
 }) {
-  const periodConfidence = Math.round(confidence?.current ?? 0);
-  const todayConfidence = Math.round(confidence?.today ?? 0);
-  const weekConfidence = Math.round(confidence?.week ?? 0);
+  const periodConfidence = confidence?.current == null ? null : Math.round(confidence.current);
+  const todayConfidence = confidence?.today == null ? null : Math.round(confidence.today);
+  const weekConfidence = confidence?.week == null ? null : Math.round(confidence.week);
 
   return (
     <div className="space-y-3">
@@ -966,7 +966,16 @@ function ConfidenceSection({
   );
 }
 
-function ConfidenceBar({ label, value }: { label: string; value: number }) {
+function ConfidenceBar({ label, value }: { label: string; value: number | null }) {
+  if (value == null) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-slate-300 w-36">{label}</span>
+        <div className="flex-1" />
+        <span className="text-xs text-slate-400 w-24 text-right">Non disponible</span>
+      </div>
+    );
+  }
   const color = value >= 70 ? "bg-green-500" : value >= 50 ? "bg-amber-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-3">

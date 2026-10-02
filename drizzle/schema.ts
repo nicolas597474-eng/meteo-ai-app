@@ -76,6 +76,36 @@ export const forecastRuns = mysqlTable("forecast_runs", {
 export type ForecastRun = typeof forecastRuns.$inferSelect;
 export type InsertForecastRun = typeof forecastRuns.$inferInsert;
 
+/** Production-only daily model/observation pairs, keyed to the exact model run and lead horizon. */
+export const dailyForecastObservationComparisons = mysqlTable("daily_forecast_observation_comparisons", {
+  id: int("id").autoincrement().primaryKey(),
+  comparisonKey: varchar("comparisonKey", { length: 160 }).notNull(),
+  forecastRunId: int("forecastRunId").notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  validDate: varchar("validDate", { length: 10 }).notNull(),
+  serviceName: varchar("serviceName", { length: 64 }).notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }).notNull(),
+  horizonBucket: mysqlEnum("horizonBucket", ["0-6h", "6-24h", "1-3d", "4-7d", "8-15d"]).notNull(),
+  leadTimeMinutes: int("leadTimeMinutes").notNull(),
+  variable: mysqlEnum("variable", ["temperature_max", "temperature_min", "precipitation_sum", "wind_speed_max", "wind_gust_max"]).notNull(),
+  forecastValue: float("forecastValue").notNull(),
+  observedValue: float("observedValue").notNull(),
+  signedError: float("signedError").notNull(),
+  absoluteError: float("absoluteError").notNull(),
+  evidenceType: mysqlEnum("evidenceType", ["physical_observation"]).notNull().default("physical_observation"),
+  observationIsQualified: int("observationIsQualified").notNull().default(1),
+  observationCoverageHours: int("observationCoverageHours").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("daily_fc_obs_comparison_key_uq").on(table.comparisonKey),
+  index("daily_fc_obs_location_date_idx").on(table.locationKey, table.validDate),
+  index("daily_fc_obs_selection_idx").on(table.locationKey, table.horizonBucket, table.variable, table.validDate),
+  index("daily_fc_obs_model_idx").on(table.locationKey, table.serviceName, table.variable, table.horizonBucket, table.validDate),
+]);
+export type DailyForecastObservationComparison = typeof dailyForecastObservationComparisons.$inferSelect;
+export type InsertDailyForecastObservationComparison = typeof dailyForecastObservationComparisons.$inferInsert;
+
 /**
  * Real weather observations from local stations.
  * Each row = one day's actual weather at Hondeghem.

@@ -1,57 +1,138 @@
 import { describe, expect, it } from "vitest";
 import { computeOfficialDailyForecast } from "./officialForecast";
+import { WEATHER_SERVICES } from "./weatherServices";
+import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
 
-const forecasts = [
-  { serviceName: "Modèle précis", tempMax: 21, tempMin: 11, precipitation: 1.2, windSpeed: 12, windGust: 22, humidity: 58, cloudCover: 35 },
-  { serviceName: "Modèle incertain", tempMax: 25, tempMin: 15, precipitation: 5.4, windSpeed: 24, windGust: 40, humidity: 84, cloudCover: 80 },
-];
+const targetDate = "2026-10-02";
+const issuedAt = Date.parse("2026-10-02T08:00:00.000Z");
+const locationKey = "50.7567_2.5204";
+const horizonBucket: DailyFusionHorizon = "6-24h";
+const serviceNames = ["AROME", "ARPEGE", "ICON", "ECMWF"];
+const serviceModelId = (serviceName: string) => WEATHER_SERVICES.expert.find((service) => service.name === serviceName)!.modelId;
+
+const forecasts = serviceNames.map((serviceName, index) => ({
+  serviceName,
+  tempMax: 21 + index,
+  tempMin: 11 + index,
+  precipitation: 0.5 + index,
+  windSpeed: 10 + index * 2,
+  windGust: 18 + index * 3,
+  humidity: 55 + index * 5,
+  cloudCover: 30 + index * 10,
+}));
+
+function evidenceFor(
+  serviceName: string,
+  variable: DailyFusionMetric,
+  options: Partial<Pick<ModelPerformanceEvidence, "locationKey" | "horizonBucket" | "sampleSize" | "evaluatedDays" | "comparisonCount" | "mae" | "standardError">> = {},
+): ModelPerformanceEvidence {
+  const sampleSize = options.sampleSize ?? 500;
+  return {
+    locationKey: options.locationKey ?? locationKey,
+    serviceName,
+    modelId: serviceModelId(serviceName),
+    variable,
+    horizonBucket: options.horizonBucket ?? horizonBucket,
+    comparisonCount: options.comparisonCount ?? sampleSize,
+    sampleSize,
+    evaluatedDays: options.evaluatedDays ?? sampleSize,
+    mae: options.mae ?? 0.5 + serviceNames.indexOf(serviceName) * 0.2,
+    rmse: (options.mae ?? 0.5 + serviceNames.indexOf(serviceName) * 0.2) + 0.2,
+    standardError: options.standardError ?? 0.05,
+    latestScoreDate: "2026-10-01",
+  };
+}
+
+function qualifiedEvidence(): ModelPerformanceEvidence[] {
+  return serviceNames.flatMap((serviceName) => DAILY_FUSION_METRICS.map((variable) => evidenceFor(serviceName, variable)));
+}
+
+function options(evidence = qualifiedEvidence(), evidenceStoreAvailable = true) {
+  return { locationKey, targetDate, issuedAt, evidenceStoreAvailable, evidence };
+}
 
 describe("computeOfficialDailyForecast", () => {
-  it("produit une synthèse déterministe sans données simulées", () => {
-    const performances = {
-      "Modèle précis": { maeTemp: 0.5, maePrecip: 0.4, maeWind: 1, maeHumidity: 4, maeCloud: 2, weightedScore: 90 },
-      "Modèle incertain": { maeTemp: 2, maePrecip: 2, maeWind: 4, maeHumidity: 16, maeCloud: 18, weightedScore: 70 },
-    };
+  it("fuse uniquement les preuves de production exactes et respecte le plafond individuel", () => {
+    const first = computeOfficialDailyForecast(forecasts, options());
+    const second = computeOfficialDailyForecast(forecasts, options());
 
-    const first = computeOfficialDailyForecast(forecasts, performances);
-    const second = computeOfficialDailyForecast(forecasts, performances);
+    expect(first).toEqual(second);
+    expect(first.coreCalibrationComplete).toBe(true);
+    expect(first.tempMax).not.toBeNull();
+    expect(first.tempMin).not.toBeNull();
+    expect(first.precipitation).not.toBeNull();
+    expect(first.windSpeed).not.toBeNull();
+    expect(first.confidenceScore).not.toBeNull();
+    expect(first.trace.version).toBe(2);
+    expect(first.trace.horizonBucket).toBe("6-24h");
+    expect(first.trace.calibrationStatus.tempMax).toBe("calibrated");
+    expect(first.trace.calibrationStatus.precipitation).toBe("calibrated");
+    expect(first.trace.calibrationStatus.humidity).toBe("insufficient_data");
+    expect(first.humidity).toBeNull();
+    expect(first.cloudCover).toBeNull();
 
-    expect(second.tempMax).toBe(first.tempMax);
-    expect(second.tempMin).toBe(first.tempMin);
-    expect(second.precipitation).toBe(first.precipitation);
-    expect(second.windSpeed).toBe(first.windSpeed);
-    expect(second.humidity).toBe(first.humidity);
-    expect(second.weights).toEqual(first.weights);
-    expect(second.trace.parameterSources).toEqual(first.trace.parameterSources);
-    expect(first.tempMax).toBeLessThan(23);
-    expect(first.weights["Modèle précis"].tempWeight).toBeGreaterThan(
-      first.weights["Modèle incertain"].tempWeight
-    );
-    expect(first.trace.parameterSources.temperature.map((source) => source.name)).toEqual([
-      "Modèle précis",
-      "Modèle incertain",
-    ]);
-    expect(first.trace.parameterSources.temperature.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
-    expect(first.trace.parameterSources.precipitation.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
-    expect(first.trace.parameterSources.wind.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
-    expect(first.trace.parameterSources.humidity.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
-    expect(first.weights["Modèle précis"].humidityWeight).toBeGreaterThan(
-      first.weights["Modèle incertain"].humidityWeight
-    );
-    expect(first.humidity).toBeLessThan(71);
-    expect(first.cloudCover).toBeLessThan(57.5);
+    for (const metricSources of [
+      first.trace.parameterSources.temperature,
+      first.trace.parameterSources.precipitation,
+      first.trace.parameterSources.wind,
+    ]) {
+      expect(metricSources.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
+      expect(metricSources.every((source) => source.finalWeight <= 0.35)).toBe(true);
+      expect(metricSources.every((source) => source.sampleSize === 500 && source.horizonBucket === "6-24h")).toBe(true);
+    }
+    expect(first.trace.parameterSources.temperature.every((source) => source.variable === "temperature_max")).toBe(true);
+    expect(Object.values(first.weights).every((weight) => weight.tempWeight <= 0.35 && weight.precipWeight <= 0.35 && weight.windWeight <= 0.35)).toBe(true);
   });
 
-  it("garde un poids d’humidité neutre lorsque cette performance n’est pas qualifiée", () => {
-    const fusion = computeOfficialDailyForecast(forecasts, {
-      "Modèle précis": { maeTemp: 0.5, maePrecip: 0.4, maeWind: 1, weightedScore: 90 },
-      "Modèle incertain": { maeTemp: 2, maePrecip: 2, maeWind: 4, weightedScore: 70 },
-    });
+  it("ne fabrique ni poids égaux ni valeur officielle quand la preuve est absente", () => {
+    const result = computeOfficialDailyForecast(forecasts, options([]));
 
-    expect(fusion.weights["Modèle précis"].humidityWeight).toBeCloseTo(0.5, 8);
-    expect(fusion.weights["Modèle incertain"].humidityWeight).toBeCloseTo(0.5, 8);
-    expect(fusion.weights["Modèle précis"].tempWeight).toBeGreaterThan(
-      fusion.weights["Modèle incertain"].tempWeight
-    );
+    expect(result.coreCalibrationComplete).toBe(false);
+    expect(result.tempMax).toBeNull();
+    expect(result.tempMin).toBeNull();
+    expect(result.precipitation).toBeNull();
+    expect(result.windSpeed).toBeNull();
+    expect(result.confidenceScore).toBeNull();
+    expect(result.trace.calibrationStatus.tempMax).toBe("insufficient_data");
+    expect(result.trace.parameterSources.temperature).toEqual([]);
+    expect(Object.values(result.weights).every((weight) => weight.tempWeight === 0 && weight.precipWeight === 0 && weight.windWeight === 0)).toBe(true);
+  });
+
+  it("signale distinctement un schéma non migré sans tenter de fusion de repli", () => {
+    const result = computeOfficialDailyForecast(forecasts, options([], false));
+    expect(result.tempMax).toBeNull();
+    expect(result.confidenceScore).toBeNull();
+    expect(result.trace.calibrationStatus.tempMax).toBe("schema_unavailable");
+    expect(result.methodNote).toContain("non calibrée");
+  });
+
+  it("n’emprunte ni une variable, ni une échéance, ni un lieu différent", () => {
+    const mismatched = serviceNames.flatMap((serviceName) => [
+      evidenceFor(serviceName, "temperature_max", { horizonBucket: "1-3d" }),
+      evidenceFor(serviceName, "temperature_max", { horizonBucket, locationKey: "autre-lieu" }),
+    ]);
+    const result = computeOfficialDailyForecast(forecasts, options(mismatched));
+
+    expect(result.trace.horizonBucket).toBe("6-24h");
+    expect(result.tempMax).toBeNull();
+    expect(result.tempMin).toBeNull();
+    expect(result.trace.calibrationStatus.tempMax).toBe("insufficient_data");
+    expect(result.trace.calibrationStatus.tempMin).toBe("insufficient_data");
+    expect(result.precipitation).toBeNull();
+    expect(result.windSpeed).toBeNull();
+  });
+
+  it("n’utilise pas un modèle indisponible pour une variable et refuse si le plafond devient impossible", () => {
+    const threeForecasts = forecasts.slice(0, 3).map((forecast, index) => ({
+      ...forecast,
+      tempMax: index === 0 ? null : forecast.tempMax,
+    }));
+    const result = computeOfficialDailyForecast(threeForecasts, options(qualifiedEvidence()));
+
+    expect(result.tempMax).toBeNull();
+    expect(result.trace.calibrationStatus.tempMax).toBe("insufficient_data");
+    expect(result.tempMin).not.toBeNull();
+    expect(result.trace.parameterSources.temperature).toEqual([]);
+    expect(result.trace.excludedSources.some((source) => source.reason.includes("prévision de cette variable indisponible"))).toBe(true);
   });
 });

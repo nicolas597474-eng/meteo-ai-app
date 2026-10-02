@@ -3812,3 +3812,14 @@
 - [x] Mettre en place le replay historique contrôlé avec rejet des données non alignées et prévention du data leakage.
 - [x] Atteindre les paliers de 18 puis 30 comparaisons valides sans fabriquer ni extrapoler d’observations.
 - [x] Produire le rapport intermédiaire et le rapport complet Phase 8 ; ne pas préparer la Phase 9.
+
+
+## Correctif de régularisation statistique de la fusion quotidienne — 2 octobre 2026
+- [x] Repartir du `main` courant `19bda22`, relire les audits, `todo.md`, les archives de production et les chemins de score ; ne pas utiliser les tables Phase 8 shadow.
+- [x] Ajouter une archive de comparaisons production par lieu, modèle, date valide, variable et horizon, avec observations physiques qualifiées et effectif en jours indépendants.
+- [x] Régulariser le MAE par l’incertitude et la taille d’échantillon, qualifier strictement les preuves et plafonner chaque `modelId` à 35 %.
+- [x] Rendre les sorties officielles et leur confiance nulles avant qualification ; masquer les anciennes traces v1 du jour courant sans altérer l’historique.
+- [x] Ajouter la migration additive `0045_daily_fusion_performance.sql` et ses métadonnées Drizzle. Migration seulement générée localement ; aucune base de données n’a été migrée.
+- [x] Ajouter les tests ciblés, dont 0,6 °C/12 dates contre 0,8 °C/500, horizons/variables distincts, plafonnement, normalisation, absence de modèle, archives et compatibilité v1/v2.
+- [x] `pnpm check` et build réussis ; 36 tests ciblés réussis. Vitest complet : 653 réussis, 2 ignorés, 7 échecs préexistants reproduits sur `main` (secrets Netatmo absents et données semées manquantes dans `weather.test.ts`).
+- [ ] Commit français, push de la branche dédiée et ouverture d’une PR ; aucune fusion ni aucun déploiement.

@@ -11,7 +11,9 @@ describe("buildLiveAILabSnapshot", () => {
     const snapshot = buildLiveAILabSnapshot("2026-08-18", models, new Date("2026-08-18T05:00:00Z"));
     expect(snapshot?.weights.trace.sourceCount).toBe(2);
     expect(snapshot?.weights.trigger).toBe("live-position");
-    expect(snapshot?.confidenceScore).toBeLessThanOrEqual(55);
+    expect(snapshot?.confidenceScore).toBeNull();
+    expect(snapshot?.weights.trace.calibrationStatus.tempMax).toBe("insufficient_data");
+    expect(snapshot?.tempMax).toBeNull();
     expect(snapshot?.stabilityIndex).toBeGreaterThanOrEqual(0);
   });
 

@@ -1,14 +1,14 @@
-import { applyBiasCorrection, computeConfidenceScore, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type LeadTimeBucket, type LeadTimePerf, type ServiceBias } from "./fusionEngine";
+import { applyBiasCorrection, type ServiceBias } from "./fusionEngine";
 import { randomUUID } from "node:crypto";
-import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDate } from "./weatherTime";
 import { calculateStabilityIndex } from "./statsEngine";
 import { computeOfficialDailyForecast } from "./officialForecast";
-import { WEATHER_SERVICES, collectExpertForecasts } from "./weatherServices";
+import { collectExpertForecasts, WEATHER_SERVICES } from "./weatherServices";
+import { buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { collectOfficialHourlyForecast, OFFICIAL_HOURLY_MODEL_NAMES } from "./officialHourlyForecast";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { cacheManualHourlyForecast } from "./officialWeatherSnapshot";
-import { acquireForecastRefreshLock, getMeteoAIForecastByDate, getQualifiedCumulativeRankingForLocation, getQualifiedLeadTimeScoresForLocation, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
+import { acquireForecastRefreshLock, getDailyFusionPerformanceEvidence, getMeteoAIForecastByDate, getQualifiedCumulativeRankingForLocation, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
 import { getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
 
 type ManualFusionFavorite = {
@@ -97,6 +97,7 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
     if (expertData.length === 0) {
       return granularityResult(0, expectedModelCount, null, "Aucun modèle quotidien n’a renvoyé de prévision.");
     }
+    const issuedAt = Date.now();
 
     const ranking = await getQualifiedCumulativeRankingForLocation(locationKey);
     const biases: ServiceBias[] = ranking
@@ -114,40 +115,24 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       precipitation: entry.precipitation,
       windSpeed: entry.windSpeed,
       windGust: null as number | null,
+      humidity: entry.humidity ?? null,
       cloudCover: entry.cloudCover ?? null,
     }));
     const biasCorrectedForecasts = biases.length > 0 ? applyBiasCorrection(rawForecasts, biases) : rawForecasts;
-    const leadTimeRows = await getQualifiedLeadTimeScoresForLocation(locationKey, 14);
-    const leadTimePerfs: LeadTimePerf[] = leadTimeRows.map((entry) => ({
-      serviceName: entry.serviceName,
-      bucket: entry.bucket as LeadTimeBucket,
-      avgMaeTemp: entry.avgMaeTemp == null ? null : Number(entry.avgMaeTemp),
-      avgMaePrecip: entry.avgMaePrecip == null ? null : Number(entry.avgMaePrecip),
-      avgMaeWind: entry.avgMaeWind == null ? null : Number(entry.avgMaeWind),
-      sampleSize: entry.totalSamples == null ? 0 : Number(entry.totalSamples),
-      latestScoreDate: entry.latestScoreDate ?? null,
-    }));
-    const leadTimeWeights = getLeadTimeWeights(leadTimePerfs, "6-24h");
-    const performanceByModel: Record<string, { maeTemp?: number; maePrecip?: number; maeWind?: number; maeCloud?: number; weightedScore?: number }> = {};
-    ranking.filter((entry) => isEligibleGlobalReliabilityScore(Number(entry.daysTracked ?? 0), entry.latestScoreDate ?? null)).forEach((entry) => {
-      const leadTime = leadTimeWeights[entry.serviceName];
-      performanceByModel[entry.serviceName] = {
-        maeTemp: leadTime?.maeTemp ?? (entry.avgMaeTemp == null ? undefined : Number(entry.avgMaeTemp)),
-        maePrecip: leadTime?.maePrecip ?? (entry.avgMaePrecip == null ? undefined : Number(entry.avgMaePrecip)),
-        maeWind: leadTime?.maeWind ?? (entry.avgMaeWind == null ? undefined : Number(entry.avgMaeWind)),
-        maeCloud: entry.avgCondMaeCloud == null ? undefined : Number(entry.avgCondMaeCloud),
-        weightedScore: entry.avgScore == null ? 50 : Number(entry.avgScore),
-      };
+    const fusionEvidence = await getDailyFusionPerformanceEvidence(locationKey, today, issuedAt);
+    const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, {
+      locationKey,
+      targetDate: today,
+      issuedAt,
+      evidenceStoreAvailable: fusionEvidence.available,
+      evidence: fusionEvidence.evidence,
     });
-
-    const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, performanceByModel);
     const stability = calculateStabilityIndex(expertData.map((entry) => ({ tempMax: entry.tempMax, tempMin: entry.tempMin, precipitation: entry.precipitation, windSpeed: entry.windSpeed })));
-    const averagePrecipitation = expertData.reduce((sum, entry) => sum + (entry.precipitation ?? 0), 0) / expertData.length;
-    const averageCloudCover = expertData.reduce((sum, entry) => sum + (entry.cloudCover ?? 50), 0) / expertData.length;
-    const condition = conditionFromWeatherValues(averagePrecipitation, averageCloudCover);
-    const bestModelScore = ranking.length > 0 ? Number(ranking[0].avgScore ?? 60) : 60;
-    const confidenceScore = computeConfidenceScore({ forecasts: biasCorrectedForecasts, bestModelScore, leadTimeBucket: "6-24h" });
-    const explanation = `Prévision quotidienne relancée manuellement pour ${favorite.customName ?? favorite.name} à partir de ${expertData.length}/${expectedModelCount} modèles experts disponibles. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`;
+    const condition = null;
+    const confidenceScore = meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null;
+    const explanation = meteoAI.coreCalibrationComplete
+      ? `Prévision quotidienne calibrée relancée pour ${favorite.customName ?? favorite.name}, avec des preuves physiques récentes par modèle, variable et horizon. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`
+      : `${meteoAI.methodNote} Les valeurs officielles et leur confiance restent indisponibles jusqu’à qualification des preuves physiques. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`;
 
     await insertForecasts(expertData.map((entry) => ({
       locationKey,
@@ -164,25 +149,7 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       condition: entry.condition,
       rawData: entry.rawData as any,
     })));
-    const issuedAt = Date.now();
-    await insertForecastRuns(expertData.map((entry) => ({
-      locationKey,
-      validDate: today,
-      serviceName: entry.serviceName,
-      provider: "open-meteo",
-      modelId: WEATHER_SERVICES.expert.find((service) => service.name === entry.serviceName)?.modelId ?? null,
-      sourceKind: "model_forecast" as const,
-      issuedAt,
-      tempMax: entry.tempMax,
-      tempMin: entry.tempMin,
-      precipitation: entry.precipitation,
-      windSpeed: entry.windSpeed,
-      windGust: entry.windGust,
-      humidity: entry.humidity,
-      cloudCover: entry.cloudCover,
-      condition: entry.condition,
-      rawData: entry.rawData as any,
-    })));
+    await insertForecastRuns(buildForecastRunArchiveRows(expertData, locationKey, today, issuedAt, biases));
     await upsertLocationForecast({
       favoriteLocationId: favorite.id,
       userId: favorite.userId,
@@ -215,7 +182,7 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       stabilityIndex: stability.index,
       stabilityLabel: stability.label,
       confidenceScore,
-      weights: { version: 1, weightByService: meteoAI.weights, trace: meteoAI.trace, trigger: "manual" } as any,
+      weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace, trigger: "manual" } as any,
       explanation,
       computedAt: updatedAt,
     }, { refreshComputedAt: true });
@@ -229,7 +196,12 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       return granularityResult(0, expectedModelCount, null, "La fusion quotidienne n’a pas pu être confirmée après son enregistrement.");
     }
 
-    return granularityResult(expertData.length, expectedModelCount, new Date(persistedAt));
+    const dailyResult = granularityResult(expertData.length, expectedModelCount, new Date(persistedAt));
+    if (!meteoAI.coreCalibrationComplete) {
+      dailyResult.status = "partial";
+      dailyResult.error = meteoAI.methodNote;
+    }
+    return dailyResult;
   } catch (error) {
     console.error("[ManualFusion] Daily refresh failed:", error);
     return granularityResult(0, expectedModelCount, null, "La collecte ou l’enregistrement quotidien a échoué.");
