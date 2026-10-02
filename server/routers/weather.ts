@@ -58,6 +58,7 @@ import { buildAppliedModelWeights } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { buildDatedDailyFusionFallback, resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
+import { buildAILabForecastComparisonReadModel } from "../aiLabForecastComparison";
 import { getCollectedModelNames, getMissingModelNames } from "../stationCollectionModels";
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
@@ -1300,6 +1301,7 @@ export const weatherRouter = router({
       aiAnalysis,
       replaySteps,
       sources,
+      forecastComparison: buildAILabForecastComparisonReadModel(officialSnapshot, coords ?? HONDEGHEM),
       engineVersion: "MeteoAI v2.0 — Multi-Dimension",
       calculatedAt: meteoAI?.computedAt ?? null,
       snapshotStatus,
