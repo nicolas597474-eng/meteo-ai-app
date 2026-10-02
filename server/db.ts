@@ -66,6 +66,12 @@ import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 import { HourlyForecastPersistenceError, withHourlyForecastPersistenceStages } from "./hourlyForecastPersistence";
 import { aggregateDailyForecastPerformance, getDailyForecastHorizon } from "./dailyForecastPerformance";
 import type { DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
+import {
+  buildDailyPhysicalComparisonHistoryPage,
+  normalizeDailyComparisonPageSize,
+  unavailableDailyPhysicalComparisonHistory,
+  type DailyPhysicalComparisonHistoryFilters,
+} from "./dailyPhysicalComparisonHistory";
 export { HourlyForecastPersistenceError } from "./hourlyForecastPersistence";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1151,6 +1157,48 @@ export async function upsertDailyForecastObservationComparisons(
     if (!isDailyComparisonTableUnavailable(error)) throw error;
     warnDailyComparisonTableUnavailable();
     return false;
+  }
+}
+
+/** Read-only production archive history. No shadow table is queried by this path. */
+export async function getDailyPhysicalComparisonHistory(
+  filters: DailyPhysicalComparisonHistoryFilters,
+) {
+  const db = await getDb();
+  if (!db) return unavailableDailyPhysicalComparisonHistory("database_unavailable");
+
+  const pageSize = normalizeDailyComparisonPageSize(filters.pageSize);
+  const conditions = [
+    eq(dailyForecastObservationComparisons.locationKey, filters.locationKey),
+    eq(dailyForecastObservationComparisons.evidenceType, "physical_observation"),
+    eq(dailyForecastObservationComparisons.observationIsQualified, 1),
+  ];
+  if (filters.validDateFrom) conditions.push(gte(dailyForecastObservationComparisons.validDate, filters.validDateFrom));
+  if (filters.validDateTo) conditions.push(lte(dailyForecastObservationComparisons.validDate, filters.validDateTo));
+  if (filters.serviceName) conditions.push(eq(dailyForecastObservationComparisons.serviceName, filters.serviceName));
+  if (filters.variable) conditions.push(eq(dailyForecastObservationComparisons.variable, filters.variable));
+  if (filters.horizonBucket) conditions.push(eq(dailyForecastObservationComparisons.horizonBucket, filters.horizonBucket));
+  if (filters.cursor) {
+    const cursorCondition = or(
+      lt(dailyForecastObservationComparisons.validDate, filters.cursor.validDate),
+      and(
+        eq(dailyForecastObservationComparisons.validDate, filters.cursor.validDate),
+        lt(dailyForecastObservationComparisons.id, filters.cursor.id),
+      ),
+    );
+    if (cursorCondition) conditions.push(cursorCondition);
+  }
+
+  try {
+    const rows = await db.select().from(dailyForecastObservationComparisons)
+      .where(and(...conditions))
+      .orderBy(desc(dailyForecastObservationComparisons.validDate), desc(dailyForecastObservationComparisons.id))
+      .limit(pageSize + 1);
+    return buildDailyPhysicalComparisonHistoryPage(rows, { ...filters, pageSize });
+  } catch (error) {
+    if (!isDailyComparisonTableUnavailable(error)) throw error;
+    warnDailyComparisonTableUnavailable();
+    return unavailableDailyPhysicalComparisonHistory("table_unavailable");
   }
 }
 

@@ -75,6 +75,7 @@ import { getP1ObservationClosure } from "../weatherP1Closure";
 import { runHondeghemAromeShadowComparison } from "../aromeHondeghemShadow";
 import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
 import { buildStationForecastComparison24h } from "../stationForecastComparison";
+import { dailyPhysicalComparisonsRouter } from "./dailyPhysicalComparisons";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -792,6 +793,9 @@ export const weatherRouter = router({
         } : null,
       };
     }),
+
+  /** Historique filtrable des comparaisons physiques de production, protégé dans son sous-routeur. */
+  dailyPhysicalComparisons: dailyPhysicalComparisonsRouter,
 
   /** P1 owner-only observability. This procedure is never used by forecast production. */
   getShadowDataHubReport: adminProcedure

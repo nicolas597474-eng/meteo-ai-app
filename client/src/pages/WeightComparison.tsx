@@ -4,7 +4,8 @@ import { trpc } from "@/lib/trpc";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "@/contexts/LocationContext";
-
+import { useAuth } from "@/_core/hooks/useAuth";
+import DailyPhysicalComparisonsPanel from "@/components/DailyPhysicalComparisonsPanel";
 function formatSnapshot(snapshot: any) {
   const date = new Date(snapshot.computedAt);
   const timestamp = Number.isNaN(date.getTime())
@@ -20,6 +21,7 @@ const PARAMETER_META = {
 } as const;
 
 export default function WeightComparison() {
+  const { user } = useAuth();
   const { activeLocation } = useLocation();
   const coords = useMemo(
     () => activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined,
@@ -145,6 +147,7 @@ export default function WeightComparison() {
             )}
           </>
         )}
+        {user?.role === "admin" && <DailyPhysicalComparisonsPanel coordinates={coords} />}
       </div>
     </main>
   );
