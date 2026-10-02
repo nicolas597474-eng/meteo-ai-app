@@ -23,9 +23,21 @@ describe("rendu géométrique de la phase lunaire", () => {
     expect(getLunarShadowPath(100)).toBeNull();
   });
 
+  it("couvre la nouvelle lune, les quartiers et les phases croissantes ou décroissantes", () => {
+    expect(getLunarShadowPath(0)).toContain("A 50 50 0 0 0 50 0");
+    expect(getLunarShadowPath(25)).toContain("A 25 50 0 0 0 50 0");
+    expect(getLunarShadowPath(50)).toContain("A 0 50 0 0 0 50 0");
+    expect(getLunarShadowPath(75)).toContain("A 25 50 0 0 1 50 0");
+    expect(getLunarShadowPath(100)).toBeNull();
+  });
+
   it("oriente le limbe éclairé selon l’angle calculé localement", () => {
-    expect(getLunarShadowTransform(41.3)).toBe("rotate(311.3 50 50)");
-    expect(getLunarShadowTransform(90)).toBe("rotate(0 50 50)");
+    expect(getLunarShadowTransform(41.3)).toBe("rotate(228.7 50 50)");
+    expect(getLunarShadowTransform(90)).toBe("rotate(180 50 50)");
+    expect(getLunarShadowTransform(244.8)).toBe("rotate(25.2 50 50)");
+    expect(getLunarShadowTransform(234.4)).toBe("rotate(35.6 50 50)");
+    expect(getLunarShadowTransform(42.4)).toBe("rotate(227.6 50 50)");
+    expect(getLunarShadowTransform(97.5)).toBe("rotate(172.5 50 50)");
     expect(getLunarShadowTransform(0)).toBe("rotate(270 50 50)");
   });
 });

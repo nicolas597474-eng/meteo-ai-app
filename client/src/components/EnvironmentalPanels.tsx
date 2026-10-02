@@ -982,7 +982,7 @@ function RealisticMoon({ phase, size, alt, cloudCover }: { phase: { angleDeg: nu
   const shadowPath = getLunarShadowPath(illumination);
   const shadowTransform = getLunarShadowTransform(phase.brightLimbAngleDeg);
 
-  return <span role="img" aria-label={`${alt}, éclairage ${illumination}%`} className={`realistic-moon-glow relative block ${diameter}`} data-phase-label={phase.label} data-illumination-pct={illumination} data-bright-limb-angle-deg={phase.brightLimbAngleDeg} data-waxing={phase.waxing} data-cloud-cover={glow.cloudCover ?? "unknown"} style={glowStyle}>
+  return <span role="img" aria-label={`${alt}, éclairage ${illumination}%`} className={`realistic-moon-glow relative block ${diameter} rounded-full`} data-phase-label={phase.label} data-illumination-pct={illumination} data-bright-limb-angle-deg={phase.brightLimbAngleDeg} data-waxing={phase.waxing} data-cloud-cover={glow.cloudCover ?? "unknown"} style={glowStyle}>
     <span className="absolute inset-0 overflow-hidden rounded-full">
       <img src={REALISTIC_MOON_SURFACE} alt="" aria-hidden="true" className="h-full w-full rounded-full object-contain" />
       {shadowPath && <svg aria-hidden="true" viewBox="0 0 100 100" className="absolute inset-0 h-full w-full"><g transform={shadowTransform}><path d={shadowPath} fill="rgba(2, 6, 23, 0.88)" /></g></svg>}

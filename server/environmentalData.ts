@@ -52,18 +52,24 @@ function normalizeDegrees(value: number) {
   return ((value % 360) + 360) % 360;
 }
 
+function roundNormalizedDegrees(value: number) {
+  const rounded = Math.round(normalizeDegrees(value) * 10) / 10;
+  return rounded >= 360 ? 0 : rounded;
+}
+
 export function getAstronomicalMoonPhase(instant: Date, observer: AstronomyObserver): AstronomicalMoonPhase {
   const angleDeg = normalizeDegrees(Astronomy.MoonPhase(instant));
+  const roundedAngleDeg = roundNormalizedDegrees(angleDeg);
   const illuminationPct = Math.round(Astronomy.Illumination(Astronomy.Body.Moon, instant).phase_fraction * 100);
-  const waxing = angleDeg > 0 && angleDeg < 180;
+  const waxing = roundedAngleDeg > 0 && roundedAngleDeg < 180;
   const label = angleDeg < 5 || angleDeg >= 355 ? "Nouvelle lune"
-    : angleDeg < 85 ? "Croissant croissant"
+    : angleDeg < 85 ? "Premier croissant"
       : angleDeg <= 95 ? "Premier quartier"
         : angleDeg < 175 ? "Gibbeuse croissante"
           : angleDeg <= 185 ? "Pleine lune"
             : angleDeg < 265 ? "Gibbeuse décroissante"
               : angleDeg <= 275 ? "Dernier quartier"
-                : "Croissant décroissant";
+                : "Dernier croissant";
   const symbol = label === "Pleine lune" ? "●" : label.includes("quartier") ? "◐" : label.includes("Gibbeuse") ? "◕" : label === "Nouvelle lune" ? "●" : "◔";
   const moon = Astronomy.Equator(Astronomy.Body.Moon, instant, observer, true, true);
   const sun = Astronomy.Equator(Astronomy.Body.Sun, instant, observer, true, true);
@@ -74,7 +80,7 @@ export function getAstronomicalMoonPhase(instant: Date, observer: AstronomyObser
   const hourAngle = Astronomy.HourAngle(Astronomy.Body.Moon, instant, observer) * 15 * Math.PI / 180;
   const latitude = observer.latitude * Math.PI / 180;
   const parallacticAngle = Math.atan2(Math.sin(hourAngle), Math.tan(latitude) * Math.cos(moonDec) - Math.sin(moonDec) * Math.cos(hourAngle));
-  return { angleDeg: Math.round(angleDeg * 10) / 10, label, symbol, waxing, illuminationPct, brightLimbAngleDeg: Math.round(normalizeDegrees((brightLimbPositionAngle - parallacticAngle) * 180 / Math.PI) * 10) / 10 };
+  return { angleDeg: roundedAngleDeg, label, symbol, waxing, illuminationPct, brightLimbAngleDeg: roundNormalizedDegrees((brightLimbPositionAngle - parallacticAngle) * 180 / Math.PI) };
 }
 
 export function roundAltitudeDegrees(value: number | null | undefined) {

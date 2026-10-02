@@ -70,7 +70,9 @@ describe("mise en page mobile des panneaux environnementaux", () => {
 
     expect(markup).toContain("w-full max-w-[330px] min-w-0 overflow-visible");
     expect(markup).toContain('data-phase-label="Gibbeuse décroissante" data-illumination-pct="85" data-bright-limb-angle-deg="41.3" data-waxing="false"');
-    expect(markup).toContain('Éclairage 85%');
+    expect(markup).toContain('class="realistic-moon-glow relative block h-10 w-10 rounded-full"');
+    expect(markup).toContain('class="realistic-moon-glow relative block h-16 w-16 rounded-full"');
+    expect(markup).toContain("Éclairage 85%");
     expect(markup).toContain("A 35 50");
     expect(markup).not.toContain("conic-gradient(from");
     expect(markup).not.toContain("celestial-arc-scene--night relative mx-auto mt-7");

@@ -19,8 +19,8 @@ export function getLunarShadowPath(illuminationPct: number) {
   return `M 50 0 A 50 50 0 0 0 50 100 A ${terminatorRadiusX} 50 0 0 ${terminatorSweep} 50 0 Z`;
 }
 
-/** CSS/SVG rotation that points the default right-facing bright limb at its sky angle. */
+/** Converts the local angle (zenith toward east) to clockwise SVG rotation; east is left in this sky-chart view. */
 export function getLunarShadowTransform(brightLimbAngleDeg: number) {
-  const normalized = ((brightLimbAngleDeg - 90) % 360 + 360) % 360;
+  const normalized = ((270 - brightLimbAngleDeg) % 360 + 360) % 360;
   return `rotate(${Math.round(normalized * 10) / 10} 50 50)`;
 }
