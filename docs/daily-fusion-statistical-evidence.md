@@ -41,7 +41,7 @@ Le plancher de 0,5 et les bornes `[0,3; 2]` bornent l’influence d’un MAE ext
 
 Si « 12 cas » correspond à 12 dates distinctes, **0,6 °C est exclu** avant le calcul des poids parce qu’il n’atteint pas les 30 jours minimum. Il ne peut donc pas battre, démultiplier ou obtenir un avantage sur le modèle à 0,8 °C.
 
-Le modèle à **0,8 °C sur 500 dates** est admissible uniquement si ses comparaisons sont récentes et appartiennent au même lieu, à la même variable et au même horizon. Son facteur d’échantillon vaut `500 / (500 + 30) ≈ 0,943`; son poids final dépend encore de `SE_m`, de la médiane `B` des modèles admissibles comparables et des autres poids de même groupe. Les deux MAE seuls ne suffisent pas à calculer honnêtement le poids exact.
+Le modèle à **0,8 °C sur 500 comparaisons** peut être admissible si ces comparaisons couvrent au moins 30 dates distinctes récentes dans le même lieu, la même variable et le même horizon. Comme la fenêtre de calcul est de 120 jours, `n` vaut au plus 120 : avec 120 dates distinctes, `q = 120 / (120 + 30) = 0,8`. Les 500 comparaisons ne sont jamais comptées comme 500 observations indépendantes; le poids final dépend aussi de `SE_m`, de la médiane `B` des modèles admissibles comparables et de la fraîcheur. Les deux MAE seuls ne suffisent pas à calculer honnêtement le poids exact.
 
 ## Avant et après la migration
 

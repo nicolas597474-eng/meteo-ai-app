@@ -170,8 +170,8 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
 
   it("n’utilise pas un MAE brut sans effectif ni contexte lieu/variable/horizon", () => {
     const sources = [
-      { ...modelSource("mae-brut-faible", 10, modelEvidence("mae-brut-faible", 0.6, 500)), maeTemp: 0.6, performanceEvidence: undefined },
-      { ...modelSource("mae-brut-fort", 20, modelEvidence("mae-brut-fort", 0.8, 500)), maeTemp: 0.8, performanceEvidence: undefined },
+      { ...modelSource("mae-brut-faible", 10, modelEvidence("mae-brut-faible", 0.6, 120)), maeTemp: 0.6, performanceEvidence: undefined },
+      { ...modelSource("mae-brut-fort", 20, modelEvidence("mae-brut-fort", 0.8, 120)), maeTemp: 0.8, performanceEvidence: undefined },
     ];
     const result = computeFusion(sources, { ...config, performanceContext: undefined });
 
@@ -181,19 +181,23 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
 
   it("n’accorde pas d’avantage excessif à 0,6 °C sur 12 cas face à 0,8 °C sur 500", () => {
     const lowN = modelEvidence("faible-effectif", 0.6, 12);
-    const highN = modelEvidence("grand-effectif", 0.8, 500);
+    const highN = modelEvidence("grand-effectif", 0.8, 120, { comparisonCount: 500 });
     const sources = [
       modelSource("faible-effectif", 10, lowN),
       modelSource("grand-effectif", 20, highN),
-      modelSource("autre-1", 30, modelEvidence("autre-1", 0.9, 500)),
-      modelSource("autre-2", 40, modelEvidence("autre-2", 1.0, 500)),
+      modelSource("autre-1", 30, modelEvidence("autre-1", 0.9, 120)),
+      modelSource("autre-2", 40, modelEvidence("autre-2", 1.0, 120)),
     ];
     const result = computeFusion(sources, config);
 
     expect(result.performanceEvidenceStatus).toBe("qualified");
     expect(result.usedSources.map((source) => source.name)).not.toContain("faible-effectif");
     expect(result.excludedSources.find((source) => source.name === "faible-effectif")?.reason).toContain("30 jours indépendants");
-    const weight = result.usedSources.find((source) => source.name === "grand-effectif")!.finalWeight;
+    const largeSample = result.usedSources.find((source) => source.name === "grand-effectif")!;
+    expect(largeSample.performanceEvidence?.comparisonCount).toBe(500);
+    expect(largeSample.performanceEvidence?.sampleSize).toBe(120);
+    expect(largeSample.sampleReliability).toBeCloseTo(0.8, 12);
+    const weight = largeSample.finalWeight;
     expect(weight).toBeGreaterThan(result.usedSources.find((source) => source.name === "autre-1")!.finalWeight);
     expect(weight).toBeLessThanOrEqual(MODEL_FUSION_WEIGHT_CAP);
     expect(result.usedSources.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
@@ -201,9 +205,9 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
 
   it("régularise l’incertitude et garde le multiplicateur dans ses bornes", () => {
     const evidence = [
-      modelEvidence("très-précis", 0.1, 500, { standardError: 0 }),
-      modelEvidence("médian", 0.5, 500, { standardError: 0 }),
-      modelEvidence("peu-précis", 9, 500, { standardError: 0 }),
+      modelEvidence("très-précis", 0.1, 120, { standardError: 0 }),
+      modelEvidence("médian", 0.5, 120, { standardError: 0 }),
+      modelEvidence("peu-précis", 9, 120, { standardError: 0 }),
     ];
     const regularized = regularizeModelPerformance(evidence, performanceContext, new Date());
 
@@ -234,8 +238,8 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
 
   it("refuse une fusion si le nombre de modèles ne permet pas de respecter le plafond", () => {
     const result = computeFusion([
-      modelSource("m1", 10, modelEvidence("m1", 0.8, 500)),
-      modelSource("m2", 12, modelEvidence("m2", 0.9, 500)),
+      modelSource("m1", 10, modelEvidence("m1", 0.8, 120)),
+      modelSource("m2", 12, modelEvidence("m2", 0.9, 120)),
     ], config);
     expect(result.temperature).toBeNull();
     expect(result.usedSources).toEqual([]);
@@ -246,11 +250,11 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
 
   it("ignore un modèle sans valeur pour la variable et exige des preuves du lieu, de la variable et de l’horizon exacts", () => {
     const available = [
-      modelSource("m1", 10, modelEvidence("m1", 0.8, 500)),
-      modelSource("m2", 12, modelEvidence("m2", 0.9, 500)),
-      modelSource("m3", 14, modelEvidence("m3", 1.0, 500)),
+      modelSource("m1", 10, modelEvidence("m1", 0.8, 120)),
+      modelSource("m2", 12, modelEvidence("m2", 0.9, 120)),
+      modelSource("m3", 14, modelEvidence("m3", 1.0, 120)),
     ];
-    const missing = modelSource("m4", null, modelEvidence("m4", 0.7, 500));
+    const missing = modelSource("m4", null, modelEvidence("m4", 0.7, 120));
     const result = computeFusion([...available, missing], config);
     expect(result.performanceEvidenceStatus).toBe("qualified");
     expect(result.usedSources.map((source) => source.name)).toEqual(["m1", "m2", "m3"]);
