@@ -1,3 +1,5 @@
+import { buildNormalizedSpatialWeights } from "./spatialFusionCore";
+
 export type LocalHistoryReading = {
   stationId: string;
   observedAt: number;
@@ -64,11 +66,23 @@ export function buildLocalOfficialDeltaHistory(
     .map(([validAt, group]) => {
       const officialTemperature = officialByValidAt.get(validAt);
       if (officialTemperature == null) return null;
-      const weighted = group.reduce((acc, reading) => {
-        if (!Number.isFinite(reading.distanceKm) || reading.distanceKm < 0 || !Number.isFinite(reading.reliabilityScore)) return acc;
-        const weight = (1 / (reading.distanceKm + 0.5)) * 0.5 + (reading.reliabilityScore / 100) * 0.3 + 0.2;
-        return { sum: acc.sum + reading.temperature! * weight, weights: acc.weights + weight };
-      }, { sum: 0, weights: 0 });
+      const validReadings = group.filter((reading) =>
+        Number.isFinite(reading.distanceKm) && reading.distanceKm >= 0 && Number.isFinite(reading.reliabilityScore),
+      );
+      const weights = buildNormalizedSpatialWeights(
+        validReadings.map((reading, index) => ({
+          id: `${reading.stationId}:${index}`,
+          distanceKm: reading.distanceKm,
+          reliabilityScore: reading.reliabilityScore,
+          updatedAt: new Date(reading.observedAt),
+          temperature: reading.temperature,
+        })),
+        { now: validAt },
+      );
+      const weighted = weights.reduce((acc, weight, index) => ({
+        sum: acc.sum + validReadings[index].temperature! * weight.finalWeight,
+        weights: acc.weights + weight.finalWeight,
+      }), { sum: 0, weights: 0 });
       if (weighted.weights <= 0) return null;
       const localTemperature = Math.round((weighted.sum / weighted.weights) * 10) / 10;
       const deltaC = Math.round((localTemperature - officialTemperature) * 10) / 10;

@@ -36,7 +36,9 @@ describe("computeFusion — fusion IDW avancée", () => {
     expect(result.methodUsed).toContain("IDW");
     expect(result.stationCount).toBe(2);
     expect(result.temperature).not.toBeNull();
-    expect(result.temperature!).toBeLessThan(12);
+    // La proximité reste prépondérante, mais ne contourne plus les parts
+    // normalisées distance/qualité/fraîcheur du noyau spatial commun.
+    expect(result.temperature!).toBeLessThan(15);
     expect(result.usedSources[0]?.name).toBe("proche");
   });
 

@@ -20,6 +20,13 @@
 import { fetchOpenSenseMapCandidates } from "./openSenseMapService";
 import { WEATHER_SERVICES } from "./weatherServices";
 import type { CurrentModelReference } from "./modelReferenceCoherence";
+import {
+  buildNormalizedSpatialWeights,
+  evaluateSpatialQuality,
+  SPATIAL_FUSION_COMPONENT_SHARES,
+  SPATIAL_FUSION_DISTANCE_EPSILON_KM,
+  SPATIAL_FUSION_IDW_EXPONENT,
+} from "./spatialFusionCore";
 
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
 
@@ -588,26 +595,9 @@ export function rankStations(stations: StationData[]): StationData[] {
 
 // ─── Ground truth calculation ─────────────────────────────────────────────────
 
-export const GROUND_TRUTH_COMPONENT_SHARES = {
-  distance: 0.5,
-  quality: 0.3,
-  freshness: 0.2,
-} as const;
-export const GROUND_TRUTH_IDW_EXPONENT = 2;
-export const GROUND_TRUTH_DISTANCE_EPSILON_KM = 0.5;
-
-function normalizeGroundTruthWeights(values: readonly number[]): number[] {
-  const safeValues = values.map((value) => Number.isFinite(value) && value > 0 ? value : 0);
-  const total = safeValues.reduce((sum, value) => sum + value, 0);
-  if (total > 0) return safeValues.map((value) => value / total);
-  return values.length === 0 ? [] : values.map(() => 1 / values.length);
-}
-
-function getGroundTruthFreshness(updatedAt: string | null, now: number): number {
-  const observedAt = updatedAt ? Date.parse(updatedAt) : NaN;
-  const ageMin = Number.isFinite(observedAt) ? Math.max(0, (now - observedAt) / 60_000) : 60;
-  return Math.exp(-ageMin / 60); // demi-vie : 60 minutes
-}
+export const GROUND_TRUTH_COMPONENT_SHARES = SPATIAL_FUSION_COMPONENT_SHARES;
+export const GROUND_TRUTH_IDW_EXPONENT = SPATIAL_FUSION_IDW_EXPONENT;
+export const GROUND_TRUTH_DISTANCE_EPSILON_KM = SPATIAL_FUSION_DISTANCE_EPSILON_KM;
 
 export function calculateGroundTruth(stations: StationData[]): GroundTruthResult {
   const active = stations.filter(s => s.isActive);
@@ -630,66 +620,79 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     };
   }
 
-  // 1. Calculer chaque composante dans son espace propre.
-  // L’IDW p=2 renforce le signal spatial sans laisser une valeur brute de
-  // distance peser plus que les 50 % documentés après normalisation.
+  // Le Ground Truth partage le QC et le noyau spatial de référence avec les
+  // modes Local/Ultra-local. Ses contraintes restent celles de la collecte
+  // physique (180 min, fiabilité >= 40, pas de correction d’altitude sans
+  // altitude connue du point favori).
   const now = Date.now();
-  const distanceRaw = active.map((station) =>
-    1 / Math.pow(Math.max(0, station.distanceKm) + GROUND_TRUTH_DISTANCE_EPSILON_KM, GROUND_TRUTH_IDW_EXPONENT),
-  );
-  const qualityRaw = active.map((station) => Math.max(0, Math.min(100, station.reliabilityScore)) / 100);
-  const freshnessRaw = active.map((station) => getGroundTruthFreshness(station.updatedAt, now));
+  const spatialQc = evaluateSpatialQuality(active.map((station) => ({ ...station, id: station.stationId })), {
+    now,
+    maxDistanceKm: Math.max(...active.map((station) => station.distanceKm), 0),
+    maxFreshnessMin: 180,
+    minReliabilityScore: 40,
+    maxTempDeviationC: 8,
+  });
+  const qualified = spatialQc.filter((result) => result.passed);
+  ignored.push(...spatialQc.filter((result) => !result.passed).map((result) => ({
+    stationId: result.source.stationId,
+    name: result.source.name,
+    source: result.source.source,
+    distanceKm: result.source.distanceKm,
+    reason: result.checks.filter((check) => !check.passed).map((check) => check.reason).join(" ; "),
+  })));
+  if (qualified.length === 0) {
+    return {
+      temperature: null, humidity: null, pressure: null,
+      windSpeed: null, windGust: null, precipitation: null,
+      stationsUsed: [], stationsIgnored: ignored,
+      stationCount: 0, confidenceScore: 0,
+    };
+  }
+  const activeQualified = qualified.map((result) => result.source);
+  const weights = buildNormalizedSpatialWeights(activeQualified, { now });
+  const weightsByStationId = new Map(weights.map((weight) => [weight.source.stationId, weight]));
 
-  // 2. Normaliser chacune des trois composantes sur les stations actives.
-  const distanceWeights = normalizeGroundTruthWeights(distanceRaw);
-  const qualityWeights = normalizeGroundTruthWeights(qualityRaw);
-  const freshnessWeights = normalizeGroundTruthWeights(freshnessRaw);
-
-  // 3. Appliquer les proportions documentées, puis normaliser le résultat final.
-  const combinedWeights = active.map((_, index) =>
-    distanceWeights[index] * GROUND_TRUTH_COMPONENT_SHARES.distance
-      + qualityWeights[index] * GROUND_TRUTH_COMPONENT_SHARES.quality
-      + freshnessWeights[index] * GROUND_TRUTH_COMPONENT_SHARES.freshness,
-  );
-  const finalWeights = normalizeGroundTruthWeights(combinedWeights);
-
-  const contributions: StationContribution[] = active.map((s, i) => ({
+  const contributions: StationContribution[] = activeQualified.map((s) => {
+    const weight = weightsByStationId.get(s.stationId)!;
+    return {
     stationId: s.stationId,
     name: s.name,
     source: s.source,
     distanceKm: s.distanceKm,
-    weight: Math.round(finalWeights[i] * 1000) / 1000,
-    distanceWeight: Math.round(distanceWeights[i] * 1000) / 1000,
-    qualityWeight: Math.round(qualityWeights[i] * 1000) / 1000,
-    freshnessWeight: Math.round(freshnessWeights[i] * 1000) / 1000,
+    weight: Math.round(weight.finalWeight * 1000) / 1000,
+    distanceWeight: Math.round(weight.distanceWeight * 1000) / 1000,
+    qualityWeight: Math.round(weight.qualityWeight * 1000) / 1000,
+    freshnessWeight: Math.round(weight.freshnessWeight * 1000) / 1000,
     temperature: s.temperature,
     humidity: s.humidity,
     pressure: s.pressure,
     windSpeed: s.windSpeed,
     precipitation: s.precipitation,
-  }));
+  };
+  });
 
   // Weighted average for each variable
   function weightedAvg(field: keyof Pick<StationData, "temperature" | "humidity" | "pressure" | "windSpeed" | "windGust" | "precipitation">): number | null {
     let sum = 0, wSum = 0;
-    active.forEach((s, i) => {
+    activeQualified.forEach((s) => {
       const v = s[field];
       if (v != null) {
-        sum += (v as number) * finalWeights[i];
-        wSum += finalWeights[i];
+        const weight = weightsByStationId.get(s.stationId)!.finalWeight;
+        sum += (v as number) * weight;
+        wSum += weight;
       }
     });
     return wSum > 0 ? Math.round((sum / wSum) * 10) / 10 : null;
   }
 
   // Confidence: higher when more stations agree (low std dev) and many stations
-  const temps = active.map(s => s.temperature).filter((v): v is number => v != null);
+  const temps = activeQualified.map(s => s.temperature).filter((v): v is number => v != null);
   const tempMean = temps.length > 0 ? temps.reduce((a, b) => a + b) / temps.length : 0;
   const tempStd = temps.length > 1
     ? Math.sqrt(temps.reduce((s, v) => s + (v - tempMean) ** 2, 0) / temps.length)
     : 0;
   const confidenceScore = Math.max(0, Math.min(100, Math.round(
-    100 - tempStd * 10 - Math.max(0, 5 - active.length) * 5
+    100 - tempStd * 10 - Math.max(0, 5 - activeQualified.length) * 5
   )));
 
   return {
@@ -701,7 +704,7 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     precipitation: weightedAvg("precipitation"),
     stationsUsed: contributions,
     stationsIgnored: ignored,
-    stationCount: active.length,
+    stationCount: activeQualified.length,
     confidenceScore,
   };
 }

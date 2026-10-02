@@ -23,6 +23,8 @@
  * le MAE de manière statistiquement significative (p < 0.05, n >= 10 observations)
  */
 
+import { buildNormalizedSpatialWeights, evaluateSpatialQuality } from "./spatialFusionCore";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type FusionSource = {
@@ -683,26 +685,31 @@ export function computeFusion(
     candidates.push(s);
   }
 
-  // Coherence check: remove stations deviating too much from neighbors
-  const stationCandidates = candidates.filter(s => s.type === "station");
-  const modelCandidates = candidates.filter(s => s.type !== "station");
-
-  if (stationCandidates.length >= 3) {
-    const temps = stationCandidates.filter(s => s.temperature != null).map(s => s.temperature!);
-    const medianTemp = temps.sort((a, b) => a - b)[Math.floor(temps.length / 2)];
-
-    stationCandidates.forEach(s => {
-      if (s.temperature != null && Math.abs(s.temperature - medianTemp) > cfg.maxTempDeviationC) {
-        const idx = candidates.indexOf(s);
-        if (idx !== -1) candidates.splice(idx, 1);
-        excluded.push({
-          id: s.id,
-          name: s.name,
-          reason: `Incohérence: ${s.temperature.toFixed(1)}°C vs médiane ${medianTemp.toFixed(1)}°C (écart ${Math.abs(s.temperature - medianTemp).toFixed(1)}°C > ${cfg.maxTempDeviationC}°C)`,
-          temperature: s.temperature,
-        });
-      }
+  // Les stations utilisent le QC spatial partagé avec Ground Truth et Ultra-local.
+  // Les modèles restent dans leur pipeline numérique propre et ne sont pas assimilés
+  // à des observations physiques.
+  const preliminaryStations = candidates.filter(source => source.type === "station");
+  const spatialQc = evaluateSpatialQuality(preliminaryStations, {
+    now,
+    maxDistanceKm: cfg.maxDistanceKm,
+    maxFreshnessMin: cfg.maxFreshnessMin,
+    minReliabilityScore: cfg.minReliabilityScore,
+    maxTempDeviationC: cfg.maxTempDeviationC,
+    refAltitude: cfg.altitudeCorrectionEnabled ? cfg.refAltitude : null,
+  });
+  const rejectedStationIds = new Set(spatialQc.filter(result => !result.passed).map(result => result.source.id));
+  for (const result of spatialQc.filter(result => !result.passed)) {
+    excluded.push({
+      id: result.source.id,
+      name: result.source.name,
+      reason: result.checks.filter(check => !check.passed).map(check => check.reason).join(" ; "),
+      temperature: result.source.temperature ?? null,
     });
+  }
+  if (rejectedStationIds.size > 0) {
+    for (let index = candidates.length - 1; index >= 0; index--) {
+      if (candidates[index].type === "station" && rejectedStationIds.has(candidates[index].id)) candidates.splice(index, 1);
+    }
   }
 
   if (candidates.length === 0) {
@@ -722,79 +729,65 @@ export function computeFusion(
     ? detectAnomalies(candidates, previousReadings)
     : { penalties: new Map<string, number>(), reports: [] };
 
-  // ── Step 3-7: Compute weights ───────────────────────────────────────────────
+  // ── Step 3-8: Poids spatiaux communs pour stations + fusion numérique ───────
   const stationsOnly = candidates.filter(s => s.type === "station");
   const modelsOnly = candidates.filter(s => s.type !== "station");
 
-  function computeRawWeight(s: FusionSource): number {
-    const ageMin = s.updatedAt
-      ? (now - new Date(s.updatedAt).getTime()) / 60000
-      : 30;
-
-    // IDW p=2: weight ∝ 1/d²
-    const distW = 1 / Math.pow(s.distanceKm + 0.1, cfg.idwExponent);
-
-    // Quality multiplier (0.5 to 1.5 range)
-    const reliability = s.reliabilityScore ?? 50;
-    const qualW = 0.5 + (reliability / 100);
-
-    // Freshness decay: exponential half-life 60 min
-    const freshW = Math.exp(-ageMin / 60);
-
-    // Performance multiplier: 1/MAE (better accuracy → higher weight)
-    // Only applied if adaptive weighting is enabled and MAE data is available
-    let perfW = 1.0;
-    if (cfg.adaptiveWeightingEnabled && s.maeTemp != null && s.maeTemp > 0) {
-      // Normalize: MAE of 0.5°C → perfW=2.0, MAE of 2.0°C → perfW=0.5
-      perfW = Math.min(2.0, Math.max(0.3, 1.0 / s.maeTemp));
-    }
-
-    // Anomaly penalty
-    const penalty = penalties.get(s.id) ?? 1.0;
-
-    return distW * qualW * freshW * perfW * penalty;
+  function performanceMultiplier(source: FusionSource): number {
+    if (!cfg.adaptiveWeightingEnabled || source.maeTemp == null || source.maeTemp <= 0) return 1;
+    return Math.min(2.0, Math.max(0.3, 1.0 / source.maeTemp));
   }
 
-  // ── Step 8: Separate station/model weights ──────────────────────────────────
-  const stationWeights = stationsOnly.map(s => ({ source: s, raw: computeRawWeight(s) }));
-  const modelWeights = modelsOnly.map(s => ({ source: s, raw: computeRawWeight(s) }));
-
-  const stationTotalRaw = stationWeights.reduce((s, w) => s + w.raw, 0);
-  const modelTotalRaw = modelWeights.reduce((s, w) => s + w.raw, 0);
-
-  // Determine effective fractions
-  const hasStations = stationTotalRaw > 0;
-  const hasModels = modelTotalRaw > 0;
-  const stationFraction = hasStations
-    ? (hasModels ? 1 - cfg.modelWeightFraction : 1.0)
-    : 0;
-  const modelFraction = hasModels
-    ? (hasStations ? cfg.modelWeightFraction : 1.0)
-    : 0;
-
-  // Normalize within each group then apply fraction
-  const allWeighted: { source: FusionSource; weight: number; distW: number; qualW: number; freshW: number; perfW: number }[] = [];
-
-  stationWeights.forEach(({ source: s, raw }) => {
-    const ageMin = s.updatedAt ? (now - new Date(s.updatedAt).getTime()) / 60000 : 30;
-    const distW = 1 / Math.pow(s.distanceKm + 0.1, cfg.idwExponent);
-    const qualW = 0.5 + ((s.reliabilityScore ?? 50) / 100);
-    const freshW = Math.exp(-ageMin / 60);
-    const perfW = cfg.adaptiveWeightingEnabled && s.maeTemp != null && s.maeTemp > 0
-      ? Math.min(2.0, Math.max(0.3, 1.0 / s.maeTemp)) : 1.0;
-    const weight = stationTotalRaw > 0 ? (raw / stationTotalRaw) * stationFraction : 0;
-    allWeighted.push({ source: s, weight, distW, qualW, freshW, perfW });
+  // Le noyau commun applique IDW p=2, qualité et fraîcheur normalisées (50/30/20),
+  // puis les modulations de performance et d’anomalie avant renormalisation.
+  const performanceMultiplierById = new Map(stationsOnly.map(source => [source.id, performanceMultiplier(source)]));
+  const stationSpatialWeights = buildNormalizedSpatialWeights(stationsOnly, {
+    now,
+    refAltitude: cfg.altitudeCorrectionEnabled ? cfg.refAltitude : null,
+    idwExponent: cfg.idwExponent,
+    performanceMultiplierById,
+    anomalyPenaltyById: penalties,
   });
 
-  modelWeights.forEach(({ source: s, raw }) => {
-    const ageMin = s.updatedAt ? (now - new Date(s.updatedAt).getTime()) / 60000 : 30;
-    const distW = 1 / Math.pow(s.distanceKm + 0.1, cfg.idwExponent);
-    const qualW = 0.5 + ((s.reliabilityScore ?? 50) / 100);
-    const freshW = Math.exp(-ageMin / 60);
-    const perfW = cfg.adaptiveWeightingEnabled && s.maeTemp != null && s.maeTemp > 0
-      ? Math.min(2.0, Math.max(0.3, 1.0 / s.maeTemp)) : 1.0;
-    const weight = modelTotalRaw > 0 ? (raw / modelTotalRaw) * modelFraction : 0;
-    allWeighted.push({ source: s, weight, distW, qualW, freshW, perfW });
+  function computeModelRawWeight(source: FusionSource): number {
+    const ageMin = source.updatedAt ? Math.max(0, (now - new Date(source.updatedAt).getTime()) / 60000) : 30;
+    const distanceWeight = 1 / Math.pow(Math.max(0, source.distanceKm) + 0.1, cfg.idwExponent);
+    const qualityWeight = 0.5 + ((source.reliabilityScore ?? 50) / 100);
+    const freshnessWeight = Math.exp(-ageMin / 60);
+    return distanceWeight * qualityWeight * freshnessWeight * performanceMultiplier(source) * (penalties.get(source.id) ?? 1);
+  }
+
+  const modelWeights = modelsOnly.map(source => ({ source, raw: computeModelRawWeight(source) }));
+  const stationTotalRaw = stationSpatialWeights.reduce((sum, weight) => sum + weight.finalWeight, 0);
+  const modelTotalRaw = modelWeights.reduce((sum, weight) => sum + weight.raw, 0);
+  const hasStations = stationTotalRaw > 0;
+  const hasModels = modelTotalRaw > 0;
+  const stationFraction = hasStations ? (hasModels ? 1 - cfg.modelWeightFraction : 1.0) : 0;
+  const modelFraction = hasModels ? (hasStations ? cfg.modelWeightFraction : 1.0) : 0;
+
+  const allWeighted: { source: FusionSource; weight: number; distW: number; qualW: number; freshW: number; perfW: number; altAdj: number }[] = [];
+  stationSpatialWeights.forEach((spatial) => {
+    allWeighted.push({
+      source: spatial.source,
+      weight: spatial.finalWeight * stationFraction,
+      distW: spatial.distanceWeight,
+      qualW: spatial.qualityWeight,
+      freshW: spatial.freshnessWeight,
+      perfW: spatial.performanceWeight,
+      altAdj: spatial.altitudeAdjustmentC,
+    });
+  });
+  modelWeights.forEach(({ source, raw }) => {
+    const ageMin = source.updatedAt ? Math.max(0, (now - new Date(source.updatedAt).getTime()) / 60000) : 30;
+    allWeighted.push({
+      source,
+      weight: modelTotalRaw > 0 ? (raw / modelTotalRaw) * modelFraction : 0,
+      distW: 1 / Math.pow(Math.max(0, source.distanceKm) + 0.1, cfg.idwExponent),
+      qualW: 0.5 + ((source.reliabilityScore ?? 50) / 100),
+      freshW: Math.exp(-ageMin / 60),
+      perfW: performanceMultiplier(source),
+      altAdj: 0,
+    });
   });
 
   // ── Step 9: Weighted average per parameter ──────────────────────────────────
@@ -803,8 +796,9 @@ export function computeFusion(
     "windGust" | "precipitation" | "cloudCover" | "dewPoint" | "uvIndex" | "visibility">
   ): number | null {
     let sum = 0, wSum = 0;
-    for (const { source, weight } of allWeighted) {
-      const v = source[field];
+    for (const { source, weight, altAdj } of allWeighted) {
+      const base = source[field];
+      const v = field === "temperature" && source.type === "station" && base != null ? (base as number) + altAdj : base;
       if (v != null) {
         sum += (v as number) * weight;
         wSum += weight;
@@ -842,30 +836,19 @@ export function computeFusion(
   const visibility = weightedAvg("visibility");
   const apparentTemp = weightedAvg("apparentTemp");
 
-  // ── Step 10: Altitude correction ────────────────────────────────────────────
-  let altitudeAdjustmentC = 0;
-  if (cfg.altitudeCorrectionEnabled && cfg.refAltitude != null && temperature != null) {
-    // Compute weighted mean altitude of used stations
-    const altStations = allWeighted.filter(w => w.source.altitude != null && w.source.type === "station");
-    if (altStations.length > 0) {
-      const wAlt = altStations.reduce((s, w) => s + w.source.altitude! * w.weight, 0);
-      const wSum = altStations.reduce((s, w) => s + w.weight, 0);
-      const avgStationAlt = wAlt / wSum;
-      const altDiff = avgStationAlt - cfg.refAltitude;
-      // Only apply if difference is meaningful (> 20m)
-      if (Math.abs(altDiff) > 20) {
-        altitudeAdjustmentC = -(altDiff / 100) * 0.65;
-        temperature = Math.round((temperature + altitudeAdjustmentC) * 10) / 10;
-      }
-    }
-  }
+  // ── Step 10: Correction d’altitude déjà appliquée dans le noyau spatial ─────
+  const altitudeContributors = allWeighted.filter(weight => weight.source.type === "station" && weight.source.temperature != null && weight.weight > 0);
+  const altitudeTotal = altitudeContributors.reduce((sum, weight) => sum + weight.weight, 0);
+  const altitudeAdjustmentC = altitudeTotal > 0
+    ? altitudeContributors.reduce((sum, weight) => sum + weight.altAdj * weight.weight, 0) / altitudeTotal
+    : 0;
 
   // ── Step 11: Confidence score ────────────────────────────────────────────────
   const stationCount = stationsOnly.length;
   const modelCount = modelsOnly.length;
   const temps = allWeighted
-    .filter(w => w.source.temperature != null)
-    .map(w => w.source.temperature!);
+    .filter(weight => weight.source.temperature != null)
+    .map(weight => weight.source.temperature! + (weight.source.type === "station" ? weight.altAdj : 0));
   const tempMean = temps.length > 0 ? temps.reduce((a, b) => a + b, 0) / temps.length : 0;
   const tempStd = temps.length > 1
     ? Math.sqrt(temps.reduce((s, v) => s + Math.pow(v - tempMean, 2), 0) / temps.length)
@@ -882,11 +865,7 @@ export function computeFusion(
   )));
 
   // ── Build used sources list ──────────────────────────────────────────────────
-  const usedSources: UsedSource[] = allWeighted.map(({ source: s, weight, distW, qualW, freshW, perfW }) => {
-    const ageMin = s.updatedAt ? (now - new Date(s.updatedAt).getTime()) / 60000 : 30;
-    const altAdj = cfg.altitudeCorrectionEnabled && cfg.refAltitude != null && s.altitude != null
-      ? -(((s.altitude - cfg.refAltitude) / 100) * 0.65)
-      : 0;
+  const usedSources: UsedSource[] = allWeighted.map(({ source: s, weight, distW, qualW, freshW, perfW, altAdj }) => {
     return {
       id: s.id,
       name: s.name,
@@ -895,7 +874,7 @@ export function computeFusion(
       finalWeight: Math.round(weight * 1000) / 1000,
       distanceWeight: Math.round(distW * 1000) / 1000,
       qualityWeight: Math.round(qualW * 1000) / 1000,
-      freshnessWeight: Math.round(Math.exp(-ageMin / 60) * 1000) / 1000,
+      freshnessWeight: Math.round(freshW * 1000) / 1000,
       performanceWeight: Math.round(perfW * 1000) / 1000,
       altitudeAdjustmentC: Math.round(altAdj * 100) / 100,
       temperature: s.temperature ?? null,
@@ -906,7 +885,7 @@ export function computeFusion(
   });
 
   const methodParts = [
-    `IDW-p${cfg.idwExponent}`,
+    `spatial-core+IDW-p${cfg.idwExponent}`,
     cfg.adaptiveWeightingEnabled ? "adaptive" : "fixed",
     cfg.anomalyDetectionEnabled ? "anomaly-checked" : "",
     cfg.altitudeCorrectionEnabled ? "alt-corrected" : "",

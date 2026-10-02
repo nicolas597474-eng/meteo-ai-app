@@ -30,6 +30,7 @@ import { getPreviousReadings, recordStationReadings } from "./stationReadingsCac
  */
 
 import { StationData, StationContribution, StationExclusion, haversineKm } from "./stationService";
+import { buildNormalizedSpatialWeights, evaluateSpatialQuality } from "./spatialFusionCore";
 
 export type LocalMode = "standard" | "local" | "ultra-local";
 
@@ -162,94 +163,28 @@ function verifyStationQuality(
   allStations: StationData[],
   config: typeof MODE_CONFIG["ultra-local"],
   refAltitude: number | null
-): { passed: boolean; checks: QualityCheck[]; altitudeAdj: number } {
-  const checks: QualityCheck[] = [];
-  let passed = true;
-  let altitudeAdj = 0;
-
-  // 1. Freshness check
-  const ageMin = station.updatedAt
-    ? (Date.now() - new Date(station.updatedAt).getTime()) / 60000
-    : 999;
-  const freshnessOk = ageMin <= config.maxFreshnessMin;
-  checks.push({
-    name: "Fraîcheur",
-    passed: freshnessOk,
-    value: `${Math.round(ageMin)} min`,
-    threshold: `< ${config.maxFreshnessMin} min`,
-  });
-  if (!freshnessOk) passed = false;
-
-  // 2. Coherence with neighbors
-  if (station.temperature != null) {
-    const maxModeRadiusKm = Math.max(...config.radiusBands.map((band) => band.maxKm));
-    const neighbors = allStations.filter(
-      s => s.stationId !== station.stationId &&
-        s.temperature != null &&
-        s.isActive &&
-        s.distanceKm < maxModeRadiusKm
-    );
-    if (neighbors.length > 0) {
-      const avgNeighborTemp = neighbors.reduce((sum, s) => sum + (s.temperature ?? 0), 0) / neighbors.length;
-      const deviation = Math.abs(station.temperature - avgNeighborTemp);
-      const coherenceOk = deviation <= config.maxTempDeviation;
-      checks.push({
-        name: "Cohérence",
-        passed: coherenceOk,
-        value: `±${deviation.toFixed(1)}°C`,
-        threshold: `< ${config.maxTempDeviation}°C d'écart`,
-      });
-      if (!coherenceOk) passed = false;
-    }
+): { passed: boolean; checks: QualityCheck[]; altAdj: number } {
+  const maxDistanceKm = Math.max(...config.radiusBands.map((band) => band.maxKm));
+  const evaluations = evaluateSpatialQuality(
+    allStations.filter((candidate) => candidate.isActive).map((candidate) => ({ ...candidate, id: candidate.stationId })),
+    {
+      maxDistanceKm,
+      maxFreshnessMin: config.maxFreshnessMin,
+      minReliabilityScore: config.minReliability,
+      maxTempDeviationC: config.maxTempDeviation,
+      refAltitude: config.altitudeCorrection ? refAltitude : null,
+    },
+  );
+  const evaluation = evaluations.find((candidate) => candidate.source.stationId === station.stationId);
+  if (!evaluation) {
+    return { passed: false, checks: [{ name: "Disponibilité", passed: false, value: "Station absente", threshold: "Station active" }], altAdj: 0 };
   }
-
-  // 3. Altitude verification & correction
-  if (config.altitudeCorrection && station.altitude != null && refAltitude != null) {
-    const altDiff = station.altitude - refAltitude;
-    // Standard lapse rate: -0.65°C per 100m
-    altitudeAdj = -(altDiff / 100) * 0.65;
-    // Exclude stations with extreme altitude difference (> 200m)
-    const altitudeOk = Math.abs(altDiff) <= 200;
-    checks.push({
-      name: "Altitude",
-      passed: altitudeOk,
-      value: `${station.altitude}m (réf: ${refAltitude}m, Δ${Math.abs(altDiff)}m)`,
-      threshold: altitudeOk
-        ? `Correction: ${altitudeAdj > 0 ? "+" : ""}${altitudeAdj.toFixed(2)}°C`
-        : `Écart > 200m — station exclue`,
-    });
-    if (!altitudeOk) passed = false;
-  } else if (config.altitudeCorrection && station.altitude == null) {
-    // No altitude data available — note it but don't exclude
-    checks.push({
-      name: "Altitude",
-      passed: true,
-      value: "Inconnue",
-      threshold: "Non vérifiable",
-    });
-  }
-
-  // 4. Historical quality
-  const qualityOk = station.reliabilityScore >= config.minReliability;
-  checks.push({
-    name: "Qualité historique",
-    passed: qualityOk,
-    value: `${station.reliabilityScore}/100`,
-    threshold: `≥ ${config.minReliability}`,
-  });
-  if (!qualityOk) passed = false;
-
-  // 5. Stability (no null data = stable enough)
-  const hasData = station.temperature != null || station.windSpeed != null;
-  checks.push({
-    name: "Stabilité",
-    passed: hasData,
-    value: hasData ? "Données disponibles" : "Aucune donnée",
-    threshold: "Mesures actives",
-  });
-  if (!hasData) passed = false;
-
-  return { passed, checks, altitudeAdj };
+  const labels = { distance: "Distance", freshness: "Fraîcheur", reliability: "Qualité historique", data: "Disponibilité", coherence: "Cohérence", altitude: "Altitude" } as const;
+  return {
+    passed: evaluation.passed,
+    checks: evaluation.checks.map((check) => ({ name: labels[check.code], passed: check.passed, value: check.value, threshold: check.threshold })),
+    altAdj: evaluation.altitudeAdjustmentC,
+  };
 }
 
 // ─── Microclimate Detection ──────────────────────────────────────────────────
@@ -384,7 +319,7 @@ export function calculateUltraLocal(
           }
         }
       }
-      return { station: s, passed: result.passed, checks: result.checks, altAdj: result.altitudeAdj };
+      return { station: s, passed: result.passed, checks: result.checks, altAdj: result.altAdj };
     });
 
   const activeStations = verified.filter(v => v.passed);
@@ -447,29 +382,18 @@ export function calculateUltraLocal(
       v => v.station.distanceKm >= band.minKm && v.station.distanceKm < band.maxKm
     );
 
-    // Dans une même bande, les contrôles de cohérence et d'altitude ont déjà
-    // exclu les mesures non admissibles. La pondération relative combine alors
-    // distance, fiabilité historique et fraîcheur réelle du relevé.
-    const inBandWeights = bandStations.map(v => {
-      const distW = 1 / (v.station.distanceKm + 0.1);
-      const qualW = v.station.reliabilityScore / 100;
-      const ageMin = v.station.updatedAt
-        ? Math.max(0, (Date.now() - new Date(v.station.updatedAt).getTime()) / 60000)
-        : config.maxFreshnessMin;
-      // Une mesure exactement à la limite reste admissible mais pèse moins
-      // qu'une mesure récente ; la fonction est bornée pour rester stable.
-      const freshnessW = Math.max(0.20, 1 - (Math.min(ageMin, config.maxFreshnessMin) / config.maxFreshnessMin) * 0.80);
-      return (distW * 0.60 + qualW * 0.40) * freshnessW;
-    });
-    const inBandTotal = inBandWeights.reduce((s, w) => s + w, 0);
+    // Le QC commun est déjà appliqué. Le même noyau spatial normalisé sert
+    // désormais au Ground Truth et à l’Ultra-local ; les bandes restent les
+    // contraintes propres au mode Ultra-local, appliquées après l’IDW intra-bande.
+    const inBandWeights = buildNormalizedSpatialWeights(
+      bandStations.map(({ station }) => ({ ...station, id: station.stationId })),
+      { refAltitude: config.altitudeCorrection ? effectiveAltitude : null },
+    );
 
       bandStations.forEach((v, i) => {
-        const stationWeight = (inBandWeights[i] / inBandTotal) * bandInfo.effectiveWeight;
-        const adjustedTemp = v.station.temperature != null ? v.station.temperature + v.altAdj : null;
-        const ageMin = v.station.updatedAt
-          ? Math.max(0, (Date.now() - new Date(v.station.updatedAt).getTime()) / 60000)
-          : config.maxFreshnessMin;
-        const freshnessWeight = Math.max(0.20, 1 - (Math.min(ageMin, config.maxFreshnessMin) / config.maxFreshnessMin) * 0.80);
+        const coreWeight = inBandWeights[i];
+        const stationWeight = coreWeight.finalWeight * bandInfo.effectiveWeight;
+        const adjustedTemp = coreWeight.adjustedTemperature;
 
       if (adjustedTemp != null) {
         weightedTemp += adjustedTemp * stationWeight;
@@ -482,9 +406,9 @@ export function calculateUltraLocal(
         source: v.station.source,
         distanceKm: v.station.distanceKm,
         weight: Math.round(stationWeight * 1000) / 1000,
-        distanceWeight: Math.round((1 / (v.station.distanceKm + 0.1)) * 1000) / 1000,
-        qualityWeight: Math.round((v.station.reliabilityScore / 100) * 1000) / 1000,
-        freshnessWeight: Math.round(freshnessWeight * 1000) / 1000,
+        distanceWeight: Math.round(coreWeight.distanceWeight * 1000) / 1000,
+        qualityWeight: Math.round(coreWeight.qualityWeight * 1000) / 1000,
+        freshnessWeight: Math.round(coreWeight.freshnessWeight * 1000) / 1000,
         temperature: v.station.temperature,
         humidity: v.station.humidity,
         pressure: v.station.pressure,
