@@ -217,6 +217,45 @@ describe("calculateGroundTruth", () => {
     expect(result.temperature).toBeGreaterThan(20);
   });
 
+  it("normalise chaque composante avant d’appliquer les parts distance 50 %, qualité 30 % et fraîcheur 20 %", () => {
+    const now = new Date().toISOString();
+    const result = calculateGroundTruth([
+      makeStation({ stationId: "near", distanceKm: 0.5, temperature: 20, reliabilityScore: 80, updatedAt: now }),
+      makeStation({ stationId: "far", distanceKm: 10, temperature: 30, reliabilityScore: 80, updatedAt: now }),
+    ]);
+    const near = result.stationsUsed.find((station) => station.stationId === "near")!;
+    const far = result.stationsUsed.find((station) => station.stationId === "far")!;
+
+    // Chaque composante est une distribution normalisée entre les stations actives.
+    expect(near.distanceWeight + far.distanceWeight).toBeCloseTo(1, 2);
+    expect(near.qualityWeight + far.qualityWeight).toBeCloseTo(1, 2);
+    expect(near.freshnessWeight + far.freshnessWeight).toBeCloseTo(1, 2);
+    expect(near.weight + far.weight).toBeCloseTo(1, 2);
+
+    // Avec qualité et fraîcheur identiques, l’IDW p=2 ne peut représenter que
+    // les 50 % annoncés : la station proche pèse ~75 %, jamais ~100 %.
+    expect(near.weight).toBeGreaterThan(0.74);
+    expect(near.weight).toBeLessThan(0.76);
+    expect(far.weight).toBeGreaterThan(0.24);
+    expect(far.weight).toBeLessThan(0.26);
+    expect(result.temperature).toBeCloseTo(22.5, 1);
+  });
+
+  it("rend la qualité et la fraîcheur réellement influentes après normalisation", () => {
+    const now = Date.now();
+    const result = calculateGroundTruth([
+      makeStation({ stationId: "recent-reliable", distanceKm: 3, temperature: 20, reliabilityScore: 100, updatedAt: new Date(now).toISOString() }),
+      makeStation({ stationId: "old-less-reliable", distanceKm: 3, temperature: 30, reliabilityScore: 40, updatedAt: new Date(now - 120 * 60_000).toISOString() }),
+    ]);
+    const recentReliable = result.stationsUsed.find((station) => station.stationId === "recent-reliable")!;
+    const oldLessReliable = result.stationsUsed.find((station) => station.stationId === "old-less-reliable")!;
+    expect(recentReliable.distanceWeight).toBeCloseTo(oldLessReliable.distanceWeight, 2);
+    expect(recentReliable.qualityWeight).toBeGreaterThan(oldLessReliable.qualityWeight);
+    expect(recentReliable.freshnessWeight).toBeGreaterThan(oldLessReliable.freshnessWeight);
+    expect(recentReliable.weight).toBeGreaterThan(oldLessReliable.weight);
+    expect(result.temperature).toBeLessThan(25);
+  });
+
   it("handles null values gracefully (skips nulls in weighted average)", () => {
     const s1 = makeStation({ stationId: "s1", temperature: 18, humidity: null });
     const s2 = makeStation({ stationId: "s2", temperature: 22, humidity: 70 });

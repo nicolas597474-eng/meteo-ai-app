@@ -9,9 +9,12 @@
  * 5. openSenseMap outdoor citizen sensors (candidates, excluded from ground truth)
  *
  * Ground truth weighting:
- *   50% distance (closer = more weight)
- *   30% historical quality (reliability score)
- *   20% data freshness (how recent the last reading is)
+ *   50% distance normalisée (IDW quadratique, closer = more weight)
+ *   30% historical quality normalisée (reliability score)
+ *   20% data freshness normalisée (how recent the last reading is)
+ * Les trois composantes sont normalisées entre les stations actives AVANT
+ * la combinaison, puis le poids final est normalisé à 1. Cela empêche une
+ * distance brute de contourner les proportions annoncées.
  */
 
 import { fetchOpenSenseMapCandidates } from "./openSenseMapService";
@@ -101,9 +104,9 @@ export type StationContribution = {
   source: string;
   distanceKm: number;
   weight: number; // 0-1 final weight
-  distanceWeight: number;
-  qualityWeight: number;
-  freshnessWeight: number;
+  distanceWeight: number; // part normalisée de la composante distance
+  qualityWeight: number; // part normalisée de la composante qualité
+  freshnessWeight: number; // part normalisée de la composante fraîcheur
   temperature: number | null;
   humidity: number | null;
   pressure: number | null;
@@ -585,6 +588,27 @@ export function rankStations(stations: StationData[]): StationData[] {
 
 // ─── Ground truth calculation ─────────────────────────────────────────────────
 
+export const GROUND_TRUTH_COMPONENT_SHARES = {
+  distance: 0.5,
+  quality: 0.3,
+  freshness: 0.2,
+} as const;
+export const GROUND_TRUTH_IDW_EXPONENT = 2;
+export const GROUND_TRUTH_DISTANCE_EPSILON_KM = 0.5;
+
+function normalizeGroundTruthWeights(values: readonly number[]): number[] {
+  const safeValues = values.map((value) => Number.isFinite(value) && value > 0 ? value : 0);
+  const total = safeValues.reduce((sum, value) => sum + value, 0);
+  if (total > 0) return safeValues.map((value) => value / total);
+  return values.length === 0 ? [] : values.map(() => 1 / values.length);
+}
+
+function getGroundTruthFreshness(updatedAt: string | null, now: number): number {
+  const observedAt = updatedAt ? Date.parse(updatedAt) : NaN;
+  const ageMin = Number.isFinite(observedAt) ? Math.max(0, (now - observedAt) / 60_000) : 60;
+  return Math.exp(-ageMin / 60); // demi-vie : 60 minutes
+}
+
 export function calculateGroundTruth(stations: StationData[]): GroundTruthResult {
   const active = stations.filter(s => s.isActive);
   const ignored: StationExclusion[] = stations
@@ -606,35 +630,38 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     };
   }
 
-  // Compute raw weights per station
+  // 1. Calculer chaque composante dans son espace propre.
+  // L’IDW p=2 renforce le signal spatial sans laisser une valeur brute de
+  // distance peser plus que les 50 % documentés après normalisation.
   const now = Date.now();
-  const rawWeights = active.map(s => {
-    // Distance weight (50%): inverse distance, normalized
-    const distW = 1 / (s.distanceKm + 0.5);
+  const distanceRaw = active.map((station) =>
+    1 / Math.pow(Math.max(0, station.distanceKm) + GROUND_TRUTH_DISTANCE_EPSILON_KM, GROUND_TRUTH_IDW_EXPONENT),
+  );
+  const qualityRaw = active.map((station) => Math.max(0, Math.min(100, station.reliabilityScore)) / 100);
+  const freshnessRaw = active.map((station) => getGroundTruthFreshness(station.updatedAt, now));
 
-    // Quality weight (30%): reliability score 0-100
-    const qualW = s.reliabilityScore / 100;
+  // 2. Normaliser chacune des trois composantes sur les stations actives.
+  const distanceWeights = normalizeGroundTruthWeights(distanceRaw);
+  const qualityWeights = normalizeGroundTruthWeights(qualityRaw);
+  const freshnessWeights = normalizeGroundTruthWeights(freshnessRaw);
 
-    // Freshness weight (20%): decay based on age
-    const ageMin = s.updatedAt
-      ? (now - new Date(s.updatedAt).getTime()) / 60000
-      : 60;
-    const freshW = Math.exp(-ageMin / 60); // half-life = 60 min
-
-    return { distW, qualW, freshW, total: distW * 0.5 + qualW * 0.3 + freshW * 0.2 };
-  });
-
-  const totalWeight = rawWeights.reduce((s, w) => s + w.total, 0);
+  // 3. Appliquer les proportions documentées, puis normaliser le résultat final.
+  const combinedWeights = active.map((_, index) =>
+    distanceWeights[index] * GROUND_TRUTH_COMPONENT_SHARES.distance
+      + qualityWeights[index] * GROUND_TRUTH_COMPONENT_SHARES.quality
+      + freshnessWeights[index] * GROUND_TRUTH_COMPONENT_SHARES.freshness,
+  );
+  const finalWeights = normalizeGroundTruthWeights(combinedWeights);
 
   const contributions: StationContribution[] = active.map((s, i) => ({
     stationId: s.stationId,
     name: s.name,
     source: s.source,
     distanceKm: s.distanceKm,
-    weight: Math.round((rawWeights[i].total / totalWeight) * 1000) / 1000,
-    distanceWeight: Math.round(rawWeights[i].distW * 1000) / 1000,
-    qualityWeight: Math.round(rawWeights[i].qualW * 1000) / 1000,
-    freshnessWeight: Math.round(rawWeights[i].freshW * 1000) / 1000,
+    weight: Math.round(finalWeights[i] * 1000) / 1000,
+    distanceWeight: Math.round(distanceWeights[i] * 1000) / 1000,
+    qualityWeight: Math.round(qualityWeights[i] * 1000) / 1000,
+    freshnessWeight: Math.round(freshnessWeights[i] * 1000) / 1000,
     temperature: s.temperature,
     humidity: s.humidity,
     pressure: s.pressure,
@@ -648,8 +675,8 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     active.forEach((s, i) => {
       const v = s[field];
       if (v != null) {
-        sum += (v as number) * rawWeights[i].total;
-        wSum += rawWeights[i].total;
+        sum += (v as number) * finalWeights[i];
+        wSum += finalWeights[i];
       }
     });
     return wSum > 0 ? Math.round((sum / wSum) * 10) / 10 : null;

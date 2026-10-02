@@ -3,8 +3,8 @@
  *
  * Améliorations par rapport aux algorithmes précédents :
  *
- * 1. IDW adaptatif (p=2) — exposant quadratique pour mieux pondérer les stations proches
- *    vs IDW p=1 (linéaire) utilisé dans calculateGroundTruth
+ * 1. IDW adaptatif (p=2) — exposant quadratique pour mieux pondérer les stations proches,
+ *    cohérent avec la composante spatiale normalisée de calculateGroundTruth
  *
  * 2. Pondération adaptative par performance historique — les stations/modèles ayant
  *    démontré une meilleure précision (MAE plus faible) reçoivent un poids plus élevé
