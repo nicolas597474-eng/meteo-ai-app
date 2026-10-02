@@ -3,78 +3,49 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./ReliabilityLaboratory.tsx", import.meta.url), "utf8");
 
-describe("ReliabilityLaboratory", () => {
-  it("ouvre la période de fiabilité sur 7 jours", () => {
-    expect(source).toContain('useState<PeriodId>("7d")');
+describe("ReliabilityLaboratory — preuves brutes", () => {
+  it("sélectionne une fenêtre et un horizon exacts sans repli vers une autre échéance", () => {
+    expect(source).toContain('useState<PeriodId>("30d")');
+    expect(source).toContain('useState<HorizonId>("6-24h")');
+    expect(source).toContain("Aucune échéance voisine ni période extérieure n’est utilisée en repli.");
   });
 
-  it("privilégie une synthèse courte et des modèles effectivement classables", () => {
-    expect(source).toContain("Fiabilité en bref");
-    expect(source).toContain("Classement en préparation");
-    expect(source).toContain("Modèles classables");
-    expect(source).toContain("slice(0, 3)");
+  it("sépare les métriques historiques par modèle, variable et horizon sans score global", () => {
+    expect(source).toContain("Fiabilité historique, sans note globale");
+    expect(source).toContain("MAE, RMSE, biais, effectifs, dates et évolution par modèle × variable × horizon exact");
+    expect(source).toContain("Fiabilité historique · modèle × variable × horizon");
+    expect(source).toContain("row.modelId");
+    expect(source).toContain("row.variableLabel");
+    expect(source).toContain("row.horizonId");
+    expect(source).not.toContain("normalizedScore");
+    expect(source).not.toContain("averageScore");
+    expect(source).not.toContain("Meilleur modèle");
+    expect(source).not.toContain("/100");
   });
 
-  it("retire les cartes de métriques secondaires du résumé mobile", () => {
-    expect(source).not.toContain('MiniBar label="RMSE"');
-    expect(source).not.toContain("MiniBar label=\"Précipitations\"");
-    expect(source).not.toContain("SectionHeading title=\"Évolution des scores\"");
+  it("montre des statuts explicites et ne transforme pas les valeurs indisponibles en zéro", () => {
+    expect(source).toContain("Seuil d’évidence atteint");
+    expect(source).toContain("Données insuffisantes");
+    expect(source).toContain("Horizon non archivé séparément");
+    expect(source).toContain("Historique indisponible");
+    expect(source).toContain("Une cellule « — » signifie non disponible, pas zéro.");
+    expect(source).toContain("Aucune métrique n’est estimée");
   });
 
-  it("affiche les tendances mesurées sans les présenter comme un classement validé", () => {
-    expect(source).toContain("Tendances provisoires");
-    expect(source).toContain("Couverture provisoire des preuves");
-    expect(source).not.toContain("Notes par modèle");
-    expect(source).not.toContain("Note {evidenceScore}/100");
-    expect(source).not.toContain("Note de preuve de ${model.name}: ${evidenceScore}/100");
-    expect(source).toContain("Température");
-    expect(source).toContain("Pluie");
-    expect(source).toContain("Vent");
-    expect(source).toContain("Humidité");
-    expect(source).toContain("Scores globaux par modèle");
-    expect(source).toContain("GLOBAL_SCORE_MODEL_PALETTES");
-    expect(source).toContain("palette.bar");
-    expect(source).toContain("formatFrenchDayMonth");
-    expect(source).toContain("normalizedScore");
-    expect(source).toContain("averageScore");
-    expect(source).toContain("right.averageScore - left.averageScore");
-    expect(source).toContain("Meilleur modèle");
-    expect(source.indexOf('id="scores-globaux"')).toBeLessThan(source.indexOf('id="tendances-provisoires"'));
-    expect(source.indexOf('id="tendances-provisoires"')).toBeLessThan(source.indexOf('id="vue-generale"'));
-    expect(source).toContain("Scores globaux indisponibles");
-    expect(source).toContain("ProvisionalTrendCard");
-    expect(source).toContain("Comprendre le score de pluie");
-    expect(source).toContain("score-precipitation-help");
-    expect(source).toContain("Fermer l’explication du score de précipitation");
-    expect(source).toContain("mae-temperature-help");
-    expect(source).toContain("mae-vent-help");
-    expect(source).toContain("mae-humidite-help");
-    expect(source).toContain("Fermer l’explication de la MAE de température");
-    expect(source).toContain("Fermer l’explication de la MAE de vent");
-    expect(source).toContain("Fermer l’explication de la MAE d’humidité");
-    expect(source).toContain("Le biais indique le sens");
-    expect(source).toContain("un biais positif signifie une prévision trop chaude en moyenne");
-    expect(source).toContain("un biais négatif, trop froide");
-    expect(source).toContain("Le RMSE détecte les gros écarts");
-    expect(source).toContain("Un RMSE nettement supérieur à la MAE");
-    expect(source).toContain("temperatureBiasTrend");
-    expect(source).toContain("Plutôt chaud");
-    expect(source).toContain("Plutôt froid");
-    expect(source).toContain("model.metrics?.temperature?.bias");
-    expect(source).toContain("DialogContent");
-    expect(source).toContain("!h-[100dvh]");
-    expect(source).toContain("showCloseButton={false}");
-    expect(source).toContain('aria-haspopup="dialog"');
-    expect(source).toContain("closeHelpAndReturnToProvisionalTrends");
-    expect(source).toContain("tendances-provisoires");
-    expect(source).toContain("scrollIntoView({ behavior: \"smooth\", block: \"start\" })");
-    expect(source).toContain("sticky top-0");
-    expect(source).toContain("leading-7 text-slate-200");
+  it("conserve la porte d’évidence, les effectifs distincts et les dates des scores", () => {
+    expect(source).toContain("minimumComparisons");
+    expect(source).toContain("minimumComparableDays");
+    expect(source).toContain("comparisonCount");
+    expect(source).toContain("evaluatedDays");
+    expect(source).toContain("firstScoreDate");
+    expect(source).toContain("latestScoreDate");
+    expect(source).toContain("latestComputedAt");
+    expect(source).toContain("Fenêtre");
   });
 
-  it("utilise des accents bleu-vert pour les états de préparation et provisoires", () => {
-    expect(source).toContain("border-sky-500/30");
-    expect(source).toContain("border-sky-400/35");
-    expect(source).not.toContain("amber-500");
+  it("exclut Best Match et distingue la dispersion de l’erreur face aux observations", () => {
+    expect(source).toContain("Best Match/agrégateurs, modèles candidats et autres horizons ne sont jamais utilisés comme substituts.");
+    expect(source).toContain("L’accord inter-modèles décrit une dispersion de prévisions et n’est pas une mesure de fiabilité.");
+    expect(source).toContain("L’accord inter-modèles");
   });
 });

@@ -141,6 +141,9 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.hours[0].multiModelMetrics?.temperature.median).toBe(11);
     expect(result.hours[0].multiModelMetrics?.temperature.standardDeviation).toBeCloseTo(2, 10);
     expect(result.hours[0].multiModelMetrics?.temperature.range).toBe(6);
+    expect(result.hours[0].multiModelMetrics?.dispersion.windSpeed.standardDeviation).toBeCloseTo(2, 10);
+    expect(result.hours[0].multiModelMetrics?.dispersion.windGust.standardDeviation).toBeCloseTo(2, 10);
+    expect(result.hours[0].multiModelMetrics?.dispersion.windDirection.standardDeviation).toBeNull();
     expect(result.hours[0].multiModelMetrics?.temperature.weightedMean).toBe(result.hours[0].temp);
     expect(result.hours[0].multiModelMetrics?.modelsExpected).toEqual(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
     expect(result.hours[0].temp).toBeLessThan(11);

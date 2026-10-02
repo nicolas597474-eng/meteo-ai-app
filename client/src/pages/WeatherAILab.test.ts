@@ -19,7 +19,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Comparer avant de privilégier");
     expect(source).toContain("Apprendre sans réécrire le passé");
     expect(source).toContain("Expliquer les limites");
-    expect(source).toContain("Confiance");
+    expect(source).toContain("Accord inter-modèles");
+    expect(source).toContain("Fiabilité historique");
     expect(source).toContain("Poids du régime, en clair");
     expect(source).toContain("Exemple : Ciel couvert");
     expect(source).toContain("ne veut pas dire 30 % de nuages");
@@ -35,7 +36,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).not.toContain("Exemple simple ·");
     expect(source).toContain("Fermer le Lexique");
     expect(source).toContain("setIsOpen(false)");
-    expect(source).toContain("Stabilité des modèles");
+    expect(source).toContain("Accord inter-modèles");
+    expect(source).toContain("Fiabilité historique");
     expect(source).toContain("Données insuffisantes / —");
     expect(source).toContain("group-open:rotate-180");
     expect(source).toContain("Horizon de prévision");
@@ -46,7 +48,7 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Prévisions de référence · cycle 4 h");
     expect(source).toContain("Analyse de nuit · 00 h 30");
     expect(source).toContain("Journée qualifiée");
-    expect(source).toContain("Comparaison et scores");
+    expect(source).toContain("Comparaison et métriques");
     expect(source).toContain("ce n’est donc pas un score immédiat affiché au soir");
     expect(source).toContain("Correction de biais");
     expect(source).toContain("Maille et microclimat");
@@ -57,10 +59,14 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Visibilité d’éclipse");
     expect(source).toContain("Ces modèles sont archivés pour une validation historique");
     expect(source).toContain("gain de fiabilité n’est pas mesuré");
-    expect(source).toContain("Calcul de l’indicateur");
-    expect(source).toContain("40 % accord des modèles");
-    expect(source).toContain("60 % de stabilité des températures maximales");
-    expect(source).toContain("poids final strictement positif");
+    expect(source).toContain("Définition de la mesure");
+    expect(source).toContain("formatAgreementRange");
+    expect(source).toContain("σ population");
+    expect(source).toContain("precipitationWetAmounts");
+    expect(source).toContain("fréquence non calibrée");
+    expect(source).not.toContain("40 % accord des modèles");
+    expect(source).not.toContain("60 % de stabilité des températures maximales");
+    expect(source).not.toContain("stabilityScore");
     expect(source).toContain("PopoverClose");
     expect(source).toContain("h-6 w-6");
     expect(source).toContain("Simulation de la fusion");
@@ -117,7 +123,7 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain('operationalStatus?.status ?? "FAILED"');
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
     expect(source).toContain("<BackToTopButton />");
-    expect(source).toContain('className="order-[-1] grid grid-cols-3 gap-2"');
+    expect(source).toContain('className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4"');
     expect(source).toContain('className="order-[-2] flex items-center justify-between gap-2"');
     expect(source).toContain("getShadowDataHubReport");
     expect(source).toContain('enabled: user?.role === "admin"');

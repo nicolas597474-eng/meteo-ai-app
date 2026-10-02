@@ -34,7 +34,6 @@ type LocationItem = {
   localMode?: "standard" | "local" | "ultra-local";
   temp?: number | null;
   condition?: string | null;
-  confidenceScore?: number | null;
 };
 
 // ─── LocalStorage favorites (for non-logged-in users) ───────────────────────
@@ -67,7 +66,7 @@ function removeLocalFavorite(id: string): LocalFavorite[] {
   return updated;
 }
 
-type FavoriteWeather = { temp: number | null; condition: string | null; confidenceScore: number | null };
+type FavoriteWeather = { temp: number | null; condition: string | null };
 
 function FavoritePillContent({ loc, weather, active }: { loc: LocationItem; weather?: FavoriteWeather; active: boolean }) {
   const hasCurrentTemperature = weather?.temp != null;
@@ -154,7 +153,7 @@ export function FavoritesBar({
 }: {
   activeLocation: { lat: number; lon: number; name: string } | null;
   onLocationChange: (loc: { lat: number; lon: number; name: string; radiusKm: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" }) => void;
-  prefetchedWeather?: Map<string, { temp: number | null; condition: string | null; confidenceScore: number | null }>;
+  prefetchedWeather?: Map<string, { temp: number | null; condition: string | null }>;
   activeWeather?: FavoriteWeather;
 }) {
   const { user } = useAuth();

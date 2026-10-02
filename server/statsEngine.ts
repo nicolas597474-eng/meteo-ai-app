@@ -648,32 +648,6 @@ export function calculateReliabilityScore(
   };
 }
 
-// ─── Stability Index ──────────────────────────────────────────────────────────
-
-export function calculateStabilityIndex(forecasts: ForecastRow[]): {
-  index: number;
-  label: "stable" | "unstable";
-} {
-  if (forecasts.length < 2) return { index: 100, label: "stable" };
-
-  const temps = forecasts.filter(f => f.tempMax != null).map(f => f.tempMax!);
-  const precips = forecasts.filter(f => f.precipitation != null).map(f => f.precipitation!);
-
-  const tempMean = mean(temps);
-  const tempStd = Math.sqrt(mean(temps.map(t => Math.pow(t - tempMean, 2))));
-
-  const precipMean = precips.length > 0 ? mean(precips) : 0;
-  const precipStd = precips.length > 0
-    ? Math.sqrt(mean(precips.map(p => Math.pow(p - precipMean, 2))))
-    : 0;
-
-  const tempStability = Math.max(0, 100 - (tempStd * 20));
-  const precipStability = Math.max(0, 100 - (precipStd * 10));
-
-  const index = Math.round((tempStability * 0.6) + (precipStability * 0.4));
-  return { index, label: index >= 60 ? "stable" : "unstable" };
-}
-
 // ─── MeteoAI Forecast Generator ──────────────────────────────────────────────
 
 export function generateMeteoAIForecast(

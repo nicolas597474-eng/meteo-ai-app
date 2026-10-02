@@ -28,10 +28,6 @@ export function PrecipitationConsensusSummary({
     );
   }
 
-  const frequency =
-    summary.frequencyPercent == null
-      ? "—"
-      : `${summary.frequencyPercent.toFixed(0)}%`;
   const conditional =
     summary.rainModelCount === 0
       ? "aucun modèle au seuil"
@@ -52,10 +48,10 @@ export function PrecipitationConsensusSummary({
         Fréquence / estimation de consensus des modèles
       </p>
       <p>
-        Seuil : ≥{summary.thresholdMm.toFixed(1)} mm · fréquence brute :{" "}
+        Seuil : ≥{summary.thresholdMm.toFixed(1)} mm · modèles au seuil :{" "}
         <b className="text-white">
           {summary.rainModelCount}/{summary.availableModelCount} modèles
-          disponibles · {frequency}
+          disponibles
         </b>{" "}
         ({summary.availableModelCount}/{summary.expectedModelCount} modèles
         attendus ont fourni une valeur)

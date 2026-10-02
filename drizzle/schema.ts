@@ -209,7 +209,9 @@ export const meteoaiForecast = mysqlTable("meteoai_forecast", {
   /** Nullable for historical rows created before humidity joined the official fusion. */
   humidity: float("humidity"),
   condition: varchar("condition", { length: 128 }),
-  stabilityIndex: float("stabilityIndex"), // 0-100
+  /** Legacy nullable column; no current UI/API may interpret it as forecast reliability. */
+  stabilityIndex: float("stabilityIndex"),
+  /** Legacy NOT NULL storage contract retained until a separately reviewed schema migration. */
   stabilityLabel: mysqlEnum("stabilityLabel", ["stable", "unstable"]).notNull(),
   confidenceScore: float("confidenceScore"), // 0-100
   weights: json("weights"), // { serviceName: weight% }

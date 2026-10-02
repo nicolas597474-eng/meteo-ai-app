@@ -50,13 +50,11 @@ vi.mock("./db", () => ({
 vi.mock("./officialWeatherSnapshot", () => ({ cacheManualHourlyForecast: mocks.cacheManualHourlyForecast }));
 vi.mock("./weatherTime", () => ({ getParisDate: () => "2026-09-30" }));
 vi.mock("./weatherConditionLabels", () => ({ conditionFromWeatherValues: () => "Nuageux" }));
-vi.mock("./statsEngine", () => ({ calculateStabilityIndex: () => ({ index: 72, label: "stable" }) }));
 vi.mock("./officialForecast", () => ({
   computeOfficialDailyForecast: () => ({ tempMax: 23, tempMin: 12, precipitation: 0.4, windSpeed: 12, confidenceScore: 84, coreCalibrationComplete: true, methodNote: "Fusion calibrée", weights: {}, trace: {} }),
 }));
 vi.mock("./fusionEngine", () => ({
   applyBiasCorrection: (forecasts: unknown[]) => forecasts,
-  computeConfidenceScore: () => 84,
   getLeadTimeWeights: () => ({}),
   isEligibleGlobalReliabilityScore: () => false,
 }));

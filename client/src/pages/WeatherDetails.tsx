@@ -10,6 +10,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
+import { HourlyHistoricalEvidencePanel } from "@/components/weather/HourlyHistoricalEvidencePanel";
 import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getCenteredHourScrollLeft, getHourCenterX, getNearestCenteredHourIndex, getNearestHourIndex } from "@/lib/hourlyScrollSync";
@@ -85,41 +86,7 @@ const PERIOD_LABELS: Record<Period, { label: string; emoji: string }> = {
   nuit: { label: "Nuit", emoji: "🌙" },
 };
 
-/**
- * Indicateur local de créneau : il combine uniquement l'accord pluie réellement
- * comparé et la dispersion thermique réellement disponible. Il ne prétend pas
- * reproduire le score officiel de confiance, qui reste présenté séparément.
- */
-type AgreementDetail = { label: string; value: number; detail?: string };
 type HourlyConditionDetail = { icon: string; label: string; detail?: string };
-
-function getSlotAgreementDetails(hour: any, historical: any = null): AgreementDetail[] {
-  const bound = (value: number) => Math.max(0, Math.min(100, value));
-  const details: AgreementDetail[] = [];
-  const metrics = hour?.multiModelMetrics;
-  const dispersion = metrics?.dispersion;
-  const precipitation = metrics?.precipitation;
-  if (typeof precipitation?.frequencyPercent === "number") details.push({
-    label: "Fréquence modèle pluie",
-    value: precipitation.frequencyPercent,
-    detail: `${precipitation.rainModelCount}/${precipitation.availableModelCount} modèles valides`,
-  });
-  if (typeof metrics?.temperature?.range === "number") details.push({ label: "Température", value: bound(100 - metrics.temperature.range * 25) });
-  if (typeof dispersion?.windSpeed?.range === "number") details.push({ label: "Vent", value: bound(100 - dispersion.windSpeed.range * 10) });
-  if (typeof dispersion?.windGust?.range === "number") details.push({ label: "Rafales", value: bound(100 - dispersion.windGust.range * 8) });
-  if (typeof dispersion?.windDirection?.range === "number") details.push({ label: "Direction", value: bound(100 - dispersion.windDirection.range / 1.8) });
-  if (typeof dispersion?.humidity?.range === "number") details.push({ label: "Humidité", value: bound(100 - dispersion.humidity.range) });
-  if (typeof dispersion?.cloudCover?.range === "number") details.push({ label: "Nuages", value: bound(100 - dispersion.cloudCover.range) });
-  if (typeof historical?.score === "number" && typeof historical?.comparisons === "number" && historical.comparisons > 0) {
-    details.push({ label: `Historique qualifié (${historical.comparisons} comp.)`, value: bound(historical.score) });
-  }
-  return details.map((detail) => ({ ...detail, value: Math.round(detail.value) }));
-}
-
-function getSlotAgreementConfidence(hour: any, historical: any = null): number | null {
-  const details = getSlotAgreementDetails(hour, historical);
-  return details.length > 0 ? Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length) : null;
-}
 
 function getHourlyConditionDetails(hour: any): HourlyConditionDetail[] {
   const precipitationDetail = hour?.precipIntensity === "heavy"
@@ -150,32 +117,6 @@ function getHourlyConditionDetails(hour: any): HourlyConditionDetail[] {
   ].filter((detail): detail is HourlyConditionDetail => detail !== null);
 }
 
-function SlotConfidenceBadge({ details, historicalModels = [] }: { details: AgreementDetail[]; historicalModels?: Array<{ name: string; score: number; comparisons: number; temperatureMae?: number | null; precipitationMae?: number | null; windMae?: number | null }> }) {
-  const [open, setOpen] = useState(false);
-  if (details.length === 0) return null;
-  const value = Math.round(details.reduce((sum, detail) => sum + detail.value, 0) / details.length);
-  const tone = value >= 75
-    ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
-    : value >= 55
-      ? "border-sky-300/25 bg-sky-300/10 text-sky-100"
-      : "border-amber-300/25 bg-amber-300/10 text-amber-100";
-  const level = value >= 75 ? "élevé" : value >= 55 ? "modéré" : "faible";
-  return <span className="relative inline-block">
-    <button type="button" onClick={() => setOpen((shown) => !shown)} aria-expanded={open} title="Indice descriptif, pas une probabilité calibrée" className={`!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px] ${tone}`}>Indice d’accord descriptif {value}% · {level}</button>
-    {open && <span className="absolute left-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/15 bg-slate-950/95 p-2 text-[9px] shadow-xl">
-      <span className="mb-1 block text-slate-400">Indice descriptif, non probabilité météorologique calibrée</span>
-      <span className="mb-1 block text-slate-300">Accord par paramètre</span>
-      {details.map((detail) => <span key={detail.label} className="flex justify-between text-slate-100"><span>{detail.label}</span><span>{detail.detail ? `${detail.detail} · ` : ""}{detail.value}%</span></span>)}
-      {historicalModels.length > 0 && <span className="mt-1 block border-t border-white/10 pt-1 text-slate-300">
-        <span className="mb-0.5 block">Historique qualifié par modèle</span>
-        {historicalModels.map((model) => <span key={model.name} className="block text-[8px] text-slate-200">
-          {model.name} · T {model.temperatureMae == null ? "—" : `${model.temperatureMae}°C`} · Pluie {model.precipitationMae == null ? "—" : `${model.precipitationMae} mm`} · Vent {model.windMae == null ? "—" : `${model.windMae} km/h`}
-        </span>)}
-      </span>}
-    </span>}
-  </span>;
-}
-
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 type ChartType = "temp" | "feels" | "precip" | "wind" | "gusts" | "humidity" | "pressure" | "clouds";
@@ -194,14 +135,6 @@ export default function WeatherDetails() {
     refetchOnWindowFocus: false,
   });
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
-  const reliabilityInput = useMemo(() => ({
-    lat: activeLocation?.lat ?? 50.7567,
-    lon: activeLocation?.lon ?? 2.5204,
-    period: "7d" as const,
-    horizon: "6-24h" as const,
-  }), [activeLocation?.lat, activeLocation?.lon]);
-  const { data: reliabilityLaboratory } = trpc.weather.getReliabilityLaboratory.useQuery(reliabilityInput, { staleTime: 2 * 60 * 1000 });
-  const bestForecastModel = reliabilityLaboratory?.bestModel as { name?: string; normalizedScore?: number | null } | undefined;
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const hourlyRef = useRef<HTMLDivElement>(null);
   const [slowLoad, setSlowLoad] = useState(false);
@@ -281,8 +214,6 @@ export default function WeatherDetails() {
   const periodHours = data?.periodHours ?? hours;
   const days = data?.days ?? [];
   const regime = data?.regime;
-  const confidence = data?.confidence;
-  const historicalPerformance = data?.historicalModelPerformance ?? null;
   const currentHour = hours[currentHourIdx] ?? hours[0];
 
   return (
@@ -293,7 +224,7 @@ export default function WeatherDetails() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="grid h-10 w-10 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10"><MeteoIcon name="refresh" size={18} /></span>
-              <div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/55">Déroulé temporel</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Heure par heure</h2>{bestForecastModel?.name && bestForecastModel.normalizedScore != null ? <span aria-label={`Meilleur modèle : ${bestForecastModel.name}`} className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300/45 bg-amber-300/10 px-1.5 py-0.5 text-[8px] font-bold text-amber-100"><span>Meilleur modèle</span><span className="text-white">{bestForecastModel.name}</span><span className="text-amber-100/75">{Math.round(bestForecastModel.normalizedScore)} /100</span></span> : null}</div>
+              <div><p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-100/55">Déroulé temporel</p><h2 className="mt-0.5 text-lg font-semibold tracking-tight text-white">Heure par heure</h2></div>
             </div>
             <span className="rounded-full border border-sky-200/20 bg-sky-300/10 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-sky-100">48 h</span>
           </div>
@@ -336,17 +267,16 @@ export default function WeatherDetails() {
                       <span className="mb-1 block text-[8px] font-semibold uppercase tracking-[0.12em] text-slate-300">Moyenne pondérée officielle</span>
                       <span className={`text-[36px] font-semibold leading-none tracking-[-0.075em] ${hourlyTemperatureTone(h.temp)}`}>{h.temp?.toFixed(1) ?? "—"}°</span>
                       <span className="mt-1 block text-[10px] font-medium text-slate-300">ressenti {h.apparentTemp?.toFixed(0) ?? "—"}°</span>
-                      <div className="mt-1"><SlotConfidenceBadge details={getSlotAgreementDetails(h, historicalPerformance)} historicalModels={historicalPerformance?.models ?? []} /></div>
                     </div>
 
                     {multiModelMetrics && <div className="mb-2 rounded-xl border border-amber-200/15 bg-amber-200/[0.035] p-2 text-[9px] leading-relaxed text-slate-200">
                       <p className="mb-1 font-semibold text-amber-100">Ensemble horaire · Best Match exclu</p>
-                      <p>Température ({temperatureMetrics?.availableModelCount ?? 0}/{multiModelMetrics.expectedModelCount} modèles valides) : min <b>{temperatureMetrics?.min == null ? "—" : `${temperatureMetrics.min.toFixed(1)}°`}</b> · max <b>{temperatureMetrics?.max == null ? "—" : `${temperatureMetrics.max.toFixed(1)}°`}</b></p>
+                      <p>Température ({temperatureMetrics ? `${temperatureMetrics.availableModelCount}/${multiModelMetrics.expectedModelCount} modèles valides` : "effectif indisponible"}) : min <b>{temperatureMetrics?.min == null ? "—" : `${temperatureMetrics.min.toFixed(1)}°`}</b> · max <b>{temperatureMetrics?.max == null ? "—" : `${temperatureMetrics.max.toFixed(1)}°`}</b></p>
                       <p>Médiane <b>{temperatureMetrics?.median == null ? "—" : `${temperatureMetrics.median.toFixed(1)}°`}</b> · écart-type population <b>{temperatureMetrics?.standardDeviation == null ? "—" : `${temperatureMetrics.standardDeviation.toFixed(1)}°`}</b></p>
                       <p>Dispersion (étendue max–min) <b>{temperatureMetrics?.range == null ? "—" : `${temperatureMetrics.range.toFixed(1)}°`}</b></p>
                       <p>Modèles température : {temperatureMetrics?.modelsWithData.join(", ") || "aucun"}</p>
                       {precipitationMetrics && <div className="mt-1 border-t border-white/10 pt-1">
-                        <p>Modèles pluvieux (≥0,1 mm) : <b>{precipitationMetrics.rainModelCount}/{precipitationMetrics.availableModelCount}</b> · fréquence modèle <b>{precipitationMetrics.frequencyPercent == null ? "—" : `${precipitationMetrics.frequencyPercent.toFixed(0)}%`}</b></p>
+                        <p>Modèles pluvieux (≥{precipitationMetrics.thresholdMm.toFixed(1)} mm) : <b>{precipitationMetrics.rainModelCount}/{precipitationMetrics.availableModelCount}</b></p>
                         <p>Valeurs pluie valides : {precipitationMetrics.availableModelCount}/{multiModelMetrics.expectedModelCount} · fréquence non calibrée comme probabilité météorologique.</p>
                         <p>Quantité conditionnelle pondérée parmi les modèles pluvieux : <b>{precipitationMetrics.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics.conditionalMeanMm == null ? "indisponible sans poids historiques qualifiés" : `${precipitationMetrics.conditionalMeanMm.toFixed(1)} mm`}</b></p>
                         <p>Estimation de quantité = fréquence brute × quantité conditionnelle : <b>{precipitationMetrics.consensusEstimateMm == null ? "—" : `${precipitationMetrics.consensusEstimateMm.toFixed(1)} mm`}</b></p>
@@ -492,8 +422,7 @@ export default function WeatherDetails() {
           <div className="space-y-2">
             {days.map((day: any) => {
               const isExpanded = expandedDay === day.date;
-              // Les données serveur distinguent la confiance (accord, qualité,
-              // historique, échéance) de la simple dispersion des modèles.
+              // L’accord entre modèles et l’erreur historique contre observations restent distincts.
               return (
                 <div key={day.date} className="weather-surface-inset overflow-hidden rounded-[18px] border border-white/10 bg-white/[0.025]">
                   {/* Day summary card */}
@@ -545,7 +474,7 @@ export default function WeatherDetails() {
                       )}
                       
                       {/* Period breakdown */}
-                      <DayPeriodBreakdown dayDate={day.date} hours={periodHours} regime={regime} historicalPerformance={historicalPerformance} />
+                      <DayPeriodBreakdown dayDate={day.date} hours={periodHours} regime={regime} />
                       
                     </div>
                   )}
@@ -571,13 +500,17 @@ export default function WeatherDetails() {
           <TrendSection days={days} />
         </MeteoSurface>
 
-        {/* ═══ SECTION 6: CONFIANCE DE PRÉVISION ═══ */}
+        {/* ═══ SECTION 6: FIABILITÉ HISTORIQUE QUALIFIÉE ═══ */}
         <MeteoSurface as="section" tone="subtle" className="min-w-0 w-full max-w-full rounded-2xl border border-white/8 bg-black/20 p-2 sm:rounded-[24px] sm:p-4">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
               <MeteoIcon name="confidence" size={18} />
-              Confiance de prévision officielle
+              Fiabilité historique face aux observations
             </h2>
-            <ConfidenceSection confidence={confidence} regime={regime} />
+            <HourlyHistoricalEvidencePanel
+                variableWeightings={currentHour?.forecastWeighting?.variableWeightings ?? []}
+                horizonBucket={currentHour?.forecastWeighting?.horizonBucket}
+                horizonUnavailableReason={currentHour?.forecastWeighting?.unavailableReason}
+              />
         </MeteoSurface>
 
       </div>
@@ -619,7 +552,7 @@ function calculateSunshineDuration(sunrise: string, sunset: string): string {
   return `${h}h${m.toString().padStart(2, "0")}`;
 }
 
-function DayPeriodBreakdown({ dayDate, hours, regime, historicalPerformance }: { dayDate: string; hours: any[]; regime: any; historicalPerformance: any }) {
+function DayPeriodBreakdown({ dayDate, hours, regime }: { dayDate: string; hours: any[]; regime: any }) {
   const dayHours = hours.filter((hour) => hour.date === dayDate);
 
   if (dayHours.length === 0) {
@@ -658,14 +591,6 @@ function DayPeriodBreakdown({ dayDate, hours, regime, historicalPerformance }: {
         const avgHumidity = Math.round(periodHours.reduce((s: number, h: any) => s + (h.humidity ?? 0), 0) / periodHours.length);
         const avgCloud = Math.round(periodHours.reduce((s: number, h: any) => s + (h.cloudCover ?? 0), 0) / periodHours.length);
         const dominantCondition = periodHours[Math.floor(periodHours.length / 2)]?.condition ?? "—";
-        const detailByLabel = new Map<string, number[]>();
-        periodHours.flatMap((hour) => getSlotAgreementDetails(hour, historicalPerformance)).forEach((detail) => {
-          detailByLabel.set(detail.label, [...(detailByLabel.get(detail.label) ?? []), detail.value]);
-        });
-        const periodAgreementDetails = Array.from(detailByLabel.entries()).map(([label, values]: [string, number[]]) => ({
-          label,
-          value: Math.round(values.reduce((sum: number, value: number) => sum + value, 0) / values.length),
-        }));
         return (
           <div key={p} className="bg-slate-800/30 rounded-xl p-2">
             <div className="flex items-center gap-1.5 mb-1">
@@ -673,7 +598,6 @@ function DayPeriodBreakdown({ dayDate, hours, regime, historicalPerformance }: {
               <span className="text-[10px] text-white font-semibold">{PERIOD_LABELS[p].label}</span>
               <MeteoIcon name={getIconNameFromCondition(dominantCondition)} size={14} className="ml-auto" />
             </div>
-            <div className="mb-1.5"><SlotConfidenceBadge details={periodAgreementDetails} historicalModels={historicalPerformance?.models ?? []} /></div>
             <div className="space-y-0.5 text-[9px] text-slate-300">
               <div className="flex justify-between"><span>Temp.</span><span className="text-white font-medium">{avgTemp}°C</span></div>
               <div className="flex justify-between"><span>Vent</span><span>{avgWind} km/h</span></div>
@@ -826,15 +750,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
     <div className="space-y-3">
       <div ref={chartScrollRef} onScroll={syncDetailScroll} className="-mx-3 overflow-x-auto px-3 scrollbar-hide">
         <div className="min-w-[720px] rounded-[18px] border border-sky-300/25 bg-[linear-gradient(180deg,rgba(25,48,72,0.75),rgba(9,20,31,0.96))] p-3">
-          <div className="mb-3 border-b border-slate-500/45 pb-2"><div className="flex h-10 items-end gap-1.5 overflow-hidden">
-            {hours.map((hour: any, index: number) => {
-              const agreement = hour.multiModelMetrics?.precipitation.frequencyPercent;
-              const spread = hour.multiModelMetrics?.temperature.range;
-              const quality = agreement == null && spread == null ? 0 : Math.max(0, Math.min(100, ((agreement ?? 70) + (spread == null ? 70 : 100 - spread * 25)) / 2));
-              const barTone = quality >= 75 ? "from-lime-300 to-lime-700" : quality >= 55 ? "from-teal-300 to-teal-700" : quality > 0 ? "from-amber-300 to-amber-700" : "from-slate-500 to-slate-700";
-              return <span key={`quality-${hour.hour}-${index}`} className={`min-w-[14px] flex-1 rounded-t-[8px] bg-gradient-to-b ${barTone}`} style={{ height: `${28 + ((index % 4) * 3)}px` }} />;
-            })}
-          </div><div className="mt-1.5 flex justify-between text-[9px] text-slate-500"><span>{hours[0]?.hour ?? "—"}</span><span>Prochaines 48 h</span><span>{hours[hours.length - 1]?.hour ?? "—"}</span></div></div>
+          <p className="mb-3 border-b border-slate-500/45 pb-2 text-[9px] text-slate-400">Évolution de {type} · valeurs brutes; aucune note d’accord composite.</p>
           <div className="relative flex h-[188px] items-end gap-2 border-b border-slate-500/35 pt-5">
             <div className="pointer-events-none absolute inset-x-0 top-1/3 border-t border-slate-500/20" /><div className="pointer-events-none absolute inset-x-0 top-2/3 border-t border-slate-500/20" />
             {hours.map((hour: any, index: number) => {
@@ -880,12 +796,12 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
                     <span>Min/max modèles <b className="text-white">{temperatureMetrics?.min?.toFixed(1) ?? "—"}/{temperatureMetrics?.max?.toFixed(1) ?? "—"}°</b></span>
                     <span>Médiane <b className="text-white">{temperatureMetrics?.median?.toFixed(1) ?? "—"}°</b></span>
                     <span>σ population <b className="text-white">{temperatureMetrics?.standardDeviation?.toFixed(1) ?? "—"}°</b></span>
-                    <span>Modèles temp. <b className="text-white">{temperatureMetrics?.availableModelCount ?? 0}/{h.multiModelMetrics?.expectedModelCount ?? 7}</b></span>
+                    <span>Modèles temp. <b className="text-white">{temperatureMetrics && h.multiModelMetrics ? `${temperatureMetrics.availableModelCount}/${h.multiModelMetrics.expectedModelCount}` : "effectif indisponible"}</b></span>
                     <span>Ress. <b className="text-white">{h.apparentTemp?.toFixed(1) ?? "—"}°</b></span>
                     <span>Vent <b className="text-white">{h.windSpeed?.toFixed(0) ?? "—"}</b> km/h</span>
                     <span>Raf. <b className="text-white">{h.windGust?.toFixed(0) ?? "—"}</b> km/h</span>
                     <span>Estimation pluie (consensus) <b className="text-blue-300">{h.precipitation?.toFixed(1) ?? "—"}</b> mm</span>
-                    <span title="Fréquence des modèles, non probabilité calibrée">Fréquence pluie <b className="text-blue-300">{precipitationMetrics ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} · ${precipitationMetrics.frequencyPercent == null ? "—" : `${precipitationMetrics.frequencyPercent.toFixed(0)}%`}` : "—"}</b></span>
+                    <span title="Nombre de modèles au seuil; ce dénombrement n’est pas une probabilité calibrée">Modèles au seuil pluie <b className="text-blue-300">{precipitationMetrics ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount}` : "—"}</b></span>
                     <span className="col-span-2">Quantité conditionnelle <b className="text-blue-300">{precipitationMetrics?.rainModelCount === 0 ? "aucun modèle au seuil" : precipitationMetrics?.conditionalMeanMm == null ? "indisponible sans poids historiques qualifiés" : `${precipitationMetrics.conditionalMeanMm.toFixed(1)} mm`}</b></span>
                     <span>Hum. <b className="text-white">{h.humidity ?? "—"}%</b></span>
                     <span>Press. <b className="text-white">{h.pressure?.toFixed(0) ?? "—"}</b></span>
@@ -945,54 +861,6 @@ function TrendSection({ days }: { days: any[] }) {
           {trendIcon(t.trend)}
         </div>
       ))}
-    </div>
-  );
-}
-
-function ConfidenceSection({
-  confidence,
-  regime,
-}: {
-  confidence?: { current?: number | null; today?: number | null; week?: number | null; stabilityIndex?: number | null };
-  regime: any;
-}) {
-  const periodConfidence = confidence?.current == null ? null : Math.round(confidence.current);
-  const todayConfidence = confidence?.today == null ? null : Math.round(confidence.today);
-  const weekConfidence = confidence?.week == null ? null : Math.round(confidence.week);
-
-  return (
-    <div className="space-y-3">
-      <ConfidenceBar label="Période en cours" value={periodConfidence} />
-      <ConfidenceBar label="Aujourd'hui" value={todayConfidence} />
-      <ConfidenceBar label="J+4 à J+7" value={weekConfidence} />
-      {regime && (
-        <div className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-700/50">
-          Cette confiance de prévision combine l’accord des modèles, leurs performances historiques qualifiées, la cohérence des stations si disponible et l’horizon de prévision.
-          {confidence?.stabilityIndex != null && ` Stabilité des modèles : ${Math.round(confidence.stabilityIndex)}%.`}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ConfidenceBar({ label, value }: { label: string; value: number | null }) {
-  if (value == null) {
-    return (
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-slate-300 w-36">{label}</span>
-        <div className="flex-1" />
-        <span className="text-xs text-slate-400 w-24 text-right">Non disponible</span>
-      </div>
-    );
-  }
-  const color = value >= 70 ? "bg-green-500" : value >= 50 ? "bg-amber-500" : "bg-red-500";
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-slate-300 w-36">{label}</span>
-      <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${value}%` }} />
-      </div>
-      <span className="text-xs text-white font-bold w-10 text-right">{value}%</span>
     </div>
   );
 }

@@ -101,7 +101,6 @@ describe("buildOfficialWeatherSnapshot", () => {
       precipitation: 1.4,
       windSpeed: 18,
       condition: "Nuageux",
-      confidenceScore: 72,
     });
 
     expect(fallback).toEqual({
@@ -114,7 +113,6 @@ describe("buildOfficialWeatherSnapshot", () => {
       precipitationConsensus: null,
       windSpeed: 18,
       condition: "Nuageux",
-      confidenceScore: 72,
     });
   });
 });

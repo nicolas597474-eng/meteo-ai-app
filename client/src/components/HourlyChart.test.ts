@@ -99,33 +99,35 @@ describe("HourlyChart", () => {
   });
 
   it("inclut tous les accords multi-paramètres réellement disponibles", () => {
-    expect(source).toContain("Indice d’accord des modèles");
+    expect(source).toContain("Accord inter-modèles · dispersions brutes");
     expect(source).toContain("multiModelMetrics");
-    expect(source).toContain("dispersion?.windSpeed.range");
-    expect(source).toContain("dispersion?.windGust.range");
-    expect(source).toContain("dispersion?.windDirection.range");
-    expect(source).toContain("dispersion?.humidity.range");
-    expect(source).toContain("dispersion?.cloudCover.range");
+    expect(source).toContain("dispersion?.windSpeed");
+    expect(source).toContain("dispersion?.windGust");
+    expect(source).toContain("dispersion?.windDirection");
+    expect(source).toContain("dispersion?.humidity");
+    expect(source).toContain("dispersion?.cloudCover");
     expect(source).toContain("PrecipitationConsensusSummary");
     expect(precipitationSummarySource).toContain("Fréquence / estimation de consensus des modèles");
     expect(source).toContain("rainModelCount");
-    expect(source).toContain("frequencyPercent");
-    expect(source).toContain("n’est pas une probabilité météorologique calibrée");
+    expect(precipitationSummarySource).toContain("ce ne sont pas des probabilités météorologiques calibrées");
     expect(precipitationSummarySource).toContain("ce ne sont pas des probabilités météorologiques calibrées");
     expect(source).not.toContain("tempSpread");
     expect(source).not.toContain("precipAgreement");
-    expect(source).toContain("Humidité & nuages");
-    expect(source).toContain("windAgreementParts");
-    expect(source).toContain("Repères d’accord");
-    expect(source).toContain("motion-reduce:animate-none");
-    expect(source).toContain("agreementContentMounted");
-    expect(source).toContain("slide-out-to-top-1");
-    expect(source).toContain("Élevé");
-    expect(source).toContain("80–100 %");
-    expect(source).toContain("Modéré");
-    expect(source).toContain("60–79 %");
-    expect(source).toContain("Faible");
-    expect(source).toContain("&lt; 60 %");
+    expect(source).toContain("Vent moyen");
+    expect(source).toContain("Rafales");
+    expect(source).toContain("Direction");
+    expect(source).toContain("Humidité");
+    expect(source).toContain("Nuages");
+    expect(source).toContain("standardDeviation");
+    expect(source).toContain("dispersion circulaire");
+    expect(source).toContain("wetPrecipitationStandardDeviation");
+    expect(source).toContain("fréquence non calibrée");
+    expect(source).not.toContain("windAgreementParts");
+    expect(source).not.toContain("Repères d’accord");
+    expect(source).not.toContain("Indice d’accord des modèles");
+    expect(source).not.toContain("frequencyPercent.toFixed");
+    expect(source).not.toContain("80–100 %");
+    expect(source).not.toContain("60–79 %");
   });
 
   it("retire les sections de régime et d’évolution à court terme du panneau détaillé", () => {

@@ -11,10 +11,10 @@ describe("buildLiveAILabSnapshot", () => {
     const snapshot = buildLiveAILabSnapshot("2026-08-18", models, new Date("2026-08-18T05:00:00Z"));
     expect(snapshot?.weights.trace.sourceCount).toBe(2);
     expect(snapshot?.weights.trigger).toBe("live-position");
-    expect(snapshot?.confidenceScore).toBeNull();
+    expect(snapshot).not.toHaveProperty("confidenceScore");
     expect(snapshot?.weights.trace.calibrationStatus.tempMax).toBe("insufficient_data");
     expect(snapshot?.tempMax).toBeNull();
-    expect(snapshot?.stabilityIndex).toBeGreaterThanOrEqual(0);
+    expect(snapshot).not.toHaveProperty("stabilityIndex");
   });
 
   it("ne crée pas de snapshot lorsque les modèles sont indisponibles", () => {

@@ -38,9 +38,11 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("référence agrégée Open-Meteo Best Match");
     expect(source).toContain("n’est pas comptée parmi les sept modèles horaires officiels");
     expect(source).toContain("Détail horaire non disponible pour cette journée.");
-    expect(source).toContain("getSlotAgreementConfidence");
-    expect(source).toContain("Indice d’accord descriptif {value}%");
-    expect(source).toContain("!min-h-5 inline-flex items-center rounded-full border px-1.5 py-0 text-[8px] font-semibold leading-[9px]");
+    expect(source).toContain("HourlyHistoricalEvidencePanel");
+    expect(source).toContain("aucune note d’accord composite");
+    expect(source).not.toContain("getSlotAgreementConfidence");
+    expect(source).not.toContain("frequencyPercent.toFixed");
+    expect(source).toContain("Fiabilité historique face aux observations");
     expect(source).toContain('border px-3 pb-4 pt-3 transition-colors');
     expect(source).toContain('px-2 pb-1 scrollbar-hide snap-x');
     expect(source).toContain('min-h-dvh w-full overflow-x-clip bg-[#0d1117]');
@@ -71,14 +73,11 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain('DetailCell className="col-span-2" label="Vent"');
     expect(source).toContain('min-h-[52px] flex-col justify-center');
     expect(source).toContain("multiModelMetrics");
-    expect(source).toContain("dispersion?.windSpeed?.range");
-    expect(source).toContain("dispersion?.humidity?.range");
-    expect(source).toContain("dispersion?.cloudCover?.range");
-    expect(source).toContain("dispersion?.windGust?.range");
-    expect(source).toContain("dispersion?.windDirection?.range");
+    expect(source).toContain("temperatureMetrics?.standardDeviation");
+    expect(source).toContain("precipitationMetrics.rainModelCount");
     expect(source).toContain("Moyenne pondérée officielle");
     expect(source).toContain("écart-type population");
-    expect(source).toContain("Fréquence modèle pluie");
+    expect(source).toContain("Modèles au seuil pluie");
     expect(source).toContain("Quantité conditionnelle pondérée parmi les modèles pluvieux");
     expect(source).toContain("Estimation de quantité = fréquence brute × quantité conditionnelle");
     expect(source).toContain("non calibrée comme probabilité météorologique");
@@ -90,15 +89,13 @@ describe("page Prévisions détaillées", () => {
     expect(precipitationSummarySource).toContain("ce ne sont pas des probabilités météorologiques calibrées");
     expect(source).not.toContain("precipAgreement");
     expect(source).not.toContain("tempSpread");
-    expect(source).toContain("Accord par paramètre");
-    expect(source).toContain("Historique qualifié");
-    expect(source).toContain("temperatureMae");
-    expect(source).toContain("precipitationMae");
-    expect(source).toContain("windMae");
-    expect(source).toContain("getReliabilityLaboratory.useQuery");
-    expect(source).toContain("bestForecastModel");
-    expect(source).toContain("Meilleur modèle");
-    expect(source).toContain("normalizedScore");
+    expect(source).toContain("Fiabilité historique face aux observations");
+    expect(source).toContain("<HourlyHistoricalEvidencePanel");
+    expect(source).toContain("horizonBucket");
+    expect(source).not.toContain("normalizedScore");
+    expect(source).not.toContain("bestForecastModel");
+    expect(source).not.toContain("Meilleur modèle");
+    expect(source).not.toContain("normalizedScore");
     expect(source).toContain("shouldRetryWeatherQuery");
     expect(source).toContain("WEATHER_QUERY_SLOW_MS");
     expect(source).toContain("Prévisions temporairement indisponibles");
@@ -113,10 +110,11 @@ describe("page Prévisions détaillées", () => {
     expect(source.indexOf("Historique des prévisions")).toBeLessThan(source.indexOf("/* ═══ SECTION 5: TENDANCES ═══ */"));
   });
 
-  it("conserve une seule surface de premier niveau pour les sections Tendances et Confiance", () => {
+  it("sépare les tendances et la fiabilité historique dans des sections distinctes", () => {
     expect(source).toContain('<TrendSection days={days} />');
-    expect(source).not.toContain('weather-surface-inset rounded-[18px] border border-white/8 bg-white/[0.025] p-3');
-    expect(source).toContain('<ConfidenceSection confidence={confidence} regime={regime} />');
+    expect(source).toContain("SECTION 6: FIABILITÉ HISTORIQUE QUALIFIÉE");
+    expect(source).toContain("<HourlyHistoricalEvidencePanel");
+    expect(source).not.toContain("<ConfidenceSection");
     expect(source).toContain('<WindyMap lat={activeLocation.lat} lon={activeLocation.lon} locationName={activeLocation.name} />');
     expect(source).toContain('className="space-y-2"');
   });

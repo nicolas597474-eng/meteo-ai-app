@@ -466,15 +466,14 @@ export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast, options
   const db = await getDb();
   if (!db) return;
   // Keep one current fusion per location/date; completed manual and scheduled refreshes may bump computedAt.
+  // Legacy stabilityIndex/Label/ConfidenceScore are intentionally omitted from
+  // updates; stabilityLabel remains required only on inserts by the old schema.
   const update: Partial<InsertMeteoAIForecast> = {
     tempMax: data.tempMax,
     tempMin: data.tempMin,
     precipitation: data.precipitation,
     windSpeed: data.windSpeed,
     condition: data.condition,
-    stabilityIndex: data.stabilityIndex,
-    stabilityLabel: data.stabilityLabel,
-    confidenceScore: data.confidenceScore,
     weights: data.weights,
     explanation: data.explanation,
   };
@@ -1674,6 +1673,9 @@ export async function getHourlyForecastEvaluationHistory(locationKey: string, fr
       horizonBucket: hourlyForecastEvaluationScores.horizonBucket,
       sampleSize: hourlyForecastEvaluationScores.sampleSize,
       mae: hourlyForecastEvaluationScores.mae,
+      rmse: hourlyForecastEvaluationScores.rmse,
+      bias: hourlyForecastEvaluationScores.bias,
+      computedAt: hourlyForecastEvaluationScores.computedAt,
     }).from(hourlyForecastEvaluationScores).where(and(
       eq(hourlyForecastEvaluationScores.locationKey, locationKey),
       gte(hourlyForecastEvaluationScores.date, fromDate),

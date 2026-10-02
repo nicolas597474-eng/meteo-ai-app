@@ -29,7 +29,6 @@ export type DatedDailyFusionFallback = {
   precipitationConsensus: PrecipitationModelConsensus | null;
   windSpeed: number | null;
   condition: string | null;
-  confidenceScore: number | null;
 };
 
 type DailyFusionSource = {
@@ -40,7 +39,6 @@ type DailyFusionSource = {
   precipitation: number | null;
   windSpeed: number | null;
   condition: string | null;
-  confidenceScore: number | null;
 };
 
 /**
@@ -64,7 +62,6 @@ export function buildDatedDailyFusionFallback(
     precipitationConsensus: precipitationConsensus ?? null,
     windSpeed: source.windSpeed,
     condition: source.condition,
-    confidenceScore: source.confidenceScore,
   };
 }
 

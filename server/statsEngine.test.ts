@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateReliabilityScore,
-  calculateStabilityIndex,
   generateMeteoAIForecast,
   detectWeatherRegime,
 } from "./statsEngine";
@@ -235,44 +234,6 @@ describe("calculateReliabilityScore — dimensions", () => {
 
     expect(result.laboratory.pressure.sampleSize).toBe(0);
     expect(result.normalizedScore).toBeNull();
-  });
-});
-
-// ─── calculateStabilityIndex ─────────────────────────────────────────────────
-
-describe("calculateStabilityIndex", () => {
-  it("returns high stability when all models agree", () => {
-    const forecasts = [
-      { tempMax: 25, tempMin: 15, precipitation: 2, windSpeed: 10 },
-      { tempMax: 25, tempMin: 15, precipitation: 2, windSpeed: 10 },
-      { tempMax: 25, tempMin: 15, precipitation: 2, windSpeed: 10 },
-    ];
-    const result = calculateStabilityIndex(forecasts);
-    expect(result.index).toBeGreaterThanOrEqual(90);
-    expect(result.label).toBe("stable");
-  });
-
-  it("returns low stability when models disagree", () => {
-    const forecasts = [
-      { tempMax: 30, tempMin: 20, precipitation: 0, windSpeed: 5 },
-      { tempMax: 20, tempMin: 10, precipitation: 15, windSpeed: 30 },
-      { tempMax: 35, tempMin: 25, precipitation: 0, windSpeed: 10 },
-    ];
-    const result = calculateStabilityIndex(forecasts);
-    expect(result.index).toBeLessThan(60);
-    expect(result.label).toBe("unstable");
-  });
-
-  it("handles single forecast", () => {
-    const result = calculateStabilityIndex([{ tempMax: 25, tempMin: 15, precipitation: 2, windSpeed: 10 }]);
-    expect(result.index).toBe(100);
-    expect(result.label).toBe("stable");
-  });
-
-  it("handles empty array", () => {
-    const result = calculateStabilityIndex([]);
-    expect(typeof result.index).toBe("number");
-    expect(result.label).toBe("stable");
   });
 });
 

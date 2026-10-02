@@ -1,8 +1,8 @@
 import { applyBiasCorrection, type ServiceBias } from "./fusionEngine";
 import { randomUUID } from "node:crypto";
 import { getParisDate } from "./weatherTime";
-import { calculateStabilityIndex } from "./statsEngine";
 import { computeOfficialDailyForecast } from "./officialForecast";
+import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
 import { collectExpertForecasts, WEATHER_SERVICES } from "./weatherServices";
 import { buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { collectOfficialHourlyForecast, OFFICIAL_HOURLY_MODEL_NAMES } from "./officialHourlyForecast";
@@ -127,12 +127,10 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       evidenceStoreAvailable: fusionEvidence.available,
       evidence: fusionEvidence.evidence,
     });
-    const stability = calculateStabilityIndex(expertData.map((entry) => ({ tempMax: entry.tempMax, tempMin: entry.tempMin, precipitation: entry.precipitation, windSpeed: entry.windSpeed })));
     const condition = null;
-    const confidenceScore = meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null;
     const explanation = meteoAI.coreCalibrationComplete
       ? `Prévision quotidienne calibrée relancée pour ${favorite.customName ?? favorite.name}, avec des preuves physiques récentes par modèle, variable et horizon. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`
-      : `${meteoAI.methodNote} Les valeurs officielles et leur confiance restent indisponibles jusqu’à qualification des preuves physiques. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`;
+      : `${meteoAI.methodNote} Les valeurs officielles restent indisponibles jusqu’à qualification des preuves physiques. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`;
 
     await insertForecasts(expertData.map((entry) => ({
       locationKey,
@@ -161,9 +159,6 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       precipitation: meteoAI.precipitation,
       windSpeed: meteoAI.windSpeed,
       condition,
-      aiScore: confidenceScore,
-      confidenceScore,
-      stabilityIndex: stability.index,
       modelsData: expertData as any,
       explanation,
     });
@@ -179,9 +174,7 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       precipitation: meteoAI.precipitation,
       windSpeed: meteoAI.windSpeed,
       condition,
-      stabilityIndex: stability.index,
-      stabilityLabel: stability.label,
-      confidenceScore,
+      stabilityLabel: legacyStabilityLabelForStorage(expertData),
       weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace, trigger: "manual" } as any,
       explanation,
       computedAt: updatedAt,

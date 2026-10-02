@@ -22,10 +22,11 @@ describe("History", () => {
     expect(source).toContain("Comparaison en attente");
   });
 
-  it("conserve les états d’historique et de données insuffisantes", () => {
+  it("conserve l’état d’historique en constitution sans réintroduire des scores par échéance", () => {
     expect(source).toContain("Historique en cours de constitution");
-    expect(source).toContain("Scores encore insuffisants");
-    expect(source).toContain("Données par échéance insuffisantes");
+    expect(source).not.toContain("Scores encore insuffisants");
+    expect(source).not.toContain("Données par échéance insuffisantes");
+    expect(source).not.toContain("normalizedScore");
   });
 
   it("affiche les preuves réellement collectées chaque soir sans inventer de couverture", () => {

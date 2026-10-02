@@ -119,60 +119,24 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
   const temperatureMetrics = metrics?.temperature;
   const precipitationMetrics = metrics?.precipitation;
   const dispersion = metrics?.dispersion;
-  const hasSpread = typeof temperatureMetrics?.range === "number";
-  const hasPrecipAgreement = typeof precipitationMetrics?.frequencyPercent === "number";
   const hasGust = hour.windGust != null && hour.windGust > 0;
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const [agreementOpen, setAgreementOpen] = useState(false);
-  const [agreementContentMounted, setAgreementContentMounted] = useState(false);
-  const [agreementClosing, setAgreementClosing] = useState(false);
-
-  useEffect(() => {
-    if (agreementOpen) {
-      setAgreementContentMounted(true);
-      setAgreementClosing(false);
-      return;
-    }
-    if (!agreementContentMounted) return;
-    setAgreementClosing(true);
-    const timeoutId = window.setTimeout(() => {
-      setAgreementContentMounted(false);
-      setAgreementClosing(false);
-    }, 200);
-    return () => window.clearTimeout(timeoutId);
-  }, [agreementOpen, agreementContentMounted]);
-
-  // This is a descriptive agreement index, not a calibrated probability.
-  const spreadConfidence = hasSpread
-    ? Math.max(0, Math.round(100 - (temperatureMetrics!.range! * 25)))
+  const precipitationValues = precipitationMetrics?.modelValues.map((value) => value.amountMm) ?? [];
+  const precipitationRange = precipitationValues.length >= 2
+    ? Math.max(...precipitationValues) - Math.min(...precipitationValues)
     : null;
-  const boundAgreement = (value: number) => Math.max(0, Math.min(100, value));
-  type AgreementPart = { label: string; value: number; detail?: string };
-  const agreementParts: AgreementPart[] = [
-    spreadConfidence == null ? null : { label: "Température", value: spreadConfidence },
-    hasPrecipAgreement ? {
-      label: "Fréquence modèle pluie",
-      value: precipitationMetrics!.frequencyPercent!,
-      detail: `${precipitationMetrics!.rainModelCount}/${precipitationMetrics!.availableModelCount} modèles`,
-    } : null,
-    typeof dispersion?.windSpeed.range === "number" ? { label: "Vent", value: boundAgreement(100 - dispersion.windSpeed.range * 10) } : null,
-    typeof dispersion?.windGust.range === "number" ? { label: "Rafales", value: boundAgreement(100 - dispersion.windGust.range * 8) } : null,
-    typeof dispersion?.windDirection.range === "number" ? { label: "Direction", value: boundAgreement(100 - dispersion.windDirection.range / 1.8) } : null,
-    typeof dispersion?.humidity.range === "number" ? { label: "Humidité", value: boundAgreement(100 - dispersion.humidity.range) } : null,
-    typeof dispersion?.cloudCover.range === "number" ? { label: "Nuages", value: boundAgreement(100 - dispersion.cloudCover.range) } : null,
-  ].filter((part): part is AgreementPart => part != null).map((part) => ({ ...part, value: Math.round(part.value) }));
-  const globalAgreement = agreementParts.length > 0
-    ? Math.round(agreementParts.reduce((sum, part) => sum + part.value, 0) / agreementParts.length)
+  const wetPrecipitationValues = precipitationMetrics?.thresholdMm == null
+    ? []
+    : precipitationValues.filter((value) => value >= precipitationMetrics.thresholdMm);
+  const wetPrecipitationMean = wetPrecipitationValues.length > 0
+    ? wetPrecipitationValues.reduce((sum, value) => sum + value, 0) / wetPrecipitationValues.length
     : null;
-  const agreementLevel = globalAgreement == null ? null : globalAgreement >= 80 ? "élevé" : globalAgreement >= 60 ? "modéré" : "faible";
-  const agreementTone = globalAgreement == null ? "" : globalAgreement >= 80
-    ? "border-emerald-300/35 bg-emerald-300/10 text-emerald-50"
-    : globalAgreement >= 60
-      ? "border-sky-300/35 bg-sky-300/10 text-sky-50"
-      : "border-amber-300/35 bg-amber-300/10 text-amber-50";
-  const windAgreementParts = agreementParts.filter((part) => ["Vent", "Rafales", "Direction"].includes(part.label));
-  const humidityAgreementParts = agreementParts.filter((part) => ["Humidité", "Nuages"].includes(part.label));
-  const otherAgreementParts = agreementParts.filter((part) => !["Vent", "Rafales", "Direction", "Humidité", "Nuages"].includes(part.label));
+  const wetPrecipitationRange = wetPrecipitationValues.length >= 2
+    ? Math.max(...wetPrecipitationValues) - Math.min(...wetPrecipitationValues)
+    : null;
+  const wetPrecipitationStandardDeviation = wetPrecipitationValues.length >= 2 && wetPrecipitationMean != null
+    ? Math.sqrt(wetPrecipitationValues.reduce((sum, value) => sum + (value - wetPrecipitationMean) ** 2, 0) / wetPrecipitationValues.length)
+    : null;
 
   return (
     <section className="mb-3 rounded-2xl border border-blue-400/25 bg-[#0a0e14] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.35)] animate-in slide-in-from-top-2 duration-200" role="region" aria-labelledby="hour-detail-title">
@@ -192,32 +156,26 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           </button>
         </div>
 
-        {/* L’accord global est prioritaire ; l’écart thermique reste un détail explicable. */}
-        {globalAgreement != null && <div className="mb-2 rounded-xl border border-white/10 bg-slate-900/35">
-          <button type="button" onClick={() => setAgreementOpen((open) => !open)} aria-expanded={agreementOpen} className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left active:scale-[0.99] ${agreementTone}`}>
-            <span><span className="block text-[13px] font-bold">Indice d’accord des modèles {globalAgreement}%</span><span className="block text-[10px] opacity-80">{agreementLevel} · {agreementParts.length} paramètre{agreementParts.length > 1 ? "s" : ""} comparé{agreementParts.length > 1 ? "s" : ""} · indicateur descriptif non calibré</span></span>
-            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${agreementOpen ? "rotate-180" : ""}`} />
-          </button>
-          {agreementContentMounted && <div className={`${agreementClosing ? "animate-out fade-out slide-out-to-top-1 duration-200 motion-reduce:animate-none" : "animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none"} space-y-2 border-t border-white/10 px-3 py-2 text-[11px] text-slate-200`}>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Accord par paramètre</p>
-            {otherAgreementParts.length > 0 && <div className="space-y-1">{otherAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.detail ? `${part.detail} · ` : ""}{part.value}%</span></div>)}</div>}
-            {hasPrecipAgreement && <p className="text-[10px] text-slate-400">La fréquence des modèles prévoyant de la pluie n’est pas une probabilité météorologique calibrée.</p>}
-            {windAgreementParts.length > 0 && <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-cyan-100">Vent</p>{windAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
-            {humidityAgreementParts.length > 0 && <div className="rounded-lg border border-sky-300/15 bg-sky-300/[0.05] px-2 py-1.5"><p className="mb-1 font-semibold text-sky-100">Humidité & nuages</p>{humidityAgreementParts.map((part) => <div key={part.label} className="flex justify-between"><span>{part.label}</span><span className="font-semibold">{part.value}%</span></div>)}</div>}
-            <div className="animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none border-t border-white/10 pt-2" aria-label="Légende des seuils d’accord global">
-              <p className="mb-1.5 px-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Repères d’accord</p>
-              <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/5 bg-slate-950/25 p-1">
-                <div className="min-w-0 rounded-md bg-emerald-300/[0.07] px-1.5 py-1"><span className="mb-0.5 block h-1 w-5 rounded-full bg-emerald-300" /><span className="block text-[9px] font-semibold text-emerald-200">Élevé</span><span className="block whitespace-nowrap text-[9px] text-slate-400">80–100 %</span></div>
-                <div className="min-w-0 rounded-md bg-sky-300/[0.07] px-1.5 py-1"><span className="mb-0.5 block h-1 w-5 rounded-full bg-sky-300" /><span className="block text-[9px] font-semibold text-sky-200">Modéré</span><span className="block whitespace-nowrap text-[9px] text-slate-400">60–79 %</span></div>
-                <div className="min-w-0 rounded-md bg-amber-300/[0.07] px-1.5 py-1"><span className="mb-0.5 block h-1 w-5 rounded-full bg-amber-300" /><span className="block text-[9px] font-semibold text-amber-200">Faible</span><span className="block whitespace-nowrap text-[9px] text-slate-400">&lt; 60 %</span></div>
-              </div>
-            </div>
-          </div>}
-        </div>}
+        {metrics && <section className="mb-2 rounded-xl border border-sky-300/20 bg-slate-900/35 px-3 py-2.5" aria-label="Accord inter-modèles par dispersion brute">
+          <p className="text-[12px] font-bold text-sky-100">Accord inter-modèles · dispersions brutes</p>
+          <p className="mb-2 text-[9px] text-slate-400">Best Match exclu · étendues et σ population décrivent l’accord, pas la fiabilité face aux observations. Direction : étendue circulaire.</p>
+          <div className="space-y-1 text-[10px] text-slate-200">
+            <div className="flex justify-between gap-2"><span>Température</span><span className="text-right font-semibold">{temperatureMetrics?.range == null ? "étendue indisponible" : `étendue ${temperatureMetrics.range.toFixed(1)} °C`} · {temperatureMetrics?.standardDeviation == null ? "σ population indisponible" : `σ pop ${temperatureMetrics.standardDeviation.toFixed(1)} °C`} · {temperatureMetrics ? `${temperatureMetrics.availableModelCount}/${metrics.expectedModelCount} modèles` : "effectif indisponible"}</span></div>
+            <div><p className="flex justify-between gap-2"><span>Pluie {precipitationMetrics?.thresholdMm == null ? "(seuil indisponible)" : `(≥${precipitationMetrics.thresholdMm.toFixed(1)} mm)`}</span><span className="text-right font-semibold">{precipitationMetrics ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} modèles au seuil` : "effectif pluie indisponible"} · fréquence non calibrée</span></p><p className="mt-0.5 text-right text-slate-400">Toutes quantités : étendue {precipitationRange == null ? "indisponible" : `${precipitationRange.toFixed(1)} mm`} · modèles pluvieux : étendue {wetPrecipitationRange == null ? "indisponible" : `${wetPrecipitationRange.toFixed(1)} mm`} · σ pop {wetPrecipitationStandardDeviation == null ? "indisponible" : `${wetPrecipitationStandardDeviation.toFixed(1)} mm`} · n={wetPrecipitationValues.length}</p></div>
+            {([
+              ["Vent moyen", dispersion?.windSpeed, "km/h"],
+              ["Rafales", dispersion?.windGust, "km/h"],
+              ["Direction", dispersion?.windDirection, "°"],
+              ["Humidité", dispersion?.humidity, "%"],
+              ["Nuages", dispersion?.cloudCover, "%"],
+            ] as const).map(([label, item, unit]) => <div key={label} className="flex justify-between gap-2"><span>{label}</span><span className="text-right font-semibold">{item?.range == null ? "étendue indisponible" : `${item.range.toFixed(1)} ${unit}`} · {label === "Direction" ? "dispersion circulaire" : item?.standardDeviation == null ? "σ population indisponible" : `σ pop ${item.standardDeviation.toFixed(1)} ${unit}`} · {item?.availableModelCount == null ? "effectif indisponible" : `${item.availableModelCount}/${metrics.expectedModelCount} modèles`}</span></div>)}
+          </div>
+          <PrecipitationConsensusSummary summary={precipitationMetrics} compact />
+        </section>}
         {metrics && (
           <div className="mb-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06]">
             <button type="button" onClick={() => setComparisonOpen((open) => !open)} aria-expanded={comparisonOpen} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-amber-50 active:scale-[0.99]">
-              <span><span className="font-semibold">Dispersion thermique · étendue {temperatureMetrics?.range == null ? "—" : `${temperatureMetrics.range.toFixed(1)}°C`}</span><span className="ml-1 text-[10px] text-amber-100/70">· {temperatureMetrics?.availableModelCount ?? 0}/{metrics.expectedModelCount} modèles</span></span>
+              <span><span className="font-semibold">Dispersion thermique · étendue {temperatureMetrics?.range == null ? "—" : `${temperatureMetrics.range.toFixed(1)}°C`}</span><span className="ml-1 text-[10px] text-amber-100/70">· {temperatureMetrics ? `${temperatureMetrics.availableModelCount}/${metrics.expectedModelCount} modèles` : "effectif indisponible"}</span></span>
               <span className="flex items-center gap-1 text-[10px]">Statistiques <ChevronDown className={`h-3.5 w-3.5 transition-transform ${comparisonOpen ? "rotate-180" : ""}`} /></span>
             </button>
             {comparisonOpen && (
@@ -230,7 +188,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
                 <div className="mt-2 space-y-1 leading-relaxed text-slate-300">
                   <p>Moyenne pondérée officielle : <b>{temperatureMetrics?.weightedMean == null ? "—" : `${temperatureMetrics.weightedMean.toFixed(1)}°C`}</b></p>
                   <p>Médiane : <b>{temperatureMetrics?.median == null ? "—" : `${temperatureMetrics.median.toFixed(1)}°C`}</b> · écart-type population : <b>{temperatureMetrics?.standardDeviation == null ? "—" : `${temperatureMetrics.standardDeviation.toFixed(1)}°C`}</b></p>
-                  <p>Modèles température disponibles ({temperatureMetrics?.availableModelCount ?? 0}/{metrics.expectedModelCount}) : {temperatureMetrics?.modelsWithData.join(", ") || "aucun"}</p>
+                  <p>Modèles température disponibles ({temperatureMetrics ? `${temperatureMetrics.availableModelCount}/${metrics.expectedModelCount}` : "effectif indisponible"}) : {temperatureMetrics?.modelsWithData.join(", ") || "aucun"}</p>
                   {temperatureMetrics?.availableModelCount != null && temperatureMetrics.availableModelCount < 2 && <p>Dispersion non calculable avec moins de deux valeurs valides.</p>}
                 </div>
               </div>
@@ -244,7 +202,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1"><Thermometer className="h-3.5 w-3.5 text-orange-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Moyenne pondérée officielle</span></div>
             <p className="text-sm font-bold text-white">{temperatureMetrics?.weightedMean != null ? `${temperatureMetrics.weightedMean.toFixed(1)}°C` : "—"}</p>
-            {hasSpread && <p className="text-[10px] text-slate-500 mt-0.5">Étendue des modèles : {temperatureMetrics!.range!.toFixed(1)}°C</p>}
+            {temperatureMetrics?.range != null && <p className="text-[10px] text-slate-500 mt-0.5">Étendue inter-modèles : {temperatureMetrics.range.toFixed(1)}°C</p>}
             {temperatureMetrics && <p className="text-[10px] text-slate-500 mt-0.5">Valeurs disponibles : {temperatureMetrics.availableModelCount}/{metrics!.expectedModelCount}</p>}
           </div>
 
