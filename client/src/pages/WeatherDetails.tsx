@@ -18,6 +18,7 @@ import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } fro
 import { WindyMap } from "@/components/WindyMap";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -166,30 +167,23 @@ export default function WeatherDetails() {
     return () => window.clearTimeout(timeout);
   }, [isLoading, isFetching]);
 
-  // Current hour index
-  const currentHourStr = useMemo(() => {
-    const now = new Date();
-    return now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
-  }, []);
-
   const currentHourIdx = useMemo(() => {
-    if (!data?.hours) return 0;
-    const idx = data.hours.findIndex((h: any) => h.hour === currentHourStr);
-    return idx >= 0 ? idx : 0;
-  }, [data?.hours, currentHourStr]);
+    if (!data?.hours) return -1;
+    return findActiveHourlyForecastIndex(data.hours, Date.now());
+  }, [data?.hours]);
+  const focusHourIdx = currentHourIdx >= 0 ? currentHourIdx : 0;
 
-  // À l’ouverture ou au changement de lieu, placer directement la carte de
-  // l’heure réelle de Paris au début du ruban horizontal, sans révéler les
-  // cartes voisines sur les côtés.
+  // À l’ouverture ou au changement de lieu, centrer le créneau prévisionnel
+  // actif identifié par validAt, sans révéler les cartes voisines sur les côtés.
   useEffect(() => {
     const rail = hourlyRef.current;
     if (!rail || !data?.hours?.length) return;
     const firstCard = rail.querySelector<HTMLElement>('[data-hour-index="0"]');
-    const currentCard = rail.querySelector<HTMLElement>(`[data-hour-index="${currentHourIdx}"]`);
+    const currentCard = rail.querySelector<HTMLElement>(`[data-hour-index="${focusHourIdx}"]`);
     const targetLeft = Math.max(0, (currentCard?.offsetLeft ?? 0) - (firstCard?.offsetLeft ?? 0));
     const frame = requestAnimationFrame(() => rail.scrollTo({ left: targetLeft, behavior: "auto" }));
     return () => cancelAnimationFrame(frame);
-  }, [data?.hours?.length, currentHourIdx, activeLocation?.lat, activeLocation?.lon]);
+  }, [data?.hours?.length, focusHourIdx, activeLocation?.lat, activeLocation?.lon]);
 
   if (isLoading) {
     return (
@@ -214,7 +208,7 @@ export default function WeatherDetails() {
   const periodHours = data?.periodHours ?? hours;
   const days = data?.days ?? [];
   const regime = data?.regime;
-  const currentHour = hours[currentHourIdx] ?? hours[0];
+  const currentHour = hours[currentHourIdx] ?? null;
 
   return (
     <div className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
@@ -234,7 +228,7 @@ export default function WeatherDetails() {
           <div ref={hourlyRef} className="-mx-2 overflow-x-auto overscroll-x-contain px-2 pb-1 scrollbar-hide snap-x snap-mandatory scroll-px-2">
             <div className="flex items-start gap-2.5">
               {hours.map((h: any, i: number) => {
-                const isNow = i === currentHourIdx;
+                const isActiveForecast = i === currentHourIdx;
                 const pTrend = pressureTrend(hours, i);
                 const conditionDetails = getHourlyConditionDetails(h);
                 const multiModelMetrics = h.multiModelMetrics ?? null;
@@ -245,15 +239,15 @@ export default function WeatherDetails() {
                     key={hourlyCardKey(h, i)}
                     data-hour-index={i}
                     className={`w-[calc((100%-10px)/2)] shrink-0 snap-start rounded-[22px] border px-3 pb-4 pt-3 transition-colors ${
-                      isNow
+                      isActiveForecast
                         ? "border-sky-200/65 bg-[linear-gradient(160deg,rgba(44,128,181,0.30),rgba(10,35,60,0.34))]"
                         : "border-white/20 bg-[linear-gradient(160deg,rgba(77,105,132,0.20),rgba(16,36,56,0.28))]"
                     }`}
                   >
-                    {/* Hour + Now badge */}
+                    {/* Hour + active forecast badge */}
                     <div className="flex items-center justify-between">
-                      <span className={`text-[19px] font-semibold tracking-[-0.05em] ${isNow ? "text-sky-100" : "text-white"}`}>{h.hour}</span>
-                      {isNow && <span className="rounded-full border border-sky-200/25 bg-sky-300/10 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.1em] text-sky-100">MAINTENANT</span>}
+                      <span className={`text-[19px] font-semibold tracking-[-0.05em] ${isActiveForecast ? "text-sky-100" : "text-white"}`}>{h.hour}</span>
+                      {isActiveForecast && <span className="rounded-full border border-sky-200/25 bg-sky-300/10 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.1em] text-sky-100">PRÉVISION ACTIVE</span>}
                     </div>
                     
                     {/* Icon + condition */}
@@ -760,7 +754,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
               return <button key={`bar-${hour.hour}-${index}`} type="button" onClick={() => syncSelectedHour(index, "chart")} className={`relative flex h-full min-w-[42px] flex-1 snap-center flex-col justify-end rounded-t-xl px-0.5 text-center ${selected ? "bg-sky-400/10" : ""}`}>
                 <span className="mb-1 text-[11px] font-bold" style={{ color }}>{value == null ? "—" : `${type === "pressure" ? value.toFixed(0) : value.toFixed(1)}${getUnit()}`}</span>
                 <span className="w-full rounded-t-[9px] border border-white/10" style={{ height: `${Math.round(normalized * 132)}px`, background: `linear-gradient(180deg, ${color}, rgba(15,23,42,0.45))` }} />
-                <span className={`mt-1.5 text-[10px] font-semibold ${selected ? "text-sky-100" : "text-slate-400"}`}>{hour.hour}</span>{index === currentIdx && <span className="text-[8px] font-bold text-sky-200">MAINTENANT</span>}
+                <span className={`mt-1.5 text-[10px] font-semibold ${selected ? "text-sky-100" : "text-slate-400"}`}>{hour.hour}</span>{index === currentIdx && <span className="text-[8px] font-bold text-sky-200">PRÉVISION ACTIVE</span>}
               </button>;
             })}
           </div>
@@ -787,7 +781,7 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
                   <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-bold text-white">{h.hour}</span>
-                      {i === currentIdx && <span className="rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[8px] font-bold text-sky-200">MAINTENANT</span>}
+                      {i === currentIdx && <span className="rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[8px] font-bold text-sky-200">PRÉVISION ACTIVE</span>}
                     </div>
                     <span className="text-xs font-semibold" style={{ color }}>{selectedValue == null ? "—" : `${type === "pressure" ? selectedValue.toFixed(0) : selectedValue.toFixed(1)} ${getUnit()}`}</span>
                   </div>

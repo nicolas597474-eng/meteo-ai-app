@@ -27,4 +27,15 @@ describe("findNextConditionChange", () => {
 
     expect(result?.hour).toBe("10:00");
   });
+
+  it("utilise le validAt exact quand l’heure locale 02:00 est répétée", () => {
+    const hours = [
+      { hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), condition: "Ensoleillé" },
+      { hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), condition: "Pluie" },
+      { hour: "03:00", validAt: Date.parse("2026-10-25T02:00:00.000Z"), condition: "Pluie" },
+      { hour: "04:00", validAt: Date.parse("2026-10-25T03:00:00.000Z"), condition: "Nuageux" },
+    ];
+
+    expect(findNextConditionChange(hours, "02:00", hours[1].validAt)).toBe(hours[3]);
+  });
 });

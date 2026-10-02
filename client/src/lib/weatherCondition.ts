@@ -1,5 +1,6 @@
 export type HourlyConditionPoint = {
   hour: string;
+  validAt?: number | null;
   condition?: string | null;
   precipitation?: number | null;
   windSpeed?: number | null;
@@ -21,8 +22,11 @@ function normalizeCondition(condition?: string | null) {
 export function findNextConditionChange<T extends HourlyConditionPoint>(
   hours: T[],
   currentHour: string,
+  currentValidAt?: number | null,
 ): T | null {
-  const currentIndex = hours.findIndex((point) => point.hour === currentHour);
+  const currentIndex = typeof currentValidAt === "number" && Number.isFinite(currentValidAt)
+    ? hours.findIndex((point) => point.validAt === currentValidAt)
+    : hours.findIndex((point) => point.hour === currentHour);
   const startIndex = currentIndex >= 0
     ? currentIndex
     : hours.findIndex((point) => point.hour >= currentHour);

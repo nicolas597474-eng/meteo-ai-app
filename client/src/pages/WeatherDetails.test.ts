@@ -18,7 +18,8 @@ describe("page Prévisions détaillées", () => {
     expect(source).toContain("key={hourlyCardKey(h, i)}");
     expect(source).not.toContain("key={h.hour}");
     expect(source).toContain("text-[36px] font-semibold leading-none");
-    expect(source).toContain("MAINTENANT");
+    expect(source).toContain("PRÉVISION ACTIVE");
+    expect(source).not.toContain("MAINTENANT");
     expect(source).toContain('currentCard?.offsetLeft');
     expect(source).toContain('rail.scrollTo({ left: targetLeft, behavior: "auto" })');
     expect(source).toContain("rgba(77,105,132,0.20)");

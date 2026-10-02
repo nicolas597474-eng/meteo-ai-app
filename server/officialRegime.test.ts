@@ -57,4 +57,17 @@ describe("buildOperationalRegime", () => {
 
     expect(change).toMatchObject({ hour: "08:00", id: "partly_cloudy", cloudCover: 65 });
   });
+
+  it("utilise validAt pour la seconde heure locale répétée au changement d’heure", () => {
+    const hours = [
+      { hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
+      { hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 60 },
+      { hour: "03:00", validAt: Date.parse("2026-10-25T02:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 60 },
+      { hour: "04:00", validAt: Date.parse("2026-10-25T03:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
+    ];
+
+    const change = findNextHourlyRegimeChange(hours, "02:00", "partly_cloudy", hours[1].validAt);
+
+    expect(change).toMatchObject({ hour: "04:00", id: "sunny" });
+  });
 });

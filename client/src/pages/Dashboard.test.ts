@@ -27,9 +27,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Consulter l’historique complet");
     expect(source).toContain("Modifier mon observation");
     expect(source).toContain("Supprimer cette observation et recalculer la calibration");
-    expect(source).toContain("Écart observé avec la prévision officielle");
+    expect(source).toContain("Écart observé avec le snapshot du modèle");
     expect(source).toContain("hasMaterialLocalDelta");
-    expect(source).toContain("La température principale reste la prévision au point du lieu.");
+    expect(source).toContain("La température principale est l’instantané du modèle");
     expect(source).toContain("Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée.");
     expect(source).toContain("Couverture locale");
     expect(source).toContain("Stations contributrices");
@@ -77,7 +77,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(heroRegimeIndex).toBeLessThan(contextIndex);
     expect(observationsIndex).toBeGreaterThan(contextIndex);
     expect(source).not.toContain("{regime && (\n          <DominantRegimePanel");
-    expect(source).toContain("Phénomène actuel");
+    expect(source).toContain("currentSnapshot?.condition");
     expect(source).toContain("Synthèse horaire · {regimeFreshnessLabel}");
     expect(source).toContain("whitespace-nowrap text-[15px] font-medium leading-tight");
     expect(source).toContain('nextRegimeChange.hour.replace(":00", "h")');
@@ -99,7 +99,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Fermer les informations de prévision et d’accord inter-modèles");
     expect(source).toContain("Créneaux horaires indisponibles");
     expect(source).toContain("Dernière fusion quotidienne réelle");
-    expect(source).toContain('isDailyFallback ? "Tendance quotidienne · " : "Phénomène actuel · "');
+    expect(source).toContain('isDailyFallback ? "Tendance quotidienne · " : currentSnapshot ? "État actuel · " : "Snapshot modèle indisponible · "');
     expect(source).toContain('text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');
@@ -113,7 +113,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).not.toContain('mb-0.5 flex justify-center sm:mb-3');
     expect(source).toContain('mb-1 flex justify-center sm:mb-1.5');
     expect(source).toContain("État du ciel</p>");
-    expect(source).toContain("Phénomène actuel");
+    expect(source).toContain("Snapshot du modèle Open-Meteo");
     expect(source).toContain('{panelDate}');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');
     expect(source).not.toContain('aria-label="Actualiser la météo maintenant"');

@@ -279,13 +279,13 @@ export const favoritesRouter = router({
         getMeteoAIForecastByDate(todayDate, locationKey),
       ]);
       const hourly = officialSnapshot.hourly;
+      const currentSnapshot = officialSnapshot.currentSnapshot;
       const forecast15d = officialSnapshot.daily;
 
       // Ultra-local calculation
       const ranked = rankStations(stations);
       const physicalStations = getPhysicalActiveStations(ranked);
-      const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
-      const officialCurrentTemperature = hourly.find((hour) => hour.hour === nowHour)?.temp ?? hourly[0]?.temp ?? null;
+      const officialCurrentTemperature = currentSnapshot?.temp ?? null;
       const modelFallback = buildOfficialModelFallback(currentModelReferences, meteoAI?.weights);
       const ultraLocalResult = calculateUltraLocal(physicalStations, localMode, lat, lon, null, officialCurrentTemperature);
       const modeFusionConstraints = getModeAlignedFusionConstraints(localMode);
@@ -317,21 +317,20 @@ export const favoritesRouter = router({
 
       // Le point de grille au lieu demandé demeure disponible lorsque les stations
       // sont rares, sans écraser leur contribution locale dans les modes Local/Ultra-local.
-      if (hourly[0]) {
+      if (currentSnapshot) {
         fusionSources.push({
           id: "openmeteo_best_match",
-          name: "Open-Meteo Best Match",
+          name: "Open-Meteo current model snapshot",
           distanceKm: 0,
-          temperature: officialCurrentTemperature,
-          apparentTemp: hourly[0].apparentTemp ?? null,
-          humidity: hourly[0].humidity ?? null,
-          pressure: hourly[0].pressure ?? null,
-          windSpeed: hourly[0].windSpeed ?? null,
-          windGust: hourly[0].windGust ?? null,
-          windDirection: hourly[0].windDirection ?? null,
-          precipitation: hourly[0].precipitation ?? null,
-          cloudCover: hourly[0].cloudCover ?? null,
-          updatedAt: new Date(),
+          temperature: currentSnapshot.temp,
+          apparentTemp: currentSnapshot.apparentTemp,
+          humidity: currentSnapshot.humidity,
+          windSpeed: currentSnapshot.windSpeed,
+          windGust: currentSnapshot.windGust,
+          windDirection: currentSnapshot.windDirection,
+          precipitation: currentSnapshot.precipitation,
+          cloudCover: currentSnapshot.cloudCover,
+          updatedAt: new Date(currentSnapshot.capturedAt),
           reliabilityScore: 75,
           type: "model",
         });
@@ -410,6 +409,7 @@ export const favoritesRouter = router({
 
       return {
         location: { lat, lon },
+        currentSnapshot,
         officialSnapshot: {
           validAt: officialSnapshot.validAt,
           computedAt: officialSnapshot.computedAt,

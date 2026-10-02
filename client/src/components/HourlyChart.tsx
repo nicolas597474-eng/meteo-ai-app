@@ -7,10 +7,12 @@ import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLab
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
 import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import type { HourlyMultiModelMetrics } from "@shared/hourlyModelMetrics";
+import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
   hour: string;
+  validAt?: number;
   temp: number | null;
   apparentTemp: number | null;
   precipitation: number | null;
@@ -323,10 +325,9 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const tempToY = useCallback((t: number) => tempCurveTop + (1 - (t - scaleBot) / scaleRange) * (tempZoneBot - tempCurveTop), [scaleBot, scaleRange, tempCurveTop, tempZoneBot]);
   const colX = useCallback((i: number) => i * COL_W + COL_W / 2, []);
 
-  // Current hour index
+  // Active forecast interval index
   const nowHour = useMemo(() => {
-    const h = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
-    return hours.findIndex(hr => hr.hour === h);
+    return findActiveHourlyForecastIndex(hours, Date.now());
   }, [hours]);
   const dayBoundaryIndexes = useMemo(
     () => hours.reduce<number[]>((indexes, hour, index) => {
