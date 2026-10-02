@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { resolveWeightComparisonSelection } from "@/lib/weightComparisonSelection";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "@/contexts/LocationContext";
@@ -27,13 +28,21 @@ export default function WeightComparison() {
     () => activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined,
     [activeLocation?.lat, activeLocation?.lon]
   );
-  const { data: history = [], isLoading: historyLoading } = trpc.weather.getWeightTraceHistory.useQuery(coords);
-  const [selectedBefore, setSelectedBefore] = useState<number | null>(null);
-  const [selectedAfter, setSelectedAfter] = useState<number | null>(null);
+  const locationKey = coords ? `${coords.lat},${coords.lon}` : "default";
+  const { data: history = [], isLoading: historyLoading, isPlaceholderData } = trpc.weather.getWeightTraceHistory.useQuery(coords);
+  const [selection, setSelection] = useState<{ locationKey: string; before: number | null; after: number | null }>({
+    locationKey: "",
+    before: null,
+    after: null,
+  });
 
-  const afterId = selectedAfter ?? history[0]?.id ?? null;
-  const beforeId = selectedBefore ?? history.find((snapshot) => snapshot.id !== afterId)?.id ?? null;
-  const canCompare = beforeId != null && afterId != null && beforeId !== afterId;
+  useEffect(() => {
+    setSelection({ locationKey, before: null, after: null });
+  }, [locationKey]);
+
+  const currentSelection = selection.locationKey === locationKey ? selection : { before: null, after: null };
+  const { beforeId, afterId, canCompare } = resolveWeightComparisonSelection(history, currentSelection.before, currentSelection.after);
+  const canCompareCurrentLocation = canCompare && !isPlaceholderData;
   const comparisonInput = {
     lat: coords?.lat,
     lon: coords?.lon,
@@ -41,7 +50,7 @@ export default function WeightComparison() {
     afterId: afterId ?? 1,
   };
   const { data: comparison, isLoading: comparisonLoading } = trpc.weather.compareWeightSnapshots.useQuery(comparisonInput, {
-    enabled: canCompare,
+    enabled: canCompareCurrentLocation,
   });
 
   const totalChanges = comparison?.parameters.reduce((total, parameter) =>
@@ -64,7 +73,7 @@ export default function WeightComparison() {
           </Link>
         </div>
 
-        {historyLoading ? (
+        {historyLoading || isPlaceholderData ? (
           <div className="space-y-3"><Skeleton className="h-28 w-full rounded-2xl" /><Skeleton className="h-72 w-full rounded-2xl" /></div>
         ) : history.length < 2 ? (
           <section className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-5 text-sm text-muted-foreground">
@@ -79,7 +88,11 @@ export default function WeightComparison() {
                   Prévision précédente
                   <select
                     value={beforeId ?? ""}
-                    onChange={(event) => setSelectedBefore(Number(event.target.value))}
+                    onChange={(event) => setSelection((current) => ({
+                      locationKey,
+                      before: Number(event.target.value),
+                      after: current.locationKey === locationKey ? current.after : null,
+                    }))}
                     className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-sky-500"
                   >
                     {history.filter((snapshot) => snapshot.id !== afterId).map((snapshot) => <option key={snapshot.id} value={snapshot.id}>{formatSnapshot(snapshot)}</option>)}
@@ -89,7 +102,11 @@ export default function WeightComparison() {
                   Prévision la plus récente
                   <select
                     value={afterId ?? ""}
-                    onChange={(event) => setSelectedAfter(Number(event.target.value))}
+                    onChange={(event) => setSelection((current) => ({
+                      locationKey,
+                      before: current.locationKey === locationKey ? current.before : null,
+                      after: Number(event.target.value),
+                    }))}
                     className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-sky-500"
                   >
                     {history.filter((snapshot) => snapshot.id !== beforeId).map((snapshot) => <option key={snapshot.id} value={snapshot.id}>{formatSnapshot(snapshot)}</option>)}

@@ -136,7 +136,7 @@ export default function DailyPhysicalComparisonsPanel({ coordinates }: { coordin
         </label>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[10px] text-muted-foreground">Lieu : {coordinates ? `${coordinates.lat.toFixed(3)}, ${coordinates.lon.toFixed(3)}` : "lieu par défaut"}. Le fournisseur enregistré est affiché dans chaque ligne.</p>
+        <p className="text-[10px] text-muted-foreground">Lieu : {coordinates ? `${coordinates.lat.toFixed(3)}, ${coordinates.lon.toFixed(3)}` : "lieu par défaut"}. Le fournisseur de prévision enregistré est indiqué ; la source de l’observation n’est pas enregistrée.</p>
         <button type="button" onClick={clearFilters} className="min-h-9 rounded-lg border border-border px-3 text-[11px] font-medium text-sky-200 hover:bg-white/5">Effacer les filtres</button>
       </div>
 
@@ -149,7 +149,7 @@ export default function DailyPhysicalComparisonsPanel({ coordinates }: { coordin
       ) : historyQuery.data?.status === "unavailable" ? (
         <div role="status" className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-3 text-xs leading-relaxed text-amber-100">
           {historyQuery.data.reason === "table_unavailable" ? (
-            <>L’archive de comparaisons physiques de production n’est pas disponible sur ce serveur. La migration <code>0045_daily_fusion_performance.sql</code> est documentée comme générée mais non appliquée ; aucune table Phase 8 shadow ne sert de substitut.</>
+            <>L’archive de comparaisons physiques de production n’est pas accessible actuellement ; la cause de cette indisponibilité n’est pas déterminée. Aucune table Phase 8 shadow ne sert de substitut.</>
           ) : (
             <>La base de données n’est pas disponible ; aucune archive physique n’a pu être lue. Aucune table Phase 8 shadow ne sert de substitut.</>
           )}
@@ -183,7 +183,7 @@ export default function DailyPhysicalComparisonsPanel({ coordinates }: { coordin
                     <p className="text-muted-foreground">Délai d’émission <span className="font-mono text-foreground">{row.leadTimeMinutes.toLocaleString("fr-FR")} min</span></p>
                     <p className="text-muted-foreground">Couverture physique <span className="font-mono text-foreground">{row.observationCoverageHours} h qualifiées</span></p>
                   </div>
-                  <p className="mt-2 text-[9px] text-muted-foreground">Provenance enregistrée : {row.provider} · observation physique qualifiée.</p>
+                  <p className="mt-2 text-[9px] text-muted-foreground">Fournisseur de la prévision : {row.provider} · la source de l’observation physique n’est pas enregistrée.</p>
                 </article>
               );
             })}

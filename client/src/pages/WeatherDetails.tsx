@@ -19,6 +19,7 @@ import { WindyMap } from "@/components/WindyMap";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
+import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ export default function WeatherDetails() {
                 const isActiveForecast = i === currentHourIdx;
                 const pTrend = pressureTrend(hours, i);
                 const conditionDetails = getHourlyConditionDetails(h);
+                const hourDisplay = formatHourlyDisplay(h, hours);
                 const multiModelMetrics = h.multiModelMetrics ?? null;
                 const temperatureMetrics = multiModelMetrics?.temperature;
                 const precipitationMetrics = multiModelMetrics?.precipitation;
@@ -245,8 +247,12 @@ export default function WeatherDetails() {
                     }`}
                   >
                     {/* Hour + active forecast badge */}
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[19px] font-semibold tracking-[-0.05em] ${isActiveForecast ? "text-sky-100" : "text-white"}`}>{h.hour}</span>
+                    <div className="flex items-start justify-between">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="text-[9px] font-medium text-slate-300">{hourDisplay.dateLabel}</span>
+                        <span className={`text-[19px] font-semibold tracking-[-0.05em] ${isActiveForecast ? "text-sky-100" : "text-white"}`}>{hourDisplay.hourLabel}</span>
+                        {hourDisplay.offsetLabel && <span className="text-[8px] font-medium text-amber-200">{hourDisplay.offsetLabel}</span>}
+                      </div>
                       {isActiveForecast && <span className="rounded-full border border-sky-200/25 bg-sky-300/10 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.1em] text-sky-100">PRÉVISION ACTIVE</span>}
                     </div>
                     
@@ -751,10 +757,11 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
               const value = getValue(hour);
               const normalized = value == null ? 0 : type === "precip" ? Math.min(1, value / Math.max(max, 0.1)) : Math.max(0.08, (value - min) / range);
               const selected = index === selectedIdx;
+              const hourDisplay = formatHourlyDisplay(hour, hours);
               return <button key={`bar-${hour.hour}-${index}`} type="button" onClick={() => syncSelectedHour(index, "chart")} className={`relative flex h-full min-w-[42px] flex-1 snap-center flex-col justify-end rounded-t-xl px-0.5 text-center ${selected ? "bg-sky-400/10" : ""}`}>
                 <span className="mb-1 text-[11px] font-bold" style={{ color }}>{value == null ? "—" : `${type === "pressure" ? value.toFixed(0) : value.toFixed(1)}${getUnit()}`}</span>
                 <span className="w-full rounded-t-[9px] border border-white/10" style={{ height: `${Math.round(normalized * 132)}px`, background: `linear-gradient(180deg, ${color}, rgba(15,23,42,0.45))` }} />
-                <span className={`mt-1.5 text-[10px] font-semibold ${selected ? "text-sky-100" : "text-slate-400"}`}>{hour.hour}</span>{index === currentIdx && <span className="text-[8px] font-bold text-sky-200">PRÉVISION ACTIVE</span>}
+                <span className={`mt-1.5 flex flex-col text-[10px] font-semibold ${selected ? "text-sky-100" : "text-slate-400"}`}><span>{hourDisplay.hourLabel}</span><span className="text-[7px] font-normal">{hour.date ? `${hour.date.slice(8, 10)}/${hour.date.slice(5, 7)}` : ""}</span>{hourDisplay.offsetLabel && <span className="text-[6px] font-normal">{hourDisplay.offsetLabel.replace("Europe/Paris ", "")}</span>}</span>{index === currentIdx && <span className="text-[8px] font-bold text-sky-200">PRÉVISION ACTIVE</span>}
               </button>;
             })}
           </div>
@@ -774,13 +781,18 @@ function HourlyChart({ hours, type, currentIdx }: { hours: any[]; type: ChartTyp
           <div className="flex gap-3" style={{ width: `${hours.length * 186}px` }}>
             {hours.map((h: any, i: number) => {
               const selectedValue = getValue(h);
+              const hourDisplay = formatHourlyDisplay(h, hours);
               const temperatureMetrics = h.multiModelMetrics?.temperature;
               const precipitationMetrics = h.multiModelMetrics?.precipitation;
               return (
                 <div key={`detail-${h.hour}-${i}`} className={`w-[174px] flex-shrink-0 rounded-xl border p-2.5 ${i === selectedIdx ? "border-sky-300/70 bg-sky-950/50" : "border-slate-700/70 bg-slate-950/40"}`}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-bold text-white">{h.hour}</span>
+                  <div className="mb-2 flex items-start justify-between">
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-[9px] text-slate-400">{hourDisplay.dateLabel}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-white">{hourDisplay.hourLabel}</span>
+                        {hourDisplay.offsetLabel && <span className="text-[8px] font-medium text-amber-200">{hourDisplay.offsetLabel}</span>}
+                      </div>
                       {i === currentIdx && <span className="rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[8px] font-bold text-sky-200">PRÉVISION ACTIVE</span>}
                     </div>
                     <span className="text-xs font-semibold" style={{ color }}>{selectedValue == null ? "—" : `${type === "pressure" ? selectedValue.toFixed(0) : selectedValue.toFixed(1)} ${getUnit()}`}</span>

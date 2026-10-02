@@ -8,6 +8,9 @@ describe("page Prévisions détaillées", () => {
   it("conserve le déroulé horaire sans afficher de section Graphiques", () => {
     expect(source).toContain('import { MeteoSurface } from "@/components/weather/MeteoSurface"');
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
+    expect(source).toContain('import { formatHourlyDisplay } from "@/lib/hourlyDisplay"');
+    expect(source).toContain("hourDisplay.dateLabel");
+    expect(source).toContain("hourDisplay.offsetLabel");
     expect(source).toContain('tone="default"');
     expect(source).not.toContain("weather-chart-3d");
     expect(source).toContain("<BackToTopButton />");

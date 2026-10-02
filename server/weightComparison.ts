@@ -22,14 +22,16 @@ export function compareTraceWeights(before: TraceWeightSnapshot, after: TraceWei
     const names = new Set([...previous.map((source) => source.name), ...current.map((source) => source.name)]);
     const sourceChanges = Array.from(names)
       .map((name) => {
-        const beforeWeight = previous.find((source) => source.name === name)?.finalWeight ?? 0;
-        const afterWeight = current.find((source) => source.name === name)?.finalWeight ?? 0;
+        const previousSource = previous.find((source) => source.name === name);
+        const currentSource = current.find((source) => source.name === name);
+        const beforeWeight = previousSource?.finalWeight ?? 0;
+        const afterWeight = currentSource?.finalWeight ?? 0;
         return {
           name,
           beforeWeight,
           afterWeight,
           delta: afterWeight - beforeWeight,
-          status: beforeWeight === 0 ? "added" : afterWeight === 0 ? "removed" : "retained",
+          status: previousSource == null ? "added" : currentSource == null ? "removed" : "retained",
         };
       })
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.name.localeCompare(b.name, "fr"));
