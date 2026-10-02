@@ -167,6 +167,22 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain('"Relancer"');
   });
 
+  it("intègre le panneau d’écarts descriptifs sans confondre snapshot modèle, prévisions et stations", () => {
+    const page = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
+    const panel = readFileSync(new URL("../components/weather/ForecastAlignmentPanel.tsx", import.meta.url), "utf8");
+
+    expect(page).toContain("ForecastAlignmentPanel");
+    expect(page).toContain("data.forecastComparison");
+    expect(panel).toContain("Instantané courant du modèle");
+    expect(panel).toContain("pas un relevé physique");
+    expect(panel).toContain("Heure d’émission fournisseur exacte : non archivée");
+    expect(panel).toContain("Écart brut (prévision horaire − snapshot modèle)");
+    expect(panel).toContain("ni une erreur vérifiée");
+    expect(panel).toContain("ne corrigent pas les prévisions futures");
+    expect(panel).not.toContain("confidenceScore");
+    expect(panel).not.toContain("stationData");
+  });
+
   it("présente les résultats quotidiens et horaires séparément et rafraîchit le Dashboard du même lieu", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
     expect(source).toContain("refreshManualFusion");

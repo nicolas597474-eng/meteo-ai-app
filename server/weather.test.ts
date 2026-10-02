@@ -142,6 +142,14 @@ describe("weather.getAILab", () => {
     expect(Array.isArray(result.appliedModelWeights)).toBe(true);
     expect(Object.hasOwn(result, "latestStationCollection")).toBe(true);
     expect(Object.hasOwn(result, "modelIndicator")).toBe(true);
+    expect(result.forecastComparison).toMatchObject({
+      timeZone: "Europe/Paris",
+      currentSnapshotSource: { sourceKind: "model_current_snapshot", source: "open-meteo" },
+      hourlyForecast: { sourceKind: "official_forecast", source: "open-meteo", bestMatchIncluded: false },
+      dailyForecast: { source: "open-meteo" },
+    });
+    expect(Array.isArray(result.forecastComparison.hourlyForecast.points)).toBe(true);
+    expect(Array.isArray(result.forecastComparison.dailyForecast.days)).toBe(true);
     for (const model of result.appliedModelWeights) {
       expect(model.name).toBeTruthy();
       expect(model.averageWeight).toBeGreaterThan(0);
