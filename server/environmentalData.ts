@@ -45,7 +45,11 @@ export type AstronomicalMoonPhase = {
   symbol: string;
   waxing: boolean;
   illuminationPct: number;
+  illuminationFraction: number;
   brightLimbAngleDeg: number;
+  librationLongitudeDeg: number;
+  librationLatitudeDeg: number;
+  lunarNorthPoleAngleDeg: number;
 };
 
 function normalizeDegrees(value: number) {
@@ -60,7 +64,8 @@ function roundNormalizedDegrees(value: number) {
 export function getAstronomicalMoonPhase(instant: Date, observer: AstronomyObserver): AstronomicalMoonPhase {
   const angleDeg = normalizeDegrees(Astronomy.MoonPhase(instant));
   const roundedAngleDeg = roundNormalizedDegrees(angleDeg);
-  const illuminationPct = Math.round(Astronomy.Illumination(Astronomy.Body.Moon, instant).phase_fraction * 100);
+  const illuminationFraction = Astronomy.Illumination(Astronomy.Body.Moon, instant).phase_fraction;
+  const illuminationPct = Math.round(illuminationFraction * 100);
   const waxing = roundedAngleDeg > 0 && roundedAngleDeg < 180;
   const label = angleDeg < 5 || angleDeg >= 355 ? "Nouvelle lune"
     : angleDeg < 85 ? "Premier croissant"
@@ -80,7 +85,25 @@ export function getAstronomicalMoonPhase(instant: Date, observer: AstronomyObser
   const hourAngle = Astronomy.HourAngle(Astronomy.Body.Moon, instant, observer) * 15 * Math.PI / 180;
   const latitude = observer.latitude * Math.PI / 180;
   const parallacticAngle = Math.atan2(Math.sin(hourAngle), Math.tan(latitude) * Math.cos(moonDec) - Math.sin(moonDec) * Math.cos(hourAngle));
-  return { angleDeg: roundedAngleDeg, label, symbol, waxing, illuminationPct, brightLimbAngleDeg: roundNormalizedDegrees((brightLimbPositionAngle - parallacticAngle) * 180 / Math.PI) };
+  const lunarPoleJ2000 = Astronomy.VectorFromSphere(new Astronomy.Spherical(66.5392, 269.9949, 1), instant);
+  const lunarPoleOfDate = Astronomy.RotateVector(Astronomy.Rotation_EQJ_EQD(instant), lunarPoleJ2000);
+  const lunarPole = Astronomy.EquatorFromVector(lunarPoleOfDate);
+  const poleRaDelta = (lunarPole.ra * 15 - moon.ra * 15) * Math.PI / 180;
+  const poleDec = lunarPole.dec * Math.PI / 180;
+  const lunarPolePositionAngle = Math.atan2(Math.cos(poleDec) * Math.sin(poleRaDelta), Math.sin(poleDec) * Math.cos(moonDec) - Math.cos(poleDec) * Math.sin(moonDec) * Math.cos(poleRaDelta));
+  const libration = Astronomy.Libration(instant);
+  return {
+    angleDeg: roundedAngleDeg,
+    label,
+    symbol,
+    waxing,
+    illuminationPct,
+    illuminationFraction,
+    brightLimbAngleDeg: roundNormalizedDegrees((brightLimbPositionAngle - parallacticAngle) * 180 / Math.PI),
+    librationLongitudeDeg: libration.elon,
+    librationLatitudeDeg: libration.elat,
+    lunarNorthPoleAngleDeg: roundNormalizedDegrees((lunarPolePositionAngle - parallacticAngle) * 180 / Math.PI),
+  };
 }
 
 export function roundAltitudeDegrees(value: number | null | undefined) {

@@ -98,7 +98,14 @@ describe("environmentalData", () => {
       expect(lunar.angleDeg).toBeLessThan(360);
       expect(lunar.label).toBe(expected.label);
       expect(lunar.illuminationPct).toBe(expected.illumination);
+      expect(Math.round(lunar.illuminationFraction * 100)).toBe(expected.illumination);
+      expect(lunar.illuminationFraction).toBeGreaterThanOrEqual(0);
+      expect(lunar.illuminationFraction).toBeLessThanOrEqual(1);
       expect(lunar.waxing).toBe(expected.waxing);
+      expect(Math.abs(lunar.librationLongitudeDeg)).toBeLessThan(10);
+      expect(Math.abs(lunar.librationLatitudeDeg)).toBeLessThan(10);
+      expect(lunar.lunarNorthPoleAngleDeg).toBeGreaterThanOrEqual(0);
+      expect(lunar.lunarNorthPoleAngleDeg).toBeLessThan(360);
     }
   });
 
@@ -109,9 +116,13 @@ describe("environmentalData", () => {
 
     expect(northern.illuminationPct).toBe(85);
     expect(southern.illuminationPct).toBe(85);
+    expect(northern.illuminationFraction).toBeCloseTo(southern.illuminationFraction, 6);
     expect(northern.waxing).toBe(true);
     expect(southern.waxing).toBe(true);
     expect(Math.abs(northern.brightLimbAngleDeg - southern.brightLimbAngleDeg)).toBeGreaterThan(45);
+    expect(northern.lunarNorthPoleAngleDeg).not.toBe(southern.lunarNorthPoleAngleDeg);
+    expect(northern.librationLongitudeDeg).toBe(southern.librationLongitudeDeg);
+    expect(northern.librationLatitudeDeg).toBe(southern.librationLatitudeDeg);
   });
 
   it("respecte les variations de lieu, de saison et de latitude dans l’état d’horizon", () => {

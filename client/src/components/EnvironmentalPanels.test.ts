@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./EnvironmentalPanels.tsx", import.meta.url), "utf8");
+const lunarGlobeSource = readFileSync(new URL("./LunarPhaseGlobe.tsx", import.meta.url), "utf8");
+const lunarWebglSource = readFileSync(new URL("../lib/lunarWebgl.ts", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const celestialSvgPathsSource = readFileSync(new URL("../lib/celestialSvgPaths.ts", import.meta.url), "utf8");
 const apparentSunMoonSource = source.slice(source.indexOf("function SunMoonPanelApparent"), source.indexOf("export function EnvironmentalPanels"));
@@ -356,22 +358,25 @@ describe("EnvironmentalPanels", () => {
     expect(temporalSunMoonSource).toContain("moonPhase.illuminationPct");
   });
 
-  it("utilise une texture réaliste pour toute phase lunaire visible", () => {
-    expect(source).toContain("meteoai-realistic-moon-surface_f2f79daf.png");
+  it("utilise une sphère WebGL texturée pour la Lune et un fallback 2D explicite", () => {
     expect(source).toContain("function RealisticMoon");
+    expect(source).toContain("<LunarPhaseGlobe phase={phase} size={size} alt={alt} />");
+    expect(source).toContain("NASA's Scientific Visualization Studio");
     expect(source).not.toContain("overflow-hidden rounded-full bg-slate-950");
     expect(source).not.toContain("ring-1 ring-slate-200/20");
-    expect(source).toContain("getLunarShadowPath(illumination)");
-    expect(source).toContain("getLunarShadowTransform(phase.brightLimbAngleDeg)");
-    expect(source).toContain("<path d={shadowPath}");
-    expect(source).not.toContain("conic-gradient(from ${phase.brightLimbAngleDeg}");
+    expect(source).not.toContain("realistic-moon-glow");
+    expect(lunarWebglSource).toContain("gl.drawArrays(gl.TRIANGLES");
+    expect(lunarWebglSource).toContain("getLunarSunDirection");
+    expect(lunarWebglSource).toContain("librationLongitudeDeg");
+    expect(lunarWebglSource).not.toContain("radial-gradient");
+    expect(lunarGlobeSource).toContain("prefers-reduced-motion: reduce");
+    expect(lunarGlobeSource).toContain("2D ·");
+    expect(lunarGlobeSource).toContain('data-render-mode={mode}');
   });
 
-  it("anime une lueur lunaire discrète sans l’imposer aux préférences de mouvement réduit", () => {
-    expect(source).toContain("realistic-moon-glow");
-    expect(styles).toContain("@media (prefers-reduced-motion: no-preference)");
-    expect(styles).toContain("meteoai-lunar-glow");
-    expect(styles).toContain("--moon-glow-opacity");
-    expect(styles).toContain("filter: brightness(1.08)");
+  it("n’ajoute aucun cadre carré ou halo à la sphère lunaire", () => {
+    expect(lunarGlobeSource).not.toContain("box-shadow");
+    expect(lunarGlobeSource).not.toContain("filter:");
+    expect(lunarWebglSource).toContain("gl.clearColor(0, 0, 0, 0)");
   });
 });
