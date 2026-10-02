@@ -376,23 +376,8 @@ export const favoritesRouter = router({
         humidity: null,
         visibility: null,
       });
-      // Legacy compat
-      const regimeInfo = {
-        regime: multiRegimeResult.primaryRegime.id,
-        label: multiRegimeResult.primaryRegime.label,
-        emoji: multiRegimeResult.primaryRegime.emoji,
-        description: multiRegimeResult.description,
-        weights: multiRegimeResult.blendedWeights,
-      };
-
-      // Stabilité = dispersion entre modèles. La confiance locale suit les
-      // stations effectivement admises par le mode affiché ; la fusion avancée
-      // reste une trace de contrôle avec les mêmes seuils d’admission.
-      const temps = forecast15d.map((forecast) => forecast.tempMax).filter((value): value is number => value != null);
-      const divergence = temps.length > 1 ? Math.max(...temps) - Math.min(...temps) : 0;
       const modeUsesLocalStations = localMode !== "standard";
       const confidenceScore = modeUsesLocalStations ? ultraLocalResult.confidenceScore : advancedFusion.confidenceScore;
-      const stabilityIndex = Math.max(0, Math.min(100, 100 - divergence * 4));
       const localTemperature = modeUsesLocalStations
         ? ultraLocalResult.temperature
         : advancedFusion.temperature ?? ultraLocalResult.temperature;
@@ -495,7 +480,6 @@ export const favoritesRouter = router({
           // Cette confiance et ce compteur décrivent la même sélection de
           // stations que la température locale affichée, et non la seule
           // trace de contrôle de fusion avancée.
-          confidenceScore,
           explanation: localModeTemperature.usesModelFallback
             ? `Aucune station physique validée dans le rayon ${localMode === "ultra-local" ? "Ultra-local de 10 km" : localMode === "local" ? "Local de 30 km" : "recherché"}. Repli sur la fusion officielle de ${modelFallback?.modelCount ?? 0} modèles, pondérée par la trace de température appliquée ; aucun micro-ajustement local n’est appliqué.`
             : localModeTemperature.usesOfficialFallback
@@ -512,15 +496,6 @@ export const favoritesRouter = router({
           },
         },
         currentObservation,
-        scores: {
-          confidenceScore,
-          stabilityIndex,
-          regime: regimeInfo.regime,
-          regimeLabel: regimeInfo.label,
-          regimeEmoji: regimeInfo.emoji,
-          regimeDescription: regimeInfo.description,
-          regimeWeights: regimeInfo.weights,
-        },
         multiRegime: {
           activeRegimes: multiRegimeResult.activeRegimes,
           confidenceScore: multiRegimeResult.confidenceScore,

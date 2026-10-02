@@ -26,11 +26,11 @@ import {
   persistHourlyForecastsToShadow,
 } from "./weatherDataHubShadow";
 import { recordP1ObservationDay } from "./weatherP1Observation";
-import { calculateStabilityIndex, calculateReliabilityScore } from "./statsEngine";
+import { calculateReliabilityScore } from "./statsEngine";
+import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
 import {
   applyBiasCorrection,
-  computeConfidenceScore,
   type ServiceBias,
 } from "./fusionEngine";
 import {
@@ -514,16 +514,6 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       const allForecasts = expertData;
 
       if (allForecasts.length > 0) {
-        // Calculate stability index
-        const stability = calculateStabilityIndex(
-          allForecasts.map((f) => ({
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-          }))
-        );
-
         // Get cumulative ranking for weights
         const ranking = await getQualifiedCumulativeRankingForLocation(defaultLocKey);
         // ── Correction automatique des biais ─────────────────────────────────
@@ -572,11 +562,11 @@ export async function collectForecastsHandler(req: Request, res: Response) {
               messages: [
                 {
                   role: "system",
-                  content: "Tu es MeteoAI, un assistant météo expert pour Hondeghem (Nord). Génère une explication concise (3-4 phrases) de la prévision du jour calibrée en français, en mentionnant la confiance et les sources principales.",
+                  content: "Tu es MeteoAI, un assistant météo expert pour Hondeghem (Nord). Génère une explication concise (3-4 phrases) de la prévision du jour en français, en citant les sources disponibles et sans inventer de note globale de confiance.",
                 },
                 {
                   role: "user",
-                  content: `Prévision MeteoAI calibrée pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- Indice de stabilité: ${stability.index}/100 (${stability.label === "stable" ? "Stable" : "Instable"})\n- ${allForecasts.length} services consultés\n\nGénère une explication naturelle et concise.`,
+                  content: `Prévision MeteoAI pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- ${allForecasts.length} services consultés\n\nGénère une explication naturelle et concise, sans score global.`,
                 },
               ],
               maxTokens: 300,
@@ -585,15 +575,12 @@ export async function collectForecastsHandler(req: Request, res: Response) {
             explanation = typeof rawContent === "string" ? rawContent : "";
           } catch (e) {
             console.warn("[MeteoAI] LLM explanation failed:", e);
-            explanation = `Prévision calibrée à partir de preuves physiques récentes. Indice de stabilité: ${stability.index}/100.`;
+            explanation = `Prévision calculée à partir des preuves physiques disponibles. Aucun indice global de stabilité ou de confiance n’est publié.`;
           }
         }
 
         // Determine condition from majority
         const condition = meteoAI.coreCalibrationComplete ? determineMajorityCondition(allForecasts) : null;
-
-        // Compute true confidence score (accord modèles + performances historiques + échéance)
-        const trueConfidenceScore = meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null;
 
         // Save MeteoAI forecast with locationKey
         await upsertMeteoAIForecast({
@@ -605,9 +592,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           windSpeed: meteoAI.windSpeed,
           humidity: meteoAI.humidity,
           condition,
-          stabilityIndex: stability.index,
-          stabilityLabel: stability.label,
-          confidenceScore: trueConfidenceScore,
+          stabilityLabel: legacyStabilityLabelForStorage(allForecasts),
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         });
@@ -1371,16 +1356,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           return;
         }
 
-        // Calculate stability index
-        const stability = calculateStabilityIndex(
-          expertData.map((f) => ({
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-          }))
-        );
-
         // Store all model forecasts in the main forecasts table with locationKey
         const forecastRowsForLoc = expertData.map((f) => ({
           locationKey: locKey,
@@ -1484,16 +1459,13 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         const condition = null;
 
         const explanation = meteoAI.coreCalibrationComplete
-          ? `Prévision quotidienne calibrée pour ${fav.customName ?? fav.name} : les quatre métriques principales disposent de preuves physiques récentes par modèle, variable et horizon. Indice de stabilité : ${stability.index}/100. La température actuelle est résolue en direct lors de la consultation et n’est pas interpolée depuis Tmin/Tmax.`
-          : `${meteoAI.methodNote} Pour ${fav.customName ?? fav.name}, les valeurs numériques officielles et leur confiance restent indisponibles jusqu’à qualification des preuves physiques. La température actuelle reste résolue séparément en direct.`;
+          ? `Prévision quotidienne calculée pour ${fav.customName ?? fav.name} : les quatre métriques principales disposent de preuves physiques récentes par modèle, variable et horizon. La température actuelle est résolue en direct lors de la consultation et n’est pas interpolée depuis Tmin/Tmax.`
+          : `${meteoAI.methodNote} Pour ${fav.customName ?? fav.name}, les valeurs numériques officielles restent indisponibles jusqu’à qualification des preuves physiques. La température actuelle reste résolue séparément en direct.`;
 
         // Find all favorites with this location (same lat/lon) and upsert for each
         const matchingFavorites = allFavorites.filter(
           (f) => Math.abs(f.lat - fav.lat) < 0.001 && Math.abs(f.lon - fav.lon) < 0.001
         );
-
-        // Compute true confidence score (accord modèles + performances historiques + échéance)
-        const favConfidenceScore = meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null;
 
         // Also save MeteoAI forecast for this location
         await upsertMeteoAIForecast({
@@ -1504,9 +1476,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           precipitation: meteoAI.precipitation,
           windSpeed: meteoAI.windSpeed,
           condition,
-          stabilityIndex: stability.index,
-          stabilityLabel: stability.label,
-          confidenceScore: favConfidenceScore,
+          stabilityLabel: legacyStabilityLabelForStorage(expertData),
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         }, { refreshComputedAt: true });
@@ -1523,9 +1493,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             precipitation: meteoAI.precipitation,
             windSpeed: meteoAI.windSpeed,
             condition,
-            aiScore: favConfidenceScore,
-            confidenceScore: favConfidenceScore,
-            stabilityIndex: stability.index,
             modelsData: expertData as any,
             explanation,
           });

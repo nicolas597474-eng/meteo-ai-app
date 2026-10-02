@@ -7,7 +7,8 @@ import { randomUUID } from "node:crypto";
 import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weatherConditionLabels";
 import { fetchWeather, getWeatherResponseAttemptCount } from "./weatherFetch";
 import { getParisDateAndHour } from "./parisHourlyTime";
-import type { HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
+import type { HourlyHistoricalEvidence, HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
+import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
 import { summarizePrecipitationModels, type PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
 // Hondeghem coordinates
@@ -242,8 +243,7 @@ export type DayForecast = {
   humidity: number | null;
   cloudCover: number | null;
   condition: string | null;
-  stabilityIndex: number;
-  stabilityLabel: string;
+  modelAgreement: DailyModelAgreement;
   uvIndex?: number | null;
   feelsLikeMax?: number | null;
   feelsLikeMin?: number | null;
@@ -267,6 +267,7 @@ export type HourlyVariableWeighting = {
   modelWeights: Array<{ modelName: string; weight: number }>;
   minimumComparisons: number | null;
   minimumComparableDays: number | null;
+  historicalEvidence?: HourlyHistoricalEvidence[];
 };
 
 export type HourlyPointWeighting = {
@@ -351,6 +352,7 @@ export async function collect15DayForecast(
 
   const allModelData: Record<string, { tempMax: number[]; tempMin: number[]; precip: number[]; wind: number[]; windGust: number[]; windDir: number[]; humidity: number[]; cloud: number[]; uv: number[]; feelsMax: number[]; feelsMin: number[] }> = {};
   const precipitationInputsByDate = new Map<string, Array<{ modelName: string; amountMm: number }>>();
+  const modelAgreementInputsByDate = new Map<string, DailyAgreementInput[]>();
   const sunData: Record<string, { sunrise: string | null; sunset: string | null }> = {};
   const modelsUsed: string[] = [];
   let dates: string[] = [];
@@ -389,6 +391,18 @@ export async function collect15DayForecast(
       if (!allModelData[d]) {
         allModelData[d] = { tempMax: [], tempMin: [], precip: [], wind: [], windGust: [], windDir: [], humidity: [], cloud: [], uv: [], feelsMax: [], feelsMin: [] };
       }
+      const agreementInputs = modelAgreementInputsByDate.get(d) ?? [];
+      agreementInputs.push({
+        modelName: name,
+        tempMax: daily.temperature_2m_max?.[i],
+        tempMin: daily.temperature_2m_min?.[i],
+        precipitation: daily.precipitation_sum?.[i],
+        windSpeed: daily.wind_speed_10m_max?.[i],
+        windGust: daily.wind_gusts_10m_max?.[i],
+        humidity: daily.relative_humidity_2m_mean?.[i],
+        cloudCover: daily.cloud_cover_mean?.[i],
+      });
+      modelAgreementInputsByDate.set(d, agreementInputs);
       if (daily.temperature_2m_max?.[i] != null) allModelData[d].tempMax.push(daily.temperature_2m_max[i]);
       if (daily.temperature_2m_min?.[i] != null) allModelData[d].tempMin.push(daily.temperature_2m_min[i]);
       const precipitation = daily.precipitation_sum?.[i];
@@ -426,13 +440,11 @@ export async function collect15DayForecast(
     const consensusAmount = precipitationConsensus.consensusEstimateMm;
     const avgPrecip = consensusAmount == null ? null : Math.round(consensusAmount * 10) / 10;
     const avgCloud = avg(d.cloud);
-    // Stability: higher for near-term, lower for far future + model agreement
-    const spread = d.tempMax.length > 1
-      ? Math.max(...d.tempMax) - Math.min(...d.tempMax)
-      : 0;
-    const baseStability = Math.max(20, 100 - i * 4);
-    const stabilityIndex = Math.round(Math.max(20, Math.min(100, baseStability - spread * 3)));
-    const stabilityLabel = stabilityIndex >= 70 ? "stable" : stabilityIndex >= 45 ? "unstable" : "very-unstable";
+    const modelAgreement = summarizeDailyModelAgreement(
+      modelAgreementInputsByDate.get(date) ?? [],
+      precipitationModelNames,
+      i,
+    );
 
     return {
       date,
@@ -446,8 +458,7 @@ export async function collect15DayForecast(
       humidity: avg(d.humidity),
       cloudCover: avgCloud,
       condition: deriveCondition(avgPrecip, avgCloud),
-      stabilityIndex,
-      stabilityLabel,
+      modelAgreement,
       uvIndex: avg(d.uv),
       feelsLikeMax: avg(d.feelsMax),
       feelsLikeMin: avg(d.feelsMin),

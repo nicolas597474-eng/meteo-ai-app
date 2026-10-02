@@ -58,12 +58,12 @@ describe("weather.getDashboard", () => {
 
     expect(result).toHaveProperty("today");
     expect(result.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(result).toHaveProperty("topServices");
-    expect(Array.isArray(result.topServices)).toBe(true);
+    expect(result).not.toHaveProperty("topServices");
     expect(result).toHaveProperty("recentForecasts");
     expect(Array.isArray(result.recentForecasts)).toBe(true);
     expect(result).toHaveProperty("allServices");
     expect(Array.isArray(result.allServices)).toBe(true);
+    expect(JSON.stringify(result)).not.toMatch(/stability(Index|Label)/i);
   }, 25_000);
 
   it("returns meteoAI forecast for today if available", async () => {
@@ -76,8 +76,9 @@ describe("weather.getDashboard", () => {
     if (result.meteoAI) {
       expect(result.meteoAI).toHaveProperty("tempMax");
       expect(result.meteoAI).toHaveProperty("tempMin");
-      expect(result.meteoAI).toHaveProperty("stabilityIndex");
-      expect(result.meteoAI).toHaveProperty("stabilityLabel");
+      expect(result.meteoAI).not.toHaveProperty("stabilityIndex");
+      expect(result.meteoAI).not.toHaveProperty("stabilityLabel");
+      expect(result.meteoAI).not.toHaveProperty("confidenceScore");
     }
   });
 });
@@ -102,6 +103,7 @@ describe("contrat de snapshot officiel inter-pages", () => {
     expect(details.officialSnapshot.sourceKind).toBe(daily.officialSnapshot.sourceKind);
     expect(hourly.officialSnapshot.source).toBe(daily.officialSnapshot.source);
     expect(details.officialSnapshot.source).toBe(daily.officialSnapshot.source);
+    expect(JSON.stringify(details)).not.toMatch(/stability(Index|Label)/i);
     expect(hourly.officialSnapshot.hourlyWeighting).toEqual(details.officialSnapshot.hourlyWeighting);
     expect(hourly.officialSnapshot.hourlyWeighting.bestMatchIncluded).toBe(false);
     expect(hourly.officialSnapshot.hourlyWeighting.modelsConsidered).toEqual(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"]);
@@ -124,43 +126,14 @@ describe("weather.getAILab", () => {
 });
 
 describe("weather.getRanking", () => {
-  it("returns ranking array with scores", async () => {
-    const ctx = createPublicContext();
-    const caller = appRouter.createCaller(ctx);
+  it("expose le contexte de régime sans classement ou note globale par modèle", async () => {
+    const result = await appRouter.createCaller(createPublicContext()).weather.getRanking();
 
-    const result = await caller.weather.getRanking();
-
-    expect(result).toHaveProperty("ranking");
-    expect(Array.isArray(result.ranking)).toBe(true);
-    expect(result).toHaveProperty("totalServices");
-    expect(typeof result.totalServices).toBe("number");
-
-    // With seeded data, we should have rankings
-    if (result.ranking.length > 0) {
-      const first = result.ranking[0];
-      expect(first).toHaveProperty("serviceName");
-      expect(first).toHaveProperty("avgScore");
-      expect(first).toHaveProperty("avgMaeTemp");
-      expect(first).toHaveProperty("daysTracked");
-      // Should be sorted by score descending
-      for (let i = 1; i < result.ranking.length; i++) {
-        expect(result.ranking[i - 1].avgScore! >= result.ranking[i].avgScore!).toBe(true);
-      }
-    }
-  }, 25_000);
-
-  it("expose un régime officiel structuré pour le Dashboard et la fiabilité locale", async () => {
-    const ctx = createPublicContext();
-    const caller = appRouter.createCaller(ctx);
-    const dashboard = await caller.weather.getDashboard();
-    const ranking = await caller.weather.getRanking();
-
-    expect(dashboard.officialRegime.primary.id).toEqual(expect.any(String));
-    expect(ranking.officialRegime.primary.id).toEqual(expect.any(String));
-    expect(dashboard.officialRegime.active).toEqual(expect.any(Array));
-    expect(ranking.officialRegime.active).toEqual(expect.any(Array));
-    expect(dashboard.officialRegime.blendedWeights).toEqual(expect.objectContaining({ temp: expect.any(Number) }));
-    expect(ranking.officialRegime.blendedWeights).toEqual(expect.objectContaining({ temp: expect.any(Number) }));
+    expect(result.officialRegime.primary.id).toEqual(expect.any(String));
+    expect(result.officialRegime.active).toEqual(expect.any(Array));
+    expect(result.officialRegime.blendedWeights).toEqual(expect.objectContaining({ temp: expect.any(Number) }));
+    expect(result).not.toHaveProperty("ranking");
+    expect(result).not.toHaveProperty("totalServices");
   }, 25_000);
 });
 
@@ -200,7 +173,7 @@ describe("weather.getStationReliabilityOverview", () => {
 });
 
 describe("weather.getReliabilityLaboratory", () => {
-  it("expose uniquement des structures mesurées et les règles explicites de données insuffisantes", async () => {
+  it("expose uniquement des métriques brutes par maille et des statuts d’indisponibilité explicites", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     const result = await caller.weather.getReliabilityLaboratory({
       lat: 50.7567,
@@ -211,26 +184,23 @@ describe("weather.getReliabilityLaboratory", () => {
 
     expect(result.locationKey).toBeTruthy();
     expect(result.period).toEqual(expect.objectContaining({ id: "30d", days: 30 }));
-    expect(result.scoreDefinition).toEqual(expect.objectContaining({
-      minimumComparisons: 18,
-      weights: expect.objectContaining({ temperature: 0.30, precipitation: 0.25, wind: 0.20 }),
+    expect(result.evidence).toEqual(expect.objectContaining({
+      source: "hourly_forecast_evaluation_scores",
+      bestMatchIncluded: false,
+      minimumComparisons: expect.any(Number),
+      minimumComparableDays: expect.any(Number),
     }));
-    expect(Array.isArray(result.models)).toBe(true);
-    expect(Array.isArray(result.horizons)).toBe(true);
-    expect(Array.isArray(result.stations)).toBe(true);
-    expect(result.horizons).toHaveLength(7);
-
-    for (const model of result.models) {
-      expect(model).toEqual(expect.objectContaining({
-        name: expect.any(String),
-        status: expect.any(String),
-        evidence: expect.objectContaining({ comparisons: expect.any(Number), evaluatedDays: expect.any(Number) }),
-        confidence: expect.objectContaining({ isRankable: expect.any(Boolean), label: expect.any(String) }),
-      }));
-      if (model.normalizedScore === null) {
-        expect(model.insufficiencyReason).toBeTruthy();
-      }
-    }
+    expect(result.metrics).toHaveLength(result.evidence.expectedModelCount * result.evidence.variables.length);
+    expect(result.metrics[0]).toEqual(expect.objectContaining({
+      modelId: expect.any(String),
+      variable: expect.any(String),
+      horizonId: "6-24h",
+      status: expect.stringMatching(/history_unavailable|no_evidence|insufficient_evidence|qualified|incomplete_metrics/),
+      metrics: null,
+    }));
+    expect(result.metrics[0]).not.toHaveProperty("normalizedScore");
+    expect(result.metrics[0]).not.toHaveProperty("averageScore");
+    expect(result.availability.dailyHorizon).toContain("sans horodatage d’émission exact");
   }, 25_000);
 });
 
@@ -248,6 +218,7 @@ describe("weather.getHistory", () => {
     expect(result).toHaveProperty("endDate");
     expect(Array.isArray(result.forecasts)).toBe(true);
     expect(Array.isArray(result.observations)).toBe(true);
+    expect(JSON.stringify(result.meteoAIForecasts)).not.toMatch(/stability(Index|Label)/i);
   });
 });
 
@@ -272,5 +243,6 @@ describe("weather.getReport", () => {
     const result = await caller.weather.getReport({ date: "2026-06-26" });
 
     expect(result.observation).toBeNull();
+    expect(JSON.stringify(result)).not.toMatch(/stability(Index|Label)/i);
   });
 });

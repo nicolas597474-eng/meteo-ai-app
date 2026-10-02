@@ -12,8 +12,6 @@ import {
   getMeteoAIForecastByDate,
   getLatestMeteoAIForecasts,
   getMeteoAIForecastHistory,
-  getCumulativeRanking,
-  getCumulativeRankingForLocation,
   getRecentCollectionJobs,
   getRecentScheduledForecastCollectionJobs,
   getLatestHourlyForecastCollectionResults,
@@ -24,10 +22,8 @@ import {
   insertObservation,
   insertReliabilityScores,
   upsertMeteoAIForecast,
-  getHistoricalScoreTimeSeries,
   getLeadTimeScoresForLocation,
   getQualifiedCumulativeRankingForLocation,
-  getQualifiedLeadTimeScoresForLocation,
   getDailyFusionPerformanceEvidence,
   makeLocationKey,
   getPhysicalStationHistory,
@@ -40,9 +36,12 @@ import {
   getFavoriteLocations,
 } from "../db";
 import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
+import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
+import { summarizePrecipitationModels } from "../../shared/precipitationConsensus";
+import { legacyStabilityLabelForStorage } from "../legacyStabilityStorage";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
-import { calculateStabilityIndex, calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
+import { calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, applyBiasCorrection, type ExtendedRegime, type MultiRegimeResult, type ServiceBias } from "../fusionEngine";
 import { getParisDate, getParisDateDaysAgo, getParisHour, getNextParisForecastRun } from "../weatherTime";
 import { getActiveParisForecastHours, getFavoritesForecastCadence, getFavoritesForecastScheduleLabel, getRequiredFavoritesForecastHeartbeatCron } from "../forecastScheduleConfig";
@@ -202,7 +201,7 @@ export const weatherRouter = router({
   )),
 
   /**
-   * Dashboard: today's MeteoAI forecast + stability index + top services
+   * Dashboard: today's MeteoAI forecast and descriptive regime context
    */
   getDashboard: publicProcedure
     .input(optionalCoordinatesSchema.optional())
@@ -223,9 +222,6 @@ export const weatherRouter = router({
     // Get all forecasts for today
     const forecasts = await getForecastsByDate(today, locKey);
 
-    // Get ranking for this location
-    const ranking = await getCumulativeRankingForLocation(locKey);
-
     // Get recent forecasts if no today data
     const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
     const dailyFallbackSource = meteoAI ?? recentForecasts[0];
@@ -240,13 +236,32 @@ export const weatherRouter = router({
 
     return {
       today,
-      meteoAI,
+      meteoAI: meteoAI ? {
+        date: meteoAI.date,
+        tempMax: meteoAI.tempMax,
+        tempMin: meteoAI.tempMin,
+        precipitation: meteoAI.precipitation,
+        windSpeed: meteoAI.windSpeed,
+        humidity: meteoAI.humidity,
+        condition: meteoAI.condition,
+        computedAt: meteoAI.computedAt,
+        explanation: meteoAI.explanation,
+      } : null,
       trace,
       modelIndicator,
       forecastCount: forecasts.length,
-      topServices: ranking.slice(0, 5),
-      recentForecasts,
+      recentForecasts: recentForecasts.map((forecast) => ({
+        date: forecast.date,
+        tempMax: forecast.tempMax,
+        tempMin: forecast.tempMin,
+        precipitation: forecast.precipitation,
+        windSpeed: forecast.windSpeed,
+        condition: forecast.condition,
+        computedAt: forecast.computedAt,
+        explanation: forecast.explanation,
+      })),
       allServices: WEATHER_SERVICES.expert,
+      totalServices: WEATHER_SERVICES.expert.length,
       dailyFallback,
       regime: {
         id: officialRegime.primary.id,
@@ -276,7 +291,6 @@ export const weatherRouter = router({
           id: snapshot.id,
           date: snapshot.date,
           computedAt: snapshot.computedAt,
-          confidenceScore: snapshot.confidenceScore,
           trace: getPersistedForecastTrace(snapshot.weights, snapshot.computedAt),
         }))
         .filter((snapshot) => snapshot.trace != null);
@@ -348,14 +362,12 @@ export const weatherRouter = router({
           id: beforeSnapshot.id,
           date: beforeSnapshot.date,
           computedAt: beforeSnapshot.computedAt,
-          confidenceScore: beforeSnapshot.confidenceScore,
           trace: beforeTrace,
         },
         after: {
           id: afterSnapshot.id,
           date: afterSnapshot.date,
           computedAt: afterSnapshot.computedAt,
-          confidenceScore: afterSnapshot.confidenceScore,
           trace: afterTrace,
         },
         parameters: compareTraceWeights(beforeTrace, afterTrace),
@@ -370,8 +382,6 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
     const today = getTodayParis();
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
-    const ranking = await getCumulativeRankingForLocation(locKey);
-
     const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
     const [meteoAI, observation, hourly] = await Promise.all([
       getMeteoAIForecastByDate(today, locKey),
@@ -436,15 +446,7 @@ export const weatherRouter = router({
     // Keep top 5
     const topFactors = keyFactors.slice(0, 5);
 
-    // Best model info
-    const bestModel = ranking[0] ?? null;
-    const bestModelTrend = ranking[0] && ranking.length > 1
-      ? Math.round(((ranking[0].avgScore ?? 0) - (ranking[1].avgScore ?? 0)) * 10) / 10
-      : 0;
-
     return {
-      ranking,
-      totalServices: WEATHER_SERVICES.expert.length,
       officialRegime,
       // Legacy single-regime field (kept for backward compat)
       regime: {
@@ -472,11 +474,6 @@ export const weatherRouter = router({
       currentParams,
       paramImpacts,
       keyFactors: topFactors,
-      bestModel: bestModel ? {
-        name: bestModel.serviceName,
-        score: bestModel.avgScore ?? 0,
-        trend: bestModelTrend,
-      } : null,
     };
   }),
 
@@ -500,9 +497,15 @@ export const weatherRouter = router({
 
       const forecasts = await getForecastsByDateRange(startStr, endDate, locKey);
       const observations = await getObservationsByDateRange(startStr, endDate, locKey);
-      const meteoAIForecasts = await getLatestMeteoAIForecasts(input.days, locKey);
-      const scoreTimeSeries = await getHistoricalScoreTimeSeries(input.days, locKey);
-      const leadTimeScoresData = await getQualifiedLeadTimeScoresForLocation(locKey, input.days);
+      const meteoAIForecasts = (await getLatestMeteoAIForecasts(input.days, locKey)).map((forecast) => ({
+        date: forecast.date,
+        tempMax: forecast.tempMax,
+        tempMin: forecast.tempMin,
+        precipitation: forecast.precipitation,
+        windSpeed: forecast.windSpeed,
+        condition: forecast.condition,
+        computedAt: forecast.computedAt,
+      }));
       const [physicalSnapshots, collectionSnapshots, physicalCollectionTraces] = await Promise.all([
         getQualifiedObservationSnapshotsByDateRange(locKey, startStr, endDate),
         getStationCollectionSnapshotsByDateRange(locKey, startStr, endDate),
@@ -513,8 +516,6 @@ export const weatherRouter = router({
         forecasts,
         observations,
         meteoAIForecasts,
-        scoreTimeSeries,
-        leadTimeScores: leadTimeScoresData,
         eveningEvidence: buildEveningEvidence(physicalSnapshots, collectionSnapshots, physicalCollectionTraces),
         startDate: startStr,
         endDate,
@@ -539,84 +540,70 @@ export const weatherRouter = router({
       const forecasts = await getForecastsByDate(date, locKey);
       const observation = await getObservationByDate(date, locKey);
       const meteoAI = await getMeteoAIForecastByDate(date, locKey);
-      const ranking = await getCumulativeRankingForLocation(locKey);
-
-      // Compute live dimension scores per service for this date
-      let dimensionScores: Array<{
-        serviceName: string;
-        weightedScore: number | null;
-        regime: string;
-        regimeEmoji: string;
-        regimeLabel: string;
-        dimensions: {
-          temperature: { mae: number; bias: number; maxError: number; score: number | null };
-          precipitation: { pod: number; far: number; csi: number; falsePositives: number; falseNegatives: number; maeQuantity: number; score: number | null };
-          wind: { maeMean: number; maeGusts: number; biasMean: number; score: number | null };
-          condition: { concordance: number; maeCloudCover: number; score: number | null };
-        };
-        weights: { temp: number; precip: number; wind: number; condition: number };
-      }> = [];
-
-      if (observation) {
-        const regimeInfo = detectWeatherRegime({
-          precipitation: observation.precipitation,
-          windSpeed: observation.windSpeed,
-          tempMax: observation.tempMax,
-          tempMin: observation.tempMin,
-        });
-
-        dimensionScores = forecasts.map((f) => {
-          const score = calculateReliabilityScore(
-            [{ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed, windGust: f.windGust, cloudCover: f.cloudCover, condition: f.condition }],
-            [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed, windGust: observation.windGust, cloudCover: observation.cloudCover, condition: observation.condition }],
-            regimeInfo.regime
-          );
-          return {
-            serviceName: f.serviceName,
-            weightedScore: score.weightedScore,
-            regime: score.regime,
-            regimeEmoji: score.regimeEmoji,
-            regimeLabel: score.regimeLabel,
-            dimensions: {
-              temperature: {
-                mae: score.dimensions.temperature.mae,
-                bias: score.dimensions.temperature.bias,
-                maxError: score.dimensions.temperature.maxError,
-                score: score.dimensions.temperature.score,
-              },
-              precipitation: {
-                pod: score.dimensions.precipitation.pod,
-                far: score.dimensions.precipitation.far,
-                csi: score.dimensions.precipitation.csi,
-                falsePositives: score.dimensions.precipitation.falsePositives,
-                falseNegatives: score.dimensions.precipitation.falseNegatives,
-                maeQuantity: score.dimensions.precipitation.maeQuantity,
-                score: score.dimensions.precipitation.score,
-              },
-              wind: {
-                maeMean: score.dimensions.wind.maeMean,
-                maeGusts: score.dimensions.wind.maeGusts,
-                biasMean: score.dimensions.wind.biasMean,
-                score: score.dimensions.wind.score,
-              },
-              condition: {
-                concordance: score.dimensions.condition.concordance,
-                maeCloudCover: score.dimensions.condition.maeCloudCover,
-                score: score.dimensions.condition.score,
-              },
-            },
-            weights: score.weights,
-          };
-        });
-      }
+      const independentModelNames = WEATHER_SERVICES.expert
+        .filter((model) => model.modelId !== "best_match")
+        .map((model) => model.name);
+      const independentForecasts = forecasts.filter((forecast) => independentModelNames.includes(forecast.serviceName));
+      const modelAgreement = summarizeDailyModelAgreement(independentForecasts.map((forecast) => ({
+        modelName: forecast.serviceName,
+        tempMax: forecast.tempMax,
+        tempMin: forecast.tempMin,
+        precipitation: forecast.precipitation,
+        windSpeed: forecast.windSpeed,
+        windGust: forecast.windGust,
+        humidity: forecast.humidity,
+        cloudCover: forecast.cloudCover,
+      })), independentModelNames, null);
+      const precipitationConsensus = summarizePrecipitationModels(
+        independentForecasts.map((forecast) => ({ modelName: forecast.serviceName, amountMm: forecast.precipitation })),
+        independentModelNames,
+      );
+      const finiteNumber = (value: unknown): number | null => {
+        if (value == null || value === "") return null;
+        const numeric = typeof value === "number" ? value : Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+      };
+      const dailyError = (forecastValue: unknown, observedValue: unknown) => {
+        const forecastNumber = finiteNumber(forecastValue);
+        const observedNumber = finiteNumber(observedValue);
+        if (forecastNumber == null || observedNumber == null) return { comparisonCount: 0, signedDifference: null, absoluteError: null };
+        const signedDifference = forecastNumber - observedNumber;
+        return { comparisonCount: 1, signedDifference, absoluteError: Math.abs(signedDifference) };
+      };
+      const observationComparisons = observation ? independentForecasts.map((forecast) => ({
+        modelName: forecast.serviceName,
+        targetDate: date,
+        horizonDays: null,
+        temperatureMax: dailyError(forecast.tempMax, observation.tempMax),
+        temperatureMin: dailyError(forecast.tempMin, observation.tempMin),
+        precipitation: dailyError(forecast.precipitation, observation.precipitation),
+        windSpeed: dailyError(forecast.windSpeed, observation.windSpeed),
+        windGust: dailyError(forecast.windGust, observation.windGust),
+        cloudCover: dailyError(forecast.cloudCover, observation.cloudCover),
+      })) : [];
 
       return {
         date,
-        forecasts,
+        forecasts: independentForecasts.map((forecast) => ({
+          serviceName: forecast.serviceName,
+          serviceCategory: forecast.serviceCategory,
+          tempMax: forecast.tempMax,
+          tempMin: forecast.tempMin,
+          precipitation: forecast.precipitation,
+          windSpeed: forecast.windSpeed,
+          windGust: forecast.windGust,
+        })),
         observation,
-        meteoAI,
-        ranking,
-        dimensionScores,
+        meteoAI: meteoAI ? {
+          tempMax: meteoAI.tempMax,
+          tempMin: meteoAI.tempMin,
+          precipitation: meteoAI.precipitation,
+          windSpeed: meteoAI.windSpeed,
+          explanation: meteoAI.explanation,
+        } : null,
+        modelAgreement,
+        precipitationConsensus,
+        observationComparisons,
       };
     }),
 
@@ -848,7 +835,7 @@ export const weatherRouter = router({
     .query(({ input }) => getLocalEclipseCircumstances(input)),
 
   /**
-   * Detailed forecast page: 48h hourly + 15-day daily + regime + confidence
+   * Detailed forecast page: 48h hourly + 15-day daily + regime and raw evidence
    */
   getDetailedForecast: publicProcedure
     .input(detailedForecastInputSchema.optional())
@@ -864,10 +851,9 @@ export const weatherRouter = router({
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
 
-      const [meteoAI, observation, qualifiedRanking, recentForecasts] = await Promise.all([
+      const [meteoAI, observation, recentForecasts] = await Promise.all([
         getMeteoAIForecastByDate(today, locKey),
         getObservationByDate(today, locKey),
-        getQualifiedCumulativeRankingForLocation(locKey),
         getLatestMeteoAIForecasts(1, locKey),
       ]);
       const dailyFallbackSource = meteoAI ?? recentForecasts[0];
@@ -878,29 +864,7 @@ export const weatherRouter = router({
       const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt)));
       const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id);
 
-      // Best model
-      const ranking = await getCumulativeRankingForLocation(locKey);
-      const bestModel = ranking[0] ?? null;
-      const todayConfidence = meteoAI?.confidenceScore ?? null;
-      const weekConfidence = null;
       const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
-      const qualifiedHistoricalModels = qualifiedRanking
-        .filter((row) => row.avgScore != null && row.totalSamples != null)
-        .map((row) => ({
-          name: row.serviceName,
-          score: Math.round(Number(row.avgScore)),
-          comparisons: Number(row.totalSamples),
-          temperatureMae: row.avgMaeTemp == null ? null : Math.round(Number(row.avgMaeTemp) * 10) / 10,
-          precipitationMae: row.avgMaePrecip == null ? null : Math.round(Number(row.avgMaePrecip) * 10) / 10,
-          windMae: row.avgMaeWind == null ? null : Math.round(Number(row.avgMaeWind) * 10) / 10,
-        }));
-      const historicalModelPerformance = qualifiedHistoricalModels.length > 0
-        ? {
-            score: Math.round(qualifiedHistoricalModels.reduce((sum, model) => sum + model.score, 0) / qualifiedHistoricalModels.length),
-            comparisons: qualifiedHistoricalModels.reduce((sum, model) => sum + model.comparisons, 0),
-            models: qualifiedHistoricalModels,
-          }
-        : null;
 
       return {
         today: snapshot.weatherDate,
@@ -924,14 +888,6 @@ export const weatherRouter = router({
           dataCoverage: officialRegime.dataCoverage,
         },
         nextRegimeChange,
-        confidence: {
-          current: todayConfidence,
-          today: todayConfidence,
-          week: weekConfidence,
-          stabilityIndex: meteoAI?.stabilityIndex ?? null,
-        },
-        historicalModelPerformance,
-        bestModel: bestModel ? { name: bestModel.serviceName, score: bestModel.avgScore ?? 0 } : null,
         trace: trace
           ? { ...trace, snapshotComputedAt: meteoAI?.computedAt?.toISOString?.() ?? null }
           : {
@@ -979,15 +935,6 @@ export const weatherRouter = router({
 
         // Compute MeteoAI
         const allForecasts = await getForecastsByDate(targetDate, locationKey);
-        const stability = calculateStabilityIndex(
-          allForecasts.map((f) => ({
-            tempMax: f.tempMax,
-            tempMin: f.tempMin,
-            precipitation: f.precipitation,
-            windSpeed: f.windSpeed,
-          }))
-        );
-
         const locationRanking = await getQualifiedCumulativeRankingForLocation(locationKey);
         const ranking = locationRanking;
 
@@ -1032,9 +979,7 @@ export const weatherRouter = router({
           precipitation: meteoAI.precipitation,
           windSpeed: meteoAI.windSpeed,
           condition,
-          stabilityIndex: stability.index,
-          stabilityLabel: stability.label,
-          confidenceScore: meteoAI.coreCalibrationComplete ? meteoAI.confidenceScore : null,
+          stabilityLabel: legacyStabilityLabelForStorage(allForecasts),
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation: meteoAI.coreCalibrationComplete
             ? "Prévision calibrée à partir de preuves physiques récentes par modèle, variable et horizon."
@@ -1187,9 +1132,6 @@ export const weatherRouter = router({
       : snapshotDate
       ? (locationKey ? await getForecastsByDate(snapshotDate, locationKey) : await getForecastsByDate(snapshotDate))
       : (locationKey ? await getForecastsByDate(today, locationKey) : await getForecastsByDate(today));
-    const ranking = locationKey
-      ? await getCumulativeRankingForLocation(locationKey)
-      : await getCumulativeRanking();
     const jobs = await getRecentCollectionJobs(5);
 
     // 1. Régime opérationnel partagé avec le Dashboard. Une observation ne peut
@@ -1231,26 +1173,37 @@ export const weatherRouter = router({
       };
     });
 
-    // Écart calculé sur les contributeurs réels lorsque la trace est disponible.
-    const tempValues = appliedForecasts.map(f => f.tempMax ?? 0).filter(v => v > 0);
-    const precipValues = appliedForecasts.map(f => f.precipitation ?? 0);
-    const windValues = appliedForecasts.map(f => f.windSpeed ?? 0).filter(v => v > 0);
+    // L'accord décrit la dispersion des modèles indépendants reçus. Best Match
+    // et les autres agrégateurs sont exclus; une valeur absente ne devient pas 0.
+    const independentModelNames = WEATHER_SERVICES.expert
+      .filter((model) => model.modelId !== "best_match")
+      .map((model) => model.name);
+    const independentForecasts = forecasts.filter((forecast) => independentModelNames.includes(forecast.serviceName));
+    const modelAgreement = summarizeDailyModelAgreement(independentForecasts.map((forecast) => ({
+      modelName: forecast.serviceName,
+      tempMax: forecast.tempMax,
+      tempMin: forecast.tempMin,
+      precipitation: forecast.precipitation,
+      windSpeed: forecast.windSpeed,
+      windGust: forecast.windGust,
+      humidity: forecast.humidity,
+      cloudCover: forecast.cloudCover,
+    })), independentModelNames, null);
+    const precipitationConsensus = summarizePrecipitationModels(
+      independentForecasts.map((forecast) => ({ modelName: forecast.serviceName, amountMm: forecast.precipitation })),
+      independentModelNames,
+    );
     const divergence = {
-      tempRange: tempValues.length > 1 ? Math.round((Math.max(...tempValues) - Math.min(...tempValues)) * 10) / 10 : 0,
-      precipRange: precipValues.length > 1 ? Math.round((Math.max(...precipValues) - Math.min(...precipValues)) * 10) / 10 : 0,
-      windRange: windValues.length > 1 ? Math.round((Math.max(...windValues) - Math.min(...windValues)) * 10) / 10 : 0,
-      tempMean: tempValues.length > 0 ? Math.round(tempValues.reduce((a, b) => a + b, 0) / tempValues.length * 10) / 10 : 0,
-      precipMean: precipValues.length > 0 ? Math.round(precipValues.reduce((a, b) => a + b, 0) / precipValues.length * 10) / 10 : 0,
+      tempRange: modelAgreement.tempMax.range,
+      tempMax: modelAgreement.tempMax,
+      tempMin: modelAgreement.tempMin,
+      precipRange: modelAgreement.precipitation.range,
+      precipitation: modelAgreement.precipitation,
+      windRange: modelAgreement.windSpeed.range,
+      windSpeed: modelAgreement.windSpeed,
+      windGust: modelAgreement.windGust,
+      expectedModelCount: modelAgreement.expectedModelCount,
     };
-
-    // Les scores sont ceux du même snapshot officiel que le Dashboard.
-    const confidenceScore = meteoAI?.confidenceScore ?? operationalRegime.confidence ?? 0;
-    const stabilityScore = meteoAI?.stabilityIndex ?? 0;
-
-    // 6. Transparency score (always high — we expose everything)
-    const transparencyScore = trace?.parameterSources
-      ? Math.min(100, 40 + Math.min(4, trace.sourceCount ?? 0) * 10 + (trace.issuedAt ? 20 : 0))
-      : 0;
 
     // 7. AI Analysis text
     const activeForecasts = forecasts.filter((forecast) => forecast.serviceCategory === "expert");
@@ -1259,64 +1212,39 @@ export const weatherRouter = router({
     const sourceComposition = aggregatorCount > 0
       ? `${namedModelCount} modèle(s) numérique(s) + 1 agrégateur Best Match`
       : `${namedModelCount} modèle(s) numérique(s)`;
-    const topModel = ranking.length > 0 ? ranking[0].serviceName : null;
-    const convergenceLevel = divergence.tempRange < 2 ? "excellente" : divergence.tempRange < 4 ? "bonne" : "modérée";
     const aiAnalysis = [
       `MeteoAI synthétise ${sourceComposition} pour Hondeghem (50.76°N, 2.52°E).`,
-      `La convergence entre les modèles est ${convergenceLevel} aujourd'hui (écart max temp : ${divergence.tempRange}°C).`,
+      modelAgreement.tempMax.range == null
+        ? `Dispersion Tmax indisponible : ${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} modèles nommés ont une valeur exploitable (au moins deux sont nécessaires pour une étendue).`
+        : `L’étendue Tmax entre modèles nommés est de ${modelAgreement.tempMax.range.toFixed(1)} °C (${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} disponibles).`,
       `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`,
-      topModel
-        ? `Le modèle le mieux classé sur ce site est ${topModel}, sur la seule base des observations physiques qualifiées disponibles.`
-        : "Aucun modèle n’est classé : les observations physiques qualifiées disponibles ne satisfont pas encore les seuils statistiques publiés.",
-      `Score de confiance global : ${confidenceScore}/100 — ${confidenceScore >= 80 ? "prévision très fiable" : confidenceScore >= 60 ? "prévision fiable" : "incertitude modérée"}.`,
+      "La fiabilité historique reste une mesure distincte, disponible uniquement par modèle, variable et horizon lorsque les preuves qualifiées atteignent leurs seuils.",
     ].join(" ");
 
-    // 8. Formula description
-    const formula = {
-      description: "Score MeteoAI = Σ (poids_dimension × score_dimension)",
-      components: [
-        { name: "Température", weight: weights.temp, description: "MAE + biais + erreur max" },
-        { name: "Précipitations", weight: weights.precip, description: "POD + FAR + CSI + faux+/faux−" },
-        { name: "Vent", weight: weights.wind, description: "MAE moyen + MAE rafales" },
-        { name: "Conditions", weight: weights.condition, description: "Concordance catégorielle + MAE nébulosité" },
-      ],
-    };
+    const officialPrecipitationSummary = meteoAI?.precipitation == null
+      ? "indisponibles"
+      : `${meteoAI.precipitation} mm`;
 
     // 9. Replay steps (7 étapes de la synthèse IA)
     const replaySteps = [
       { step: 1, title: "Collecte des flux", description: `${activeForecasts.length} flux collectés lors du dernier batch planifié via Open-Meteo API (${sourceComposition})`, icon: "📡" },
       { step: 2, title: "Détection du régime", description: `Régime "${regimeDef.label}" détecté — poids contextuels appliqués`, icon: "🔍" },
-      { step: 3, title: "Calcul des dimensions", description: "4 dimensions d'erreur calculées indépendamment (T°, Précip, Vent, Cond)", icon: "📐" },
-      { step: 4, title: "Scoring pondéré", description: `Score final = ${Math.round(weights.temp * 100)}% T° + ${Math.round(weights.precip * 100)}% Précip + ${Math.round(weights.wind * 100)}% Vent + ${Math.round(weights.condition * 100)}% Cond`, icon: "⚖️" },
-      { step: 5, title: "Analyse de divergence", description: `Écart inter-modèles : ${divergence.tempRange}°C en température, ${divergence.precipRange} mm en précipitations`, icon: "📊" },
-      { step: 6, title: "Synthèse MeteoAI", description: `Prévision finale : ${meteoAI?.tempMax ?? "—"}°C max, ${meteoAI?.tempMin ?? "—"}°C min, ${meteoAI?.precipitation ?? 0} mm`, icon: "🤖" },
-      { step: 7, title: "Calcul du Weather Confidence Score", description: `Confiance : ${confidenceScore}/100 — Stabilité : ${stabilityScore}/100`, icon: "✅" },
+      { step: 3, title: "Mesures par variable", description: "Les étendues restent en unités physiques et chaque effectif est indiqué séparément.", icon: "📐" },
+      { step: 4, title: "Pondération de fusion", description: "Les poids du régime sont des paramètres de calcul, pas une probabilité ni une note de fiabilité.", icon: "⚖️" },
+      { step: 5, title: "Accord inter-modèles", description: modelAgreement.tempMax.range == null ? "Étendue Tmax indisponible : effectif inférieur à deux ou valeurs manquantes." : `Étendue Tmax : ${modelAgreement.tempMax.range.toFixed(1)} °C (${modelAgreement.tempMax.availableModelCount} modèles).`, icon: "📊" },
+      { step: 6, title: "Synthèse MeteoAI", description: `Prévision finale : ${meteoAI?.tempMax ?? "—"}°C max, ${meteoAI?.tempMin ?? "—"}°C min, ${officialPrecipitationSummary}`, icon: "🤖" },
+      { step: 7, title: "Fiabilité historique", description: "Aucun score global : MAE, RMSE, biais, effectifs et récence doivent rester séparés par modèle × variable × horizon.", icon: "✅" },
     ];
 
     // 10. Sources with freshness info
     const lastForecastJob = jobs.find(j => j.jobType === "forecast");
     const lastObsJob = jobs.find(j => j.jobType === "observation");
 
-    // 11. Historical time series for chart
-    const rawTimeSeries = await getHistoricalScoreTimeSeries(14, locationKey ?? "default");
-    const tsByDate: Record<string, Record<string, number>> = {};
-    rawTimeSeries.forEach(row => {
-      if (!tsByDate[row.date]) tsByDate[row.date] = {};
-      tsByDate[row.date][row.serviceName] = row.weightedScore ?? 0;
-    });
-    const allServices = Array.from(new Set(rawTimeSeries.map(r => r.serviceName)));
-    const historicalTimeSeries = Object.entries(tsByDate)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, scores]) => ({
-        date,
-        ...Object.fromEntries(allServices.map(s => [s, scores[s] ?? null])),
-      }));
-
     const sources = [
       { name: "Open-Meteo API", type: "7 modèles + 1 agrégateur", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modèle", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Flux de prévision, pas observations" },
       { name: "Modèles en validation", type: "Prévisions candidates", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "Collecte quotidienne", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
       { name: "Stations physiques", type: "Observations locales", models: [], updateFrequency: "Selon la dernière collecte", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Netatmo actif ; autres sources seulement si réellement collectées" },
-      { name: "Scores de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Aucun classement avant seuil statistique" },
+      { name: "Preuves de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Métriques brutes séparées; statut indisponible tant que le seuil propre au modèle, à la variable et à l’horizon n’est pas atteint" },
     ];
     const latestStationCollection = (await getStationCollectionSnapshots(locationKey ?? "default", 1))[0] ?? null;
     const activeModelNames = WEATHER_SERVICES.expert.map((model) => model.name);
@@ -1333,9 +1261,8 @@ export const weatherRouter = router({
       allRegimes: EXTENDED_REGIME_INFO,
       modelDetails,
       divergence,
-      confidenceScore,
-      stabilityScore,
-      transparencyScore,
+      modelAgreement,
+      precipitationConsensus,
       trace,
       modelIndicator,
       appliedModelWeights,
@@ -1359,7 +1286,6 @@ export const weatherRouter = router({
         collectedAt: latestStationCollection.collectedAt,
       } : null,
       aiAnalysis,
-      formula,
       replaySteps,
       sources,
       engineVersion: "MeteoAI v2.0 — Multi-Dimension",
@@ -1372,8 +1298,6 @@ export const weatherRouter = router({
       regimeSourceAgeMinutes: operationalRegime.sourceAgeMinutes,
       regimeDataCoverage: operationalRegime.dataCoverage,
       modelsUsed: appliedModelWeights.length || modelDetails.length,
-      historicalTimeSeries,
-      historicalServices: allServices,
     };
   }),
 

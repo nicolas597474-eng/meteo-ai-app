@@ -1,5 +1,4 @@
 import { computeOfficialDailyForecast } from "./officialForecast";
-import { calculateStabilityIndex } from "./statsEngine";
 
 export type LiveModelForecast = {
   serviceName: string;
@@ -34,20 +33,12 @@ export function buildLiveAILabSnapshot(
     evidenceStoreAvailable: true,
     evidence: [],
   });
-  const stability = calculateStabilityIndex(forecasts.map((forecast) => ({
-    tempMax: forecast.tempMax,
-    tempMin: forecast.tempMin,
-    precipitation: forecast.precipitation,
-    windSpeed: forecast.windSpeed,
-  })));
   return {
     date,
     tempMax: fusion.tempMax,
     tempMin: fusion.tempMin,
     precipitation: fusion.precipitation,
     windSpeed: fusion.windSpeed,
-    confidenceScore: fusion.confidenceScore,
-    stabilityIndex: stability.index,
     computedAt,
     weights: {
       version: 1,

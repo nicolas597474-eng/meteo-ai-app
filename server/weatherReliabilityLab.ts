@@ -1,23 +1,13 @@
-import {
-  getLaboratoryModelAggregates,
-  getLaboratoryModelArchive,
-  getLaboratoryScoreTimeline,
-  getPhysicalStationHistory,
-  getQualifiedEvidenceStatus,
-  getQualifiedLeadTimeScoresForLocation,
-  getStationQualityProfiles,
-  makeLocationKey,
-} from "./db";
+import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
 import {
   getLaboratoryHorizon,
-  getStatisticalConfidence,
-  LABORATORY_HORIZONS,
-  LABORATORY_SCORE_WEIGHTS,
-  MINIMUM_RELIABILITY_COMPARISONS,
+  PUBLIC_RANKING_EVIDENCE_THRESHOLDS,
   type LaboratoryHorizonId,
 } from "./weatherReliabilityConfig";
-import { VALIDATION_WEATHER_MODELS, WEATHER_SERVICES } from "./weatherServices";
+import { HOURLY_FORECAST_VARIABLES } from "./hourlyForecastRunScoring";
+import { OFFICIAL_HOURLY_MODELS } from "./weatherServices";
 import { getParisDateDaysAgo } from "./weatherTime";
+import { summarizeHourlyHistoricalEvidence, type HourlyHistoricalScoreRow } from "./hourlyHistoricalEvidence";
 
 export const LABORATORY_PERIODS = {
   "24h": { label: "24 h", days: 1 },
@@ -29,41 +19,29 @@ export const LABORATORY_PERIODS = {
 
 export type LaboratoryPeriodId = keyof typeof LABORATORY_PERIODS;
 
-export function normalizeLaboratoryServiceName(serviceName: string): string {
-  if (serviceName === "best_match") return "Open-Meteo";
-  return serviceName.replace(/ · validation$/, "");
+export function normalizeLaboratoryServiceName(name: string): string {
+  if (name === "best_match") return "Open-Meteo";
+  return name.replace(/\s*·\s*validation\s*$/i, "").trim();
 }
 
-function numberOrNull(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
+const VARIABLE_LABELS: Record<(typeof HOURLY_FORECAST_VARIABLES)[number], string> = {
+  temperature: "Température",
+  precipitation: "Précipitations",
+  wind_speed: "Vent moyen",
+  wind_gust: "Rafales",
+  humidity: "Humidité",
+  pressure: "Pression",
+};
 
-function round(value: number | null, precision = 1): number | null {
-  if (value === null) return null;
-  const factor = 10 ** precision;
-  return Math.round(value * factor) / factor;
-}
+const VARIABLE_UNITS: Record<(typeof HOURLY_FORECAST_VARIABLES)[number], string> = {
+  temperature: "°C",
+  precipitation: "mm",
+  wind_speed: "km/h",
+  wind_gust: "km/h",
+  humidity: "%",
+  pressure: "hPa",
+};
 
-function insufficiencyReason(input: {
-  archivedRuns: number;
-  comparisons: number;
-  normalizedScore: number | null;
-  isRankable: boolean;
-}) {
-  if (input.archivedRuns === 0) return "Aucune prévision archivée pour cette période.";
-  if (input.comparisons === 0) return "Aucune comparaison à une observation physique qualifiée n’est encore archivée.";
-  if (input.normalizedScore === null) return "Les six variables du score normalisé ne sont pas encore toutes archivées sur les mêmes comparaisons.";
-  if (!input.isRankable) return `Échantillon insuffisant : ${input.comparisons}/${MINIMUM_RELIABILITY_COMPARISONS} comparaisons qualifiées.`;
-  return null;
-}
-
-/**
- * Single read model for the reliability laboratory. It does not recalculate or
- * blend forecasts: it only exposes the same physically qualified evidence that
- * feeds the central scoring path.
- */
 export async function buildReliabilityLaboratory(input: {
   lat: number;
   lon: number;
@@ -71,192 +49,91 @@ export async function buildReliabilityLaboratory(input: {
   horizon: LaboratoryHorizonId;
 }) {
   const period = LABORATORY_PERIODS[input.period];
-  const startDate = getParisDateDaysAgo(period.days - 1);
+  const startDate = getParisDateDaysAgo(period.days);
+  const throughDate = getParisDateDaysAgo(1);
+  const beforeDate = getParisDateDaysAgo(0);
   const locationKey = makeLocationKey(input.lat, input.lon);
-  const horizon = getLaboratoryHorizon(input.horizon);
+  const selectedHorizon = getLaboratoryHorizon(input.horizon);
+  const trendStartDate = getParisDateDaysAgo(Math.max(period.days, 60));
+  const history = await getHourlyForecastEvaluationHistory(locationKey, trendStartDate, throughDate);
+  const minimumComparisons = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons;
+  const minimumComparableDays = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays;
 
-  const [archiveRows, aggregateRows, timeline, leadTimeRows, evidenceStatus, stationData] = await Promise.all([
-    getLaboratoryModelArchive(locationKey, startDate),
-    getLaboratoryModelAggregates(locationKey, startDate),
-    getLaboratoryScoreTimeline(locationKey, startDate),
-    getQualifiedLeadTimeScoresForLocation(locationKey, period.days),
-    getQualifiedEvidenceStatus(locationKey),
-    getPhysicalStationHistory(input.lat, input.lon, Date.now() - period.days * 24 * 60 * 60 * 1000),
-  ]);
-  const qualityProfiles = await getStationQualityProfiles(stationData.stations.map((station) => station.stationId));
-
-  const archivesByModel = new Map(archiveRows.map((row) => [normalizeLaboratoryServiceName(row.serviceName), row]));
-  const aggregatesByModel = new Map(aggregateRows.map((row) => [normalizeLaboratoryServiceName(row.serviceName), row]));
-  const profilesByStation = new Map(qualityProfiles.map((profile) => [profile.stationId, profile]));
-
-  const modelCatalog = [
-    ...WEATHER_SERVICES.expert.map((model) => ({
-      name: model.name,
-      provider: "Open-Meteo",
+  const evidence = OFFICIAL_HOURLY_MODELS.flatMap((model) => HOURLY_FORECAST_VARIABLES.map((variable) => {
+    const base = {
+      modelName: model.name,
       modelId: model.modelId,
-      status: "actif" as const,
-    })),
-    ...VALIDATION_WEATHER_MODELS.map((model) => ({
-      name: model.name,
-      provider: "Open-Meteo",
-      modelId: model.modelId,
-      status: "validation" as const,
-    })),
-  ];
-
-  const models = modelCatalog.map((model) => {
-    const archive = archivesByModel.get(model.name);
-    const aggregate = aggregatesByModel.get(model.name);
-    const comparisons = numberOrNull(aggregate?.comparisons) ?? 0;
-    const evaluatedDays = numberOrNull(aggregate?.evaluatedDays) ?? 0;
-    const confidence = getStatisticalConfidence({ comparisons, evaluatedDays });
-    const normalizedScore = numberOrNull(aggregate?.averageNormalizedScore);
-    return {
-      ...model,
-      archive: {
-        runs: numberOrNull(archive?.archivedRuns) ?? 0,
-        firstValidDate: archive?.firstValidDate ?? null,
-        latestValidDate: archive?.latestValidDate ?? null,
-      },
-      evidence: {
-        comparisons,
-        evaluatedDays,
-        scoreRows: numberOrNull(aggregate?.scoreRows) ?? 0,
-        latestScoreDate: aggregate?.latestScoreDate ?? null,
-      },
-      normalizedScore,
-      operationalScore: numberOrNull(aggregate?.averageOperationalScore),
-      confidence,
-      metrics: {
-        temperature: {
-          mae: round(numberOrNull(aggregate?.averageMaeTemp), 2),
-          rmse: round(numberOrNull(aggregate?.averageRmseTemp), 2),
-          bias: round(numberOrNull(aggregate?.averageBiasTemp), 2),
-        },
-        precipitation: {
-          score: round(numberOrNull(aggregate?.averagePrecipScore), 1),
-          pod: round(numberOrNull(aggregate?.averagePrecipPod), 2),
-          far: round(numberOrNull(aggregate?.averagePrecipFar), 2),
-          falsePositives: numberOrNull(aggregate?.falsePositives),
-          falseNegatives: numberOrNull(aggregate?.falseNegatives),
-        },
-        wind: {
-          mae: round(numberOrNull(aggregate?.averageMaeWind), 2),
-          gustMae: round(numberOrNull(aggregate?.averageMaeGusts), 2),
-        },
-        humidity: {
-          score: round(numberOrNull(aggregate?.averageHumidityScore), 1),
-          mae: round(numberOrNull(aggregate?.averageHumidityMae), 2),
-        },
-        pressureScore: round(numberOrNull(aggregate?.averagePressureScore), 1),
-      },
-      insufficiencyReason: insufficiencyReason({
-        archivedRuns: numberOrNull(archive?.archivedRuns) ?? 0,
-        comparisons,
-        normalizedScore,
-        isRankable: confidence.isRankable,
-      }),
+      variable,
+      variableLabel: VARIABLE_LABELS[variable],
+      unit: VARIABLE_UNITS[variable],
+      horizonId: input.horizon,
+      horizonLabel: selectedHorizon?.label ?? input.horizon,
+      periodStartDate: startDate,
+      periodEndDate: throughDate,
     };
-  });
-
-  const rankedModels = [...models]
-    .filter((model) => model.status === "actif" && model.confidence.isRankable && model.normalizedScore !== null)
-    .sort((left, right) => (right.normalizedScore ?? -1) - (left.normalizedScore ?? -1));
-  const ranks = new Map(rankedModels.map((model, index) => [model.name, index + 1]));
-
-  const stations = stationData.stations.map((station) => {
-    const profile = profilesByStation.get(station.stationId);
-    const observations = profile?.observationCount ?? 0;
-    const evaluatedDays = Math.max(0, Math.floor((profile?.windowHours ?? 0) / 24));
-    return {
-      stationId: station.stationId,
-      name: station.name,
-      source: station.source,
-      lat: station.lat,
-      lon: station.lon,
-      altitude: station.altitude,
-      distanceKm: round(station.distanceKm, 1),
-      availability: station.dataAvailability === null ? null : round(station.dataAvailability * 100, 1),
-      latest: station.readings.at(-1) ?? null,
-      quality: profile ? {
-        status: profile.status,
-        observationCount: observations,
-        continuityScore: round(profile.continuityScore, 1),
-        completenessScore: round(profile.completenessScore, 1),
-        stabilityScore: round(profile.stabilityScore, 1),
-        windowHours: profile.windowHours,
-      } : null,
-      confidence: getStatisticalConfidence({ comparisons: observations, evaluatedDays }),
-    };
-  });
-
-  const leadTimeByBucket = new Map(leadTimeRows.map((row) => [`${normalizeLaboratoryServiceName(row.serviceName)}:${row.bucket}`, row]));
-  const horizonAnalysis = LABORATORY_HORIZONS.map((definition) => {
-    if (!definition.storageBucket) {
+    if (!selectedHorizon?.storageBucket) {
       return {
-        ...definition,
-        available: false,
-        reason: "Cet horizon n’est pas encore archivé séparément par le moteur central.",
-        models: [],
+        ...base,
+        horizonBucket: null,
+        status: "horizon_not_stored" as const,
+        reason: "Cet horizon n’est pas archivé séparément; aucune échéance voisine n’est utilisée en repli.",
+        metrics: null,
+        minimumComparisons,
+        minimumComparableDays,
+        firstScoreDate: null,
+        latestScoreDate: null,
+        latestComputedAt: null,
+        incompleteMetricRows: 0,
+        trend: null,
       };
     }
-    const modelRows = WEATHER_SERVICES.expert.map((model) => {
-      const row = leadTimeByBucket.get(`${model.name}:${definition.storageBucket}`);
-      const comparisons = numberOrNull(row?.totalSamples) ?? 0;
-      return {
-        name: model.name,
-        comparisons,
-        confidence: getStatisticalConfidence({ comparisons, evaluatedDays: comparisons > 0 ? 1 : 0 }),
-        temperatureMae: round(numberOrNull(row?.avgMaeTemp), 2),
-        precipitationMae: round(numberOrNull(row?.avgMaePrecip), 2),
-        windMae: round(numberOrNull(row?.avgMaeWind), 2),
-        latestScoreDate: row?.latestScoreDate ?? null,
-      };
+    const summary = summarizeHourlyHistoricalEvidence(history.rows as HourlyHistoricalScoreRow[], {
+      modelName: model.name,
+      modelId: model.modelId,
+      variable,
+      horizonBucket: selectedHorizon.storageBucket,
+      beforeDate,
+      periodStartDate: startDate,
+      historyAvailable: history.available,
     });
     return {
-      ...definition,
-      available: modelRows.some((model) => model.comparisons > 0),
-      reason: modelRows.some((model) => model.comparisons > 0) ? null : "Aucune comparaison physique qualifiée n’est archivée pour cet horizon.",
-      models: modelRows,
+      ...base,
+      ...summary,
+      horizonLabel: selectedHorizon.label,
+      reason: summary.status === "history_unavailable"
+        ? "Historique illisible ou indisponible; statut séparé de l’absence de comparaisons."
+        : summary.status === "no_evidence"
+          ? "Aucune ligne complète modèle × variable × horizon n’est archivée sur cette période."
+          : summary.status === "incomplete_metrics"
+            ? "Des lignes existent, mais au moins une métrique requise est absente ou invalide."
+            : summary.status === "insufficient_evidence"
+              ? `Valeurs brutes disponibles; qualification non atteinte (${summary.metrics?.comparisonCount ?? 0}/${minimumComparisons} comparaisons, ${summary.metrics?.evaluatedDays ?? 0}/${minimumComparableDays} jours).`
+              : null,
     };
-  });
+  }));
 
   return {
     locationKey,
-    period: { id: input.period, ...period, startDate },
-    selectedHorizon: horizon,
+    period: { id: input.period, ...period, startDate, endDate: throughDate },
+    trendWindowStartDate: trendStartDate,
+    selectedHorizon,
     evidence: {
-      policy: "Seules les observations physiques qualifiées sont admises dans les classements du laboratoire.",
-      status: evidenceStatus,
-      totalComparisons: models.reduce((total, model) => total + model.evidence.comparisons, 0),
-      evaluatedModelCount: rankedModels.length,
+      status: history.available ? "available" as const : "history_unavailable" as const,
+      source: "hourly_forecast_evaluation_scores" as const,
+      expectedModelCount: OFFICIAL_HOURLY_MODELS.length,
+      includedModels: OFFICIAL_HOURLY_MODELS.map((model) => model.name),
+      bestMatchIncluded: false as const,
+      variables: HOURLY_FORECAST_VARIABLES.map((variable) => ({ key: variable, label: VARIABLE_LABELS[variable], unit: VARIABLE_UNITS[variable] })),
+      minimumComparisons,
+      minimumComparableDays,
+      note: "Les valeurs restent brutes et exactes au grain modèle × variable × horizon. MAE/RMSE/biais ne sont pas fusionnés en note; Best Match et agrégateurs sont exclus.",
     },
-    scoreDefinition: {
-      weights: LABORATORY_SCORE_WEIGHTS,
-      minimumComparisons: MINIMUM_RELIABILITY_COMPARISONS,
-      missingMetricRule: "Une composante absente rend le score normalisé indisponible ; elle n’est jamais remplacée par une valeur estimée.",
-    },
-    bestModel: rankedModels[0] ?? null,
-    models: models.map((model) => ({ ...model, rank: ranks.get(model.name) ?? null })),
-    scoreTimeline: timeline.map((point) => ({
-      ...point,
-      serviceName: normalizeLaboratoryServiceName(point.serviceName),
-      comparisons: numberOrNull(point.comparisons) ?? 0,
-      normalizedScore: round(numberOrNull(point.normalizedScore), 1),
-      operationalScore: round(numberOrNull(point.operationalScore), 1),
-      maeTemp: round(numberOrNull(point.maeTemp), 2),
-      rmseTemp: round(numberOrNull(point.rmseTemp), 2),
-      maeWind: round(numberOrNull(point.maeWind), 2),
-      humidityScore: round(numberOrNull(point.humidityScore), 1),
-      humidityMae: round(numberOrNull(point.humidityMae), 2),
-    })),
-    horizons: horizonAnalysis,
-    stations,
-    stationEvidence: stationData.latestGroundTruth ?? null,
+    metrics: evidence,
     availability: {
-      situations: "Données insuffisantes : aucun découpage statistique par situation météo n’est encore archivé.",
-      seasons: "Données insuffisantes : aucun découpage statistique saisonnier n’est encore archivé.",
-      modelObservationReplay: "Données insuffisantes : les comparaisons horaires qualifiées seront exposées dès que les premiers scores complets auront été persistés.",
+      history: history.available ? "Historique lisible" : "Historique indisponible",
+      dailyHorizon: "Les prévisions journalières sans horodatage d’émission exact ne sont pas converties en preuves horaires par horizon.",
+      selectedHorizon: selectedHorizon?.storageBucket ? "Horizon archivé séparément" : "Horizon non archivé séparément",
+      trend: "Les fenêtres récentes et précédentes sont lues séparément sur 60 jours minimum; leur différence n’est calculée que si chacune atteint les seuils d’évidence.",
     },
   };
 }

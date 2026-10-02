@@ -1,5 +1,49 @@
 import type { PrecipitationModelConsensus } from "./precipitationConsensus";
 
+export type HourlyHistoricalEvidenceStatus =
+  | "qualified"
+  | "insufficient_evidence"
+  | "no_evidence"
+  | "incomplete_metrics"
+  | "history_unavailable";
+
+export type HistoricalMetricValues = {
+  mae: number;
+  rmse: number;
+  bias: number;
+  comparisonCount: number;
+  evaluatedDays: number;
+};
+
+export type HourlyHistoricalTrend = {
+  status: "qualified" | "insufficient_evidence" | "no_evidence" | "history_unavailable";
+  recentWindowStart: string;
+  recentWindowEnd: string;
+  previousWindowStart: string;
+  previousWindowEnd: string;
+  recent: HistoricalMetricValues | null;
+  previous: HistoricalMetricValues | null;
+  delta: { mae: number; rmse: number; bias: number } | null;
+  minimumComparisons: number;
+  minimumComparableDays: number;
+};
+
+export type HourlyHistoricalEvidence = {
+  modelName: string;
+  modelId: string;
+  variable: string;
+  horizonBucket: string;
+  status: HourlyHistoricalEvidenceStatus;
+  metrics: HistoricalMetricValues | null;
+  minimumComparisons: number;
+  minimumComparableDays: number;
+  firstScoreDate: string | null;
+  latestScoreDate: string | null;
+  latestComputedAt: string | null;
+  incompleteMetricRows: number;
+  trend: HourlyHistoricalTrend;
+};
+
 /**
  * Descriptive summaries of the seven independent hourly forecast models.
  * Null means no valid observations (or no qualified historical weights for an
@@ -19,6 +63,8 @@ export type HourlyModelSummary = {
 export type HourlyModelRange = {
   /** Max - min; null when fewer than two valid models exist. */
   range: number | null;
+  /** Population standard deviation for scalar variables; null when unavailable or circular. */
+  standardDeviation: number | null;
   availableModelCount: number;
 };
 

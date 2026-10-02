@@ -176,7 +176,6 @@ export const personalObservationsRouter = router({
       },
     })));
 
-    const updatedCalibrations = [];
     for (const { forecast, result } of modelResults) {
       const updated = updatePersonalCalibration(priorByModel.get(forecast.modelName), result);
       await upsertPersonalModelCalibration({
@@ -186,13 +185,11 @@ export const personalObservationsRouter = router({
         ...updated,
         lastObservationAt: observedAt,
       });
-      updatedCalibrations.push({ modelName: forecast.modelName, ...updated, overallScore: result.overallScore });
     }
 
     return {
       observationId,
       matchedModelCount: modelResults.length,
-      modelResults: updatedCalibrations.sort((a, b) => b.overallScore - a.overallScore),
       notice: modelResults.length === 0
         ? "Observation enregistrée, mais aucune prévision archivée ne correspond encore à ce créneau."
         : "Observation comparée aux prévisions archivées du même lieu et du même créneau.",

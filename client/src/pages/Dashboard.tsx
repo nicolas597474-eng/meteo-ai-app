@@ -77,14 +77,6 @@ function UVBadge({ uv }: { uv: number | null }) {
   );
 }
 
-function stabilityColor(i: number) {
-  if (i >= 80) return "text-emerald-400";
-  if (i >= 60) return "text-yellow-400";
-  if (i >= 40) return "text-orange-400";
-  return "text-red-400";
-}
-
-
 function getStoredLocation(): { lat: number; lon: number; name: string; radiusKm?: number } | null {
   try {
     const stored = localStorage.getItem("meteoai_last_location");
@@ -275,7 +267,7 @@ export default function Dashboard() {
   const [personalWind, setPersonalWind] = useState("");
   const [personalPrecipitation, setPersonalPrecipitation] = useState("");
   const [personalCondition, setPersonalCondition] = useState<(typeof PERSONAL_CONDITION_OPTIONS)[number]["id"]>("partly_cloudy");
-  const [personalSubmitResult, setPersonalSubmitResult] = useState<{ notice: string; topModel?: { modelName: string; overallScore: number } } | null>(null);
+  const [personalSubmitResult, setPersonalSubmitResult] = useState<{ notice: string } | null>(null);
   const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
   const [isForecastInfoOpen, setIsForecastInfoOpen] = useState(false);
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
@@ -332,13 +324,12 @@ export default function Dashboard() {
   // Build prefetchedWeather map for FavoritesBar pills (key = "fav-{id}")
   const prefetchedWeather = useMemo(() => {
     if (!preloadedForecasts) return undefined;
-    const map = new Map<string, { temp: number | null; condition: string | null; confidenceScore: number | null }>();
+    const map = new Map<string, { temp: number | null; condition: string | null }>();
     for (const pf of preloadedForecasts) {
       if (pf.forecast) {
         map.set(`fav-${pf.favoriteId}`, {
           temp: pf.forecast.tempCurrent ?? null,
           condition: pf.forecast.condition,
-          confidenceScore: pf.forecast.confidenceScore,
         });
       }
     }
@@ -360,8 +351,7 @@ export default function Dashboard() {
       refetchOnWindowFocus: false,
     }
   );
-  // Réponse officielle consolidée : la même source alimente désormais Dashboard
-  // et Détails pour les heures, les jours et les indices de confiance.
+  // Réponse officielle consolidée : la même source alimente Dashboard et Détails.
   const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast, dataUpdatedAt: officialDataUpdatedAt } = trpc.weather.getDetailedForecast.useQuery(
     { ...coordsInput, includeExtendedPeriods: false },
     {
@@ -444,7 +434,7 @@ export default function Dashboard() {
   };
   const submitPersonalObservation = trpc.personalObservations.submit.useMutation({
     onSuccess: async (result) => {
-      setPersonalSubmitResult({ notice: result.notice, topModel: result.modelResults[0] });
+      setPersonalSubmitResult({ notice: result.notice });
       await refreshPersonalObservationData();
     },
   });
@@ -563,12 +553,9 @@ export default function Dashboard() {
   const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const panelDate = formatDashboardCompactDate(officialForecast?.today ?? dash?.today);
-  const localObservedRegime = lw
-    ? {
-        id: lw.scores.regime,
-        label: lw.scores.regimeLabel,
-        emoji: lw.scores.regimeEmoji,
-      }
+  const localPrimaryRegime = lw?.multiRegime?.activeRegimes?.[0] ?? null;
+  const localObservedRegime = localPrimaryRegime
+    ? { id: localPrimaryRegime.id, label: localPrimaryRegime.label, emoji: localPrimaryRegime.emoji }
     : null;
   const regime = officialPrimaryRegime
       ? {
@@ -607,19 +594,8 @@ export default function Dashboard() {
     ? { activeRegimes: officialRegime.active, confidenceScore: officialRegime.confidence }
     : (dash as any)?.multiRegime ?? null;
   const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "variable";
-  const regimeConfidence: number = multiRegime?.confidenceScore ?? 70;
-  const fallbackConfidence = dailyFallback?.kind === "daily_fusion" ? dailyFallback.confidenceScore : null;
-  // La confiance mesure la qualité / accord des sources ; la stabilité mesure
-  // seulement la dispersion des modèles. Ne jamais les confondre dans l'UI.
-  const forecastConfidence: number = lw?.scores?.confidenceScore
-    ?? officialForecast?.confidence?.current
-    ?? fallbackConfidence
-    ?? dash?.meteoAI?.confidenceScore
-    ?? 0;
-  const stabilityIndex: number = officialForecast?.confidence?.stabilityIndex ?? today?.stabilityIndex ?? meteoAI?.stabilityIndex ?? 0;
-
-  // Le Dashboard présente un unique snapshot officiel multi-modèles : les
-  // observations locales restent auditables dans Fiabilité, sans modifier cette valeur.
+  const regimeConfidence: number | null = multiRegime?.confidenceScore ?? null;
+  // L’accord est affiché en unités physiques et demeure distinct de la fiabilité historique.
   const currentHour = hours.find((h: any) => h.hour === nowHour) ?? hours[hours.length - 1] ?? null;
   const isDailyFallback = currentHour == null && dailyFallback?.kind === "daily_fusion";
   const fallbackDateLabel = isDailyFallback
@@ -639,8 +615,8 @@ export default function Dashboard() {
   const activeFavoriteWeather = {
     temp: currentTemp,
     condition: displayedCondition,
-    confidenceScore: forecastConfidence,
   };
+  const dailyAgreement = today?.modelAgreement ?? null;
   const maxTemperature = isDailyFallback ? dailyFallback.tempMax : today?.tempMax ?? meteoAI?.tempMax ?? null;
   const minTemperature = isDailyFallback ? dailyFallback.tempMin : today?.tempMin ?? meteoAI?.tempMin ?? null;
   const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
@@ -839,7 +815,7 @@ export default function Dashboard() {
             )}
 
             {/* ── Alert badge for dangerous regimes ── */}
-            {isDangerousRegime(primaryRegimeId) && (
+            {isDangerousRegime(primaryRegimeId) && regimeConfidence != null && (
               <div className="mb-3">
                 <AlertBadge regimeId={primaryRegimeId} confidence={regimeConfidence} confidenceThreshold={60} />
               </div>
@@ -970,22 +946,23 @@ export default function Dashboard() {
               </div>
               <div className="text-center">
                   <p className="mb-0 flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                    <Activity className="h-3 w-3" />Confiance prévision
+                    <Thermometer className="h-3 w-3" />Dispersion Tmax
                     <button
                       type="button"
                       onClick={() => setIsForecastInfoOpen((open) => !open)}
                       aria-expanded={isForecastInfoOpen}
                       aria-controls="forecast-information-panel"
-                      aria-label={isForecastInfoOpen ? "Masquer les informations de confiance" : "Afficher les informations de confiance"}
+                      aria-label={isForecastInfoOpen ? "Masquer les informations d’accord entre modèles" : "Afficher les informations d’accord entre modèles"}
                       className="inline-flex size-5 items-center justify-center rounded-full text-sky-200 transition-colors hover:bg-sky-400/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                     >
                       {isForecastInfoOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                     </button>
                   </p>
-                <p className={`text-sm font-semibold sm:text-lg ${stabilityColor(forecastConfidence)}`}>
-                  {Math.round(forecastConfidence)}%
+                <p className="text-sm font-semibold sm:text-lg">
+                  {dailyAgreement?.tempMax.range == null ? "Étendue indisponible" : `Étendue ${dailyAgreement.tempMax.range.toFixed(1)} °C`}
                 </p>
-                <p className="text-[9px] text-muted-foreground sm:text-[10px]">Stabilité {Math.round(stabilityIndex)}%</p>
+                <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement?.tempMax.standardDeviation == null ? "σ population indisponible" : `σ population ${dailyAgreement.tempMax.standardDeviation.toFixed(1)} °C`}</p>
+                <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement ? `${dailyAgreement.tempMax.availableModelCount}/${dailyAgreement.expectedModelCount} modèles · jour demandé ${dailyAgreement.requestDayOffset == null ? "indisponible" : `J+${dailyAgreement.requestDayOffset}`} · heure de run modèle non archivée · accord, pas fiabilité` : "Accord inter-modèles indisponible"}</p>
               </div>
             </div>
           </div>
@@ -1017,17 +994,17 @@ export default function Dashboard() {
           <DialogContent
             id="forecast-information-panel"
             showCloseButton={false}
-            aria-label="Informations de prévision et de confiance"
+            aria-label="Informations sur les prévisions et l’accord inter-modèles"
             className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto border-sky-300/35 bg-[#08131f]/[0.98] p-3 text-slate-100 shadow-2xl sm:max-w-xl"
           >
             <div className="flex items-center justify-between gap-3 pr-0">
               <DialogHeader className="text-left">
-                <DialogTitle className="text-base font-semibold text-slate-50">Informations de prévision</DialogTitle>
+                <DialogTitle className="text-base font-semibold text-slate-50">Accord et fiabilité des prévisions</DialogTitle>
               </DialogHeader>
               <button
                 type="button"
                 onClick={() => setIsForecastInfoOpen(false)}
-                aria-label="Fermer les informations de prévision et de confiance"
+                aria-label="Fermer les informations de prévision et d’accord inter-modèles"
                 title="Fermer"
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/90 text-slate-200 transition-colors hover:border-sky-300/65 hover:bg-sky-400/15 hover:text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95"
               >
@@ -1077,7 +1054,7 @@ export default function Dashboard() {
             {acceptsPersonalPrecipitation(personalCondition) ? <label className="mt-3 block text-[11px] font-medium text-slate-300">Précipitations observées (mm)<input aria-label="Précipitations observées en millimètres" inputMode="decimal" value={personalPrecipitation} onChange={(event) => setPersonalPrecipitation(event.target.value)} placeholder="Ex. 1,2" className="mt-1 min-h-10 w-full rounded-lg border border-sky-400/40 bg-[#0b1019]/80 px-3 text-sm text-white outline-none focus:border-sky-300" /></label> : null}
             <button type="button" onClick={handlePersonalObservationSubmit} disabled={submitPersonalObservation.isPending} className="mt-3 min-h-10 w-full rounded-lg border border-sky-300/45 bg-sky-400/15 px-3 text-xs font-semibold text-sky-100 disabled:cursor-wait disabled:opacity-60">{submitPersonalObservation.isPending ? "Comparaison des modèles…" : "Enregistrer et comparer aux modèles"}</button>
             {submitPersonalObservation.isError ? <p className="mt-2 text-[11px] text-red-300">L’observation n’a pas pu être enregistrée. Vérifiez les valeurs puis réessayez.</p> : null}
-            {personalSubmitResult ? <div className="mt-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-100"><p>{personalSubmitResult.notice}</p>{personalSubmitResult.topModel ? <p className="mt-1 font-semibold">Meilleur accord sur cette observation : {personalSubmitResult.topModel.modelName} — {Math.round(personalSubmitResult.topModel.overallScore)}/100.</p> : null}</div> : null}
+            {personalSubmitResult ? <div className="mt-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-100"><p>{personalSubmitResult.notice}</p></div> : null}
             <div className="mt-3 border-t border-sky-300/15 pt-2 text-[11px] text-slate-400">{personalizedHourly?.applied ? `Calibration qualifiée disponible pour l’analyse personnelle (${personalizedHourly.comparedModels.join(", ")}); elle reste séparée de la série horaire officielle.` : personalObservationState?.evidence.state === "qualified" ? "Calibration qualifiée disponible en analyse personnelle; elle ne remplace pas la série horaire officielle." : personalObservationState?.evidence.state === "provisional" ? `Tendance personnelle provisoire : ${personalObservationState.evidence.comparisonCount}/50 comparaisons avant qualification. Elle ne modifie pas la série horaire officielle.` : `Données insuffisantes : ${personalObservationState?.evidence.comparisonCount ?? 0}/20 comparaisons pour une première tendance personnelle; la calibration reste séparée de la série horaire officielle.`}</div>
             <button type="button" onClick={() => setIsPersonalHistoryOpen(true)} className="mt-3 min-h-10 w-full rounded-lg border border-slate-600 bg-black/15 px-3 text-xs font-semibold text-slate-200">Consulter l’historique complet</button>
           </>}
@@ -1116,7 +1093,7 @@ export default function Dashboard() {
                       : `Repli explicite sur ${locationWeather.ultraLocal.modelFallback?.modelCount ?? 0} modèle${locationWeather.ultraLocal.modelFallback?.modelCount === 1 ? "" : "s"}`}
                   </p>
                 </div>
-                <WeatherStatusBadge compact tone="success" label="Confiance locale" value={locationWeather.ultraLocal.confidenceScore == null ? "Données insuffisantes" : `${locationWeather.ultraLocal.confidenceScore}%`} pulse={locationWeather.ultraLocal.confidenceScore != null && locationWeather.ultraLocal.stationCount > 0} description="Cet indice décrit l’accord et la qualité des observations locales disponibles. Sans au moins deux observations comparables, il reste indiqué comme données insuffisantes. Il concerne le contexte local et ne remplace pas la confiance de la prévision officielle." />
+                <WeatherStatusBadge compact tone="success" label="Relevés locaux" value={locationWeather.ultraLocal.stationCount > 0 ? `${locationWeather.ultraLocal.stationCount} station(s)` : "Données insuffisantes"} pulse={locationWeather.ultraLocal.stationCount > 0} description="Nombre de stations locales retenues pour le contexte physique. Ce compteur n’est pas un score et ne mesure pas la fiabilité des prévisions." />
               </div>
               {hasMaterialLocalDelta ? <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5" role="status">
                 <div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-amber-100">Écart observé avec la prévision officielle</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">Les stations locales et le modèle officiel ne décrivent pas la même source. La température principale reste la prévision au point du lieu.</p></div><span className="shrink-0 text-sm font-bold text-amber-200">{localOfficialDelta > 0 ? "+" : ""}{localOfficialDelta.toFixed(1)}°</span></div>

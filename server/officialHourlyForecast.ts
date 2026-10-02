@@ -17,6 +17,7 @@ import {
   type HourlyWeightingUnavailableReason,
 } from "./weatherServices";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
+import { summarizeHourlyHistoricalEvidence, type HourlyHistoricalScoreRow } from "./hourlyHistoricalEvidence";
 
 export type OfficialHourlyModelName = (typeof OFFICIAL_HOURLY_MODELS)[number]["name"];
 export const OFFICIAL_HOURLY_MODEL_NAMES: readonly OfficialHourlyModelName[] = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
@@ -140,16 +141,7 @@ export function reconstructOfficialHourlyModelsFromArchive(
   return forecasts;
 }
 
-export type OfficialHourlyEvaluationHistoryScore = {
-  date: string;
-  sourceName: string;
-  modelName: string;
-  modelId: string | null;
-  variable: string;
-  horizonBucket: string;
-  sampleSize: number;
-  mae: number | null;
-};
+export type OfficialHourlyEvaluationHistoryScore = HourlyHistoricalScoreRow;
 
 export type OfficialHourlyWeightingSummary = {
   status: "historical_skill" | "mixed" | "unavailable";
@@ -578,14 +570,15 @@ function makePoint(
       },
       precipitation: precipitationMetrics,
       dispersion: {
-        windSpeed: { range: windSpeedSummary.range, availableModelCount: windSpeedSummary.availableModelCount },
-        windGust: { range: windGustSummary.range, availableModelCount: windGustSummary.availableModelCount },
+        windSpeed: { range: windSpeedSummary.range, standardDeviation: windSpeedSummary.standardDeviation, availableModelCount: windSpeedSummary.availableModelCount },
+        windGust: { range: windGustSummary.range, standardDeviation: windGustSummary.standardDeviation, availableModelCount: windGustSummary.availableModelCount },
         windDirection: {
           range: maximumCircularSpread(windDirectionValues),
+          standardDeviation: null,
           availableModelCount: windDirectionValues.filter(isFiniteNumber).length,
         },
-        humidity: { range: humiditySummary.range, availableModelCount: humiditySummary.availableModelCount },
-        cloudCover: { range: cloudCoverSummary.range, availableModelCount: cloudCoverSummary.availableModelCount },
+        humidity: { range: humiditySummary.range, standardDeviation: humiditySummary.standardDeviation, availableModelCount: humiditySummary.availableModelCount },
+        cloudCover: { range: cloudCoverSummary.range, standardDeviation: cloudCoverSummary.standardDeviation, availableModelCount: cloudCoverSummary.availableModelCount },
       },
     },
     isCurrent: validAt <= now && now < validAt + 60 * 60_000,
@@ -645,6 +638,22 @@ export function computeOfficialHourlyForecast(
     .sort();
   const beforeDate = forecastDates[0] ?? null;
   const historyAggregates = collectHistoryAggregates(historyAvailable ? historyScores : [], beforeDate);
+  const historicalEvidenceByKey = new Map<string, ReturnType<typeof summarizeHourlyHistoricalEvidence>>();
+  const getHistoricalEvidence = (modelName: OfficialHourlyModelName, variable: OfficialHourlyVariable, horizonBucket: string) => {
+    const key = [modelName, variable, horizonBucket].join("|");
+    const existing = historicalEvidenceByKey.get(key);
+    if (existing) return existing;
+    const result = summarizeHourlyHistoricalEvidence(historyScores, {
+      modelName,
+      modelId: MODEL_ID_BY_NAME.get(modelName)!,
+      variable,
+      horizonBucket,
+      beforeDate,
+      historyAvailable,
+    });
+    historicalEvidenceByKey.set(key, result);
+    return result;
+  };
   const hours: HourlyPoint[] = [];
   const summaryRows = new Map<string, {
     variable: string;
@@ -669,6 +678,9 @@ export function computeOfficialHourlyForecast(
           ? unavailableWeights(horizon.unavailableReason ?? "horizon_not_scored")
           : historicalWeights(historyAggregates, variable, horizon.bucket);
       const result = computeVariableForecastValue(variable, modelValues, horizonWeights);
+      result.weighting.historicalEvidence = OFFICIAL_HOURLY_MODEL_NAMES.map((modelName) =>
+        getHistoricalEvidence(modelName, variable, horizon.bucket ?? "unavailable"),
+      );
       variableValues.set(variable, result);
     }
     modelValues.filter(({ hour }) => hasForecastValue(hour)).forEach(({ modelName }) => allModelsWithData.add(modelName));

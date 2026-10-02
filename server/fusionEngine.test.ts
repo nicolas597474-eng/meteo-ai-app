@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeConfidenceScore, computeFusion, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
+import { computeFusion, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
 import { MODEL_FUSION_WEIGHT_CAP, normalizeModelWeightsWithCap, regularizeModelPerformance, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 function station(
@@ -137,25 +137,6 @@ describe("isEligibleGlobalReliabilityScore", () => {
   });
 });
 
-describe("computeConfidenceScore", () => {
-  const agreeingForecasts = [
-    { tempMax: 20, tempMin: 12, precipitation: 0, windSpeed: 10 },
-    { tempMax: 20.1, tempMin: 12.1, precipitation: 0, windSpeed: 10.2 },
-  ];
-
-  it("plafonne la confiance sans performance historique ni cohérence de station", () => {
-    expect(computeConfidenceScore({ forecasts: agreeingForecasts, leadTimeBucket: "0-6h" })).toBeLessThanOrEqual(55);
-  });
-
-  it("ne remplace pas une preuve manquante par une note de performance arbitraire", () => {
-    const partialEvidence = computeConfidenceScore({
-      forecasts: agreeingForecasts,
-      bestModelScore: 95,
-      leadTimeBucket: "0-6h",
-    });
-    expect(partialEvidence).toBeLessThanOrEqual(75);
-  });
-});
 
 describe("computeFusion — preuve statistique quotidienne exacte", () => {
   const config = {

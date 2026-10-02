@@ -10,7 +10,7 @@ function formatSnapshot(snapshot: any) {
   const timestamp = Number.isNaN(date.getTime())
     ? snapshot.date
     : date.toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Paris" });
-  return `${timestamp} · confiance ${snapshot.confidenceScore == null ? "indisponible" : `${Math.round(snapshot.confidenceScore)}%`}`;
+  return `${timestamp} · snapshot archivé`;
 }
 
 const PARAMETER_META = {

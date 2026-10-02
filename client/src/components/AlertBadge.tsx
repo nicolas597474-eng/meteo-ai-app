@@ -71,8 +71,8 @@ const DANGEROUS_REGIME_IDS = new Set<string>(Object.keys(DANGEROUS_REGIMES));
 interface AlertBadgeProps {
   /** ID du régime actif principal */
   regimeId: string;
-  /** Confiance du régime (0-100). Le badge ne s'affiche que si > seuil */
-  confidence?: number;
+  /** Signal interne de classification du régime; une valeur absente masque le badge. */
+  confidence?: number | null;
   /** Seuil de confiance minimum pour afficher le badge (défaut: 60) */
   confidenceThreshold?: number;
   /** Taille compacte (pour les pills) ou normale */
@@ -83,8 +83,8 @@ export function isDangerousRegime(regimeId: string): regimeId is DangerousRegime
   return DANGEROUS_REGIME_IDS.has(regimeId);
 }
 
-export function AlertBadge({ regimeId, confidence = 100, confidenceThreshold = 60, compact = false }: AlertBadgeProps) {
-  if (!isDangerousRegime(regimeId)) return null;
+export function AlertBadge({ regimeId, confidence, confidenceThreshold = 60, compact = false }: AlertBadgeProps) {
+  if (!isDangerousRegime(regimeId) || confidence == null) return null;
   if (confidence < confidenceThreshold) return null;
 
   const config = DANGEROUS_REGIMES[regimeId];
@@ -110,7 +110,7 @@ export function AlertBadge({ regimeId, confidence = 100, confidenceThreshold = 6
       <div>
         <p className={`text-xs font-bold ${config.colorClass}`}>{config.label}</p>
         <p className="text-xs text-muted-foreground">
-          Confiance : {confidence}%
+          Signal de régime détecté · seuil interne atteint
         </p>
       </div>
     </div>
