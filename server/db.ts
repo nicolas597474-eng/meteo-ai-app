@@ -187,9 +187,20 @@ export function makeLocationKey(lat: number, lon: number): string {
 
 // ─── FORECAST HELPERS ───────────────────────────────────────────────────────
 
-export async function insertForecasts(data: InsertForecast[]): Promise<void> {
+export function requireDatabaseForWrite(db: unknown, operation: string): asserts db {
+  if (!db) throw new Error(`Base de données indisponible : impossible de ${operation}.`);
+}
+
+export async function insertForecasts(
+  data: InsertForecast[],
+  options: { requireDatabase?: boolean } = {},
+): Promise<void> {
   const db = await getDb();
-  if (!db || data.length === 0) return;
+  if (!db) {
+    if (options.requireDatabase) requireDatabaseForWrite(db, "enregistrer les prévisions quotidiennes");
+    return;
+  }
+  if (data.length === 0) return;
   await db.transaction(async (tx) => {
     for (const row of data) {
       await tx.insert(forecasts).values(row).onDuplicateKeyUpdate({
@@ -200,9 +211,16 @@ export async function insertForecasts(data: InsertForecast[]): Promise<void> {
 }
 
 /** Persist an immutable forecast emission for reproducible lead-time scoring. */
-export async function insertForecastRuns(data: InsertForecastRun[]): Promise<void> {
+export async function insertForecastRuns(
+  data: InsertForecastRun[],
+  options: { requireDatabase?: boolean } = {},
+): Promise<void> {
   const db = await getDb();
-  if (!db || data.length === 0) return;
+  if (!db) {
+    if (options.requireDatabase) requireDatabaseForWrite(db, "archiver les émissions de prévisions");
+    return;
+  }
+  if (data.length === 0) return;
   for (const row of data) {
     await db.insert(forecastRuns).values(row).onDuplicateKeyUpdate({
       set: { capturedAt: new Date() },
@@ -468,9 +486,15 @@ export async function getQualifiedCumulativeRankingForLocation(locationKey = "de
 
 // ─── METEOAI FORECAST HELPERS ───────────────────────────────────────────────
 
-export async function upsertMeteoAIForecast(data: InsertMeteoAIForecast, options: { refreshComputedAt?: boolean } = {}): Promise<void> {
+export async function upsertMeteoAIForecast(
+  data: InsertMeteoAIForecast,
+  options: { refreshComputedAt?: boolean; requireDatabase?: boolean } = {},
+): Promise<void> {
   const db = await getDb();
-  if (!db) return;
+  if (!db) {
+    if (options.requireDatabase) requireDatabaseForWrite(db, "enregistrer la fusion MeteoAI");
+    return;
+  }
   // Keep one current fusion per location/date; completed manual and scheduled refreshes may bump computedAt.
   // Legacy stabilityIndex/Label/ConfidenceScore are intentionally omitted from
   // updates; stabilityLabel remains required only on inserts by the old schema.
@@ -584,19 +608,29 @@ export async function getHistoricalScoreTimeSeries(days = 14, locationKey = "def
 
 // ─── COLLECTION JOB HELPERS ─────────────────────────────────────────────────
 
-export async function createCollectionJob(data: InsertCollectionJob): Promise<number> {
+export async function createCollectionJob(
+  data: InsertCollectionJob,
+  options: { requireDatabase?: boolean } = {},
+): Promise<number> {
   const db = await getDb();
-  if (!db) return -1;
+  if (!db) {
+    if (options.requireDatabase) requireDatabaseForWrite(db, "créer le journal de collecte");
+    return -1;
+  }
   const result = await db.insert(collectionJobs).values(data);
   return (result as any)[0]?.insertId ?? -1;
 }
 
 export async function updateCollectionJob(
   id: number,
-  updates: Partial<Pick<InsertCollectionJob, "status" | "servicesCollected" | "dailyModelsCollected" | "dailyModelsExpected" | "hourlyModelsCollected" | "hourlyModelsExpected" | "errorMessage" | "completedAt">>
+  updates: Partial<Pick<InsertCollectionJob, "status" | "servicesCollected" | "dailyModelsCollected" | "dailyModelsExpected" | "hourlyModelsCollected" | "hourlyModelsExpected" | "errorMessage" | "completedAt">>,
+  options: { requireDatabase?: boolean } = {},
 ): Promise<void> {
   const db = await getDb();
-  if (!db) return;
+  if (!db) {
+    if (options.requireDatabase) requireDatabaseForWrite(db, "mettre à jour le journal de collecte");
+    return;
+  }
   await db.update(collectionJobs).set(updates).where(eq(collectionJobs.id, id));
 }
 

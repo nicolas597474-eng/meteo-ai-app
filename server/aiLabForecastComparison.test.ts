@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { OfficialWeatherSnapshot } from "./officialWeatherSnapshot";
-import { buildAILabForecastComparisonReadModel } from "./aiLabForecastComparison";
+import { buildAILabForecastComparisonReadModel, formatAILabLocationLabel } from "./aiLabForecastComparison";
 
 const snapshot = {
   locationKey: "50.756_2.521",
@@ -36,6 +37,22 @@ const snapshot = {
 } as unknown as OfficialWeatherSnapshot;
 
 describe("AI Lab forecast comparison read-model", () => {
+  it("formate le lieu AI Lab depuis les coordonnées de la requête ou reste neutre", () => {
+    expect(formatAILabLocationLabel({ lat: 50.7567, lon: 2.5204 })).toBe("le point demandé (50.7567°N, 2.5204°E)");
+    expect(formatAILabLocationLabel({ lat: -33.8651, lon: -151.2099 })).toBe("le point demandé (33.8651°S, 151.2099°O)");
+    expect(formatAILabLocationLabel(null)).toBe("le lieu sélectionné");
+  });
+
+  it("branche le libellé formaté dans l’analyse AI Lab sans lieu hardcodé", () => {
+    const source = readFileSync(new URL("./routers/weather.ts", import.meta.url), "utf8");
+    const start = source.indexOf("// 7. AI Analysis text");
+    const end = source.indexOf("const officialPrecipitationSummary", start);
+    const analysis = source.slice(start, end);
+
+    expect(analysis).toContain("formatAILabLocationLabel(coords)");
+    expect(analysis).not.toContain("Hondeghem");
+  });
+
   it("projects the model snapshot, official hourly series and daily forecast as distinct products", () => {
     const result = buildAILabForecastComparisonReadModel(snapshot, { lat: 50.756, lon: 2.521 });
 

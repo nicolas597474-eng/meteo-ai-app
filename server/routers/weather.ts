@@ -58,7 +58,7 @@ import { buildAppliedModelWeights } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { buildDatedDailyFusionFallback, resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
-import { buildAILabForecastComparisonReadModel } from "../aiLabForecastComparison";
+import { buildAILabForecastComparisonReadModel, formatAILabLocationLabel } from "../aiLabForecastComparison";
 import { getCollectedModelNames, getMissingModelNames } from "../stationCollectionModels";
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
@@ -1226,7 +1226,7 @@ export const weatherRouter = router({
       ? `${namedModelCount} modèle(s) numérique(s) + 1 agrégateur Best Match`
       : `${namedModelCount} modèle(s) numérique(s)`;
     const aiAnalysis = [
-      `MeteoAI synthétise ${sourceComposition} pour Hondeghem (50.76°N, 2.52°E).`,
+      `MeteoAI synthétise ${sourceComposition} pour ${formatAILabLocationLabel(coords)}.`,
       modelAgreement.tempMax.range == null
         ? `Dispersion Tmax indisponible : ${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} modèles nommés ont une valeur exploitable (au moins deux sont nécessaires pour une étendue).`
         : `L’étendue Tmax entre modèles nommés est de ${modelAgreement.tempMax.range.toFixed(1)} °C (${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} disponibles).`,

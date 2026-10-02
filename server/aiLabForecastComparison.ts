@@ -1,5 +1,12 @@
 import type { OfficialWeatherSnapshot } from "./officialWeatherSnapshot";
 
+export function formatAILabLocationLabel(coordinates: { lat: number; lon: number } | null): string {
+  if (!coordinates) return "le lieu sélectionné";
+  const latitude = `${Math.abs(coordinates.lat).toFixed(4)}°${coordinates.lat >= 0 ? "N" : "S"}`;
+  const longitude = `${Math.abs(coordinates.lon).toFixed(4)}°${coordinates.lon >= 0 ? "E" : "O"}`;
+  return `le point demandé (${latitude}, ${longitude})`;
+}
+
 /**
  * Narrow, read-only projection for the AI Lab comparison panel. All three
  * products come from one resolved official snapshot and one location.
