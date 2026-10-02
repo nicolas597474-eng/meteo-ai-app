@@ -863,6 +863,41 @@ export const shadowWeatherPhase6Candidates = mysqlTable("shadow_weather_phase6_c
 export type ShadowWeatherPhase6Candidate = typeof shadowWeatherPhase6Candidates.$inferSelect;
 export type InsertShadowWeatherPhase6Candidate = typeof shadowWeatherPhase6Candidates.$inferInsert;
 
+/**
+ * Série quotidienne candidate issue des sept modèles déterministes uniquement.
+ * Cette table ne peut alimenter aucune prévision publique : Best Match y reste
+ * une référence de comparaison et les détails par variable sont conservés en JSON.
+ */
+export const shadowWeatherDailyUnifiedCandidates = mysqlTable("shadow_weather_daily_unified_candidates", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  cycleKey: varchar("cycleKey", { length: 128 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  forecastDate: varchar("forecastDate", { length: 10 }).notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  candidateStatus: varchar("candidateStatus", { length: 16 }).notNull(),
+  deterministicSourceCount: int("deterministicSourceCount").notNull().default(0),
+  expectedDeterministicSourceCount: int("expectedDeterministicSourceCount").notNull().default(7),
+  variableResults: json("variableResults").notNull(),
+  legacyReference: json("legacyReference").notNull(),
+  bestMatchReference: json("bestMatchReference").notNull(),
+  missingEvidence: json("missingEvidence").notNull(),
+  productionReadsEnabled: int("productionReadsEnabled").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_daily_unified_cycle_location_date_uq").on(
+    table.cycleKey,
+    table.locationKey,
+    table.forecastDate,
+  ),
+  index("shadow_daily_unified_location_status_idx").on(table.locationKey, table.candidateStatus),
+  index("shadow_daily_unified_applied_idx").on(table.appliedToProduction),
+]);
+export type ShadowWeatherDailyUnifiedCandidate = typeof shadowWeatherDailyUnifiedCandidates.$inferSelect;
+export type InsertShadowWeatherDailyUnifiedCandidate = typeof shadowWeatherDailyUnifiedCandidates.$inferInsert;
 /** Local performance history for Phase 7. Shadow-only: no production reader may use this table. */
 export const shadowWeatherPhase7LocalPerformance = mysqlTable("shadow_weather_phase7_local_performance", {
   id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),

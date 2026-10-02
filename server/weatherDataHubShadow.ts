@@ -7,6 +7,7 @@ import {
   shadowWeatherSourceRelations,
   shadowWeatherValues,
   shadowWeatherPhase6Candidates,
+  shadowWeatherDailyUnifiedCandidates,
   shadowWeatherPhase7LocalPerformance,
   shadowWeatherPhase8Metrics,
   shadowWeatherPhase8Comparisons,
@@ -51,6 +52,13 @@ import {
   type ShadowQualityStatus,
   type ShadowRunStatus,
 } from "../shared/weatherDataHub";
+import {
+  DAILY_UNIFIED_SHADOW_MODEL_KEYS,
+  DAILY_UNIFIED_SHADOW_VARIABLES,
+  DAILY_UNIFIED_SHADOW_VERSION,
+  calculateDailyUnifiedShadowVariable,
+  type DailyUnifiedShadowVariable,
+} from "../shared/dailyUnifiedShadow";
 import { getDb } from "./db";
 import type { ForecastData, HourlyModelForecast } from "./weatherServices";
 import {
@@ -1084,6 +1092,201 @@ async function persistPhase6ShadowCandidates(input: {
     return persisted;
 }
 
+function parisDateFromEpochMs(epochMs: number): string {
+  const parts = Object.fromEntries(
+    parisPartsFormatter
+      .formatToParts(new Date(epochMs))
+      .filter(part => part.type !== "literal")
+      .map(part => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+type DailyUnifiedShadowValueRow = {
+  sourceKey: string;
+  sourceType: string;
+  independenceClass: string;
+  variable: string;
+  validTime: number;
+  value: number | null;
+  qualityStatus: string;
+  phase5QualityStatus: string | null;
+  freshnessStatus: string;
+};
+
+/**
+ * Construit la série quotidienne expérimentale à partir des seules valeurs
+ * normalisées Data Hub du cycle demandé. Elle ne consulte aucune table de
+ * prévision, aucun poids ni score de production.
+ */
+export async function persistDailyUnifiedShadowCandidates(input: {
+  cycleKey: string;
+  locationKey: string;
+  evaluatedAt: number;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db.select({
+    sourceKey: shadowWeatherSourceDefinitions.sourceKey,
+    sourceType: shadowWeatherSourceDefinitions.sourceType,
+    independenceClass: shadowWeatherSourceDefinitions.independenceClass,
+    variable: shadowWeatherValues.variable,
+    validTime: shadowWeatherValues.validTime,
+    value: shadowWeatherValues.value,
+    qualityStatus: shadowWeatherValues.qualityStatus,
+    phase5QualityStatus: shadowWeatherValues.phase5QualityStatus,
+    freshnessStatus: shadowWeatherValues.freshnessStatus,
+  }).from(shadowWeatherValues)
+    .innerJoin(shadowWeatherIngestionRuns, eq(shadowWeatherValues.ingestionRunId, shadowWeatherIngestionRuns.id))
+    .innerJoin(shadowWeatherSourceDefinitions, eq(shadowWeatherValues.sourceDefinitionId, shadowWeatherSourceDefinitions.id))
+    .where(and(
+      eq(shadowWeatherIngestionRuns.cycleKey, input.cycleKey),
+      eq(shadowWeatherIngestionRuns.locationKey, input.locationKey),
+      eq(shadowWeatherIngestionRuns.shadowMode, 1),
+      eq(shadowWeatherValues.shadowMode, 1),
+    )) as DailyUnifiedShadowValueRow[];
+
+  const byDate = new Map<number, DailyUnifiedShadowValueRow[]>();
+  for (const row of rows) {
+    if (!DAILY_UNIFIED_SHADOW_VARIABLES.includes(row.variable as DailyUnifiedShadowVariable)) continue;
+    const current = byDate.get(Number(row.validTime)) ?? [];
+    current.push(row);
+    byDate.set(Number(row.validTime), current);
+  }
+
+  let persisted = 0;
+  for (const [validTime, dateRows] of Array.from(byDate.entries())) {
+    const variableResults = DAILY_UNIFIED_SHADOW_VARIABLES.map(variable => calculateDailyUnifiedShadowVariable({
+      variable,
+      sources: dateRows
+        .filter(row => row.variable === variable)
+        .map(row => ({
+          sourceKey: row.sourceKey,
+          value: row.value,
+          qualityStatus: row.qualityStatus as ShadowQualityStatus,
+          phase5Status: row.phase5QualityStatus as ShadowQualityStatus | null,
+          freshnessStatus: row.freshnessStatus as ShadowFreshnessStatus,
+          isDerived: row.sourceKey === "openmeteo_best_match"
+            || row.sourceType === "aggregator"
+            || row.independenceClass !== "independent_model",
+        })),
+    }));
+    const essential = variableResults.filter(result =>
+      result.variable === "air_temperature_max" || result.variable === "air_temperature_min",
+    );
+    const candidateStatus = essential.some(result => result.status === "UNAVAILABLE")
+      ? "UNAVAILABLE"
+      : variableResults.some(result => result.status !== "SHADOW_READY")
+        ? "PARTIAL"
+        : "SHADOW_READY";
+    const deterministicSourceCount = variableResults.length === 0
+      ? 0
+      : Math.min(...variableResults.map(result => result.availableDeterministicSourceCount));
+    const missingEvidence = Array.from(new Set(variableResults.flatMap(result =>
+      result.missingEvidence.map(evidence => `${result.variable}:${evidence}`),
+    )));
+    const legacyReference = Object.fromEntries(variableResults.map(result => [result.variable, result.legacyReferenceValue]));
+    const bestMatchReference = Object.fromEntries(variableResults.map(result => [result.variable, result.bestMatchReferenceValue]));
+    const values = {
+      cycleKey: input.cycleKey,
+      locationKey: input.locationKey,
+      forecastDate: parisDateFromEpochMs(validTime),
+      validTime,
+      candidateStatus,
+      deterministicSourceCount,
+      expectedDeterministicSourceCount: DAILY_UNIFIED_SHADOW_MODEL_KEYS.length,
+      variableResults,
+      legacyReference,
+      bestMatchReference,
+      missingEvidence,
+      productionReadsEnabled: 0,
+      shadowMode: 1,
+      appliedToProduction: 0,
+      evaluatedAt: input.evaluatedAt,
+      updatedAt: new Date(),
+    };
+    await db.insert(shadowWeatherDailyUnifiedCandidates).values(values).onDuplicateKeyUpdate({ set: values });
+    persisted += 1;
+  }
+  return persisted;
+}
+
+/** Rejoue les cycles quotidiens déjà enregistrés dans le Data Hub shadow. */
+export async function rebuildDailyUnifiedShadowCandidatesFromExistingValues(input?: {
+  locationKeys?: readonly string[];
+  cycleKeys?: readonly string[];
+}): Promise<{ cycleCount: number; candidateCount: number }> {
+  const db = await getDb();
+  if (!db) return { cycleCount: 0, candidateCount: 0 };
+  const cycles = await db.select({
+    cycleKey: shadowWeatherIngestionRuns.cycleKey,
+    locationKey: shadowWeatherIngestionRuns.locationKey,
+    evaluatedAt: sql<number>`max(${shadowWeatherIngestionRuns.receivedAt})`,
+  }).from(shadowWeatherIngestionRuns)
+    .where(and(
+      eq(shadowWeatherIngestionRuns.shadowMode, 1),
+      sql`${shadowWeatherIngestionRuns.cycleKey} like 'daily:%'`,
+    ))
+    .groupBy(shadowWeatherIngestionRuns.cycleKey, shadowWeatherIngestionRuns.locationKey);
+  const locationFilter = input?.locationKeys ? new Set(input.locationKeys) : null;
+  const cycleFilter = input?.cycleKeys ? new Set(input.cycleKeys) : null;
+  let cycleCount = 0;
+  let candidateCount = 0;
+  for (const cycle of cycles) {
+    if (locationFilter && !locationFilter.has(cycle.locationKey)) continue;
+    if (cycleFilter && !cycleFilter.has(cycle.cycleKey)) continue;
+    candidateCount += await persistDailyUnifiedShadowCandidates({
+      cycleKey: cycle.cycleKey,
+      locationKey: cycle.locationKey,
+      evaluatedAt: Number(cycle.evaluatedAt ?? Date.now()),
+    });
+    cycleCount += 1;
+  }
+  return { cycleCount, candidateCount };
+}
+
+export type DailyUnifiedShadowReportRow = {
+  cycleKey: string;
+  forecastDate: string;
+  candidateStatus: string;
+  deterministicSourceCount: number;
+  expectedDeterministicSourceCount: number;
+  legacyReference: unknown;
+  bestMatchReference: unknown;
+  missingEvidence: unknown;
+  productionReadsEnabled: number;
+  shadowMode: number;
+  appliedToProduction: number;
+  evaluatedAt: number;
+};
+
+export function buildDailyUnifiedShadowReport(rows: readonly DailyUnifiedShadowReportRow[]) {
+  const statuses = { SHADOW_READY: 0, PARTIAL: 0, UNAVAILABLE: 0 };
+  let productionReadsEnabled = 0;
+  let appliedToProduction = 0;
+  let shadowModeViolations = 0;
+  let coverageTotal = 0;
+  for (const row of rows) {
+    if (row.candidateStatus in statuses) statuses[row.candidateStatus as keyof typeof statuses] += 1;
+    coverageTotal += Number(row.deterministicSourceCount ?? 0);
+    productionReadsEnabled += Number(row.productionReadsEnabled ?? 0);
+    appliedToProduction += Number(row.appliedToProduction ?? 0);
+    if (Number(row.shadowMode ?? 0) !== 1) shadowModeViolations += 1;
+  }
+  return {
+    version: DAILY_UNIFIED_SHADOW_VERSION,
+    candidateCount: rows.length,
+    statuses,
+    averageDeterministicSourceCount: rows.length === 0 ? 0 : Math.round((coverageTotal / rows.length) * 100) / 100,
+    expectedDeterministicSourceCount: DAILY_UNIFIED_SHADOW_MODEL_KEYS.length,
+    productionReadsEnabled,
+    appliedToProduction,
+    shadowModeViolations,
+    latest: [...rows].sort((left, right) => Number(right.evaluatedAt) - Number(left.evaluatedAt))[0] ?? null,
+    valid: productionReadsEnabled === 0 && appliedToProduction === 0 && shadowModeViolations === 0,
+  } as const;
+}
+
 /**
  * Rejoue uniquement les valeurs déjà présentes dans le Data Hub shadow.
  * Ce helper ne lit ni n’écrit aucune table de production et reste idempotent
@@ -1159,6 +1362,16 @@ export async function persistDailyForecastsToShadow(
     });
   } catch (error) {
     errors.push(`phase6:${error instanceof Error ? error.message : String(error)}`);
+  }
+  try {
+    await persistDailyUnifiedShadowCandidates({
+      cycleKey: `daily:${context.targetDate}:v1`,
+      locationKey: context.locationKey,
+      evaluatedAt: context.receivedAt,
+    });
+  } catch (error) {
+    // Une sortie candidate ne peut jamais bloquer la collecte historique.
+    errors.push(`daily_unified_shadow:${error instanceof Error ? error.message : String(error)}`);
   }
   return { ok: errors.length === 0, sourceCount, valueCount, errors };
 }
@@ -1705,6 +1918,33 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     : null;
   const phase6Fusion = await buildPhase6FusionReport(locationKey);
   const phase7LocalPerformance = await buildPhase7LocalPerformanceReport(locationKey);
+  const dailyUnifiedFilters = locationKey ? [eq(shadowWeatherDailyUnifiedCandidates.locationKey, locationKey)] : [];
+  const dailyUnifiedRows = await db.select({
+    cycleKey: shadowWeatherDailyUnifiedCandidates.cycleKey,
+    forecastDate: shadowWeatherDailyUnifiedCandidates.forecastDate,
+    candidateStatus: shadowWeatherDailyUnifiedCandidates.candidateStatus,
+    deterministicSourceCount: shadowWeatherDailyUnifiedCandidates.deterministicSourceCount,
+    expectedDeterministicSourceCount: shadowWeatherDailyUnifiedCandidates.expectedDeterministicSourceCount,
+    legacyReference: shadowWeatherDailyUnifiedCandidates.legacyReference,
+    bestMatchReference: shadowWeatherDailyUnifiedCandidates.bestMatchReference,
+    missingEvidence: shadowWeatherDailyUnifiedCandidates.missingEvidence,
+    productionReadsEnabled: shadowWeatherDailyUnifiedCandidates.productionReadsEnabled,
+    shadowMode: shadowWeatherDailyUnifiedCandidates.shadowMode,
+    appliedToProduction: shadowWeatherDailyUnifiedCandidates.appliedToProduction,
+    evaluatedAt: shadowWeatherDailyUnifiedCandidates.evaluatedAt,
+  }).from(shadowWeatherDailyUnifiedCandidates).where(and(
+    ...dailyUnifiedFilters,
+    gte(shadowWeatherDailyUnifiedCandidates.evaluatedAt, Date.now() - Math.max(1, lookbackDays) * 86_400_000),
+  ));
+  const dailyUnifiedShadow = buildDailyUnifiedShadowReport(dailyUnifiedRows.map(row => ({
+    ...row,
+    deterministicSourceCount: Number(row.deterministicSourceCount),
+    expectedDeterministicSourceCount: Number(row.expectedDeterministicSourceCount),
+    productionReadsEnabled: Number(row.productionReadsEnabled),
+    shadowMode: Number(row.shadowMode),
+    appliedToProduction: Number(row.appliedToProduction),
+    evaluatedAt: Number(row.evaluatedAt),
+  })));
   const phase8Filters = locationKey ? [eq(shadowWeatherPhase8Metrics.locationKey, locationKey)] : [];
   const phase8Rows = await db.select().from(shadowWeatherPhase8Metrics).where(and(...phase8Filters,
     gte(shadowWeatherPhase8Metrics.periodEnd, Date.now() - Math.max(1, lookbackDays) * 86_400_000)));
@@ -1774,6 +2014,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
       },
     },
     phase6Fusion,
+    dailyUnifiedShadow,
     phase7LocalPerformance,
     phase8Metrics,
     lookbackDays: Math.max(1, lookbackDays),

@@ -22,6 +22,7 @@ import { Phase3HorizonHierarchyPanel } from "@/components/weather/Phase3HorizonH
 import { Phase4NormalizationPanel } from "@/components/weather/Phase4NormalizationPanel";
 import { Phase5QualityControlPanel } from "@/components/weather/Phase5QualityControlPanel";
 import { Phase6SmartFusionPanel } from "@/components/weather/Phase6SmartFusionPanel";
+import { DailyUnifiedShadowPanel } from "@/components/weather/DailyUnifiedShadowPanel";
 import { Phase7LocalPerformancePanel } from "@/components/weather/Phase7LocalPerformancePanel";
 import { Phase8MetricsPanel } from "@/components/weather/Phase8MetricsPanel";
 
@@ -640,6 +641,8 @@ export default function WeatherAILab() {
     {user?.role === "admin" && shadowDataHubReport?.phase5QualityControl && <Phase5QualityControlPanel qualityControl={shadowDataHubReport.phase5QualityControl} />}
 
     {user?.role === "admin" && shadowDataHubReport?.phase6Fusion && <Phase6SmartFusionPanel fusion={shadowDataHubReport.phase6Fusion} />}
+
+    {user?.role === "admin" && shadowDataHubReport?.dailyUnifiedShadow && <DailyUnifiedShadowPanel candidate={shadowDataHubReport.dailyUnifiedShadow} />}
 
     {user?.role === "admin" && shadowDataHubReport?.phase7LocalPerformance && <Phase7LocalPerformancePanel performance={shadowDataHubReport.phase7LocalPerformance} />}
     {user?.role === "admin" && shadowDataHubReport?.phase8Metrics && <Phase8MetricsPanel metrics={shadowDataHubReport.phase8Metrics} />}

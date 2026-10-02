@@ -135,12 +135,14 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Phase4NormalizationPanel");
     expect(source).toContain("Phase5QualityControlPanel");
     expect(source).toContain("Phase6SmartFusionPanel");
+    expect(source).toContain("DailyUnifiedShadowPanel");
     expect(source).toContain("Phase7LocalPerformancePanel");
     expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase2Classification');
     expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase3HorizonHierarchy');
     expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase4Normalization');
     expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase5QualityControl');
     expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase6Fusion');
+    expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.dailyUnifiedShadow');
     expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase7LocalPerformance');
   });
 
