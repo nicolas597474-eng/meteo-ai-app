@@ -33,5 +33,27 @@ describe("LocalPrecipitationNowcastingPanel", () => {
     expect(html).toContain("Les pluviomètres n’exposent pas tous le même intervalle d’accumulation");
     expect(html).toContain("Production verrouillée");
     expect(html).toContain("Best Match exclu");
+    expect(html).toContain("confiance station");
+    expect(html).toContain("Les compteurs de statuts sont des états de candidats, pas des scores de performance");
+    expect(html).toContain("Données insuffisantes / skill non mesuré");
+    expect(html).toContain("aucun taux de réussite, POD, FAR ni CSI n’est calculé");
+  });
+
+  it("annonce explicitement l’absence de mesure de compétence sans candidat", () => {
+    const html = renderToStaticMarkup(React.createElement(LocalPrecipitationNowcastingPanel, {
+      report: {
+        version: "local-precipitation-nowcasting-shadow-v1",
+        candidateCount: 0,
+        statuses: { WET_SIGNAL: 0, BASELINE_WET: 0, BASELINE_DRY: 0, STALE_OBSERVATION: 0, UNAVAILABLE: 0, LEAKAGE_BLOCKED: 0 },
+        productionReadsEnabled: 0,
+        appliedToProduction: 0,
+        shadowModeViolations: 0,
+        valid: true,
+        latest: null,
+      },
+    }));
+
+    expect(html).toContain("Aucun candidat à afficher");
+    expect(html).toContain("Données insuffisantes / skill non mesuré");
   });
 });
