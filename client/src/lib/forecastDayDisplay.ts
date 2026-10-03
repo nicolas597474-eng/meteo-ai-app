@@ -4,7 +4,10 @@ import {
   type ForecastDayGroup,
 } from "@/lib/forecastTimeline";
 import type { DailyModelAgreement } from "@shared/modelAgreement";
-import type { BestMatchDailyReference, DailyOfficialFusionDisplay } from "@shared/dailyForecast";
+import type {
+  BestMatchDailyReference,
+  DailyOfficialFusionDisplay,
+} from "@shared/dailyForecast";
 
 export type DailyForecastPoint = {
   date?: string | null;

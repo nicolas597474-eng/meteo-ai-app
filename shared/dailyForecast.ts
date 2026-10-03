@@ -6,7 +6,10 @@ export type DailyForecastMetric =
   | "wind_gust_max";
 
 export type DailyForecastHorizon = "0-6h" | "6-24h" | "1-3d" | "4-7d" | "8-15d";
-export type DailyForecastEvidenceStatus = "calibrated" | "insufficient_data" | "schema_unavailable";
+export type DailyForecastEvidenceStatus =
+  | "calibrated"
+  | "insufficient_data"
+  | "schema_unavailable";
 
 export type DailyForecastSourceDiagnostic = {
   modelName: string;
