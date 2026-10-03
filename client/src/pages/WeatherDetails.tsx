@@ -90,8 +90,8 @@ export default function WeatherDetails() {
   const currentHour = hours[currentHourIdx] ?? null;
 
   return (
-    <div className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
-      <div className="mx-auto w-full min-w-0 max-w-none space-y-3 px-1 pt-[max(env(safe-area-inset-top),0.25rem)] pb-3 sm:max-w-2xl sm:space-y-5 sm:px-3 sm:py-4 sm:pb-28">
+    <div className="weather-page-sky forecast-details-page min-h-dvh w-full overflow-x-clip bg-[#202124]" style={pageSkyStyle}>
+      <div className="mx-auto w-full min-w-0 max-w-none space-y-3 px-4 pt-[max(env(safe-area-inset-top),0.25rem)] pb-24 sm:max-w-2xl sm:space-y-5 sm:px-3 sm:py-4 sm:pb-28">
         <ForecastByDaySection hours={hours} activeHourIndex={currentHourIdx} hourlyWeighting={data?.officialSnapshot?.hourlyWeighting} />
 
         {user?.role === "admin" && <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-violet-300/25 bg-violet-300/[0.045] p-3 sm:rounded-[24px] sm:p-4" aria-labelledby="arome-shadow-title">
