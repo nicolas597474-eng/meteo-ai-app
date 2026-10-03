@@ -12,7 +12,8 @@ describe("page Fiabilité", () => {
   it("explique le statut des capteurs citoyens en validation", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Comprendre le statut capteur en validation");
-    expect(source).toContain("Il reste hors de la température locale tant qu’un gain de fiabilité n’est pas mesuré.");
+    expect(source).toContain("Performance météo individuelle non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique");
+    expect(source).not.toContain("références physiques indépendantes suffisantes");
     expect(source).toContain("PopoverContent");
     expect(source).toContain("collisionPadding={12}");
     expect(source).toContain("À propos de ce statut");
@@ -137,5 +138,41 @@ describe("page Fiabilité", () => {
     expect(source).toContain("location.snapshotPreserved");
     expect(source).toContain("nouveau${count > 1 ? \"x\" : \"\"} relevé");
     expect(source).toContain("Aucun relevé physique qualifié n’a été retourné par les stations.");
+  });
+
+  it("distingue la priorité technique source d’une performance météo individuelle", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("priorité technique réseau {Math.round(station.reliabilityScore)}/100");
+    expect(source).toContain("Priorités techniques fixes par réseau/source — pas des scores météo");
+    expect(source).toContain("elles ne mesurent ni la précision météorologique ni la performance de cette station");
+    expect(source).toContain("Performance individuelle non mesurée");
+    expect(source).not.toContain("fiabilité {Math.round(station.reliabilityScore)}%");
+  });
+
+  it("sépare complétude, continuité et stabilité opérationnelles des mesures d’accord météo", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Profil opérationnel des relevés");
+    expect(source).toContain("Complétude");
+    expect(source).toContain("continuité");
+    expect(source).toContain("stabilité");
+    expect(source).toContain("pas la précision météorologique");
+    expect(source).toContain("pas une vérité météorologique absolue");
+    expect(source).toContain("MAE brute");
+    expect(source).toContain("MAE shrinkée");
+    expect(source).toContain("prior empirique");
+    expect(source).toContain("poids de la mesure station");
+    expect(source).toContain("intervalle nominal approximatif à 95 %");
+    expect(source).toContain("désaccord moyen des références");
+    expect(source).toContain("un site aux mêmes coordonnées n’est pas compté deux fois");
+    expect(source).toContain("l’indépendance amont des fournisseurs n’est pas vérifiée");
+    expect(source).not.toContain("PROFIL FIABLE");
+  });
+
+  it("ne publie pas d’estimation pluie ni de score ou probabilité calibrée", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Les précipitations restent non mesurées jusqu’à une règle d’échantillon défendable");
+    expect(source).toContain("aucun score composite ou probabilité n’est publié");
+    expect(source).toContain("n’est pas calibré");
+    expect(source).not.toContain("minimumPrecipitationEventDays");
   });
 });

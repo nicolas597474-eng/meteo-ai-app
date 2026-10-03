@@ -63,7 +63,7 @@ export function normalizeSpatialWeights(values: readonly number[]): number[] {
 }
 
 /**
- * Contrôle qualité spatial commun : distance, fraîcheur, fiabilité, donnée exploitable,
+ * Contrôle qualité spatial commun : distance, fraîcheur, priorité de source, donnée exploitable,
  * cohérence thermique et correction/limite d’altitude. Les consommateurs peuvent définir
  * leurs contraintes de mode, mais n’implémentent pas une seconde logique de QC.
  */
@@ -85,7 +85,7 @@ export function evaluateSpatialQuality<T extends SpatialFusionSource>(
 
     const reliability = Math.max(0, Math.min(100, source.reliabilityScore ?? 50));
     const reliabilityOk = reliability >= options.minReliabilityScore;
-    checks.push({ code: "reliability", passed: reliabilityOk, value: `${Math.round(reliability)}/100`, threshold: `≥ ${options.minReliabilityScore}/100`, reason: "Fiabilité historique insuffisante" });
+    checks.push({ code: "reliability", passed: reliabilityOk, value: `${Math.round(reliability)}/100`, threshold: `≥ ${options.minReliabilityScore}/100`, reason: "Priorité technique de source insuffisante" });
 
     const dataOk = source.temperature != null || source.windSpeed != null;
     checks.push({ code: "data", passed: dataOk, value: dataOk ? "mesure présente" : "aucune mesure", threshold: "température ou vent", reason: "Aucune mesure exploitable" });

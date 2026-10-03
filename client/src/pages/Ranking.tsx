@@ -44,6 +44,64 @@ function minutesSince(updatedAt: Date | string | null | undefined) {
   return Math.max(0, Math.round((Date.now() - timestamp) / 60_000));
 }
 
+const PERFORMANCE_VARIABLE_LABELS: Record<string, string> = {
+  temperature: "Température",
+  humidity: "Humidité",
+  pressure: "Pression",
+  windSpeed: "Vent",
+  windGust: "Rafales",
+  windDirection: "Direction du vent",
+  precipitation: "Précipitations",
+};
+
+const PERFORMANCE_SOURCE_NAMES: Record<string, string> = {
+  meteofrance: "Météo-France",
+  metar: "METAR",
+  netatmo: "Netatmo",
+};
+
+const PERFORMANCE_REASON_LABELS: Record<string, string> = {
+  station_not_eligible: "station non éligible aux comparaisons physiques",
+  outside_reference_radius: "station hors du rayon choisi",
+  no_station_observations: "aucun relevé exploitable",
+  distinct_reference_networks_insufficient: "moins de deux réseaux physiques distincts sur des sites non co-localisés",
+  comparisons_insufficient: "moins de 30 comparaisons horaires valides",
+  distinct_days_insufficient: "moins de 7 jours distincts couverts",
+  precipitation_method_not_defined: "aucun minimum d’échantillon défendable n’est documenté pour mesurer occurrence ou quantité",
+  source_prior_insufficient: "moins de deux sites homologues utilisables pour le prior empirique du réseau",
+  source_prior_variance_unavailable: "variabilité inter-stations du réseau insuffisante pour estimer une performance individuelle",
+};
+
+function StationPerformancePanel({ performance, windowDays }: { performance: any; windowDays: number }) {
+  const variables = Object.entries(PERFORMANCE_VARIABLE_LABELS) as Array<[string, string]>;
+  const measuredCount = variables.filter(([key]) => performance?.variables?.[key]?.estimate !== null
+    && performance?.variables?.[key]?.estimate !== undefined).length;
+  const headline = measuredCount > 0
+    ? `Mesurée pour ${measuredCount} variable${measuredCount > 1 ? "s" : ""}`
+    : "Performance individuelle non mesurée";
+
+  return <div className="mt-3 rounded-lg border border-violet-500/20 bg-violet-500/[0.035] p-3" aria-label="Performance météorologique individuelle de la station">
+    <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-violet-100">Performance météo individuelle · accord inter-réseaux</p><span className="text-[10px] font-medium text-violet-200">{headline}</span></div>
+    <p className="mt-1 text-[10px] leading-relaxed text-slate-400">MAE/RMSE/biais en unités physiques, comparés à des réseaux et sites distincts; un site aux mêmes coordonnées n’est pas compté deux fois. C’est un accord inter-réseaux, pas une vérité météorologique absolue; l’indépendance amont des fournisseurs n’est pas vérifiée. Fenêtre glissante de {windowDays} jours. Les gates 30/7 sont des minimums de couverture hérités, pas une preuve statistique ni un seuil de score. L’intervalle nominal approximatif à 95 % (t de Student, blocs journaliers) n’est pas calibré; aucun score composite ou probabilité n’est publié. Les précipitations restent non mesurées jusqu’à une règle d’échantillon défendable.</p>
+    <details className="mt-2 border-t border-violet-500/15 pt-2">
+      <summary className="cursor-pointer text-[10px] font-medium text-violet-200">Détails par variable</summary>
+      <div className="mt-2 space-y-2">
+        {variables.map(([key, label]) => {
+          const result = performance?.variables?.[key];
+          const estimate = result?.estimate;
+          const networks = (result?.referenceNetworks ?? []).map((network: string) => PERFORMANCE_SOURCE_NAMES[network] ?? network).join(", ");
+          if (!estimate) {
+            const reason = PERFORMANCE_REASON_LABELS[result?.reason] ?? "historique ou références insuffisants";
+            return <p key={key} className="text-[10px] leading-relaxed text-slate-400"><span className="font-semibold text-slate-200">{label} :</span> non mesurée · {reason} · {result?.comparisons ?? 0} comparaison(s), {result?.distinctDays ?? 0} jour(s){result?.distinctEventDays === null || result?.distinctEventDays === undefined ? "" : `, ${result.distinctEventDays} jour(s) d’événement`} {networks ? `· références : ${networks}` : ""}.</p>;
+          }
+          const interval = estimate.uncertainty95;
+          return <p key={key} className="text-[10px] leading-relaxed text-slate-300"><span className="font-semibold text-slate-100">{label} :</span> MAE brute poolée {estimate.meanAbsoluteError.toFixed(1)} {result.unit} · MAE moyenne par jour (entrée du shrinkage) {estimate.meanDailyAbsoluteError.toFixed(1)} {result.unit} · prior empirique {estimate.sourcePriorMeanAbsoluteError.toFixed(1)} {result.unit} · MAE shrinkée {estimate.shrunkMeanAbsoluteError.toFixed(1)} {result.unit} (poids de la mesure station : {estimate.stationEvidenceWeight.toFixed(2)}) · intervalle nominal approximatif à 95 % [{interval.lower.toFixed(1)}–{interval.upper.toFixed(1)}] · RMSE {estimate.rootMeanSquareError.toFixed(1)} {result.unit} · biais {estimate.meanBias.toFixed(1)} {result.unit} · désaccord moyen des références {estimate.meanReferenceDisagreement.toFixed(1)} {result.unit} · {result.comparisons} comparaison(s), {result.distinctDays} jour(s){result.distinctEventDays === null ? "" : `, ${result.distinctEventDays} jour(s) d’événement`} · prior de {result.sourcePriorSiteCount} site(s) du réseau{networks ? ` · références : ${networks}` : ""}.</p>;
+        })}
+      </div>
+    </details>
+  </div>;
+}
+
 type PhysicalStationDiagnostics = {
   netatmoStatus?: "not_connected" | "temporarily_unavailable" | "fresh_cache" | "live" | "connected_empty";
   discoveredCount?: number;
@@ -321,9 +379,14 @@ export default function Ranking() {
                 const hasDirectReading = Boolean(displayedLatest && Object.values(displayedLatest).some((reading) => reading !== null && reading !== undefined));
 
                 return <article key={station.stationId} className="rounded-xl border border-slate-800 bg-[#090b10] p-3">
-                  <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-sm text-white">{station.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{station.source} · {station.distanceKm.toFixed(1)} km · fiabilité {Math.round(station.reliabilityScore)}%</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${displayedAgeMinutes !== null && displayedAgeMinutes <= 90 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"}`}>{formatAge(displayedAgeMinutes)}</span></div>
+                  <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-sm text-white">{station.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{station.source} · {station.distanceKm.toFixed(1)} km · priorité technique réseau {Math.round(station.reliabilityScore)}/100</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${displayedAgeMinutes !== null && displayedAgeMinutes <= 90 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"}`}>{formatAge(displayedAgeMinutes)}</span></div>
                   <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-800 pt-3 text-center"><Reading label="Temp." value={value(displayedLatest?.temperature, "°")} /><Reading label="Vent" value={value(displayedLatest?.windSpeed, " km/h")} /><Reading label="Rafales" value={value(displayedLatest?.windGust, " km/h")} /><Reading label="Pluie" value={value(displayedLatest?.precipitation, " mm")} /></div>
                   <p className="mt-3 text-[11px] text-slate-600">{station.readings.length > 0 ? `${station.readings.length} relevé(s) conservé(s) sur les dernières 24 h.` : hasDirectReading ? "Relevé actuel direct : pas encore archivé sur 24 h." : "Aucun relevé archivé ou direct disponible."}</p>
+                  <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/25 p-3">
+                    <p className="text-[10px] font-semibold text-slate-200">Profil opérationnel des relevés</p>
+                    {station.qualityProfile ? <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Complétude {station.qualityProfile.completenessScore == null ? "—" : `${Math.round(station.qualityProfile.completenessScore * 100)}%`} · continuité {station.qualityProfile.continuityScore == null ? "—" : `${Math.round(station.qualityProfile.continuityScore * 100)}%`} · stabilité {station.qualityProfile.stabilityScore == null ? "—" : `${Math.round(station.qualityProfile.stabilityScore * 100)}%`} · {station.qualityProfile.observationCount} relevé(s). Cela décrit la couverture et la régularité des données, pas la précision météorologique.</p> : <p className="mt-1 text-[10px] text-slate-500">Profil de complétude, continuité et stabilité non disponible.</p>}
+                  </div>
+                  <StationPerformancePanel performance={station.stationPerformance} windowDays={data?.performanceWindowDays ?? 30} />
                 </article>;
               })}
             </div>
@@ -367,9 +430,9 @@ function StationSourceCard({ station, rank, physical, onOpenDetails }: { station
   const statusLabel = isAuthenticatedNetatmo ? "NIVEAU 1 · AUTHENTIFIÉE" : displayStatus === "physical" ? "STATION RÉELLE" : displayStatus === "candidate" ? "CAPTEUR EN VALIDATION" : displayStatus === "reference" ? "RÉFÉRENCE / GRILLE" : "SOURCE ÉCARTÉE";
   const markerClass = displayStatus === "physical" ? "bg-emerald-400" : displayStatus === "candidate" ? "bg-amber-300" : displayStatus === "reference" ? "bg-sky-400" : "bg-rose-400";
   const inactiveClass = displayStatus === "excluded" ? "border-rose-500/25 bg-rose-500/5 opacity-80" : "border-slate-800 bg-[#090b10]";
-  const description = displayStatus === "candidate" ? "Capteur citoyen observé : il est archivé, mais n’influence pas encore la température locale." : isAuthenticatedNetatmo ? "Observation issue de l’API Netatmo autorisée ; identifiant de station vérifiable et provenance physique." : station.exclusionReason ? `Écartée : ${station.exclusionReason}` : null;
+  const description = displayStatus === "candidate" ? "Capteur citoyen en validation : profil opérationnel seulement. Performance météo individuelle non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique; il reste hors de la température locale." : isAuthenticatedNetatmo ? "Observation issue de l’API Netatmo autorisée ; identifiant de station vérifiable et provenance physique." : station.exclusionReason ? `Écartée : ${station.exclusionReason}` : null;
   const quality = station.qualityProfile;
-  const qualityLabel = quality?.status === "fiable" ? "PROFIL FIABLE" : quality?.status === "qualifiee" ? "PROFIL QUALIFIÉ" : quality?.status === "degradee" ? "PROFIL DÉGRADÉ" : quality?.status === "en_observation" ? "PROFIL EN OBSERVATION" : null;
+  const qualityLabel = quality?.status === "fiable" ? "PROFIL OPÉRATIONNEL STABLE" : quality?.status === "qualifiee" ? "PROFIL DE RELEVÉS QUALIFIÉ" : quality?.status === "degradee" ? "PROFIL DE RELEVÉS DÉGRADÉ" : quality?.status === "en_observation" ? "PROFIL DE RELEVÉS EN OBSERVATION" : null;
   const qualityTone: WeatherStatusBadgeTone = quality?.status === "fiable" ? "success" : quality?.status === "qualifiee" ? "info" : quality?.status === "degradee" ? "warning" : "neutral";
   return <article className={`rounded-xl border ${inactiveClass}`}>
     <button type="button" onClick={() => onOpenDetails(station)} aria-label={`Ouvrir les données brutes et la contribution de ${station.name}`} className="flex w-full items-center gap-3 p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
@@ -379,7 +442,7 @@ function StationSourceCard({ station, rank, physical, onOpenDetails }: { station
       <span className="text-right"><span className="block text-lg font-semibold text-white">{temperature}</span><span className="text-[10px] text-slate-500">Temp.</span></span>
       <span className="text-[10px] font-semibold text-blue-300">Détails</span>
     </button>
-    <p className={`border-t border-slate-800 px-3 py-2 text-[10px] ${description ? "text-amber-200" : "text-slate-500"}`}>{description ?? `Disponibilité ${Math.round((station.dataAvailability ?? 0) * 100)}% · mise à jour estimée toutes les ${station.updateFrequencyMin ?? "—"} min.`}{quality ? ` · historique ${quality.observationCount} relevé(s), continuité ${quality.continuityScore == null ? "—" : `${Math.round(quality.continuityScore * 100)}%`}.` : ""}</p>
+    <p className={`border-t border-slate-800 px-3 py-2 text-[10px] ${description ? "text-amber-200" : "text-slate-500"}`}>{description ?? `Disponibilité de source estimée ${Math.round((station.dataAvailability ?? 0) * 100)}% · cadence nominale ${station.updateFrequencyMin ?? "—"} min.`}{quality ? ` · profil opérationnel (${quality.observationCount} relevé(s)) : complétude ${quality.completenessScore == null ? "—" : `${Math.round(quality.completenessScore * 100)}%`}, continuité ${quality.continuityScore == null ? "—" : `${Math.round(quality.continuityScore * 100)}%`}, stabilité ${quality.stabilityScore == null ? "—" : `${Math.round(quality.stabilityScore * 100)}%`}; ces indicateurs ne mesurent pas la précision météorologique.` : ""}</p>
   </article>;
 }
 
@@ -440,8 +503,8 @@ function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, ca
         </> : null}
       </div> : <div className="rounded-xl border border-dashed border-violet-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucune référence de modèle n’est disponible pour ce cycle.</div>}
     </div>
-    <div className="rounded-2xl border border-amber-500/20 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Capteurs citoyens en validation</h2><p className="text-xs text-slate-500">Observations réelles archivées pour contrôle qualité ; elles n’influencent pas encore la température locale.</p></div><div className="flex shrink-0 items-center gap-2"><Popover><PopoverTrigger asChild><button type="button" aria-label="Comprendre le statut capteur en validation" className="min-h-8 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 text-[10px] font-semibold text-amber-100 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">Comprendre</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-amber-500/30 bg-[#17130b] px-3 py-3 text-left text-[11px] leading-relaxed text-amber-50 shadow-xl"><div className="flex items-start justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-200/75">À propos de ce statut</p><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-amber-100/70 hover:bg-amber-500/15 hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><p className="mt-1.5">Ce capteur est archivé pour vérifier sa fraîcheur, sa cohérence et sa précision historique. Il reste hors de la température locale tant qu’un gain de fiabilité n’est pas mesuré.</p></PopoverContent></Popover><WeatherStatusBadge compact tone="warning" label="Capteurs" value={String(candidateSources.length)} /></div></div>{isLoading ? <div className="h-20 animate-pulse rounded-xl bg-slate-800" /> : candidateSources.length > 0 ? <div className="space-y-2">{candidateSources.map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical={false} onOpenDetails={(source) => onOpenDetails(source, "station")} />)}</div> : <div className="rounded-xl border border-dashed border-amber-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucun capteur citoyen extérieur récent trouvé dans le rayon actuel.</div>}</div>
-    {criteria && <div className="rounded-2xl border border-slate-800 bg-[#10131a] p-4"><h2 className="mb-3 font-semibold text-white">Critères de classement</h2><div className="grid grid-cols-2 gap-2">{criteria.criteria.map((criterion: any) => <div key={criterion.name} className="flex items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-bold text-blue-300">{criterion.weight}%</span><span><span className="block text-xs font-medium text-slate-200">{criterion.name}</span><span className="block text-[10px] leading-tight text-slate-500">{criterion.description}</span></span></div>)}</div></div>}
+    <div className="rounded-2xl border border-amber-500/20 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Capteurs citoyens en validation</h2><p className="text-xs text-slate-500">Observations réelles archivées pour contrôle qualité ; elles n’influencent pas encore la température locale.</p></div><div className="flex shrink-0 items-center gap-2"><Popover><PopoverTrigger asChild><button type="button" aria-label="Comprendre le statut capteur en validation" className="min-h-8 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 text-[10px] font-semibold text-amber-100 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">Comprendre</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-amber-500/30 bg-[#17130b] px-3 py-3 text-left text-[11px] leading-relaxed text-amber-50 shadow-xl"><div className="flex items-start justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-200/75">À propos de ce statut</p><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-amber-100/70 hover:bg-amber-500/15 hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><p className="mt-1.5">Ce capteur est archivé pour documenter son profil opérationnel (fraîcheur, complétude, continuité, stabilité). Sa performance météo individuelle reste non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique; il reste hors de la température locale.</p></PopoverContent></Popover><WeatherStatusBadge compact tone="warning" label="Capteurs" value={String(candidateSources.length)} /></div></div>{isLoading ? <div className="h-20 animate-pulse rounded-xl bg-slate-800" /> : candidateSources.length > 0 ? <div className="space-y-2">{candidateSources.map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical={false} onOpenDetails={(source) => onOpenDetails(source, "station")} />)}</div> : <div className="rounded-xl border border-dashed border-amber-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucun capteur citoyen extérieur récent trouvé dans le rayon actuel.</div>}</div>
+    {criteria && <div className="rounded-2xl border border-slate-800 bg-[#10131a] p-4"><h2 className="mb-3 font-semibold text-white">Critères de classement</h2><div className="grid grid-cols-2 gap-2">{criteria.criteria.map((criterion: any) => <div key={criterion.name} className="flex items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-bold text-blue-300">{criterion.weight}%</span><span><span className="block text-xs font-medium text-slate-200">{criterion.name}</span><span className="block text-[10px] leading-tight text-slate-500">{criterion.description}</span></span></div>)}</div><div className="mt-4 border-t border-slate-800 pt-3"><h3 className="text-xs font-semibold text-slate-100">Priorités techniques fixes par réseau/source — pas des scores météo</h3><div className="mt-2 flex flex-wrap gap-2">{criteria.sources.map((source: any) => <span key={source.id} className="rounded-lg border border-slate-700 bg-slate-950/40 px-2.5 py-1.5 text-[10px] text-slate-200">{source.name} · {source.sourcePriorityScore}/100</span>)}</div><p className="mt-2 text-[10px] leading-relaxed text-slate-400">Ces valeurs codées par origine servent aux heuristiques de classement et de pondération existantes; elles ne mesurent ni la précision météorologique ni la performance de cette station. Une performance individuelle n’est publiée que si des comparaisons physiques entre réseaux distincts et un prior empirique propre au réseau sont suffisants. Le profil opérationnel (complétude, continuité, stabilité) reste une information distincte.</p></div></div>}
     </details>
   </section>;
 }
