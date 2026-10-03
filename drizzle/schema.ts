@@ -1027,6 +1027,77 @@ export const shadowLocalPrecipitationNowcasts = mysqlTable("shadow_local_precipi
 export type ShadowLocalPrecipitationNowcast = typeof shadowLocalPrecipitationNowcasts.$inferSelect;
 export type InsertShadowLocalPrecipitationNowcast = typeof shadowLocalPrecipitationNowcasts.$inferInsert;
 
+/** Immutable shadow-only record of a composed local-precipitation forecast emission. */
+export const shadowLocalPrecipitationForecastEmissions = mysqlTable("shadow_local_precipitation_forecast_emissions", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  observationDate: varchar("observationDate", { length: 10 }).notNull(),
+  observationHour: int("observationHour").notNull(),
+  observationReferenceAt: bigint("observationReferenceAt", { mode: "number" }).notNull(),
+  referenceSnapshotId: int("referenceSnapshotId").notNull(),
+  referenceCollectedAt: bigint("referenceCollectedAt", { mode: "number" }).notNull(),
+  referenceSnapshot: json("referenceSnapshot").notNull(),
+  /** Actual shadow candidate composition/availability time; never reconstructed from a later evaluation. */
+  emittedAt: bigint("emittedAt", { mode: "number" }).notNull(),
+  availableAt: bigint("availableAt", { mode: "number" }).notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  horizonMinutes: int("horizonMinutes").notNull(),
+  candidateStatus: varchar("candidateStatus", { length: 24 }).notNull(),
+  baselinePrecipitation: float("baselinePrecipitation"),
+  baselineWet: int("baselineWet"),
+  localWetSignal: int("localWetSignal").notNull().default(0),
+  candidateWet: int("candidateWet"),
+  continuationFactor: float("continuationFactor").notNull().default(0),
+  forecastAvailableAt: bigint("forecastAvailableAt", { mode: "number" }),
+  forecastAccumulationWindow: json("forecastAccumulationWindow"),
+  forecastProvenance: json("forecastProvenance").notNull(),
+  productionReadsEnabled: int("productionReadsEnabled").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_local_precip_emission_ref_valid_uq").on(
+    table.locationKey,
+    table.observationReferenceAt,
+    table.validTime,
+  ),
+  index("shadow_local_precip_emission_location_valid_idx").on(table.locationKey, table.validTime),
+  index("shadow_local_precip_emission_location_emitted_idx").on(table.locationKey, table.emittedAt),
+]);
+export type ShadowLocalPrecipitationForecastEmission = typeof shadowLocalPrecipitationForecastEmissions.$inferSelect;
+export type InsertShadowLocalPrecipitationForecastEmission = typeof shadowLocalPrecipitationForecastEmissions.$inferInsert;
+
+/** Future-label linkage lives separately from the immutable forecast emission. */
+export const shadowLocalPrecipitationForecastOutcomes = mysqlTable("shadow_local_precipitation_forecast_outcomes", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  emissionId: bigint("emissionId", { mode: "number" }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  horizonMinutes: int("horizonMinutes").notNull(),
+  outcomeStatus: varchar("outcomeStatus", { length: 64 }).notNull(),
+  futureSnapshotId: int("futureSnapshotId"),
+  futureReferenceAt: bigint("futureReferenceAt", { mode: "number" }),
+  futureCollectedAt: bigint("futureCollectedAt", { mode: "number" }),
+  futureObservedAt: bigint("futureObservedAt", { mode: "number" }),
+  sourceObservationIds: json("sourceObservationIds").notNull(),
+  sourceObservations: json("sourceObservations").notNull(),
+  observedPrecipitation: float("observedPrecipitation"),
+  observedWet: int("observedWet"),
+  accumulationWindow: json("accumulationWindow"),
+  unavailabilityReason: varchar("unavailabilityReason", { length: 128 }),
+  productionReadsEnabled: int("productionReadsEnabled").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_local_precip_outcome_emission_uq").on(table.emissionId),
+  index("shadow_local_precip_outcome_location_status_idx").on(table.locationKey, table.outcomeStatus),
+  index("shadow_local_precip_outcome_location_valid_idx").on(table.locationKey, table.validTime),
+]);
+export type ShadowLocalPrecipitationForecastOutcome = typeof shadowLocalPrecipitationForecastOutcomes.$inferSelect;
+export type InsertShadowLocalPrecipitationForecastOutcome = typeof shadowLocalPrecipitationForecastOutcomes.$inferInsert;
+
 /** Local performance history for Phase 7. Shadow-only: no production reader may use this table. */
 export const shadowWeatherPhase7LocalPerformance = mysqlTable("shadow_weather_phase7_local_performance", {
   id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
