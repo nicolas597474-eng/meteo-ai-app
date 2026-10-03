@@ -4,10 +4,11 @@ import { computeOfficialDailyForecast } from "./officialForecast";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
 import { collectExpertForecasts } from "./weatherServices";
 import { buildForecastRunArchiveRows } from "./dailyForecastPerformance";
+import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { collectOfficialHourlyForecast, OFFICIAL_HOURLY_MODEL_NAMES } from "./officialHourlyForecast";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { cacheManualHourlyForecast } from "./officialWeatherSnapshot";
-import { acquireForecastRefreshLock, getDailyFusionPerformanceEvidence, getMeteoAIForecastByDate, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
+import { acquireForecastRefreshLock, getDailyFusionPerformanceEvidence, getMeteoAIForecastByDate, getStoredHourlyForecasts, insertForecastRuns, insertMeteoAIDailyFusionRun, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
 import { getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
 
 type ManualFusionFavorite = {
@@ -179,6 +180,14 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
     if (!persistedSnapshot || persistedAt == null || Math.abs(persistedAt - updatedAt.getTime()) > 2_000 || (persistedWeights as any)?.trigger !== "manual") {
       return granularityResult(0, expectedModelCount, null, "La fusion quotidienne n’a pas pu être confirmée après son enregistrement.");
     }
+
+    const fusionArchive = buildMeteoAIDailyFusionArchiveRun({
+      locationKey,
+      targetDate: today,
+      availableAt: Date.now(),
+      forecast: { ...meteoAI, condition, weights: meteoAI.weights, trace: meteoAI.trace },
+    });
+    if (fusionArchive) await insertMeteoAIDailyFusionRun(fusionArchive, { requireDatabase: true });
 
     const dailyResult = granularityResult(officialDailyForecasts.length, expectedModelCount, new Date(persistedAt));
     if (!meteoAI.coreCalibrationComplete) {

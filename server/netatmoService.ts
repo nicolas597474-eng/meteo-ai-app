@@ -60,6 +60,11 @@ function updatedAtFrom(station: NetatmoPublicStation, modules: NetatmoModule[]) 
   return null;
 }
 
+function measurementTimeFrom(module: NetatmoModule | NetatmoPublicStation | undefined): string | null {
+  const raw = dashboardNumber(module, "time_utc", "Time_UTC");
+  return raw !== null ? new Date(raw * 1000).toISOString() : null;
+}
+
 function normalizeMeasureType(type: string) {
   return type.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -89,6 +94,14 @@ function extractPublicMeasures(station: NetatmoPublicStation) {
     windDirection: null as number | null,
     precipitation: null as number | null,
     updatedAt: null as string | null,
+    measurementTimes: {
+      temperature: null as string | null,
+      humidity: null as string | null,
+      pressure: null as string | null,
+      windSpeed: null as string | null,
+      windGust: null as string | null,
+      precipitation: null as string | null,
+    },
   };
   let latestTimestamp: number | null = null;
   const setTimestamp = (timestamp: number | null) => {
@@ -102,6 +115,9 @@ function extractPublicMeasures(station: NetatmoPublicStation) {
     if (result.temperature === null) result.temperature = temperature.value;
     if (result.humidity === null) result.humidity = humidity.value;
     if (result.pressure === null) result.pressure = pressure.value;
+    if (result.measurementTimes.temperature === null && temperature.timestamp !== null) result.measurementTimes.temperature = new Date(temperature.timestamp * 1000).toISOString();
+    if (result.measurementTimes.humidity === null && humidity.timestamp !== null) result.measurementTimes.humidity = new Date(humidity.timestamp * 1000).toISOString();
+    if (result.measurementTimes.pressure === null && pressure.timestamp !== null) result.measurementTimes.pressure = new Date(pressure.timestamp * 1000).toISOString();
     setTimestamp(temperature.timestamp);
     setTimestamp(humidity.timestamp);
     setTimestamp(pressure.timestamp);
@@ -112,6 +128,14 @@ function extractPublicMeasures(station: NetatmoPublicStation) {
     if (result.precipitation === null) result.precipitation = numberValue(measure.rain_60min) ?? numberValue(measure.rain_live);
     setTimestamp(numberValue(measure.wind_timeutc));
     setTimestamp(numberValue(measure.rain_utc));
+    const windTime = numberValue(measure.wind_timeutc);
+    const rainTime = numberValue(measure.rain_utc);
+    if (windTime !== null) {
+      const iso = new Date(windTime * 1000).toISOString();
+      if (result.measurementTimes.windSpeed === null) result.measurementTimes.windSpeed = iso;
+      if (result.measurementTimes.windGust === null) result.measurementTimes.windGust = iso;
+    }
+    if (rainTime !== null && result.measurementTimes.precipitation === null) result.measurementTimes.precipitation = new Date(rainTime * 1000).toISOString();
   }
   if (latestTimestamp !== null) result.updatedAt = new Date(latestTimestamp * 1000).toISOString();
   return result;
@@ -152,6 +176,14 @@ export function mapNetatmoPublicStation(station: NetatmoPublicStation, refLat: n
     windDirection,
     precipitation,
     updatedAt: updatedAtFrom(station, modules) ?? publicMeasures.updatedAt,
+    measurementTimes: {
+      temperature: measurementTimeFrom(outdoor) ?? publicMeasures.measurementTimes.temperature,
+      humidity: measurementTimeFrom(outdoor) ?? publicMeasures.measurementTimes.humidity,
+      pressure: measurementTimeFrom(station) ?? publicMeasures.measurementTimes.pressure,
+      windSpeed: measurementTimeFrom(anemometer) ?? publicMeasures.measurementTimes.windSpeed,
+      windGust: measurementTimeFrom(anemometer) ?? publicMeasures.measurementTimes.windGust,
+      precipitation: measurementTimeFrom(rainGauge) ?? publicMeasures.measurementTimes.precipitation,
+    },
     reliabilityScore: 72,
     updateFrequencyMin: 10,
     dataAvailability: 0.75,

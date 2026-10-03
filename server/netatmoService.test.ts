@@ -62,8 +62,8 @@ describe("stations Netatmo publiques", () => {
           type: ["temperature", "humidity", "pressure"],
           res: { "1786524000": [20.3, 57, 1015.6] },
         },
-        wind: { type: ["wind"], wind_strength: 14, gust_strength: 28, wind_angle: 135, wind_timeutc: 1_786_524_000 },
-        rain: { type: ["rain"], rain_60min: 0.6, rain_utc: 1_786_524_000 },
+        wind: { type: ["wind"], wind_strength: 14, gust_strength: 28, wind_angle: 135, wind_timeutc: 1_786_524_060 },
+        rain: { type: ["rain"], rain_60min: 0.6, rain_utc: 1_786_524_120 },
       },
     }, 50.7567, 2.5204);
 
@@ -77,7 +77,15 @@ describe("stations Netatmo publiques", () => {
       windDirection: 135,
       precipitation: 0.6,
     });
-    expect(station?.updatedAt).toBe(new Date(1_786_524_000 * 1000).toISOString());
+    expect(station?.updatedAt).toBe(new Date(1_786_524_120 * 1000).toISOString());
+    expect(station?.measurementTimes).toMatchObject({
+      temperature: new Date(1_786_524_000 * 1000).toISOString(),
+      humidity: new Date(1_786_524_000 * 1000).toISOString(),
+      pressure: new Date(1_786_524_000 * 1000).toISOString(),
+      windSpeed: new Date(1_786_524_060 * 1000).toISOString(),
+      windGust: new Date(1_786_524_060 * 1000).toISOString(),
+      precipitation: new Date(1_786_524_120 * 1000).toISOString(),
+    });
   });
 
   it("réutilise uniquement une observation Netatmo persistée, validée, fraîche et dans le rayon", () => {

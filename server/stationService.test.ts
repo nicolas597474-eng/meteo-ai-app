@@ -101,6 +101,13 @@ describe("mapMetarObservation", () => {
   it("écarte une observation officielle au-delà du rayon choisi", () => {
     expect(mapMetarObservation({ icaoId: "LFAC", lat: 50.962, lon: 1.954 }, 50.7567, 2.5204, 10)).toBeNull();
   });
+
+  it("ne remplace pas un reportTime absent par l’heure de collecte", () => {
+    const station = mapMetarObservation({ icaoId: "LFAC", temp: 20, lat: 50.962, lon: 1.954 }, 50.95, 1.96, 30);
+    expect(station?.updatedAt).toBeNull();
+    expect(station?.measurementTimes?.temperature).toBeNull();
+    expect(station?.measurementTimes?.windSpeed).toBeNull();
+  });
 });
 
 // ─── rankStations ─────────────────────────────────────────────────────────────

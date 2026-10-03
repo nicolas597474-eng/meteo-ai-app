@@ -5,6 +5,7 @@ import { BackToTopButton } from "@/components/BackToTopButton";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { trpc } from "@/lib/trpc";
+import { YesterdayVerificationPanel } from "@/components/weather/YesterdayVerificationPanel";
 
 type PeriodId = "24h" | "7d" | "30d" | "90d" | "365d";
 type HorizonId = "0-6h" | "6-24h" | "24-48h" | "2-3d" | "4-7d" | "8-10d" | "11-15d";
@@ -72,7 +73,12 @@ export default function ReliabilityLaboratory() {
     period,
     horizon,
   }), [activeLocation?.lat, activeLocation?.lon, period, horizon]);
+  const yesterdayInput = useMemo(() => ({
+    lat: activeLocation?.lat ?? 50.7567,
+    lon: activeLocation?.lon ?? 2.5204,
+  }), [activeLocation?.lat, activeLocation?.lon]);
   const { data, isLoading, isError } = trpc.weather.getReliabilityLaboratory.useQuery(input, { staleTime: 2 * 60 * 1000 });
+  const { data: yesterdayData, isLoading: yesterdayLoading, isError: yesterdayError } = trpc.weather.getYesterdayForecastObservation.useQuery(yesterdayInput, { staleTime: 2 * 60 * 1000 });
 
   return <main className="weather-page-sky min-h-screen bg-[#080a0f] pb-28" style={pageSkyStyle}>
     <div className="mx-auto max-w-7xl space-y-4 px-3 pt-3 sm:px-5 sm:pt-5">
@@ -82,6 +88,8 @@ export default function ReliabilityLaboratory() {
         <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-400">MAE, RMSE, biais, effectifs, dates et évolution par modèle × variable × horizon exact. Le biais signé est descriptif et n’est jamais appliqué aux prévisions officielles futures. Best Match et agrégateurs sont exclus. L’accord inter-modèles décrit une dispersion de prévisions et n’est pas une mesure de fiabilité.</p>
         <p className="mt-2 text-xs font-medium text-slate-300">{locationName} · fuseau Europe/Paris · unité conservée pour chaque variable</p>
       </header>
+
+      <YesterdayVerificationPanel data={yesterdayData} locationName={locationName} isLoading={yesterdayLoading} isError={yesterdayError} />
 
       <MeteoSurface tone="lab" className="rounded-2xl p-3 sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

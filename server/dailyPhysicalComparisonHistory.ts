@@ -1,4 +1,5 @@
 import type { DailyForecastObservationComparison } from "../drizzle/schema";
+import { isComparableDailyForecastObservationPair } from "./dailyForecastVerification";
 
 export const DAILY_PHYSICAL_COMPARISON_VARIABLES = [
   "temperature_max",
@@ -71,6 +72,7 @@ function matchesDailyPhysicalComparison(
 ): boolean {
   if (row.locationKey !== filters.locationKey) return false;
   if (row.evidenceType !== "physical_observation" || row.observationIsQualified !== 1) return false;
+  if (!isComparableDailyForecastObservationPair(row)) return false;
   if (filters.validDateFrom && row.validDate < filters.validDateFrom) return false;
   if (filters.validDateTo && row.validDate > filters.validDateTo) return false;
   if (filters.serviceName && row.serviceName !== filters.serviceName) return false;

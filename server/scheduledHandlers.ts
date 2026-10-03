@@ -18,6 +18,7 @@ import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { isOperationalObservation } from "./observationProvenance";
 import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
 import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows } from "./dailyForecastPerformance";
+import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { evaluateHourlyForecastRuns, isHourlyForecastVariable, type HourlyForecastVariable } from "./hourlyForecastRunScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
@@ -38,6 +39,7 @@ import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getP
 import {
   insertForecasts,
   insertForecastRuns,
+  insertMeteoAIDailyFusionRun,
   HourlyForecastPersistenceError,
   upsertHourlyForecastCollectionResults,
   claimScheduledForecastCollectionJob,
@@ -619,6 +621,14 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         }, { requireDatabase: true });
+        const fusionAvailableAt = Date.now();
+        const fusionArchive = buildMeteoAIDailyFusionArchiveRun({
+          locationKey: defaultLocKey,
+          targetDate: today,
+          availableAt: fusionAvailableAt,
+          forecast: { ...meteoAI, condition, weights: meteoAI.weights, trace: meteoAI.trace },
+        });
+        if (fusionArchive) await insertMeteoAIDailyFusionRun(fusionArchive, { requireDatabase: true });
       }
 
       // Update job as completed
@@ -1502,6 +1512,14 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         }, { refreshComputedAt: true });
+        const fusionAvailableAt = Date.now();
+        const fusionArchive = buildMeteoAIDailyFusionArchiveRun({
+          locationKey: locKey,
+          targetDate: today,
+          availableAt: fusionAvailableAt,
+          forecast: { ...meteoAI, condition, weights: meteoAI.weights, trace: meteoAI.trace },
+        });
+        if (fusionArchive) await insertMeteoAIDailyFusionRun(fusionArchive, { requireDatabase: true });
 
         for (const matchFav of matchingFavorites) {
           await upsertLocationForecast({

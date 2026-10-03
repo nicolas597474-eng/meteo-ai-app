@@ -30,6 +30,18 @@ function row(overrides: Partial<DailyForecastObservationComparison> = {}): Daily
     evidenceType: "physical_observation",
     observationIsQualified: 1,
     observationCoverageHours: 24,
+    forecastAvailableAt: Date.parse("2026-10-01T08:00:00.000Z"),
+    observationWindowStartAt: Date.parse("2026-10-02T07:00:00.000Z"),
+    observationWindowEndAt: Date.parse("2026-10-02T07:00:00.000Z"),
+    stationEvidence: [{
+      stationId: "metar-LFAC",
+      stationName: "Station physique",
+      source: "metar",
+      snapshotHour: 9,
+      observedAt: Date.parse("2026-10-02T07:00:00.000Z"),
+      value: 18,
+      weight: 1,
+    }],
     createdAt: new Date("2026-10-03T01:00:00.000Z"),
     ...overrides,
   };
@@ -46,6 +58,10 @@ describe("historique des comparaisons physiques quotidiennes", () => {
       row({ id: 7, horizonBucket: "1-3d" }),
       row({ id: 8, locationKey: "autre_lieu" }),
       row({ id: 9, evidenceType: "physical_observation", observationIsQualified: 0 }),
+      row({ id: 10, forecastAvailableAt: null, observationWindowStartAt: null, observationWindowEndAt: null, stationEvidence: null }),
+      row({ id: 11, forecastAvailableAt: Date.parse("2026-10-02T08:00:00.000Z") }),
+      row({ id: 12, stationEvidence: [{ stationId: "openmeteo-grid", source: "openmeteo", observedAt: Date.parse("2026-10-02T07:00:00.000Z") }] }),
+      row({ id: 13, stationEvidence: [{ stationId: "metar-LFAC", source: "metar", observedAt: Date.parse("2026-10-01T20:00:00.000Z") }] }),
     ];
 
     const result = buildDailyPhysicalComparisonHistoryPage(rows, {
@@ -60,7 +76,10 @@ describe("historique des comparaisons physiques quotidiennes", () => {
 
     expect(result.status).toBe("available");
     expect(result.rows).toEqual([matching]);
-    expect(result.rows.every((item) => item.evidenceType === "physical_observation" && item.observationIsQualified === 1)).toBe(true);
+    expect(result.rows.every((item) => item.evidenceType === "physical_observation"
+      && item.observationIsQualified === 1
+      && item.forecastAvailableAt! < item.observationWindowStartAt!
+      && item.stationEvidence != null)).toBe(true);
   });
 
   it("n’émet pas de page suivante quand il n’y a aucune preuve correspondante", () => {
@@ -72,7 +91,14 @@ describe("historique des comparaisons physiques quotidiennes", () => {
     const rows = [
       row({ id: 5, validDate: "2026-10-02" }),
       row({ id: 4, validDate: "2026-10-02" }),
-      row({ id: 3, validDate: "2026-10-01" }),
+      row({
+        id: 3,
+        validDate: "2026-10-01",
+        forecastAvailableAt: Date.parse("2026-09-30T08:00:00.000Z"),
+        observationWindowStartAt: Date.parse("2026-10-01T07:00:00.000Z"),
+        observationWindowEndAt: Date.parse("2026-10-01T07:00:00.000Z"),
+        stationEvidence: [{ stationId: "metar-LFAC", stationName: "Station physique", source: "metar", snapshotHour: 9, observedAt: Date.parse("2026-10-01T07:00:00.000Z"), value: 18, weight: 1 }],
+      }),
     ];
     const result = buildDailyPhysicalComparisonHistoryPage(rows, { locationKey, pageSize: 2 });
 

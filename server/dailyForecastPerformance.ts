@@ -1,17 +1,14 @@
 import type { ForecastRun, InsertForecastRun, InsertDailyForecastObservationComparison } from "../drizzle/schema";
 import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, type ForecastData } from "./weatherServices";
-import { buildQualifiedDailyObservation, type PhysicalSnapshot } from "./physicalObservationAggregation";
-import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
-import type { DailyFusionHorizon, DailyFusionMetric, ModelPerformanceEvidence } from "./fusionPerformance";
+import type { PhysicalSnapshot } from "./physicalObservationAggregation";
+import type { DailyFusionMetric, ModelPerformanceEvidence } from "./fusionPerformance";
+import { buildDailyForecastVerificationReadModel, getDailyForecastHorizon, isComparableDailyForecastObservationPair } from "./dailyForecastVerification";
+export { getDailyForecastHorizon } from "./dailyForecastVerification";
 
 const MODEL_SERVICES = new Map(WEATHER_SERVICES.expert.map((service) => [service.name, service]));
 const OFFICIAL_DAILY_MODEL_BY_NAME = new Map<string, (typeof OFFICIAL_HOURLY_MODELS)[number]>(
   OFFICIAL_HOURLY_MODELS.map((model) => [model.name, model]),
 );
-const DAILY_TEMPERATURE_MINIMUM_HOURS = 18;
-const DAILY_WIND_MINIMUM_HOURS = 18;
-const DAILY_PRECIPITATION_REQUIRED_HOURS = 24;
-
 function isRecord(value: unknown): value is Record<string, any> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
@@ -23,14 +20,6 @@ function finiteOrNull(value: unknown): number | null {
 
 function isOfficialDailyModel(serviceName: string, modelId: string | null | undefined): boolean {
   return OFFICIAL_DAILY_MODEL_BY_NAME.get(serviceName)?.modelId === modelId;
-}
-
-function nextIsoDate(date: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const parsed = new Date(`${date}T12:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
-  parsed.setUTCDate(parsed.getUTCDate() + 1);
-  return parsed.toISOString().slice(0, 10);
 }
 
 /** Derive every target-day row from the already-fetched 16-day provider payload. */
@@ -102,63 +91,9 @@ export function buildForecastRunArchiveRows(
   return rows;
 }
 
-export function getDailyForecastHorizon(issuedAt: number, validDate: string): { bucket: DailyFusionHorizon; leadTimeMinutes: number } | null {
-  const followingDate = nextIsoDate(validDate);
-  if (!followingDate) return null;
-  const endOfValidDay = parisLocalHourToUniqueEpochMs(followingDate, 0);
-  const leadMs = endOfValidDay == null ? NaN : endOfValidDay - issuedAt;
-  if (!Number.isFinite(leadMs) || leadMs <= 0) return null;
-  const leadHours = leadMs / 3_600_000;
-  if (leadHours > 15 * 24) return null;
-  const bucket: DailyFusionHorizon = leadHours <= 6 ? "0-6h"
-    : leadHours <= 24 ? "6-24h"
-      : leadHours <= 3 * 24 ? "1-3d"
-        : leadHours <= 7 * 24 ? "4-7d"
-          : "8-15d";
-  return { bucket, leadTimeMinutes: Math.floor(leadMs / 60_000) };
-}
-
-function buildVariableComparison(
-  run: ForecastRun,
-  validDate: string,
-  horizonBucket: DailyFusionHorizon,
-  leadTimeMinutes: number,
-  variable: DailyFusionMetric,
-  forecastValue: unknown,
-  observedValue: unknown,
-  observationCoverageHours: number,
-): InsertDailyForecastObservationComparison | null {
-  const forecast = finiteOrNull(forecastValue);
-  const observed = finiteOrNull(observedValue);
-  const officialModelId = OFFICIAL_DAILY_MODEL_BY_NAME.get(run.serviceName)?.modelId;
-  const modelId = run.modelId ?? officialModelId ?? null;
-  if (run.id == null || forecast == null || observed == null) return null;
-  if (run.sourceKind !== "model_forecast" || officialModelId == null || modelId !== officialModelId) return null;
-  const signedError = forecast - observed;
-  return {
-    comparisonKey: `${run.id}:${variable}`,
-    forecastRunId: run.id,
-    locationKey: run.locationKey,
-    validDate,
-    serviceName: run.serviceName,
-    provider: run.provider,
-    modelId,
-    horizonBucket,
-    leadTimeMinutes,
-    variable,
-    forecastValue: forecast,
-    observedValue: observed,
-    signedError,
-    absoluteError: Math.abs(signedError),
-    evidenceType: "physical_observation",
-    observationIsQualified: 1,
-    observationCoverageHours,
-  };
-}
-
 /**
- * Create production comparisons only from qualified physical snapshots. Daily
- * precipitation is admitted only when all 24 hourly amounts can be summed.
+ * Create strict comparison rows only when the immutable forecast was available
+ * before every source-station measurement contributing to the daily value.
  */
 export function buildDailyForecastObservationComparisons(
   locationKey: string,
@@ -166,30 +101,8 @@ export function buildDailyForecastObservationComparisons(
   forecasts: ForecastRun[],
   snapshots: PhysicalSnapshot[],
 ): InsertDailyForecastObservationComparison[] {
-  const observation = buildQualifiedDailyObservation(snapshots);
-  if (!observation.isQualified) return [];
-  const comparisons: InsertDailyForecastObservationComparison[] = [];
-
-  for (const run of forecasts) {
-    if (run.locationKey !== locationKey || run.validDate !== validDate || run.sourceKind !== "model_forecast") continue;
-    const horizon = getDailyForecastHorizon(Number(run.issuedAt), validDate);
-    if (!horizon) continue;
-
-    const candidates: Array<[DailyFusionMetric, unknown, unknown, number, boolean]> = [
-      ["temperature_max", run.tempMax, observation.tempMax, observation.coverageHours, observation.coverageHours >= DAILY_TEMPERATURE_MINIMUM_HOURS],
-      ["temperature_min", run.tempMin, observation.tempMin, observation.coverageHours, observation.coverageHours >= DAILY_TEMPERATURE_MINIMUM_HOURS],
-      ["precipitation_sum", run.precipitation, observation.precipitationSum, observation.precipitationCoverageHours, observation.precipitationCoverageHours === DAILY_PRECIPITATION_REQUIRED_HOURS],
-      ["wind_speed_max", run.windSpeed, observation.windSpeed, observation.windSpeedCoverageHours, observation.windSpeedCoverageHours >= DAILY_WIND_MINIMUM_HOURS],
-      ["wind_gust_max", run.windGust, observation.windGust, observation.windGustCoverageHours, observation.windGustCoverageHours >= DAILY_WIND_MINIMUM_HOURS],
-    ];
-
-    for (const [variable, forecastValue, observedValue, coverage, covered] of candidates) {
-      if (!covered) continue;
-      const comparison = buildVariableComparison(run, validDate, horizon.bucket, horizon.leadTimeMinutes, variable, forecastValue, observedValue, coverage);
-      if (comparison) comparisons.push(comparison);
-    }
-  }
-  return comparisons;
+  return buildDailyForecastVerificationReadModel(locationKey, validDate, forecasts, snapshots).pairs
+    .map(({ forecastIssuedAt: _forecastIssuedAt, ...row }) => row);
 }
 
 type StoredComparison = InsertDailyForecastObservationComparison;
@@ -199,7 +112,8 @@ export function aggregateDailyForecastPerformance(rows: StoredComparison[]): Mod
   const groups = new Map<string, StoredComparison[]>();
   for (const row of rows) {
     if (row.evidenceType !== "physical_observation" || row.observationIsQualified !== 1
-      || !isOfficialDailyModel(row.serviceName, row.modelId)) continue;
+      || !isOfficialDailyModel(row.serviceName, row.modelId)
+      || !isComparableDailyForecastObservationPair(row)) continue;
     const key = [row.locationKey, row.serviceName, row.modelId, row.variable, row.horizonBucket].join("\u001f");
     const group = groups.get(key) ?? [];
     group.push(row);

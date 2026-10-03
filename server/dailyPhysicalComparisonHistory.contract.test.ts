@@ -13,6 +13,9 @@ describe("contrat de lecture de l’historique quotidien physique", () => {
     expect(readerSource).toContain(".from(dailyForecastObservationComparisons)");
     expect(readerSource).toContain('eq(dailyForecastObservationComparisons.evidenceType, "physical_observation")');
     expect(readerSource).toContain("eq(dailyForecastObservationComparisons.observationIsQualified, 1)");
+    expect(readerSource).toContain("isNotNull(dailyForecastObservationComparisons.forecastAvailableAt)");
+    expect(readerSource).toContain("lt(dailyForecastObservationComparisons.forecastAvailableAt, dailyForecastObservationComparisons.observationWindowStartAt)");
+    expect(readerSource).toContain("isNotNull(dailyForecastObservationComparisons.stationEvidence)");
     expect(readerSource).not.toContain("shadowWeatherPhase8Comparisons");
     expect(readerSource).not.toContain("shadowWeatherPhase7");
   });
