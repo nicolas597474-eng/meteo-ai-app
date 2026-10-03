@@ -108,6 +108,8 @@ export function reconstructOfficialHourlyModelsFromArchive(
         temperature: null,
         apparentTemperature: null,
         precipitation: null,
+        rain: null,
+        showers: null,
         windSpeed: null,
         windGusts: null,
         windDirection: null,

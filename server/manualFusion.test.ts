@@ -175,7 +175,7 @@ describe("relance manuelle des prévisions", () => {
     expect(result.status).toBe("refreshed");
     if (result.status === "cooldown" || result.status === "in_progress") throw new Error("Unexpected status");
     expect(result.location).toEqual({ lat: favorite.lat, lon: favorite.lon });
-    expect(result.daily).toMatchObject({ status: "succeeded", modelCount: 8, expectedModelCount: 8 });
+    expect(result.daily).toMatchObject({ status: "succeeded", modelCount: 7, expectedModelCount: 7 });
     expect(result.hourly).toMatchObject({ status: "succeeded", modelCount: 7, expectedModelCount: 7 });
     expect(result.daily.updatedAt).toBeTruthy();
     expect(result.hourly.updatedAt).toBeTruthy();

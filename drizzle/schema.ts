@@ -400,6 +400,7 @@ export const stationCollectionSnapshots = mysqlTable("station_collection_snapsho
   hourlyModelCount: int("hourlyModelCount").notNull(),
   dailyMissingModels: json("dailyMissingModels"),
   hourlyMissingModels: json("hourlyMissingModels"),
+  dailyVariableCoverage: json("dailyVariableCoverage"),
   status: mysqlEnum("status", ["completed", "partial", "failed"]).notNull(),
   collectedAt: timestamp("collectedAt").defaultNow().notNull(),
 }, (table) => [
@@ -613,6 +614,7 @@ export const hourlyForecastCollectionResults = mysqlTable("hourly_forecast_colle
   expectedValueCount: int("expectedValueCount").notNull().default(0),
   archiveRowsWritten: int("archiveRowsWritten").notNull().default(0),
   projectionRowsWritten: int("projectionRowsWritten").notNull().default(0),
+  variableCoverage: json("variableCoverage"),
   errorCode: varchar("errorCode", { length: 32 }),
   attemptedAt: bigint("attemptedAt", { mode: "number" }).notNull(),
   completedAt: bigint("completedAt", { mode: "number" }),

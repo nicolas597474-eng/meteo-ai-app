@@ -19,21 +19,32 @@ const completeHourly = {
   temperature_2m: [10, 11, 12],
   apparent_temperature: [9, 10, 11],
   precipitation: [0, 0.1, 0],
+  rain: [0, 0.1, 0],
+  showers: [0, 0, 0],
+  snowfall: [0, 0, 0],
   wind_speed_10m: [5, 6, 7],
   wind_gusts_10m: [9, 10, 11],
   wind_direction_10m: [180, 190, 200],
   relative_humidity_2m: [80, 81, 82],
   surface_pressure: [1012, 1011, 1010],
   cloud_cover: [50, 55, 60],
+  cloud_cover_low: [10, 11, 12],
+  cloud_cover_mid: [20, 21, 22],
+  cloud_cover_high: [20, 23, 26],
   weather_code: [1, 2, 3],
+  uv_index: [1, 2, 3],
+  dew_point_2m: [5, 6, 7],
+  visibility: [24000, 24000, 24000],
+  shortwave_radiation: [100, 200, 300],
 };
 const completeResponse = () => ({
   timezone: "Europe/Paris",
   utc_offset_seconds: 3600,
   hourly_units: {
-    temperature_2m: "°C", apparent_temperature: "°C", precipitation: "mm",
+    temperature_2m: "°C", apparent_temperature: "°C", precipitation: "mm", rain: "mm", showers: "mm", snowfall: "cm",
     wind_speed_10m: "km/h", wind_gusts_10m: "km/h", wind_direction_10m: "°",
-    relative_humidity_2m: "%", surface_pressure: "hPa", cloud_cover: "%", weather_code: "wmo code",
+    relative_humidity_2m: "%", surface_pressure: "hPa", cloud_cover: "%", cloud_cover_low: "%", cloud_cover_mid: "%", cloud_cover_high: "%", weather_code: "wmo code",
+    uv_index: "", dew_point_2m: "°C", visibility: "m", shortwave_radiation: "W/m²",
   },
   hourly: structuredClone(completeHourly),
 });
@@ -60,7 +71,10 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
 
     expect(forecasts).toHaveLength(7);
     expect(result.diagnostics).toHaveLength(7);
-    expect(result.diagnostics.every((item) => item.status === "succeeded" && item.hoursReceived === 3 && item.valuesReceived === 18 && item.expectedValueCount === 18)).toBe(true);
+    expect(result.diagnostics.every((item) => item.status === "succeeded" && item.hoursReceived === 3 && item.valuesReceived === 60 && item.expectedValueCount === 60)).toBe(true);
+    expect(forecasts[0].hours[0]).toMatchObject({ rain: 0, showers: 0 });
+    expect(forecasts[0].hours[0].visibility).toBe(24);
+    expect(forecasts[0].sourceMetadata?.units).toMatchObject({ rain: "mm", showers: "mm", visibility: "km" });
     expect(forecasts[0].hours.map((hour) => hour.hour)).toEqual([2, 2, 3]);
     expect(forecasts[0].hours.map((hour) => hour.validAt)).toEqual(unixTimes.map((value) => value * 1000));
     expect(new Set(forecasts.map((forecast) => forecast.captureRunId)).size).toBe(7);
@@ -71,6 +85,8 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
     expect(requestUrls.map((url) => url.searchParams.get("models")).sort()).toEqual(OFFICIAL_HOURLY_MODELS.map(({ modelId }) => modelId).sort());
     expect(requestUrls.every((url) => url.searchParams.get("timeformat") === "unixtime")).toBe(true);
     expect(requestUrls.every((url) => url.searchParams.get("timezone") === "Europe/Paris")).toBe(true);
+    expect(requestUrls.every((url) => url.searchParams.get("hourly")?.split(",").length === 20)).toBe(true);
+    expect(requestUrls.every((url) => url.searchParams.get("hourly")?.includes("rain") && url.searchParams.get("hourly")?.includes("showers"))).toBe(true);
   });
 
   it("retries only incomplete providers and preserves successful sources when another returns HTTP errors", async () => {

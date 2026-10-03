@@ -49,12 +49,13 @@ import { getForecastRunDisplayStatus } from "../forecastRunSummary";
 import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { buildForecastRunArchiveRows } from "../dailyForecastPerformance";
+import { MODEL_FORECAST_HORIZONS } from "../forecastVariableCoverage";
 import { compareTraceWeights } from "../weightComparison";
 import { findActiveHourlyForecastIndex } from "../../shared/hourlyForecastTime";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
-import { buildAppliedModelWeights } from "../aiLabTrace";
+import { buildAppliedModelWeights, filterForecastTraceToModelNames } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
 import { buildDatedDailyFusionFallback, resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
@@ -709,17 +710,17 @@ export const weatherRouter = router({
         .slice(0, 3)
         .map((trace) => ({ date: trace.date, hour: trace.hour, attempts: trace.attempts, reason: trace.reason }));
       const missingSnapshotSlots = hourlyHistory.filter((trace) => trace.status === "missing").length;
-      const expectedModels = WEATHER_SERVICES.expert.map((model) => model.name);
+      const expectedModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
       const expectedHourlyModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
       const dailyMissingModels = latestCollection ? getMissingModelNames(latestCollection.dailyMissingModels) : [];
       const hourlyMissingModels = latestCollection ? getMissingModelNames(latestCollection.hourlyMissingModels) : [];
       const dailyCollectedModels = latestCollection ? getCollectedModelNames(expectedModels, dailyMissingModels) : [];
       const hourlyCollectedModels = latestCollection ? getCollectedModelNames(expectedHourlyModels, hourlyMissingModels) : [];
       const bestMatchAudit = latestHourlyModelCollection.results.find((result) => result.modelName === "best_match");
-      if (bestMatchAudit && bestMatchAudit.archiveRowsWritten > 0 && !hourlyCollectedModels.includes("Open-Meteo")) {
-        // Visible as a separately archived reference only; it never counts toward the seven-model hourly coverage.
-        hourlyCollectedModels.push("Open-Meteo");
-      }
+      const dailyCoverageRecords = Array.isArray(latestCollection?.dailyVariableCoverage)
+        ? latestCollection.dailyVariableCoverage as Array<Record<string, unknown>>
+        : [];
+      const bestMatchDailyAudit = dailyCoverageRecords.find((record) => record.modelName === "Open-Meteo") ?? null;
       const flowStatuses = buildForecastFlowStatuses({
         expectedModels,
         dailyCollectedModels,
@@ -761,11 +762,25 @@ export const weatherRouter = router({
           expectedValueCount: result.expectedValueCount,
           archiveRowsWritten: result.archiveRowsWritten,
           projectionRowsWritten: result.projectionRowsWritten,
+          variableCoverage: result.variableCoverage ?? null,
+          maximumDocumentedDays: MODEL_FORECAST_HORIZONS[result.modelName]?.maximumDocumentedDays ?? null,
+          horizonSourceUrl: MODEL_FORECAST_HORIZONS[result.modelName]?.sourceUrl ?? null,
           errorCode: result.errorCode,
           attemptedAt: result.attemptedAt,
           completedAt: result.completedAt,
         })),
         flowStatuses,
+        bestMatchReference: {
+          model: "Open-Meteo · Best Match",
+          daily: bestMatchDailyAudit,
+          hourly: bestMatchAudit ? {
+            status: bestMatchAudit.status,
+            requestAttempts: bestMatchAudit.requestAttempts,
+            hoursReceived: bestMatchAudit.hoursReceived,
+            archiveRowsWritten: bestMatchAudit.archiveRowsWritten,
+            variableCoverage: bestMatchAudit.variableCoverage ?? null,
+          } : null,
+        },
         lastForecastSuccess: lastForecastCoverage ? {
           status: lastForecastCoverage.status,
           collectedAt: lastForecastCoverage.collectedAt,
@@ -793,6 +808,7 @@ export const weatherRouter = router({
           hourlyCollectedModels,
           dailyMissingModels,
           hourlyMissingModels,
+          dailyVariableCoverage: latestCollection.dailyVariableCoverage ?? null,
         } : null,
       };
     }),
@@ -1162,12 +1178,13 @@ export const weatherRouter = router({
     // La trace persistée est la source de vérité des modèles réellement
     // contributeurs. Les prévisions archivées ne sont pas présentées comme
     // appliquées si elles n'apparaissent pas dans cette trace.
-    const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
+    const officialForecastNames = new Set<string>(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
+    const persistedTrace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
+    const trace = filterForecastTraceToModelNames(persistedTrace, officialForecastNames);
     const appliedModelWeights = buildAppliedModelWeights(trace);
     const contributingNames = new Set(appliedModelWeights.map((model) => model.name));
-    const appliedForecasts = contributingNames.size > 0
-      ? forecasts.filter((forecast) => contributingNames.has(forecast.serviceName))
-      : forecasts;
+    const appliedForecasts = forecasts.filter((forecast) => officialForecastNames.has(forecast.serviceName)
+      && (contributingNames.size === 0 || contributingNames.has(forecast.serviceName)));
     const modelIndicator = buildModelIndicator(trace);
 
     // Détails des prévisions quotidiennes persistées.
@@ -1262,7 +1279,7 @@ export const weatherRouter = router({
       { name: "Preuves de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Métriques brutes séparées; statut indisponible tant que le seuil propre au modèle, à la variable et à l’horizon n’est pas atteint" },
     ];
     const latestStationCollection = (await getStationCollectionSnapshots(locationKey ?? "default", 1))[0] ?? null;
-    const activeModelNames = WEATHER_SERVICES.expert.map((model) => model.name);
+    const activeModelNames = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
     const dailyMissingModels = latestStationCollection ? getMissingModelNames(latestStationCollection.dailyMissingModels) : [];
     const hourlyMissingModels = latestStationCollection ? getMissingModelNames(latestStationCollection.hourlyMissingModels) : [];
 
@@ -1297,6 +1314,7 @@ export const weatherRouter = router({
         hourlyMissingModels,
         dailyCollectedModels: getCollectedModelNames(activeModelNames, dailyMissingModels),
         hourlyCollectedModels: getCollectedModelNames(activeModelNames, hourlyMissingModels),
+        dailyVariableCoverage: latestStationCollection.dailyVariableCoverage ?? null,
         status: latestStationCollection.status,
         collectedAt: latestStationCollection.collectedAt,
       } : null,

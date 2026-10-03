@@ -46,7 +46,7 @@ function manualRefreshTime(value: string | null) {
 
 function manualRefreshGranularity(label: string, result: { status: "succeeded" | "partial" | "failed"; modelCount: number; expectedModelCount: number; updatedAt: string | null; error?: string }) {
   const state = result.status === "succeeded" ? "succès" : result.status === "partial" ? "partiel" : "échec";
-  return `${label} : ${state}, ${result.modelCount}/${result.expectedModelCount} flux · ${manualRefreshTime(result.updatedAt)}${result.error ? ` · ${result.error}` : ""}`;
+  return `${label} : ${state}, ${result.modelCount}/${result.expectedModelCount} modèles officiels · ${manualRefreshTime(result.updatedAt)}${result.error ? ` · ${result.error}` : ""}`;
 }
 
 type SimulationStep = {
@@ -89,6 +89,46 @@ function stationFreshnessLabel(updatedAt: Date | string | null | undefined) {
   return `Mise à jour à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}`;
 }
 
+type VariableCoverageEvidence = {
+  key: string;
+  label: string;
+  status: string;
+  requested?: boolean;
+  documentationStatus?: "documented" | "unconfirmed";
+  requestedCount: number;
+  returnedCount?: number;
+  receivedCount: number;
+  missingCount?: number;
+  outOfHorizonCount?: number;
+  archivedCount: number | null;
+  exposedCount: number;
+  consumerProjected?: boolean;
+  unit?: string | null;
+};
+
+type ModelCoverageEvidence = {
+  modelName?: string;
+  status: string;
+  requestAttempts?: number;
+  requestedDays?: number;
+  returnedDays?: number;
+  targetDateInResponse?: boolean;
+  firstReturnedDate?: string | null;
+  lastReturnedDate?: string | null;
+  requestedForecastDays?: number;
+  returnedHours?: number;
+  firstValidAt?: string | null;
+  lastValidAt?: string | null;
+  maximumDocumentedDays?: number | null;
+  horizonSourceUrl?: string | null;
+  archiveRowsExpected?: number;
+  archiveRowsWritten?: number | null;
+  archiveWriteConfirmed?: boolean | null;
+  expectedArchiveRows?: number;
+  projectionRowsWritten?: number;
+  variables?: VariableCoverageEvidence[];
+};
+
 type HourlyModelCollectionEvidence = {
   model: string;
   modelId: string | null;
@@ -103,16 +143,57 @@ type HourlyModelCollectionEvidence = {
   errorCode: string | null;
   attemptedAt: number;
   completedAt: number | null;
+  variableCoverage: ModelCoverageEvidence | null;
 };
+
+function VariableCoverageEvidenceSection({ title, evidence, granularity }: {
+  title: string;
+  evidence: ModelCoverageEvidence | null;
+  granularity: "daily" | "hourly";
+}) {
+  const statusLabels: Record<string, string> = {
+    available: "disponible",
+    partial: "partiel",
+    missing: "manquant dans l’horizon reçu",
+    out_of_horizon: "au-delà de l’horizon retourné",
+    not_requested: "non demandé",
+    request_failed: "échec de requête",
+    unconfirmed: "prise en charge non confirmée",
+  };
+  const first = granularity === "daily" ? evidence?.firstReturnedDate : evidence?.firstValidAt;
+  const last = granularity === "daily" ? evidence?.lastReturnedDate : evidence?.lastValidAt;
+  const returned = granularity === "daily" ? evidence?.returnedDays : evidence?.returnedHours;
+  const requested = granularity === "daily" ? evidence?.requestedDays : evidence?.requestedForecastDays;
+  const hasVariables = Array.isArray(evidence?.variables);
+
+  return <section className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3">
+    <h3 className="text-xs font-semibold text-cyan-100">{title}</h3>
+    {!evidence || !hasVariables ? <p className="mt-1.5 text-[10px] leading-relaxed text-slate-300">Cette trace ne contient pas de preuve par champ. Les anciennes données ne sont pas reconstruites.</p> : <>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-slate-300">Fenêtre {granularity === "daily" ? "quotidienne" : "horaire"} demandée : {requested ?? "—"}{granularity === "daily" ? " jours" : " jour(s)"} · {returned ?? 0} pas retourné(s) · {first ?? "—"} → {last ?? "—"}. {evidence.maximumDocumentedDays == null ? "Limite documentée non spécifique à ce flux." : `Limite du produit documentée : jusqu’à ${evidence.maximumDocumentedDays} jours; ce n’est pas une garantie pour chaque réponse.`}</p>
+      {granularity === "daily" && <p className="mt-1 text-[10px] text-slate-400">Date cible : {evidence.targetDateInResponse ? "présente dans la réponse" : "absente de la réponse"} · {evidence.requestAttempts ?? 0} tentative(s). L’archive quotidienne {evidence.archiveWriteConfirmed === false ? "n’est pas confirmée" : "est suivie par champ ci-dessous"}.</p>}
+      {granularity === "hourly" && <p className="mt-1 text-[10px] text-slate-400">Archive : {evidence.archiveRowsWritten ?? 0}/{evidence.expectedArchiveRows ?? 0} lignes · vue horaire : {evidence.projectionRowsWritten ?? 0}/{returned ?? 0} lignes · {evidence.requestAttempts ?? 0} requête(s).</p>}
+      {evidence.horizonSourceUrl && <a href={evidence.horizonSourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[9px] font-medium text-cyan-200 underline underline-offset-2">Source de la limite documentée</a>}
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-2" aria-label={`${title} par variable`}>
+        {evidence.variables!.map((variable) => <div key={variable.key} className="rounded-lg border border-white/10 bg-slate-950/25 px-2.5 py-2">
+          <div className="flex items-start justify-between gap-2"><span className="text-[10px] font-semibold text-slate-100">{variable.label}{variable.unit ? ` · ${variable.unit}` : ""}</span><span className="shrink-0 text-[9px] text-cyan-100">{statusLabels[variable.status] ?? variable.status}</span></div>
+          <p className="mt-1 text-[9px] leading-relaxed text-slate-400">{variable.requested === false ? "Non demandé" : `${variable.receivedCount}/${variable.requestedCount} valeur(s) reçue(s)`} · archive {variable.archivedCount == null ? "non confirmée" : `${variable.archivedCount}`} · exposé {variable.exposedCount}{granularity === "hourly" && variable.consumerProjected === false ? " (pas dans la projection consommateur)" : ""}{variable.outOfHorizonCount ? ` · hors horizon ${variable.outOfHorizonCount}` : ""}</p>
+          {variable.documentationStatus === "unconfirmed" && <p className="mt-1 text-[9px] text-amber-100">Support de cette moyenne quotidienne non confirmé dans la documentation; aucune dérivation horaire appliquée.</p>}
+        </div>)}
+      </div>
+    </>}
+  </section>;
+}
 
 function ForecastModelGuideDialog({
   modelName,
   collectionAttempt,
+  dailyCoverage,
   collectionAvailable,
   onOpenChange,
 }: {
   modelName: string | null;
   collectionAttempt: HourlyModelCollectionEvidence | null;
+  dailyCoverage: ModelCoverageEvidence | null;
   collectionAvailable: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -151,7 +232,10 @@ function ForecastModelGuideDialog({
       {!collectionAvailable ? <p className="mt-1.5 text-[11px] leading-relaxed text-amber-100">Le journal détaillé est indisponible (base ou migration non vérifiable). Les compteurs agrégés ne prouvent ni une requête ni une écriture pour ce modèle.</p>
         : !collectionAttempt ? <p className="mt-1.5 text-[11px] leading-relaxed text-slate-300">Aucune trace durable pour ce modèle et ce lieu. L’absence de trace ne permet pas de conclure si un ancien passage a tenté la requête.</p>
           : <><p className={`mt-1.5 text-[11px] font-semibold ${statusTone}`}>{statusLabel}</p><p className="mt-1 text-[10px] text-slate-400">Tentative : {attemptedAtLabel} · {collectionAttempt.requestAttempts} requête(s) fournisseur{collectionAttempt.requestAttempts > 1 ? "s" : ""}{collectionAttempt.modelId ? ` · modèle ${collectionAttempt.modelId}` : ""}</p><div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">Réponse reçue</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.hoursReceived} h · {collectionAttempt.valuesReceived}/{collectionAttempt.expectedValueCount} valeurs valides</p></div><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">Archive immuable confirmée</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.archiveRowsWritten} lignes</p></div><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">Vue horaire confirmée</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.projectionRowsWritten}/{collectionAttempt.hoursReceived} lignes</p></div><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">État de la source</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.isOfficialModel ? "Modèle officiel horaire" : "Référence agrégée, non officielle"}</p></div></div>{collectionAttempt.errorCode && <p className="mt-2 text-[10px] text-amber-100">Motif : {errorLabels[collectionAttempt.errorCode] ?? "Erreur technique classifiée"}.</p>}{collectionAttempt.isOfficialModel ? <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Cette trace prouve uniquement la collecte/écriture. Elle ne qualifie pas les scores historiques : le statut officiel reste indisponible tant que les preuves historiques ne sont pas qualifiées.</p> : <p className="mt-2 text-[10px] leading-relaxed text-violet-100">Best Match est conservé comme référence agrégée; il ne peut jamais remplacer l’un des sept modèles ni alimenter le moteur officiel horaire.</p>}</>}
-    </section><a href={guide.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-sky-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">{guide.sourceLabel}<ChevronRight className="h-3.5 w-3.5" /></a></DialogContent></Dialog>;
+    </section>
+    <VariableCoverageEvidenceSection title="Couverture quotidienne par champ" evidence={dailyCoverage} granularity="daily" />
+    <VariableCoverageEvidenceSection title="Couverture horaire par champ" evidence={collectionAttempt?.variableCoverage ?? null} granularity="hourly" />
+    <a href={guide.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-sky-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">{guide.sourceLabel}<ChevronRight className="h-3.5 w-3.5" /></a></DialogContent></Dialog>;
 }
 
 function Stat({ label, value, tone = "text-slate-100", help }: { label: string; value: string; tone?: string; help?: ReactNode }) {
@@ -168,11 +252,11 @@ const AI_LAB_GLOSSARY = [
   {
     title: "Fusion et indicateurs du haut",
     entries: [
-      ["Fusion officielle", "Prévision combinée à partir des modèles actifs qui ont fourni une donnée exploitable. Les modèles candidats en validation restent exclus de cette fusion."],
+      ["Fusion officielle", "Prévision combinée à partir des sept modèles déterministes actifs qui ont fourni une donnée exploitable. Les modèles candidats en validation restent exclus. Best Match est une référence agrégée affichée à part, exclue de cette fusion et de ses preuves."],
       ["Snapshot", "Une photo enregistrée à un moment précis : elle garde les modèles reçus, leurs poids et le résultat calculé à cet instant. Un snapshot « archivé » est cette photo conservée après une collecte ; un calcul « direct » est une photo créée pour la consultation actuelle. Ce n’est ni une nouvelle observation ni une promesse pour plus tard."],
       ["Accord inter-modèles", "Étendues en unités physiques, séparées pour chaque variable, entre modèles nommés. Le nombre disponible est indiqué par variable; au moins deux valeurs sont nécessaires pour calculer une étendue. Best Match et les agrégateurs sont exclus. L’accord ne mesure pas la fiabilité face aux observations."],
       ["Fiabilité historique", "MAE, RMSE, biais, effectifs, fenêtre et évolution restent des mesures brutes distinctes par modèle × variable × horizon. Une mesure est indisponible tant que ses seuils d’évidence propres ne sont pas satisfaits; aucun score global ne les remplace."],
-      ["Flux appliqués", "Nombre de flux présents dans la trace de fusion actuelle. Sept flux correspondent à des modèles nommés ; Open-Meteo Best Match est un agrégateur, pas un modèle indépendant. Ce compteur ne mesure ni leur qualité ni le nombre de stations."],
+      ["Flux appliqués", "Nombre de modèles déterministes présents dans la trace officielle actuelle. Best Match est une référence agrégée affichée à part, exclue de ce compteur et des preuves du moteur. Ce compteur ne mesure ni leur qualité ni le nombre de stations."],
     ],
   },
   {
@@ -181,7 +265,7 @@ const AI_LAB_GLOSSARY = [
       ["Poids appliqué", "Part attribuée à un modèle pour un paramètre donné dans la fusion. Les poids sont des coefficients de calcul ; ils ne sont ni une probabilité ni une observation de station."],
       ["Sources appliquées par paramètre", "Liste distincte pour température, précipitations et vent. Un modèle peut contribuer différemment selon le paramètre si ses données ou ses preuves disponibles diffèrent."],
       ["Poids moyen d’un modèle", "C’est la moyenne des poids finaux réellement reçus par ce modèle pour les paramètres auxquels il a contribué : température, pluie, vent ou humidité. Ce n’est ni une note, ni une chance qu’il ait raison."],
-      ["Pourquoi plusieurs flux ont le même poids moyen", "Lorsque plusieurs flux apportent les mêmes paramètres avec des conditions comparables, la fusion partage le poids disponible entre eux. Avec 8 flux équivalents, chacun peut donc afficher environ 13 %. Ces huit flux comprennent sept modèles nommés et l’agrégateur Open-Meteo Best Match. Si un flux contribue davantage à un paramètre ou possède une meilleure preuve disponible, son poids moyen peut devenir différent."],
+      ["Pourquoi plusieurs flux ont le même poids moyen", "Lorsque plusieurs modèles officiels apportent les mêmes paramètres avec des conditions comparables, la fusion partage le poids disponible entre eux. Avec sept modèles équivalents, chacun pourrait recevoir environ 14 %. Best Match reste une référence séparée et n’entre ni dans ces poids ni dans les preuves du moteur."],
       ["Poids du régime, en clair", "Les pastilles T°, Pluie, Vent et Nuages indiquent ce qui compte le plus pour décrire le scénario météo du moment. Elles ne sont ni une probabilité ni un pourcentage de nuages."],
       ["Exemple : Ciel couvert", "Si le ciel est prévu très nuageux, la pastille Nuages peut compter davantage. Par exemple, Nuages 30 % ne veut pas dire 30 % de nuages : cela signifie seulement que l’état du ciel est important pour ce régime. Si la pluie ou le vent devient plus marqué, le résultat peut devenir Averses, Pluie ou Vent fort."],
     ],
@@ -190,7 +274,7 @@ const AI_LAB_GLOSSARY = [
     title: "Accord, tableaux et collecte",
     entries: [
       ["Accord des modèles", "Étendue min–max, en unités physiques et séparée par variable, parmi les modèles nommés disponibles. Il faut au moins deux valeurs pour calculer une étendue; Best Match et agrégateurs sont exclus. Un faible écart ne garantit pas une prévision exacte."],
-      ["Prévisions quotidiennes des contributeurs", "Valeurs journalières fournies par chaque modèle participant, avec leurs poids moyens affichés. Ce tableau présente des prévisions, pas des relevés observés."],
+      ["Prévisions quotidiennes des modèles officiels", "Valeurs journalières des sept modèles déterministes officiels. Best Match reste une référence séparée et n’est pas présenté comme contribution. Ce tableau présente des prévisions, pas des relevés observés."],
       ["Dernière collecte vérifiable", "Bilan du cycle le plus récent : stations physiques réellement trouvées, modèles journaliers et horaires réellement récupérés, et éventuelles indisponibilités."],
       ["Modèles en validation", "Candidats archivés séparément pour comparaison. Ils n’influencent ni la fusion, ni les poids, ni les compteurs actifs avant décision explicite fondée sur des preuves qualifiées."],
       ["Données insuffisantes / —", "Aucune valeur n’est affichée lorsqu’il manque une trace, plusieurs contributeurs ou des preuves physiques qualifiées. Ce n’est pas une note nulle."],
@@ -276,19 +360,19 @@ const AI_LAB_GLOSSARY = [
 ] as const;
 
 const AI_LAB_GLOSSARY_EXAMPLES: Record<string, string> = {
-  "Fusion officielle": "Si trois modèles prévoient une température proche, MeteoAI les combine dans une même prévision plutôt que d’afficher trois résultats séparés.",
+  "Fusion officielle": "Si trois modèles officiels prévoient une température proche, MeteoAI peut les combiner dans une même prévision; Best Match reste une référence séparée.",
   "Snapshot": "La prévision collectée à 05 h est conservée telle quelle ; demain, elle pourra être comparée aux relevés réellement archivés.",
   "Fiabilité historique": "Un MAE de 1,2 °C sur n prévisions alignées est rapporté avec son modèle, sa variable, son horizon, sa fenêtre et son effectif; ce n’est pas un score d’accord.",
   "Accord inter-modèles": "Si deux modèles indépendants prévoient 20 et 21 °C pour Tmax, l’étendue observée est de 1 °C; elle ne dit pas si l’un d’eux a raison.",
-  "Flux appliqués": "Les sept modèles nommés et l’agrégateur Best Match ne sont comptés ici que s’ils ont réellement contribué à au moins un paramètre de la fusion.",
+  "Flux appliqués": "Seuls les sept modèles officiels sont comptés s’ils contribuent réellement à la fusion. Best Match reste hors du moteur et de son compteur.",
   "Poids appliqué": "Pour la température, un modèle peut recevoir 20 % du calcul tandis qu’un autre reçoit 10 % ; ce sont des parts de calcul, pas leurs chances d’avoir raison.",
   "Sources appliquées par paramètre": "AROME peut aider pour la température, tandis qu’ECMWF aide aussi pour le vent : leurs contributions sont donc lues séparément.",
   "Poids moyen d’un modèle": "Un modèle qui a reçu 10 % pour la température et 20 % pour le vent affiche un poids moyen de 15 % sur ces deux contributions.",
-  "Pourquoi plusieurs flux ont le même poids moyen": "Avec huit flux qui contribuent de façon comparable, la part disponible peut être répartie presque également, autour de 13 % chacun.",
+  "Pourquoi plusieurs flux ont le même poids moyen": "Avec sept modèles officiels qui contribuent de façon comparable, la part disponible peut être répartie presque également, autour de 14 % chacun; Best Match est exclu.",
   "Poids du régime, en clair": "Pour un ciel couvert, les nuages peuvent compter plus que le vent dans la description du scénario ; cela ne dit pas quel modèle est meilleur.",
   "Exemple : Ciel couvert": "Si les nuages sont très présents mais qu’il n’y a ni pluie marquée ni vent fort, le scénario peut être Ciel couvert.",
   "Accord des modèles": "Si les modèles prévoient entre 19 et 20 °C, ils sont assez proches ; entre 15 et 24 °C, leur accord est faible.",
-  "Prévisions quotidiennes des contributeurs": "Le tableau peut afficher AROME à 21 °C et ICON à 22 °C : ce sont leurs prévisions du jour, pas des températures mesurées.",
+  "Prévisions quotidiennes des modèles officiels": "Le tableau officiel peut afficher AROME à 21 °C et ICON à 22 °C : ce sont leurs prévisions du jour, pas des températures mesurées; Best Match est présenté à part.",
   "Dernière collecte vérifiable": "Si un modèle ne répond pas lors du cycle, le bilan le signale comme indisponible au lieu de lui attribuer une valeur de remplacement.",
   "Modèles en validation": "Un nouveau modèle peut être collecté et comparé pendant plusieurs jours sans modifier la prévision officielle.",
   "Données insuffisantes / —": "S’il manque les relevés physiques comparables, l’application affiche — plutôt que d’inventer une note de fiabilité.",
@@ -465,16 +549,21 @@ export default function WeatherAILab() {
   const forecastCollectionSnapshot = forecastCollectionReport?.snapshot ?? null;
   const expectedForecastModels = forecastCollectionReport?.expectedModels ?? [];
   const expectedHourlyModels = forecastCollectionReport?.expectedHourlyModels
-    ?? expectedForecastModels.filter((model) => model !== "Open-Meteo");
-  const forecastAggregatorCount = expectedForecastModels.includes("Open-Meteo") ? 1 : 0;
-  const forecastNamedModelCount = Math.max(0, expectedForecastModels.length - forecastAggregatorCount);
-  const forecastCompositionLabel = forecastAggregatorCount > 0
-    ? `${forecastNamedModelCount} modèles + 1 agrégateur`
-    : `${forecastNamedModelCount} modèles`;
+    ?? expectedForecastModels;
+  const bestMatchReference = forecastCollectionReport?.bestMatchReference ?? null;
+  const dailyCoverageRecords = (forecastCollectionSnapshot?.dailyVariableCoverage ?? []) as ModelCoverageEvidence[];
+  const bestMatchDailyCoverage = (bestMatchReference?.daily ?? null) as ModelCoverageEvidence | null;
+  const selectedDailyModelCoverage = dailyCoverageRecords.find((coverage) => coverage.modelName === selectedCollectionModel)
+    ?? (selectedCollectionModel === "Open-Meteo" ? bestMatchDailyCoverage : null);
+  const hasBestMatchReference = Boolean(bestMatchReference?.daily || bestMatchReference?.hourly);
+  const bestMatchDailyArchived = Number((bestMatchReference?.daily as any)?.archiveRowsWritten ?? 0) > 0;
+  const bestMatchHourlyArchived = Number((bestMatchReference?.hourly as any)?.archiveRowsWritten ?? 0) > 0;
+  const forecastNamedModelCount = expectedForecastModels.length;
+  const forecastCompositionLabel = `${forecastNamedModelCount} modèles officiels`;
   const dailyCollectedModelSet = new Set(forecastCollectionSnapshot?.dailyCollectedModels ?? []);
   const hourlyCollectedModelSet = new Set(forecastCollectionSnapshot?.hourlyCollectedModels ?? []);
   const flowStatusByModel = new Map((forecastCollectionReport?.flowStatuses ?? []).map((status) => [status.model, status]));
-  const selectedHourlyModelCollection = forecastCollectionReport?.hourlyModelCollection?.find((result) => result.model === selectedCollectionModel) ?? null;
+  const selectedHourlyModelCollection = (forecastCollectionReport?.hourlyModelCollection?.find((result) => result.model === selectedCollectionModel) ?? null) as HourlyModelCollectionEvidence | null;
   const forecastCollectionTimeLabel = forecastCollectionSnapshot?.collectedAt
     ? formatCollectionTimestamp(forecastCollectionSnapshot.collectedAt)
     : null;
@@ -611,9 +700,10 @@ export default function WeatherAILab() {
 
     <section className="rounded-2xl border border-sky-400/25 bg-sky-400/[0.055] p-4" aria-labelledby="forecast-collection-title">
       <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10"><Clock className="h-4 w-4 text-sky-200" /></span><div className="min-w-0"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Prévisions · 7 modèles horaires officiels + 1 agrégateur de référence</p><h2 id="forecast-collection-title" className="text-sm font-semibold text-slate-100">Cadence prévue : {forecastCollectionReport?.scheduledAt ?? "toutes les 4 h"}</h2></div></div>{forecastCollectionSnapshot && <span className="shrink-0 rounded-full bg-sky-300/10 px-2 py-1 text-[9px] font-semibold text-sky-100">Dernier bilan</span>}</div>
-      {forecastCollectionSnapshot ? <><p className="mt-2 text-[11px] leading-relaxed text-slate-300"><span className="font-semibold text-sky-100">Prévisions des flux · </span>dernier bilan archivé le {forecastCollectionTimeLabel ?? "—"}. Il liste les données quotidiennes et horaires effectivement archivées ; le compteur horaire ne porte que sur les sept modèles officiels. Ce n’est pas une confirmation d’un passage programmé le jour en cours.</p><div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Quotidien archivé</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.dailyModelCount}/{expectedForecastModels.length || 8} flux</p><p className="mt-0.5 text-[9px] text-slate-400">{forecastCompositionLabel}</p></div><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Horaire archivé</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.hourlyModelCount}/{expectedHourlyModels.length || 7} modèles officiels</p><p className="mt-0.5 text-[9px] text-slate-400">7 modèles officiels ; Best Match est une référence distincte</p></div></div><div className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] leading-relaxed text-slate-300"><span className="font-semibold text-emerald-100">Stations météorologiques · </span>leurs relevés physiques sont collectés par un flux horaire distinct. Ils ne sont ni des modèles ni inclus dans ces compteurs de flux de prévision.</div><p className="mt-2 text-[10px] text-slate-400">Pour chaque flux : Q = prévision quotidienne archivée ; H = archive horaire reçue. Le total horaire ne compte que les sept modèles officiels. Best Match reste une référence agrégée distincte, hors moteur officiel. Touchez un nom pour connaître son rôle.</p><ForecastFlowStatusLegend /><div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2" aria-label="Statut opérationnel de tous les flux de prévision">{expectedForecastModels.map((model) => { const dailyCollected = dailyCollectedModelSet.has(model); const hourlyCollected = hourlyCollectedModelSet.has(model); const isAggregator = model === "Open-Meteo"; const operationalStatus = flowStatusByModel.get(model); return <button key={model} type="button" onClick={() => setSelectedCollectionModel(model)} aria-haspopup="dialog" aria-label={`Ouvrir la fiche du flux ${model}. Statut ${operationalStatus?.status ?? "FAILED"}. ${operationalStatus?.reason ?? "Aucun bilan vérifiable."} ${isAggregator ? "Agrégateur Best Match. " : "Modèle nommé. "}Quotidien ${dailyCollected ? "archivé" : "indisponible"}, horaire ${hourlyCollected ? "archivé" : "indisponible"}.`} className="flex min-h-12 items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-950/25 px-2.5 py-1.5 text-left text-[10px] transition-colors hover:border-sky-300/30 hover:bg-sky-300/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><span className="min-w-0"><span className="block truncate font-semibold text-sky-100">{model}</span>{isAggregator && <span className="mt-0.5 block text-[8px] uppercase tracking-wide text-violet-200">Agrégateur Best Match</span>}<ForecastFlowStatusBadge status={operationalStatus?.status ?? "FAILED"} reason={operationalStatus?.reason} /></span><span className="flex shrink-0 gap-1"><span className={dailyCollected ? "rounded bg-emerald-300/10 px-1.5 py-0.5 text-emerald-100" : "rounded bg-amber-300/10 px-1.5 py-0.5 text-amber-100"}>Q {dailyCollected ? "✓" : "—"}</span><span className={hourlyCollected ? "rounded bg-emerald-300/10 px-1.5 py-0.5 text-emerald-100" : "rounded bg-amber-300/10 px-1.5 py-0.5 text-amber-100"}>H {hourlyCollected ? "✓" : "—"}</span></span></button>; })}</div></> : <><p className="mt-2 text-[11px] leading-relaxed text-slate-400">Cycle prévu : {forecastCollectionReport?.scheduledAt ?? "toutes les 4 h"}. Aucun bilan de flux n’est archivé pour ce lieu ; l’application ne présente donc aucun flux comme collecté.</p><p className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] leading-relaxed text-slate-300"><span className="font-semibold text-emerald-100">Stations météorologiques · </span>les relevés physiques sont gérés séparément, à l’heure, et ne remplacent jamais une prévision manquante.</p></>}
+      {forecastCollectionSnapshot ? <><p className="mt-2 text-[11px] leading-relaxed text-slate-300"><span className="font-semibold text-sky-100">Prévisions des flux · </span>dernier bilan archivé le {forecastCollectionTimeLabel ?? "—"}. Il liste les données quotidiennes et horaires effectivement archivées ; le compteur horaire ne porte que sur les sept modèles officiels. Ce n’est pas une confirmation d’un passage programmé le jour en cours.</p><div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Quotidien archivé</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.dailyModelCount}/{expectedForecastModels.length || 7} modèles officiels</p><p className="mt-0.5 text-[9px] text-slate-400">{forecastCompositionLabel}</p></div><div className="rounded-lg border border-white/10 bg-slate-950/25 px-2 py-1.5"><span className="text-slate-400">Horaire archivé</span><p className="mt-0.5 font-semibold text-slate-100">{forecastCollectionSnapshot.hourlyModelCount}/{expectedHourlyModels.length || 7} modèles officiels</p><p className="mt-0.5 text-[9px] text-slate-400">7 modèles officiels ; Best Match est une référence distincte</p></div></div><div className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] leading-relaxed text-slate-300"><span className="font-semibold text-emerald-100">Stations météorologiques · </span>leurs relevés physiques sont collectés par un flux horaire distinct. Ils ne sont ni des modèles ni inclus dans ces compteurs de flux de prévision.</div><p className="mt-2 text-[10px] text-slate-400">Pour chaque flux : Q = prévision quotidienne archivée ; H = archive horaire reçue. Le total horaire ne compte que les sept modèles officiels. Best Match reste une référence agrégée distincte, hors moteur officiel. Touchez un nom pour connaître son rôle.</p><ForecastFlowStatusLegend /><div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2" aria-label="Statut opérationnel de tous les flux de prévision">{expectedForecastModels.map((model) => { const dailyCollected = dailyCollectedModelSet.has(model); const hourlyCollected = hourlyCollectedModelSet.has(model); const operationalStatus = flowStatusByModel.get(model); return <button key={model} type="button" onClick={() => setSelectedCollectionModel(model)} aria-haspopup="dialog" aria-label={`Ouvrir la fiche du flux ${model}. Statut ${operationalStatus?.status ?? "FAILED"}. ${operationalStatus?.reason ?? "Aucun bilan vérifiable."} Modèle déterministe officiel. Quotidien ${dailyCollected ? "archivé" : "indisponible"}, horaire ${hourlyCollected ? "archivé" : "indisponible"}.`} className="flex min-h-12 items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-950/25 px-2.5 py-1.5 text-left text-[10px] transition-colors hover:border-sky-300/30 hover:bg-sky-300/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><span className="min-w-0"><span className="block truncate font-semibold text-sky-100">{model}</span><ForecastFlowStatusBadge status={operationalStatus?.status ?? "FAILED"} reason={operationalStatus?.reason} /></span><span className="flex shrink-0 gap-1"><span className={dailyCollected ? "rounded bg-emerald-300/10 px-1.5 py-0.5 text-emerald-100" : "rounded bg-amber-300/10 px-1.5 py-0.5 text-amber-100"}>Q {dailyCollected ? "✓" : "—"}</span><span className={hourlyCollected ? "rounded bg-emerald-300/10 px-1.5 py-0.5 text-emerald-100" : "rounded bg-amber-300/10 px-1.5 py-0.5 text-amber-100"}>H {hourlyCollected ? "✓" : "—"}</span></span></button>; })}</div></> : <><p className="mt-2 text-[11px] leading-relaxed text-slate-400">Cycle prévu : {forecastCollectionReport?.scheduledAt ?? "toutes les 4 h"}. Aucun bilan de flux n’est archivé pour ce lieu ; l’application ne présente donc aucun flux comme collecté.</p><p className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] leading-relaxed text-slate-300"><span className="font-semibold text-emerald-100">Stations météorologiques · </span>les relevés physiques sont gérés séparément, à l’heure, et ne remplacent jamais une prévision manquante.</p></>}
     </section>
 
+    {hasBestMatchReference && <button type="button" onClick={() => setSelectedCollectionModel("Open-Meteo")} aria-haspopup="dialog" aria-label={`Ouvrir la fiche de la référence agrégée Best Match, hors des sept modèles officiels. Quotidien ${bestMatchDailyArchived ? "archivé" : "indisponible"}, horaire ${bestMatchHourlyArchived ? "archivé" : "indisponible"}.`} className="flex min-h-12 items-center justify-between gap-2 rounded-xl border border-violet-300/20 bg-violet-300/[0.05] px-3 py-2 text-left text-[10px] hover:border-violet-200/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"><span><span className="block font-semibold text-violet-100">Open-Meteo · Best Match</span><span className="text-[9px] text-slate-400">Référence agrégée, séparée des sept modèles officiels et non comptée dans leur couverture.</span></span><span className="shrink-0 text-violet-100">Q {bestMatchDailyArchived ? "✓" : "—"} · H {bestMatchHourlyArchived ? "✓" : "—"}</span></button>}
     <CollectionOperations forecast={lastForecastSuccess} physical={lastPhysicalCollection} noStationSlots={noQualifiedStationSlots} scheduleCoverage={forecastCollectionReport?.scheduleCoverage} />
 
     {user?.role === "admin" && <section className="rounded-2xl border border-violet-300/25 bg-violet-300/[0.05] p-4" aria-labelledby="shadow-data-hub-title">
@@ -645,7 +735,7 @@ export default function WeatherAILab() {
     {user?.role === "admin" && shadowDataHubReport?.phase8Metrics && <Phase8MetricsPanel metrics={shadowDataHubReport.phase8Metrics} />}
     {user?.role === "admin" && shadowDataHubReport?.phase8ValidationProgress && <Phase8ValidationProgressPanel progress={shadowDataHubReport.phase8ValidationProgress} />}
 
-    <ForecastModelGuideDialog modelName={selectedCollectionModel} collectionAttempt={selectedHourlyModelCollection} collectionAvailable={forecastCollectionReport?.hourlyModelCollectionAvailable ?? false} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
+    <ForecastModelGuideDialog modelName={selectedCollectionModel} collectionAttempt={selectedHourlyModelCollection} dailyCoverage={selectedDailyModelCoverage} collectionAvailable={forecastCollectionReport?.hourlyModelCollectionAvailable ?? false} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
 
     <AILabGlossary />
 
@@ -668,7 +758,7 @@ export default function WeatherAILab() {
 
     <section className="rounded-2xl border border-slate-800 bg-[#0d131d] p-4"><div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-blue-300" /><h2 className="text-sm font-semibold text-slate-100">Accord inter-modèles · étendues et σ population</h2></div><p className="mt-1 text-[10px] leading-relaxed text-slate-400">Chaque variable a son propre effectif. Best Match/agrégateurs exclus. Étendue et σ population nécessitent deux valeurs; « indisponible » n’équivaut pas à zéro et ne signifie pas désaccord.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{([['Température maximale', data.modelAgreement.tempMax, '°C'], ['Température minimale', data.modelAgreement.tempMin, '°C'], ['Précipitations · toutes valeurs', data.modelAgreement.precipitation, 'mm'], ['Vent maximal journalier', data.modelAgreement.windSpeed, 'km/h'], ['Rafales maximales journalières', data.modelAgreement.windGust, 'km/h']] as const).map(([label, measure, unit]) => <div key={label} className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] text-slate-400">{label}</p><p className="mt-1 text-sm font-semibold text-slate-100">{formatAgreementRange(measure, data.modelAgreement.expectedModelCount, unit)}</p><p className="mt-0.5 text-[10px] text-slate-500">Modèles avec valeur : {measure.modelsWithData.join(', ') || 'aucune valeur disponible'}</p>{label.startsWith("Précipitations") && <><p className="mt-1 text-[9px] text-slate-500">Au seuil ≥{data.modelAgreement.precipitationOccurrence.thresholdMm.toFixed(1)} mm : {data.modelAgreement.precipitationOccurrence.rainModelCount}/{data.modelAgreement.precipitationOccurrence.availableModelCount} modèles annoncent de la pluie; fréquence non calibrée.</p><p className="mt-1 text-[9px] text-slate-500">Quantités parmi modèles pluvieux : {formatAgreementRange(data.modelAgreement.precipitationWetAmounts, data.modelAgreement.expectedModelCount, 'mm')}.</p></>}</div>)}</div><p className="mt-3 text-[11px] text-slate-500">L’accord ne mesure pas la fiabilité historique contre les observations; MAE/RMSE/biais doivent être lus séparément par modèle × variable × horizon.</p></section>
 
-    <section className="rounded-2xl border border-slate-800 bg-[#0d131d] p-4"><div className="flex items-center gap-2"><Database className="h-4 w-4 text-violet-300" /><h2 className="text-sm font-semibold text-slate-100">Prévisions quotidiennes des contributeurs</h2></div>{data.modelDetails.length ? <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[380px] text-xs"><thead className="border-b border-slate-800 text-slate-500"><tr><th className="px-1 py-2 text-left font-medium">Modèle</th><th className="px-1 py-2 text-right font-medium">Poids</th><th className="px-1 py-2 text-right font-medium">Max</th><th className="px-1 py-2 text-right font-medium">Min</th><th className="px-1 py-2 text-right font-medium">Vent</th></tr></thead><tbody>{data.modelDetails.map((model) => <tr key={model.name} className="border-b border-slate-800/70 last:border-0"><td className="px-1 py-2 font-semibold text-slate-200">{model.label}</td><td className="px-1 py-2 text-right text-blue-300">{model.averageWeight == null ? "—" : `${Math.round(model.averageWeight * 100)}%`}</td><td className="px-1 py-2 text-right text-orange-200">{model.tempMax == null ? "—" : `${Number(model.tempMax).toFixed(1)}°`}</td><td className="px-1 py-2 text-right text-sky-200">{model.tempMin == null ? "—" : `${Number(model.tempMin).toFixed(1)}°`}</td><td className="px-1 py-2 text-right text-slate-300">{model.windSpeed == null ? "—" : `${Number(model.windSpeed).toFixed(1)}`}</td></tr>)}</tbody></table></div> : <p className="mt-3 text-xs text-slate-500">Aucune prévision quotidienne persistée pour ce lieu.</p>}</section>
+    <section className="rounded-2xl border border-slate-800 bg-[#0d131d] p-4"><div className="flex items-center gap-2"><Database className="h-4 w-4 text-violet-300" /><h2 className="text-sm font-semibold text-slate-100">Prévisions quotidiennes des modèles officiels</h2></div>{data.modelDetails.length ? <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[380px] text-xs"><thead className="border-b border-slate-800 text-slate-500"><tr><th className="px-1 py-2 text-left font-medium">Modèle</th><th className="px-1 py-2 text-right font-medium">Poids</th><th className="px-1 py-2 text-right font-medium">Max</th><th className="px-1 py-2 text-right font-medium">Min</th><th className="px-1 py-2 text-right font-medium">Vent</th></tr></thead><tbody>{data.modelDetails.map((model) => <tr key={model.name} className="border-b border-slate-800/70 last:border-0"><td className="px-1 py-2 font-semibold text-slate-200">{model.label}</td><td className="px-1 py-2 text-right text-blue-300">{model.averageWeight == null ? "—" : `${Math.round(model.averageWeight * 100)}%`}</td><td className="px-1 py-2 text-right text-orange-200">{model.tempMax == null ? "—" : `${Number(model.tempMax).toFixed(1)}°`}</td><td className="px-1 py-2 text-right text-sky-200">{model.tempMin == null ? "—" : `${Number(model.tempMin).toFixed(1)}°`}</td><td className="px-1 py-2 text-right text-slate-300">{model.windSpeed == null ? "—" : `${Number(model.windSpeed).toFixed(1)}`}</td></tr>)}</tbody></table></div> : <p className="mt-3 text-xs text-slate-500">Aucune prévision quotidienne persistée pour ce lieu.</p>}</section>
 
     <BackToTopButton />
   </main>;
