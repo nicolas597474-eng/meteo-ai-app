@@ -29,8 +29,8 @@ describe("summarizeDailyModelAgreement", () => {
     const noValues = summarizeDailyModelAgreement([{ modelName: "ECMWF", tempMax: null }], ["ECMWF", "GFS"], null);
     const oneValue = summarizeDailyModelAgreement([{ modelName: "ECMWF", tempMax: 0, precipitation: 0.5 }], ["ECMWF", "GFS"], null);
     expect(noValues.tempMax).toMatchObject({ min: null, max: null, range: null, standardDeviation: null, availableModelCount: 0 });
-    expect(oneValue.tempMax).toMatchObject({ min: 0, max: 0, range: null, standardDeviation: null, availableModelCount: 1 });
-    expect(oneValue.precipitationWetAmounts).toMatchObject({ min: 0.5, max: 0.5, range: null, standardDeviation: null, availableModelCount: 1 });
+    expect(oneValue.tempMax).toMatchObject({ min: null, max: null, mean: null, range: null, standardDeviation: null, availableModelCount: 1 });
+    expect(oneValue.precipitationWetAmounts).toMatchObject({ min: null, max: null, mean: null, range: null, standardDeviation: null, availableModelCount: 1 });
     expect(oneValue.precipitationOccurrence).toMatchObject({ rainModelCount: 1, availableModelCount: 1, expectedModelCount: 2 });
     expect(noValues.requestDayOffset).toBeNull();
   });
