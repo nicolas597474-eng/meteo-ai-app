@@ -59,6 +59,8 @@ export type StationData = {
   windDirection: number | null;
   precipitation: number | null;
   updatedAt: string | null; // ISO timestamp
+  /** Provider-reported measurement time per variable where available. */
+  measurementTimes?: Partial<Record<"temperature" | "humidity" | "pressure" | "windSpeed" | "windGust" | "precipitation", string | null>>;
   reliabilityScore: number; // 0-100
   updateFrequencyMin: number;
   dataAvailability: number; // 0-1
@@ -109,6 +111,9 @@ export type StationContribution = {
   stationId: string;
   name: string;
   source: string;
+  /** Source-reported measurement time; never the snapshot collection/archive time. */
+  observedAt: string | null;
+  measurementTimes: StationData["measurementTimes"] | null;
   distanceKm: number;
   weight: number; // 0-1 final weight
   distanceWeight: number; // part normalisée de la composante distance
@@ -118,6 +123,7 @@ export type StationContribution = {
   humidity: number | null;
   pressure: number | null;
   windSpeed: number | null;
+  windGust: number | null;
   precipitation: number | null;
 };
 
@@ -284,7 +290,7 @@ async function fetchOpenMeteoNearbyStations(
     windGust: pt.windGust,
     windDirection: pt.windDirection,
     precipitation: pt.precipitation,
-    updatedAt: pt.time ? `${pt.time}:00` : new Date().toISOString(),
+    updatedAt: pt.time ? `${pt.time}:00` : null,
     reliabilityScore: SOURCE_DEFAULTS.openmeteo.reliability,
     updateFrequencyMin: SOURCE_DEFAULTS.openmeteo.updateFreqMin,
     dataAvailability: SOURCE_DEFAULTS.openmeteo.availability,
@@ -355,7 +361,15 @@ async function fetchMeteoFranceStations(
         windGust: gustKmh,
         windDirection: r.dd != null ? parseFloat(r.dd) : null,
         precipitation: r.rr1 != null ? parseFloat(r.rr1) : null,
-        updatedAt: r.date ?? new Date().toISOString(),
+        updatedAt: r.date ?? null,
+        measurementTimes: {
+          temperature: r.date ?? null,
+          humidity: r.date ?? null,
+          pressure: r.date ?? null,
+          windSpeed: r.date ?? null,
+          windGust: r.date ?? null,
+          precipitation: r.date ?? null,
+        },
         reliabilityScore: SOURCE_DEFAULTS.meteofrance.reliability,
         updateFrequencyMin: SOURCE_DEFAULTS.meteofrance.updateFreqMin,
         dataAvailability: SOURCE_DEFAULTS.meteofrance.availability,
@@ -408,6 +422,14 @@ export function mapMetarObservation(observation: MetarObservation, lat: number, 
     windDirection: observation.wdir ?? null,
     precipitation: null,
     updatedAt: observation.reportTime ?? null,
+    measurementTimes: {
+      temperature: observation.reportTime ?? null,
+      humidity: observation.reportTime ?? null,
+      pressure: observation.reportTime ?? null,
+      windSpeed: observation.reportTime ?? null,
+      windGust: observation.reportTime ?? null,
+      precipitation: observation.reportTime ?? null,
+    },
     reliabilityScore: SOURCE_DEFAULTS.metar.reliability,
     updateFrequencyMin: SOURCE_DEFAULTS.metar.updateFreqMin,
     dataAvailability: SOURCE_DEFAULTS.metar.availability,
@@ -466,7 +488,7 @@ async function fetchSYNOPReference(
     windGust: pt.windGust,
     windDirection: pt.windDirection,
     precipitation: pt.precipitation,
-    updatedAt: pt.time ? `${pt.time}:00` : new Date().toISOString(),
+    updatedAt: pt.time ? `${pt.time}:00` : null,
     reliabilityScore: SOURCE_DEFAULTS.synop.reliability,
     updateFrequencyMin: SOURCE_DEFAULTS.synop.updateFreqMin,
     dataAvailability: SOURCE_DEFAULTS.synop.availability,
@@ -668,6 +690,8 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     stationId: s.stationId,
     name: s.name,
     source: s.source,
+    observedAt: s.updatedAt,
+    measurementTimes: s.measurementTimes ?? null,
     distanceKm: s.distanceKm,
     weight: Math.round(weight.finalWeight * 1000) / 1000,
     distanceWeight: Math.round(weight.distanceWeight * 1000) / 1000,
@@ -677,6 +701,7 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     humidity: s.humidity,
     pressure: s.pressure,
     windSpeed: s.windSpeed,
+    windGust: s.windGust,
     precipitation: s.precipitation,
   };
   });

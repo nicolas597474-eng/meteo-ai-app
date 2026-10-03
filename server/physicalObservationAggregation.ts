@@ -1,10 +1,14 @@
 export type PhysicalSnapshot = {
+  id?: number;
+  date?: string;
   hour: number;
   stationCount: number;
   temperature: number | null;
   windSpeed: number | null;
   windGust: number | null;
   precipitation: number | null;
+  /** Immutable per-station source measurements; absent on legacy snapshots. */
+  stationsUsed?: unknown;
 };
 
 export type QualifiedDailyObservation = {

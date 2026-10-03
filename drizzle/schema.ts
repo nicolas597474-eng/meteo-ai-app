@@ -96,6 +96,11 @@ export const dailyForecastObservationComparisons = mysqlTable("daily_forecast_ob
   evidenceType: mysqlEnum("evidenceType", ["physical_observation"]).notNull().default("physical_observation"),
   observationIsQualified: int("observationIsQualified").notNull().default(1),
   observationCoverageHours: int("observationCoverageHours").notNull(),
+  /** Null on legacy rows; populated only when exact station measurement times are archived. */
+  forecastAvailableAt: bigint("forecastAvailableAt", { mode: "number" }),
+  observationWindowStartAt: bigint("observationWindowStartAt", { mode: "number" }),
+  observationWindowEndAt: bigint("observationWindowEndAt", { mode: "number" }),
+  stationEvidence: json("stationEvidence"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("daily_fc_obs_comparison_key_uq").on(table.comparisonKey),

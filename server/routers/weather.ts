@@ -19,11 +19,13 @@ import {
   getHourlyForecastRunValues,
   insertForecasts,
   insertForecastRuns,
+  insertMeteoAIDailyFusionRun,
   insertObservation,
   insertReliabilityScores,
   upsertMeteoAIForecast,
   getLeadTimeScoresForLocation,
   getDailyFusionPerformanceEvidence,
+  getDailyForecastVerificationSources,
   makeLocationKey,
   getPhysicalStationHistory,
   getStationCollectionSnapshots,
@@ -48,6 +50,7 @@ import { getForecastRunDisplayStatus } from "../forecastRunSummary";
 import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { buildForecastRunArchiveRows } from "../dailyForecastPerformance";
+import { buildDailyForecastVerificationReadModel, buildMeteoAIDailyFusionArchiveRun } from "../dailyForecastVerification";
 import { MODEL_FORECAST_HORIZONS } from "../forecastVariableCoverage";
 import { compareTraceWeights } from "../weightComparison";
 import { findActiveHourlyForecastIndex } from "../../shared/hourlyForecastTime";
@@ -1001,6 +1004,14 @@ export const weatherRouter = router({
             ? "Prévision calibrée à partir de preuves physiques récentes par modèle, variable et horizon."
             : `${meteoAI.methodNote} Les valeurs officielles restent indisponibles jusqu’à qualification de preuves suffisantes.`,
         });
+        const fusionAvailableAt = Date.now();
+        const fusionArchive = buildMeteoAIDailyFusionArchiveRun({
+          locationKey,
+          targetDate,
+          availableAt: fusionAvailableAt,
+          forecast: { ...meteoAI, condition, weights: meteoAI.weights, trace: meteoAI.trace },
+        });
+        if (fusionArchive) await insertMeteoAIDailyFusionRun(fusionArchive);
 
         return { success: true, collected: forecastRows.length, date: targetDate };
       } else {
@@ -1706,4 +1717,21 @@ export const weatherRouter = router({
       period: input?.period ?? "30d",
       horizon: input?.horizon ?? "6-24h",
     })),
+
+  /** Direct answer for yesterday, computed only from immutable runs and qualified physical snapshots. */
+  getYesterdayForecastObservation: publicProcedure
+    .input(optionalCoordinatesSchema.optional())
+    .query(async ({ input }) => {
+      const locationKey = makeLocationKey(input?.lat ?? HONDEGHEM.lat, input?.lon ?? HONDEGHEM.lon);
+      const validDate = getParisDateDaysAgo(1);
+      const sources = await getDailyForecastVerificationSources(locationKey, validDate);
+      if (!sources.available) {
+        const empty = buildDailyForecastVerificationReadModel(locationKey, validDate, [], []);
+        const reason = sources.reason === "database_unavailable"
+          ? "Base de données indisponible : la comparaison n’est pas calculée."
+          : "Archives de prévision ou de stations indisponibles : aucune métrique n’est estimée.";
+        return { ...empty, reason, meteoai: { ...empty.meteoai, reason } };
+      }
+      return buildDailyForecastVerificationReadModel(locationKey, validDate, sources.runs, sources.snapshots);
+    }),
 });

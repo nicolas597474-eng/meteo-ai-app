@@ -224,12 +224,37 @@ export async function insertForecastRuns(
   if (data.length === 0) return 0;
   let confirmedRows = 0;
   for (const row of data) {
-    await db.insert(forecastRuns).values(row).onDuplicateKeyUpdate({
-      set: { capturedAt: new Date() },
-    });
-    confirmedRows += 1;
+    try {
+      await db.insert(forecastRuns).values(row);
+      confirmedRows += 1;
+    } catch (error: any) {
+      if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) continue;
+      throw error;
+    }
   }
   return confirmedRows;
+}
+
+/** Insert-only archive for one emitted MeteoAI fusion; duplicate emissions are never updated. */
+export async function insertMeteoAIDailyFusionRun(
+  row: InsertForecastRun,
+  options: { requireDatabase?: boolean } = {},
+): Promise<boolean> {
+  if (row.sourceKind !== "service_forecast" || row.serviceName !== "MeteoAI" || row.provider !== "meteoai" || row.modelId !== "meteoai-official-daily-v2") {
+    throw new Error("L’archive de fusion accepte uniquement une émission quotidienne MeteoAI identifiée.");
+  }
+  const db = await getDb();
+  if (!db) {
+    if (options.requireDatabase) requireDatabaseForWrite(db, "archiver la fusion quotidienne MeteoAI");
+    return false;
+  }
+  try {
+    await db.insert(forecastRuns).values(row);
+    return true;
+  } catch (error: any) {
+    if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) return false;
+    throw error;
+  }
 }
 
 export async function getForecastsByDate(date: string, locationKey = "default") {
@@ -1141,6 +1166,28 @@ export async function getForecastRunsForValidDate(locationKey: string, validDate
   )).orderBy(desc(forecastRuns.issuedAt));
 }
 
+/** Read only the immutable model/fusion runs and qualified physical snapshots for one exact valid date. */
+export async function getDailyForecastVerificationSources(locationKey: string, validDate: string) {
+  const db = await getDb();
+  if (!db) return { available: false as const, reason: "database_unavailable" as const, runs: [], snapshots: [] };
+  try {
+    const [runs, snapshots] = await Promise.all([
+      db.select().from(forecastRuns).where(and(
+        eq(forecastRuns.locationKey, locationKey),
+        eq(forecastRuns.validDate, validDate),
+      )).orderBy(desc(forecastRuns.issuedAt)),
+      db.select().from(qualifiedObservationSnapshots).where(and(
+        eq(qualifiedObservationSnapshots.locationKey, locationKey),
+        eq(qualifiedObservationSnapshots.date, validDate),
+      )).orderBy(qualifiedObservationSnapshots.hour),
+    ]);
+    return { available: true as const, reason: null, runs, snapshots };
+  } catch (error) {
+    console.warn("[MeteoAI] Sources de comparaison quotidiennes indisponibles.", error);
+    return { available: false as const, reason: "archive_unavailable" as const, runs: [], snapshots: [] };
+  }
+}
+
 let dailyComparisonTableWarningLogged = false;
 
 function isDailyComparisonTableUnavailable(error: unknown): boolean {
@@ -1149,7 +1196,12 @@ function isDailyComparisonTableUnavailable(error: unknown): boolean {
     const code = String(current.code ?? current.sqlState ?? "");
     const message = String(current.message ?? "").toLowerCase();
     if (code === "ER_NO_SUCH_TABLE" || code === "42S02" || current.errno === 1146) return true;
-    if ((code === "ER_BAD_FIELD_ERROR" || code === "42S22" || current.errno === 1054) && message.includes("daily_forecast_observation_comparisons")) return true;
+    if ((code === "ER_BAD_FIELD_ERROR" || code === "42S22" || current.errno === 1054)
+      && (message.includes("daily_forecast_observation_comparisons")
+        || message.includes("forecastAvailableAt".toLowerCase())
+        || message.includes("observationWindowStartAt".toLowerCase())
+        || message.includes("observationWindowEndAt".toLowerCase())
+        || message.includes("stationEvidence".toLowerCase()))) return true;
   }
   return false;
 }
@@ -1157,7 +1209,7 @@ function isDailyComparisonTableUnavailable(error: unknown): boolean {
 function warnDailyComparisonTableUnavailable(): void {
   if (dailyComparisonTableWarningLogged) return;
   dailyComparisonTableWarningLogged = true;
-  console.warn("[MeteoAI] La table daily_forecast_observation_comparisons n’est pas encore migrée; les comparaisons restent indisponibles et aucune pondération calibrée ne sera publiée.");
+  console.warn("[MeteoAI] L’archive daily_forecast_observation_comparisons ou ses colonnes de mesure ne sont pas migrées; aucune paire non horodatée n’entre dans la pondération.");
 }
 
 /** Persist exact production forecast/physical-observation pairs; no shadow table is read or written. */
@@ -1187,6 +1239,10 @@ export async function upsertDailyForecastObservationComparisons(
           evidenceType: row.evidenceType,
           observationIsQualified: row.observationIsQualified,
           observationCoverageHours: row.observationCoverageHours,
+          forecastAvailableAt: row.forecastAvailableAt ?? null,
+          observationWindowStartAt: row.observationWindowStartAt ?? null,
+          observationWindowEndAt: row.observationWindowEndAt ?? null,
+          stationEvidence: row.stationEvidence ?? null,
         },
       });
     }
@@ -1210,6 +1266,11 @@ export async function getDailyPhysicalComparisonHistory(
     eq(dailyForecastObservationComparisons.locationKey, filters.locationKey),
     eq(dailyForecastObservationComparisons.evidenceType, "physical_observation"),
     eq(dailyForecastObservationComparisons.observationIsQualified, 1),
+    isNotNull(dailyForecastObservationComparisons.forecastAvailableAt),
+    isNotNull(dailyForecastObservationComparisons.observationWindowStartAt),
+    isNotNull(dailyForecastObservationComparisons.observationWindowEndAt),
+    isNotNull(dailyForecastObservationComparisons.stationEvidence),
+    lt(dailyForecastObservationComparisons.forecastAvailableAt, dailyForecastObservationComparisons.observationWindowStartAt),
   ];
   if (filters.validDateFrom) conditions.push(gte(dailyForecastObservationComparisons.validDate, filters.validDateFrom));
   if (filters.validDateTo) conditions.push(lte(dailyForecastObservationComparisons.validDate, filters.validDateTo));
@@ -1262,6 +1323,10 @@ export async function getDailyFusionPerformanceEvidence(
       eq(dailyForecastObservationComparisons.horizonBucket, horizon.bucket),
       eq(dailyForecastObservationComparisons.evidenceType, "physical_observation"),
       eq(dailyForecastObservationComparisons.observationIsQualified, 1),
+      isNotNull(dailyForecastObservationComparisons.forecastAvailableAt),
+      isNotNull(dailyForecastObservationComparisons.observationWindowStartAt),
+      isNotNull(dailyForecastObservationComparisons.observationWindowEndAt),
+      lt(dailyForecastObservationComparisons.forecastAvailableAt, dailyForecastObservationComparisons.observationWindowStartAt),
     ));
     return { available: true, evidence: aggregateDailyForecastPerformance(rows), horizonBucket: horizon.bucket };
   } catch (error) {
