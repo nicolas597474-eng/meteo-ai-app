@@ -208,14 +208,14 @@ export function aggregateDailyForecastPerformance(rows: StoredComparison[]): Mod
 
   const evidence: ModelPerformanceEvidence[] = [];
   for (const group of Array.from(groups.values())) {
-    const days = new Map<string, Array<{ absoluteError: number; squaredError: number }>>();
+    const days = new Map<string, Array<{ absoluteError: number; squaredError: number; signedError: number }>>();
     for (const row of group) {
       const forecast = finiteOrNull(row.forecastValue);
       const observed = finiteOrNull(row.observedValue);
       if (forecast == null || observed == null || !/^\d{4}-\d{2}-\d{2}$/.test(row.validDate)) continue;
       const error = forecast - observed;
       const values = days.get(row.validDate) ?? [];
-      values.push({ absoluteError: Math.abs(error), squaredError: error * error });
+      values.push({ absoluteError: Math.abs(error), squaredError: error * error, signedError: error });
       days.set(row.validDate, values);
     }
     if (days.size === 0) continue;
@@ -224,9 +224,11 @@ export function aggregateDailyForecastPerformance(rows: StoredComparison[]): Mod
       date,
       mae: values.reduce((sum, item) => sum + item.absoluteError, 0) / values.length,
       mse: values.reduce((sum, item) => sum + item.squaredError, 0) / values.length,
+      signedBias: values.reduce((sum, item) => sum + item.signedError, 0) / values.length,
     }));
     const mae = dailyScores.reduce((sum, item) => sum + item.mae, 0) / dailyScores.length;
     const rmse = Math.sqrt(dailyScores.reduce((sum, item) => sum + item.mse, 0) / dailyScores.length);
+    const signedBias = dailyScores.reduce((sum, item) => sum + item.signedBias, 0) / dailyScores.length;
     const variance = dailyScores.length > 1
       ? dailyScores.reduce((sum, item) => sum + (item.mae - mae) ** 2, 0) / (dailyScores.length - 1)
       : 0;
@@ -245,6 +247,7 @@ export function aggregateDailyForecastPerformance(rows: StoredComparison[]): Mod
       mae,
       rmse,
       standardError: sampleSize > 1 ? Math.sqrt(variance / sampleSize) : 0,
+      signedBias,
       latestScoreDate,
     });
   }

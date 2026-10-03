@@ -4,12 +4,14 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { conditionFromWeatherValues, conditionFromWmoWeatherCode } from "./weatherConditionLabels";
+import { conditionFromWmoWeatherCode } from "./weatherConditionLabels";
 import { fetchWeather, getWeatherResponseAttemptCount } from "./weatherFetch";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import type { HourlyHistoricalEvidence, HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
 import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
-import { summarizePrecipitationModels, type PrecipitationModelConsensus } from "../shared/precipitationConsensus";
+import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
+import type { BestMatchDailyReference, DailyForecastMetric, DailyOfficialFusionDisplay } from "../shared/dailyForecast";
+import type { computeOfficialDailyForecast, ForecastTraceSource } from "./officialForecast";
 import {
   buildDailyModelCollectionCoverage,
   buildHourlyModelCollectionCoverage,
@@ -72,6 +74,17 @@ export type ForecastData = {
   cloudCover: number | null;
   condition: string | null;
   rawData?: unknown;
+};
+
+export type DailyFusionResolver = (
+  targetDate: string,
+  forecasts: ForecastData[],
+  issuedAt: number,
+) => Promise<ReturnType<typeof computeOfficialDailyForecast>>;
+
+export type Collect15DayForecastOptions = {
+  issuedAt: number;
+  resolveOfficialFusion: DailyFusionResolver;
 };
 
 export function hasUsableForecastValue(forecast: Pick<ForecastData, "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "windGust" | "humidity" | "cloudCover">): boolean {
@@ -312,7 +325,7 @@ export type DayForecast = {
   tempMax: number | null;
   tempMin: number | null;
   precipitation: number | null;
-  precipitationConsensus?: PrecipitationModelConsensus;
+  precipitationConsensus?: PrecipitationModelConsensus | null;
   windSpeed: number | null;
   windGust: number | null;
   windDirection?: number | null;
@@ -320,6 +333,8 @@ export type DayForecast = {
   cloudCover: number | null;
   condition: string | null;
   modelAgreement: DailyModelAgreement;
+  officialFusion: DailyOfficialFusionDisplay;
+  bestMatchReference: BestMatchDailyReference | null;
   uvIndex?: number | null;
   feelsLikeMax?: number | null;
   feelsLikeMin?: number | null;
@@ -421,141 +436,208 @@ export function circularDifferenceDegrees(left: number | null, right: number | n
   return Math.min(rawDifference, 360 - rawDifference);
 }
 
-function deriveCondition(precip: number | null, cloud: number | null): string {
-  return conditionFromWeatherValues(precip, cloud);
-}
-
-/**
- * Fetch 15-day forecast from multiple Open-Meteo models and return averaged daily data.
- */
+/** Fetch actual daily coverage from the official models and fuse only qualified evidence. */
 export async function collect15DayForecast(
-  coords?: { lat: number; lon: number }
+  coords: { lat: number; lon: number } | undefined,
+  options: Collect15DayForecastOptions,
 ): Promise<{ days: DayForecast[]; modelsUsed: string[] }> {
   const location = coords ?? HONDEGHEM;
   const models = [
-    { name: "ECMWF", modelId: "ecmwf_ifs025" },
-    { name: "GFS", modelId: "gfs_seamless" },
-    { name: "ICON", modelId: "dwd_icon_eu" },
+    ...OFFICIAL_HOURLY_MODELS.map((model) => ({ name: model.name, modelId: model.modelId })),
     { name: "Open-Meteo", modelId: null },
   ];
-  const precipitationModelNames = models.filter((model) => model.modelId != null).map((model) => model.name);
-
-  const allModelData: Record<string, { tempMax: number[]; tempMin: number[]; precip: number[]; wind: number[]; windGust: number[]; windDir: number[]; humidity: number[]; cloud: number[]; uv: number[]; feelsMax: number[]; feelsMin: number[] }> = {};
-  const precipitationInputsByDate = new Map<string, Array<{ modelName: string; amountMm: number }>>();
-  const modelAgreementInputsByDate = new Map<string, DailyAgreementInput[]>();
-  const sunData: Record<string, { sunrise: string | null; sunset: string | null }> = {};
-  const modelsUsed: string[] = [];
-  let dates: string[] = [];
+  const officialModelNames = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+  const dates = new Set<string>();
+  const forecastsByDate = new Map<string, ForecastData[]>();
+  const agreementInputsByDate = new Map<string, DailyAgreementInput[]>();
+  const bestMatchByDate = new Map<string, BestMatchDailyReference>();
+  const sunDataByDate = new Map<string, { sunrise: string | null; sunset: string | null }>();
+  const usedModels = new Set<string>();
+  const requestDate = getParisDateAndHour(options.issuedAt)?.date ?? null;
+  const dailyFields = Array.from(new Set([
+    ...DAILY_FORECAST_REQUEST_KEYS,
+    "wind_direction_10m_dominant",
+    "uv_index_max",
+    "apparent_temperature_max",
+    "apparent_temperature_min",
+    "sunrise",
+    "sunset",
+  ])).join(",");
 
   const modelResults = await Promise.all(models.map(async (model) => {
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max,apparent_temperature_max,apparent_temperature_min,sunrise,sunset");
+      url.searchParams.set("daily", dailyFields);
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", "16");
       if (model.modelId) url.searchParams.set("models", model.modelId);
 
       const response = await fetchWeather(url.toString(), {}, { timeoutMs: 6_000, attempts: 1 });
       if (!response.ok) return null;
-
       const data = await response.json();
       const daily = data.daily;
-      if (!daily?.time) return null;
+      if (!Array.isArray(daily?.time)) return null;
       return { name: model.name, modelId: model.modelId, daily };
-    } catch (err) {
-      console.error(`[15Day] Error fetching ${model.name}:`, err);
+    } catch (error) {
+      console.error(`[15Day] Error fetching ${model.name}:`, error);
       return null;
     }
   }));
 
+  const at = (values: unknown, index: number): number | null =>
+    Array.isArray(values) ? finiteCoverageValue(values[index]) : null;
+  const dateIsValid = (value: unknown): value is string => {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T12:00:00.000Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  };
+
   for (const result of modelResults) {
     if (!result) continue;
     const { name, modelId, daily } = result;
-    if (dates.length === 0) dates = daily.time.slice(0, 16);
-    modelsUsed.push(name);
+    const bestMatch = modelId == null;
+    const requestedDates = daily.time.slice(0, 16);
+    for (let index = 0; index < requestedDates.length; index++) {
+      const date = requestedDates[index];
+      if (!dateIsValid(date)) continue;
+      dates.add(date);
+      const values = {
+        tempMax: at(daily.temperature_2m_max, index),
+        tempMin: at(daily.temperature_2m_min, index),
+        precipitation: at(daily.precipitation_sum, index),
+        windSpeed: at(daily.wind_speed_10m_max, index),
+        windGust: at(daily.wind_gusts_10m_max, index),
+      };
+      const hasMetric = Object.values(values).some((value) => value != null);
+      if (hasMetric) usedModels.add(name);
 
-    for (let i = 0; i < Math.min(16, daily.time.length); i++) {
-      const d = daily.time[i];
-      if (!allModelData[d]) {
-        allModelData[d] = { tempMax: [], tempMin: [], precip: [], wind: [], windGust: [], windDir: [], humidity: [], cloud: [], uv: [], feelsMax: [], feelsMin: [] };
+      if (bestMatch) {
+        if (hasMetric) {
+          bestMatchByDate.set(date, {
+            source: "Open-Meteo Best Match",
+            role: "derived_reference",
+            officialContributor: false,
+            ...values,
+          });
+        }
+      } else {
+        const forecast: ForecastData = {
+          serviceName: name,
+          serviceCategory: "expert",
+          tempMax: values.tempMax,
+          tempMin: values.tempMin,
+          precipitation: values.precipitation,
+          windSpeed: values.windSpeed,
+          windGust: values.windGust,
+          humidity: null,
+          cloudCover: null,
+          condition: null,
+        };
+        const forecasts = forecastsByDate.get(date) ?? [];
+        forecasts.push(forecast);
+        forecastsByDate.set(date, forecasts);
+        const agreementInputs = agreementInputsByDate.get(date) ?? [];
+        agreementInputs.push({
+          modelName: name,
+          tempMax: values.tempMax,
+          tempMin: values.tempMin,
+          precipitation: values.precipitation,
+          windSpeed: values.windSpeed,
+          windGust: values.windGust,
+          humidity: null,
+          cloudCover: null,
+        });
+        agreementInputsByDate.set(date, agreementInputs);
       }
-      const agreementInputs = modelAgreementInputsByDate.get(d) ?? [];
-      agreementInputs.push({
-        modelName: name,
-        tempMax: daily.temperature_2m_max?.[i],
-        tempMin: daily.temperature_2m_min?.[i],
-        precipitation: daily.precipitation_sum?.[i],
-        windSpeed: daily.wind_speed_10m_max?.[i],
-        windGust: daily.wind_gusts_10m_max?.[i],
-        humidity: null,
-        cloudCover: null,
-      });
-      modelAgreementInputsByDate.set(d, agreementInputs);
-      if (daily.temperature_2m_max?.[i] != null) allModelData[d].tempMax.push(daily.temperature_2m_max[i]);
-      if (daily.temperature_2m_min?.[i] != null) allModelData[d].tempMin.push(daily.temperature_2m_min[i]);
-      const precipitation = daily.precipitation_sum?.[i];
-      if (typeof precipitation === "number" && Number.isFinite(precipitation) && modelId != null) {
-        allModelData[d].precip.push(precipitation);
-        const inputs = precipitationInputsByDate.get(d) ?? [];
-        inputs.push({ modelName: name, amountMm: precipitation });
-        precipitationInputsByDate.set(d, inputs);
-      }
-      if (daily.wind_speed_10m_max?.[i] != null) allModelData[d].wind.push(daily.wind_speed_10m_max[i]);
-      if (daily.wind_gusts_10m_max?.[i] != null) allModelData[d].windGust.push(daily.wind_gusts_10m_max[i]);
-      if (daily.wind_direction_10m_dominant?.[i] != null) allModelData[d].windDir.push(daily.wind_direction_10m_dominant[i]);
-      if (daily.uv_index_max?.[i] != null) allModelData[d].uv.push(daily.uv_index_max[i]);
-      if (daily.apparent_temperature_max?.[i] != null) allModelData[d].feelsMax.push(daily.apparent_temperature_max[i]);
-      if (daily.apparent_temperature_min?.[i] != null) allModelData[d].feelsMin.push(daily.apparent_temperature_min[i]);
-      if (!sunData[d] && daily.sunrise?.[i] && daily.sunset?.[i]) {
-        const sr = daily.sunrise[i] as string;
-        const ss = daily.sunset[i] as string;
-        sunData[d] = { sunrise: sr.slice(11, 16), sunset: ss.slice(11, 16) };
+
+      if (!sunDataByDate.has(date) && Array.isArray(daily.sunrise) && Array.isArray(daily.sunset)
+        && typeof daily.sunrise[index] === "string" && typeof daily.sunset[index] === "string") {
+        sunDataByDate.set(date, {
+          sunrise: daily.sunrise[index].slice(11, 16),
+          sunset: daily.sunset[index].slice(11, 16),
+        });
       }
     }
   }
 
-  const avg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null;
+  const toDiagnostics = (
+    sources: readonly ForecastTraceSource[],
+    variable: DailyForecastMetric,
+    horizonBucket: DailyOfficialFusionDisplay["horizonBucket"],
+  ) => sources.flatMap((source) => {
+    const sourceHorizon = source.horizonBucket ?? horizonBucket;
+    if (!sourceHorizon) return [];
+    return [{
+      modelName: source.name,
+      variable: source.variable ?? variable,
+      horizonBucket: sourceHorizon,
+      finalWeight: source.finalWeight,
+      signedBias: source.signedBias ?? null,
+      sampleSize: source.sampleSize ?? null,
+      comparisonCount: source.comparisonCount ?? null,
+      evaluatedDays: source.evaluatedDays ?? null,
+      latestScoreDate: source.latestScoreDate ?? null,
+    }];
+  });
 
-  const days: DayForecast[] = dates.map((date, i) => {
-    const d = allModelData[date];
-    if (!d) return null;
-    const precipitationConsensus = summarizePrecipitationModels(
-      precipitationInputsByDate.get(date) ?? [],
-      precipitationModelNames,
-    );
-    const consensusAmount = precipitationConsensus.consensusEstimateMm;
-    const avgPrecip = consensusAmount == null ? null : Math.round(consensusAmount * 10) / 10;
-    const avgCloud = avg(d.cloud);
+  const requestDay = requestDate ? Date.parse(`${requestDate}T12:00:00.000Z`) : NaN;
+  const days: DayForecast[] = await Promise.all(Array.from(dates).sort().slice(0, 16).map(async (date) => {
+    const officialForecasts = forecastsByDate.get(date) ?? [];
+    const fusion = await options.resolveOfficialFusion(date, officialForecasts, options.issuedAt);
+    const horizonBucket = fusion.trace.horizonBucket;
     const modelAgreement = summarizeDailyModelAgreement(
-      modelAgreementInputsByDate.get(date) ?? [],
-      precipitationModelNames,
-      i,
+      agreementInputsByDate.get(date) ?? [],
+      officialModelNames,
+      Number.isFinite(requestDay)
+        ? Math.round((Date.parse(`${date}T12:00:00.000Z`) - requestDay) / 86_400_000)
+        : null,
     );
-
+    const officialFusion: DailyOfficialFusionDisplay = {
+      issuedAt: fusion.trace.issuedAt,
+      horizonBucket,
+      calibrationStatus: {
+        tempMax: fusion.calibrationStatus.tempMax,
+        tempMin: fusion.calibrationStatus.tempMin,
+        precipitation: fusion.calibrationStatus.precipitation,
+        windSpeed: fusion.calibrationStatus.windSpeed,
+        windGust: fusion.calibrationStatus.windGust,
+      },
+      sourcesByVariable: {
+        tempMax: toDiagnostics(fusion.trace.parameterSources.temperature, "temperature_max", horizonBucket),
+        tempMin: toDiagnostics(fusion.trace.parameterSources.temperatureMin, "temperature_min", horizonBucket),
+        precipitation: toDiagnostics(fusion.trace.parameterSources.precipitation, "precipitation_sum", horizonBucket),
+        windSpeed: toDiagnostics(fusion.trace.parameterSources.wind, "wind_speed_max", horizonBucket),
+        windGust: toDiagnostics(fusion.trace.parameterSources.windGust, "wind_gust_max", horizonBucket),
+      },
+    };
+    const precipitationIsQualified = fusion.calibrationStatus.precipitation === "calibrated";
     return {
       date,
-      tempMax: avg(d.tempMax),
-      tempMin: avg(d.tempMin),
-      precipitation: avgPrecip,
-      precipitationConsensus,
-      windSpeed: avg(d.wind),
-      windGust: avg(d.windGust),
-      windDirection: circularMeanDegrees(d.windDir),
-      humidity: avg(d.humidity),
-      cloudCover: avgCloud,
-      condition: deriveCondition(avgPrecip, avgCloud),
+      tempMax: fusion.tempMax,
+      tempMin: fusion.tempMin,
+      precipitation: fusion.precipitation,
+      precipitationConsensus: precipitationIsQualified ? fusion.trace.precipitationConsensus : null,
+      windSpeed: fusion.windSpeed,
+      windGust: fusion.windGust,
+      // Daily issue-run provenance is absent for these variables, so they remain unavailable.
+      windDirection: null,
+      humidity: null,
+      cloudCover: null,
+      condition: null,
       modelAgreement,
-      uvIndex: avg(d.uv),
-      feelsLikeMax: avg(d.feelsMax),
-      feelsLikeMin: avg(d.feelsMin),
-      sunrise: sunData[date]?.sunrise ?? null,
-      sunset: sunData[date]?.sunset ?? null,
+      officialFusion,
+      bestMatchReference: bestMatchByDate.get(date) ?? null,
+      uvIndex: null,
+      feelsLikeMax: null,
+      feelsLikeMin: null,
+      sunrise: sunDataByDate.get(date)?.sunrise ?? null,
+      sunset: sunDataByDate.get(date)?.sunset ?? null,
     };
-  }).filter(Boolean) as DayForecast[];
+  }));
 
-  return { days, modelsUsed };
+  return { days, modelsUsed: models.filter((model) => usedModels.has(model.name)).map((model) => model.name) };
 }
 
 /**

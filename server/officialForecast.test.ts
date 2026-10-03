@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES } from "./weatherServices";
 import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
@@ -9,6 +9,13 @@ const locationKey = "50.7567_2.5204";
 const horizonBucket: DailyFusionHorizon = "6-24h";
 const serviceNames = ["AROME", "ARPEGE", "ICON", "ECMWF"];
 const serviceModelId = (serviceName: string) => WEATHER_SERVICES.expert.find((service) => service.name === serviceName)!.modelId;
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(issuedAt);
+});
+
+afterEach(() => vi.useRealTimers());
 
 const forecasts = serviceNames.map((serviceName, index) => ({
   serviceName,
@@ -137,6 +144,23 @@ describe("computeOfficialDailyForecast", () => {
     }
     expect(first.trace.parameterSources.temperature.every((source) => source.variable === "temperature_max")).toBe(true);
     expect(Object.values(first.weights).every((weight) => weight.tempWeight <= 0.35 && weight.precipWeight <= 0.35 && weight.windWeight <= 0.35)).toBe(true);
+    expect(first.trace.parameterSources.temperatureMin.every((source) => source.variable === "temperature_min")).toBe(true);
+    expect(first.trace.parameterSources.windGust.every((source) => source.variable === "wind_gust_max")).toBe(true);
+  });
+
+  it("expose le biais signé comme diagnostic sans corriger les valeurs ou les poids", () => {
+    const withoutBias = computeOfficialDailyForecast(forecasts, options(qualifiedEvidence()));
+    const withBias = computeOfficialDailyForecast(
+      forecasts,
+      options(qualifiedEvidence().map((item) => ({ ...item, signedBias: 999 }))),
+    );
+
+    for (const metric of ["tempMax", "tempMin", "precipitation", "windSpeed", "windGust"] as const) {
+      expect(withBias[metric]).toBe(withoutBias[metric]);
+    }
+    expect(withBias.weights).toEqual(withoutBias.weights);
+    expect(withBias.trace.parameterSources.temperature.every((source) => source.signedBias === 999)).toBe(true);
+    expect(withBias.trace.parameterSources.temperature.every((source) => source.latestScoreDate === "2026-10-01")).toBe(true);
   });
 
   it("garde valeurs, poids, trace et compte officiel invariants face à Best Match pour Tmin/Tmax, pluie, vent et rafales", () => {

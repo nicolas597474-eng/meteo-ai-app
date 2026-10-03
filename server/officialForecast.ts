@@ -31,6 +31,9 @@ export type ForecastTraceSource = {
   mae?: number;
   rmse?: number;
   standardError?: number;
+  /** Signed forecast-minus-observation error; diagnostic only, never applied. */
+  signedBias?: number;
+  latestScoreDate?: string;
   uncertaintyAdjustedMae?: number;
   regularizedMae?: number;
   sampleReliability?: number;
@@ -55,8 +58,10 @@ export type ForecastTrace = {
   };
   parameterSources: {
     temperature: ForecastTraceSource[];
+    temperatureMin: ForecastTraceSource[];
     precipitation: ForecastTraceSource[];
     wind: ForecastTraceSource[];
+    windGust: ForecastTraceSource[];
     humidity: ForecastTraceSource[];
   };
   precipitationConsensus: PrecipitationModelConsensus;
@@ -83,6 +88,8 @@ function toTraceSources(result: FusionResult): ForecastTraceSource[] {
         mae: evidence.mae,
         rmse: evidence.rmse,
         standardError: evidence.standardError,
+        ...(typeof evidence.signedBias === "number" && Number.isFinite(evidence.signedBias) ? { signedBias: evidence.signedBias } : {}),
+        latestScoreDate: evidence.latestScoreDate,
         variable: evidence.variable,
         horizonBucket: evidence.horizonBucket,
         uncertaintyAdjustedMae: source.uncertaintyAdjustedMae,
@@ -229,7 +236,7 @@ export function computeOfficialDailyForecast(
   const method = calibrationStatus.tempMax === "calibrated"
     ? `${maxFusion.methodUsed}+métriques exactes`
     : !options.evidenceStoreAvailable
-      ? "Fusion officielle indisponible — schéma de comparaisons non migré"
+      ? "Fusion officielle indisponible — archive de comparaisons indisponible"
       : "Fusion officielle indisponible — preuves par lieu/variable/horizon insuffisantes";
   const trace: ForecastTrace = {
     version: 2,
@@ -240,8 +247,10 @@ export function computeOfficialDailyForecast(
     calibrationStatus,
     parameterSources: {
       temperature: toTraceSources(maxFusion),
+      temperatureMin: toTraceSources(minFusion),
       precipitation: toTraceSources(precipFusion),
       wind: toTraceSources(windFusion),
+      windGust: toTraceSources(gustFusion),
       humidity: [],
     },
     precipitationConsensus,

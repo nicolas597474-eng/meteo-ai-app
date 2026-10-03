@@ -20,6 +20,7 @@ import {
   type ForecastTimelineSelection,
   type IndexedForecastHour,
 } from "@/lib/forecastTimeline";
+import type { DailyForecastEvidenceStatus, DailyOfficialFusionDisplay, DailyForecastSourceDiagnostic } from "@shared/dailyForecast";
 
 type PrecipitationMetrics = {
   thresholdMm?: number | null;
@@ -274,6 +275,61 @@ function buildHourlyDetailCategories(
   ].filter(({ rows }) => rows.length > 0);
 }
 
+function evidenceStatusLabel(status: DailyForecastEvidenceStatus): string {
+  if (status === "calibrated") return "preuve historique qualifiée";
+  if (status === "schema_unavailable") return "indisponible · archive de comparaisons indisponible";
+  return "indisponible · preuves qualifiées insuffisantes";
+}
+
+function biasDescription(source: DailyForecastSourceDiagnostic, unit: string): string {
+  if (source.signedBias == null) return `${source.modelName} · biais signé indisponible`;
+  const bias = source.signedBias.toLocaleString("fr-FR", { signDisplay: "always", maximumFractionDigits: 1 });
+  const sample = source.sampleSize == null ? "n inconnu" : `n=${source.sampleSize} jours`;
+  const comparisons = source.comparisonCount == null ? "comparaisons inconnues" : `${source.comparisonCount} comparaisons`;
+  const freshness = source.latestScoreDate ? `dernier score ${source.latestScoreDate}` : "fraîcheur inconnue";
+  return `${source.modelName} · biais signé ${bias}${unit} (${sample}, ${comparisons}, ${freshness})`;
+}
+
+function DailyFusionDiagnostics({ day, sourceLabels }: { day: DailyForecastPoint; sourceLabels: string[] }) {
+  const fusion = day.officialFusion;
+  if (!fusion) return <p className="pb-2 leading-relaxed">Provenance de fusion quotidienne indisponible.</p>;
+  const variables: Array<{ label: string; key: keyof DailyOfficialFusionDisplay["sourcesByVariable"]; status: DailyForecastEvidenceStatus; unit: string }> = [
+    { label: "Température maximale", key: "tempMax", status: fusion.calibrationStatus.tempMax, unit: "°C" },
+    { label: "Température minimale", key: "tempMin", status: fusion.calibrationStatus.tempMin, unit: "°C" },
+    { label: "Précipitations", key: "precipitation", status: fusion.calibrationStatus.precipitation, unit: " mm" },
+    { label: "Vent maximal", key: "windSpeed", status: fusion.calibrationStatus.windSpeed, unit: " km/h" },
+    { label: "Rafales maximales", key: "windGust", status: fusion.calibrationStatus.windGust, unit: " km/h" },
+  ];
+  const agreement = day.modelAgreement;
+  const availability = agreement ? [
+    `Tmax ${agreement.tempMax.availableModelCount}/${agreement.expectedModelCount}`,
+    `Tmin ${agreement.tempMin.availableModelCount}/${agreement.expectedModelCount}`,
+    `pluie ${agreement.precipitation.availableModelCount}/${agreement.expectedModelCount}`,
+    `vent ${agreement.windSpeed.availableModelCount}/${agreement.expectedModelCount}`,
+    `rafales ${agreement.windGust.availableModelCount}/${agreement.expectedModelCount}`,
+  ].join(" · ") : "effectifs indisponibles";
+  const reference = day.bestMatchReference;
+  return (
+    <div className="space-y-2 pb-3 leading-relaxed">
+      <p>Les poids utilisent uniquement des preuves historiques qualifiées pour le lieu, le modèle, la variable et la tranche d’horizon indiqués. Aucun biais n’est appliqué aux valeurs futures.</p>
+      <p>Émission de collecte : {fusion.issuedAt} · horizon : {fusion.horizonBucket ?? "indisponible"}.</p>
+      <div className="space-y-1">
+        {variables.map(({ label, key, status, unit }) => {
+          const sources = fusion.sourcesByVariable[key];
+          return <p key={key}><strong className="text-slate-100">{label} :</strong> {evidenceStatusLabel(status)}{sources.length > 0 ? ` · ${sources.map((source) => `${source.modelName} (${(source.finalWeight * 100).toFixed(1)} %)`).join(", ")}` : ""}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>;
+        })}
+      </div>
+      <p>Biais historique signé (prévision − observation), diagnostic uniquement; une valeur positive indique une surestimation. Sans preuve qualifiée, le biais reste indisponible.</p>
+      <p>Dispersion descriptive indisponible : l’heure exacte des runs modèles n’est pas fournie. Effectifs de valeurs reçues, sans assertion de comparabilité : {availability}. Aucun min/max, étendue ni écart-type n’est publié comme incertitude.</p>
+      <div className="rounded-lg border border-sky-100/10 bg-black/15 p-2">
+        <p className="font-semibold text-sky-100">Best Match · référence dérivée, non contributeur officiel</p>
+        {reference ? <p>{formatOptionalForecastValue(reference.tempMax, 1, "°")} / {formatOptionalForecastValue(reference.tempMin, 1, "°")} · pluie {formatOptionalForecastValue(reference.precipitation, 1, " mm")} · vent {formatOptionalForecastValue(reference.windSpeed, 0, " km/h")} · rafales {formatOptionalForecastValue(reference.windGust, 0, " km/h")}</p> : <p>Référence non disponible pour cette date.</p>}
+      </div>
+      <p>Sources quotidiennes réellement reçues : {sourceLabels.length ? sourceLabels.join(" · ") : "aucune"}.</p>
+    </div>
+  );
+}
+
 function buildDailyDetailCategories(day: DailyForecastPoint): DetailCategory[] {
   const makeCategory = (key: string, title: string, icon: string, unit: string, value: string, chartValue: number | null, note?: string): DetailCategory => ({
     key, title, icon, summary: value || "—", unit, cadence: "daily",
@@ -284,8 +340,8 @@ function buildDailyDetailCategories(day: DailyForecastPoint): DetailCategory[] {
     const consensus = day.precipitationConsensus;
     const hasCounts = isFiniteValue(consensus?.rainModelCount) && isFiniteValue(consensus?.availableModelCount);
     const note = hasCounts
-      ? `${consensus.rainModelCount}/${consensus.availableModelCount} modèles au seuil${isFiniteValue(consensus.thresholdMm) ? ` ≥ ${formatOptionalForecastValue(consensus.thresholdMm, 1, " mm")}` : ""} · fréquence brute non calibrée, pas une probabilité`
-      : "Cumul quotidien de la série de référence non calibrée.";
+      ? `${consensus.rainModelCount}/${consensus.availableModelCount} modèles au seuil${isFiniteValue(consensus.thresholdMm) ? ` ≥ ${formatOptionalForecastValue(consensus.thresholdMm, 1, " mm")}` : ""} · fréquence brute descriptive, pas une probabilité`
+      : "Cumul quotidien issu de la fusion officielle pondérée par preuves qualifiées.";
     categories.push(makeCategory("precipitation", "Précipitations", "precipitation", "mm", formatOptionalForecastValue(day.precipitation, 1, " mm"), day.precipitation, note));
   }
   const windParts = [
@@ -299,7 +355,7 @@ function buildDailyDetailCategories(day: DailyForecastPoint): DetailCategory[] {
     isFiniteValue(day.cloudCover) ? `Nuages ${formatOptionalForecastValue(day.cloudCover, 0, "%")}` : null,
   ].filter((value): value is string => value != null);
   if (humidityParts.length) categories.push(makeCategory("humidity", "Humidité et nuages", "humidity", "%", humidityParts.join(" · "), isFiniteValue(day.humidity) ? day.humidity : isFiniteValue(day.cloudCover) ? day.cloudCover : null));
-  if (isFiniteValue(day.uvIndex)) categories.push(makeCategory("uv", "Indice UV quotidien", "sunny", "indice", formatOptionalForecastValue(day.uvIndex, 1), day.uvIndex, "Valeur issue de la série quotidienne de référence."));
+  if (isFiniteValue(day.uvIndex)) categories.push(makeCategory("uv", "Indice UV quotidien", "sunny", "indice", formatOptionalForecastValue(day.uvIndex, 1), day.uvIndex, "Valeur quotidienne disponible."));
   const feelsLikeParts = [
     isFiniteValue(day.feelsLikeMax) ? `Max. ${formatOptionalForecastValue(day.feelsLikeMax, 1, "°")}` : null,
     isFiniteValue(day.feelsLikeMin) ? `Min. ${formatOptionalForecastValue(day.feelsLikeMin, 1, "°")}` : null,
@@ -350,7 +406,7 @@ function DayDetailsAccordion({ category }: { category: DetailCategory }) {
         <span aria-hidden="true" className="ml-1 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
       </summary>
       <div className="pb-4 pl-14 pr-1">
-        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne fournie par la série de référence non calibrée."}</p>
+        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne issue de la fusion officielle lorsque sa preuve est qualifiée; champs non pondérés indisponibles."}</p>
         {category.cadence === "hourly" ? <HourlyMiniChart category={category} /> : (
           <dl className="space-y-1 text-sm text-slate-100">
             {category.rows.map((row) => <div key={row.key} className="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt className="text-slate-400">{row.time}</dt><dd className="text-right font-medium tabular-nums">{row.value}</dd></div>)}
@@ -416,7 +472,7 @@ export function ForecastByDaySection({
     : null;
   const selectedEntry = selectedGroup?.hours.find(({ index }) => index === selectedHourIndex);
   const selectedDaily = selectedDay?.daily ?? null;
-  const detailCategories = selectedDay?.kind === "legacy-daily-reference"
+  const detailCategories = selectedDay?.kind === "official-daily-fusion"
     ? selectedDaily ? buildDailyDetailCategories(selectedDaily) : []
     : selectedGroup ? buildHourlyDetailCategories(selectedGroup, hours) : [];
   const today = parisDateKey();
@@ -458,7 +514,7 @@ export function ForecastByDaySection({
       {selectedDay ? (
         <>
           <section
-            aria-label={`Prévision ${selectedDay.kind === "official-hourly" ? "horaire officielle" : "quotidienne de référence"} du ${dateText(selectedDay.date)}`}
+            aria-label={`Prévision ${selectedDay.kind === "official-hourly" ? "horaire officielle" : "fusion quotidienne officielle"} du ${dateText(selectedDay.date)}`}
             className="relative min-w-0 overflow-hidden rounded-2xl border border-sky-300/30 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 text-slate-50 shadow-[0_10px_32px_rgba(2,8,23,0.38)]"
             style={sceneStyle}
           >
@@ -466,7 +522,7 @@ export function ForecastByDaySection({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-100/80">
-                    {selectedDay.kind === "official-hourly" ? "Prévision horaire officielle" : "Prévision quotidienne · référence"}
+                    {selectedDay.kind === "official-hourly" ? "Prévision horaire officielle" : "Prévision quotidienne officielle"}
                   </p>
                   <h2 id="forecast-by-day-title" className="mt-1 truncate text-lg font-semibold tracking-tight text-white">{dateLabel(selectedDay.date, today, tomorrow) || dateText(selectedDay.date)}</h2>
                 </div>
@@ -482,7 +538,7 @@ export function ForecastByDaySection({
                   </div>
                 ) : (
                   <div className="min-w-0 flex-1">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">Max / Min · référence quotidienne</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">Max / Min · fusion pondérée</p>
                     <p className="mt-0.5 whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-4xl">
                       {formatOptionalForecastValue(selectedDaily?.tempMax, 1, "°")}<span className="px-1 text-[0.72em] text-sky-100/80">/</span>{formatOptionalForecastValue(selectedDaily?.tempMin, 1, "°")}
                     </p>
@@ -502,11 +558,10 @@ export function ForecastByDaySection({
                 </div>
               </div>
 
-              {selectedDay.kind === "legacy-daily-reference" && (
-                <div className="mt-3 border-t border-sky-100/15 pt-2.5" aria-label="Provenance de la référence quotidienne">
-                  <span className="inline-flex rounded-full border border-amber-200/40 bg-amber-300/15 px-2 py-1 text-[10px] font-bold text-amber-100">Référence non calibrée</span>
-                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-100">Série quotidienne héritée, distincte de la prévision horaire officielle à sept modèles. Sources réellement récupérées : {sourceLabels.length ? sourceLabels.join(" · ") : "non renseignées"}.</p>
-                  {sourceLabels.some((source) => source.startsWith("Best Match")) && <p className="mt-1 text-[9px] leading-relaxed text-sky-100/80">Best Match est indiqué comme agrégateur non indépendant, jamais comme huitième modèle officiel.</p>}
+              {selectedDay.kind === "official-daily-fusion" && selectedDaily && (
+                <div className="mt-3 border-t border-sky-100/15 pt-2.5" aria-label="Provenance de la fusion quotidienne">
+                  <span className="inline-flex rounded-full border border-cyan-200/40 bg-cyan-300/10 px-2 py-1 text-[10px] font-bold text-cyan-100">Fusion officielle · preuves par variable</span>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-100">Les valeurs sans preuves qualifiées restent indisponibles. Les détails des poids, biais diagnostiques et limites de comparabilité sont ci-dessous.</p>
                 </div>
               )}
             </div>
@@ -548,12 +603,12 @@ export function ForecastByDaySection({
               const first = day.hourlyGroup?.hours[0]?.hour;
               const condition = day.daily?.condition ?? first?.condition;
               const isSelected = selectedDayDate === day.date;
-              const isLegacy = day.kind === "legacy-daily-reference";
-              const temperatures = isLegacy
+              const isDailyFusion = day.kind === "official-daily-fusion";
+              const temperatures = isDailyFusion
                 ? `${formatOptionalForecastValue(day.daily?.tempMax, 0, "°")}/${formatOptionalForecastValue(day.daily?.tempMin, 0, "°")}`
                 : "—/—";
-              const buttonLabel = isLegacy
-                ? `Référence quotidienne non calibrée du ${dateText(day.date)}. Max ${formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}, min ${formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}. ${conditionDescription(condition) || "Condition indisponible"}.`
+              const buttonLabel = isDailyFusion
+                ? `Prévision quotidienne officielle du ${dateText(day.date)}. Max ${formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}, min ${formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}. ${conditionDescription(condition) || "Condition indisponible"}.`
                 : `Prévision horaire officielle du ${dateText(day.date)}. Extrêmes quotidiens non fournis. ${conditionDescription(condition) || "Condition indisponible"}.`;
               return (
                 <button
@@ -568,7 +623,7 @@ export function ForecastByDaySection({
                   <span className="block truncate text-[11px] font-medium text-slate-200">{shortWeekday(day.date)}</span>
                   <span className="my-1 flex justify-center"><MeteoIcon name={conditionIconName(condition)} size={20} /></span>
                   <span className="block whitespace-nowrap text-[9px] font-semibold tabular-nums text-slate-100">{temperatures}</span>
-                  {isLegacy && <span className="mt-1 block whitespace-nowrap text-[8px] font-bold text-amber-200">Référence</span>}
+                  {isDailyFusion && <span className="mt-1 block whitespace-nowrap text-[8px] font-bold text-cyan-100">Fusion</span>}
                 </button>
               );
             })}
@@ -581,8 +636,8 @@ export function ForecastByDaySection({
 
           <details className="group px-1 text-xs text-slate-300">
             <summary className="min-h-10 cursor-pointer list-none py-2 font-medium text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">Provenance et disponibilité des champs <span aria-hidden="true" className="ml-1 inline-block transition-transform group-open:rotate-180">⌄</span></summary>
-            {selectedDay.kind === "legacy-daily-reference" ? (
-              <p className="pb-2 leading-relaxed">Cette série quotidienne héritée n’est pas calibrée et n’est pas la fusion horaire officielle à sept modèles. Les champs absents ne sont pas estimés. Best Match, s’il est listé, est un agrégateur de référence non indépendant.</p>
+            {selectedDay.kind === "official-daily-fusion" && selectedDaily ? (
+              <DailyFusionDiagnostics day={selectedDaily} sourceLabels={sourceLabels} />
             ) : (
               <>
                 <p className="pb-2 leading-relaxed">Cette vue utilise uniquement la série horaire officielle à sept modèles, sans Best Match. Les variables sans valeur qualifiée restent indisponibles; les maxima/minima quotidiens ne sont pas reconstitués à partir d’un échantillon horaire incomplet.</p>
@@ -594,7 +649,7 @@ export function ForecastByDaySection({
       ) : (
         <div className="rounded-2xl border border-sky-300/25 bg-slate-900/75 px-4 py-5 text-sm leading-relaxed text-slate-200" role="status">
           <h2 id="forecast-by-day-title" className="font-semibold text-white">Prévisions</h2>
-          <p className="mt-2">Aucune échéance datée n’est disponible dans la série horaire officielle ni dans les données quotidiennes de référence.</p>
+          <p className="mt-2">Aucune échéance datée n’est disponible dans la série horaire officielle ni dans la fusion quotidienne officielle.</p>
           {grouped.undatedHours > 0 && <p className="mt-1 text-amber-100">{grouped.undatedHours} échéance(s) sans date locale explicite n’ont pas été regroupées; aucune date n’a été déduite de l’horodatage UTC.</p>}
         </div>
       )}

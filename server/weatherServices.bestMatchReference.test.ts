@@ -6,7 +6,9 @@ vi.mock("./weatherFetch", () => ({
 }));
 
 import { fetchWeather } from "./weatherFetch";
-import { collect15DayForecast, collectCurrentWeatherSnapshot, collectHourlyForecast } from "./weatherServices";
+import { collect15DayForecast, collectCurrentWeatherSnapshot, collectHourlyForecast, OFFICIAL_HOURLY_MODELS } from "./weatherServices";
+import { computeOfficialDailyForecast } from "./officialForecast";
+import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 const mockedFetchWeather = vi.mocked(fetchWeather);
 
@@ -124,46 +126,101 @@ describe("collectHourlyForecast auxiliaire", () => {
   });
 });
 
-describe("collect15DayForecast consensus de précipitations", () => {
+describe("collect15DayForecast fusion officielle", () => {
   beforeEach(() => mockedFetchWeather.mockReset());
 
-  it("compte les seuls modèles indépendants avec des données et expose le calcul dérivé", async () => {
-    const dailyResponse = (amount: number) => response({
+  it("fuse les preuves exactes, garde Best Match en référence et refuse fallback/cap impossible", async () => {
+    const issuedAt = Date.parse("2026-10-03T08:00:00.000Z");
+    const locationKey = "50.7567_2.5204";
+    const datesByModel = [
+      ["2026-10-03"],
+      ["2026-10-03", "2026-10-04"],
+      ["2026-10-03", "2026-10-04"],
+      ["2026-10-03", "2026-10-04", "2026-10-05"],
+      ["2026-10-03", "2026-10-04", "2026-10-05"],
+      ["2026-10-03", "2026-10-04"],
+      ["2026-10-03", "2026-10-04"],
+      ["2026-10-03"],
+    ];
+    const dailyResponse = (modelIndex: number, dates: string[]) => response({
       daily: {
-        time: ["2026-10-03"],
-        precipitation_sum: [amount],
+        time: dates,
+        temperature_2m_max: dates.map(() => modelIndex === 7 ? 999 : 20 + modelIndex),
+        temperature_2m_min: dates.map(() => modelIndex === 7 ? -999 : 10 + modelIndex),
+        precipitation_sum: dates.map(() => modelIndex === 7 ? 999 : 0.2 + modelIndex),
+        wind_speed_10m_max: dates.map(() => modelIndex === 7 ? 999 : 8 + modelIndex),
+        wind_gusts_10m_max: dates.map(() => modelIndex === 7 ? 999 : 12 + modelIndex),
       },
     });
-    mockedFetchWeather
-      .mockResolvedValueOnce(dailyResponse(0))
-      .mockResolvedValueOnce(dailyResponse(0.1))
-      .mockResolvedValueOnce(dailyResponse(0.4))
-      .mockResolvedValueOnce(dailyResponse(99));
+    datesByModel.forEach((dates, index) => mockedFetchWeather.mockResolvedValueOnce(dailyResponse(index, dates)));
 
-    const result = await collect15DayForecast();
-    const day = result.days[0]!;
-    const summary = day.precipitationConsensus!;
-
-    expect(result.modelsUsed).toContain("Open-Meteo");
-    expect(summary).toMatchObject({
-      thresholdMm: 0.1,
-      expectedModelCount: 3,
-      availableModelCount: 3,
-      rainModelCount: 2,
-      frequencyPercent: (2 / 3) * 100,
-      conditionalMeanMm: 0.25,
-      conditionalMeanMethod: "arithmetic_mean",
-      modelsExpected: ["ECMWF", "GFS", "ICON"],
-      modelsWithData: ["ECMWF", "GFS", "ICON"],
-      modelsPredictingRain: ["GFS", "ICON"],
-      isProbabilityCalibrated: false,
+    const evidence: ModelPerformanceEvidence[] = OFFICIAL_HOURLY_MODELS.flatMap((model, modelIndex) =>
+      ( ["6-24h", "1-3d"] as DailyFusionHorizon[] ).flatMap((horizonBucket) => DAILY_FUSION_METRICS.map((variable) => ({
+        locationKey,
+        serviceName: model.name,
+        modelId: model.modelId,
+        variable,
+        horizonBucket,
+        comparisonCount: 500,
+        sampleSize: 500,
+        evaluatedDays: 500,
+        mae: 0.4 + modelIndex * 0.1,
+        rmse: 0.7 + modelIndex * 0.1,
+        standardError: 0.02,
+        signedBias: modelIndex - 3,
+        latestScoreDate: "2026-10-02",
+      }))),
+    );
+    const result = await collect15DayForecast(undefined, {
+      issuedAt,
+      resolveOfficialFusion: (targetDate, forecasts, forecastIssuedAt) => Promise.resolve(computeOfficialDailyForecast(forecasts, {
+        locationKey,
+        targetDate,
+        issuedAt: forecastIssuedAt,
+        evidenceStoreAvailable: true,
+        evidence,
+      })),
     });
-    expect(summary.consensusEstimateMm).toBeCloseTo((2 / 3) * 0.25, 12);
-    expect(summary.modelValues.map(({ modelName, amountMm }) => [modelName, amountMm])).toEqual([
-      ["ECMWF", 0],
-      ["GFS", 0.1],
-      ["ICON", 0.4],
-    ]);
-    expect(day.precipitation).toBe(0.2);
+    const [today, tomorrow, longRange] = result.days;
+
+    expect(mockedFetchWeather).toHaveBeenCalledTimes(8);
+    expect(mockedFetchWeather.mock.calls.map(([url]) => new URL(String(url)).searchParams.get("forecast_days"))).toEqual(Array(8).fill("16"));
+    expect(result.modelsUsed).toContain("Open-Meteo");
+    expect(result.modelsUsed).toHaveLength(8);
+    expect(result.days.map(({ date }) => date)).toEqual(["2026-10-03", "2026-10-04", "2026-10-05"]);
+
+    expect(today).toMatchObject({
+      tempMax: expect.any(Number),
+      tempMin: expect.any(Number),
+      precipitation: expect.any(Number),
+      windSpeed: expect.any(Number),
+      windGust: expect.any(Number),
+      officialFusion: { horizonBucket: "6-24h" },
+      bestMatchReference: {
+        source: "Open-Meteo Best Match",
+        officialContributor: false,
+        tempMax: 999,
+      },
+    });
+    expect(today!.tempMax).not.toBe(999);
+    expect(today!.officialFusion.sourcesByVariable.tempMax).toHaveLength(7);
+    expect(today!.officialFusion.sourcesByVariable.tempMin.every((source) => source.variable === "temperature_min" && source.horizonBucket === "6-24h")).toBe(true);
+    expect(today!.officialFusion.sourcesByVariable.tempMax.every((source) => source.signedBias != null && source.latestScoreDate === "2026-10-02")).toBe(true);
+    expect(today!.precipitationConsensus?.conditionalMeanMethod).toBe("historical_skill");
+    expect(today!.modelAgreement.modelIssueTimeAvailable).toBe(false);
+    expect(today!.modelAgreement.tempMax.range).toBeNull();
+    expect(today!.modelAgreement.tempMax.availableModelCount).toBe(7);
+
+    expect(tomorrow!.officialFusion.horizonBucket).toBe("1-3d");
+    expect(tomorrow!.tempMax).not.toBeNull();
+    expect(tomorrow!.officialFusion.sourcesByVariable.tempMax.every((source) => source.horizonBucket === "1-3d")).toBe(true);
+    expect(tomorrow!.bestMatchReference).toBeNull();
+
+    expect(longRange!.officialFusion.horizonBucket).toBe("1-3d");
+    expect(longRange!.modelAgreement.tempMax.availableModelCount).toBe(2);
+    expect(longRange!.tempMax).toBeNull();
+    expect(longRange!.precipitation).toBeNull();
+    expect(longRange!.officialFusion.sourcesByVariable.tempMax).toEqual([]);
+    expect(longRange!.bestMatchReference).toBeNull();
   });
 });

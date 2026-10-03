@@ -45,6 +45,7 @@ export type DailyModelAgreement = {
   requestDayOffset: number | null;
   /** The provider payload does not archive an independent issue timestamp per daily model. */
   modelIssueTimeAvailable: false;
+  dispersionUnavailableReason: "run_issue_time_missing";
   tempMax: DailyAgreementMeasure;
   tempMin: DailyAgreementMeasure;
   /** Amount range over every available named model, including genuine 0 mm values. */
@@ -107,7 +108,12 @@ export function summarizeDailyModelAgreement(
     .flatMap(([modelName, forecast]) => finite(forecast[variable])
       ? [{ modelName, value: forecast[variable] }]
       : []);
-  const summarize = (variable: DailyAgreementVariable) => summarizeValues(valuesFor(variable));
+  const summarize = (variable: DailyAgreementVariable): DailyAgreementMeasure => {
+    const measure = summarizeValues(valuesFor(variable));
+    // The provider does not identify each daily model run. Preserve the exact
+    // sample size/provenance, but do not label incomparable runs as dispersion.
+    return { ...measure, min: null, max: null, mean: null, range: null, standardDeviation: null };
+  };
   const precipitationValues = valuesFor("precipitation").filter(({ value }) => value >= PRECIPITATION_RAIN_THRESHOLD_MM);
   const precipitationAvailableModelCount = valuesFor("precipitation").length;
 
@@ -118,10 +124,18 @@ export function summarizeDailyModelAgreement(
     modelsExpected,
     requestDayOffset: Number.isInteger(requestDayOffset) && requestDayOffset! >= 0 ? requestDayOffset : null,
     modelIssueTimeAvailable: false,
+    dispersionUnavailableReason: "run_issue_time_missing",
     tempMax: summarize("tempMax"),
     tempMin: summarize("tempMin"),
     precipitation: summarize("precipitation"),
-    precipitationWetAmounts: summarizeValues(precipitationValues),
+    precipitationWetAmounts: {
+      ...summarizeValues(precipitationValues),
+      min: null,
+      max: null,
+      mean: null,
+      range: null,
+      standardDeviation: null,
+    },
     precipitationOccurrence: {
       thresholdMm: PRECIPITATION_RAIN_THRESHOLD_MM,
       rainModelCount: precipitationValues.length,
