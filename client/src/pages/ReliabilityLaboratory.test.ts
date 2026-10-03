@@ -13,6 +13,7 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
   it("sépare les métriques historiques par modèle, variable et horizon sans score global", () => {
     expect(source).toContain("Fiabilité historique, sans note globale");
     expect(source).toContain("MAE, RMSE, biais, effectifs, dates et évolution par modèle × variable × horizon exact");
+    expect(source).toContain("Le biais signé est descriptif et n’est jamais appliqué aux prévisions officielles futures.");
     expect(source).toContain("Fiabilité historique · modèle × variable × horizon");
     expect(source).toContain("row.modelId");
     expect(source).toContain("row.variableLabel");

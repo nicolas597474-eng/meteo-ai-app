@@ -1,6 +1,5 @@
 import type { ForecastRun, InsertForecastRun, InsertDailyForecastObservationComparison } from "../drizzle/schema";
 import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, type ForecastData } from "./weatherServices";
-import { applyBiasCorrection, type ServiceBias } from "./fusionEngine";
 import { buildQualifiedDailyObservation, type PhysicalSnapshot } from "./physicalObservationAggregation";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 import type { DailyFusionHorizon, DailyFusionMetric, ModelPerformanceEvidence } from "./fusionPerformance";
@@ -40,7 +39,6 @@ export function buildForecastRunArchiveRows(
   locationKey: string,
   requestedDate: string,
   issuedAt: number,
-  biases: ServiceBias[] = [],
 ): InsertForecastRun[] {
   if (!Number.isFinite(issuedAt) || !/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return [];
   const rows: InsertForecastRun[] = [];
@@ -58,14 +56,6 @@ export function buildForecastRunArchiveRows(
       for (let index = 0; index < times.length; index++) {
         const validDate = times[index];
         if (typeof validDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(validDate) || validDate < requestedDate) continue;
-        const corrected = applyBiasCorrection([{
-          serviceName: forecast.serviceName,
-          tempMax: finiteOrNull(daily.temperature_2m_max?.[index]),
-          tempMin: finiteOrNull(daily.temperature_2m_min?.[index]),
-          precipitation: finiteOrNull(daily.precipitation_sum?.[index]),
-          windSpeed: finiteOrNull(daily.wind_speed_10m_max?.[index]),
-          windGust: finiteOrNull(daily.wind_gusts_10m_max?.[index]),
-        }], biases)[0];
         rows.push({
           locationKey,
           validDate,
@@ -74,11 +64,11 @@ export function buildForecastRunArchiveRows(
           modelId: service.modelId,
           sourceKind: "model_forecast",
           issuedAt,
-          tempMax: corrected.tempMax,
-          tempMin: corrected.tempMin,
-          precipitation: corrected.precipitation,
-          windSpeed: corrected.windSpeed,
-          windGust: corrected.windGust ?? null,
+          tempMax: finiteOrNull(daily.temperature_2m_max?.[index]),
+          tempMin: finiteOrNull(daily.temperature_2m_min?.[index]),
+          precipitation: finiteOrNull(daily.precipitation_sum?.[index]),
+          windSpeed: finiteOrNull(daily.wind_speed_10m_max?.[index]),
+          windGust: finiteOrNull(daily.wind_gusts_10m_max?.[index]),
           humidity: finiteOrNull(daily.relative_humidity_2m_mean?.[index]),
           cloudCover: finiteOrNull(daily.cloud_cover_mean?.[index]),
           condition: validDate === requestedDate ? forecast.condition : null,
@@ -90,14 +80,6 @@ export function buildForecastRunArchiveRows(
     }
 
     // Older mocks or provider responses without a dated daily array remain current-day only.
-    const corrected = applyBiasCorrection([{
-      serviceName: forecast.serviceName,
-      tempMax: finiteOrNull(forecast.tempMax),
-      tempMin: finiteOrNull(forecast.tempMin),
-      precipitation: finiteOrNull(forecast.precipitation),
-      windSpeed: finiteOrNull(forecast.windSpeed),
-      windGust: finiteOrNull(forecast.windGust),
-    }], biases)[0];
     rows.push({
       locationKey,
       validDate: requestedDate,
@@ -106,11 +88,11 @@ export function buildForecastRunArchiveRows(
       modelId: service.modelId,
       sourceKind: "model_forecast",
       issuedAt,
-      tempMax: corrected.tempMax,
-      tempMin: corrected.tempMin,
-      precipitation: corrected.precipitation,
-      windSpeed: corrected.windSpeed,
-      windGust: corrected.windGust ?? null,
+      tempMax: finiteOrNull(forecast.tempMax),
+      tempMin: finiteOrNull(forecast.tempMin),
+      precipitation: finiteOrNull(forecast.precipitation),
+      windSpeed: finiteOrNull(forecast.windSpeed),
+      windGust: finiteOrNull(forecast.windGust),
       humidity: finiteOrNull(forecast.humidity),
       cloudCover: finiteOrNull(forecast.cloudCover),
       condition: forecast.condition,

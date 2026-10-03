@@ -23,7 +23,6 @@ import {
   insertReliabilityScores,
   upsertMeteoAIForecast,
   getLeadTimeScoresForLocation,
-  getQualifiedCumulativeRankingForLocation,
   getDailyFusionPerformanceEvidence,
   makeLocationKey,
   getPhysicalStationHistory,
@@ -42,7 +41,7 @@ import { legacyStabilityLabelForStorage } from "../legacyStabilityStorage";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
-import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, applyBiasCorrection, type ExtendedRegime, type MultiRegimeResult, type ServiceBias } from "../fusionEngine";
+import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, type ExtendedRegime, type MultiRegimeResult } from "../fusionEngine";
 import { getParisDate, getParisDateDaysAgo, getParisHour, getNextParisForecastRun } from "../weatherTime";
 import { getActiveParisForecastHours, getFavoritesForecastCadence, getFavoritesForecastScheduleLabel, getRequiredFavoritesForecastHeartbeatCron } from "../forecastScheduleConfig";
 import { getForecastRunDisplayStatus } from "../forecastRunSummary";
@@ -966,17 +965,6 @@ export const weatherRouter = router({
 
         // Compute MeteoAI
         const allForecasts = await getForecastsByDate(targetDate, locationKey);
-        const locationRanking = await getQualifiedCumulativeRankingForLocation(locationKey);
-        const ranking = locationRanking;
-
-        const biases: ServiceBias[] = ranking
-          .filter((row) => row.avgBiasTemp != null || row.avgBiasPrecip != null)
-          .map((row) => ({
-            serviceName: row.serviceName,
-            biasTemp: row.avgBiasTemp != null ? Number(row.avgBiasTemp) : null,
-            biasPrecip: row.avgBiasPrecip != null ? Number(row.avgBiasPrecip) : null,
-            biasWind: null,
-          }));
         const rawForecasts = allForecasts.map((forecast) => ({
           serviceName: forecast.serviceName,
           tempMax: forecast.tempMax,
@@ -987,13 +975,10 @@ export const weatherRouter = router({
           humidity: forecast.humidity ?? null,
           cloudCover: forecast.cloudCover ?? null,
         }));
-        const correctedForecasts = biases.length > 0
-          ? applyBiasCorrection(rawForecasts, biases)
-          : rawForecasts;
 
-        await insertForecastRuns(buildForecastRunArchiveRows(expertData, locationKey, targetDate, issuedAt, biases));
+        await insertForecastRuns(buildForecastRunArchiveRows(expertData, locationKey, targetDate, issuedAt));
         const fusionEvidence = await getDailyFusionPerformanceEvidence(locationKey, targetDate, issuedAt);
-        const meteoAI = computeOfficialDailyForecast(correctedForecasts, {
+        const meteoAI = computeOfficialDailyForecast(rawForecasts, {
           locationKey,
           targetDate,
           issuedAt,

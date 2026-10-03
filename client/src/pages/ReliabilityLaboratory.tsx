@@ -79,7 +79,7 @@ export default function ReliabilityLaboratory() {
       <header className="rounded-2xl border border-sky-500/15 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,.18),transparent_40%),linear-gradient(135deg,#101827,#090d15)] p-4 sm:p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.17em] text-sky-300">Laboratoire · observations physiques</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">Fiabilité historique, sans note globale</h1>
-        <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-400">MAE, RMSE, biais, effectifs, dates et évolution par modèle × variable × horizon exact. Best Match et agrégateurs sont exclus. L’accord inter-modèles décrit une dispersion de prévisions et n’est pas une mesure de fiabilité.</p>
+        <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-400">MAE, RMSE, biais, effectifs, dates et évolution par modèle × variable × horizon exact. Le biais signé est descriptif et n’est jamais appliqué aux prévisions officielles futures. Best Match et agrégateurs sont exclus. L’accord inter-modèles décrit une dispersion de prévisions et n’est pas une mesure de fiabilité.</p>
         <p className="mt-2 text-xs font-medium text-slate-300">{locationName} · fuseau Europe/Paris · unité conservée pour chaque variable</p>
       </header>
 

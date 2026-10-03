@@ -190,7 +190,7 @@ describe("persistance stricte de la collecte legacy", () => {
     const handler = source.slice(start, end);
     const jobCreation = handler.indexOf("const jobId = await createCollectionJob({");
     const forecastWrite = handler.indexOf("await insertForecasts(forecastRows, { requireDatabase: true });");
-    const runWrite = handler.indexOf("await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt, biases), { requireDatabase: true });");
+    const runWrite = handler.indexOf("await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt), { requireDatabase: true });");
     const fusionWrite = handler.indexOf("await upsertMeteoAIForecast({");
     const completedStatus = handler.indexOf('status: "completed"');
     const completedWrite = handler.indexOf("{ requireDatabase: true });", completedStatus);
@@ -205,5 +205,22 @@ describe("persistance stricte de la collecte legacy", () => {
     expect(handler.slice(fusionWrite, completedStatus)).toContain("}, { requireDatabase: true });");
     expect(completedStatus).toBeGreaterThan(fusionWrite);
     expect(completedWrite).toBeGreaterThan(completedStatus);
+    expect(handler).not.toContain("applyBiasCorrection");
+    expect(handler).not.toContain("getQualifiedCumulativeRankingForLocation");
+    expect(handler).toContain("computeOfficialDailyForecast(rawForecastsForFusion");
+  });
+
+  it("garde les prévisions planifiées des favoris brutes pour la fusion et les nouvelles archives", () => {
+    const source = readFileSync(new URL("./scheduledHandlers.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export async function collectFavoritesForecastsHandler");
+    const end = source.indexOf("export async function collectPhysicalObservationSnapshotsForFavorites", start);
+    const handler = source.slice(start, end);
+
+    expect(handler).not.toContain("applyBiasCorrection");
+    expect(handler).not.toContain("getQualifiedCumulativeRankingForLocation");
+    expect(handler).not.toContain("locBiases");
+    expect(handler).not.toContain("biasCorrectedLocForecasts");
+    expect(handler).toContain("buildForecastRunArchiveRows(expertData, locKey, today, issuedAt)");
+    expect(handler).toContain("computeOfficialDailyForecast(rawLocForecasts");
   });
 });

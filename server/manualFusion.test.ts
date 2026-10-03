@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   insertHourlyForecasts: vi.fn(),
   upsertLocationForecast: vi.fn(),
   upsertMeteoAIForecast: vi.fn(),
+  computeOfficialDailyForecast: vi.fn(),
+  applyBiasCorrection: vi.fn(),
   cacheManualHourlyForecast: vi.fn(),
   persistedDailySnapshot: null as any,
   storedHourlyRows: [] as any[],
@@ -54,10 +56,10 @@ vi.mock("./officialWeatherSnapshot", () => ({ cacheManualHourlyForecast: mocks.c
 vi.mock("./weatherTime", () => ({ getParisDate: () => "2026-09-30" }));
 vi.mock("./weatherConditionLabels", () => ({ conditionFromWeatherValues: () => "Nuageux" }));
 vi.mock("./officialForecast", () => ({
-  computeOfficialDailyForecast: () => ({ tempMax: 23, tempMin: 12, precipitation: 0.4, windSpeed: 12, confidenceScore: 84, coreCalibrationComplete: true, methodNote: "Fusion calibrée", weights: {}, trace: {} }),
+  computeOfficialDailyForecast: mocks.computeOfficialDailyForecast,
 }));
 vi.mock("./fusionEngine", () => ({
-  applyBiasCorrection: (forecasts: unknown[]) => forecasts,
+  applyBiasCorrection: mocks.applyBiasCorrection,
   getLeadTimeWeights: () => ({}),
   isEligibleGlobalReliabilityScore: () => false,
 }));
@@ -146,6 +148,13 @@ beforeEach(() => {
   mocks.getQualifiedCumulativeRankingForLocation.mockResolvedValue([]);
   mocks.getQualifiedLeadTimeScoresForLocation.mockResolvedValue([]);
   mocks.getDailyFusionPerformanceEvidence.mockResolvedValue({ available: true, evidence: [], horizonBucket: "6-24h" });
+  mocks.computeOfficialDailyForecast.mockReturnValue({ tempMax: 23, tempMin: 12, precipitation: 0.4, windSpeed: 12, confidenceScore: 84, coreCalibrationComplete: true, methodNote: "Fusion calibrée", weights: {}, trace: {} });
+  mocks.applyBiasCorrection.mockImplementation((forecasts: any[]) => forecasts.map((forecast) => ({
+    ...forecast,
+    tempMax: forecast.tempMax == null ? null : forecast.tempMax + 100,
+    tempMin: forecast.tempMin == null ? null : forecast.tempMin + 100,
+    precipitation: forecast.precipitation == null ? null : forecast.precipitation + 100,
+  })));
   mocks.getStoredHourlyForecasts.mockImplementation(async () => mocks.storedHourlyRows.slice());
   mocks.insertForecasts.mockResolvedValue(undefined);
   mocks.insertForecastRuns.mockResolvedValue(undefined);
@@ -208,6 +217,29 @@ describe("relance manuelle des prévisions", () => {
     expect(repeated.status).toBe("cooldown");
     expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
     expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(7);
+  });
+
+  it("n’applique pas un biais physique disponible à la fusion officielle ni aux nouvelles archives", async () => {
+    mocks.getQualifiedCumulativeRankingForLocation.mockResolvedValue([
+      { serviceName: "AROME", avgBiasTemp: 2, avgBiasPrecip: 3 },
+    ]);
+
+    await refreshManualFusionForFavorite(favorite);
+
+    expect(mocks.getQualifiedCumulativeRankingForLocation).not.toHaveBeenCalled();
+    expect(mocks.applyBiasCorrection).not.toHaveBeenCalled();
+    const officialForecasts = mocks.computeOfficialDailyForecast.mock.calls[0]?.[0] as any[];
+    expect(officialForecasts.find((forecast) => forecast.serviceName === "AROME")).toMatchObject({
+      tempMax: 23,
+      tempMin: 12,
+      precipitation: 0.4,
+    });
+    const archivedRows = mocks.insertForecastRuns.mock.calls[0]?.[0] as any[];
+    expect(archivedRows.find((row) => row.serviceName === "AROME")).toMatchObject({
+      tempMax: 23,
+      tempMin: 12,
+      precipitation: 0.4,
+    });
   });
 
   it("rapporte un succès partiel sans horodatage pour la granularité échouée", async () => {
