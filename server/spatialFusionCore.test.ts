@@ -41,6 +41,15 @@ describe("noyau spatial commun", () => {
     expect(results[0].altitudeAdjustmentC).toBeCloseTo(-0.065, 3);
   });
 
+  it("nomme le seuil reliabilityScore comme une priorité technique de source", () => {
+    const [result] = evaluateSpatialQuality([
+      { id: "low-priority", distanceKm: 1, reliabilityScore: 39, updatedAt: now, altitude: 50, temperature: 20 },
+    ], { maxDistanceKm: 10, maxFreshnessMin: 60, minReliabilityScore: 40, maxTempDeviationC: 8, refAltitude: 40 });
+
+    expect(result.checks.find((check) => check.code === "reliability")?.reason)
+      .toBe("Priorité technique de source insuffisante");
+  });
+
   it("produit la même synthèse stationnaire pour Ground Truth, Ultra-local standard et fusion avancée", () => {
     const stations = [
       station({ stationId: "near", distanceKm: 0.5, temperature: 20, reliabilityScore: 80 }),

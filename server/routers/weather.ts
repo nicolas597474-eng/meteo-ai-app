@@ -73,6 +73,8 @@ import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHan
 import { buildForecastFlowStatuses } from "../forecastFlowStatus";
 import { getShadowDataHubObservability } from "../weatherDataHubShadow";
 import { getP1ObservationClosure } from "../weatherP1Closure";
+import { deriveStationPerformanceProfiles } from "../stationPerformanceService";
+import { getStationRankingContract } from "../stationRankingContract";
 import { runHondeghemAromeShadowComparison } from "../aromeHondeghemShadow";
 import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
 import { buildStationForecastComparison24h } from "../stationForecastComparison";
@@ -1499,36 +1501,7 @@ export const weatherRouter = router({
   /**
    * Get ranking criteria explanation for a set of stations.
    */
-  getStationRankingCriteria: publicProcedure.query(() => {
-    return {
-      criteria: [
-        { name: "Distance", weight: 40, description: "Plus la station est proche, plus son poids est élevé (inverse de la distance)" },
-        { name: "Fiabilité historique", weight: 30, description: "Score de cohérence basé sur l'historique de la station" },
-        { name: "Disponibilité", weight: 20, description: "Fraction des mises à jour attendues effectivement reçues" },
-        { name: "Fréquence", weight: 10, description: "Stations à mise à jour fréquente (toutes les 5-10 min) favorisées" },
-      ],
-      groundTruthWeights: {
-        distance: 50,
-        qualityHistory: 30,
-        freshness: 20,
-      },
-      exclusionRules: [
-        "Aucune donnée disponible (température, vent et précipitations toutes nulles)",
-        "Données trop anciennes (> 120 minutes)",
-        "Score de fiabilité trop bas (< 40/100)",
-      ],
-      sources: [
-        { id: "meteofrance", name: "Météo-France StatIC", reliability: 92, updateFreqMin: 60 },
-        { id: "synop", name: "SYNOP/WMO (ECMWF)", reliability: 88, updateFreqMin: 60 },
-        { id: "noaa", name: "NOAA International", reliability: 85, updateFreqMin: 60 },
-        { id: "openmeteo", name: "Open-Meteo Grid", reliability: 80, updateFreqMin: 60 },
-        { id: "davis", name: "Davis Instruments", reliability: 78, updateFreqMin: 10 },
-        { id: "netatmo", name: "Netatmo Public", reliability: 65, updateFreqMin: 10 },
-        { id: "cwop", name: "CWOP/APRS Amateur", reliability: 60, updateFreqMin: 15 },
-        { id: "wunderground", name: "Weather Underground PWS", reliability: 58, updateFreqMin: 5 },
-      ],
-    };
-  }),
+  getStationRankingCriteria: publicProcedure.query(() => getStationRankingContract()),
 
   /**
    * Get full details for a single station by ID, including live data refresh.
@@ -1591,13 +1564,29 @@ export const weatherRouter = router({
       const periodDays = input?.periodDays ?? 1;
       const now = Date.now();
       const sinceMs = now - periodDays * 24 * 60 * 60 * 1000;
+      const performanceWindowDays = 30;
+      const performanceSinceMs = now - performanceWindowDays * 24 * 60 * 60 * 1000;
       const locationKey = makeLocationKey(lat, lon);
       const date = getTodayParis();
       const [stationData, hourlyRunValues, collectionSnapshots] = await Promise.all([
-        getPhysicalStationHistory(lat, lon, sinceMs),
+        getPhysicalStationHistory(lat, lon, performanceSinceMs),
         getHourlyForecastRunValues(locationKey, date),
         getStationCollectionSnapshots(locationKey, 14),
       ]);
+      const radiusKm = input?.radiusKm ?? stationData.latestGroundTruth?.radiusKm ?? 20;
+      const stationPerformanceById = deriveStationPerformanceProfiles({
+        stations: stationData.stations.map((station) => ({
+          stationId: station.stationId,
+          source: station.source,
+          qualificationStatus: station.qualificationStatus,
+          isActive: station.isActive,
+          lat: station.lat,
+          lon: station.lon,
+          distanceKm: station.distanceKm,
+          readings: station.readings,
+        })),
+        maxDistanceKm: radiusKm,
+      });
       const qualityProfiles = await getStationQualityProfiles(stationData.stations.map((station) => station.stationId));
       const qualityByStationId = new Map(qualityProfiles.map((profile) => [profile.stationId, profile]));
       const archivedOfficialModels = reconstructOfficialHourlyModelsFromArchive(hourlyRunValues, date);
@@ -1611,7 +1600,7 @@ export const weatherRouter = router({
         hourlyScoreHistory.rows,
         { historyAvailable: hourlyScoreHistory.available },
       );
-      const stationHourlyReadings = stationData.stations.flatMap((station) => station.readings);
+      const stationHourlyReadings = stationData.stations.flatMap((station) => station.readings.filter((reading) => reading.observedAt >= sinceMs));
       const comparison24h = buildStationForecastComparison24h(date, officialHourlyForecast.hours, stationHourlyReadings);
 
       const parisDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
@@ -1619,6 +1608,7 @@ export const weatherRouter = router({
       const stationByDate = new Map<string, Array<{ temperature: number | null; windSpeed: number | null; precipitation: number | null }>>();
       for (const station of stationData.stations) {
         for (const reading of station.readings) {
+          if (reading.observedAt < sinceMs) continue;
           const key = parisDate.format(new Date(reading.observedAt));
           const list = stationByDate.get(key) ?? [];
           list.push(reading);
@@ -1653,7 +1643,8 @@ export const weatherRouter = router({
         locationKey,
         center: { lat, lon },
         periodDays,
-        radiusKm: input?.radiusKm ?? stationData.latestGroundTruth?.radiusKm ?? 20,
+        radiusKm,
+        performanceWindowDays,
         collectedAt: stationData.latestGroundTruth?.computedAt ?? null,
         latestGroundTruth: stationData.latestGroundTruth,
         latestCollection: collectionSnapshots[0] ?? null,
@@ -1669,7 +1660,8 @@ export const weatherRouter = router({
           status: snapshot.status,
         })),
         stations: stationData.stations.map((station) => {
-          const latest = station.readings.at(-1) ?? null;
+          const currentPeriodReadings = station.readings.filter((reading) => reading.observedAt >= sinceMs);
+          const latest = currentPeriodReadings.at(-1) ?? null;
           const qualityProfile = qualityByStationId.get(station.stationId) ?? null;
           return {
             stationId: station.stationId,
@@ -1682,8 +1674,9 @@ export const weatherRouter = router({
             updateFrequencyMin: station.updateFrequencyMin,
             latest,
             ageMinutes: latest ? Math.max(0, Math.round((now - latest.observedAt) / 60000)) : null,
-            readings: station.readings,
+            readings: currentPeriodReadings,
             qualityProfile,
+            stationPerformance: stationPerformanceById.get(station.stationId) ?? null,
           };
         }),
         comparison24h,

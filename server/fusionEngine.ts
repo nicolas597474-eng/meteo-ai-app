@@ -53,7 +53,7 @@ export type FusionSource = {
   uvIndex?: number | null;
   visibility?: number | null;
   updatedAt?: Date | string | null;
-  reliabilityScore?: number; // 0-100 historical quality
+  reliabilityScore?: number; // Prior source/réseau 0-100; pas une performance individuelle mesurée
   // Per-parameter historical MAE (lower = better, used for adaptive weighting)
   maeTemp?: number | null;
   maePrecip?: number | null;
@@ -69,7 +69,7 @@ export type FusionConfig = {
   maxDistanceKm: number;        // Maximum search radius
   maxFreshnessMin: number;      // Max age of data in minutes
   maxTempDeviationC: number;    // Max deviation from neighbors (coherence check)
-  minReliabilityScore: number;  // Minimum historical quality score
+  minReliabilityScore: number;  // Seuil minimum de priorité technique source/réseau
   altitudeCorrectionEnabled: boolean;
   anomalyDetectionEnabled: boolean;
   adaptiveWeightingEnabled: boolean; // Use historical MAE for weighting

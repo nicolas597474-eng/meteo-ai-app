@@ -10,7 +10,7 @@
  *
  * Ground truth weighting:
  *   50% distance normalisée (IDW quadratique, closer = more weight)
- *   30% historical quality normalisée (reliability score)
+ *   30% prior de priorité réseau/source normalisé (valeur fixe du mapper)
  *   20% data freshness normalisée (how recent the last reading is)
  * Les trois composantes sont normalisées entre les stations actives AVANT
  * la combinaison, puis le poids final est normalisé à 1. Cela empêche une
@@ -158,6 +158,16 @@ const SOURCE_DEFAULTS: Record<StationSource, { reliability: number; updateFreqMi
   wunderground: { reliability: 58, updateFreqMin: 5,  availability: 0.65 },
   opensensemap: { reliability: 0, updateFreqMin: 15, availability: 0 },
 };
+
+/** Read-only copy of a mapper's existing source-level prioritization defaults. */
+export function getStationSourcePriorityDefaults(source: StationSource) {
+  const defaults = SOURCE_DEFAULTS[source];
+  return {
+    reliability: defaults.reliability,
+    updateFreqMin: defaults.updateFreqMin,
+    availability: defaults.availability,
+  };
+}
 
 // La même collecte de stations alimente les modes Local et Ultra-local. Un cache
 // très court évite de solliciter quatre fournisseurs à chaque changement de filtre,
@@ -536,7 +546,7 @@ async function collectNearbyStationsUncached(
       return { ...s, isActive: false, exclusionReason: `Données trop anciennes (${Math.round(ageMin)} min)` };
     }
     if (s.reliabilityScore < 40) {
-      return { ...s, isActive: false, exclusionReason: `Score de fiabilité trop bas (${s.reliabilityScore}/100)` };
+      return { ...s, isActive: false, exclusionReason: `Priorité technique de source trop basse (${s.reliabilityScore}/100)` };
     }
     return s;
   });

@@ -74,6 +74,8 @@ describe("carte des stations", () => {
     expect(source).toContain("#fb7185");
     expect(source).toContain("function stationInfoHtml");
     expect(source).toContain("new google.maps.InfoWindow()");
-    expect(source).toContain("Fiabilité mesurée");
+    expect(source).toContain("Priorité technique de réseau/source");
+    expect(source).toContain("pas une performance météo individuelle mesurée");
+    expect(source).not.toContain("Fiabilité mesurée");
   });
 });

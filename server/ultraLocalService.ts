@@ -18,7 +18,7 @@ import { getPreviousReadings, recordStationReadings } from "./stationReadingsCac
  *   1. Freshness: last measurement must be recent (< 30 min for ultra-local)
  *   2. Coherence: temperature must not deviate > 5°C from neighbors
  *   3. Altitude: adjust for elevation differences
- *   4. Historical quality: reliability score must be adequate
+ *   4. Priorité technique source : le score fixe du réseau doit atteindre le seuil
  *   5. Stability: no erratic jumps in recent readings
  *
  * Microclimate detection:
