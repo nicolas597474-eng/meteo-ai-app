@@ -41,6 +41,16 @@ describe("getModelCoverage", () => {
     expect(coverage.collected).not.toContain("Open-Meteo");
   });
 
+  it("sépare aussi le compte quotidien officiel de la référence Best Match", () => {
+    const expectedOfficialModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+    const coverage = getModelCoverage([...expectedOfficialModels, "Open-Meteo"], expectedOfficialModels);
+
+    expect(coverage.expected).toHaveLength(7);
+    expect(coverage.collected).toEqual(expectedOfficialModels);
+    expect(coverage.expected).not.toContain("Open-Meteo");
+    expect(coverage.collected).not.toContain("Open-Meteo");
+  });
+
   it("conserve les candidats hors du compteur de couverture active", () => {
     const coverage = getModelCoverage(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo"]);
     expect(coverage.expected).toHaveLength(8);
@@ -131,8 +141,9 @@ describe("cadence automatique des prévisions", () => {
 });
 
 describe("buildStationCollectionSnapshot", () => {
-  it("conserve le rayon choisi et signale une couverture complète", () => {
-    const complete = getModelCoverage(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo"]);
+  it("conserve le rayon choisi et compte sept modèles officiels malgré une référence Best Match collectée", () => {
+    const officialModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+    const complete = getModelCoverage([...officialModels, "Open-Meteo"], officialModels);
     const snapshot = buildStationCollectionSnapshot({
       locationKey: "50.756_2.521",
       date: "2026-08-12",
@@ -142,16 +153,17 @@ describe("buildStationCollectionSnapshot", () => {
       hourly: complete,
     });
 
-    expect(snapshot).toMatchObject({ radiusKm: 30, physicalStationCount: 2, dailyModelCount: 8, hourlyModelCount: 8, status: "completed" });
+    expect(snapshot).toMatchObject({ radiusKm: 30, physicalStationCount: 2, dailyModelCount: 7, hourlyModelCount: 7, status: "completed" });
   });
 
   it("distingue une couverture partielle et une indisponibilité totale", () => {
-    const partial = getModelCoverage(["AROME", "ECMWF"]);
+    const officialModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+    const partial = getModelCoverage(["AROME", "ECMWF"], officialModels);
     const partialSnapshot = buildStationCollectionSnapshot({ locationKey: "key", date: "2026-08-12", radiusKm: 20, physicalStationCount: 0, daily: partial, hourly: partial });
     const failedSnapshot = buildStationCollectionSnapshot({ locationKey: "key", date: "2026-08-12", radiusKm: 20, physicalStationCount: 0, daily: partial, hourly: partial, forceFailed: true });
 
     expect(partialSnapshot.status).toBe("partial");
-    expect(partialSnapshot.dailyMissingModels).toHaveLength(6);
+    expect(partialSnapshot.dailyMissingModels).toHaveLength(5);
     expect(failedSnapshot.status).toBe("failed");
   });
 });

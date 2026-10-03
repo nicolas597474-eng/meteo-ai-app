@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ForecastRun } from "../drizzle/schema";
 import { aggregateDailyForecastPerformance, buildDailyForecastObservationComparisons, buildForecastRunArchiveRows, getDailyForecastHorizon } from "./dailyForecastPerformance";
+import { OFFICIAL_HOURLY_MODELS } from "./weatherServices";
 import type { PhysicalSnapshot } from "./physicalObservationAggregation";
 
 const locationKey = "50.7567_2.5204";
@@ -103,5 +104,35 @@ describe("daily production forecast performance archive", () => {
     expect(score.sampleSize).toBe(1);
     expect(score.evaluatedDays).toBe(1);
     expect(score.latestScoreDate).toBe(validDate);
+  });
+
+  it("conserve l’archive Best Match comme référence sans créer ni agréger sa preuve de fusion", () => {
+    const forecasts = [
+      ...OFFICIAL_HOURLY_MODELS.map((model) => ({ ...makeForecast(), serviceName: model.name })),
+      { ...makeForecast(), serviceName: "Open-Meteo" },
+    ];
+    const archived = buildForecastRunArchiveRows(forecasts, locationKey, validDate, issuedAt, []);
+    const targetRows = archived.filter((row) => row.validDate === validDate);
+    const bestMatchArchive = targetRows.find((row) => row.serviceName === "Open-Meteo");
+    const runs = targetRows.map((row, index) => ({ ...row, id: index + 1 })) as ForecastRun[];
+    const comparisons = buildDailyForecastObservationComparisons(locationKey, validDate, runs, snapshots());
+
+    expect(targetRows).toHaveLength(8);
+    expect(bestMatchArchive).toMatchObject({ serviceName: "Open-Meteo", modelId: "best_match" });
+    expect(comparisons).toHaveLength(7 * 5);
+    expect(comparisons.every((row) => row.serviceName !== "Open-Meteo" && row.modelId !== "best_match")).toBe(true);
+
+    const legacyBestMatchProof = {
+      ...comparisons[0]!,
+      forecastRunId: 999,
+      comparisonKey: "999:temperature_max",
+      serviceName: "Open-Meteo",
+      modelId: "best_match",
+    };
+    expect(aggregateDailyForecastPerformance([...comparisons, legacyBestMatchProof])).toEqual(
+      aggregateDailyForecastPerformance(comparisons),
+    );
+    expect(aggregateDailyForecastPerformance([...comparisons, legacyBestMatchProof])
+      .every((item) => item.serviceName !== "Open-Meteo" && item.modelId !== "best_match")).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeOfficialDailyForecast } from "./officialForecast";
-import { WEATHER_SERVICES } from "./weatherServices";
+import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES } from "./weatherServices";
 import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 const targetDate = "2026-10-02";
@@ -51,6 +51,44 @@ function options(evidence = qualifiedEvidence(), evidenceStoreAvailable = true) 
   return { locationKey, targetDate, issuedAt, evidenceStoreAvailable, evidence };
 }
 
+const allOfficialServiceNames = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+const sevenModelForecasts = OFFICIAL_HOURLY_MODELS.map((model, index) => ({
+  serviceName: model.name,
+  tempMax: 22 + index,
+  tempMin: 12 + index,
+  precipitation: 0.5 + index,
+  windSpeed: 9 + index,
+  windGust: 15 + index,
+  humidity: 40 + index,
+  cloudCover: 20 + index,
+}));
+const bestMatchForecast = {
+  serviceName: "Open-Meteo",
+  tempMax: 99,
+  tempMin: -50,
+  precipitation: 1000,
+  windSpeed: 400,
+  windGust: 700,
+  humidity: 100,
+  cloudCover: 100,
+};
+
+function sevenModelEvidence(): ModelPerformanceEvidence[] {
+  return allOfficialServiceNames.flatMap((serviceName, index) => DAILY_FUSION_METRICS.map((variable) => evidenceFor(
+    serviceName,
+    variable,
+    { sampleSize: 500, comparisonCount: 500, evaluatedDays: 500, mae: 0.4 + index * 0.1, standardError: 0.05 },
+  )));
+}
+
+function bestMatchEvidence(): ModelPerformanceEvidence[] {
+  return DAILY_FUSION_METRICS.map((variable) => evidenceFor(
+    "Open-Meteo",
+    variable,
+    { sampleSize: 500, comparisonCount: 500, evaluatedDays: 500, mae: 0.001, standardError: 0 },
+  ));
+}
+
 describe("computeOfficialDailyForecast", () => {
   it("fuse uniquement les preuves de production exactes et respecte le plafond individuel", () => {
     const first = computeOfficialDailyForecast(forecasts, options());
@@ -99,6 +137,55 @@ describe("computeOfficialDailyForecast", () => {
     }
     expect(first.trace.parameterSources.temperature.every((source) => source.variable === "temperature_max")).toBe(true);
     expect(Object.values(first.weights).every((weight) => weight.tempWeight <= 0.35 && weight.precipWeight <= 0.35 && weight.windWeight <= 0.35)).toBe(true);
+  });
+
+  it("garde valeurs, poids, trace et compte officiel invariants face à Best Match pour Tmin/Tmax, pluie, vent et rafales", () => {
+    const evidence = sevenModelEvidence();
+    const withoutBestMatch = computeOfficialDailyForecast(sevenModelForecasts, options(evidence));
+    const withBestMatch = computeOfficialDailyForecast(
+      [...sevenModelForecasts, bestMatchForecast],
+      options([...evidence, ...bestMatchEvidence()]),
+    );
+
+    expect(withoutBestMatch.coreCalibrationComplete).toBe(true);
+    expect(withBestMatch).toEqual(withoutBestMatch);
+    for (const metric of ["tempMax", "tempMin", "precipitation", "windSpeed", "windGust"] as const) {
+      expect(withBestMatch[metric]).toBe(withoutBestMatch[metric]);
+    }
+    expect(withBestMatch.weights).toEqual(withoutBestMatch.weights);
+    expect(Object.keys(withBestMatch.weights)).toEqual(allOfficialServiceNames);
+    expect(withBestMatch.weights).not.toHaveProperty("Open-Meteo");
+    expect(withBestMatch.trace.sourceCount).toBe(7);
+    expect(withBestMatch.trace.parameterSources.temperature.every((source) => source.name !== "Open-Meteo")).toBe(true);
+    expect(withBestMatch.trace.parameterSources.precipitation.every((source) => source.name !== "Open-Meteo")).toBe(true);
+    expect(withBestMatch.trace.parameterSources.wind.every((source) => source.name !== "Open-Meteo")).toBe(true);
+    expect(withBestMatch.trace.precipitationConsensus.modelsWithData).toEqual(allOfficialServiceNames);
+  });
+
+  it("reste indisponible quand la seule preuve qualifiée appartient à Best Match", () => {
+    const result = computeOfficialDailyForecast(
+      [...sevenModelForecasts, bestMatchForecast],
+      options(bestMatchEvidence()),
+    );
+
+    expect(result.coreCalibrationComplete).toBe(false);
+    expect(result.tempMax).toBeNull();
+    expect(result.tempMin).toBeNull();
+    expect(result.precipitation).toBeNull();
+    expect(result.windSpeed).toBeNull();
+    expect(result.windGust).toBeNull();
+    expect(result.trace.sourceCount).toBe(7);
+    expect(result.trace.parameterSources.temperature).toEqual([]);
+    expect(result.trace.parameterSources.precipitation).toEqual([]);
+    expect(result.trace.parameterSources.wind).toEqual([]);
+    expect(result.trace.precipitationConsensus).toMatchObject({
+      expectedModelCount: 7,
+      availableModelCount: 7,
+      conditionalMeanMethod: "arithmetic_mean",
+      modelsWithData: allOfficialServiceNames,
+    });
+    expect(Object.keys(result.weights)).toEqual(allOfficialServiceNames);
+    expect(Object.values(result.weights).every((weight) => weight.tempWeight === 0 && weight.precipWeight === 0 && weight.windWeight === 0)).toBe(true);
   });
 
   it("ne fabrique ni poids égaux ni valeur officielle quand la preuve est absente", () => {

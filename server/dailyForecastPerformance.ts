@@ -1,11 +1,14 @@
 import type { ForecastRun, InsertForecastRun, InsertDailyForecastObservationComparison } from "../drizzle/schema";
-import { WEATHER_SERVICES, type ForecastData } from "./weatherServices";
+import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, type ForecastData } from "./weatherServices";
 import { applyBiasCorrection, type ServiceBias } from "./fusionEngine";
 import { buildQualifiedDailyObservation, type PhysicalSnapshot } from "./physicalObservationAggregation";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 import type { DailyFusionHorizon, DailyFusionMetric, ModelPerformanceEvidence } from "./fusionPerformance";
 
 const MODEL_SERVICES = new Map(WEATHER_SERVICES.expert.map((service) => [service.name, service]));
+const OFFICIAL_DAILY_MODEL_BY_NAME = new Map<string, (typeof OFFICIAL_HOURLY_MODELS)[number]>(
+  OFFICIAL_HOURLY_MODELS.map((model) => [model.name, model]),
+);
 const DAILY_TEMPERATURE_MINIMUM_HOURS = 18;
 const DAILY_WIND_MINIMUM_HOURS = 18;
 const DAILY_PRECIPITATION_REQUIRED_HOURS = 24;
@@ -17,6 +20,10 @@ function isRecord(value: unknown): value is Record<string, any> {
 function finiteOrNull(value: unknown): number | null {
   const number = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
   return Number.isFinite(number) ? number : null;
+}
+
+function isOfficialDailyModel(serviceName: string, modelId: string | null | undefined): boolean {
+  return OFFICIAL_DAILY_MODEL_BY_NAME.get(serviceName)?.modelId === modelId;
 }
 
 function nextIsoDate(date: string): string | null {
@@ -141,8 +148,10 @@ function buildVariableComparison(
 ): InsertDailyForecastObservationComparison | null {
   const forecast = finiteOrNull(forecastValue);
   const observed = finiteOrNull(observedValue);
+  const officialModelId = OFFICIAL_DAILY_MODEL_BY_NAME.get(run.serviceName)?.modelId;
+  const modelId = run.modelId ?? officialModelId ?? null;
   if (run.id == null || forecast == null || observed == null) return null;
-  if (run.sourceKind !== "model_forecast" || !MODEL_SERVICES.has(run.serviceName)) return null;
+  if (run.sourceKind !== "model_forecast" || officialModelId == null || modelId !== officialModelId) return null;
   const signedError = forecast - observed;
   return {
     comparisonKey: `${run.id}:${variable}`,
@@ -151,7 +160,7 @@ function buildVariableComparison(
     validDate,
     serviceName: run.serviceName,
     provider: run.provider,
-    modelId: run.modelId ?? MODEL_SERVICES.get(run.serviceName)!.modelId,
+    modelId,
     horizonBucket,
     leadTimeMinutes,
     variable,
@@ -207,7 +216,8 @@ type StoredComparison = InsertDailyForecastObservationComparison;
 export function aggregateDailyForecastPerformance(rows: StoredComparison[]): ModelPerformanceEvidence[] {
   const groups = new Map<string, StoredComparison[]>();
   for (const row of rows) {
-    if (row.evidenceType !== "physical_observation" || row.observationIsQualified !== 1) continue;
+    if (row.evidenceType !== "physical_observation" || row.observationIsQualified !== 1
+      || !isOfficialDailyModel(row.serviceName, row.modelId)) continue;
     const key = [row.locationKey, row.serviceName, row.modelId, row.variable, row.horizonBucket].join("\u001f");
     const group = groups.get(key) ?? [];
     group.push(row);
