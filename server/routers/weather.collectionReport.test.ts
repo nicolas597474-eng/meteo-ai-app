@@ -34,17 +34,37 @@ describe("weather.getForecastCollectionReport", () => {
     expect(procedure).toContain("durationMs");
     expect(procedure).toContain("flowStatuses");
     expect(procedure).toContain("buildForecastFlowStatuses");
+    expect(procedure).toContain("const expectedModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name)");
     expect(procedure).toContain("dailyCollectedModels");
     expect(procedure).toContain("hourlyCollectedModels");
     expect(procedure).toContain("const expectedHourlyModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name)");
     expect(procedure).toContain("getCollectedModelNames(expectedHourlyModels, hourlyMissingModels)");
     expect(procedure).toContain('result.modelName === "best_match"');
-    expect(procedure).toContain("bestMatchAudit.archiveRowsWritten > 0");
+    expect(procedure).toContain("bestMatchReference: {");
+    expect(procedure).toContain("daily: bestMatchDailyAudit");
+    expect(procedure).toContain("variableCoverage: result.variableCoverage ?? null");
+    expect(procedure).not.toContain('hourlyCollectedModels.push("Open-Meteo")');
     expect(procedure).toContain("expectedHourlyModels,");
     expect(procedure).toContain("getLatestHourlyForecastCollectionResults(locationKey)");
     expect(procedure).toContain("hourlyModelCollectionAvailable");
     expect(procedure).toContain("archiveRowsWritten: result.archiveRowsWritten");
     expect(procedure).toContain("isOfficialModel: result.isOfficialModel === 1");
+    expect(procedure).toContain("dailyVariableCoverage: latestCollection.dailyVariableCoverage ?? null");
+  });
+});
+
+describe("weather.getAILab modelDetails", () => {
+  it("garde Best Match hors des prévisions officielles même sans trace pondérée", () => {
+    const source = readFileSync(new URL("./weather.ts", import.meta.url), "utf8");
+    const start = source.indexOf("const officialForecastNames = new Set<string>(OFFICIAL_HOURLY_MODELS.map((model) => model.name))");
+    const end = source.indexOf("// L'accord décrit la dispersion", start);
+    const contributionBlock = source.slice(start, end);
+
+    expect(contributionBlock).toContain("const officialForecastNames = new Set<string>(OFFICIAL_HOURLY_MODELS.map((model) => model.name))");
+    expect(contributionBlock).toContain("filterForecastTraceToModelNames(persistedTrace, officialForecastNames)");
+    expect(contributionBlock).toContain("officialForecastNames.has(forecast.serviceName)");
+    expect(contributionBlock).toContain("contributingNames.size === 0 || contributingNames.has(forecast.serviceName)");
+    expect(contributionBlock).not.toContain("? forecasts.filter((forecast) => contributingNames.has");
   });
 });
 

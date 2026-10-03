@@ -2,6 +2,7 @@ import { eq, desc, and, gte, lte, lt, sql, isNull, isNotNull, inArray, or } from
 import { drizzle } from "drizzle-orm/mysql2";
 import { acquireForecastLease, decideScheduledForecastJobDisposition, FORECAST_REFRESH_LOCK_LEASE_MS } from "./forecastRefreshLock";
 import { getParisDate } from "./weatherTime";
+import { buildHourlyArchiveValues } from "./forecastVariableCoverage";
 import {
   InsertUser,
   users,
@@ -214,18 +215,21 @@ export async function insertForecasts(
 export async function insertForecastRuns(
   data: InsertForecastRun[],
   options: { requireDatabase?: boolean } = {},
-): Promise<void> {
+): Promise<number> {
   const db = await getDb();
   if (!db) {
     if (options.requireDatabase) requireDatabaseForWrite(db, "archiver les émissions de prévisions");
-    return;
+    return 0;
   }
-  if (data.length === 0) return;
+  if (data.length === 0) return 0;
+  let confirmedRows = 0;
   for (const row of data) {
     await db.insert(forecastRuns).values(row).onDuplicateKeyUpdate({
       set: { capturedAt: new Date() },
     });
+    confirmedRows += 1;
   }
+  return confirmedRows;
 }
 
 export async function getForecastsByDate(date: string, locationKey = "default") {
@@ -1550,19 +1554,13 @@ type HourlyForecastCapture = {
   modelId: string | null;
   requestStartedAt: number;
   availableAt: number;
-  units?: {
-    temperature?: string | null;
-    precipitation?: string | null;
-    windSpeed?: string | null;
-    windGusts?: string | null;
-    humidity?: string | null;
-    pressure?: string | null;
-  };
+  units?: Record<string, string | null | undefined>;
 };
 
 type InsertHourlyForecastWithCapture = InsertHourlyForecast & {
   validTime?: number;
   captureRun?: HourlyForecastCapture;
+  archiveValues?: Record<string, unknown>;
 };
 
 /**
@@ -1589,14 +1587,16 @@ export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCaptur
       const capture = captureRows[0].captureRun!;
       const runValues: InsertHourlyForecastRunValue[] = captureRows.flatMap((row) => {
         if (row.captureRun?.captureRunId !== captureRunId) return [];
-        const values: Array<{ variable: string; value: number | null; unit: string | null }> = [
-          { variable: "temperature", value: row.temperature ?? null, unit: capture.units?.temperature ?? "°C" },
-          { variable: "precipitation", value: row.precipitation ?? null, unit: capture.units?.precipitation ?? "mm" },
-          { variable: "wind_speed", value: row.windSpeed ?? null, unit: capture.units?.windSpeed ?? "km/h" },
-          { variable: "wind_gust", value: row.windGusts ?? null, unit: capture.units?.windGusts ?? "km/h" },
-          { variable: "humidity", value: row.humidity ?? null, unit: capture.units?.humidity ?? "%" },
-          { variable: "pressure", value: row.pressure ?? null, unit: capture.units?.pressure ?? "hPa" },
-        ];
+        const values: Array<{ variable: string; value: number | null; unit: string | null }> = row.archiveValues
+          ? buildHourlyArchiveValues({ values: row.archiveValues, units: capture.units })
+          : [
+              { variable: "temperature", value: row.temperature ?? null, unit: capture.units?.temperature ?? "°C" },
+              { variable: "precipitation", value: row.precipitation ?? null, unit: capture.units?.precipitation ?? "mm" },
+              { variable: "wind_speed", value: row.windSpeed ?? null, unit: capture.units?.windSpeed ?? "km/h" },
+              { variable: "wind_gust", value: row.windGusts ?? null, unit: capture.units?.windGusts ?? "km/h" },
+              { variable: "humidity", value: row.humidity ?? null, unit: capture.units?.humidity ?? "%" },
+              { variable: "pressure", value: row.pressure ?? null, unit: capture.units?.pressure ?? "hPa" },
+            ];
         return values.map(({ variable, value, unit }) => ({
           captureRunId,
           locationKey: row.locationKey,
@@ -1630,7 +1630,7 @@ export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCaptur
         eq(hourlyForecasts.modelName, modelName),
       ));
       for (let i = 0; i < rows.length; i += 50) {
-        const activeRows = rows.slice(i, i + 50).map(({ validTime: _validTime, captureRun: _captureRun, ...row }) => row);
+        const activeRows = rows.slice(i, i + 50).map(({ validTime: _validTime, captureRun: _captureRun, archiveValues: _archiveValues, ...row }) => row);
         await tx.insert(hourlyForecasts).values(activeRows);
       }
     });
@@ -1681,6 +1681,7 @@ export async function upsertHourlyForecastCollectionResults(rows: InsertHourlyFo
         expectedValueCount: row.expectedValueCount,
         archiveRowsWritten: row.archiveRowsWritten,
         projectionRowsWritten: row.projectionRowsWritten,
+        variableCoverage: row.variableCoverage ?? null,
         errorCode: row.errorCode,
         completedAt: row.completedAt,
       },

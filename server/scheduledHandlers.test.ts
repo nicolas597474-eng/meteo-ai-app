@@ -5,29 +5,31 @@ import { requireDatabaseForWrite } from "./db";
 import { OFFICIAL_HOURLY_MODELS, VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
 describe("getModelCoverage", () => {
-  it("conserve le catalogue quotidien à huit flux par défaut", () => {
+  it("conserve le catalogue quotidien à sept modèles officiels par défaut", () => {
     const coverage = getModelCoverage([
       "AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo",
     ]);
 
     expect(coverage).toMatchObject({ expected: expect.any(Array), collected: expect.any(Array), missing: [] });
-    expect(coverage.expected).toHaveLength(8);
+    expect(coverage.expected).toHaveLength(7);
+    expect(coverage.expected).not.toContain("Open-Meteo");
   });
 
-  it("identifie les huit modèles experts attendus et les indisponibilités", () => {
+  it("identifie les sept modèles officiels attendus et les indisponibilités", () => {
     const coverage = getModelCoverage(["AROME", "ECMWF", "GEM"]);
 
-    expect(coverage.expected).toHaveLength(8);
+    expect(coverage.expected).toHaveLength(7);
     expect(coverage.collected).toEqual(["AROME", "ECMWF", "GEM"]);
-    expect(coverage.missing).toEqual(expect.arrayContaining(["ARPEGE", "ICON", "GFS", "UKMET", "Open-Meteo"]));
+    expect(coverage.missing).toEqual(expect.arrayContaining(["ARPEGE", "ICON", "GFS", "UKMET"]));
+    expect(coverage.missing).not.toContain("Open-Meteo");
   });
 
-  it("ne signale aucune indisponibilité lorsque les huit modèles sont présents", () => {
+  it("ne signale aucune indisponibilité lorsque les sept modèles officiels sont présents", () => {
     const coverage = getModelCoverage([
       "AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo",
     ]);
 
-    expect(coverage.collected).toHaveLength(8);
+    expect(coverage.collected).toHaveLength(7);
     expect(coverage.missing).toEqual([]);
   });
 
@@ -51,9 +53,11 @@ describe("getModelCoverage", () => {
     expect(coverage.collected).not.toContain("Open-Meteo");
   });
 
-  it("conserve les candidats hors du compteur de couverture active", () => {
+  it("conserve Best Match et les candidats hors du compteur de couverture active", () => {
     const coverage = getModelCoverage(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo"]);
-    expect(coverage.expected).toHaveLength(8);
+    expect(coverage.expected).toHaveLength(7);
+    expect(coverage.collected).toHaveLength(7);
+    expect(coverage.collected).not.toContain("Open-Meteo");
     expect(VALIDATION_WEATHER_MODELS).toHaveLength(5);
     expect(coverage.expected).not.toContain("DMI HARMONIE-DINI");
   });
@@ -141,9 +145,10 @@ describe("cadence automatique des prévisions", () => {
 });
 
 describe("buildStationCollectionSnapshot", () => {
-  it("conserve le rayon choisi et compte sept modèles officiels malgré une référence Best Match collectée", () => {
+  it("conserve la preuve quotidienne par champ et compte sept modèles officiels malgré Best Match", () => {
     const officialModels = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
     const complete = getModelCoverage([...officialModels, "Open-Meteo"], officialModels);
+    const dailyVariableCoverage = [{ modelName: "AROME", variables: [{ key: "relative_humidity_2m_mean", receivedCount: 2 }] }] as any;
     const snapshot = buildStationCollectionSnapshot({
       locationKey: "50.756_2.521",
       date: "2026-08-12",
@@ -151,9 +156,11 @@ describe("buildStationCollectionSnapshot", () => {
       physicalStationCount: 2,
       daily: complete,
       hourly: complete,
+      dailyVariableCoverage,
     });
 
     expect(snapshot).toMatchObject({ radiusKm: 30, physicalStationCount: 2, dailyModelCount: 7, hourlyModelCount: 7, status: "completed" });
+    expect(snapshot.dailyVariableCoverage).toEqual(dailyVariableCoverage);
   });
 
   it("distingue une couverture partielle et une indisponibilité totale", () => {

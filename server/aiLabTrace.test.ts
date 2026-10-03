@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAppliedModelWeights } from "./aiLabTrace";
+import { buildAppliedModelWeights, filterForecastTraceToModelNames } from "./aiLabTrace";
 
 describe("trace AI Lab", () => {
   it("n’expose que les modèles qui ont effectivement contribué à la fusion", () => {
@@ -23,5 +23,25 @@ describe("trace AI Lab", () => {
 
   it("ne fabrique aucun contributeur sans trace valide", () => {
     expect(buildAppliedModelWeights(null)).toEqual([]);
+  });
+
+  it("exclut les modèles non officiels d’une ancienne trace tout en préservant les autres sources", () => {
+    const filtered = filterForecastTraceToModelNames({
+      parameterSources: {
+        temperature: [
+          { name: "ECMWF", type: "model", finalWeight: 0.7 },
+          { name: "Open-Meteo", type: "model", finalWeight: 0.3 },
+          { name: "Station locale", type: "station", finalWeight: 0.2 },
+        ],
+        precipitation: [{ name: "best_match", type: "model", finalWeight: 0.2 }],
+        wind: [{ name: "GFS", type: "model", finalWeight: 0.8 }],
+        humidity: [{ name: "Open-Meteo", type: "model", finalWeight: 0.2 }],
+      },
+    }, new Set(["ECMWF", "GFS"]));
+
+    expect(buildAppliedModelWeights(filtered).map((model) => model.name)).toEqual(["GFS", "ECMWF"]);
+    expect(filtered?.parameterSources?.temperature).toContainEqual({ name: "Station locale", type: "station", finalWeight: 0.2 });
+    expect(filtered?.parameterSources?.precipitation).toEqual([]);
+    expect(filtered?.parameterSources?.humidity).toEqual([]);
   });
 });

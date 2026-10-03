@@ -4,7 +4,7 @@ type TraceSource = {
   finalWeight: number;
 };
 
-type ForecastTrace = {
+export type ForecastTrace = {
   parameterSources?: {
     temperature?: TraceSource[];
     precipitation?: TraceSource[];
@@ -12,6 +12,24 @@ type ForecastTrace = {
     humidity?: TraceSource[];
   };
 };
+
+/** Remove non-official model sources from an official-engine trace without altering other source types. */
+export function filterForecastTraceToModelNames(trace: ForecastTrace | null, officialModelNames: ReadonlySet<string>): ForecastTrace | null {
+  if (!trace?.parameterSources) return trace;
+  const filter = (sources: TraceSource[] | undefined) => sources?.filter((source) =>
+    source.type !== "model" || officialModelNames.has(source.name),
+  );
+  return {
+    ...trace,
+    parameterSources: {
+      ...trace.parameterSources,
+      temperature: filter(trace.parameterSources.temperature),
+      precipitation: filter(trace.parameterSources.precipitation),
+      wind: filter(trace.parameterSources.wind),
+      humidity: filter(trace.parameterSources.humidity),
+    },
+  };
+}
 
 export type AppliedModelWeight = {
   name: string;

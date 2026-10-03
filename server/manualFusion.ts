@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getParisDate } from "./weatherTime";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
-import { collectExpertForecasts, WEATHER_SERVICES } from "./weatherServices";
+import { collectExpertForecasts } from "./weatherServices";
 import { buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { collectOfficialHourlyForecast, OFFICIAL_HOURLY_MODEL_NAMES } from "./officialHourlyForecast";
 import { getParisDateAndHour } from "./parisHourlyTime";
@@ -39,6 +39,7 @@ type ManualRefreshResult = {
 };
 
 const inFlightRefreshes = new Set<string>();
+const OFFICIAL_DAILY_MODEL_NAME_SET = new Set<string>(OFFICIAL_HOURLY_MODEL_NAMES);
 
 export function isManualFusionCoolingDown(computedAt: Date | null | undefined, now = Date.now()) {
   return computedAt != null && now - computedAt.getTime() < MANUAL_FUSION_COOLDOWN_MS;
@@ -91,11 +92,12 @@ function persistedHourlySeriesMatches(
 }
 
 async function refreshDailyForecast(favorite: ManualFusionFavorite, today: string, locationKey: string): Promise<GranularityResult> {
-  const expectedModelCount = WEATHER_SERVICES.expert.length;
+  const expectedModelCount = OFFICIAL_HOURLY_MODEL_NAMES.length;
   try {
     const expertData = await collectExpertForecasts(today, { lat: favorite.lat, lon: favorite.lon });
-    if (expertData.length === 0) {
-      return granularityResult(0, expectedModelCount, null, "Aucun modèle quotidien n’a renvoyé de prévision.");
+    const officialDailyForecasts = expertData.filter((forecast) => OFFICIAL_DAILY_MODEL_NAME_SET.has(forecast.serviceName));
+    if (officialDailyForecasts.length === 0) {
+      return granularityResult(0, expectedModelCount, null, "Aucun des sept modèles quotidiens officiels n’a renvoyé de prévision.");
     }
     const issuedAt = Date.now();
 
@@ -189,7 +191,7 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       return granularityResult(0, expectedModelCount, null, "La fusion quotidienne n’a pas pu être confirmée après son enregistrement.");
     }
 
-    const dailyResult = granularityResult(expertData.length, expectedModelCount, new Date(persistedAt));
+    const dailyResult = granularityResult(officialDailyForecasts.length, expectedModelCount, new Date(persistedAt));
     if (!meteoAI.coreCalibrationComplete) {
       dailyResult.status = "partial";
       dailyResult.error = meteoAI.methodNote;

@@ -108,8 +108,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("const expectedHourlyModels = forecastCollectionReport?.expectedHourlyModels");
     expect(source).toContain("{forecastCollectionSnapshot.hourlyModelCount}/{expectedHourlyModels.length || 7} modèles officiels");
     expect(source).toContain("forecastNamedModelCount");
-    expect(source).toContain("forecastAggregatorCount");
-    expect(source).toContain("Agrégateur Best Match");
+    expect(source).toContain("forecastCompositionLabel");
+    expect(source).toContain("Open-Meteo · Best Match");
     expect(source).toContain("getForecastModelGuide");
     expect(source).toContain("Ouvrir la fiche du flux");
     expect(source).toContain("Comprendre le modèle");
@@ -121,6 +121,16 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("ForecastFlowStatusBadge");
     expect(source).toContain("Statut opérationnel de tous les flux de prévision");
     expect(source).toContain('operationalStatus?.status ?? "FAILED"');
+    expect(source).toContain("Couverture quotidienne par champ");
+    expect(source).toContain("Couverture horaire par champ");
+    expect(source).toContain("Prévisions quotidiennes des modèles officiels");
+    expect(source).not.toContain("Prévisions quotidiennes des contributeurs");
+    expect(source).toContain("Limite du produit documentée");
+    expect(source).toContain("Support de cette moyenne quotidienne non confirmé");
+    expect(source).toContain("Open-Meteo · Best Match");
+    expect(source).toContain("hors des sept modèles officiels");
+    expect(source).toContain("dailyVariableCoverage");
+    expect(source).toContain("variableCoverage");
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
     expect(source).toContain("<BackToTopButton />");
     expect(source).toContain('className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4"');

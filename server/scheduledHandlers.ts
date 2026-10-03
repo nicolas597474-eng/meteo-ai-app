@@ -9,7 +9,8 @@ import { randomUUID } from "node:crypto";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
-import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, collectExpertForecasts, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
+import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, collectExpertForecasts, collectExpertForecastsWithDiagnostics, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
+import { buildHourlyModelCollectionCoverage, confirmDailyArchiveCoverage, HOURLY_FORECAST_VARIABLES, type DailyModelCollectionCoverage } from "./forecastVariableCoverage";
 import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour } from "./weatherTime";
 import { getActiveParisForecastHours } from "./forecastScheduleConfig";
 import { FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, FORECAST_REFRESH_LOCK_LEASE_MS, getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
@@ -98,7 +99,7 @@ const OFFICIAL_DAILY_COVERAGE_MODEL_SET = new Set<string>(OFFICIAL_DAILY_COVERAG
 
 export function getModelCoverage(
   receivedNames: string[],
-  expectedNames = WEATHER_SERVICES.expert.map((service) => service.name),
+  expectedNames = OFFICIAL_DAILY_COVERAGE_MODELS,
 ) {
   const received = new Set(receivedNames);
   return {
@@ -119,6 +120,7 @@ export function buildStationCollectionSnapshot(input: {
   physicalStationCount: number;
   daily: ReturnType<typeof getModelCoverage>;
   hourly: ReturnType<typeof getModelCoverage>;
+  dailyVariableCoverage?: DailyModelCollectionCoverage[];
   forceFailed?: boolean;
 }) {
   const status = input.forceFailed
@@ -135,6 +137,7 @@ export function buildStationCollectionSnapshot(input: {
     hourlyModelCount: input.hourly.collected.length,
     dailyMissingModels: input.daily.missing,
     hourlyMissingModels: input.hourly.missing,
+    dailyVariableCoverage: input.dailyVariableCoverage ?? null,
     status,
   };
 }
@@ -1085,7 +1088,15 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
         // Collect expert forecasts for this location
         const dailyShadowRequestStartedAt = Date.now();
-        const expertData = await collectExpertForecasts(today, { lat: fav.lat, lon: fav.lon });
+        const dailyCollection = await collectExpertForecastsWithDiagnostics(today, { lat: fav.lat, lon: fav.lon });
+        const expertData = dailyCollection.forecasts;
+        const dailyDiagnostics = dailyCollection.diagnostics;
+        let dailyVariableCoverage = confirmDailyArchiveCoverage(dailyDiagnostics, {
+          targetDate: today,
+          forecasts: expertData,
+          archiveRows: [],
+          archiveRowsWritten: 0,
+        });
         const dailyShadowReceivedAt = Date.now();
         const dailyCoverage = getModelCoverage(
           expertData.map((forecast) => forecast.serviceName),
@@ -1174,15 +1185,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                   modelId: forecast.modelId ?? null,
                   requestStartedAt: forecast.requestStartedAt ?? hourlyShadowRequestStartedAt,
                   availableAt: forecast.availableAt ?? hourlyShadowReceivedAt,
-                  units: {
-                    temperature: forecast.sourceMetadata?.units.temperature,
-                    precipitation: forecast.sourceMetadata?.units.precipitation,
-                    windSpeed: forecast.sourceMetadata?.units.windSpeed,
-                    windGusts: forecast.sourceMetadata?.units.windGusts,
-                    humidity: forecast.sourceMetadata?.units.humidity,
-                    pressure: forecast.sourceMetadata?.units.pressure,
-                  },
+                  units: forecast.sourceMetadata?.units ?? {},
                 },
+                archiveValues: hour,
                 modelName: forecast.modelName,
                 temperature: hour.temperature,
                 apparentTemperature: hour.apparentTemperature,
@@ -1200,7 +1205,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 archiveRowsWritten = writeResult.archiveRowsWritten;
                 projectionRowsWritten = writeResult.projectionRowsWritten;
                 finalStatus = diagnostic.status === "succeeded"
-                  && archiveRowsWritten === forecast.hours.length * 6
+                  && archiveRowsWritten === forecast.hours.length * HOURLY_FORECAST_VARIABLES.length
                   && projectionRowsWritten === forecast.hours.length
                   ? "succeeded"
                   : "partial";
@@ -1217,6 +1222,20 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 console.warn(`[HourlyArchive] ${fav.name}/${model.modelName}: write not confirmed (${errorCode}).`);
               }
             }
+
+            const variableCoverage = buildHourlyModelCollectionCoverage({
+              modelName: model.modelName,
+              modelId: model.modelId,
+              isOfficialModel: officialModelNames.has(model.modelName),
+              status: finalStatus,
+              requestAttempts: diagnostic.attemptCount,
+              errorCode: finalStatus === "succeeded" ? null : errorCode,
+              requestedForecastDays: 2,
+              hours: forecast?.hours ?? [],
+              units: forecast?.sourceMetadata?.units,
+              archiveRowsWritten,
+              projectionRowsWritten,
+            });
 
             if (archiveRowsWritten > 0 && OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName) && !persistedHourlyModelNames.has(model.modelName)) {
               persistedHourlyModelNames.add(model.modelName);
@@ -1240,6 +1259,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 expectedValueCount: diagnostic.expectedValueCount,
                 archiveRowsWritten,
                 projectionRowsWritten,
+                variableCoverage: variableCoverage as any,
                 errorCode: finalStatus === "succeeded" ? null : errorCode,
                 attemptedAt: hourlyAttemptedAt,
                 completedAt: Date.now(),
@@ -1351,6 +1371,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             physicalStationCount,
             daily: dailyCoverage,
             hourly: hourlyCoverage,
+            dailyVariableCoverage,
             forceFailed: true,
           }));
           coverageByLocation.push({
@@ -1404,7 +1425,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         });
 
         // Candidate outputs are archived independently and cannot enter the
-        // forecasts table, official fusion or eight-model coverage counters.
+        // forecasts table, official fusion or seven-model coverage counters.
         const validationDaily = await collectValidationForecasts(today, { lat: fav.lat, lon: fav.lon });
         if (validationDaily.length > 0) {
           await insertForecastRuns(validationDaily.map((f) => ({
@@ -1453,7 +1474,14 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           ? applyBiasCorrection(rawLocForecasts, locBiases)
           : rawLocForecasts;
 
-        await insertForecastRuns(buildForecastRunArchiveRows(expertData, locKey, today, issuedAt, locBiases));
+        const dailyArchiveRows = buildForecastRunArchiveRows(expertData, locKey, today, issuedAt, locBiases);
+        const dailyArchiveRowsWritten = await insertForecastRuns(dailyArchiveRows);
+        dailyVariableCoverage = confirmDailyArchiveCoverage(dailyDiagnostics, {
+          targetDate: today,
+          forecasts: expertData,
+          archiveRows: dailyArchiveRows,
+          archiveRowsWritten: dailyArchiveRowsWritten,
+        });
         const fusionEvidence = await getDailyFusionPerformanceEvidence(locKey, today, issuedAt);
         const meteoAI = computeOfficialDailyForecast(biasCorrectedLocForecasts, {
           locationKey: locKey,
@@ -1525,6 +1553,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           physicalStationCount,
           daily: dailyCoverage,
           hourly: hourlyCoverage,
+          dailyVariableCoverage,
         }));
 
         await executeShadowWriteSafely(`p1.6:${locKey}:${today}`, async () => {

@@ -10,6 +10,14 @@ import { getParisDateAndHour } from "./parisHourlyTime";
 import type { HourlyHistoricalEvidence, HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
 import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
 import { summarizePrecipitationModels, type PrecipitationModelConsensus } from "../shared/precipitationConsensus";
+import {
+  buildDailyModelCollectionCoverage,
+  buildHourlyModelCollectionCoverage,
+  DAILY_FORECAST_REQUEST_KEYS,
+  finiteCoverageValue,
+  HOURLY_FORECAST_VARIABLES,
+  type DailyModelCollectionCoverage,
+} from "./forecastVariableCoverage";
 
 // Hondeghem coordinates
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
@@ -83,64 +91,119 @@ export type ValidationForecastData = ForecastData & {
   validationStatus: "candidate";
 };
 
-/**
- * Collect forecasts from Open-Meteo API for expert models.
- * Returns forecast data for today's date.
- */
+/** Collect each expert source and retain a safe per-model daily coverage summary. */
+export async function collectExpertForecastsWithDiagnostics(
+  targetDate: string,
+  coords?: { lat: number; lon: number },
+): Promise<{ forecasts: ForecastData[]; diagnostics: DailyModelCollectionCoverage[] }> {
+  const location = coords ?? HONDEGHEM;
+  const outcomes = await Promise.all(WEATHER_SERVICES.expert.map(async (service) => {
+    const base = {
+      modelName: service.name,
+      modelId: service.modelId,
+      isOfficialModel: service.modelId !== "best_match",
+      requestedDays: 16,
+      targetDate,
+    };
+    try {
+      const url = new URL("https://api.open-meteo.com/v1/forecast");
+      url.searchParams.set("latitude", location.lat.toString());
+      url.searchParams.set("longitude", location.lon.toString());
+      url.searchParams.set("daily", DAILY_FORECAST_REQUEST_KEYS.join(","));
+      url.searchParams.set("timezone", "Europe/Paris");
+      url.searchParams.set("forecast_days", String(base.requestedDays));
+      if (service.modelId !== "best_match") url.searchParams.set("models", service.modelId);
+
+      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
+      const requestAttempts = getWeatherResponseAttemptCount(response);
+      if (!response.ok) {
+        const errorCode = response.status >= 500 ? "provider_http_5xx" : response.status >= 400 ? "provider_http_4xx" : "provider_http_error";
+        return {
+          forecast: null,
+          diagnostic: buildDailyModelCollectionCoverage({ ...base, status: "failed", requestAttempts, errorCode }),
+        };
+      }
+
+      const data = await response.json();
+      const daily = data && typeof data === "object" && "daily" in data && data.daily && typeof data.daily === "object"
+        ? data.daily as Record<string, unknown>
+        : null;
+      const preliminary = buildDailyModelCollectionCoverage({
+        ...base,
+        status: "succeeded",
+        requestAttempts,
+        errorCode: null,
+        daily,
+      });
+      const hasReturnedValues = preliminary.variables.some((variable) => variable.requested && variable.receivedCount > 0);
+      const allRequestedVariablesHaveValues = preliminary.variables
+        .filter((variable) => variable.requested)
+        .every((variable) => variable.receivedCount === base.requestedDays);
+      const dateIndex = Array.isArray(daily?.time) ? daily.time.indexOf(targetDate) : -1;
+      const rawAtDate = (key: string): unknown => dateIndex >= 0 && Array.isArray(daily?.[key])
+        ? (daily![key] as unknown[])[dateIndex]
+        : null;
+      const forecast: ForecastData | null = dateIndex < 0 ? null : {
+        serviceName: service.name,
+        serviceCategory: service.category,
+        tempMax: finiteCoverageValue(rawAtDate("temperature_2m_max")),
+        tempMin: finiteCoverageValue(rawAtDate("temperature_2m_min")),
+        precipitation: finiteCoverageValue(rawAtDate("precipitation_sum")),
+        windSpeed: finiteCoverageValue(rawAtDate("wind_speed_10m_max")),
+        windGust: finiteCoverageValue(rawAtDate("wind_gusts_10m_max")),
+        // Keep requesting these undocumented means; expose only values actually returned by this model.
+        humidity: finiteCoverageValue(rawAtDate("relative_humidity_2m_mean")),
+        cloudCover: finiteCoverageValue(rawAtDate("cloud_cover_mean")),
+        condition: null,
+        rawData: data,
+      };
+      const usableForecast = forecast && hasUsableForecastValue(forecast) ? forecast : null;
+      const status = preliminary.returnedDays === 0
+        ? "failed"
+        : hasReturnedValues && allRequestedVariablesHaveValues && preliminary.returnedDays === base.requestedDays && preliminary.targetDateInResponse
+          ? "succeeded"
+          : "partial";
+      const errorCode = !hasReturnedValues
+        ? "no_usable_data"
+        : !preliminary.targetDateInResponse
+          ? "target_date_out_of_horizon"
+          : !usableForecast
+            ? "target_date_no_usable_data"
+            : null;
+      const diagnostic = buildDailyModelCollectionCoverage({
+        ...base,
+        status,
+        requestAttempts,
+        errorCode,
+        daily,
+      });
+      return { forecast: usableForecast, diagnostic };
+    } catch (error) {
+      const errorCode = classifyHourlyProviderError(error);
+      return {
+        forecast: null,
+        diagnostic: buildDailyModelCollectionCoverage({
+          ...base,
+          status: errorCode === "invalid_response" ? "failed" : "safe_error",
+          requestAttempts: 2,
+          errorCode,
+        }),
+      };
+    }
+  }));
+
+  return {
+    forecasts: outcomes.flatMap((outcome) => outcome.forecast ? [outcome.forecast] : []),
+    diagnostics: outcomes.map((outcome) => outcome.diagnostic),
+  };
+}
+
+/** Compatibility wrapper for consumers that only need the current daily values. */
 export async function collectExpertForecasts(
   targetDate: string,
-  coords?: { lat: number; lon: number }
+  coords?: { lat: number; lon: number },
 ): Promise<ForecastData[]> {
-  const location = coords ?? HONDEGHEM;
-  const responses = await Promise.all(
-    WEATHER_SERVICES.expert.map(async (service): Promise<ForecastData | null> => {
-      try {
-        const url = new URL("https://api.open-meteo.com/v1/forecast");
-        url.searchParams.set("latitude", location.lat.toString());
-        url.searchParams.set("longitude", location.lon.toString());
-        url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
-        url.searchParams.set("timezone", "Europe/Paris");
-        url.searchParams.set("forecast_days", "16");
-
-        if (service.modelId !== "best_match") {
-          url.searchParams.set("models", service.modelId);
-        }
-
-        const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
-        if (!response.ok) {
-          console.warn(`[Collector] ${service.name} HTTP ${response.status}`);
-          return null;
-        }
-
-        const data = await response.json();
-        const daily = data.daily;
-        if (!daily?.time) return null;
-
-        const dateIndex = daily.time.indexOf(targetDate);
-        if (dateIndex === -1) return null;
-
-        const forecast: ForecastData = {
-          serviceName: service.name,
-          serviceCategory: service.category,
-          tempMax: daily.temperature_2m_max?.[dateIndex] ?? null,
-          tempMin: daily.temperature_2m_min?.[dateIndex] ?? null,
-          precipitation: daily.precipitation_sum?.[dateIndex] ?? null,
-          windSpeed: daily.wind_speed_10m_max?.[dateIndex] ?? null,
-          windGust: daily.wind_gusts_10m_max?.[dateIndex] ?? null,
-          humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
-          cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
-          condition: null,
-          rawData: data,
-        };
-        return hasUsableForecastValue(forecast) ? forecast : null;
-      } catch (err) {
-        console.warn(`[Collector] Error fetching ${service.name}:`, err);
-        return null;
-      }
-    })
-  );
-
-  return responses.filter((forecast): forecast is ForecastData => forecast !== null);
+  return (await collectExpertForecastsWithDiagnostics(targetDate, coords)).forecasts;
 }
 
 /**
@@ -158,7 +221,7 @@ export async function collectValidationForecasts(
         const url = new URL("https://api.open-meteo.com/v1/forecast");
         url.searchParams.set("latitude", location.lat.toString());
         url.searchParams.set("longitude", location.lon.toString());
-        url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
+        url.searchParams.set("daily", DAILY_FORECAST_REQUEST_KEYS.join(","));
         url.searchParams.set("timezone", "Europe/Paris");
         url.searchParams.set("forecast_days", "16");
         url.searchParams.set("models", model.modelId);
@@ -179,8 +242,8 @@ export async function collectValidationForecasts(
           precipitation: daily.precipitation_sum?.[dateIndex] ?? null,
           windSpeed: daily.wind_speed_10m_max?.[dateIndex] ?? null,
           windGust: daily.wind_gusts_10m_max?.[dateIndex] ?? null,
-          humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
-          cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
+          humidity: null,
+          cloudCover: null,
           condition: null,
           rawData: data,
         };
@@ -208,7 +271,7 @@ export async function collectObservations(
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", lat.toString());
     url.searchParams.set("longitude", lon.toString());
-    url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,relative_humidity_2m_mean,cloud_cover_mean");
+    url.searchParams.set("daily", DAILY_FORECAST_REQUEST_KEYS.join(","));
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("past_days", "7");
     url.searchParams.set("forecast_days", "0");
@@ -230,8 +293,8 @@ export async function collectObservations(
       precipitation: daily.precipitation_sum?.[dateIndex] ?? null,
       windSpeed: daily.wind_speed_10m_max?.[dateIndex] ?? null,
       windGust: daily.wind_gusts_10m_max?.[dateIndex] ?? null,
-      humidity: daily.relative_humidity_2m_mean?.[dateIndex] ?? null,
-      cloudCover: daily.cloud_cover_mean?.[dateIndex] ?? null,
+      humidity: null,
+      cloudCover: null,
       condition: null,
       source: `Open-Meteo forecast reference (${locationName})`,
       provenanceType: "model_reference" as const,
@@ -389,7 +452,7 @@ export async function collect15DayForecast(
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,relative_humidity_2m_mean,cloud_cover_mean,uv_index_max,apparent_temperature_max,apparent_temperature_min,sunrise,sunset");
+      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max,apparent_temperature_max,apparent_temperature_min,sunrise,sunset");
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", "16");
       if (model.modelId) url.searchParams.set("models", model.modelId);
@@ -426,8 +489,8 @@ export async function collect15DayForecast(
         precipitation: daily.precipitation_sum?.[i],
         windSpeed: daily.wind_speed_10m_max?.[i],
         windGust: daily.wind_gusts_10m_max?.[i],
-        humidity: daily.relative_humidity_2m_mean?.[i],
-        cloudCover: daily.cloud_cover_mean?.[i],
+        humidity: null,
+        cloudCover: null,
       });
       modelAgreementInputsByDate.set(d, agreementInputs);
       if (daily.temperature_2m_max?.[i] != null) allModelData[d].tempMax.push(daily.temperature_2m_max[i]);
@@ -442,8 +505,6 @@ export async function collect15DayForecast(
       if (daily.wind_speed_10m_max?.[i] != null) allModelData[d].wind.push(daily.wind_speed_10m_max[i]);
       if (daily.wind_gusts_10m_max?.[i] != null) allModelData[d].windGust.push(daily.wind_gusts_10m_max[i]);
       if (daily.wind_direction_10m_dominant?.[i] != null) allModelData[d].windDir.push(daily.wind_direction_10m_dominant[i]);
-      if (daily.relative_humidity_2m_mean?.[i] != null) allModelData[d].humidity.push(daily.relative_humidity_2m_mean[i]);
-      if (daily.cloud_cover_mean?.[i] != null) allModelData[d].cloud.push(daily.cloud_cover_mean[i]);
       if (daily.uv_index_max?.[i] != null) allModelData[d].uv.push(daily.uv_index_max[i]);
       if (daily.apparent_temperature_max?.[i] != null) allModelData[d].feelsMax.push(daily.apparent_temperature_max[i]);
       if (daily.apparent_temperature_min?.[i] != null) allModelData[d].feelsMin.push(daily.apparent_temperature_min[i]);
@@ -640,11 +701,13 @@ export type HourlyModelForecast = {
   requestStartedAt?: number;
   availableAt?: number;
   hours: Array<{
-    validAt?: number;
+    validAt: number;
     hour: number;
     temperature: number | null;
     apparentTemperature: number | null;
     precipitation: number | null;
+    rain: number | null;
+    showers: number | null;
     windSpeed: number | null;
     windGusts: number | null;
     windDirection: number | null;
@@ -668,6 +731,8 @@ export type HourlyModelForecast = {
       temperature: string | null;
       apparentTemperature: string | null;
       precipitation: string | null;
+      rain: string | null;
+      showers: string | null;
       windSpeed: string | null;
       windGusts: string | null;
       windDirection: string | null;
@@ -704,9 +769,7 @@ export type CollectedHourlyForecastModels = {
   diagnostics: HourlyModelCollectionDiagnostic[];
 };
 
-const HOURLY_ARCHIVE_VARIABLES = [
-  "temperature", "precipitation", "windSpeed", "windGusts", "humidity", "pressure",
-] as const;
+const HOURLY_ARCHIVE_VARIABLES = HOURLY_FORECAST_VARIABLES.map((definition) => definition.valueField);
 
 function finiteHourlyValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -745,7 +808,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("hourly", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,surface_pressure,cloud_cover,weather_code,uv_index,dew_point_2m,visibility,shortwave_radiation,cloud_cover_low,cloud_cover_mid,cloud_cover_high,snowfall");
+      url.searchParams.set("hourly", HOURLY_FORECAST_VARIABLES.map((definition) => definition.apiKey).join(","));
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("timeformat", "unixtime");
       url.searchParams.set("forecast_days", "2");
@@ -796,6 +859,8 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
           temperature: finiteHourlyValue(hourly.temperature_2m instanceof Array ? hourly.temperature_2m[i] : null),
           apparentTemperature: finiteHourlyValue(hourly.apparent_temperature instanceof Array ? hourly.apparent_temperature[i] : null),
           precipitation: finiteHourlyValue(hourly.precipitation instanceof Array ? hourly.precipitation[i] : null),
+          rain: finiteHourlyValue(hourly.rain instanceof Array ? hourly.rain[i] : null),
+          showers: finiteHourlyValue(hourly.showers instanceof Array ? hourly.showers[i] : null),
           windSpeed: finiteHourlyValue(hourly.wind_speed_10m instanceof Array ? hourly.wind_speed_10m[i] : null),
           windGusts: finiteHourlyValue(hourly.wind_gusts_10m instanceof Array ? hourly.wind_gusts_10m[i] : null),
           windDirection: finiteHourlyValue(hourly.wind_direction_10m instanceof Array ? hourly.wind_direction_10m[i] : null),
@@ -813,7 +878,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
           cloudHigh: finiteHourlyValue(hourly.cloud_cover_high instanceof Array ? hourly.cloud_cover_high[i] : null),
           snowfall: finiteHourlyValue(hourly.snowfall instanceof Array ? hourly.snowfall[i] : null),
         };
-        valuesReceived += HOURLY_ARCHIVE_VARIABLES.filter((key) => parsedHour[key] != null).length;
+        valuesReceived += HOURLY_ARCHIVE_VARIABLES.filter((key) => parsedHour[key as keyof typeof parsedHour] != null).length;
         hours.push(parsedHour);
       }
 
@@ -837,6 +902,8 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
               temperature: getUnit("temperature_2m"),
               apparentTemperature: getUnit("apparent_temperature"),
               precipitation: getUnit("precipitation"),
+              rain: getUnit("rain"),
+              showers: getUnit("showers"),
               windSpeed: getUnit("wind_speed_10m"),
               windGusts: getUnit("wind_gusts_10m"),
               windDirection: getUnit("wind_direction_10m"),
@@ -846,7 +913,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
               weatherCode: getUnit("weather_code"),
               uvIndex: getUnit("uv_index"),
               dewPoint: getUnit("dew_point_2m"),
-              visibility: getUnit("visibility"),
+              visibility: getUnit("visibility") === "m" ? "km" : getUnit("visibility"),
               solarRadiation: getUnit("shortwave_radiation"),
               cloudLow: getUnit("cloud_cover_low"),
               cloudMid: getUnit("cloud_cover_mid"),
@@ -855,7 +922,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
             },
           },
         };
-        const expectedValueCount = hours.length * HOURLY_ARCHIVE_VARIABLES.length;
+        const expectedValueCount = hours.length * HOURLY_FORECAST_VARIABLES.length;
         if (valuesReceived === 0) {
           return { forecast: null, diagnostic: {
             modelName: model.name, modelId: model.modelId, status: "failed", attemptCount,
