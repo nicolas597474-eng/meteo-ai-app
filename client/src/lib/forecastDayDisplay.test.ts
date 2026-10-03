@@ -32,7 +32,7 @@ describe("forecast display days", () => {
     });
     expect(result[2]).toMatchObject({
       date: "2026-10-05",
-      kind: "legacy-daily-reference",
+      kind: "official-daily-fusion",
       hourlyGroup: null,
     });
     expect(result.at(-1)?.date).toBe("2026-10-17");
@@ -52,7 +52,7 @@ describe("forecast display days", () => {
 
     expect(result.map(({ date, kind }) => [date, kind])).toEqual([
       ["2026-10-03", "official-hourly"],
-      ["2026-10-06", "legacy-daily-reference"],
+      ["2026-10-06", "official-daily-fusion"],
     ]);
   });
 
@@ -69,7 +69,7 @@ describe("forecast display days", () => {
       "ECMWF",
       "GFS",
       "ICON",
-      "Best Match · agrégateur, non indépendant",
+      "Best Match · référence dérivée, non contributeur officiel",
     ]);
     expect(getDailyReferenceSourceLabels([])).toEqual([]);
   });

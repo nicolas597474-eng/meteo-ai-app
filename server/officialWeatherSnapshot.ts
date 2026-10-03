@@ -1,8 +1,9 @@
-import { makeLocationKey } from "./db";
+import { getDailyFusionPerformanceEvidence, makeLocationKey } from "./db";
 import { getParisDate, getParisHour } from "./weatherTime";
 import { collect15DayForecast, collectCurrentWeatherSnapshot, type CurrentWeatherSnapshot, type DayForecast, type HourlyPoint } from "./weatherServices";
 import { findActiveHourlyForecastIndex, keepCurrentAndFutureHourlyForecasts } from "../shared/hourlyForecastTime";
 import { collectOfficialHourlyForecast, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
+import { computeOfficialDailyForecast } from "./officialForecast";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
 export type OfficialWeatherSnapshot = {
@@ -210,10 +211,24 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
   }
 
   const value = (async () => {
+    const dailyIssuedAt = Date.now();
+    const dailyLocationKey = makeLocationKey(coords.lat, coords.lon);
     const [hourlyResult, currentSnapshot, dailyResult] = await Promise.all([
       collectOfficialHourlyForecast(weatherDate, coords),
       collectCurrentWeatherSnapshot(coords),
-      collect15DayForecast(coords),
+      collect15DayForecast(coords, {
+        issuedAt: dailyIssuedAt,
+        resolveOfficialFusion: async (targetDate, forecasts, issuedAt) => {
+          const fusionEvidence = await getDailyFusionPerformanceEvidence(dailyLocationKey, targetDate, issuedAt);
+          return computeOfficialDailyForecast(forecasts, {
+            locationKey: dailyLocationKey,
+            targetDate,
+            issuedAt,
+            evidenceStoreAvailable: fusionEvidence.available,
+            evidence: fusionEvidence.evidence,
+          });
+        },
+      }),
     ]);
     return applyManualHourlyForecast(buildOfficialWeatherSnapshot({
       lat: coords.lat,

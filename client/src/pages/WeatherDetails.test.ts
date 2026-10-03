@@ -11,7 +11,7 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("hours={hours}");
     expect(pageSource).not.toContain("periodHours");
     expect(pageSource).not.toContain("includeExtendedPeriods: true");
-    expect(displayDaysSource).toContain("kind: \"legacy-daily-reference\"");
+    expect(displayDaysSource).toContain("kind: \"official-daily-fusion\"");
     expect(displayDaysSource).toContain("kind: \"official-hourly\"");
   });
   it("limite les dates aux données réelles et protège la séparation officielle/référence", () => {
@@ -20,10 +20,11 @@ describe("page Prévisions détaillées", () => {
     expect(displayDaysSource).toContain("if (current?.hourlyGroup) continue");
     expect(displayDaysSource).toContain("isValidDateKey(daily.date)");
     expect(timelineSource).toContain("buildForecastDisplayDays(hours, dailyDays)");
-    expect(timelineSource).toContain("Référence non calibrée");
-    expect(timelineSource).toContain("distincte de la prévision horaire officielle à sept modèles");
-    expect(timelineSource).toContain("Sources réellement récupérées");
-    expect(timelineSource).toContain("agrégateur non indépendant");
+    expect(timelineSource).toContain("Fusion officielle · preuves par variable");
+    expect(timelineSource).toContain("Sources quotidiennes réellement reçues");
+    expect(timelineSource).toContain("Best Match · référence dérivée, non contributeur officiel");
+    expect(timelineSource).toContain("Aucun biais n’est appliqué aux valeurs futures");
+    expect(timelineSource).toContain("l’heure exacte des runs modèles n’est pas fournie");
     expect(timelineSource).toContain("Best Match");
   });
   it("garde les rubans horizontaux accessibles et n’invente pas d’échéances pour la série quotidienne", () => {
@@ -45,7 +46,7 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("Rafales max.");
     expect(timelineSource).toContain("Direction dominante");
     expect(timelineSource).toContain("Soleil");
-    expect(timelineSource).toContain("fréquence brute non calibrée, pas une probabilité");
+    expect(timelineSource).toContain("fréquence brute descriptive, pas une probabilité");
     expect(timelineSource).toContain("jamais une probabilité de pluie calibrée");
     expect(timelineSource).toContain("buildDailyDetailCategories");
     expect(timelineSource).toContain("L’indice de qualité de l’air ne fait pas partie des données renvoyées à cette page");

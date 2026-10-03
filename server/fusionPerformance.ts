@@ -21,6 +21,8 @@ export type ModelPerformanceEvidence = {
   mae: number;
   rmse: number;
   standardError: number;
+  /** Mean signed forecast-minus-observation error, diagnostic only. */
+  signedBias?: number;
   latestScoreDate: string;
 };
 

@@ -3,6 +3,11 @@ import {
   type DatedForecastHour,
   type ForecastDayGroup,
 } from "@/lib/forecastTimeline";
+import type { DailyModelAgreement } from "@shared/modelAgreement";
+import type {
+  BestMatchDailyReference,
+  DailyOfficialFusionDisplay,
+} from "@shared/dailyForecast";
 
 export type DailyForecastPoint = {
   date?: string | null;
@@ -25,6 +30,9 @@ export type DailyForecastPoint = {
   feelsLikeMin?: number | null;
   sunrise?: string | null;
   sunset?: string | null;
+  officialFusion?: DailyOfficialFusionDisplay | null;
+  bestMatchReference?: BestMatchDailyReference | null;
+  modelAgreement?: DailyModelAgreement | null;
 };
 
 export type ForecastDisplayDay<
@@ -32,7 +40,7 @@ export type ForecastDisplayDay<
   TDay extends DailyForecastPoint,
 > = {
   date: string;
-  kind: "official-hourly" | "legacy-daily-reference";
+  kind: "official-hourly" | "official-daily-fusion";
   hourlyGroup: ForecastDayGroup<THour> | null;
   daily: TDay | null;
 };
@@ -48,8 +56,8 @@ function isValidDateKey(value: string | null | undefined): value is string {
 
 /**
  * Keeps the official hourly series authoritative wherever it exists. Daily
- * values are used only for dates without official hours and retain their own
- * explicit legacy/reference identity. Dates are never inferred from timestamps.
+ * qualified daily fusions are used only for dates without official hours and
+ * retain their own explicit identity. Dates are never inferred from timestamps.
  */
 export function buildForecastDisplayDays<
   THour extends DatedForecastHour,
@@ -95,7 +103,7 @@ export function buildForecastDisplayDays<
     } else if (entry.daily) {
       result.push({
         date,
-        kind: "legacy-daily-reference",
+        kind: "official-daily-fusion",
         hourlyGroup: null,
         daily: entry.daily,
       });
@@ -104,7 +112,7 @@ export function buildForecastDisplayDays<
   return result;
 }
 
-/** Map the existing endpoint's legacy name to its actual aggregator role. */
+/** Names Best Match as a separate derived reference, never an official contributor. */
 export function getDailyReferenceSourceLabels(
   modelsUsed: readonly string[]
 ): string[] {
@@ -117,7 +125,7 @@ export function getDailyReferenceSourceLabels(
             .toLowerCase()
             .replace(/[\s_-]+/g, "");
           return normalized === "openmeteo" || normalized === "bestmatch"
-            ? "Best Match · agrégateur, non indépendant"
+            ? "Best Match · référence dérivée, non contributeur officiel"
             : source.trim();
         })
         .filter(Boolean)

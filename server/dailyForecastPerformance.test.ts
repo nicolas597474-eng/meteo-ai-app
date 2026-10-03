@@ -95,13 +95,15 @@ describe("daily production forecast performance archive", () => {
       forecastRunId: 102,
       comparisonKey: "102:temperature_max",
       forecastValue: Number(first.forecastValue) + 0.4,
-      absoluteError: Number(first.absoluteError) + 0.4,
+      signedError: Number(first.signedError) + 0.4,
+      absoluteError: Math.abs(Number(first.signedError) + 0.4),
     };
     const [score] = aggregateDailyForecastPerformance([first, second]);
 
     expect(score.comparisonCount).toBe(2);
     expect(score.sampleSize).toBe(1);
     expect(score.evaluatedDays).toBe(1);
+    expect(score.signedBias).toBeCloseTo(0.7, 10);
     expect(score.latestScoreDate).toBe(validDate);
   });
 
