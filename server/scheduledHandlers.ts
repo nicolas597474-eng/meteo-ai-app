@@ -26,6 +26,7 @@ import {
   persistDailyForecastsToShadow,
   persistHourlyForecastsToShadow,
 } from "./weatherDataHubShadow";
+import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow";
 import { recordP1ObservationDay } from "./weatherP1Observation";
 import { calculateReliabilityScore } from "./statsEngine";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
@@ -352,6 +353,15 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
               snapshotPreserved: true,
               reason: "Le snapshot horaire a été archivé entre-temps ; les nouveaux relevés directs ont été conservés sans le remplacer.",
             };
+        // Extension strictement shadow : toute indisponibilité du nowcasting ne
+        // peut ni bloquer ni réécrire le snapshot physique ou la prévision publique.
+        await executeShadowWriteSafely(`local-temperature-nowcast:${locationKey}:${date}:${hour}`, () =>
+          rebuildLocalTemperatureNowcastForSnapshot({
+            locationKey,
+            observationDate: date,
+            observationHour: hour,
+          }),
+        );
         results.push(locationResult);
         break;
       } catch (error: any) {

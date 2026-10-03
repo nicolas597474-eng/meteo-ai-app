@@ -330,6 +330,13 @@
       "when": 1791011208982,
       "tag": "0046_forecast_variable_coverage",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1791012504187,
+      "tag": "0047_certain_cyclops",
+      "breakpoints": true
     }
   ]
 }

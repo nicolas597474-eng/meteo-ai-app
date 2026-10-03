@@ -932,6 +932,55 @@ export const shadowWeatherDailyUnifiedCandidates = mysqlTable("shadow_weather_da
 ]);
 export type ShadowWeatherDailyUnifiedCandidate = typeof shadowWeatherDailyUnifiedCandidates.$inferSelect;
 export type InsertShadowWeatherDailyUnifiedCandidate = typeof shadowWeatherDailyUnifiedCandidates.$inferInsert;
+
+/**
+ * Local temperature nowcasting candidates. These records are administrative
+ * shadow evidence only: public forecasts, weights and scores never read them.
+ * The archived baseline must be available no later than the physical snapshot
+ * reference hour, making temporal leakage mechanically auditable.
+ */
+export const shadowLocalTemperatureNowcasts = mysqlTable("shadow_local_temperature_nowcasts", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  observationDate: varchar("observationDate", { length: 10 }).notNull(),
+  observationHour: int("observationHour").notNull(),
+  observationReferenceAt: bigint("observationReferenceAt", { mode: "number" }).notNull(),
+  observationCollectedAt: bigint("observationCollectedAt", { mode: "number" }).notNull(),
+  observedTemperature: float("observedTemperature"),
+  stationCount: int("stationCount").notNull().default(0),
+  confidenceScore: float("confidenceScore"),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  horizonMinutes: int("horizonMinutes"),
+  candidateStatus: varchar("candidateStatus", { length: 24 }).notNull(),
+  baselineTemperature: float("baselineTemperature"),
+  rawResidual: float("rawResidual"),
+  boundedResidual: float("boundedResidual"),
+  correctionFactor: float("correctionFactor").notNull().default(0),
+  appliedCorrection: float("appliedCorrection"),
+  correctedTemperature: float("correctedTemperature"),
+  correctionClamped: int("correctionClamped").notNull().default(0),
+  forecastAvailableAt: bigint("forecastAvailableAt", { mode: "number" }),
+  forecastEvidence: json("forecastEvidence").notNull(),
+  reasons: json("reasons").notNull(),
+  productionReadsEnabled: int("productionReadsEnabled").notNull().default(0),
+  shadowMode: int("shadowMode").notNull().default(1),
+  appliedToProduction: int("appliedToProduction").notNull().default(0),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("shadow_local_nowcast_obs_time_valid_uq").on(
+    table.locationKey,
+    table.observationReferenceAt,
+    table.validTime,
+  ),
+  index("shadow_local_nowcast_location_evaluated_idx").on(table.locationKey, table.evaluatedAt),
+  index("shadow_local_nowcast_status_idx").on(table.candidateStatus),
+  index("shadow_local_nowcast_applied_idx").on(table.appliedToProduction),
+]);
+export type ShadowLocalTemperatureNowcast = typeof shadowLocalTemperatureNowcasts.$inferSelect;
+export type InsertShadowLocalTemperatureNowcast = typeof shadowLocalTemperatureNowcasts.$inferInsert;
+
 /** Local performance history for Phase 7. Shadow-only: no production reader may use this table. */
 export const shadowWeatherPhase7LocalPerformance = mysqlTable("shadow_weather_phase7_local_performance", {
   id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),

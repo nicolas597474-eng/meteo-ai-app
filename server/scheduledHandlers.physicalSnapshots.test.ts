@@ -25,4 +25,12 @@ describe("collecte horaire des snapshots physiques", () => {
     expect(source).toContain("if (synthesis.stationCount < 1 || synthesis.temperature == null)");
     expect(source).toContain("await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));");
   });
+
+  it("déclenche le nowcasting local en shadow sans pouvoir bloquer le snapshot", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/scheduledHandlers.ts"), "utf8");
+
+    expect(source).toContain('import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow"');
+    expect(source).toContain('await executeShadowWriteSafely(`local-temperature-nowcast:${locationKey}:${date}:${hour}`');
+    expect(source).toContain("rebuildLocalTemperatureNowcastForSnapshot({");
+  });
 });
