@@ -27,6 +27,7 @@ import {
   persistHourlyForecastsToShadow,
 } from "./weatherDataHubShadow";
 import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow";
+import { rebuildLocalPrecipitationNowcastForSnapshot } from "./localPrecipitationNowcastingShadow";
 import { recordP1ObservationDay } from "./weatherP1Observation";
 import { calculateReliabilityScore } from "./statsEngine";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
@@ -357,6 +358,15 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         // peut ni bloquer ni réécrire le snapshot physique ou la prévision publique.
         await executeShadowWriteSafely(`local-temperature-nowcast:${locationKey}:${date}:${hour}`, () =>
           rebuildLocalTemperatureNowcastForSnapshot({
+            locationKey,
+            observationDate: date,
+            observationHour: hour,
+          }),
+        );
+        // Le signal précipitations reste catégoriel : il ne modifie aucun
+        // montant officiel et toute indisponibilité reste non bloquante.
+        await executeShadowWriteSafely(`local-precipitation-nowcast:${locationKey}:${date}:${hour}`, () =>
+          rebuildLocalPrecipitationNowcastForSnapshot({
             locationKey,
             observationDate: date,
             observationHour: hour,

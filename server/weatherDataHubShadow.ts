@@ -68,6 +68,7 @@ import {
 import { getP1ObservationWindow } from "./weatherP1Observation";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 import { buildLocalTemperatureNowcastingReport } from "./localTemperatureNowcastingShadow";
+import { buildLocalPrecipitationNowcastingReport } from "./localPrecipitationNowcastingShadow";
 
 export type ShadowHourlyForecast = HourlyModelForecast;
 
@@ -2022,6 +2023,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
   const phase8Metrics = buildPhase8MetricsReport(phase8MetricRows);
   const phase8ValidationProgress = buildPhase8ValidationProgress(phase8MetricRows);
   const localTemperatureNowcasting = await buildLocalTemperatureNowcastingReport(locationKey, lookbackDays);
+  const localPrecipitationNowcasting = await buildLocalPrecipitationNowcastingReport(locationKey, lookbackDays);
   const phase5QualityControl = buildPhase5QualityControlReport(horizonValues.map(value => ({
     ingestionRunId: Number(value.ingestionRunId),
     sourceKey: value.sourceKey,
@@ -2090,6 +2092,7 @@ export async function getShadowDataHubObservability(locationKey?: string, lookba
     phase8Metrics,
     phase8ValidationProgress,
     localTemperatureNowcasting,
+    localPrecipitationNowcasting,
     lookbackDays: Math.max(1, lookbackDays),
     runs: {
       total: Number(runSummary?.totalRuns ?? 0),

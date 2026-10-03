@@ -28,6 +28,7 @@ import { Phase7LocalPerformancePanel } from "@/components/weather/Phase7LocalPer
 import { Phase8MetricsPanel } from "@/components/weather/Phase8MetricsPanel";
 import { Phase8ValidationProgressPanel } from "@/components/weather/Phase8ValidationProgressPanel";
 import { LocalTemperatureNowcastingPanel } from "@/components/weather/LocalTemperatureNowcastingPanel";
+import { LocalPrecipitationNowcastingPanel } from "@/components/weather/LocalPrecipitationNowcastingPanel";
 
 function IndicatorHelp({ title, children }: { title: string; children: ReactNode }) {
   return <Popover><PopoverTrigger asChild><button type="button" aria-label={`Comprendre le calcul : ${title}`} className="grid h-6 w-6 place-items-center rounded-full border border-slate-700/70 bg-slate-950/30 text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><CircleHelp className="h-3.5 w-3.5" /></button></PopoverTrigger><PopoverContent side="bottom" align="center" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-slate-600 bg-[#101622] px-3 py-3 text-left text-[11px] leading-relaxed text-slate-100 shadow-xl"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/75">Définition de la mesure</p><p className="mt-1 text-sm font-semibold text-white">{title}</p></div><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-700/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><div className="mt-2.5 space-y-2 text-slate-200">{children}</div></PopoverContent></Popover>;
@@ -731,6 +732,8 @@ export default function WeatherAILab() {
     {user?.role === "admin" && shadowDataHubReport?.dailyUnifiedShadow && <DailyUnifiedShadowPanel candidate={shadowDataHubReport.dailyUnifiedShadow} />}
 
     {user?.role === "admin" && shadowDataHubReport?.localTemperatureNowcasting && <LocalTemperatureNowcastingPanel report={shadowDataHubReport.localTemperatureNowcasting} />}
+
+    {user?.role === "admin" && shadowDataHubReport?.localPrecipitationNowcasting && <LocalPrecipitationNowcastingPanel report={shadowDataHubReport.localPrecipitationNowcasting} />}
 
     {user?.role === "admin" && shadowDataHubReport?.phase7LocalPerformance && <Phase7LocalPerformancePanel performance={shadowDataHubReport.phase7LocalPerformance} />}
     {user?.role === "admin" && shadowDataHubReport?.phase8Metrics && <Phase8MetricsPanel metrics={shadowDataHubReport.phase8Metrics} />}
