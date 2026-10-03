@@ -32,8 +32,10 @@ describe("collecte horaire des snapshots physiques", () => {
     expect(source).toContain('import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow"');
     expect(source).toContain('await executeShadowWriteSafely(`local-temperature-nowcast:${locationKey}:${date}:${hour}`');
     expect(source).toContain("rebuildLocalTemperatureNowcastForSnapshot({");
-    expect(source).toContain('import { rebuildLocalPrecipitationNowcastForSnapshot } from "./localPrecipitationNowcastingShadow"');
+    expect(source).toContain("evaluateLocalPrecipitationNowcastOutcomesForSnapshot");
+    expect(source).toContain('await executeShadowWriteSafely(`local-precipitation-nowcast-outcome:${locationKey}:${date}:${hour}`');
     expect(source).toContain('await executeShadowWriteSafely(`local-precipitation-nowcast:${locationKey}:${date}:${hour}`');
     expect(source).toContain("rebuildLocalPrecipitationNowcastForSnapshot({");
+    expect(source).not.toContain("setInterval(");
   });
 });

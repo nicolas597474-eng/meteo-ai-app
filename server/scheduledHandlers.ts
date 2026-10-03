@@ -27,7 +27,10 @@ import {
   persistHourlyForecastsToShadow,
 } from "./weatherDataHubShadow";
 import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow";
-import { rebuildLocalPrecipitationNowcastForSnapshot } from "./localPrecipitationNowcastingShadow";
+import {
+  evaluateLocalPrecipitationNowcastOutcomesForSnapshot,
+  rebuildLocalPrecipitationNowcastForSnapshot,
+} from "./localPrecipitationNowcastingShadow";
 import { recordP1ObservationDay } from "./weatherP1Observation";
 import { calculateReliabilityScore } from "./statsEngine";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
@@ -221,6 +224,15 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     // n'empêche pas la reprise de tenter de produire le snapshot manquant.
     const successfulEvidenceAlreadyArchived = snapshotAlreadyArchived || traceForHour?.status === "stored";
     if ((trigger === "scheduled" || recoveryOnly) && successfulEvidenceAlreadyArchived) {
+      // Un passage normal peut rapprocher les émissions pending du snapshot
+      // déjà archivé, sans nouvelle collecte ni réécriture de celui-ci.
+      await executeShadowWriteSafely(`local-precipitation-nowcast-outcome:${locationKey}:${date}:${hour}`, () =>
+        evaluateLocalPrecipitationNowcastOutcomesForSnapshot({
+          locationKey,
+          observationDate: date,
+          observationHour: hour,
+        }),
+      );
       results.push({
         locationKey,
         stationCount: 0,
@@ -365,13 +377,18 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         );
         // Le signal précipitations reste catégoriel : il ne modifie aucun
         // montant officiel et toute indisponibilité reste non bloquante.
-        await executeShadowWriteSafely(`local-precipitation-nowcast:${locationKey}:${date}:${hour}`, () =>
-          rebuildLocalPrecipitationNowcastForSnapshot({
+        await executeShadowWriteSafely(`local-precipitation-nowcast:${locationKey}:${date}:${hour}`, async () => {
+          await rebuildLocalPrecipitationNowcastForSnapshot({
             locationKey,
             observationDate: date,
             observationHour: hour,
-          }),
-        );
+          });
+          await evaluateLocalPrecipitationNowcastOutcomesForSnapshot({
+            locationKey,
+            observationDate: date,
+            observationHour: hour,
+          });
+        });
         results.push(locationResult);
         break;
       } catch (error: any) {
