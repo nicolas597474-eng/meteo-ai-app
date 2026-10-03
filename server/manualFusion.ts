@@ -1,4 +1,3 @@
-import { applyBiasCorrection, type ServiceBias } from "./fusionEngine";
 import { randomUUID } from "node:crypto";
 import { getParisDate } from "./weatherTime";
 import { computeOfficialDailyForecast } from "./officialForecast";
@@ -8,7 +7,7 @@ import { buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { collectOfficialHourlyForecast, OFFICIAL_HOURLY_MODEL_NAMES } from "./officialHourlyForecast";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { cacheManualHourlyForecast } from "./officialWeatherSnapshot";
-import { acquireForecastRefreshLock, getDailyFusionPerformanceEvidence, getMeteoAIForecastByDate, getQualifiedCumulativeRankingForLocation, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
+import { acquireForecastRefreshLock, getDailyFusionPerformanceEvidence, getMeteoAIForecastByDate, getStoredHourlyForecasts, insertForecastRuns, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
 import { getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
 
 type ManualFusionFavorite = {
@@ -101,15 +100,6 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
     }
     const issuedAt = Date.now();
 
-    const ranking = await getQualifiedCumulativeRankingForLocation(locationKey);
-    const biases: ServiceBias[] = ranking
-      .filter((entry) => entry.avgBiasTemp != null || entry.avgBiasPrecip != null)
-      .map((entry) => ({
-        serviceName: entry.serviceName,
-        biasTemp: entry.avgBiasTemp == null ? null : Number(entry.avgBiasTemp),
-        biasPrecip: entry.avgBiasPrecip == null ? null : Number(entry.avgBiasPrecip),
-        biasWind: null,
-      }));
     const rawForecasts = expertData.map((entry) => ({
       serviceName: entry.serviceName,
       tempMax: entry.tempMax,
@@ -120,9 +110,8 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       humidity: entry.humidity ?? null,
       cloudCover: entry.cloudCover ?? null,
     }));
-    const biasCorrectedForecasts = biases.length > 0 ? applyBiasCorrection(rawForecasts, biases) : rawForecasts;
     const fusionEvidence = await getDailyFusionPerformanceEvidence(locationKey, today, issuedAt);
-    const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, {
+    const meteoAI = computeOfficialDailyForecast(rawForecasts, {
       locationKey,
       targetDate: today,
       issuedAt,
@@ -149,7 +138,7 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       condition: entry.condition,
       rawData: entry.rawData as any,
     })));
-    await insertForecastRuns(buildForecastRunArchiveRows(expertData, locationKey, today, issuedAt, biases));
+    await insertForecastRuns(buildForecastRunArchiveRows(expertData, locationKey, today, issuedAt));
     await upsertLocationForecast({
       favoriteLocationId: favorite.id,
       userId: favorite.userId,

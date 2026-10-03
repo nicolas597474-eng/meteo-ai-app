@@ -31,10 +31,6 @@ import { calculateReliabilityScore } from "./statsEngine";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
 import {
-  applyBiasCorrection,
-  type ServiceBias,
-} from "./fusionEngine";
-import {
   insertForecasts,
   insertForecastRuns,
   HourlyForecastPersistenceError,
@@ -57,7 +53,6 @@ import {
   insertHourlyForecasts,
   insertLeadTimeScores,
   getLeadTimeScoresForLocation,
-  getQualifiedCumulativeRankingForLocation,
   getForecastRunsForValidDate,
   getDailyFusionPerformanceEvidence,
   upsertDailyForecastObservationComparisons,
@@ -522,19 +517,6 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       const allForecasts = expertData;
 
       if (allForecasts.length > 0) {
-        // Get cumulative ranking for weights
-        const ranking = await getQualifiedCumulativeRankingForLocation(defaultLocKey);
-        // ── Correction automatique des biais ─────────────────────────────────
-        // Récupérer les biais historiques par modèle et les appliquer avant fusion
-        const biases: ServiceBias[] = ranking
-          .filter((r) => r.avgBiasTemp != null || r.avgBiasPrecip != null)
-          .map((r) => ({
-            serviceName: r.serviceName,
-            biasTemp: r.avgBiasTemp != null ? Number(r.avgBiasTemp) : null,
-            biasPrecip: r.avgBiasPrecip != null ? Number(r.avgBiasPrecip) : null,
-            biasWind: null, // avgBiasWind not in getCumulativeRanking yet
-          }));
-
         const rawForecastsForFusion = allForecasts.map((f) => ({
           serviceName: f.serviceName,
           tempMax: f.tempMax,
@@ -546,13 +528,9 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           cloudCover: f.cloudCover ?? null,
         }));
 
-        const biasCorrectedForecasts = biases.length > 0
-          ? applyBiasCorrection(rawForecastsForFusion, biases)
-          : rawForecastsForFusion;
-
-        await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt, biases), { requireDatabase: true });
+        await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt), { requireDatabase: true });
         const fusionEvidence = await getDailyFusionPerformanceEvidence(defaultLocKey, today, issuedAt);
-        const meteoAI = computeOfficialDailyForecast(biasCorrectedForecasts, {
+        const meteoAI = computeOfficialDailyForecast(rawForecastsForFusion, {
           locationKey: defaultLocKey,
           targetDate: today,
           issuedAt,
@@ -929,13 +907,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     hourlyModelsExpected = uniqueLocations.length * OFFICIAL_HOURLY_COVERAGE_MODELS.length;
     await updateCollectionJob(jobId, { dailyModelsExpected, hourlyModelsExpected });
 
-    // Get only qualified evidence for operational model weights.
-    const ranking = await getQualifiedCumulativeRankingForLocation("default");
-    const reliabilityMap: Record<string, number> = {};
-    ranking.forEach((r) => {
-      reliabilityMap[r.serviceName] = r.avgScore ?? 50;
-    });
-
     // Les relevés physiques ont leur propre tâche horaire : les exécuter ici
     // pouvait faire dépasser le délai d’un batch de prévisions favoris.
     const stationCollectionDeferred = true;
@@ -1078,13 +1049,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         if (stationCollectionDeferred) {
           console.log(`[Stations] ${fav.name}: relevés physiques confiés à la collecte horaire dédiée`);
         }
-
-        // Get location-specific ranking (fallback to global)
-        const locRanking = await getQualifiedCumulativeRankingForLocation(locKey);
-        const locReliabilityMap: Record<string, number> = {};
-        (locRanking.length > 0 ? locRanking : ranking).forEach((r) => {
-          locReliabilityMap[r.serviceName] = r.avgScore ?? 50;
-        });
 
         // Collect expert forecasts for this location
         const dailyShadowRequestStartedAt = Date.now();
@@ -1448,17 +1412,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           })));
         }
 
-        // ── Correction automatique des biais (favoris) ──────────────────────────────
-        const activeRanking = locRanking.length > 0 ? locRanking : ranking;
-        const locBiases: ServiceBias[] = activeRanking
-          .filter((r) => r.avgBiasTemp != null || r.avgBiasPrecip != null)
-          .map((r) => ({
-            serviceName: r.serviceName,
-            biasTemp: r.avgBiasTemp != null ? Number(r.avgBiasTemp) : null,
-            biasPrecip: r.avgBiasPrecip != null ? Number(r.avgBiasPrecip) : null,
-            biasWind: null,
-          }));
-
         const rawLocForecasts = expertData.map((f) => ({
           serviceName: f.serviceName,
           tempMax: f.tempMax,
@@ -1470,11 +1423,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           cloudCover: f.cloudCover ?? null,
         }));
 
-        const biasCorrectedLocForecasts = locBiases.length > 0
-          ? applyBiasCorrection(rawLocForecasts, locBiases)
-          : rawLocForecasts;
-
-        const dailyArchiveRows = buildForecastRunArchiveRows(expertData, locKey, today, issuedAt, locBiases);
+        const dailyArchiveRows = buildForecastRunArchiveRows(expertData, locKey, today, issuedAt);
         const dailyArchiveRowsWritten = await insertForecastRuns(dailyArchiveRows);
         dailyVariableCoverage = confirmDailyArchiveCoverage(dailyDiagnostics, {
           targetDate: today,
@@ -1483,7 +1432,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           archiveRowsWritten: dailyArchiveRowsWritten,
         });
         const fusionEvidence = await getDailyFusionPerformanceEvidence(locKey, today, issuedAt);
-        const meteoAI = computeOfficialDailyForecast(biasCorrectedLocForecasts, {
+        const meteoAI = computeOfficialDailyForecast(rawLocForecasts, {
           locationKey: locKey,
           targetDate: today,
           issuedAt,

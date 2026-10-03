@@ -50,7 +50,9 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Journée qualifiée");
     expect(source).toContain("Comparaison et métriques");
     expect(source).toContain("ce n’est donc pas un score immédiat affiché au soir");
-    expect(source).toContain("Correction de biais");
+    expect(source).toContain("Biais signé · diagnostic non appliqué");
+    expect(source).toContain("elle n’est jamais appliquée aux prévisions officielles futures");
+    expect(source).not.toContain("Correction de biais");
     expect(source).toContain("Maille et microclimat");
     expect(source).toContain("Sources, provenance et cartes");
     expect(source).toContain("Netatmo Weather API");

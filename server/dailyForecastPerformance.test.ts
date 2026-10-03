@@ -47,17 +47,15 @@ function snapshots(): PhysicalSnapshot[] {
 }
 
 describe("daily production forecast performance archive", () => {
-  it("archives the provider’s actual dates and the bias-corrected forecast values", () => {
-    const rows = buildForecastRunArchiveRows([makeForecast()], locationKey, validDate, issuedAt, [
-      { serviceName: "AROME", biasTemp: 1, biasPrecip: 1, biasWind: null },
-    ]);
+  it("archives the provider’s actual dates and raw forecast values", () => {
+    const rows = buildForecastRunArchiveRows([makeForecast()], locationKey, validDate, issuedAt);
 
     expect(rows).toHaveLength(2);
     expect(rows.map((row) => row.validDate)).toEqual(["2026-10-02", "2026-10-03"]);
-    expect(rows[0].tempMax).toBe(19.3);
-    expect(rows[0].tempMin).toBe(9.3);
-    expect(rows[0].precipitation).toBe(2.3);
-    expect(rows[1].tempMax).toBe(20.3);
+    expect(rows[0].tempMax).toBe(20);
+    expect(rows[0].tempMin).toBe(10);
+    expect(rows[0].precipitation).toBe(3);
+    expect(rows[1].tempMax).toBe(21);
     expect(rows[0].rawData).toEqual(makeForecast().rawData);
   });
 
@@ -67,7 +65,7 @@ describe("daily production forecast performance archive", () => {
   });
 
   it("records separate comparisons for supported variables only with qualified physical coverage", () => {
-    const archive = buildForecastRunArchiveRows([makeForecast()], locationKey, validDate, issuedAt, []);
+    const archive = buildForecastRunArchiveRows([makeForecast()], locationKey, validDate, issuedAt);
     const run = { ...archive[0], id: 101 } as ForecastRun;
     const rows = buildDailyForecastObservationComparisons(locationKey, validDate, [run], snapshots());
 
@@ -81,13 +79,14 @@ describe("daily production forecast performance archive", () => {
     expect(rows.every((row) => row.horizonBucket === "6-24h" && row.evidenceType === "physical_observation" && row.observationIsQualified === 1)).toBe(true);
     expect(rows.find((row) => row.variable === "precipitation_sum")?.observedValue).toBe(12);
     expect(rows.find((row) => row.variable === "precipitation_sum")?.observationCoverageHours).toBe(24);
+    expect(rows.find((row) => row.variable === "temperature_max")).toMatchObject({ forecastValue: 20, signedError: 0.5 });
 
     expect(buildDailyForecastObservationComparisons(locationKey, validDate, [], snapshots())).toEqual([]);
     expect(buildDailyForecastObservationComparisons("autre-lieu", validDate, [run], snapshots())).toEqual([]);
   });
 
   it("ne transforme pas plusieurs captures d’un même jour en plusieurs jours indépendants", () => {
-    const archive = buildForecastRunArchiveRows([makeForecast()], locationKey, validDate, issuedAt, []);
+    const archive = buildForecastRunArchiveRows([makeForecast()], locationKey, validDate, issuedAt);
     const run = { ...archive[0], id: 101 } as ForecastRun;
     const first = buildDailyForecastObservationComparisons(locationKey, validDate, [run], snapshots())
       .find((row) => row.variable === "temperature_max")!;
@@ -111,7 +110,7 @@ describe("daily production forecast performance archive", () => {
       ...OFFICIAL_HOURLY_MODELS.map((model) => ({ ...makeForecast(), serviceName: model.name })),
       { ...makeForecast(), serviceName: "Open-Meteo" },
     ];
-    const archived = buildForecastRunArchiveRows(forecasts, locationKey, validDate, issuedAt, []);
+    const archived = buildForecastRunArchiveRows(forecasts, locationKey, validDate, issuedAt);
     const targetRows = archived.filter((row) => row.validDate === validDate);
     const bestMatchArchive = targetRows.find((row) => row.serviceName === "Open-Meteo");
     const runs = targetRows.map((row, index) => ({ ...row, id: index + 1 })) as ForecastRun[];
