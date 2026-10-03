@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES } from "./weatherServices";
 import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
@@ -26,7 +26,7 @@ function evidenceFor(
   variable: DailyFusionMetric,
   options: Partial<Pick<ModelPerformanceEvidence, "locationKey" | "horizonBucket" | "sampleSize" | "evaluatedDays" | "comparisonCount" | "mae" | "standardError">> = {},
 ): ModelPerformanceEvidence {
-  const sampleSize = options.sampleSize ?? 500;
+  const sampleSize = options.sampleSize ?? 120;
   return {
     locationKey: options.locationKey ?? locationKey,
     serviceName,
@@ -77,7 +77,7 @@ function sevenModelEvidence(): ModelPerformanceEvidence[] {
   return allOfficialServiceNames.flatMap((serviceName, index) => DAILY_FUSION_METRICS.map((variable) => evidenceFor(
     serviceName,
     variable,
-    { sampleSize: 500, comparisonCount: 500, evaluatedDays: 500, mae: 0.4 + index * 0.1, standardError: 0.05 },
+    { sampleSize: 120, comparisonCount: 500, evaluatedDays: 120, mae: 0.4 + index * 0.1, standardError: 0.05 },
   )));
 }
 
@@ -85,11 +85,20 @@ function bestMatchEvidence(): ModelPerformanceEvidence[] {
   return DAILY_FUSION_METRICS.map((variable) => evidenceFor(
     "Open-Meteo",
     variable,
-    { sampleSize: 500, comparisonCount: 500, evaluatedDays: 500, mae: 0.001, standardError: 0 },
+    { sampleSize: 120, comparisonCount: 500, evaluatedDays: 120, mae: 0.001, standardError: 0 },
   ));
 }
 
 describe("computeOfficialDailyForecast", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(issuedAt);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("fuse uniquement les preuves de production exactes et respecte le plafond individuel", () => {
     const first = computeOfficialDailyForecast(forecasts, options());
     const second = computeOfficialDailyForecast(forecasts, options());
@@ -133,7 +142,7 @@ describe("computeOfficialDailyForecast", () => {
     ]) {
       expect(metricSources.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
       expect(metricSources.every((source) => source.finalWeight <= 0.35)).toBe(true);
-      expect(metricSources.every((source) => source.sampleSize === 500 && source.horizonBucket === "6-24h")).toBe(true);
+      expect(metricSources.every((source) => source.sampleSize === 120 && source.horizonBucket === "6-24h")).toBe(true);
     }
     expect(first.trace.parameterSources.temperature.every((source) => source.variable === "temperature_max")).toBe(true);
     expect(Object.values(first.weights).every((weight) => weight.tempWeight <= 0.35 && weight.precipWeight <= 0.35 && weight.windWeight <= 0.35)).toBe(true);
@@ -241,6 +250,20 @@ describe("computeOfficialDailyForecast", () => {
     expect(result.confidenceScore).toBeNull();
     expect(result.trace.calibrationStatus.tempMax).toBe("schema_unavailable");
     expect(result.methodNote).toContain("non calibrée");
+  });
+
+  it("refuse une prévision dont l’horodatage dépasse la fraîcheur maximale", () => {
+    const currentTime = Date.now();
+    try {
+      vi.setSystemTime(issuedAt + 25 * 60 * 60 * 1_000);
+      const result = computeOfficialDailyForecast(forecasts, options());
+
+      expect(result.tempMax).toBeNull();
+      expect(result.trace.parameterSources.temperature).toEqual([]);
+      expect(result.trace.excludedSources.some((source) => source.reason.includes("Données trop anciennes"))).toBe(true);
+    } finally {
+      vi.setSystemTime(currentTime);
+    }
   });
 
   it("n’emprunte ni une variable, ni une échéance, ni un lieu différent", () => {
