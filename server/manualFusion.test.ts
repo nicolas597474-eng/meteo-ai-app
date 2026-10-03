@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./weatherServices", () => ({
   WEATHER_SERVICES: { expert: mocks.expertServices },
+  OFFICIAL_HOURLY_MODELS: mocks.expertServices
+    .filter((service) => service.modelId !== "best_match")
+    .map(({ name, modelId }) => ({ name, modelId })),
   collectExpertForecasts: mocks.collectExpertForecasts,
 }));
 vi.mock("./officialHourlyForecast", () => ({

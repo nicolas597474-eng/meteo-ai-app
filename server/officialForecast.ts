@@ -1,6 +1,6 @@
 import { computeFusion, type FusionResult, type FusionSource } from "./fusionEngine";
 import { getDailyForecastHorizon } from "./dailyForecastPerformance";
-import { WEATHER_SERVICES, type ForecastData } from "./weatherServices";
+import { OFFICIAL_HOURLY_MODELS, type ForecastData } from "./weatherServices";
 import type { DailyFusionMetric, DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
 import { PRECIPITATION_RAIN_THRESHOLD_MM, summarizePrecipitationModels, type PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
@@ -93,11 +93,11 @@ function toTraceSources(result: FusionResult): ForecastTraceSource[] {
   });
 }
 
-const SERVICE_BY_NAME = new Map(WEATHER_SERVICES.expert.map((service) => [service.name, service]));
-const DAILY_PRECIPITATION_MODEL_NAMES = WEATHER_SERVICES.expert
-  .filter((service) => service.modelId !== "best_match")
-  .map((service) => service.name);
-const DAILY_PRECIPITATION_MODEL_SET = new Set(DAILY_PRECIPITATION_MODEL_NAMES);
+const OFFICIAL_DAILY_MODEL_BY_NAME = new Map<string, (typeof OFFICIAL_HOURLY_MODELS)[number]>(
+  OFFICIAL_HOURLY_MODELS.map((model) => [model.name, model]),
+);
+const DAILY_PRECIPITATION_MODEL_NAMES = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+const DAILY_PRECIPITATION_MODEL_SET = new Set<string>(DAILY_PRECIPITATION_MODEL_NAMES);
 
 function forecastValue(forecast: OfficialDailyForecastInput, metric: DailyFusionMetric): number | null {
   switch (metric) {
@@ -120,6 +120,9 @@ export function computeOfficialDailyForecast(
   options: OfficialDailyForecastOptions,
 ) {
   const now = new Date(options.issuedAt);
+  // Best Match is a derived reference, not an eighth official model. Filter it
+  // before constructing any value, provenance, count, or weighting output.
+  const officialForecasts = forecasts.filter((forecast) => OFFICIAL_DAILY_MODEL_BY_NAME.has(forecast.serviceName));
   const horizon = getDailyForecastHorizon(options.issuedAt, options.targetDate);
   const horizonBucket = horizon?.bucket ?? null;
   const metrics: Array<{ key: DailyFusionMetric; traceKey: "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "windGust" }> = [
@@ -138,7 +141,7 @@ export function computeOfficialDailyForecast(
     adaptiveWeightingEnabled: true,
     modelWeightFraction: 1,
   };
-  const precipitationInputs = forecasts
+  const precipitationInputs = officialForecasts
     .filter((forecast) => DAILY_PRECIPITATION_MODEL_SET.has(forecast.serviceName))
     .map((forecast) => ({ modelName: forecast.serviceName, amountMm: forecast.precipitation }));
   const rawPrecipitationConsensus = summarizePrecipitationModels(
@@ -150,21 +153,22 @@ export function computeOfficialDailyForecast(
   for (const { key } of metrics) {
     const expected = horizonBucket ? { locationKey: options.locationKey, variable: key, horizonBucket } : null;
     const metricForecasts = key === "precipitation_sum"
-      ? forecasts.filter((forecast) => DAILY_PRECIPITATION_MODEL_SET.has(forecast.serviceName)
+      ? officialForecasts.filter((forecast) => DAILY_PRECIPITATION_MODEL_SET.has(forecast.serviceName)
         && typeof forecast.precipitation === "number"
         && Number.isFinite(forecast.precipitation)
         && forecast.precipitation >= PRECIPITATION_RAIN_THRESHOLD_MM)
-      : forecasts;
+      : officialForecasts;
     const sources: FusionSource[] = expected ? metricForecasts.map((forecast) => {
-      const service = SERVICE_BY_NAME.get(forecast.serviceName);
+      const service = OFFICIAL_DAILY_MODEL_BY_NAME.get(forecast.serviceName);
       const evidence = options.evidence.find((item) => item.serviceName === forecast.serviceName
+        && item.modelId === service?.modelId
         && item.locationKey === options.locationKey
         && item.variable === key
         && item.horizonBucket === horizonBucket) ?? null;
       return {
         id: `model:${forecast.serviceName}`,
         name: forecast.serviceName,
-        modelId: service?.modelId ?? evidence?.modelId ?? null,
+        modelId: service?.modelId ?? null,
         distanceKm: 1,
         // computeFusion uses this one field as the selected variable, so the cap
         // is enforced over exactly the contributors that can affect this result.
@@ -207,7 +211,7 @@ export function computeOfficialDailyForecast(
   };
 
   const weights: Record<string, { tempWeight: number; precipWeight: number; windWeight: number; humidityWeight: number }> = {};
-  for (const forecast of forecasts) {
+  for (const forecast of officialForecasts) {
     const findWeight = (fusion: FusionResult, name: string) => fusion.usedSources.find((entry) => entry.name === name)?.finalWeight ?? 0;
     weights[forecast.serviceName] = {
       tempWeight: findWeight(maxFusion, forecast.serviceName),
@@ -231,7 +235,7 @@ export function computeOfficialDailyForecast(
     version: 2,
     issuedAt: now.toISOString(),
     method,
-    sourceCount: forecasts.length,
+    sourceCount: officialForecasts.length,
     horizonBucket: horizon?.bucket ?? null,
     calibrationStatus,
     parameterSources: {

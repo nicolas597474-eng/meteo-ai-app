@@ -93,6 +93,8 @@ function getYesterdayParis(): string {
 
 const OFFICIAL_HOURLY_COVERAGE_MODELS = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
 const OFFICIAL_HOURLY_COVERAGE_MODEL_SET = new Set<string>(OFFICIAL_HOURLY_COVERAGE_MODELS);
+const OFFICIAL_DAILY_COVERAGE_MODELS = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
+const OFFICIAL_DAILY_COVERAGE_MODEL_SET = new Set<string>(OFFICIAL_DAILY_COVERAGE_MODELS);
 
 export function getModelCoverage(
   receivedNames: string[],
@@ -512,9 +514,8 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       await insertForecasts(forecastRows, { requireDatabase: true });
       const issuedAt = Date.now();
 
-      // La fusion de ce passage utilise explicitement les sept modèles actifs et
-      // Best Match. Les anciennes lignes publiques restent archivées mais ne sont
-      // ni relues ni réécrites par ce cycle.
+      // Les sept modèles déterministes alimentent la fusion officielle. Best Match
+      // reste archivé comme référence dérivée, séparée et non pondérée.
       const allForecasts = expertData;
 
       if (allForecasts.length > 0) {
@@ -570,7 +571,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
                 },
                 {
                   role: "user",
-                  content: `Prévision MeteoAI pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- ${allForecasts.length} services consultés\n\nGénère une explication naturelle et concise, sans score global.`,
+                  content: `Prévision MeteoAI pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- ${allForecasts.filter((forecast) => OFFICIAL_DAILY_COVERAGE_MODEL_SET.has(forecast.serviceName)).length} modèles déterministes disponibles; Best Match est une référence dérivée non pondérée\n\nGénère une explication naturelle et concise, sans score global.`,
                 },
               ],
               maxTokens: 300,
@@ -920,7 +921,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     }
 
     console.log(`[MeteoAI] Processing ${uniqueLocations.length} unique locations (${allFavorites.length} total favorites)`);
-    const expectedModelsPerLocation = getModelCoverage([]).expected.length;
+    const expectedModelsPerLocation = getModelCoverage([], OFFICIAL_DAILY_COVERAGE_MODELS).expected.length;
     dailyModelsExpected = uniqueLocations.length * expectedModelsPerLocation;
     hourlyModelsExpected = uniqueLocations.length * OFFICIAL_HOURLY_COVERAGE_MODELS.length;
     await updateCollectionJob(jobId, { dailyModelsExpected, hourlyModelsExpected });
@@ -1086,7 +1087,10 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         const dailyShadowRequestStartedAt = Date.now();
         const expertData = await collectExpertForecasts(today, { lat: fav.lat, lon: fav.lon });
         const dailyShadowReceivedAt = Date.now();
-        const dailyCoverage = getModelCoverage(expertData.map((forecast) => forecast.serviceName));
+        const dailyCoverage = getModelCoverage(
+          expertData.map((forecast) => forecast.serviceName),
+          OFFICIAL_DAILY_COVERAGE_MODELS,
+        );
         console.log(`[Models] ${fav.name}: quotidien ${dailyCoverage.collected.length}/${dailyCoverage.expected.length}`);
         if (dailyCoverage.missing.length > 0) {
           console.warn(`[Models] ${fav.name}: quotidien indisponible — ${dailyCoverage.missing.join(", ")}`);
