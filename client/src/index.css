@@ -319,6 +319,26 @@
   background-size: cover;
 }
 
+/* La page Prévisions adopte le fond minéral des captures; l'illustration reste dans sa carte. */
+.weather-page-sky.forecast-details-page {
+  background-color: #202124 !important;
+  background-image: none !important;
+}
+
+.weather-page-sky.forecast-details-page #forecast-by-day-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.weather-page-sky.forecast-details-page button.forecast-hour-cell {
+  border-radius: 0.5rem !important;
+}
+
+.weather-page-sky.forecast-details-page button.forecast-day-tile {
+  border-radius: 0.75rem !important;
+}
+
 .weather-page-sky .weather-surface,
 .weather-page-sky .weather-surface-hero,
 .weather-page-sky .weather-surface-lab,
