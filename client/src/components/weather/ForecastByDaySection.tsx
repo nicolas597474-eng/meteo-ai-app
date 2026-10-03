@@ -4,6 +4,12 @@ import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotic
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import {
+  buildForecastDisplayDays,
+  getDailyReferenceSourceLabels,
+  type DailyForecastPoint,
+  type ForecastDisplayDay,
+} from "@/lib/forecastDayDisplay";
+import {
   formatOptionalForecastValue,
   getInitialForecastTimelineSelection,
   getSelectedForecastHourIndex,
@@ -40,6 +46,10 @@ type ForecastHour = {
   cloudHigh?: number | null;
   pressure?: number | null;
   uvIndex?: number | null;
+  visibility?: number | null;
+  solarRadiation?: number | null;
+  precipType?: string | null;
+  precipIntensity?: string | null;
   multiModelMetrics?: { source?: string; bestMatchIncluded?: boolean; precipitation?: PrecipitationMetrics | null } | null;
 };
 
@@ -57,6 +67,7 @@ type DetailCategory = {
   icon: string;
   summary: string;
   unit: string;
+  cadence: "hourly" | "daily";
   rows: DetailRow[];
 };
 
@@ -156,7 +167,7 @@ function hourTime(entry: IndexedForecastHour<ForecastHour>, allHours: readonly F
   return `${display.hourLabel}${display.offsetLabel ? ` · ${display.offsetLabel}` : ""}`;
 }
 
-function buildDetailCategories(
+function buildHourlyDetailCategories(
   group: ForecastDayGroup<ForecastHour>,
   allHours: readonly ForecastHour[],
 ): DetailCategory[] {
@@ -214,16 +225,89 @@ function buildDetailCategories(
     }];
   });
 
+  const cloudRows: DetailRow[] = entries.flatMap((entry) => {
+    const { cloudCover, cloudLow, cloudMid, cloudHigh } = entry.hour;
+    if (![cloudCover, cloudLow, cloudMid, cloudHigh].some(isFiniteValue)) return [];
+    const value = [
+      isFiniteValue(cloudCover) ? `Total ${formatOptionalForecastValue(cloudCover, 0, " %")}` : null,
+      isFiniteValue(cloudLow) ? `basses ${formatOptionalForecastValue(cloudLow, 0, " %")}` : null,
+      isFiniteValue(cloudMid) ? `moyennes ${formatOptionalForecastValue(cloudMid, 0, " %")}` : null,
+      isFiniteValue(cloudHigh) ? `hautes ${formatOptionalForecastValue(cloudHigh, 0, " %")}` : null,
+    ].filter((item): item is string => item != null).join(" · ");
+    return [{ key: `cloud-${entry.index}`, time: time(entry), value, chartValue: isFiniteValue(cloudCover) ? cloudCover : null, chartValueLabel: formatOptionalForecastValue(cloudCover, 0, "%") }];
+  });
+
+  const numericRows = (
+    key: string,
+    selectValue: (hour: ForecastHour) => number | null | undefined,
+    decimals: number,
+    unit: string,
+  ) => entries.flatMap((entry) => {
+    const value = selectValue(entry.hour);
+    if (!isFiniteValue(value)) return [];
+    return [{ key: `${key}-${entry.index}`, time: time(entry), value: formatOptionalForecastValue(value, decimals, unit), chartValue: value, chartValueLabel: formatOptionalForecastValue(value, decimals, unit) }];
+  });
+
+  const typeRows: DetailRow[] = entries.flatMap((entry) => {
+    const { precipType, precipIntensity } = entry.hour;
+    if (!precipType && !precipIntensity) return [];
+    const labels: Record<string, string> = { rain: "pluie", snow: "neige", freezing_rain: "pluie verglaçante", light: "faible", moderate: "modérée", heavy: "forte" };
+    return [{ key: `precip-type-${entry.index}`, time: time(entry), value: [precipType ? labels[precipType] ?? precipType : null, precipIntensity ? labels[precipIntensity] ?? precipIntensity : null].filter(Boolean).join(" · "), chartValue: null, chartValueLabel: "—" }];
+  });
+
   const firstAvailable = (rows: DetailRow[]) => {
     const row = rows.find(({ chartValue }) => chartValue !== null) ?? rows[0];
     return row ? `${row.value} · ${row.time}` : "—";
   };
 
   return [
-    { key: "precipitation", title: "Précipitations", icon: "precipitation", summary: firstAvailable(precipitationRows), unit: "mm", rows: precipitationRows },
-    { key: "wind", title: "Vent", icon: "wind_param", summary: firstAvailable(windRows), unit: "km/h", rows: windRows },
-    { key: "humidity", title: "Humidité", icon: "humidity", summary: firstAvailable(humidityRows), unit: "%", rows: humidityRows },
-  ].filter(({ key, rows }) => ["precipitation", "wind", "humidity"].includes(key) || rows.length > 0);
+    { key: "precipitation", title: "Précipitations", icon: "precipitation", summary: firstAvailable(precipitationRows), unit: "mm", cadence: "hourly" as const, rows: precipitationRows },
+    { key: "precip-type", title: "Type et intensité", icon: "precipitation", summary: firstAvailable(typeRows), unit: "", cadence: "hourly" as const, rows: typeRows },
+    { key: "wind", title: "Vent", icon: "wind_param", summary: firstAvailable(windRows), unit: "km/h", cadence: "hourly" as const, rows: windRows },
+    { key: "humidity", title: "Humidité et rosée", icon: "humidity", summary: firstAvailable(humidityRows), unit: "%", cadence: "hourly" as const, rows: humidityRows },
+    { key: "clouds", title: "Nuages", icon: "cloud_cover", summary: firstAvailable(cloudRows), unit: "%", cadence: "hourly" as const, rows: cloudRows },
+    { key: "pressure", title: "Pression", icon: "pressure", summary: firstAvailable(numericRows("pressure", (hour) => hour.pressure, 0, " hPa")), unit: "hPa", cadence: "hourly" as const, rows: numericRows("pressure", (hour) => hour.pressure, 0, " hPa") },
+    { key: "uv", title: "Indice UV", icon: "sunny", summary: firstAvailable(numericRows("uv", (hour) => hour.uvIndex, 1, "")), unit: "indice", cadence: "hourly" as const, rows: numericRows("uv", (hour) => hour.uvIndex, 1, "") },
+    { key: "apparent", title: "Température ressentie", icon: "thermometer", summary: firstAvailable(numericRows("apparent", (hour) => hour.apparentTemp, 1, "°")), unit: "°C", cadence: "hourly" as const, rows: numericRows("apparent", (hour) => hour.apparentTemp, 1, "°") },
+    { key: "visibility", title: "Visibilité", icon: "eye", summary: firstAvailable(numericRows("visibility", (hour) => hour.visibility, 1, " km")), unit: "km", cadence: "hourly" as const, rows: numericRows("visibility", (hour) => hour.visibility, 1, " km") },
+    { key: "radiation", title: "Rayonnement solaire", icon: "sunny", summary: firstAvailable(numericRows("radiation", (hour) => hour.solarRadiation, 0, " W/m²")), unit: "W/m²", cadence: "hourly" as const, rows: numericRows("radiation", (hour) => hour.solarRadiation, 0, " W/m²") },
+  ].filter(({ rows }) => rows.length > 0);
+}
+
+function buildDailyDetailCategories(day: DailyForecastPoint): DetailCategory[] {
+  const makeCategory = (key: string, title: string, icon: string, unit: string, value: string, chartValue: number | null, note?: string): DetailCategory => ({
+    key, title, icon, summary: value || "—", unit, cadence: "daily",
+    rows: value ? [{ key: `${key}-${day.date ?? "date"}`, time: "Journée", value, note, chartValue, chartValueLabel: chartValue == null ? "—" : `${chartValue}${unit ? ` ${unit}` : ""}` }] : [],
+  });
+  const categories: DetailCategory[] = [];
+  if (isFiniteValue(day.precipitation)) {
+    const consensus = day.precipitationConsensus;
+    const hasCounts = isFiniteValue(consensus?.rainModelCount) && isFiniteValue(consensus?.availableModelCount);
+    const note = hasCounts
+      ? `${consensus.rainModelCount}/${consensus.availableModelCount} modèles au seuil${isFiniteValue(consensus.thresholdMm) ? ` ≥ ${formatOptionalForecastValue(consensus.thresholdMm, 1, " mm")}` : ""} · fréquence brute non calibrée, pas une probabilité`
+      : "Cumul quotidien de la série de référence non calibrée.";
+    categories.push(makeCategory("precipitation", "Précipitations", "precipitation", "mm", formatOptionalForecastValue(day.precipitation, 1, " mm"), day.precipitation, note));
+  }
+  const windParts = [
+    isFiniteValue(day.windSpeed) ? `Vent max. ${formatOptionalForecastValue(day.windSpeed, 0, " km/h")}` : null,
+    isFiniteValue(day.windGust) ? `Rafales max. ${formatOptionalForecastValue(day.windGust, 0, " km/h")}` : null,
+    isFiniteValue(day.windDirection) ? `Direction dominante ${windDirectionLabel(day.windDirection)}` : null,
+  ].filter((value): value is string => value != null);
+  if (windParts.length) categories.push(makeCategory("wind", "Vent", "wind_param", "km/h", windParts.join(" · "), isFiniteValue(day.windSpeed) ? day.windSpeed : null));
+  const humidityParts = [
+    isFiniteValue(day.humidity) ? `Humidité ${formatOptionalForecastValue(day.humidity, 0, "%")}` : null,
+    isFiniteValue(day.cloudCover) ? `Nuages ${formatOptionalForecastValue(day.cloudCover, 0, "%")}` : null,
+  ].filter((value): value is string => value != null);
+  if (humidityParts.length) categories.push(makeCategory("humidity", "Humidité et nuages", "humidity", "%", humidityParts.join(" · "), isFiniteValue(day.humidity) ? day.humidity : isFiniteValue(day.cloudCover) ? day.cloudCover : null));
+  if (isFiniteValue(day.uvIndex)) categories.push(makeCategory("uv", "Indice UV quotidien", "sunny", "indice", formatOptionalForecastValue(day.uvIndex, 1), day.uvIndex, "Valeur issue de la série quotidienne de référence."));
+  const feelsLikeParts = [
+    isFiniteValue(day.feelsLikeMax) ? `Max. ${formatOptionalForecastValue(day.feelsLikeMax, 1, "°")}` : null,
+    isFiniteValue(day.feelsLikeMin) ? `Min. ${formatOptionalForecastValue(day.feelsLikeMin, 1, "°")}` : null,
+  ].filter((value): value is string => value != null);
+  if (feelsLikeParts.length) categories.push(makeCategory("feels-like", "Température ressentie", "thermometer", "°C", feelsLikeParts.join(" · "), null));
+  const sunParts = [day.sunrise ? `Lever ${day.sunrise}` : null, day.sunset ? `Coucher ${day.sunset}` : null].filter((value): value is string => value != null);
+  if (sunParts.length) categories.push(makeCategory("sun", "Soleil", "sunny", "", sunParts.join(" · "), null));
+  return categories.filter(({ rows }) => rows.length > 0);
 }
 
 function HourlyMiniChart({ category }: { category: DetailCategory }) {
@@ -258,20 +342,24 @@ function HourlyMiniChart({ category }: { category: DetailCategory }) {
 function DayDetailsAccordion({ category }: { category: DetailCategory }) {
   const notes = category.rows.filter(({ note }) => Boolean(note));
   return (
-    <details className="group border-t border-white/[0.10] first:border-t-0">
-      <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a8c7fa]/80">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#35373d] text-[#b6ccf8]"><MeteoIcon name={category.icon} size={16} /></span>
-        <span className="min-w-0 flex-1 text-[15px] font-semibold text-[#eceef2]">{category.title}</span>
-        <span className="max-w-[42%] truncate text-sm tabular-nums text-[#b8bbc2]">{category.summary}</span>
-        <span aria-hidden="true" className="ml-1 text-xl leading-none text-[#c4c7ce] transition-transform group-open:rotate-180">⌄</span>
+    <details className="group border-t border-sky-100/10 first:border-t-0">
+      <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-300/10 text-cyan-100"><MeteoIcon name={category.icon} size={16} /></span>
+        <span className="min-w-0 flex-1 text-[14px] font-semibold text-slate-100">{category.title}</span>
+        <span className="max-w-[42%] truncate text-xs tabular-nums text-slate-300">{category.summary}</span>
+        <span aria-hidden="true" className="ml-1 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
       </summary>
       <div className="pb-4 pl-14 pr-1">
-        <p className="mb-2 text-xs text-[#aeb3bd]">Valeurs horaires fournies · défilez horizontalement pour parcourir les heures.</p>
-        <HourlyMiniChart category={category} />
+        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne fournie par la série de référence non calibrée."}</p>
+        {category.cadence === "hourly" ? <HourlyMiniChart category={category} /> : (
+          <dl className="space-y-1 text-sm text-slate-100">
+            {category.rows.map((row) => <div key={row.key} className="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt className="text-slate-400">{row.time}</dt><dd className="text-right font-medium tabular-nums">{row.value}</dd></div>)}
+          </dl>
+        )}
         {notes.length > 0 && (
-          <div className="mt-2 space-y-1 border-t border-white/[0.08] pt-2 text-xs leading-relaxed text-[#b8bbc2]">
+          <div className="mt-2 space-y-1 border-t border-sky-100/10 pt-2 text-xs leading-relaxed text-slate-300">
             {notes.map((row) => <p key={row.key}>{row.time} · {row.note}</p>)}
-            {category.key === "precipitation" && <p className="pt-1 text-[#d0d4dc]">Les comptes de modèles décrivent une fréquence brute, jamais une probabilité de pluie calibrée.</p>}
+            {category.key === "precipitation" && <p className="pt-1 text-sky-100">Les comptes de modèles décrivent une fréquence brute, jamais une probabilité de pluie calibrée.</p>}
           </div>
         )}
       </div>
@@ -281,28 +369,34 @@ function DayDetailsAccordion({ category }: { category: DetailCategory }) {
 
 function AirQualityAccordion() {
   return (
-    <details className="group border-t border-white/[0.10]">
-      <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a8c7fa]/80">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#35373d] text-[#b6ccf8]"><MeteoIcon name="cloud_cover" size={16} /></span>
-        <span className="min-w-0 flex-1 text-[15px] font-semibold text-[#eceef2]">Qualité de l’air</span>
-        <span className="text-sm text-[#b8bbc2]">Indisponible</span>
-        <span aria-hidden="true" className="ml-1 text-xl leading-none text-[#c4c7ce] transition-transform group-open:rotate-180">⌄</span>
+    <details className="group border-t border-sky-100/10">
+      <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-300/10 text-cyan-100"><MeteoIcon name="cloud_cover" size={16} /></span>
+        <span className="min-w-0 flex-1 text-[14px] font-semibold text-slate-100">Qualité de l’air</span>
+        <span className="text-xs text-slate-300">Non disponible</span>
+        <span aria-hidden="true" className="ml-1 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
       </summary>
-      <p className="pb-4 pl-14 pr-2 text-sm leading-relaxed text-[#b8bbc2]">La qualité de l’air ne fait pas partie du contrat météo de cette page. Aucune mesure n’est affichée.</p>
+      <p className="pb-4 pl-14 pr-2 text-xs leading-relaxed text-slate-300">L’indice de qualité de l’air ne fait pas partie des données renvoyées à cette page. Aucune valeur n’est demandée, déduite ou inventée.</p>
     </details>
   );
 }
 
 export function ForecastByDaySection({
   hours,
+  dailyDays,
+  dailySources,
   activeHourIndex,
   hourlyWeighting,
 }: {
   hours: ForecastHour[];
+  dailyDays: DailyForecastPoint[];
+  dailySources: string[];
   activeHourIndex: number;
   hourlyWeighting?: unknown;
 }) {
   const grouped = useMemo(() => groupOfficialHourlyForecastByDate(hours), [hours]);
+  const displayDays = useMemo(() => buildForecastDisplayDays(hours, dailyDays), [hours, dailyDays]);
+  const sourceLabels = useMemo(() => getDailyReferenceSourceLabels(dailySources), [dailySources]);
   const [selection, setSelection] = useState<ForecastTimelineSelection>({ dayDate: null, hourIndex: null, expanded: true });
   const selectedHourRef = useRef<HTMLButtonElement | null>(null);
   const selectedDayRef = useRef<HTMLButtonElement | null>(null);
@@ -312,21 +406,30 @@ export function ForecastByDaySection({
     () => getInitialForecastTimelineSelection(grouped.days, activeHourIndex),
     [grouped.days, activeHourIndex],
   );
-  const selectedGroup = grouped.days.find(({ date }) => date === selection.dayDate)
-    ?? grouped.days.find(({ date }) => date === initialSelection.dayDate);
-  const selectedDayDate = selectedGroup?.date ?? null;
+  const initialDate = initialSelection.dayDate ?? displayDays[0]?.date ?? null;
+  const selectedDay = displayDays.find(({ date }) => date === selection.dayDate)
+    ?? displayDays.find(({ date }) => date === initialDate);
+  const selectedDayDate = selectedDay?.date ?? null;
+  const selectedGroup = selectedDay?.hourlyGroup ?? undefined;
   const selectedHourIndex = selectedGroup
     ? getSelectedForecastHourIndex(selection, selectedGroup, activeHourIndex)
     : null;
   const selectedEntry = selectedGroup?.hours.find(({ index }) => index === selectedHourIndex);
-  const detailCategories = selectedGroup ? buildDetailCategories(selectedGroup, hours) : [];
+  const selectedDaily = selectedDay?.daily ?? null;
+  const detailCategories = selectedDay?.kind === "legacy-daily-reference"
+    ? selectedDaily ? buildDailyDetailCategories(selectedDaily) : []
+    : selectedGroup ? buildHourlyDetailCategories(selectedGroup, hours) : [];
   const today = parisDateKey();
   const tomorrow = nextCalendarDate(today);
-  const selectedConditionSource = selectedEntry?.hour.condition?.trim() ?? "";
+  const selectedConditionSource = selectedEntry?.hour.condition?.trim() ?? selectedDaily?.condition?.trim() ?? "";
   const selectedCondition = conditionDescription(selectedConditionSource);
   const selectedConditionIcon = conditionIconName(selectedConditionSource);
   const sceneStyle = selectedConditionSource && selectedConditionIcon !== "calendar"
-    ? { backgroundImage: `linear-gradient(180deg, rgba(32, 33, 36, 0.12), rgba(32, 33, 36, 0.16)), url("${getWeatherLandscapeImage(selectedConditionSource)}")` }
+    ? {
+        backgroundImage: `linear-gradient(180deg, rgba(5, 20, 38, 0.54) 0%, rgba(5, 17, 33, 0.76) 52%, rgba(4, 13, 27, 0.92) 100%), url("${getWeatherLandscapeImage(selectedConditionSource)}")`,
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+      }
     : undefined;
 
   useEffect(() => {
@@ -337,9 +440,9 @@ export function ForecastByDaySection({
     centerWithinHorizontalStrip(dayStripRef.current, selectedDayRef.current);
   }, [selectedDayDate]);
 
-  const onDayPress = (group: ForecastDayGroup<ForecastHour>) => {
-    const active = group.hours.find(({ index }) => index === activeHourIndex);
-    setSelection({ dayDate: group.date, hourIndex: active?.index ?? group.hours[0]?.index ?? null, expanded: true });
+  const onDayPress = (day: ForecastDisplayDay<ForecastHour, DailyForecastPoint>) => {
+    const active = day.hourlyGroup?.hours.find(({ index }) => index === activeHourIndex);
+    setSelection({ dayDate: day.date, hourIndex: active?.index ?? day.hourlyGroup?.hours[0]?.index ?? null, expanded: true });
   };
   const onHourPress = (index: number) => {
     if (!selectedGroup) return;
@@ -352,107 +455,150 @@ export function ForecastByDaySection({
 
   return (
     <section aria-labelledby="forecast-by-day-title" className="min-w-0 w-full space-y-3">
-      {selectedGroup ? (
+      {selectedDay ? (
         <>
-          <section aria-label={`Prévision horaire du ${dateText(selectedGroup.date)}`} className="min-w-0 overflow-hidden rounded-[18px] bg-[#292a2e] text-[#f1f3f4] ring-1 ring-white/[0.055]">
-            <div className="px-4 pb-2 pt-3 sm:px-5 sm:pt-4">
+          <section
+            aria-label={`Prévision ${selectedDay.kind === "official-hourly" ? "horaire officielle" : "quotidienne de référence"} du ${dateText(selectedDay.date)}`}
+            className="relative min-w-0 overflow-hidden rounded-2xl border border-sky-300/30 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 text-slate-50 shadow-[0_10px_32px_rgba(2,8,23,0.38)]"
+            style={sceneStyle}
+          >
+            <div className="relative z-10 px-4 pb-3 pt-3 sm:px-5 sm:pt-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 id="forecast-by-day-title" className="truncate text-base font-medium tracking-tight text-[#f1f3f4]">{dateLabel(selectedGroup.date, today, tomorrow) || dateText(selectedGroup.date)}</h2>
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-100/80">
+                    {selectedDay.kind === "official-hourly" ? "Prévision horaire officielle" : "Prévision quotidienne · référence"}
+                  </p>
+                  <h2 id="forecast-by-day-title" className="mt-1 truncate text-lg font-semibold tracking-tight text-white">{dateLabel(selectedDay.date, today, tomorrow) || dateText(selectedDay.date)}</h2>
                 </div>
-                <span className="shrink-0 pt-1 text-[10px] font-medium tracking-wide text-[#aeb3bd]">MeteoAI</span>
+                <span className="shrink-0 rounded-full border border-sky-200/25 bg-slate-950/45 px-2 py-1 text-[9px] font-semibold tracking-wide text-sky-100">MeteoAI</span>
               </div>
 
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <div className="flex min-w-0 shrink items-center gap-1.5">
-                  <div className="min-w-0">
-                    <p className="text-[9px] font-medium uppercase tracking-[0.1em] text-[#bdc1c6]">Max / Min · jour</p>
-                    <p aria-label="Températures maximale et minimale quotidiennes indisponibles" className="mt-0.5 whitespace-nowrap text-[2rem] font-normal leading-none tracking-[-0.06em] text-[#f1f3f4] sm:text-4xl">—°<span className="px-0.5 text-[0.72em] text-[#c4c7ce]">/</span>—°</p>
-                    <p className="sr-only">Extrêmes quotidiens non fournis</p>
+              <div className="mt-3 flex items-center gap-3 sm:gap-5">
+                {selectedConditionIcon !== "calendar" && <div className="shrink-0 drop-shadow-md"><MeteoIcon name={selectedConditionIcon} size={56} /></div>}
+                {selectedDay.kind === "official-hourly" ? (
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">{selectedEntry ? `Échéance ${hourTime(selectedEntry, hours)}` : "Température horaire"}</p>
+                    <p className="mt-0.5 text-[2.8rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-5xl">{formatOptionalForecastValue(selectedEntry?.hour.temp, 1, "°")}</p>
                   </div>
-                  {selectedConditionIcon !== "calendar" && <MeteoIcon name={selectedConditionIcon} size={28} />}
-                </div>
-                <div className="flex min-w-0 flex-col items-end text-right">
-                  <p className="max-w-[9rem] whitespace-normal break-words text-[13px] font-medium leading-tight text-[#eceef2]">{selectedCondition || "Condition indisponible"}</p>
-                  <p className="mt-1 text-[10px] text-[#bdc1c6]">Ressenti <span className="ml-1 tabular-nums text-[#eceef2]">{formatOptionalForecastValue(selectedEntry?.hour.apparentTemp, 0, "°")}</span></p>
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">Max / Min · référence quotidienne</p>
+                    <p className="mt-0.5 whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-4xl">
+                      {formatOptionalForecastValue(selectedDaily?.tempMax, 1, "°")}<span className="px-1 text-[0.72em] text-sky-100/80">/</span>{formatOptionalForecastValue(selectedDaily?.tempMin, 1, "°")}
+                    </p>
+                  </div>
+                )}
+                <div className="max-w-[42%] shrink-0 text-right">
+                  <p className="text-[13px] font-medium leading-snug text-slate-50">{selectedCondition || "Condition indisponible"}</p>
+                  <p className="mt-2 text-[10px] text-slate-300">Ressenti</p>
+                  <p className="text-sm font-semibold tabular-nums text-white">
+                    {selectedDay.kind === "official-hourly"
+                      ? formatOptionalForecastValue(selectedEntry?.hour.apparentTemp, 1, "°")
+                      : [
+                          isFiniteValue(selectedDaily?.feelsLikeMax) ? `Max ${formatOptionalForecastValue(selectedDaily.feelsLikeMax, 1, "°")}` : null,
+                          isFiniteValue(selectedDaily?.feelsLikeMin) ? `Min ${formatOptionalForecastValue(selectedDaily.feelsLikeMin, 1, "°")}` : null,
+                        ].filter(Boolean).join(" · ") || "—"}
+                  </p>
                 </div>
               </div>
+
+              {selectedDay.kind === "legacy-daily-reference" && (
+                <div className="mt-3 border-t border-sky-100/15 pt-2.5" aria-label="Provenance de la référence quotidienne">
+                  <span className="inline-flex rounded-full border border-amber-200/40 bg-amber-300/15 px-2 py-1 text-[10px] font-bold text-amber-100">Référence non calibrée</span>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-100">Série quotidienne héritée, distincte de la prévision horaire officielle à sept modèles. Sources réellement récupérées : {sourceLabels.length ? sourceLabels.join(" · ") : "non renseignées"}.</p>
+                  {sourceLabels.some((source) => source.startsWith("Best Match")) && <p className="mt-1 text-[9px] leading-relaxed text-sky-100/80">Best Match est indiqué comme agrégateur non indépendant, jamais comme huitième modèle officiel.</p>}
+                </div>
+              )}
             </div>
 
-            <div className="border-y border-white/[0.08] py-2">
-              <div ref={hourStripRef} role="group" aria-label="Heures de prévision défilables" className="flex snap-x snap-mandatory gap-1 overflow-x-auto overscroll-x-contain px-3 pb-0.5 scrollbar-hide touch-pan-x">
-                {selectedGroup.hours.map((entry) => {
-                  const display = formatHourlyDisplay(entry.hour, hours);
-                  const isHourSelected = entry.index === selectedHourIndex;
-                  const isActiveForecast = entry.index === activeHourIndex;
-                  const icon = conditionIconName(entry.hour.condition);
-                  return (
-                    <button
-                      key={`${entry.hour.date ?? "date-absente"}-${entry.hour.hour ?? "heure-absente"}-${entry.index}`}
-                      type="button"
-                      ref={isHourSelected ? selectedHourRef : undefined}
-                      aria-pressed={isHourSelected}
-                      aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 0, "°")}${isActiveForecast ? ", prévision active" : ""}`}
-                      onClick={() => onHourPress(entry.index)}
-                      className={`forecast-hour-cell w-[3.25rem] shrink-0 snap-start rounded-lg px-1 py-0.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a8c7fa]/80 ${isHourSelected ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"}`}
-                    >
-                      <span className="block min-h-4 text-[12px] font-medium tabular-nums text-[#e8eaed]">{formatOptionalForecastValue(entry.hour.temp, 0, "°")}</span>
-                      <MeteoIcon name={icon} size={19} />
-                      <span className={`mt-0.5 block text-[10px] tabular-nums ${isHourSelected ? "text-[#d7e3fc]" : "text-[#bdc1c6]"}`}>{display.hourLabel}</span>
-                      {display.offsetLabel && <span className="block text-[9px] text-amber-200">{display.offsetLabel}</span>}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="relative z-10 border-y border-sky-100/15 bg-slate-950/25 py-2">
+              {selectedGroup ? (
+                <div ref={hourStripRef} role="group" aria-label="Heures de prévision défilables" className="flex snap-x snap-mandatory gap-1 overflow-x-auto overscroll-x-contain px-3 pb-0.5 scrollbar-hide touch-pan-x">
+                  {selectedGroup.hours.map((entry) => {
+                    const display = formatHourlyDisplay(entry.hour, hours);
+                    const isHourSelected = entry.index === selectedHourIndex;
+                    const isActiveForecast = entry.index === activeHourIndex;
+                    const icon = conditionIconName(entry.hour.condition);
+                    return (
+                      <button
+                        key={`${entry.hour.date ?? "date-absente"}-${entry.hour.hour ?? "heure-absente"}-${entry.index}`}
+                        type="button"
+                        ref={isHourSelected ? selectedHourRef : undefined}
+                        aria-pressed={isHourSelected}
+                        aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 0, "°")}${isActiveForecast ? ", prévision active" : ""}`}
+                        onClick={() => onHourPress(entry.index)}
+                        className={`forecast-hour-cell w-[3.45rem] shrink-0 snap-start rounded-xl border px-1 py-1 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
+                      >
+                        <span className="block min-h-4 text-[12px] font-semibold tabular-nums text-white">{formatOptionalForecastValue(entry.hour.temp, 0, "°")}</span>
+                        <MeteoIcon name={icon} size={19} />
+                        <span className={`mt-0.5 block text-[10px] tabular-nums ${isHourSelected ? "text-cyan-100" : "text-slate-300"}`}>{display.hourLabel}</span>
+                        {display.offsetLabel && <span className="block text-[9px] text-amber-200">{display.offsetLabel}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="px-4 py-3 text-xs leading-relaxed text-slate-200">Aucune série horaire officielle disponible pour cette date. Les valeurs restent quotidiennes et ne sont pas déclinées heure par heure.</p>
+              )}
             </div>
-
-            <div aria-hidden="true" className="h-[3.5rem] bg-[#202124] bg-cover bg-center sm:h-20" style={{ ...sceneStyle, backgroundColor: "#202124" }} />
           </section>
 
           <div ref={dayStripRef} role="group" aria-label="Jours de prévision défilables" className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 scrollbar-hide touch-pan-x">
-            {grouped.days.map((group) => {
-              const first = group.hours[0];
-              const condition = first?.hour.condition;
-              const isSelected = selectedDayDate === group.date;
-              const buttonLabel = `Prévision du ${dateText(group.date)}. Températures max et min quotidiennes indisponibles.${condition ? ` ${conditionDescription(condition)}.` : ""}`;
+            {displayDays.map((day) => {
+              const first = day.hourlyGroup?.hours[0]?.hour;
+              const condition = day.daily?.condition ?? first?.condition;
+              const isSelected = selectedDayDate === day.date;
+              const isLegacy = day.kind === "legacy-daily-reference";
+              const temperatures = isLegacy
+                ? `${formatOptionalForecastValue(day.daily?.tempMax, 0, "°")}/${formatOptionalForecastValue(day.daily?.tempMin, 0, "°")}`
+                : "—/—";
+              const buttonLabel = isLegacy
+                ? `Référence quotidienne non calibrée du ${dateText(day.date)}. Max ${formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}, min ${formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}. ${conditionDescription(condition) || "Condition indisponible"}.`
+                : `Prévision horaire officielle du ${dateText(day.date)}. Extrêmes quotidiens non fournis. ${conditionDescription(condition) || "Condition indisponible"}.`;
               return (
                 <button
-                  key={group.date}
+                  key={day.date}
                   type="button"
                   ref={isSelected ? selectedDayRef : undefined}
                   aria-label={buttonLabel}
                   aria-pressed={isSelected}
-                  onClick={() => onDayPress(group)}
-                  className={`forecast-day-tile w-[3.65rem] shrink-0 snap-start rounded-xl border px-1.5 py-1 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a8c7fa]/80 ${isSelected ? "border-[#e8eaed] bg-[#303136]" : "border-transparent bg-[#25262a] hover:bg-[#303136]"}`}
+                  onClick={() => onDayPress(day)}
+                  className={`forecast-day-tile w-[4.25rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
                 >
-                  <span className="block truncate text-[11px] text-[#c4c7ce]">{shortWeekday(group.date)}</span>
-                  <span className="my-1 flex justify-center"><MeteoIcon name={conditionIconName(condition)} size={19} /></span>
-                  <span className="block whitespace-nowrap text-[9px] tabular-nums text-[#d9dce2]">—°/—°</span>
+                  <span className="block truncate text-[11px] font-medium text-slate-200">{shortWeekday(day.date)}</span>
+                  <span className="my-1 flex justify-center"><MeteoIcon name={conditionIconName(condition)} size={20} /></span>
+                  <span className="block whitespace-nowrap text-[9px] font-semibold tabular-nums text-slate-100">{temperatures}</span>
+                  {isLegacy && <span className="mt-1 block whitespace-nowrap text-[8px] font-bold text-amber-200">Référence</span>}
                 </button>
               );
             })}
           </div>
-          <p className="sr-only">Les valeurs max et min par jour ne sont pas présentes dans le contrat horaire ; elles restent indisponibles.</p>
 
-          <section aria-label="Détails horaires par mesure" className="border-y border-white/[0.11] px-2">
+          <section aria-label="Détails météo disponibles" className="rounded-2xl border border-sky-300/20 bg-slate-950/35 px-3">
             {detailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} />)}
             <AirQualityAccordion />
           </section>
 
-          <details className="group px-1 text-xs text-[#aeb3bd]">
-            <summary className="min-h-10 cursor-pointer list-none py-2 font-medium text-[#c4c7ce] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a8c7fa]/80">Provenance et disponibilité des champs <span aria-hidden="true" className="ml-1 inline-block transition-transform group-open:rotate-180">⌄</span></summary>
-            <p className="pb-2 leading-relaxed">Cette vue utilise uniquement la série horaire officielle à sept modèles, sans Best Match. Les champs absents restent indisponibles; aucun maximum, minimum ou cumul quotidien n’est recalculé à partir des heures.</p>
-            <HourlyWeightingNotice weighting={hourlyWeighting as any} />
+          <details className="group px-1 text-xs text-slate-300">
+            <summary className="min-h-10 cursor-pointer list-none py-2 font-medium text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">Provenance et disponibilité des champs <span aria-hidden="true" className="ml-1 inline-block transition-transform group-open:rotate-180">⌄</span></summary>
+            {selectedDay.kind === "legacy-daily-reference" ? (
+              <p className="pb-2 leading-relaxed">Cette série quotidienne héritée n’est pas calibrée et n’est pas la fusion horaire officielle à sept modèles. Les champs absents ne sont pas estimés. Best Match, s’il est listé, est un agrégateur de référence non indépendant.</p>
+            ) : (
+              <>
+                <p className="pb-2 leading-relaxed">Cette vue utilise uniquement la série horaire officielle à sept modèles, sans Best Match. Les variables sans valeur qualifiée restent indisponibles; les maxima/minima quotidiens ne sont pas reconstitués à partir d’un échantillon horaire incomplet.</p>
+                <HourlyWeightingNotice weighting={hourlyWeighting as any} />
+              </>
+            )}
           </details>
         </>
       ) : (
-        <div className="rounded-2xl bg-[#292a2e] px-4 py-5 text-sm leading-relaxed text-[#d9dce2]" role="status">
-          <h2 id="forecast-by-day-title" className="font-semibold text-[#f1f3f4]">Prévisions</h2>
-          <p className="mt-2">Aucune échéance horaire officielle datée n’est disponible pour organiser les prévisions par jour.</p>
-          {grouped.undatedHours > 0 && <p className="mt-1 text-[#aeb3bd]">{grouped.undatedHours} échéance(s) sans date locale explicite n’ont pas été regroupées; aucune date n’a été déduite de l’horodatage UTC.</p>}
+        <div className="rounded-2xl border border-sky-300/25 bg-slate-900/75 px-4 py-5 text-sm leading-relaxed text-slate-200" role="status">
+          <h2 id="forecast-by-day-title" className="font-semibold text-white">Prévisions</h2>
+          <p className="mt-2">Aucune échéance datée n’est disponible dans la série horaire officielle ni dans les données quotidiennes de référence.</p>
+          {grouped.undatedHours > 0 && <p className="mt-1 text-amber-100">{grouped.undatedHours} échéance(s) sans date locale explicite n’ont pas été regroupées; aucune date n’a été déduite de l’horodatage UTC.</p>}
         </div>
       )}
-      {grouped.days.length > 0 && grouped.undatedHours > 0 && <p className="px-1 text-xs text-amber-100/80">{grouped.undatedHours} échéance(s) sans date locale explicite ne sont pas affichées dans les bandes.</p>}
+      {displayDays.length > 0 && grouped.undatedHours > 0 && <p className="px-1 text-xs text-amber-100/90">{grouped.undatedHours} échéance(s) sans date locale explicite ne sont pas affichées dans les bandes.</p>}
     </section>
   );
 }
