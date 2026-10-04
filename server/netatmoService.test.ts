@@ -84,6 +84,7 @@ describe("stations Netatmo publiques", () => {
       pressure: new Date(1_786_524_000 * 1000).toISOString(),
       windSpeed: new Date(1_786_524_060 * 1000).toISOString(),
       windGust: new Date(1_786_524_060 * 1000).toISOString(),
+      windDirection: new Date(1_786_524_060 * 1000).toISOString(),
       precipitation: new Date(1_786_524_120 * 1000).toISOString(),
     });
   });
@@ -106,6 +107,7 @@ describe("stations Netatmo publiques", () => {
       stationId: "netatmo-cache-1", source: "netatmo", temperature: 19.2,
       isActive: true, qualificationStatus: "validated", sourceTier: 1,
     });
+    expect(station?.measurementTimes).toBeUndefined();
   });
 
   it("refuse une observation persistée expirée ou non qualifiée", () => {

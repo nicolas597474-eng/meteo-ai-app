@@ -485,6 +485,8 @@ export type CurrentWeatherSnapshot = {
   sourceKind: "model_current_snapshot";
   source: "open-meteo";
   capturedAt: string;
+  /** Elevation reported for the requested point; used only for station altitude QA. */
+  elevationM?: number | null;
   temp: number | null;
   apparentTemp: number | null;
   precipitation: number | null;
@@ -884,7 +886,8 @@ export async function collectCurrentWeatherSnapshot(
 
     const response = await fetchWeather(url.toString(), {}, { timeoutMs: 8_000, attempts: 1 });
     if (!response.ok) return null;
-    const current = (await response.json()).current;
+    const payload = await response.json();
+    const current = payload.current;
     if (!current || typeof current.time !== "number" || !Number.isFinite(current.time)) return null;
     const capturedAt = Number(current?.time) * 1000;
     if (!Number.isFinite(capturedAt)) return null;
@@ -895,6 +898,7 @@ export async function collectCurrentWeatherSnapshot(
       sourceKind: "model_current_snapshot",
       source: "open-meteo",
       capturedAt: new Date(capturedAt).toISOString(),
+      elevationM: typeof payload.elevation === "number" && Number.isFinite(payload.elevation) ? payload.elevation : null,
       temp: current.temperature_2m ?? null,
       apparentTemp: current.apparent_temperature ?? null,
       precipitation,

@@ -126,6 +126,7 @@ import { getPreviousReadings, recordStationReadings } from "../stationReadingsCa
 import { getParisDate } from "../weatherTime";
 import { buildOfficialModelFallback } from "../modelFallback";
 import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
+import { buildCurrentDashboardWeatherState } from "../currentDashboardWeather";
 
 export const favoritesRouter = router({
   /**
@@ -237,6 +238,32 @@ export const favoritesRouter = router({
     }))
     .query(({ input }) => {
       return getUltraLocalConfig(input.mode);
+    }),
+
+  /** Read-model dedicated to present conditions; it never changes forecast data. */
+  getCurrentDashboardWeather: publicProcedure
+    .input(z.object({
+      lat: z.number().min(-90).max(90),
+      lon: z.number().min(-180).max(180),
+    }))
+    .query(async ({ ctx, input }) => {
+      const localRadiusKm = Math.max(...getUltraLocalConfig("local").config.radiusBands.map((band) => band.maxKm));
+      const [officialSnapshot, stations] = await Promise.all([
+        resolveOfficialWeatherSnapshot({ lat: input.lat, lon: input.lon }),
+        collectNearbyStations(
+          input.lat,
+          input.lon,
+          localRadiusKm,
+          "Dashboard état courant",
+          getDashboardNetatmoCollectionOptions(ctx.user),
+        ),
+      ]);
+      return buildCurrentDashboardWeatherState({
+        lat: input.lat,
+        lon: input.lon,
+        snapshot: officialSnapshot.currentSnapshot,
+        stations,
+      });
     }),
 
   /**
