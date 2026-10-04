@@ -45,11 +45,21 @@ function formatNumber(value: number | null | undefined, digits = 2): string {
 function variableLabel(variable: string): string {
   const labels: Record<string, string> = {
     temperature: "Température",
+    apparent_temperature: "Ressenti",
     precipitation: "Précipitations",
     wind_speed: "Vent",
+    wind_direction: "Direction du vent",
     wind_gust: "Rafales",
     humidity: "Humidité",
     pressure: "Pression",
+    cloud_cover: "Nébulosité",
+    cloud_cover_low: "Nuages bas",
+    cloud_cover_mid: "Nuages moyens",
+    cloud_cover_high: "Nuages hauts",
+    uv_index: "Indice UV",
+    dew_point: "Point de rosée",
+    visibility: "Visibilité",
+    shortwave_radiation: "Rayonnement solaire",
   };
   return labels[variable] ?? variable;
 }
@@ -62,14 +72,14 @@ function statusLabel(value: string): string {
     CALIBRATED: "calibrée sur preuve historique qualifiée",
     PARTIALLY_CALIBRATED: "calibration historique partielle",
     UNCALIBRATED_ROBUST: "repli robuste non calibré",
-    EXACT_LOCAL_MODEL_VARIABLE_HORIZON: "bucket exact lieu × modèle × variable × horizon",
+    EXACT_LOCAL_MODEL_VARIABLE_BUCKET: "bucket exact lieu × modèle × variable",
   };
   return labels[value] ?? value;
 }
 
 function calibrationLevelLabel(level: string): string {
-  return level === "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
-    ? "preuve locale exacte (modèle × variable × bucket)"
+  return level === "EXACT_LOCAL_MODEL_VARIABLE_BUCKET"
+    ? "preuve locale (modèle × variable × bucket)"
     : "repli robuste non calibré";
 }
 
@@ -113,7 +123,7 @@ export function HourlyFusionDebugPanel({
           <summary className="cursor-pointer text-[10px] font-semibold text-slate-100">
             {variableLabel(variable.variable)} · {variable.contributingModelCount}/{variable.expectedModelCount} contributeurs · {getModelCountCoverageLabel(variable.coverageLevel as Parameters<typeof getModelCountCoverageLabel>[0])} · {statusLabel(variable.calibrationStatus)}
           </summary>
-          <p className="mt-1 text-[9px] leading-relaxed text-slate-400">Disponibles : {variable.availableModelCount} · preuves qualifiées : {variable.evidenceEligibleModelCount} · bucket commun : {variable.horizonBucket ?? "aucun (mixte ou non classé)"}. Le niveau de couverture est descriptif, pas une probabilité statistique.</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-slate-400">Disponibles : {variable.availableModelCount} · preuves qualifiées : {variable.evidenceEligibleModelCount} · résumé bucket : {variable.horizonBucket ?? "mixte ou non classé"}. Les modèles peuvent appartenir à des buckets différents; aucun horizon commun n’est requis. Le niveau de couverture est descriptif, pas une probabilité statistique.</p>
           {variable.modelWeights.length > 0 && <ul className="mt-1.5 space-y-1.5">
             {variable.modelWeights.map((model) => <li key={`${variable.variable}-${model.modelName}`} className="rounded-md border border-emerald-300/10 bg-emerald-300/[0.035] px-2 py-1.5 text-[9px] leading-relaxed text-slate-300">
               <p className="font-semibold text-emerald-100">{model.modelName} · disponible · {model.contributedToValue ? "contributeur" : "valeur conservée, non contributrice à la quantité"}</p>

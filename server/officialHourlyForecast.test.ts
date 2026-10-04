@@ -26,6 +26,12 @@ function modelForecasts(at = validAt, available = at - 12 * 60 * 60_000): Hourly
       cloudCover: 30 + index,
       weatherCode: index < 4 ? 2 : 3,
       uvIndex: 2 + index / 10,
+      dewPoint: 4 + index,
+      visibility: 10 + index,
+      solarRadiation: 100 + index * 10,
+      cloudLow: 20 + index,
+      cloudMid: 30 + index,
+      cloudHigh: 40 + index,
     }],
   }));
 }
@@ -110,6 +116,10 @@ describe("reconstructOfficialHourlyModelsFromArchive", () => {
       row({ id: 2, validTime: firstValidAt, value: 8 }),
       row({ id: 3, validTime: secondValidAt, value: 12 }),
       row({ id: 4, captureRunId: "aggregate-run", modelName: "best_match", modelId: null, value: 99 }),
+      row({ id: 5, validTime: firstValidAt, variable: "cloud_cover", value: 55, unit: "%" }),
+      row({ id: 6, validTime: firstValidAt, variable: "dew_point", value: 3, unit: "°C" }),
+      row({ id: 7, validTime: firstValidAt, variable: "visibility", value: 6, unit: "km" }),
+      row({ id: 8, validTime: firstValidAt, variable: "weather_code", value: 2, unit: "wmo code" }),
     ];
 
     const forecasts = reconstructOfficialHourlyModelsFromArchive(archives, targetDate);
@@ -119,6 +129,7 @@ describe("reconstructOfficialHourlyModelsFromArchive", () => {
     expect(forecasts[0]?.hours.map((hour) => hour.validAt)).toEqual([firstValidAt, secondValidAt]);
     expect(forecasts[0]?.hours.map((hour) => hour.hour)).toEqual([2, 2]);
     expect(forecasts[0]?.hours.map((hour) => hour.temperature)).toEqual([8, 12]);
+    expect(forecasts[0]?.hours[0]).toMatchObject({ cloudCover: 55, dewPoint: 3, visibility: 6, weatherCode: 2 });
   });
 });
 
@@ -156,7 +167,7 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.hours[0].forecastWeighting?.scoredVariables).toEqual(["temperature"]);
     expect(result.hours[0].forecastWeighting?.unavailableVariables).toEqual([]);
     expect(result.hours[0].forecastWeighting?.robustVariables).toContain("wind_speed");
-    expect(result.hours[0].forecastWeighting?.variableWeightings).toHaveLength(6);
+    expect(result.hours[0].forecastWeighting?.variableWeightings).toHaveLength(17);
     expect(result.hours[0].precipitation).toBeCloseTo(0.4 / 7, 10);
     expect(result.hours[0].multiModelMetrics?.precipitation).toMatchObject({
       thresholdMm: 0.1,
@@ -168,7 +179,13 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.hours[0].multiModelMetrics?.precipitation.consensusEstimateMm).toBeCloseTo(0.4 / 7, 10);
     expect(result.hours[0].multiModelMetrics?.precipitation.frequencyPercent).toBeCloseTo(100 / 7, 10);
     expect(result.hours[0].windSpeed).not.toBeNull();
-    expect(result.hours[0].apparentTemp).toBeNull();
+    expect(result.hours[0].apparentTemp).not.toBeNull();
+    expect(result.hours[0].cloudCover).not.toBeNull();
+    expect(result.hours[0].dewPoint).not.toBeNull();
+    expect(result.hours[0].visibility).not.toBeNull();
+    expect(result.hours[0].weatherCode).toBe(2);
+    expect(variableWeighting(result, "weather_code")?.availableModelCount).toBe(7);
+    expect(variableWeighting(result, "weather_code")?.calibrationStatus).toBe("UNCALIBRATED_ROBUST");
     expect(variableWeighting(result, "temperature")).toMatchObject({
       availableModelCount: 7,
       contributingModelCount: 7,
@@ -177,7 +194,7 @@ describe("computeOfficialHourlyForecast", () => {
     const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
     expect(weights).toHaveLength(7);
     expect(weights.reduce((sum, item) => sum + item.weight, 0)).toBeCloseTo(1, 10);
-    expect(weights[0]).toMatchObject({ value: 8, calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON", historicalScore: { comparisonCount: 35, evaluatedDays: 7 } });
+    expect(weights[0]).toMatchObject({ value: 8, calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_BUCKET", historicalScore: { comparisonCount: 35, evaluatedDays: 7 } });
     expect(weights[0]?.reliability).toBeGreaterThan(0);
     expect(weights.find((item) => item.modelName === "AROME")!.weight)
       .toBeGreaterThan(weights.find((item) => item.modelName === "UKMET")!.weight);
@@ -410,6 +427,72 @@ describe("computeOfficialHourlyForecast", () => {
     expect(variableWeighting(result, "temperature")?.availabilityStatus).toBe("FUSED");
   });
 
+  it("récupère pour chaque modèle la preuve de son propre bucket dans une même échéance", () => {
+    const horizons = [30, 119.6, 120, 359.6, 360, 1439.6, 1440];
+    const buckets = ["0_2h", "0_2h", "2_6h", "2_6h", "6_24h", "6_24h", "1_3d"];
+    const forecasts = modelForecasts().map((model, index) => ({
+      ...model,
+      availableAt: validAt - horizons[index]! * 60_000,
+    }));
+    const scores = OFFICIAL_HOURLY_MODELS.flatMap((model, modelIndex) => Array.from({ length: 7 }, (_, dayIndex) => {
+      const mae = 0.25 + modelIndex;
+      return {
+        date: `2026-09-${String(20 + dayIndex).padStart(2, "0")}`,
+        sourceName: "open-meteo",
+        modelName: model.name,
+        modelId: model.modelId,
+        variable: "temperature",
+        horizonBucket: buckets[modelIndex]!,
+        sampleSize: 5,
+        mae,
+        rmse: mae + 0.2,
+        bias: 0,
+      };
+    }));
+    const result = computeOfficialHourlyForecast(forecasts, scores);
+    const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
+
+    expect(weights.map((item) => item.horizonBucket)).toEqual(buckets);
+    expect(weights.map((item) => item.historicalScore?.mae)).toEqual(OFFICIAL_HOURLY_MODELS.map((_, index) => 0.25 + index));
+    expect(weights.every((item) => item.calibrationStatus === "CALIBRATED")).toBe(true);
+    expect(weights.reduce((sum, item) => sum + item.weight, 0)).toBeCloseTo(1, 10);
+  });
+
+  it("traite indépendamment les valeurs nuage/visibilité/rosée et moyenne la direction du vent circulairement", () => {
+    const forecasts = modelForecasts().map((model, index) => index === 0
+      ? { ...model, hours: [{ ...model.hours[0]!, windSpeed: null }] }
+      : index === 1
+        ? { ...model, hours: [{ ...model.hours[0]!, cloudCover: null }] }
+        : model);
+    const result = computeOfficialHourlyForecast(forecasts, []);
+    const windSpeed = variableWeighting(result, "wind_speed")!;
+    const cloudCover = variableWeighting(result, "cloud_cover")!;
+
+    expect(windSpeed.availableModelCount).toBe(6);
+    expect(cloudCover.availableModelCount).toBe(6);
+    expect(variableWeighting(result, "visibility")?.availableModelCount).toBe(7);
+    expect(variableWeighting(result, "dew_point")?.availableModelCount).toBe(7);
+    expect(result.hours[0]?.windSpeed).not.toBeNull();
+    expect(result.hours[0]?.cloudCover).not.toBeNull();
+    expect(result.hours[0]?.visibility).not.toBeNull();
+    expect(result.hours[0]?.dewPoint).not.toBeNull();
+    expect(result.hours[0]?.windDirection).toBeLessThan(20);
+    expect(result.hours[0]?.windDirection).toBeGreaterThanOrEqual(0);
+    expect(cloudCover.modelWeights.some((item) => item.modelName === OFFICIAL_HOURLY_MODELS[1]!.name)).toBe(false);
+    expect(variableWeighting(result, "cloud_cover")?.calibrationStatus).toBe("UNCALIBRATED_ROBUST");
+  });
+
+  it("garde un modèle disponible mais historiquement mauvais avec un poids inférieur", () => {
+    const scores = historicalScores("temperature", "6_24h", (index) => index === 0 ? 50 : 0.1);
+    const result = computeOfficialHourlyForecast(modelForecasts(), scores);
+    const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
+    const poorModel = weights.find((item) => item.modelName === OFFICIAL_HOURLY_MODELS[0]!.name)!;
+    const strongModels = weights.filter((item) => item.modelName !== OFFICIAL_HOURLY_MODELS[0]!.name);
+
+    expect(poorModel.contributedToValue).toBe(true);
+    expect(poorModel.weight).toBeLessThan(Math.min(...strongModels.map((item) => item.weight)));
+  });
+
   it("maintient une série horaire continue quand le nombre de modèles change à une échéance", () => {
     const nextValidAt = validAt + 60 * 60_000;
     const forecasts = modelForecasts().map((model, index) => ({
@@ -521,6 +604,13 @@ describe("computeOfficialHourlyForecast", () => {
         pressure: 1012,
         cloudCover: 50,
         weatherCode: 2,
+        uvIndex: 1,
+        dewPoint: 7,
+        visibility: 12,
+        solarRadiation: 50,
+        cloudLow: 25,
+        cloudMid: 30,
+        cloudHigh: 35,
       })),
     }));
     const result = computeOfficialHourlyForecast(repeatedForecasts, [], {

@@ -53,7 +53,7 @@ const weighting: HourlyFusionTrace = {
         value: 12,
         reliability: 0.5,
         historicalScore: { mae: 1, rmse: 1.5, bias: 0.2, comparisonCount: 35, evaluatedDays: 7 },
-        calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON",
+        calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_BUCKET",
         calibrationStatus: "CALIBRATED",
         rawWeight: 1.2,
         robustFallbackWeight: null,

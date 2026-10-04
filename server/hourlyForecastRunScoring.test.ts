@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateHourlyForecastRuns, type HourlyForecastRunValue, type HourlyPhysicalSnapshot } from "./hourlyForecastRunScoring";
+import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable, type HourlyForecastRunValue, type HourlyPhysicalSnapshot } from "./hourlyForecastRunScoring";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 
 const locationKey = "50.756_2.520";
@@ -32,6 +32,24 @@ function scoresFor(result: ReturnType<typeof evaluateHourlyForecastRuns>, variab
 }
 
 describe("evaluateHourlyForecastRuns", () => {
+  it("normalise l'alias archive surface_pressure avant le scoring physique de pression", () => {
+    const validTime = observedAt(12);
+    const variable = normalizeHourlyForecastVariable("surface_pressure");
+    expect(variable).toBe("pressure");
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({
+        captureRunId: "pressure-alias-run",
+        validTime,
+        availableAt: validTime - 60 * 60_000,
+        variable: variable!,
+        value: 1012,
+        unit: "hPa",
+      }),
+    ]);
+
+    expect(scoresFor(result, "pressure").find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 3 });
+  });
+
   it("ignore un run reçu après l’observation et choisit le dernier run admissible", () => {
     const validTime = observedAt(12);
     const result = evaluateHourlyForecastRuns([snapshot(12)], [
@@ -70,6 +88,21 @@ describe("evaluateHourlyForecastRuns", () => {
 
     expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 2 });
     expect(scoresFor(result).find((score) => score.horizonBucket === "2_6h")?.sampleSize).toBe(0);
+  });
+
+  it("exclut du dénominateur évalué un run dont l'horizon dépasse les buckets scorables", () => {
+    const validTime = observedAt(12);
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({
+        captureRunId: "run-outside-scoring-window",
+        validTime,
+        availableAt: validTime - 16 * 24 * 60 * 60_000,
+        variable: "temperature",
+        value: 12,
+      }),
+    ]);
+
+    expect(scoresFor(result).every((score) => score.sampleSize === 0 && score.evaluableObservationCount === 0 && score.coverageRatio === 0)).toBe(true);
   });
 
   it("ne surcompte pas les doublons et retombe sur une valeur admissible quand le run récent est manquant", () => {

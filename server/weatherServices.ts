@@ -393,7 +393,7 @@ export type HourlyModelWeightDiagnostic = {
   value: number;
   reliability: number;
   historicalScore: HourlyHistoricalEvidence["metrics"];
-  calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" | "UNCALIBRATED_ROBUST";
+  calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" | "UNCALIBRATED_ROBUST";
   calibrationStatus: HourlyCalibrationStatus;
   rawWeight: number;
   robustFallbackWeight: number | null;

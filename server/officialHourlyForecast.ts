@@ -1,5 +1,6 @@
 import { getPhase3HorizonWindow } from "../shared/weatherDataHub";
-import { HOURLY_FORECAST_VARIABLES } from "./hourlyForecastRunScoring";
+import { HOURLY_FORECAST_VARIABLES as HOURLY_SCORING_VARIABLES } from "./hourlyForecastRunScoring";
+import { HOURLY_FORECAST_VARIABLES as ARCHIVED_HOURLY_VARIABLES } from "./forecastVariableCoverage";
 import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
 import type { HourlyForecastRunValue } from "../drizzle/schema";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
@@ -32,8 +33,26 @@ export const OFFICIAL_HOURLY_HISTORY_DAYS = 365;
 
 const MODEL_NAME_SET = new Set<string>(OFFICIAL_HOURLY_MODEL_NAMES);
 const MODEL_ID_BY_NAME = new Map<string, string>(OFFICIAL_HOURLY_MODELS.map((model) => [model.name, model.modelId] as const));
-const HISTORY_VARIABLES = HOURLY_FORECAST_VARIABLES;
-type OfficialHourlyVariable = (typeof HISTORY_VARIABLES)[number];
+const HISTORY_VARIABLES = HOURLY_SCORING_VARIABLES;
+const HISTORY_VARIABLE_SET = new Set<string>(HISTORY_VARIABLES);
+type OfficialHourlyVariable =
+  | "temperature"
+  | "apparent_temperature"
+  | "precipitation"
+  | "wind_speed"
+  | "wind_direction"
+  | "wind_gust"
+  | "humidity"
+  | "pressure"
+  | "cloud_cover"
+  | "weather_code"
+  | "cloud_cover_low"
+  | "cloud_cover_mid"
+  | "cloud_cover_high"
+  | "uv_index"
+  | "dew_point"
+  | "visibility"
+  | "shortwave_radiation";
 
 type HourlyModelValue = {
   modelName: OfficialHourlyModelName;
@@ -66,21 +85,28 @@ type VariableForecastValue = {
 
 const FORECAST_FIELD_BY_VARIABLE: Record<OfficialHourlyVariable, keyof HourlyModelForecast["hours"][number]> = {
   temperature: "temperature",
+  apparent_temperature: "apparentTemperature",
   precipitation: "precipitation",
   wind_speed: "windSpeed",
+  wind_direction: "windDirection",
   wind_gust: "windGusts",
   humidity: "humidity",
   pressure: "pressure",
+  cloud_cover: "cloudCover",
+  weather_code: "weatherCode",
+  cloud_cover_low: "cloudLow",
+  cloud_cover_mid: "cloudMid",
+  cloud_cover_high: "cloudHigh",
+  uv_index: "uvIndex",
+  dew_point: "dewPoint",
+  visibility: "visibility",
+  shortwave_radiation: "solarRadiation",
 };
 
-const ARCHIVED_VARIABLE_FIELD: Readonly<Record<string, keyof HourlyModelForecast["hours"][number]>> = {
-  temperature: "temperature",
-  precipitation: "precipitation",
-  wind_speed: "windSpeed",
-  wind_gust: "windGusts",
-  humidity: "humidity",
-  pressure: "pressure",
-};
+const OFFICIAL_HOURLY_FUSION_VARIABLES = Object.keys(FORECAST_FIELD_BY_VARIABLE) as OfficialHourlyVariable[];
+const ARCHIVED_VARIABLE_FIELD: Readonly<Record<string, keyof HourlyModelForecast["hours"][number]>> = Object.fromEntries(
+  ARCHIVED_HOURLY_VARIABLES.map(({ key, valueField }) => [key, valueField]),
+);
 
 /** Rebuild the latest archived run for each official model without consulting Best Match. */
 export function reconstructOfficialHourlyModelsFromArchive(
@@ -242,6 +268,26 @@ function weightedMean(items: Array<{ value: number | null | undefined; weight: n
   return usable.reduce((sum, item) => sum + item.value! * item.weight, 0) / totalWeight;
 }
 
+function weightedCircularMeanDegrees(items: Array<{ value: number | null | undefined; weight: number }>): number | null {
+  const usable = items.filter((item) => isFiniteNumber(item.value) && Number.isFinite(item.weight) && item.weight > 0);
+  if (usable.length === 0) return null;
+  const radians = usable.map((item) => (item.value! * Math.PI) / 180);
+  const sin = usable.reduce((sum, item, index) => sum + Math.sin(radians[index]!) * item.weight, 0);
+  const cos = usable.reduce((sum, item, index) => sum + Math.cos(radians[index]!) * item.weight, 0);
+  if (Math.hypot(sin, cos) < 1e-12) return null;
+  return ((Math.atan2(sin, cos) * 180 / Math.PI) + 360) % 360;
+}
+
+function weightedMode(items: Array<{ value: number | null | undefined; weight: number }>): number | null {
+  const votes = new Map<number, number>();
+  for (const item of items) {
+    if (!Number.isInteger(item.value) || !Number.isFinite(item.weight) || item.weight <= 0) continue;
+    votes.set(item.value!, (votes.get(item.value!) ?? 0) + item.weight);
+  }
+  return Array.from(votes.entries())
+    .sort(([leftValue, leftWeight], [rightValue, rightWeight]) => rightWeight - leftWeight || leftValue - rightValue)[0]?.[0] ?? null;
+}
+
 function summarizeModelValues(values: unknown[]): {
   min: number | null;
   max: number | null;
@@ -334,7 +380,7 @@ function makeDiagnostic(
     reliability: source.reliability,
     historicalScore: source.evidence?.metrics ?? null,
     calibrationLevel: source.evidence?.metrics
-      ? "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
+      ? "EXACT_LOCAL_MODEL_VARIABLE_BUCKET"
       : "UNCALIBRATED_ROBUST",
     calibrationStatus: source.calibrationStatus,
     rawWeight: source.rawWeight,
@@ -387,7 +433,7 @@ function computeVariableForecastValue(input: {
     missingReasonByModel: availabilityReasonByModel,
   });
   const valueHistory = selection.eligible.map((selected) => {
-    const evidence = selected.horizonBucket == null
+    const evidence = selected.horizonBucket == null || !HISTORY_VARIABLE_SET.has(variable)
       ? null
       : getHistoricalEvidence(selected.modelName as OfficialHourlyModelName, variable, selected.horizonBucket);
     return { selected, evidence };
@@ -439,7 +485,7 @@ function computeVariableForecastValue(input: {
   // compares a model at a different lead time or uses absent values as zeros.
   const fallbackGroups = new Map<string, PreparedHourlyModel[]>();
   for (const item of prepared) {
-    if (item.calibrationStatus !== "UNCALIBRATED_ROBUST") continue;
+    if (item.calibrationStatus !== "UNCALIBRATED_ROBUST" || variable === "wind_direction" || variable === "weather_code") continue;
     const horizonKey = item.selected.horizonBucket ?? `unscored-${Math.floor(item.selected.horizonMinutes / 60)}`;
     const group = fallbackGroups.get(horizonKey) ?? [];
     group.push(item);
@@ -482,16 +528,23 @@ function computeVariableForecastValue(input: {
   const availableCalibrationStatuses = prepared.map((item) => item.calibrationStatus);
   const calibrationStatus = getCalibrationStatus(availableCalibrationStatuses);
   const method = getVariableMethod(availabilityStatus, calibrationStatus);
-  const computedValue = variable === "precipitation" && wetModels.length === 0
-    ? (availableCount > 0 ? 0 : null)
-    : weightedMean(valueContributors.map((item) => ({ value: item.selected.value, weight: item.finalWeight })));
+  const contributorValues = valueContributors.map((item) => ({ value: item.selected.value, weight: item.finalWeight }));
+  const computedValue = variable === "weather_code"
+    ? weightedMode(contributorValues)
+    : variable === "wind_direction"
+      ? weightedCircularMeanDegrees(contributorValues)
+      : variable === "precipitation" && wetModels.length === 0
+        ? (availableCount > 0 ? 0 : null)
+        : weightedMean(contributorValues);
   const evidenceEligible = prepared.filter((item) => item.calibrationStatus === "CALIBRATED");
   const minComparisons = prepared.flatMap((item) => item.evidence?.metrics ? [item.evidence.metrics.comparisonCount] : []);
   const minComparableDays = prepared.flatMap((item) => item.evidence?.metrics ? [item.evidence.metrics.evaluatedDays] : []);
   const calibrationReasons = prepared.filter((item) => item.calibrationStatus !== "CALIBRATED").map((item) => ({
     modelName: item.selected.modelName,
-    reason: !historyAvailable
-      ? "Historique indisponible; la valeur reste incluse avec une pondération robuste non calibrée."
+    reason: !HISTORY_VARIABLE_SET.has(variable)
+      ? "Aucune série d’observations physiques n’est disponible pour calibrer cette variable; la valeur reste incluse avec un repli robuste non calibré."
+      : !historyAvailable
+        ? "Historique indisponible; la valeur reste incluse avec une pondération robuste non calibrée."
       : item.selected.horizonBucket == null
         ? "Aucun bucket historique ne correspond à cet horizon; la valeur reste incluse avec une pondération robuste non calibrée."
         : item.evidence?.status === "insufficient_evidence"
@@ -567,14 +620,19 @@ function makePoint(
   const windGust = valueFor("wind_gust");
   const humidity = valueFor("humidity");
   const pressure = valueFor("pressure");
+  const windDirectionValue = variableValues.get("wind_direction")!;
+  const cloudCoverValue = variableValues.get("cloud_cover")!;
+  const windDirection = valueFor("wind_direction");
+  const weatherCode = valueFor("weather_code");
   const rawTemperatures = temperatureValue.selected.map(({ selected }) => ({ name: selected.modelName, temperature: selected.value }));
   const temperatureSummary = summarizeModelValues(rawTemperatures.map(({ temperature: value }) => value));
   const temperatureExtremes = [...rawTemperatures].sort((left, right) => left.temperature - right.temperature || left.name.localeCompare(right.name));
   const windSpeedSummary = summarizeModelValues(variableValues.get("wind_speed")!.selected.map(({ selected }) => selected.value));
   const windGustSummary = summarizeModelValues(variableValues.get("wind_gust")!.selected.map(({ selected }) => selected.value));
   const humiditySummary = summarizeModelValues(variableValues.get("humidity")!.selected.map(({ selected }) => selected.value));
-  const availableModels = Array.from(new Set(HISTORY_VARIABLES.flatMap((variable) => variableValues.get(variable)!.weighting.availableModels)));
-  const variableWeightings = HISTORY_VARIABLES.map((variable) => variableValues.get(variable)!.weighting);
+  const cloudCoverSummary = summarizeModelValues(cloudCoverValue.selected.map(({ selected }) => selected.value));
+  const availableModels = Array.from(new Set(OFFICIAL_HOURLY_FUSION_VARIABLES.flatMap((variable) => variableValues.get(variable)!.weighting.availableModels)));
+  const variableWeightings = OFFICIAL_HOURLY_FUSION_VARIABLES.map((variable) => variableValues.get(variable)!.weighting);
   const scoredVariables = variableWeightings.filter((item) => item.calibrationStatus === "CALIBRATED").map((item) => item.variable);
   const robustVariables = variableWeightings.filter((item) => item.calibrationStatus === "PARTIALLY_CALIBRATED" || item.calibrationStatus === "UNCALIBRATED_ROBUST").map((item) => item.variable);
   const unavailableVariables = variableWeightings.filter((item) => item.availabilityStatus === "UNAVAILABLE").map((item) => item.variable);
@@ -592,8 +650,6 @@ function makePoint(
   const counts = variableWeightings.filter((item) => item.availabilityStatus !== "UNAVAILABLE");
   const minimumComparisons = counts.flatMap((item) => item.minimumComparisons == null ? [] : [item.minimumComparisons]);
   const minimumComparableDays = counts.flatMap((item) => item.minimumComparableDays == null ? [] : [item.minimumComparableDays]);
-  const windDirectionValues = variableValues.get("wind_speed")!.selected.map(({ selected }) => selected.metadata.hour.windDirection);
-  const cloudCoverValues = variableValues.get("humidity")!.selected.map(({ selected }) => selected.metadata.hour.cloudCover);
   const condition = precipitation == null ? null : conditionFromWeatherValues(precipitation, null);
   const precipIntensity = precipitation == null || precipitation <= 0
     ? null
@@ -604,23 +660,23 @@ function makePoint(
     hour: `${String(parisTime.hour).padStart(2, "0")}:00`,
     validAt,
     temp: temperature,
-    apparentTemp: null,
+    apparentTemp: valueFor("apparent_temperature"),
     precipitation,
     windSpeed,
     windGust,
-    windDirection: null,
-    cloudCover: null,
+    windDirection,
+    cloudCover: valueFor("cloud_cover"),
     humidity,
-    uvIndex: null,
+    uvIndex: valueFor("uv_index"),
     condition,
-    weatherCode: null,
+    weatherCode,
     pressure,
-    dewPoint: null,
-    visibility: null,
-    solarRadiation: null,
-    cloudLow: null,
-    cloudMid: null,
-    cloudHigh: null,
+    dewPoint: valueFor("dew_point"),
+    visibility: valueFor("visibility"),
+    solarRadiation: valueFor("shortwave_radiation"),
+    cloudLow: valueFor("cloud_cover_low"),
+    cloudMid: valueFor("cloud_cover_mid"),
+    cloudHigh: valueFor("cloud_cover_high"),
     precipType: null,
     precipIntensity,
     multiModelMetrics: {
@@ -642,12 +698,12 @@ function makePoint(
         windSpeed: { range: windSpeedSummary.range, standardDeviation: windSpeedSummary.standardDeviation, availableModelCount: windSpeedSummary.availableModelCount },
         windGust: { range: windGustSummary.range, standardDeviation: windGustSummary.standardDeviation, availableModelCount: windGustSummary.availableModelCount },
         windDirection: {
-          range: maximumCircularSpread(windDirectionValues),
+          range: maximumCircularSpread(windDirectionValue.selected.map(({ selected }) => selected.value)),
           standardDeviation: null,
-          availableModelCount: windDirectionValues.filter(isFiniteNumber).length,
+          availableModelCount: windDirectionValue.selected.length,
         },
         humidity: { range: humiditySummary.range, standardDeviation: humiditySummary.standardDeviation, availableModelCount: humiditySummary.availableModelCount },
-        cloudCover: { range: null, standardDeviation: null, availableModelCount: cloudCoverValues.filter(isFiniteNumber).length },
+        cloudCover: { range: cloudCoverSummary.range, standardDeviation: cloudCoverSummary.standardDeviation, availableModelCount: cloudCoverSummary.availableModelCount },
       },
     },
     forecastWeighting: {
@@ -746,7 +802,7 @@ export function computeOfficialHourlyForecast(
 
   for (const [validAt, modelValues] of Array.from(byValidTime.entries()).sort((left, right) => left[0] - right[0])) {
     const variableValues = new Map<OfficialHourlyVariable, VariableForecastValue>();
-    for (const variable of HISTORY_VARIABLES) {
+    for (const variable of OFFICIAL_HOURLY_FUSION_VARIABLES) {
       const { result } = computeVariableForecastValue({
         variable,
         candidates: modelValues,

@@ -20,7 +20,7 @@ import { buildQualifiedDailyObservation } from "./physicalObservationAggregation
 import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
-import { evaluateHourlyForecastRuns, isHourlyForecastVariable, type HourlyForecastVariable } from "./hourlyForecastRunScoring";
+import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable } from "./hourlyForecastRunScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import {
   executeShadowWriteSafely,
@@ -750,9 +750,10 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           }
           const evaluation = evaluateHourlyForecastRuns(
             snapshots,
-            hourlyForecastRuns.flatMap((run) => isHourlyForecastVariable(run.variable)
-              ? [{ ...run, variable: run.variable as HourlyForecastVariable }]
-              : []),
+            hourlyForecastRuns.flatMap((run) => {
+              const variable = normalizeHourlyForecastVariable(run.variable);
+              return variable ? [{ ...run, variable }] : [];
+            }),
           );
           const hourlyScores = evaluation.compatibilityScores;
           if (evaluation.scores.length > 0) {

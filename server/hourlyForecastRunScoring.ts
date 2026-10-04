@@ -16,6 +16,11 @@ export function isHourlyForecastVariable(value: string): value is HourlyForecast
   return (HOURLY_FORECAST_VARIABLES as readonly string[]).includes(value);
 }
 
+export function normalizeHourlyForecastVariable(value: string): HourlyForecastVariable | null {
+  const normalized = value === "surface_pressure" ? "pressure" : value;
+  return isHourlyForecastVariable(normalized) ? normalized : null;
+}
+
 export type HourlyForecastRunValue = {
   captureRunId: string;
   locationKey: string;

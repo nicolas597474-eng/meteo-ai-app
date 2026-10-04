@@ -54,7 +54,7 @@ export type HourlyHistoricalEvidence = {
 };
 
 export type HourlyModelCalibrationLevel =
-  | "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
+  | "EXACT_LOCAL_MODEL_VARIABLE_BUCKET"
   | "UNCALIBRATED_ROBUST";
 
 export type HourlyFusionWeightModelTrace = {
