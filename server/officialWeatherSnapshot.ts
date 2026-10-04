@@ -3,8 +3,9 @@ import { getParisDate, getParisHour } from "./weatherTime";
 import { collect15DayForecast, collectCurrentWeatherSnapshot, type CurrentWeatherSnapshot, type DayForecast, type HourlyPoint } from "./weatherServices";
 import { findActiveHourlyForecastIndex, keepCurrentAndFutureHourlyForecasts } from "../shared/hourlyForecastTime";
 import { collectOfficialHourlyForecast, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
-import { computeOfficialDailyForecast } from "./officialForecast";
+import { computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
+import type { ManualHourlyOverride } from "../shared/hourlyModelMetrics";
 
 export type OfficialWeatherSnapshot = {
   locationKey: string;
@@ -15,6 +16,8 @@ export type OfficialWeatherSnapshot = {
   sourceKind: "official_forecast";
   source: "open-meteo";
   hourlyWeighting: OfficialHourlyWeightingSummary;
+  hourlyOverride: ManualHourlyOverride | null;
+  officialHourlyOriginal: HourlyPoint[] | null;
   currentSnapshot: CurrentWeatherSnapshot | null;
   hourly: HourlyPoint[];
   daily: DayForecast[];
@@ -68,7 +71,7 @@ export function buildDatedDailyFusionFallback(
 }
 
 type CacheEntry = { expiresAt: number; value: Promise<OfficialWeatherSnapshot> };
-type ManualHourlyForecast = { expiresAt: number; hours: HourlyPoint[]; computedAt: string; weighting?: OfficialHourlyWeightingSummary };
+type ManualHourlyForecast = { expiresAt: number; hours: HourlyPoint[]; computedAt: string; weighting?: OfficialHourlyWeightingSummary; reason: string };
 const snapshotCache = new Map<string, CacheEntry>();
 const manualHourlyForecastCache = new Map<string, ManualHourlyForecast>();
 const SNAPSHOT_TTL_MS = 2 * 60_000;
@@ -104,6 +107,8 @@ export function buildOfficialWeatherSnapshot(input: {
     sourceKind: "official_forecast",
     source: "open-meteo",
     hourlyWeighting: input.hourlyWeighting,
+    hourlyOverride: null,
+    officialHourlyOriginal: null,
     currentSnapshot: input.currentSnapshot,
     hourly,
     daily: input.daily,
@@ -130,11 +135,25 @@ export function mergeManualHourlyForecast(
   hours: HourlyPoint[],
   computedAt: Date,
   weighting?: OfficialHourlyWeightingSummary,
+  reason = "Relance manuelle explicite du moteur horaire officiel multi-modèles.",
 ): OfficialWeatherSnapshot {
+  const officialHourlyOriginal = snapshot.hourlyOverride
+    ? snapshot.officialHourlyOriginal ?? snapshot.hourly
+    : snapshot.hourly;
+  const manualOverride: ManualHourlyOverride = {
+    source: "manual_refresh",
+    reason,
+    computedAt: computedAt.toISOString(),
+    officialOriginalComputedAt: snapshot.hourlyOverride?.officialOriginalComputedAt ?? snapshot.hourlyComputedAt,
+    officialOriginalPreserved: true,
+    officialOriginalPointCount: officialHourlyOriginal.length,
+  };
   return {
     ...snapshot,
     hourly: keepCurrentAndFutureHourlyForecasts(hours, computedAt.getTime()),
-    hourlyWeighting: weighting ?? snapshot.hourlyWeighting,
+    hourlyWeighting: { ...(weighting ?? snapshot.hourlyWeighting), manualOverride },
+    hourlyOverride: manualOverride,
+    officialHourlyOriginal,
     // The current snapshot has its own capturedAt; this timestamp belongs only to the hourly series.
     hourlyComputedAt: computedAt.toISOString(),
   };
@@ -164,7 +183,7 @@ function applyManualHourlyForecast(snapshot: OfficialWeatherSnapshot, coords: { 
     manualHourlyForecastCache.delete(key);
     return snapshot;
   }
-  return mergeManualHourlyForecast(snapshot, cached.hours, new Date(cached.computedAt), cached.weighting);
+  return mergeManualHourlyForecast(snapshot, cached.hours, new Date(cached.computedAt), cached.weighting, cached.reason);
 }
 
 /** Cache a completed manual forecast refresh while preserving the official current snapshot. */
@@ -174,11 +193,12 @@ export function cacheManualHourlyForecast(
   hours: HourlyPoint[],
   computedAt: Date,
   weighting?: OfficialHourlyWeightingSummary,
+  reason = "Relance manuelle explicite du moteur horaire officiel multi-modèles.",
 ): void {
   const cacheLocationKey = preciseCacheLocationKey(coords);
   const manualKey = manualForecastCacheKey(cacheLocationKey, weatherDate);
   const expiresAt = Date.now() + getOfficialSnapshotTtlMs(hours);
-  manualHourlyForecastCache.set(manualKey, { expiresAt, hours, computedAt: computedAt.toISOString(), weighting });
+  manualHourlyForecastCache.set(manualKey, { expiresAt, hours, computedAt: computedAt.toISOString(), weighting, reason });
 
   const snapshotPrefix = `${cacheLocationKey}:${weatherDate}:`;
   snapshotCache.forEach((cached, cacheKey) => {
@@ -187,7 +207,7 @@ export function cacheManualHourlyForecast(
       snapshotCache.delete(cacheKey);
       return;
     }
-    const value = cached.value.then((snapshot: OfficialWeatherSnapshot) => mergeManualHourlyForecast(snapshot, hours, computedAt, weighting));
+    const value = cached.value.then((snapshot: OfficialWeatherSnapshot) => mergeManualHourlyForecast(snapshot, hours, computedAt, weighting, reason));
     snapshotCache.set(cacheKey, { expiresAt, value });
     void value.catch(() => {
       if (snapshotCache.get(cacheKey)?.value === value) snapshotCache.delete(cacheKey);
@@ -218,14 +238,20 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
       collectCurrentWeatherSnapshot(coords),
       collect15DayForecast(coords, {
         issuedAt: dailyIssuedAt,
-        resolveOfficialFusion: async (targetDate, forecasts, issuedAt) => {
-          const fusionEvidence = await getDailyFusionPerformanceEvidence(dailyLocationKey, targetDate, issuedAt);
-          return computeOfficialDailyForecast(forecasts, {
+        resolveOfficialFusion: async (targetDate, forecasts, referenceAt, availabilityReasonByModel) => {
+          const fusionEvidence = await getDailyFusionPerformanceEvidence(
+            dailyLocationKey,
+            targetDate,
+            forecasts.flatMap((forecast) => forecast.availableAt == null ? [] : [forecast.availableAt]),
+          );
+          return computeOfficialDailyForecastWithDiagnostics(forecasts, {
             locationKey: dailyLocationKey,
             targetDate,
-            issuedAt,
+            issuedAt: referenceAt,
+            referenceAt,
             evidenceStoreAvailable: fusionEvidence.available,
             evidence: fusionEvidence.evidence,
+            availabilityReasonByModel,
           });
         },
       }),

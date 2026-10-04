@@ -7,7 +7,7 @@ vi.mock("./weatherFetch", () => ({
 
 import { fetchWeather } from "./weatherFetch";
 import { collect15DayForecast, collectCurrentWeatherSnapshot, collectHourlyForecast, OFFICIAL_HOURLY_MODELS } from "./weatherServices";
-import { computeOfficialDailyForecast } from "./officialForecast";
+import { computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
 import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 const mockedFetchWeather = vi.mocked(fetchWeather);
@@ -129,8 +129,9 @@ describe("collectHourlyForecast auxiliaire", () => {
 describe("collect15DayForecast fusion officielle", () => {
   beforeEach(() => mockedFetchWeather.mockReset());
 
-  it("fuse les preuves exactes, garde Best Match en référence et refuse fallback/cap impossible", async () => {
+  it("fuse les preuves exactes, garde Best Match en référence et conserve une fusion à deux modèles", async () => {
     const issuedAt = Date.parse("2026-10-03T08:00:00.000Z");
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(issuedAt + 60_000);
     const locationKey = "50.7567_2.5204";
     const datesByModel = [
       ["2026-10-03"],
@@ -173,14 +174,16 @@ describe("collect15DayForecast fusion officielle", () => {
     );
     const result = await collect15DayForecast(undefined, {
       issuedAt,
-      resolveOfficialFusion: (targetDate, forecasts, forecastIssuedAt) => Promise.resolve(computeOfficialDailyForecast(forecasts, {
+      resolveOfficialFusion: (targetDate, forecasts, collectionReferenceAt) => Promise.resolve(computeOfficialDailyForecastWithDiagnostics(forecasts, {
         locationKey,
         targetDate,
-        issuedAt: forecastIssuedAt,
+        issuedAt,
+        referenceAt: collectionReferenceAt,
         evidenceStoreAvailable: true,
         evidence,
       })),
     });
+    nowSpy.mockRestore();
     const [today, tomorrow, longRange] = result.days;
 
     expect(mockedFetchWeather).toHaveBeenCalledTimes(8);
@@ -204,6 +207,15 @@ describe("collect15DayForecast fusion officielle", () => {
     });
     expect(today!.tempMax).not.toBe(999);
     expect(today!.officialFusion.sourcesByVariable.tempMax).toHaveLength(7);
+    expect(today!.officialFusion.diagnosticsByVariable?.tempMax).toMatchObject({
+      status: "FUSED",
+      availabilityStatus: "FUSED",
+      calibrationStatus: "CALIBRATED",
+      expectedModelCount: 7,
+      availableValueModelCount: 7,
+      evidenceEligibleModelCount: 7,
+      contributingModelCount: 7,
+    });
     expect(today!.officialFusion.sourcesByVariable.tempMin.every((source) => source.variable === "temperature_min" && source.horizonBucket === "6-24h")).toBe(true);
     expect(today!.officialFusion.sourcesByVariable.tempMax.every((source) => source.signedBias != null && source.latestScoreDate === "2026-10-02")).toBe(true);
     expect(today!.precipitationConsensus?.conditionalMeanMethod).toBe("historical_skill");
@@ -218,9 +230,17 @@ describe("collect15DayForecast fusion officielle", () => {
 
     expect(longRange!.officialFusion.horizonBucket).toBe("1-3d");
     expect(longRange!.modelAgreement.tempMax.availableModelCount).toBe(2);
-    expect(longRange!.tempMax).toBeNull();
-    expect(longRange!.precipitation).toBeNull();
-    expect(longRange!.officialFusion.sourcesByVariable.tempMax).toEqual([]);
+    expect(longRange!.tempMax).not.toBeNull();
+    expect(longRange!.precipitation).not.toBeNull();
+    expect(longRange!.officialFusion.sourcesByVariable.tempMax).toHaveLength(2);
+    expect(longRange!.officialFusion.diagnosticsByVariable?.tempMax).toMatchObject({
+      status: "FUSED",
+      availabilityStatus: "FUSED",
+      calibrationStatus: "CALIBRATED",
+      availableValueModelCount: 2,
+      evidenceEligibleModelCount: 2,
+      contributingModelCount: 2,
+    });
     expect(longRange!.bestMatchReference).toBeNull();
   });
 });

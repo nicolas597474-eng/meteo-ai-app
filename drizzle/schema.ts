@@ -585,10 +585,10 @@ export const hourlyForecastEvaluationScores = mysqlTable("hourly_forecast_evalua
   modelId: varchar("modelId", { length: 96 }),
   variable: varchar("variable", { length: 32 }).notNull(),
   horizonBucket: varchar("horizonBucket", { length: 16 }).notNull(), // Shared Phase 3 horizon key.
-  observationCount: int("observationCount").notNull().default(0),
-  evaluableObservationCount: int("evaluableObservationCount").notNull().default(0),
+  observationCount: int("observationCount").notNull().default(0), // Qualified physical observations, independent of model availability.
+  evaluableObservationCount: int("evaluableObservationCount").notNull().default(0), // Exact validTime runs received before observation; no-run horizons are excluded.
   sampleSize: int("sampleSize").notNull().default(0),
-  coverageRatio: float("coverageRatio").notNull().default(0), // sampleSize / evaluableObservationCount.
+  coverageRatio: float("coverageRatio").notNull().default(0), // Finite forecast pairs / recorded exact-time run opportunities; not a skill score.
   mae: float("mae"),
   rmse: float("rmse"),
   bias: float("bias"), // Forecast minus observation.

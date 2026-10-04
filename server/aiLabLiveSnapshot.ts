@@ -1,23 +1,17 @@
 import { computeOfficialDailyForecast } from "./officialForecast";
+import type { ForecastData } from "./weatherServices";
 
-export type LiveModelForecast = {
-  serviceName: string;
-  tempMax: number | null;
-  tempMin: number | null;
-  precipitation: number | null;
-  windSpeed: number | null;
-  windGust: number | null;
-  humidity: number | null;
-  cloudCover: number | null;
-  condition: string | null;
-  serviceCategory?: string | null;
-  rawData?: unknown;
-};
+export type LiveModelForecast = Pick<ForecastData,
+  "serviceName" | "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "windGust" | "humidity" | "cloudCover" | "condition"
+> & Partial<Pick<ForecastData,
+  "modelId" | "sourceName" | "runId" | "runIdKind" | "requestStartedAt" | "availableAt" | "validTime" | "qualityStatus"
+>> & { serviceCategory?: ForecastData["serviceCategory"] | null; rawData?: unknown };
 
 /**
  * Produces a non-persisted, inspectable fusion for an arbitrary geolocated
- * position. No saved-place evidence exists for this request, so the official
- * numerical fields stay unavailable instead of substituting a global score.
+ * position. It uses the same availability-first official engine as saved places;
+ * without exact saved-place evidence, available values remain visible with a
+ * robust uncalibrated weight rather than borrowing a global performance score.
  */
 export function buildLiveAILabSnapshot(
   date: string,

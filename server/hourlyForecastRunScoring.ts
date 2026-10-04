@@ -169,6 +169,22 @@ function latestAdmissibleValue(
   return latest;
 }
 
+function latestAdmissibleRun(
+  candidates: HourlyForecastRunValue[],
+  observationAt: number,
+): HourlyForecastRunValue | null {
+  const admissible = candidates.filter((candidate) => candidate.availableAt < observationAt);
+  if (admissible.length === 0) return null;
+  admissible.sort((left, right) => right.availableAt - left.availableAt
+    || right.requestStartedAt - left.requestStartedAt
+    || left.captureRunId.localeCompare(right.captureRunId));
+  const latest = admissible[0];
+  const tied = admissible.filter((candidate) => candidate.availableAt === latest.availableAt
+    && candidate.requestStartedAt === latest.requestStartedAt);
+  if (tied.some((candidate) => !equalNullableNumber(candidate.value, latest.value))) return null;
+  return latest;
+}
+
 function latestCompatibleRun(
   rows: HourlyForecastRunValue[],
   observationAt: number,
@@ -276,22 +292,31 @@ export function evaluateHourlyForecastRuns(
         if (observedValue == null) return [];
         return [{ snapshot, validTime: parisLocalHourToUniqueEpochMs(snapshot.date, snapshot.hour), observedValue }];
       });
-      const evaluable = opportunities.filter((opportunity) => opportunity.validTime != null);
+      const observedOpportunities = opportunities.filter((opportunity) => opportunity.validTime != null);
       const errorsByHorizon = new Map<string, number[]>();
-      for (const opportunity of evaluable) {
+      const evaluableObservationCountsByHorizon = new Map<string, number>();
+      for (const opportunity of observedOpportunities) {
         const validTime = opportunity.validTime!;
         const key = forecastSeriesKey({ ...model, validTime, variable });
-        const selected = latestAdmissibleValue(valuesBySeries.get(key) ?? [], validTime);
-        if (!selected) continue;
-        const horizonMinutes = Math.round((validTime - selected.availableAt) / 60_000);
+        const candidates = valuesBySeries.get(key) ?? [];
+        const selected = latestAdmissibleValue(candidates, validTime);
+        // A recorded exact-time run with a missing variable is an availability
+        // opportunity, but no run at this validTime (e.g. outside model scope)
+        // is excluded from both this ratio and every error-score denominator.
+        const opportunityRun = selected ?? latestAdmissibleRun(candidates, validTime);
+        if (!opportunityRun) continue;
+        const horizonMinutes = Math.round((validTime - opportunityRun.availableAt) / 60_000);
         const horizon = getPhase3HorizonWindow(horizonMinutes);
         if (!horizon) continue;
+        evaluableObservationCountsByHorizon.set(horizon.key, (evaluableObservationCountsByHorizon.get(horizon.key) ?? 0) + 1);
+        if (!selected) continue;
         const errors = errorsByHorizon.get(horizon.key) ?? [];
         errors.push(selected.value! - opportunity.observedValue);
         errorsByHorizon.set(horizon.key, errors);
       }
       for (const horizon of PHASE3_HORIZON_WINDOWS) {
         const errors = errorsByHorizon.get(horizon.key) ?? [];
+        const evaluableObservationCount = evaluableObservationCountsByHorizon.get(horizon.key) ?? 0;
         scores.push({
           locationKey: model.locationKey,
           date: model.targetDate,
@@ -301,9 +326,11 @@ export function evaluateHourlyForecastRuns(
           variable,
           horizonBucket: horizon.key,
           observationCount: opportunities.length,
-          evaluableObservationCount: evaluable.length,
+          // The denominator contains only immutable forecast values from runs that
+          // existed before this exact validTime. Missing/out-of-scope runs never count.
+          evaluableObservationCount,
           sampleSize: errors.length,
-          coverageRatio: evaluable.length > 0 ? errors.length / evaluable.length : 0,
+          coverageRatio: evaluableObservationCount > 0 ? errors.length / evaluableObservationCount : 0,
           ...calculateErrors(errors),
         });
       }

@@ -526,7 +526,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       const defaultLocKey = makeLocationKey(HONDEGHEM.lat, HONDEGHEM.lon);
 
       // Collect from Open-Meteo expert models
-      const expertData = await collectExpertForecasts(today);
+      const { forecasts: expertData, availabilityReasonByModel } = await collectExpertForecastsWithDiagnostics(today);
 
       // Insert forecasts into DB with locationKey
       const forecastRows = expertData.map((f) => ({
@@ -556,31 +556,28 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       const allForecasts = expertData;
 
       if (allForecasts.length > 0) {
-        const rawForecastsForFusion = allForecasts.map((f) => ({
-          serviceName: f.serviceName,
-          tempMax: f.tempMax,
-          tempMin: f.tempMin,
-          precipitation: f.precipitation,
-          windSpeed: f.windSpeed,
-          windGust: null as number | null,
-          humidity: f.humidity ?? null,
-          cloudCover: f.cloudCover ?? null,
-        }));
+        const rawForecastsForFusion = allForecasts.map((f) => ({ ...f, windGust: f.windGust ?? null }));
 
         await insertForecastRuns(buildForecastRunArchiveRows(expertData, defaultLocKey, today, issuedAt), { requireDatabase: true });
-        const fusionEvidence = await getDailyFusionPerformanceEvidence(defaultLocKey, today, issuedAt);
+        const fusionEvidence = await getDailyFusionPerformanceEvidence(
+          defaultLocKey,
+          today,
+          allForecasts.flatMap((forecast) => forecast.availableAt == null ? [] : [forecast.availableAt]),
+        );
         const meteoAI = computeOfficialDailyForecast(rawForecastsForFusion, {
           locationKey: defaultLocKey,
           targetDate: today,
           issuedAt,
+          referenceAt: issuedAt,
           evidenceStoreAvailable: fusionEvidence.available,
           evidence: fusionEvidence.evidence,
+          availabilityReasonByModel,
         });
 
         // Do not ask the LLM to narrate an uncalibrated equal-source ensemble.
         let explanation = meteoAI.coreCalibrationComplete
           ? ""
-          : `${meteoAI.methodNote} Aucune prévision officielle n’est publiée tant que les quatre variables principales ne disposent pas d’effectifs suffisants par modèle, lieu, variable et horizon.`;
+          : `${meteoAI.methodNote} Les valeurs disponibles restent publiées avec un statut explicite de calibration robuste ou partielle.`;
         if (meteoAI.coreCalibrationComplete) {
           try {
             const llmResult = await invokeLLM({
@@ -618,7 +615,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
           humidity: meteoAI.humidity,
           condition,
           stabilityLabel: legacyStabilityLabelForStorage(allForecasts),
-          weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
+          weights: { version: 3, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         }, { requireDatabase: true });
         const fusionAvailableAt = Date.now();
@@ -1459,16 +1456,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           })));
         }
 
-        const rawLocForecasts = expertData.map((f) => ({
-          serviceName: f.serviceName,
-          tempMax: f.tempMax,
-          tempMin: f.tempMin,
-          precipitation: f.precipitation,
-          windSpeed: f.windSpeed,
-          windGust: null as number | null,
-          humidity: f.humidity ?? null,
-          cloudCover: f.cloudCover ?? null,
-        }));
+        const rawLocForecasts = expertData.map((f) => ({ ...f, windGust: f.windGust ?? null }));
 
         const dailyArchiveRows = buildForecastRunArchiveRows(expertData, locKey, today, issuedAt);
         const dailyArchiveRowsWritten = await insertForecastRuns(dailyArchiveRows);
@@ -1478,13 +1466,19 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           archiveRows: dailyArchiveRows,
           archiveRowsWritten: dailyArchiveRowsWritten,
         });
-        const fusionEvidence = await getDailyFusionPerformanceEvidence(locKey, today, issuedAt);
+        const fusionEvidence = await getDailyFusionPerformanceEvidence(
+          locKey,
+          today,
+          expertData.flatMap((forecast) => forecast.availableAt == null ? [] : [forecast.availableAt]),
+        );
         const meteoAI = computeOfficialDailyForecast(rawLocForecasts, {
           locationKey: locKey,
           targetDate: today,
           issuedAt,
+          referenceAt: issuedAt,
           evidenceStoreAvailable: fusionEvidence.available,
           evidence: fusionEvidence.evidence,
+          availabilityReasonByModel: dailyCollection.availabilityReasonByModel,
         });
 
         // Cloud cover has no qualified physical daily evidence yet; do not infer a condition from an equal-source average.
@@ -1492,7 +1486,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
 
         const explanation = meteoAI.coreCalibrationComplete
           ? `Prévision quotidienne calculée pour ${fav.customName ?? fav.name} : les quatre métriques principales disposent de preuves physiques récentes par modèle, variable et horizon. La température actuelle est résolue en direct lors de la consultation et n’est pas interpolée depuis Tmin/Tmax.`
-          : `${meteoAI.methodNote} Pour ${fav.customName ?? fav.name}, les valeurs numériques officielles restent indisponibles jusqu’à qualification des preuves physiques. La température actuelle reste résolue séparément en direct.`;
+          : `${meteoAI.methodNote} Pour ${fav.customName ?? fav.name}, les valeurs disponibles restent publiées avec un statut robuste ou partiellement calibré. La température actuelle reste résolue séparément en direct.`;
 
         // Find all favorites with this location (same lat/lon) and upsert for each
         const matchingFavorites = allFavorites.filter(
@@ -1509,7 +1503,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           windSpeed: meteoAI.windSpeed,
           condition,
           stabilityLabel: legacyStabilityLabelForStorage(expertData),
-          weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
+          weights: { version: 3, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation,
         }, { refreshComputedAt: true });
         const fusionAvailableAt = Date.now();

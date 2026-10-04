@@ -77,6 +77,30 @@ describe("computeFusion — fusion IDW avancée", () => {
     expect(result.usedSources[0]?.name).toBe("proche");
   });
 
+  it("évalue la fraîcheur d’un run à l’instant de référence de sa fusion", () => {
+    const referenceAt = Date.parse("2026-08-18T05:00:00.000Z");
+    const result = computeFusion([{
+      id: "model:ECMWF",
+      name: "ECMWF",
+      modelId: "ecmwf_ifs025",
+      distanceKm: 1,
+      temperature: 20,
+      updatedAt: new Date(referenceAt),
+      type: "model",
+    }], {
+      referenceAt,
+      maxFreshnessMin: 15 * 24 * 60,
+      minReliabilityScore: 0,
+      altitudeCorrectionEnabled: false,
+      anomalyDetectionEnabled: false,
+      modelWeightFraction: 1,
+      allowRobustUncalibratedModels: true,
+    });
+
+    expect(result.temperature).toBe(20);
+    expect(result.usedSources.map((source) => source.name)).toEqual(["ECMWF"]);
+  });
+
   it("détecte et pénalise une valeur station figée depuis plus d'une heure", () => {
     const sources = [station("figee", 1, 10), station("reference", 2, 11)];
     const baseline = computeFusion(sources, {
@@ -214,19 +238,32 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
     expect(Array.from(weights!.values()).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1, 12);
     expect(Math.max(...Array.from(weights!.values()))).toBeLessThanOrEqual(MODEL_FUSION_WEIGHT_CAP);
     expect(weights!.get("dominant")).toBeCloseTo(MODEL_FUSION_WEIGHT_CAP, 12);
-    expect(normalizeModelWeightsWithCap([{ modelId: "only-one", rawWeight: 1 }])).toBeNull();
+    expect(normalizeModelWeightsWithCap([{ modelId: "only-one", rawWeight: 1 }])).toEqual(new Map([["only-one", 1]]));
   });
 
-  it("refuse une fusion si le nombre de modèles ne permet pas de respecter le plafond", () => {
+  it("adapte le plafond à deux sources au lieu de bloquer la prévision", () => {
     const result = computeFusion([
       modelSource("m1", 10, modelEvidence("m1", 0.8, 120)),
       modelSource("m2", 12, modelEvidence("m2", 0.9, 120)),
     ], config);
-    expect(result.temperature).toBeNull();
-    expect(result.usedSources).toEqual([]);
-    expect(result.confidenceScore).toBe(0);
-    expect(result.performanceEvidenceStatus).toBe("insufficient");
-    expect(result.excludedSources.every((source) => source.reason.includes("plafond individuel"))).toBe(true);
+    expect(result.temperature).not.toBeNull();
+    expect(result.usedSources).toHaveLength(2);
+    expect(result.usedSources.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 10);
+    expect(Math.max(...result.usedSources.map((source) => source.finalWeight))).toBeLessThanOrEqual(0.65);
+    expect(result.confidenceScore).toBeGreaterThan(0);
+    expect(result.performanceEvidenceStatus).toBe("qualified");
+  });
+
+  it("renormalise exactement un plafond effectif relâché face à un poids 99/1", () => {
+    const weights = normalizeModelWeightsWithCap([
+      { modelId: "dominant", rawWeight: 99 },
+      { modelId: "minor", rawWeight: 1 },
+    ]);
+
+    expect(weights).not.toBeNull();
+    expect(Array.from(weights!.values()).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1, 12);
+    expect(weights!.get("dominant")).toBeCloseTo(0.65, 12);
+    expect(weights!.get("minor")).toBeCloseTo(0.35, 12);
   });
 
   it("ignore un modèle sans valeur pour la variable et exige des preuves du lieu, de la variable et de l’horizon exacts", () => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
+import { getModelCountCoverageLabel, getModelCountCoverageLevel } from "@shared/modelCoverageConfidence";
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import {
@@ -20,7 +21,7 @@ import {
   type ForecastTimelineSelection,
   type IndexedForecastHour,
 } from "@/lib/forecastTimeline";
-import type { DailyForecastEvidenceStatus, DailyOfficialFusionDisplay, DailyForecastSourceDiagnostic } from "@shared/dailyForecast";
+import type { DailyForecastEvidenceStatus, DailyOfficialFusionDisplay, DailyForecastSourceDiagnostic, DailyFusionMetricDiagnostic } from "@shared/dailyForecast";
 
 type PrecipitationMetrics = {
   thresholdMm?: number | null;
@@ -276,9 +277,35 @@ function buildHourlyDetailCategories(
 }
 
 function evidenceStatusLabel(status: DailyForecastEvidenceStatus): string {
-  if (status === "calibrated") return "preuve historique qualifiée";
-  if (status === "schema_unavailable") return "indisponible · archive de comparaisons indisponible";
-  return "indisponible · preuves qualifiées insuffisantes";
+  if (status === "CALIBRATED") return "preuves historiques qualifiées";
+  if (status === "PARTIALLY_CALIBRATED") return "calibration historique partielle";
+  if (status === "UNCALIBRATED_ROBUST") return "valeurs disponibles · pondération robuste non calibrée";
+  return "aucune valeur disponible pour la calibration historique";
+}
+
+function diagnosticStatusLabel(diagnostic: DailyFusionMetricDiagnostic): string {
+  if (diagnostic.availabilityStatus === "UNAVAILABLE" || diagnostic.contributingModelCount === 0) return "aucune valeur admissible reçue pour cette variable et cette validTime";
+  if (diagnostic.availabilityStatus === "SINGLE_MODEL" || diagnostic.contributingModelCount === 1) return diagnostic.calibrationStatus === "CALIBRATED"
+    ? "prévision single-model · preuve historique qualifiée"
+    : "prévision single-model · valeur conservée avec calibration robuste non qualifiée";
+  if (diagnostic.calibrationStatus === "CALIBRATED") return "fusion des modèles disponibles · preuves historiques qualifiées";
+  if (diagnostic.calibrationStatus === "PARTIALLY_CALIBRATED") return "fusion des valeurs disponibles · calibration partielle et repli robuste";
+  return "fusion robuste des valeurs disponibles · non calibrée historiquement";
+}
+
+function sourceAvailabilityTime(value: number | null): string {
+  return value == null ? "heure indisponible" : new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris",
+  }).format(value);
+}
+
+function sourceTraceDescription(source: DailyForecastSourceDiagnostic): string {
+  const raw = source.rawWeight == null ? "poids brut indisponible" : `brut ${source.rawWeight.toFixed(3)}`;
+  const fallback = source.robustFallbackWeight == null ? "" : ` · facteur robuste ${source.robustFallbackWeight.toFixed(3)}`;
+  const horizon = source.horizonBucket ?? "horizon non classé";
+  const run = source.runId ? ` · run ${source.runId}` : "";
+  const evidence = source.comparisonCount == null ? "preuve non qualifiée" : `${source.comparisonCount} comparaisons / ${source.evaluatedDays ?? "?"} jours`;
+  return `${source.modelName} · ${source.calibrationStatus} · poids final ${(source.finalWeight * 100).toFixed(1)} % (${raw}${fallback}) · disponible ${sourceAvailabilityTime(source.availableAt)} · validTime ${source.validTime == null ? "indisponible" : new Date(source.validTime).toISOString()} · ${horizon} · ${evidence}${run}`;
 }
 
 function biasDescription(source: DailyForecastSourceDiagnostic, unit: string): string {
@@ -311,14 +338,35 @@ function DailyFusionDiagnostics({ day, sourceLabels }: { day: DailyForecastPoint
   const reference = day.bestMatchReference;
   return (
     <div className="space-y-2 pb-3 leading-relaxed">
-      <p>Les poids utilisent uniquement des preuves historiques qualifiées pour le lieu, le modèle, la variable et la tranche d’horizon indiqués. Aucun biais n’est appliqué aux valeurs futures.</p>
+      <p>Availability → sélection par variable/validTime/horizon/run → fiabilité historique exacte si qualifiée → pondération robuste sinon → renormalisation → fusion. Chaque valeur admissible reste utilisable même sans preuve suffisante; aucun biais historique n’est appliqué aux valeurs futures.</p>
       <p>Émission de collecte : {fusion.issuedAt} · horizon : {fusion.horizonBucket ?? "indisponible"}.</p>
       <div className="space-y-1">
         {variables.map(({ label, key, status, unit }) => {
           const sources = fusion.sourcesByVariable[key];
-          return <p key={key}><strong className="text-slate-100">{label} :</strong> {evidenceStatusLabel(status)}{sources.length > 0 ? ` · ${sources.map((source) => `${source.modelName} (${(source.finalWeight * 100).toFixed(1)} %)`).join(", ")}` : ""}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>;
+          const diagnostic = fusion.diagnosticsByVariable?.[key];
+          const contributingModelCount = diagnostic?.contributingModelCount
+            ?? sources.filter((source) => source.finalWeight > 0).length;
+          const coverageLevel = getModelCountCoverageLevel(contributingModelCount);
+          const coverageLabel = getModelCountCoverageLabel(coverageLevel);
+          const calibrationStatus = diagnostic?.calibrationStatus ?? status;
+          return <div key={key} className="space-y-1">
+            <p><strong className="text-slate-100">{label} :</strong> {diagnostic ? diagnosticStatusLabel(diagnostic) : evidenceStatusLabel(status)}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map(sourceTraceDescription).join("; ")}</span>}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>
+            <div className="pl-2 text-slate-400">
+              <p><strong>Niveau de couverture/confiance indicatif selon le nombre de contributeurs :</strong> {coverageLabel} ({contributingModelCount} modèle{contributingModelCount === 1 ? "" : "s"}). Ce niveau descriptif n’est ni une probabilité ni une confiance statistiquement calibrée. Statut de calibration historique, distinct : {calibrationStatus}.</p>
+              {diagnostic && <div className="space-y-1">
+              <p>Valeurs réellement disponibles : {diagnostic.availableValueModelCount} · preuves historiques qualifiées : {diagnostic.evidenceEligibleModelCount} · contributeurs effectifs : {diagnostic.contributingModelCount}. Catalogue de référence : {diagnostic.expectedModelCount} modèles; les absences hors portée ne sont pas des échecs et sont exclues des dénominateurs de scoring.</p>
+              <p>{diagnostic.reason}</p>
+              {diagnostic.availableModels.length > 0 && <p>Modèles avec valeur : {diagnostic.availableModels.join(", ")}.</p>}
+              {diagnostic.modelReasons.length > 0 && <details className="mt-1">
+                <summary className="cursor-pointer text-sky-100">Motif par modèle ({diagnostic.modelReasons.length})</summary>
+                <ul className="list-inside list-disc pl-1">{diagnostic.modelReasons.map(({ modelName, reason: modelReason }) => <li key={`${key}-${modelName}`}>{modelName} — {modelReason}</li>)}</ul>
+              </details>}
+              </div>}
+            </div>
+          </div>;
         })}
       </div>
+      <p>Les effectifs ci-dessus décrivent la couverture des valeurs et l’admissibilité au calcul; ils ne constituent ni une note de fiabilité ni un pourcentage de confiance. Une couverture plus faible peut être normale selon l’horizon du modèle.</p>
       <p>Biais historique signé (prévision − observation), diagnostic uniquement; une valeur positive indique une surestimation. Sans preuve qualifiée, le biais reste indisponible.</p>
       <p>Dispersion descriptive indisponible : l’heure exacte des runs modèles n’est pas fournie. Effectifs de valeurs reçues, sans assertion de comparabilité : {availability}. Aucun min/max, étendue ni écart-type n’est publié comme incertitude.</p>
       <div className="rounded-lg border border-sky-100/10 bg-black/15 p-2">
@@ -406,7 +454,7 @@ function DayDetailsAccordion({ category }: { category: DetailCategory }) {
         <span aria-hidden="true" className="ml-1 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
       </summary>
       <div className="pb-4 pl-14 pr-1">
-        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne issue de la fusion officielle lorsque sa preuve est qualifiée; champs non pondérés indisponibles."}</p>
+        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne issue de la fusion officielle; pondération historique si la preuve est qualifiée, sinon repli robuste non calibré."}</p>
         {category.cadence === "hourly" ? <HourlyMiniChart category={category} /> : (
           <dl className="space-y-1 text-sm text-slate-100">
             {category.rows.map((row) => <div key={row.key} className="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt className="text-slate-400">{row.time}</dt><dd className="text-right font-medium tabular-nums">{row.value}</dd></div>)}

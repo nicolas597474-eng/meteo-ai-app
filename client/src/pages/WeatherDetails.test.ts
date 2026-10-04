@@ -23,9 +23,25 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("Fusion officielle · preuves par variable");
     expect(timelineSource).toContain("Sources quotidiennes réellement reçues");
     expect(timelineSource).toContain("Best Match · référence dérivée, non contributeur officiel");
-    expect(timelineSource).toContain("Aucun biais n’est appliqué aux valeurs futures");
+    expect(timelineSource).toContain("aucun biais historique n’est appliqué aux valeurs futures");
     expect(timelineSource).toContain("l’heure exacte des runs modèles n’est pas fournie");
     expect(timelineSource).toContain("Best Match");
+  });
+  it("sépare disponibilité physique, calibration robuste et contributions sans score de confiance", () => {
+    expect(timelineSource).toContain('diagnostic.availabilityStatus === "UNAVAILABLE"');
+    expect(timelineSource).toContain('diagnostic.availabilityStatus === "SINGLE_MODEL"');
+    expect(timelineSource).toContain("diagnostic.contributingModelCount === 1");
+    expect(timelineSource).toContain('diagnostic.calibrationStatus === "PARTIALLY_CALIBRATED"');
+    expect(timelineSource).toContain('diagnostic.calibrationStatus === "CALIBRATED"');
+    expect(timelineSource).toContain("diagnosticsByVariable?.[key]");
+    expect(timelineSource).toContain("Valeurs réellement disponibles :");
+    expect(timelineSource).toContain("preuves historiques qualifiées :");
+    expect(timelineSource).toContain("contributeurs effectifs");
+    expect(timelineSource).toContain("ils ne constituent ni une note de fiabilité ni un pourcentage de confiance");
+    expect(timelineSource).toContain("Une couverture plus faible peut être normale selon l’horizon du modèle.");
+    expect(timelineSource).toContain("Niveau de couverture/confiance indicatif selon le nombre de contributeurs");
+    expect(timelineSource).toContain("ni une probabilité ni une confiance statistiquement calibrée");
+    expect(timelineSource).toContain("Statut de calibration historique, distinct");
   });
   it("garde les rubans horizontaux accessibles et n’invente pas d’échéances pour la série quotidienne", () => {
     expect(timelineSource).toContain('aria-label="Jours de prévision défilables"');

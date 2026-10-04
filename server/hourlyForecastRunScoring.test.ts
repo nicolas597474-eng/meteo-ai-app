@@ -52,7 +52,8 @@ describe("evaluateHourlyForecastRuns", () => {
     });
     const result = evaluateHourlyForecastRuns(hours.map((hour) => snapshot(hour)), forecasts);
     expect(scoresFor(result).filter((score) => score.sampleSize > 0).map((score) => score.horizonBucket)).toEqual(["0_2h", "2_6h", "6_24h"]);
-    expect(scoresFor(result).filter((score) => score.sampleSize > 0).every((score) => score.coverageRatio === 1 / 3)).toBe(true);
+    expect(scoresFor(result).filter((score) => score.sampleSize > 0).every((score) => score.coverageRatio === 1)).toBe(true);
+    expect(scoresFor(result).filter((score) => score.sampleSize === 0).every((score) => score.evaluableObservationCount === 0)).toBe(true);
   });
 
   it("ne surcompte pas les doublons et retombe sur une valeur admissible quand le run récent est manquant", () => {
@@ -64,6 +65,23 @@ describe("evaluateHourlyForecastRuns", () => {
       forecast({ captureRunId: "run-without-temp", validTime, availableAt: validTime - 60 * 60_000, variable: "temperature", value: null }),
     ]);
     expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 1, observationCount: 1 });
+  });
+
+  it("sépare la couverture des scores et exclut les échéances sans run exact du dénominateur", () => {
+    const withValue = observedAt(12);
+    const withNullValue = observedAt(13);
+    const withoutRun = observedAt(14);
+    const result = evaluateHourlyForecastRuns([snapshot(12), snapshot(13), snapshot(14)], [
+      forecast({ captureRunId: "run-with-value", validTime: withValue, availableAt: withValue - 60 * 60_000, variable: "temperature", value: 12 }),
+      forecast({ captureRunId: "run-with-null", validTime: withNullValue, availableAt: withNullValue - 60 * 60_000, variable: "temperature", value: null }),
+    ]);
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({
+      observationCount: 3,
+      evaluableObservationCount: 2,
+      sampleSize: 1,
+      coverageRatio: 0.5,
+      mae: 2,
+    });
   });
 
   it("écarte un instant d’observation ambigu à l’heure répétée d’Europe/Paris", () => {

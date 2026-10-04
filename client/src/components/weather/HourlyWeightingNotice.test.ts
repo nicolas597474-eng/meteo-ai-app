@@ -6,46 +6,104 @@ import { HourlyWeightingNotice } from "./HourlyWeightingNotice";
 const sevenModels = ["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"];
 
 describe("HourlyWeightingNotice", () => {
-  it("annonce l’indisponibilité faute d’historique suffisant et liste les modèles qui ont des données", () => {
+  it("annonce l’indisponibilité physique uniquement quand aucun modèle n’a fourni de valeur", () => {
     const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
       status: "unavailable",
+      availabilityStatus: "UNAVAILABLE",
+      calibrationStatus: "UNAVAILABLE",
       historyStatus: "available",
       minimumComparisons: 30,
       minimumComparableDays: 7,
-      modelsWithData: sevenModels,
+      modelsWithData: [],
       horizons: [{
         variable: "temperature",
         horizonBucket: "6_24h",
         method: "unavailable",
-        unavailableReason: "insufficient_historical_evidence",
+        availabilityStatus: "UNAVAILABLE",
+        calibrationStatus: "UNAVAILABLE",
+        unavailableReason: "no_model_data",
         hourCount: 4,
-        modelNamesWithData: sevenModels,
+        availableModelCount: 0,
+        modelNamesWithData: [],
       }],
     } }));
 
     expect(html).toContain("Prévision officielle horaire indisponible");
-    expect(html).toContain("historique comparable est insuffisant");
+    expect(html).toContain("aucune valeur réelle reçue pour cette variable et cette échéance");
     expect(html).toContain("30 comparaisons sur 7 jours");
-    expect(html).toContain("AROME, ARPEGE, ICON, ECMWF, GFS, GEM, UKMET");
+    expect(html).toContain("Modèles avec données : aucun modèle");
     expect(html).toContain("Best Match est exclu");
     expect(html).not.toContain("Repli égalitaire");
   });
 
-  it("distingue les variables et échéances calibrées des variables indisponibles", () => {
+  it("distingue les variables calibrées du repli robuste disponible", () => {
     const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
       status: "mixed",
+      availabilityStatus: "FUSED",
+      calibrationStatus: "PARTIALLY_CALIBRATED",
       historyStatus: "available",
       minimumComparisons: 30,
       minimumComparableDays: 7,
       modelsWithData: ["AROME", "UKMET"],
       horizons: [
-        { variable: "temperature", horizonBucket: "6_24h", method: "historical_skill", unavailableReason: null, hourCount: 3, modelNamesWithData: ["AROME", "UKMET"] },
-        { variable: "wind_speed", horizonBucket: "6_24h", method: "unavailable", unavailableReason: "insufficient_historical_evidence", hourCount: 3, modelNamesWithData: ["AROME", "UKMET"] },
+        { variable: "temperature", horizonBucket: "6_24h", method: "historical_skill", availabilityStatus: "FUSED", calibrationStatus: "CALIBRATED", unavailableReason: null, hourCount: 3, modelNamesWithData: ["AROME", "UKMET"] },
+        { variable: "wind_speed", horizonBucket: "6_24h", method: "robust_fallback", availabilityStatus: "FUSED", calibrationStatus: "UNCALIBRATED_ROBUST", unavailableReason: null, hourCount: 3, modelNamesWithData: ["AROME", "UKMET"] },
       ],
     } }));
 
     expect(html).toContain("Calibrées : température (6_24h)");
-    expect(html).toContain("Indisponibles : historique de calibration insuffisant : vent (6_24h)");
-    expect(html).toContain("aucune moyenne de secours");
+    expect(html).toContain("Robustes non calibrées : vent (6_24h)");
+    expect(html).toContain("Les autres valeurs exploitables restent incluses avec un repli robuste");
+    expect(html).not.toContain("Champs sans valeur disponible");
+  });
+
+  it("signale l’override manuel et confirme que la série officielle originale est conservée", () => {
+    const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
+      status: "historical_skill",
+      manualOverride: {
+        source: "manual_refresh",
+        reason: "Rafraîchissement demandé explicitement.",
+        computedAt: "2026-10-04T08:00:00.000Z",
+        officialOriginalComputedAt: "2026-10-04T07:58:00.000Z",
+        officialOriginalPreserved: true,
+        officialOriginalPointCount: 24,
+      },
+    } }));
+
+    expect(html).toContain("Override horaire manuel explicite appliqué");
+    expect(html).toContain("Rafraîchissement demandé explicitement.");
+    expect(html).toContain("Série officielle d’origine conservée (24 échéances");
+    expect(html).toContain("2026-10-04T07:58:00.000Z");
+  });
+
+  it("affiche les niveaux indicatifs par variable et horizon, distincts de la calibration", () => {
+    const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
+      status: "mixed",
+      availabilityStatus: "FUSED",
+      calibrationStatus: "PARTIALLY_CALIBRATED",
+      horizons: [{
+        variable: "temperature",
+        horizonBucket: "6_24h",
+        method: "mixed",
+        availabilityStatus: "FUSED",
+        calibrationStatus: "PARTIALLY_CALIBRATED",
+        unavailableReason: null,
+        hourCount: 9,
+        contributingModelCount: 18,
+        coverageLevelCounts: { NONE: 1, SINGLE_MODEL: 1, LIMITED: 2, MODERATE: 3, BROAD: 2 },
+        modelNamesWithData: sevenModels,
+      }],
+    } }));
+
+    expect(html).toContain("Niveau de couverture/confiance indicatif selon le nombre réel de contributeurs, par variable et horizon");
+    expect(html).toContain("confiance élevée sur 2 échéances");
+    expect(html).toContain("confiance moyenne sur 3 échéances");
+    expect(html).toContain("confiance réduite sur 2 échéances");
+    expect(html).toContain("prévision d’un modèle unique sur 1 échéance");
+    expect(html).toContain("indisponible sur 1 échéance");
+    expect(html).toContain("ni une probabilité ni une confiance statistiquement calibrée");
+    expect(html).toContain("CALIBRATED");
+    expect(html).toContain("PARTIALLY_CALIBRATED");
+    expect(html).toContain("UNCALIBRATED_ROBUST");
   });
 });

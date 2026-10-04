@@ -170,6 +170,15 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain('user?.role === "admin" && shadowDataHubReport?.phase8ValidationProgress');
   });
 
+  it("sépare la disponibilité réelle de la calibration et des scores historiques", () => {
+    const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Une absence hors portée n’est pas un échec de performance");
+    expect(source).toContain("Un contributeur reste affiché en statut SINGLE_MODEL");
+    expect(source).toContain("UNCALIBRATED_ROBUST");
+    expect(source).toContain("n’empêche pas une prévision reçue d’entrer dans le moteur robuste");
+    expect(source).not.toContain("Aucune valeur n’est affichée lorsqu’il manque une trace, plusieurs contributeurs ou des preuves physiques qualifiées.");
+  });
+
   it("présente explicitement la dernière fusion archivée sans la confondre avec la prévision actuelle", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
     expect(source).toContain("snapshotStatus");
