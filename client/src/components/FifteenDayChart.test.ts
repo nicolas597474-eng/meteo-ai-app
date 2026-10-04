@@ -58,6 +58,7 @@ describe("FifteenDayChart", () => {
   it("distingue l’accord brut du run exact et la dispersion positive de pluie", () => {
     expect(source).toContain("requestDayOffset");
     expect(source).toContain("heure d’émission propre à chaque modèle non archivée");
+    expect(source).toContain("Les dispersions décrivent l’accord brut; incertitude statistique non mesurée, fiabilité historique distincte.");
     expect(source).toContain("σ pop");
     expect(source).toContain("precipitationWetAmounts");
     expect(source).toContain("fréquence de modèles, pas une probabilité calibrée");

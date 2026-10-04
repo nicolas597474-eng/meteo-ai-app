@@ -136,14 +136,14 @@ export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps)
     : hasInsufficientHistory
       ? `L’historique comparable n’atteint pas toujours le seuil de ${minimumComparisons} comparaisons sur ${minimumDays} jours.`
       : `Les preuves historiques qualifiées sont propres à la variable et à l’horizon (seuil : ${minimumComparisons} comparaisons sur ${minimumDays} jours).`;
-  const availabilityMessage = "La disponibilité physique est évaluée séparément de la fiabilité : une absence normale hors portée du modèle n’est ni une erreur ni un échec de score, et n’entre pas dans les dénominateurs de classement.";
+  const availabilityMessage = "La disponibilité des valeurs des modèles est évaluée séparément de la fiabilité historique : une absence normale hors portée n’est ni une erreur ni un échec de score, et n’entre pas dans les dénominateurs de classement.";
 
   return (
     <div role="note" className="rounded-lg border border-sky-200/10 bg-sky-200/[0.035] px-2.5 py-2 text-[10px] leading-relaxed text-slate-400">
       {weighting.manualOverride && <p className="mb-1 rounded-md border border-amber-200/20 bg-amber-200/[0.05] px-2 py-1 text-amber-100"><span className="font-semibold">Override horaire manuel explicite appliqué.</span> {weighting.manualOverride.reason} Série officielle d’origine conservée ({weighting.manualOverride.officialOriginalPointCount} échéances; calcul officiel du {weighting.manualOverride.officialOriginalComputedAt}).</p>}
       {coverageDistribution && <div className="mb-1 rounded-md border border-sky-200/10 bg-black/10 px-2 py-1">
-        <p><span className="font-semibold text-sky-100">Niveau de couverture/confiance indicatif selon le nombre réel de contributeurs, par variable et horizon :</span> {coverageDistribution}.</p>
-        <p>Ces catégories décrivent uniquement le nombre de modèles : elles ne sont ni une probabilité ni une confiance statistiquement calibrée. Le statut de calibration historique (`CALIBRATED`, `PARTIALLY_CALIBRATED`, `UNCALIBRATED_ROBUST`) est distinct et affiché séparément ci-dessous.</p>
+        <p><span className="font-semibold text-sky-100">Nombre de modèles contributeurs, par variable et horizon :</span> {coverageDistribution}.</p>
+        <p>Ces catégories décrivent uniquement l’effectif des modèles contributeurs, pas la couverture/qualité des stations physiques. L’incertitude statistique n’est pas mesurée ici; la performance historique et son statut de calibration (`CALIBRATED`, `PARTIALLY_CALIBRATED`, `UNCALIBRATED_ROBUST`) restent distincts et sont affichés séparément ci-dessous.</p>
       </div>}
       {weighting.status === "unavailable" ? (
         <>

@@ -9,11 +9,11 @@ export const MODEL_COUNT_COVERAGE_LEVELS = [
 export type ModelCountCoverageLevel = (typeof MODEL_COUNT_COVERAGE_LEVELS)[number];
 
 const MODEL_COUNT_COVERAGE_LABELS: Record<ModelCountCoverageLevel, string> = {
-  NONE: "indisponible",
+  NONE: "aucun modèle contributeur",
   SINGLE_MODEL: "prévision d’un modèle unique",
-  LIMITED: "confiance réduite",
-  MODERATE: "confiance moyenne",
-  BROAD: "confiance élevée",
+  LIMITED: "effectif limité",
+  MODERATE: "effectif intermédiaire",
+  BROAD: "effectif étendu",
 };
 
 /** Descriptive bucket by actual positive-weight contributors, never a skill score. */

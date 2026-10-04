@@ -43,7 +43,10 @@ describe("LocalPrecipitationNowcastingPanel", () => {
     expect(html).toContain("snapshot qualifié ne conserve pas la fenêtre par station");
     expect(html).toContain("Production verrouillée");
     expect(html).toContain("Best Match exclu");
-    expect(html).toContain("confiance station");
+    expect(html).toContain("Accord inter-stations pour les précipitations : non mesuré ici");
+    expect(html).toContain("il n’évalue pas la pluie");
+    expect(html).not.toContain("confiance station");
+    expect(html).not.toContain("85/100");
     expect(html).toContain("Les compteurs de statuts sont des états de candidats, pas des scores de performance");
     expect(html).toContain("Données insuffisantes / skill non mesuré");
     expect(html).toContain("aucun taux de réussite, POD, FAR ni CSI n’est calculé");

@@ -95,13 +95,13 @@ describe("HourlyWeightingNotice", () => {
       }],
     } }));
 
-    expect(html).toContain("Niveau de couverture/confiance indicatif selon le nombre réel de contributeurs, par variable et horizon");
-    expect(html).toContain("confiance élevée sur 2 échéances");
-    expect(html).toContain("confiance moyenne sur 3 échéances");
-    expect(html).toContain("confiance réduite sur 2 échéances");
+    expect(html).toContain("Nombre de modèles contributeurs, par variable et horizon");
+    expect(html).toContain("effectif étendu sur 2 échéances");
+    expect(html).toContain("effectif intermédiaire sur 3 échéances");
+    expect(html).toContain("effectif limité sur 2 échéances");
     expect(html).toContain("prévision d’un modèle unique sur 1 échéance");
-    expect(html).toContain("indisponible sur 1 échéance");
-    expect(html).toContain("ni une probabilité ni une confiance statistiquement calibrée");
+    expect(html).toContain("aucun modèle contributeur sur 1 échéance");
+    expect(html).toContain("pas la couverture/qualité des stations physiques. L’incertitude statistique n’est pas mesurée ici");
     expect(html).toContain("CALIBRATED");
     expect(html).toContain("PARTIALLY_CALIBRATED");
     expect(html).toContain("UNCALIBRATED_ROBUST");

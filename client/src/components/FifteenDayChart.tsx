@@ -189,7 +189,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           <DetailCard icon={<Sunset className="h-3.5 w-3.5 text-orange-500" />} label="Coucher" value={<span className="text-orange-500">{day.sunset ?? "—"}</span>} />
           <div className="col-span-3 rounded-lg border border-sky-300/15 bg-sky-300/[0.035] p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-100">Accord inter-modèles · dispersions brutes</p>
-            <p className="mt-0.5 text-[9px] text-slate-400">Best Match exclu · jour demandé {agreement?.requestDayOffset == null ? "indisponible" : `J+${agreement.requestDayOffset}`} · heure d’émission propre à chaque modèle non archivée · aucune note de fiabilité.</p>
+            <p className="mt-0.5 text-[9px] text-slate-400">Best Match exclu · jour demandé {agreement?.requestDayOffset == null ? "indisponible" : `J+${agreement.requestDayOffset}`} · heure d’émission propre à chaque modèle non archivée. Les dispersions décrivent l’accord brut; incertitude statistique non mesurée, fiabilité historique distincte.</p>
             {agreement && <p className="mt-1 text-[9px] text-slate-500">Pluie au seuil ≥{agreement.precipitationOccurrence.thresholdMm.toFixed(1)} mm : {agreement.precipitationOccurrence.rainModelCount}/{agreement.precipitationOccurrence.availableModelCount} modèles disponibles annoncent de la pluie; fréquence de modèles, pas une probabilité calibrée.</p>}
             <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-orange-300" />} label="Dispersion Tmax" value={formatAgreementSpread(agreement?.tempMax, "°C", agreement?.expectedModelCount ?? 0)} />

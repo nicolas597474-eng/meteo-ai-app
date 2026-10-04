@@ -119,7 +119,7 @@ export function HourlyHistoricalEvidencePanel({
     return [`${VARIABLE_LABELS[item.variable] ?? item.variable} (${horizon}) : ${getModelCountCoverageLabel(coverageLevel)} (${contributorCount} contributeur${contributorCount === 1 ? "" : "s"}) · calibration ${calibration}`];
   }).join("; ");
   const coverageNote = coverageSummary ? <div role="note" className="rounded-lg border border-sky-200/10 bg-sky-200/[0.035] p-2">
-    <p className="text-[9px] leading-relaxed text-slate-300"><strong>Niveau de couverture/confiance indicatif selon le nombre de contributeurs, pour cette échéance et variable :</strong> {coverageSummary}. Ce niveau n’est ni une probabilité ni une confiance statistiquement calibrée; le statut de calibration historique indiqué séparément est distinct.</p>
+    <p className="text-[9px] leading-relaxed text-slate-300"><strong>Nombre de modèles contributeurs pour cette échéance et variable :</strong> {coverageSummary}. Cette couverture décrit uniquement l’effectif des modèles; elle ne mesure pas la couverture/qualité physique des stations. L’incertitude statistique n’est pas mesurée ici; la performance historique et son statut de calibration restent distincts.</p>
   </div> : null;
   const hasHorizonContract = horizonBucket !== undefined || horizonUnavailableReason !== undefined;
   const horizonIsUnusable = hasHorizonContract && (

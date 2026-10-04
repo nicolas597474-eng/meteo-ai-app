@@ -9,6 +9,7 @@ describe("harmonisation des badges météo", () => {
     const dashboard = readPage("../../pages/Dashboard.tsx");
     const reliability = readPage("../../pages/ReliabilityLaboratory.tsx");
     const aiLab = readPage("../../pages/WeatherAILab.tsx");
+    const report = readPage("../../pages/Report.tsx");
 
     expect(ranking).toContain("WeatherStatusBadge");
     expect(ranking).toContain("sans note 0–100");
@@ -16,5 +17,6 @@ describe("harmonisation des badges météo", () => {
     expect(dashboard).toContain("Accord inter-modèles");
     expect(reliability).toContain("Fiabilité historique, sans note globale");
     expect(aiLab).toContain("Hors fusion");
+    expect(report).toContain("cette dispersion décrit l’accord brut, pas la fiabilité historique. Incertitude statistique : non mesurée ici.");
   });
 });

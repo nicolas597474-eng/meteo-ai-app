@@ -84,7 +84,7 @@ export default function Report() {
 
       {agreement && <MeteoSurface as="section" className="rounded-xl p-4 sm:p-6" aria-label="Accord inter-modèles par variable">
         <h2 className="text-base sm:text-lg font-semibold">Accord inter-modèles · dispersion physique</h2>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Étendues et σ population entre modèles nommés pour la date cible. Best Match et agrégateurs exclus. L’heure d’émission de chaque modèle est indisponible; ces mesures ne décrivent pas la fiabilité historique.</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Étendues et σ population entre modèles nommés pour la date cible. Best Match et agrégateurs exclus. L’heure d’émission de chaque modèle est indisponible; cette dispersion décrit l’accord brut, pas la fiabilité historique. Incertitude statistique : non mesurée ici.</p>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {agreementRows.map(({ label, measure, unit }) => <MetricCard key={label} icon={label.includes("Température") ? <Thermometer className="h-4 w-4" /> : label.includes("Pluie") ? <Droplets className="h-4 w-4" /> : <Wind className="h-4 w-4" />} label={label} value={`${formatRange(measure, unit)} · ${measure.availableModelCount}/${agreement.expectedModelCount} modèles`} small />)}
         </div>

@@ -110,6 +110,7 @@ describe("HourlyChart", () => {
 
   it("inclut tous les accords multi-paramètres réellement disponibles", () => {
     expect(source).toContain("Accord inter-modèles · dispersions brutes");
+    expect(source).toContain("l’incertitude statistique n’est pas mesurée ici et la fiabilité face aux observations est présentée séparément");
     expect(source).toContain("multiModelMetrics");
     expect(source).toContain("dispersion?.windSpeed");
     expect(source).toContain("dispersion?.windGust");
