@@ -15,6 +15,7 @@ import {
   getRecentCollectionJobs,
   getRecentScheduledForecastCollectionJobs,
   getLatestHourlyForecastCollectionResults,
+  getLatestHourlyProviderRunCaptures,
   getStoredHourlyForecasts,
   getHourlyForecastEvaluationHistory,
   getHourlyForecastRunValues,
@@ -683,9 +684,10 @@ export const weatherRouter = router({
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, getParisDateDaysAgo(1), getTodayParis()),
         getRecentScheduledForecastCollectionJobs(2),
       ]);
-      const [latestHourlyModelCollection, currentHourlyProjectionRows] = await Promise.all([
+      const [latestHourlyModelCollection, currentHourlyProjectionRows, providerRunCollection] = await Promise.all([
         getLatestHourlyForecastCollectionResults(locationKey),
         getStoredHourlyForecasts(locationKey, getParisDate()),
+        getLatestHourlyProviderRunCaptures(locationKey),
       ]);
       const projectionMeasuredAt = Date.now();
       const expectedProjectionTimes = getParisHourlyTimestamps(getParisDate());
@@ -815,6 +817,25 @@ export const weatherRouter = router({
           errorCode: result.errorCode,
           attemptedAt: result.attemptedAt,
           completedAt: result.completedAt,
+        })),
+        providerRunCollectionAvailable: providerRunCollection.available,
+        providerRunCollection: providerRunCollection.results.map((result) => ({
+          model: result.modelName,
+          modelId: result.modelId,
+          status: result.status,
+          reasonCode: result.reasonCode,
+          leadBasis: result.leadBasis,
+          metadataHttpStatus: result.metadataHttpStatus,
+          metadataAvailableAt: result.metadataAvailableAt,
+          providerRunAt: result.providerRunAt,
+          requestStartedAt: result.requestStartedAt,
+          availableAt: result.availableAt,
+          responseStatus: result.responseStatus,
+          collectionLatencyMilliseconds: result.collectionLatencyMilliseconds,
+          valuesStored: result.valuesStored,
+          minimumForecastLeadMilliseconds: result.minimumForecastLeadMilliseconds,
+          maximumForecastLeadMilliseconds: result.maximumForecastLeadMilliseconds,
+          capturedAt: result.capturedAt,
         })),
         flowStatuses,
         bestMatchReference: {
