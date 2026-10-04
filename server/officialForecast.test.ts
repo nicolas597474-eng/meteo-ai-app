@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { computeOfficialDailyForecast, computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
 import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES } from "./weatherServices";
 import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
@@ -11,12 +11,12 @@ const horizonBucket: DailyFusionHorizon = "6-24h";
 const serviceNames = ["AROME", "ARPEGE", "ICON", "ECMWF"];
 const serviceModelId = (serviceName: string) => WEATHER_SERVICES.expert.find((service) => service.name === serviceName)!.modelId;
 
-beforeEach(() => {
+beforeAll(() => {
   vi.useFakeTimers();
   vi.setSystemTime(issuedAt);
 });
 
-afterEach(() => vi.useRealTimers());
+afterAll(() => vi.useRealTimers());
 
 const forecasts = serviceNames.map((serviceName, index) => ({
   serviceName,
@@ -42,7 +42,7 @@ function evidenceFor(
   variable: DailyFusionMetric,
   options: Partial<Pick<ModelPerformanceEvidence, "locationKey" | "horizonBucket" | "sampleSize" | "evaluatedDays" | "comparisonCount" | "mae" | "standardError">> = {},
 ): ModelPerformanceEvidence {
-  const sampleSize = options.sampleSize ?? 500;
+  const sampleSize = options.sampleSize ?? 120;
   return {
     locationKey: options.locationKey ?? locationKey,
     serviceName,
@@ -109,7 +109,7 @@ function sevenModelEvidence(): ModelPerformanceEvidence[] {
   return allOfficialServiceNames.flatMap((serviceName, index) => DAILY_FUSION_METRICS.map((variable) => evidenceFor(
     serviceName,
     variable,
-    { sampleSize: 500, comparisonCount: 500, evaluatedDays: 500, mae: 0.4 + index * 0.1, standardError: 0.05 },
+    { sampleSize: 120, comparisonCount: 500, evaluatedDays: 120, mae: 0.4 + index * 0.1, standardError: 0.05 },
   )));
 }
 
@@ -117,7 +117,7 @@ function bestMatchEvidence(): ModelPerformanceEvidence[] {
   return DAILY_FUSION_METRICS.map((variable) => evidenceFor(
     "Open-Meteo",
     variable,
-    { sampleSize: 500, comparisonCount: 500, evaluatedDays: 500, mae: 0.001, standardError: 0 },
+    { sampleSize: 120, comparisonCount: 500, evaluatedDays: 120, mae: 0.001, standardError: 0 },
   ));
 }
 
@@ -178,7 +178,7 @@ describe("computeOfficialDailyForecast", () => {
     ]) {
       expect(metricSources.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
       expect(metricSources.every((source) => source.finalWeight <= 0.35)).toBe(true);
-      expect(metricSources.every((source) => source.sampleSize === 500 && source.horizonBucket === "6-24h")).toBe(true);
+      expect(metricSources.every((source) => source.sampleSize === 120 && source.horizonBucket === "6-24h")).toBe(true);
     }
     expect(first.trace.parameterSources.tempMax.every((source) => source.variable === "temperature_max")).toBe(true);
     expect(Object.values(first.weights).every((weight) => weight.tempWeight <= 0.35 && weight.precipWeight <= 0.35 && weight.windWeight <= 0.35)).toBe(true);
@@ -186,7 +186,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(first.trace.parameterSources.windGust.every((source) => source.variable === "wind_gust_max")).toBe(true);
   });
 
-  it("expose le biais signé comme diagnostic sans corriger les valeurs ou les poids", () => {
+  it("expose le biais sign\u00e9 comme diagnostic sans corriger les valeurs ou les poids", () => {
     const withoutBias = computeOfficialDailyForecast(forecasts, options(qualifiedEvidence()));
     const withBias = computeOfficialDailyForecast(
       forecasts,
@@ -201,7 +201,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(withBias.trace.parameterSources.tempMax.every((source) => source.latestScoreDate === "2026-10-01")).toBe(true);
   });
 
-  it("garde valeurs, poids, trace et compte officiel invariants face à Best Match pour Tmin/Tmax, pluie, vent et rafales", () => {
+  it("garde valeurs, poids, trace et compte officiel invariants face \u00e0 Best Match pour Tmin/Tmax, pluie, vent et rafales", () => {
     const evidence = sevenModelEvidence();
     const withoutBestMatch = computeOfficialDailyForecastWithDiagnostics(sevenModelForecasts, options(evidence));
     const withBestMatch = computeOfficialDailyForecastWithDiagnostics(
@@ -231,7 +231,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(withBestMatch.trace.precipitationConsensus.modelsWithData).toEqual(allOfficialServiceNames);
   });
 
-  it("garde les modèles disponibles en repli robuste quand la seule preuve qualifiée est celle de Best Match", () => {
+  it("garde les mod\u00e8les disponibles en repli robuste quand la seule preuve qualifi\u00e9e est celle de Best Match", () => {
     const result = computeOfficialDailyForecast(
       [...sevenModelForecasts, bestMatchForecast],
       options(bestMatchEvidence()),
@@ -258,7 +258,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(Object.values(result.weights).some((weight) => weight.tempWeight > 0 && weight.precipWeight > 0 && weight.windWeight > 0)).toBe(true);
   });
 
-  it("publie une fusion robuste lorsque l’historique est absent, sans la présenter comme calibrée", () => {
+  it("publie une fusion robuste lorsque l\u2019historique est absent, sans la pr\u00e9senter comme calibr\u00e9e", () => {
     const result = computeOfficialDailyForecast(forecasts, options([]));
 
     expect(result.coreCalibrationComplete).toBe(false);
@@ -282,7 +282,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(Object.values(result.weights).some((weight) => weight.tempWeight > 0 && weight.precipWeight > 0 && weight.windWeight > 0)).toBe(true);
   });
 
-  it("exclut les modèles sous 0,1 mm de la quantité conditionnelle et du poids officiel de pluie", () => {
+  it("exclut les mod\u00e8les sous 0,1 mm de la quantit\u00e9 conditionnelle et du poids officiel de pluie", () => {
     const mixedRainForecasts = forecasts.map((forecast, index) => ({
       ...forecast,
       precipitation: [0, 0.1, 0.4, 1][index]!,
@@ -311,10 +311,21 @@ describe("computeOfficialDailyForecast", () => {
     expect(result.tempMax).not.toBeNull();
     expect(result.confidenceScore).toBeNull();
     expect(result.trace.calibrationStatus.tempMax).toBe("UNCALIBRATED_ROBUST");
-    expect(result.methodNote).toContain("non calibrée");
+    expect(result.methodNote).toContain("non calibr\u00e9e");
   });
 
-  it("n’emprunte ni une variable, ni une échéance, ni un lieu différent", () => {
+  it("refuse une pr\u00e9vision dont l\u2019horodatage d\u00e9passe la fra\u00eecheur maximale", () => {
+    const staleForecasts = forecasts.map((f) => ({ ...f, availableAt: issuedAt - 16 * 24 * 60 * 60 * 1_000 }));
+    const result = computeOfficialDailyForecast(staleForecasts, {
+      ...options(),
+      referenceAt: issuedAt,
+    });
+
+    expect(result.tempMax).toBeNull();
+    expect(result.trace.parameterSources.tempMax).toEqual([]);
+  });
+
+  it("n\u2019emprunte ni une variable, ni une \u00e9ch\u00e9ance, ni un lieu diff\u00e9rent", () => {
     const mismatched = serviceNames.flatMap((serviceName) => [
       evidenceFor(serviceName, "temperature_max", { horizonBucket: "1-3d" }),
       evidenceFor(serviceName, "temperature_max", { horizonBucket, locationKey: "autre-lieu" }),
@@ -330,7 +341,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(result.windSpeed).not.toBeNull();
   });
 
-  it("fusionne les seules couvertures réellement reçues à J+3, J+7 et J+15 et marque un modèle unique", () => {
+  it("fusionne les seules couvertures r\u00e9ellement re\u00e7ues \u00e0 J+3, J+7 et J+15 et marque un mod\u00e8le unique", () => {
     const referenceAt = Date.parse("2026-10-02T22:00:00.000Z");
     const forecastsAt = (date: string, names: string[]) => OFFICIAL_HOURLY_MODELS
       .filter((model) => names.includes(model.name))
@@ -387,7 +398,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(singleModel.trace.parameterSources.tempMax[0]?.finalWeight).toBe(1);
   });
 
-  it("exclut le modèle sans valeur pour cette variable et fusionne les deux contributeurs restants", () => {
+  it("exclut le mod\u00e8le sans valeur pour cette variable et fusionne les deux contributeurs restants", () => {
     const threeForecasts = forecasts.slice(0, 3).map((forecast, index) => ({
       ...forecast,
       tempMax: index === 0 ? null : forecast.tempMax,
@@ -402,7 +413,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(result.trace.eligibilityByVariable.temperature_max.find((item) => item.modelName === "AROME")?.reason).toContain("Aucune valeur finie disponible");
   });
 
-  it("distingue une absence réelle de valeur d’un manque de preuve historique", () => {
+  it("distingue une absence r\u00e9elle de valeur d\u2019un manque de preuve historique", () => {
     const noValues = computeOfficialDailyForecastWithDiagnostics(
       forecasts.map((forecast) => ({ ...forecast, tempMax: null })),
       options(),
@@ -434,7 +445,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(noEvidence.tempMax).not.toBeNull();
   });
 
-  it("fusionne dynamiquement deux ou trois sources à preuve qualifiée sans blocage du plafond", () => {
+  it("fusionne dynamiquement deux ou trois sources \u00e0 preuve qualifi\u00e9e sans blocage du plafond", () => {
     const twoModels = computeOfficialDailyForecastWithDiagnostics(forecasts.slice(0, 2), options());
     const threeModels = computeOfficialDailyForecastWithDiagnostics(forecasts.slice(0, 3), options());
 
@@ -462,7 +473,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(threeModels.trace.parameterSources.tempMax.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
   });
 
-  it("conserve les prévisions sèches comme valeurs disponibles à zéro", () => {
+  it("conserve les pr\u00e9visions s\u00e8ches comme valeurs disponibles \u00e0 z\u00e9ro", () => {
     const result = computeOfficialDailyForecastWithDiagnostics(
       forecasts.map((forecast) => ({ ...forecast, precipitation: 0 })),
       options(),
