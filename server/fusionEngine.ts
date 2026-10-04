@@ -27,10 +27,12 @@ import { buildNormalizedSpatialWeights, evaluateSpatialQuality } from "./spatial
 import {
   getEvidenceIneligibilityReason,
   regularizeModelPerformance,
+  calculateRobustFallbackMultipliers,
   normalizeModelWeightsWithCap,
   MODEL_FUSION_WEIGHT_CAP,
   type ModelPerformanceContext,
   type ModelPerformanceEvidence,
+  type RegularizedPerformance,
 } from "./fusionPerformance";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -60,6 +62,8 @@ export type FusionSource = {
   maeWind?: number | null;
   modelId?: string | null;
   performanceEvidence?: ModelPerformanceEvidence | null;
+  /** Exact model-specific slice; different models may legitimately have different lead buckets. */
+  performanceContext?: ModelPerformanceContext;
   // Source type
   type: "station" | "model" | "service";
 };
@@ -77,6 +81,10 @@ export type FusionConfig = {
   refAltitude?: number | null;
   /** When present, model sources require exact qualified production evidence for this slice. */
   performanceContext?: ModelPerformanceContext;
+  /** Keep available model values when history is missing; use a bounded robust fallback. */
+  allowRobustUncalibratedModels?: boolean;
+  /** Evaluate source freshness at the forecast fusion reference time for reproducible runs. */
+  referenceAt?: number;
 };
 
 export type FusionResult = {
@@ -101,7 +109,7 @@ export type FusionResult = {
   altitudeAdjustmentC: number;
   methodUsed: string;
   validationNote: string;
-  performanceEvidenceStatus: "not_requested" | "qualified" | "insufficient";
+  performanceEvidenceStatus: "not_requested" | "qualified" | "partially_qualified" | "insufficient";
 };
 
 export type UsedSource = {
@@ -114,6 +122,8 @@ export type UsedSource = {
   qualityWeight: number;
   freshnessWeight: number;
   performanceWeight: number;   // from historical MAE
+  rawWeight?: number;
+  robustFallbackWeight?: number;
   performanceEvidence?: ModelPerformanceEvidence | null;
   uncertaintyAdjustedMae?: number;
   regularizedMae?: number;
@@ -673,7 +683,7 @@ export function computeFusion(
   previousReadings?: Map<string, { temperature: number; timestamp: number }>
 ): FusionResult {
   const cfg: FusionConfig = { ...DEFAULT_CONFIG, ...config };
-  const now = Date.now();
+  const now = Number.isFinite(cfg.referenceAt) ? cfg.referenceAt! : Date.now();
 
   // ── Step 1: Filter sources ──────────────────────────────────────────────────
   const excluded: ExcludedSource[] = [];
@@ -699,14 +709,19 @@ export function computeFusion(
       excluded.push({ id: s.id, name: s.name, reason: `Score fiabilité trop bas (${reliability}/100 < ${cfg.minReliabilityScore})`, temperature: s.temperature ?? null });
       continue;
     }
-    if (cfg.performanceContext && s.type !== "station") {
+    const performanceContext = s.performanceContext ?? cfg.performanceContext;
+    if ((performanceContext || cfg.allowRobustUncalibratedModels) && s.type !== "station"
+      && (s.temperature == null || !Number.isFinite(s.temperature))) {
+      excluded.push({ id: s.id, name: s.name, reason: "prévision de cette variable indisponible", temperature: s.temperature ?? null });
+      continue;
+    }
+    if (performanceContext && s.type !== "station") {
       const evidence = s.performanceEvidence;
-      let evidenceReason = getEvidenceIneligibilityReason(evidence, cfg.performanceContext, new Date(now));
+      let evidenceReason = getEvidenceIneligibilityReason(evidence, performanceContext, new Date(now));
       if (!evidenceReason && evidence && (evidence.serviceName !== s.name || (s.modelId != null && evidence.modelId !== s.modelId))) {
         evidenceReason = "preuve rattachée à un autre modèle";
       }
-      if (!evidenceReason && s.temperature == null) evidenceReason = "prévision de cette variable indisponible";
-      if (evidenceReason) {
+      if (evidenceReason && !cfg.allowRobustUncalibratedModels) {
         excluded.push({ id: s.id, name: s.name, reason: `Preuve statistique non qualifiée : ${evidenceReason}`, temperature: s.temperature ?? null });
         continue;
       }
@@ -750,7 +765,7 @@ export function computeFusion(
       usedSources: [], excludedSources: excluded, anomaliesDetected: [],
       altitudeAdjustmentC: 0, methodUsed: "IDW-p2-adaptive",
       validationNote: "Aucune source disponible après filtrage",
-      performanceEvidenceStatus: cfg.performanceContext ? "insufficient" : "not_requested",
+      performanceEvidenceStatus: cfg.performanceContext || cfg.allowRobustUncalibratedModels ? "insufficient" : "not_requested",
     };
   }
 
@@ -762,16 +777,40 @@ export function computeFusion(
   // ── Step 3-8: Poids spatiaux communs pour stations + fusion numérique ───────
   const stationsOnly = candidates.filter(s => s.type === "station");
   const modelsOnly = candidates.filter(s => s.type !== "station");
-  const regularizedPerformance = cfg.performanceContext
-    ? regularizeModelPerformance(
-      modelsOnly.map((source) => source.performanceEvidence).filter((item): item is ModelPerformanceEvidence => item != null),
-      cfg.performanceContext,
+  const regularizedPerformanceById = new Map<string, RegularizedPerformance>();
+  const performanceGroups = new Map<string, { context: ModelPerformanceContext; sources: FusionSource[] }>();
+  const performanceContextFor = (source: FusionSource) => source.performanceContext ?? cfg.performanceContext;
+  for (const source of modelsOnly) {
+    const context = performanceContextFor(source);
+    const evidence = source.performanceEvidence;
+    if (!context || !evidence || getEvidenceIneligibilityReason(evidence, context, new Date(now)) != null
+      || evidence.serviceName !== source.name || (source.modelId != null && evidence.modelId !== source.modelId)) continue;
+    const key = [context.locationKey, context.variable, context.horizonBucket].join("\u001f");
+    const group = performanceGroups.get(key) ?? { context, sources: [] };
+    group.sources.push(source);
+    performanceGroups.set(key, group);
+  }
+  Array.from(performanceGroups.values()).forEach(({ context, sources: groupSources }) => {
+    const regularized = regularizeModelPerformance(
+      groupSources.map((source) => source.performanceEvidence!).filter((evidence): evidence is ModelPerformanceEvidence => evidence != null),
+      context,
       new Date(now),
-    )
-    : undefined;
+    );
+    for (const source of groupSources) {
+      const performance = regularized.get(source.name);
+      if (performance) regularizedPerformanceById.set(source.id, performance);
+    }
+  });
+  const robustFallbackById = cfg.allowRobustUncalibratedModels
+    ? calculateRobustFallbackMultipliers(modelsOnly.flatMap((source) => source.temperature != null && Number.isFinite(source.temperature)
+      ? [{ modelId: source.id, value: source.temperature }]
+      : []))
+    : new Map<string, number>();
+  const isModelPerformanceQualified = (source: FusionSource) => regularizedPerformanceById.has(source.id);
 
   function performanceMultiplier(source: FusionSource): number {
-    if (cfg.performanceContext) return regularizedPerformance?.get(source.name)?.performanceMultiplier ?? 0;
+    if (performanceContextFor(source)) return regularizedPerformanceById.get(source.id)?.performanceMultiplier ?? (cfg.allowRobustUncalibratedModels ? 1 : 0);
+    if (cfg.allowRobustUncalibratedModels) return 1;
     // A bare MAE has no sample size, location, variable, or horizon; never use it to alter a weight.
     return 1;
   }
@@ -791,32 +830,53 @@ export function computeFusion(
     const ageMin = source.updatedAt ? Math.max(0, (now - new Date(source.updatedAt).getTime()) / 60000) : 30;
     const distanceWeight = 1 / Math.pow(Math.max(0, source.distanceKm) + 0.1, cfg.idwExponent);
     // Exact production evidence already carries model performance; do not count a second, unrelated score.
-    const qualityWeight = cfg.performanceContext ? 1 : 0.5 + ((source.reliabilityScore ?? 50) / 100);
+    const qualityWeight = cfg.performanceContext || source.performanceContext || cfg.allowRobustUncalibratedModels
+      ? 1
+      : 0.5 + ((source.reliabilityScore ?? 50) / 100);
     const freshnessWeight = Math.exp(-ageMin / 60);
-    return distanceWeight * qualityWeight * freshnessWeight * performanceMultiplier(source) * (penalties.get(source.id) ?? 1);
+    const robustnessWeight = cfg.allowRobustUncalibratedModels && !isModelPerformanceQualified(source)
+      ? robustFallbackById.get(source.id) ?? 1
+      : 1;
+    return distanceWeight * qualityWeight * freshnessWeight * performanceMultiplier(source)
+      * robustnessWeight * (penalties.get(source.id) ?? 1);
   }
 
-  let performanceEvidenceStatus: FusionResult["performanceEvidenceStatus"] = cfg.performanceContext ? "insufficient" : "not_requested";
-  let modelWeights: Array<{ source: FusionSource; raw: number; finalWeight?: number }> = modelsOnly.map(source => ({ source, raw: computeModelRawWeight(source) }));
-  if (cfg.performanceContext && modelWeights.length > 0) {
+  const hasPerformanceContext = cfg.performanceContext != null || modelsOnly.some((source) => source.performanceContext != null);
+  let performanceEvidenceStatus: FusionResult["performanceEvidenceStatus"] = hasPerformanceContext || cfg.allowRobustUncalibratedModels
+    ? "insufficient"
+    : "not_requested";
+  let modelWeights: Array<{ source: FusionSource; raw: number; finalWeight?: number; robustnessWeight: number }> = modelsOnly.map(source => ({
+    source,
+    raw: computeModelRawWeight(source),
+    robustnessWeight: cfg.allowRobustUncalibratedModels && !isModelPerformanceQualified(source)
+      ? robustFallbackById.get(source.id) ?? 1
+      : 1,
+  }));
+  if ((hasPerformanceContext || cfg.allowRobustUncalibratedModels) && modelWeights.length > 0) {
     const modelBudget = stationsOnly.length > 0 ? cfg.modelWeightFraction : 1;
     const cappedByModel = normalizeModelWeightsWithCap(modelWeights.map(({ source, raw }) => ({
-      modelId: source.modelId ?? source.performanceEvidence!.modelId,
+      modelId: source.modelId ?? source.performanceEvidence?.modelId ?? source.id,
       rawWeight: raw,
     })), modelBudget, MODEL_FUSION_WEIGHT_CAP);
     if (cappedByModel) {
       const rawByModel = new Map<string, number>();
       for (const { source, raw } of modelWeights) {
-        const modelId = source.modelId ?? source.performanceEvidence!.modelId;
+        const modelId = source.modelId ?? source.performanceEvidence?.modelId ?? source.id;
         rawByModel.set(modelId, (rawByModel.get(modelId) ?? 0) + raw);
       }
       modelWeights = modelWeights.map(({ source, raw }) => {
-        const modelId = source.modelId ?? source.performanceEvidence!.modelId;
+        const modelId = source.modelId ?? source.performanceEvidence?.modelId ?? source.id;
         const groupRaw = rawByModel.get(modelId) ?? raw;
         const groupWeight = cappedByModel.get(modelId) ?? 0;
-        return { source, raw, finalWeight: groupRaw > 0 ? groupWeight * raw / groupRaw : 0 };
+        const robustnessWeight = cfg.allowRobustUncalibratedModels && !isModelPerformanceQualified(source)
+          ? robustFallbackById.get(source.id) ?? 1
+          : 1;
+        return { source, raw, robustnessWeight, finalWeight: groupRaw > 0 ? groupWeight * raw / groupRaw : 0 };
       });
-      performanceEvidenceStatus = "qualified";
+      const qualifiedCount = modelWeights.filter(({ source }) => isModelPerformanceQualified(source)).length;
+      performanceEvidenceStatus = qualifiedCount === modelWeights.length
+        ? "qualified"
+        : qualifiedCount > 0 ? "partially_qualified" : "insufficient";
     } else {
       for (const { source } of modelWeights) {
         excluded.push({ id: source.id, name: source.name, reason: `Preuve statistique insuffisante : il faut assez de modèles pour respecter le plafond individuel de ${Math.round(MODEL_FUSION_WEIGHT_CAP * 100)} %`, temperature: source.temperature ?? null });
@@ -831,11 +891,13 @@ export function computeFusion(
   const stationFraction = hasStations ? (hasModels ? 1 - cfg.modelWeightFraction : 1.0) : 0;
   const modelFraction = hasModels ? (hasStations ? cfg.modelWeightFraction : 1.0) : 0;
 
-  const allWeighted: { source: FusionSource; weight: number; distW: number; qualW: number; freshW: number; perfW: number; altAdj: number }[] = [];
+  const allWeighted: { source: FusionSource; weight: number; rawWeight: number; robustnessWeight: number; distW: number; qualW: number; freshW: number; perfW: number; altAdj: number }[] = [];
   stationSpatialWeights.forEach((spatial) => {
     allWeighted.push({
       source: spatial.source,
       weight: spatial.finalWeight * stationFraction,
+      rawWeight: spatial.finalWeight,
+      robustnessWeight: 1,
       distW: spatial.distanceWeight,
       qualW: spatial.qualityWeight,
       freshW: spatial.freshnessWeight,
@@ -843,12 +905,16 @@ export function computeFusion(
       altAdj: spatial.altitudeAdjustmentC,
     });
   });
-  modelWeights.forEach(({ source, raw, finalWeight }) => {
+  modelWeights.forEach(({ source, raw, finalWeight, robustnessWeight }) => {
     const ageMin = source.updatedAt ? Math.max(0, (now - new Date(source.updatedAt).getTime()) / 60000) : 30;
-    const qualityWeight = cfg.performanceContext ? 1 : 0.5 + ((source.reliabilityScore ?? 50) / 100);
+    const qualityWeight = cfg.performanceContext || source.performanceContext || cfg.allowRobustUncalibratedModels
+      ? 1
+      : 0.5 + ((source.reliabilityScore ?? 50) / 100);
     allWeighted.push({
       source,
       weight: finalWeight ?? (modelTotalRaw > 0 ? (raw / modelTotalRaw) * modelFraction : 0),
+      rawWeight: raw,
+      robustnessWeight,
       distW: 1 / Math.pow(Math.max(0, source.distanceKm) + 0.1, cfg.idwExponent),
       qualW: qualityWeight,
       freshW: Math.exp(-ageMin / 60),
@@ -930,17 +996,22 @@ export function computeFusion(
     // Average reliability
     avgReliability * 0.3
   )));
-  const guardedConfidenceScore = cfg.performanceContext && performanceEvidenceStatus !== "qualified" ? 0 : confidenceScore;
+  const guardedConfidenceScore = (cfg.performanceContext || cfg.allowRobustUncalibratedModels || modelsOnly.some((source) => source.performanceContext))
+    && performanceEvidenceStatus !== "qualified"
+    ? 0
+    : confidenceScore;
 
   // ── Build used sources list ──────────────────────────────────────────────────
-  const usedSources: UsedSource[] = allWeighted.map(({ source: s, weight, distW, qualW, freshW, perfW, altAdj }) => {
-    const performance = regularizedPerformance?.get(s.name);
+  const usedSources: UsedSource[] = allWeighted.map(({ source: s, weight, rawWeight, robustnessWeight, distW, qualW, freshW, perfW, altAdj }) => {
+    const performance = regularizedPerformanceById.get(s.id);
     return {
       id: s.id,
       name: s.name,
       type: s.type,
       distanceKm: s.distanceKm,
       finalWeight: Math.round(weight * 1_000_000_000) / 1_000_000_000,
+      rawWeight: Math.round(rawWeight * 1_000_000_000) / 1_000_000_000,
+      robustFallbackWeight: Math.round(robustnessWeight * 1_000_000) / 1_000_000,
       distanceWeight: Math.round(distW * 1000) / 1000,
       qualityWeight: Math.round(qualW * 1000) / 1000,
       freshnessWeight: Math.round(freshW * 1000) / 1000,
@@ -960,7 +1031,7 @@ export function computeFusion(
   const methodParts = [
     `spatial-core+IDW-p${cfg.idwExponent}`,
     cfg.adaptiveWeightingEnabled ? "adaptive" : "fixed",
-    performanceEvidenceStatus === "qualified" ? "statistically-qualified" : "",
+    performanceEvidenceStatus === "qualified" ? "statistically-qualified" : performanceEvidenceStatus === "partially_qualified" ? "partially-calibrated" : "",
     cfg.anomalyDetectionEnabled ? "anomaly-checked" : "",
     cfg.altitudeCorrectionEnabled ? "alt-corrected" : "",
   ].filter(Boolean).join("+");

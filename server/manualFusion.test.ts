@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
     "AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET", "Open-Meteo",
   ].map((name) => ({ name, modelId: name === "Open-Meteo" ? "best_match" : name.toLowerCase(), category: "expert" as const })),
   collectExpertForecasts: vi.fn(),
+  collectExpertForecastsWithDiagnostics: vi.fn(),
   collectOfficialHourlyForecast: vi.fn(),
   acquireForecastRefreshLock: vi.fn(),
   releaseForecastRefreshLock: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock("./weatherServices", () => ({
     .filter((service) => service.modelId !== "best_match")
     .map(({ name, modelId }) => ({ name, modelId })),
   collectExpertForecasts: mocks.collectExpertForecasts,
+  collectExpertForecastsWithDiagnostics: mocks.collectExpertForecastsWithDiagnostics,
 }));
 vi.mock("./officialHourlyForecast", () => ({
   OFFICIAL_HOURLY_MODEL_NAMES: ["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"],
@@ -70,9 +72,18 @@ const favorite = { id: 9, userId: 4, lat: 50.7567, lon: 2.5204, name: "Hondeghem
 const serviceNames = mocks.expertServices.map((service) => service.name);
 
 function dailyModels(names = serviceNames) {
+  const availableAt = Date.parse("2026-09-30T10:00:00.000Z");
+  const validTime = Date.parse("2026-09-30T22:00:00.000Z");
   return names.map((serviceName) => ({
     serviceName,
     serviceCategory: "expert" as const,
+    modelId: mocks.expertServices.find((service) => service.name === serviceName)?.modelId ?? null,
+    sourceName: "open-meteo",
+    runId: `${serviceName}-capture-20260930T1000Z`,
+    runIdKind: "capture" as const,
+    requestStartedAt: availableAt - 30_000,
+    availableAt,
+    validTime,
     tempMax: 23,
     tempMin: 12,
     precipitation: 0.4,
@@ -141,6 +152,7 @@ beforeEach(() => {
   mocks.storedHourlyRows = [];
   mocks.failingHourlyModels.clear();
   mocks.collectExpertForecasts.mockResolvedValue(dailyModels());
+  mocks.collectExpertForecastsWithDiagnostics.mockResolvedValue({ forecasts: dailyModels(), availabilityReasonByModel: {} });
   mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: hourlyModels(), hours: displayHours(), weighting: unavailableWeighting });
   mocks.acquireForecastRefreshLock.mockResolvedValue(true);
   mocks.releaseForecastRefreshLock.mockResolvedValue(undefined);
@@ -188,8 +200,8 @@ describe("relance manuelle des prévisions", () => {
     expect(result.hourly).toMatchObject({ status: "succeeded", modelCount: 7, expectedModelCount: 7 });
     expect(result.daily.updatedAt).toBeTruthy();
     expect(result.hourly.updatedAt).toBeTruthy();
-    expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
-    expect(mocks.collectExpertForecasts).toHaveBeenCalledWith("2026-09-30", { lat: favorite.lat, lon: favorite.lon });
+    expect(mocks.collectExpertForecastsWithDiagnostics).toHaveBeenCalledTimes(1);
+    expect(mocks.collectExpertForecastsWithDiagnostics).toHaveBeenCalledWith("2026-09-30", { lat: favorite.lat, lon: favorite.lon });
     expect(mocks.collectOfficialHourlyForecast).toHaveBeenCalledWith("2026-09-30", { lat: favorite.lat, lon: favorite.lon });
     expect(mocks.insertForecasts).toHaveBeenCalledTimes(1);
     expect(mocks.insertForecastRuns).toHaveBeenCalledTimes(1);
@@ -209,13 +221,14 @@ describe("relance manuelle des prévisions", () => {
       displayHours(),
       expect.any(Date),
       unavailableWeighting,
+      "Relance manuelle demandée explicitement; série recalculée par le moteur officiel avec les seuls runs horaires disponibles.",
     );
     expect(mocks.acquireForecastRefreshLock).toHaveBeenCalledWith("forecast-location:50.757_2.52", expect.any(String));
     expect(mocks.releaseForecastRefreshLock).toHaveBeenCalledWith("forecast-location:50.757_2.52", expect.any(String));
 
     const repeated = await refreshManualFusionForFavorite(favorite);
     expect(repeated.status).toBe("cooldown");
-    expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
+    expect(mocks.collectExpertForecastsWithDiagnostics).toHaveBeenCalledTimes(1);
     expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(7);
   });
 
@@ -243,7 +256,7 @@ describe("relance manuelle des prévisions", () => {
   });
 
   it("rapporte un succès partiel sans horodatage pour la granularité échouée", async () => {
-    mocks.collectExpertForecasts.mockResolvedValue([]);
+    mocks.collectExpertForecastsWithDiagnostics.mockResolvedValue({ forecasts: [], availabilityReasonByModel: {} });
     mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: hourlyModels(), hours: displayHours(), weighting: unavailableWeighting });
 
     const result = await refreshManualFusionForFavorite(favorite);
@@ -258,7 +271,7 @@ describe("relance manuelle des prévisions", () => {
   });
 
   it("rapporte un échec global sans horodatage récent quand aucune granularité ne s’enregistre", async () => {
-    mocks.collectExpertForecasts.mockResolvedValue([]);
+    mocks.collectExpertForecastsWithDiagnostics.mockResolvedValue({ forecasts: [], availabilityReasonByModel: {} });
     mocks.collectOfficialHourlyForecast.mockResolvedValue({ modelForecasts: [], hours: [], weighting: unavailableWeighting });
 
     const result = await refreshManualFusionForFavorite(favorite);
@@ -272,17 +285,17 @@ describe("relance manuelle des prévisions", () => {
   });
 
   it("ne lance pas de seconde collecte concurrente pour le même lieu", async () => {
-    let releaseDaily!: (rows: ReturnType<typeof dailyModels>) => void;
-    mocks.collectExpertForecasts.mockImplementationOnce(() => new Promise((resolve) => { releaseDaily = resolve; }));
+    let releaseDaily!: (result: { forecasts: ReturnType<typeof dailyModels>; availabilityReasonByModel: Record<string, string> }) => void;
+    mocks.collectExpertForecastsWithDiagnostics.mockImplementationOnce(() => new Promise((resolve) => { releaseDaily = resolve; }));
 
     const firstRun = refreshManualFusionForFavorite(favorite);
     await new Promise((resolve) => setTimeout(resolve, 0));
     const concurrentRun = await refreshManualFusionForFavorite(favorite);
     expect(concurrentRun.status).toBe("in_progress");
-    expect(mocks.collectExpertForecasts).toHaveBeenCalledTimes(1);
+    expect(mocks.collectExpertForecastsWithDiagnostics).toHaveBeenCalledTimes(1);
     expect(mocks.collectOfficialHourlyForecast).toHaveBeenCalledTimes(1);
 
-    releaseDaily(dailyModels());
+    releaseDaily({ forecasts: dailyModels(), availabilityReasonByModel: {} });
     const completed = await firstRun;
     expect(completed.status).toBe("refreshed");
     expect(mocks.insertHourlyForecasts).toHaveBeenCalledTimes(7);
@@ -294,7 +307,7 @@ describe("relance manuelle des prévisions", () => {
     const result = await refreshManualFusionForFavorite(favorite);
 
     expect(result.status).toBe("in_progress");
-    expect(mocks.collectExpertForecasts).not.toHaveBeenCalled();
+    expect(mocks.collectExpertForecastsWithDiagnostics).not.toHaveBeenCalled();
     expect(mocks.collectOfficialHourlyForecast).not.toHaveBeenCalled();
     expect(mocks.releaseForecastRefreshLock).not.toHaveBeenCalled();
   });

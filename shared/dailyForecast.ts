@@ -6,28 +6,37 @@ export type DailyForecastMetric =
   | "wind_gust_max";
 
 export type DailyForecastHorizon = "0-6h" | "6-24h" | "1-3d" | "4-7d" | "8-15d";
-export type DailyForecastEvidenceStatus =
-  | "calibrated"
-  | "insufficient_data"
-  | "schema_unavailable";
+export type DailyForecastCalibrationStatus =
+  | "CALIBRATED"
+  | "PARTIALLY_CALIBRATED"
+  | "UNCALIBRATED_ROBUST"
+  | "UNAVAILABLE";
+export type DailyFusionAvailabilityStatus = "FUSED" | "SINGLE_MODEL" | "UNAVAILABLE";
+export type DailyFusionCoverageLevel = "NONE" | "SINGLE_MODEL" | "LIMITED" | "MODERATE" | "BROAD";
+export type DailyFusionVariable = DailyForecastMetric | "humidity" | "cloud_cover";
 
-export type DailyFusionDiagnosticStatus =
-  | "calibrated"
-  | "no_model_values"
-  | "insufficient_evidence"
-  | "weight_cap_blocked"
-  | "evidence_store_unavailable"
-  | "horizon_unavailable"
-  | "no_rain_contributors";
+/** Legacy name retained as a type alias; it describes historical qualification only. */
+export type DailyForecastEvidenceStatus = DailyForecastCalibrationStatus;
+export type DailyFusionDiagnosticStatus = DailyFusionAvailabilityStatus;
 
 export type DailyFusionModelReason = {
   modelName: string;
   reason: string;
+  sourceName?: string | null;
+  modelId?: string | null;
+  runId?: string | null;
+  availableAt?: number | null;
+  validTime?: number | null;
+  horizonMinutes?: number | null;
+  horizonBucket?: DailyForecastHorizon | null;
 };
 
-/** Counts describe value coverage and actual engine eligibility, never reliability. */
+/** Counts describe availability and actual contributions, never source skill. */
 export type DailyFusionMetricDiagnostic = {
-  status: DailyFusionDiagnosticStatus;
+  status: DailyFusionAvailabilityStatus;
+  availabilityStatus: DailyFusionAvailabilityStatus;
+  calibrationStatus: DailyForecastCalibrationStatus;
+  coverageLevel: DailyFusionCoverageLevel;
   expectedModelCount: number;
   availableValueModelCount: number;
   evidenceEligibleModelCount: number;
@@ -35,14 +44,24 @@ export type DailyFusionMetricDiagnostic = {
   availableModels: string[];
   evidenceEligibleModels: string[];
   modelReasons: DailyFusionModelReason[];
+  calibrationReasons: DailyFusionModelReason[];
   reason: string;
 };
 
 export type DailyForecastSourceDiagnostic = {
   modelName: string;
-  variable: DailyForecastMetric;
-  horizonBucket: DailyForecastHorizon;
+  variable: DailyFusionVariable;
+  horizonBucket: DailyForecastHorizon | null;
+  sourceName: string | null;
+  modelId: string | null;
+  runId: string | null;
+  availableAt: number | null;
+  validTime: number | null;
+  horizonMinutes: number | null;
+  calibrationStatus: DailyForecastCalibrationStatus;
   finalWeight: number;
+  rawWeight: number | null;
+  robustFallbackWeight: number | null;
   /** Signed forecast-minus-observation error; diagnostic only. */
   signedBias: number | null;
   sampleSize: number | null;
@@ -53,13 +72,25 @@ export type DailyForecastSourceDiagnostic = {
 
 export type DailyOfficialFusionDisplay = {
   issuedAt: string;
+  referenceAt: string;
   horizonBucket: DailyForecastHorizon | null;
+  availabilityStatus: {
+    tempMax: DailyFusionAvailabilityStatus;
+    tempMin: DailyFusionAvailabilityStatus;
+    precipitation: DailyFusionAvailabilityStatus;
+    windSpeed: DailyFusionAvailabilityStatus;
+    windGust: DailyFusionAvailabilityStatus;
+    humidity: DailyFusionAvailabilityStatus;
+    cloudCover: DailyFusionAvailabilityStatus;
+  };
   calibrationStatus: {
-    tempMax: DailyForecastEvidenceStatus;
-    tempMin: DailyForecastEvidenceStatus;
-    precipitation: DailyForecastEvidenceStatus;
-    windSpeed: DailyForecastEvidenceStatus;
-    windGust: DailyForecastEvidenceStatus;
+    tempMax: DailyForecastCalibrationStatus;
+    tempMin: DailyForecastCalibrationStatus;
+    precipitation: DailyForecastCalibrationStatus;
+    windSpeed: DailyForecastCalibrationStatus;
+    windGust: DailyForecastCalibrationStatus;
+    humidity: DailyForecastCalibrationStatus;
+    cloudCover: DailyForecastCalibrationStatus;
   };
   sourcesByVariable: {
     tempMax: DailyForecastSourceDiagnostic[];
@@ -67,6 +98,8 @@ export type DailyOfficialFusionDisplay = {
     precipitation: DailyForecastSourceDiagnostic[];
     windSpeed: DailyForecastSourceDiagnostic[];
     windGust: DailyForecastSourceDiagnostic[];
+    humidity: DailyForecastSourceDiagnostic[];
+    cloudCover: DailyForecastSourceDiagnostic[];
   };
   diagnosticsByVariable?: {
     tempMax: DailyFusionMetricDiagnostic;
@@ -74,10 +107,12 @@ export type DailyOfficialFusionDisplay = {
     precipitation: DailyFusionMetricDiagnostic;
     windSpeed: DailyFusionMetricDiagnostic;
     windGust: DailyFusionMetricDiagnostic;
+    humidity: DailyFusionMetricDiagnostic;
+    cloudCover: DailyFusionMetricDiagnostic;
   };
 };
 
-/** Best Match is retained as a separate derived reference, never a fusion input. */
+/** Best Match remains a separately labelled comparator, never an official fusion input. */
 export type BestMatchDailyReference = {
   source: "Open-Meteo Best Match";
   role: "derived_reference";

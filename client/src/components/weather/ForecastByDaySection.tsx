@@ -276,21 +276,35 @@ function buildHourlyDetailCategories(
 }
 
 function evidenceStatusLabel(status: DailyForecastEvidenceStatus): string {
-  if (status === "calibrated") return "preuve historique qualifiée";
-  if (status === "schema_unavailable") return "indisponible · archive de comparaisons indisponible";
-  return "indisponible · preuves qualifiées insuffisantes";
+  if (status === "CALIBRATED") return "preuves historiques qualifiées";
+  if (status === "PARTIALLY_CALIBRATED") return "calibration historique partielle";
+  if (status === "UNCALIBRATED_ROBUST") return "valeurs disponibles · pondération robuste non calibrée";
+  return "aucune valeur disponible pour la calibration historique";
 }
 
 function diagnosticStatusLabel(diagnostic: DailyFusionMetricDiagnostic): string {
-  switch (diagnostic.status) {
-    case "calibrated": return "fusion produite avec preuves exactes";
-    case "no_model_values": return "aucune valeur de modèle disponible à cette échéance";
-    case "insufficient_evidence": return "valeurs présentes, preuves historiques qualifiées insuffisantes";
-    case "weight_cap_blocked": return "preuves admissibles, fusion bloquée par le plafond des poids";
-    case "evidence_store_unavailable": return "archive des preuves historiques indisponible";
-    case "horizon_unavailable": return "tranche d’horizon exacte indisponible";
-    case "no_rain_contributors": return "aucun modèle au seuil utilisé pour la quantité de pluie";
-  }
+  if (diagnostic.availabilityStatus === "UNAVAILABLE") return "aucune valeur admissible reçue pour cette variable et cette validTime";
+  if (diagnostic.availabilityStatus === "SINGLE_MODEL") return diagnostic.calibrationStatus === "CALIBRATED"
+    ? "prévision single-model · preuve historique qualifiée"
+    : "prévision single-model · valeur conservée avec calibration robuste non qualifiée";
+  if (diagnostic.calibrationStatus === "CALIBRATED") return "fusion des modèles disponibles · preuves historiques qualifiées";
+  if (diagnostic.calibrationStatus === "PARTIALLY_CALIBRATED") return "fusion des valeurs disponibles · calibration partielle et repli robuste";
+  return "fusion robuste des valeurs disponibles · non calibrée historiquement";
+}
+
+function sourceAvailabilityTime(value: number | null): string {
+  return value == null ? "heure indisponible" : new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris",
+  }).format(value);
+}
+
+function sourceTraceDescription(source: DailyForecastSourceDiagnostic): string {
+  const raw = source.rawWeight == null ? "poids brut indisponible" : `brut ${source.rawWeight.toFixed(3)}`;
+  const fallback = source.robustFallbackWeight == null ? "" : ` · facteur robuste ${source.robustFallbackWeight.toFixed(3)}`;
+  const horizon = source.horizonBucket ?? "horizon non classé";
+  const run = source.runId ? ` · run ${source.runId}` : "";
+  const evidence = source.comparisonCount == null ? "preuve non qualifiée" : `${source.comparisonCount} comparaisons / ${source.evaluatedDays ?? "?"} jours`;
+  return `${source.modelName} · ${source.calibrationStatus} · poids final ${(source.finalWeight * 100).toFixed(1)} % (${raw}${fallback}) · disponible ${sourceAvailabilityTime(source.availableAt)} · validTime ${source.validTime == null ? "indisponible" : new Date(source.validTime).toISOString()} · ${horizon} · ${evidence}${run}`;
 }
 
 function biasDescription(source: DailyForecastSourceDiagnostic, unit: string): string {
@@ -323,19 +337,18 @@ function DailyFusionDiagnostics({ day, sourceLabels }: { day: DailyForecastPoint
   const reference = day.bestMatchReference;
   return (
     <div className="space-y-2 pb-3 leading-relaxed">
-      <p>Les poids utilisent uniquement des preuves historiques qualifiées pour le lieu, le modèle, la variable et la tranche d’horizon indiqués. Aucun biais n’est appliqué aux valeurs futures.</p>
+      <p>Availability → sélection par variable/validTime/horizon/run → fiabilité historique exacte si qualifiée → pondération robuste sinon → renormalisation → fusion. Chaque valeur admissible reste utilisable même sans preuve suffisante; aucun biais historique n’est appliqué aux valeurs futures.</p>
       <p>Émission de collecte : {fusion.issuedAt} · horizon : {fusion.horizonBucket ?? "indisponible"}.</p>
       <div className="space-y-1">
         {variables.map(({ label, key, status, unit }) => {
           const sources = fusion.sourcesByVariable[key];
           const diagnostic = fusion.diagnosticsByVariable?.[key];
           return <div key={key} className="space-y-1">
-            <p><strong className="text-slate-100">{label} :</strong> {diagnostic ? diagnosticStatusLabel(diagnostic) : evidenceStatusLabel(status)}{sources.length > 0 ? ` · ${sources.map((source) => `${source.modelName} (${(source.finalWeight * 100).toFixed(1)} %)`).join(", ")}` : ""}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>
+            <p><strong className="text-slate-100">{label} :</strong> {diagnostic ? diagnosticStatusLabel(diagnostic) : evidenceStatusLabel(status)}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map(sourceTraceDescription).join("; ")}</span>}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>
             {diagnostic && <div className="pl-2 text-slate-400">
-              <p>Valeurs présentes : {diagnostic.availableValueModelCount}/{diagnostic.expectedModelCount} · preuves admissibles avant plafond : {diagnostic.evidenceEligibleModelCount} · contributeurs effectifs : {diagnostic.contributingModelCount}.</p>
+              <p>Valeurs réellement disponibles : {diagnostic.availableValueModelCount} · preuves historiques qualifiées : {diagnostic.evidenceEligibleModelCount} · contributeurs effectifs : {diagnostic.contributingModelCount}. Catalogue de référence : {diagnostic.expectedModelCount} modèles; les absences hors portée ne sont pas des échecs et sont exclues des dénominateurs de scoring.</p>
               <p>{diagnostic.reason}</p>
               {diagnostic.availableModels.length > 0 && <p>Modèles avec valeur : {diagnostic.availableModels.join(", ")}.</p>}
-              {diagnostic.evidenceEligibleModels.length > 0 && diagnostic.status === "weight_cap_blocked" && <p>Modèles admissibles avant plafond : {diagnostic.evidenceEligibleModels.join(", ")}.</p>}
               {diagnostic.modelReasons.length > 0 && <details className="mt-1">
                 <summary className="cursor-pointer text-sky-100">Motif par modèle ({diagnostic.modelReasons.length})</summary>
                 <ul className="list-inside list-disc pl-1">{diagnostic.modelReasons.map(({ modelName, reason: modelReason }) => <li key={`${key}-${modelName}`}>{modelName} — {modelReason}</li>)}</ul>
@@ -432,7 +445,7 @@ function DayDetailsAccordion({ category }: { category: DetailCategory }) {
         <span aria-hidden="true" className="ml-1 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
       </summary>
       <div className="pb-4 pl-14 pr-1">
-        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne issue de la fusion officielle lorsque sa preuve est qualifiée; champs non pondérés indisponibles."}</p>
+        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne issue de la fusion officielle; pondération historique si la preuve est qualifiée, sinon repli robuste non calibré."}</p>
         {category.cadence === "hourly" ? <HourlyMiniChart category={category} /> : (
           <dl className="space-y-1 text-sm text-slate-100">
             {category.rows.map((row) => <div key={row.key} className="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt className="text-slate-400">{row.time}</dt><dd className="text-right font-medium tabular-nums">{row.value}</dd></div>)}

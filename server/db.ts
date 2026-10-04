@@ -1305,14 +1305,18 @@ export async function getDailyPhysicalComparisonHistory(
 export async function getDailyFusionPerformanceEvidence(
   locationKey: string,
   targetDate: string,
-  issuedAt: number,
-): Promise<{ available: boolean; evidence: ModelPerformanceEvidence[]; horizonBucket: DailyFusionHorizon | null }> {
+  availableAtByModel: readonly number[],
+): Promise<{ available: boolean; evidence: ModelPerformanceEvidence[]; horizonBucket: DailyFusionHorizon | null; horizonBuckets: DailyFusionHorizon[] }> {
   const db = await getDb();
-  if (!db) return { available: false, evidence: [], horizonBucket: null };
-  const horizon = getDailyForecastHorizon(issuedAt, targetDate);
-  if (!horizon) return { available: true, evidence: [], horizonBucket: null };
+  if (!db) return { available: false, evidence: [], horizonBucket: null, horizonBuckets: [] };
+  const horizonBuckets = Array.from(new Set(availableAtByModel.flatMap((availableAt) => {
+    if (!Number.isFinite(availableAt)) return [];
+    const horizon = getDailyForecastHorizon(availableAt, targetDate);
+    return horizon ? [horizon.bucket] : [];
+  })));
+  if (horizonBuckets.length === 0) return { available: true, evidence: [], horizonBucket: null, horizonBuckets: [] };
   const from = new Date(`${targetDate}T12:00:00.000Z`);
-  if (Number.isNaN(from.getTime())) return { available: false, evidence: [], horizonBucket: null };
+  if (Number.isNaN(from.getTime())) return { available: false, evidence: [], horizonBucket: null, horizonBuckets };
   from.setUTCDate(from.getUTCDate() - 120);
   const fromDate = from.toISOString().slice(0, 10);
   try {
@@ -1320,7 +1324,7 @@ export async function getDailyFusionPerformanceEvidence(
       eq(dailyForecastObservationComparisons.locationKey, locationKey),
       gte(dailyForecastObservationComparisons.validDate, fromDate),
       lt(dailyForecastObservationComparisons.validDate, targetDate),
-      eq(dailyForecastObservationComparisons.horizonBucket, horizon.bucket),
+      inArray(dailyForecastObservationComparisons.horizonBucket, horizonBuckets),
       eq(dailyForecastObservationComparisons.evidenceType, "physical_observation"),
       eq(dailyForecastObservationComparisons.observationIsQualified, 1),
       isNotNull(dailyForecastObservationComparisons.forecastAvailableAt),
@@ -1328,11 +1332,16 @@ export async function getDailyFusionPerformanceEvidence(
       isNotNull(dailyForecastObservationComparisons.observationWindowEndAt),
       lt(dailyForecastObservationComparisons.forecastAvailableAt, dailyForecastObservationComparisons.observationWindowStartAt),
     ));
-    return { available: true, evidence: aggregateDailyForecastPerformance(rows), horizonBucket: horizon.bucket };
+    return {
+      available: true,
+      evidence: aggregateDailyForecastPerformance(rows),
+      horizonBucket: horizonBuckets.length === 1 ? horizonBuckets[0]! : null,
+      horizonBuckets,
+    };
   } catch (error) {
     if (!isDailyComparisonTableUnavailable(error)) throw error;
     warnDailyComparisonTableUnavailable();
-    return { available: false, evidence: [], horizonBucket: horizon.bucket };
+    return { available: false, evidence: [], horizonBucket: horizonBuckets.length === 1 ? horizonBuckets[0]! : null, horizonBuckets };
   }
 }
 

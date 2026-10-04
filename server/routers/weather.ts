@@ -945,9 +945,10 @@ export const weatherRouter = router({
       const targetDate = input.date || getTodayParis();
 
       if (input.type === "forecast") {
-        const { HONDEGHEM } = await import("../weatherServices");
+        const { HONDEGHEM, collectExpertForecastsWithDiagnostics } = await import("../weatherServices");
         const locationKey = makeLocationKey(HONDEGHEM.lat, HONDEGHEM.lon);
-        const expertData = await collectExpertForecasts(targetDate);
+        const dailyCollection = await collectExpertForecastsWithDiagnostics(targetDate);
+        const expertData = dailyCollection.forecasts;
         const forecastRows = expertData.map((f) => ({
           locationKey,
           date: targetDate,
@@ -967,26 +968,17 @@ export const weatherRouter = router({
         const issuedAt = Date.now();
 
         // Compute MeteoAI
-        const allForecasts = await getForecastsByDate(targetDate, locationKey);
-        const rawForecasts = allForecasts.map((forecast) => ({
-          serviceName: forecast.serviceName,
-          tempMax: forecast.tempMax,
-          tempMin: forecast.tempMin,
-          precipitation: forecast.precipitation,
-          windSpeed: forecast.windSpeed,
-          windGust: forecast.windGust,
-          humidity: forecast.humidity ?? null,
-          cloudCover: forecast.cloudCover ?? null,
-        }));
-
         await insertForecastRuns(buildForecastRunArchiveRows(expertData, locationKey, targetDate, issuedAt));
-        const fusionEvidence = await getDailyFusionPerformanceEvidence(locationKey, targetDate, issuedAt);
-        const meteoAI = computeOfficialDailyForecast(rawForecasts, {
+        const officialRuns = expertData.filter((forecast) => forecast.serviceName !== "Best Match");
+        const fusionEvidence = await getDailyFusionPerformanceEvidence(locationKey, targetDate, officialRuns.flatMap((forecast) => forecast.availableAt == null ? [] : [forecast.availableAt]));
+        const meteoAI = computeOfficialDailyForecast(expertData, {
           locationKey,
           targetDate,
           issuedAt,
+          referenceAt: issuedAt,
           evidenceStoreAvailable: fusionEvidence.available,
           evidence: fusionEvidence.evidence,
+          availabilityReasonByModel: dailyCollection.availabilityReasonByModel,
         });
         const condition = null;
 
@@ -998,11 +990,11 @@ export const weatherRouter = router({
           precipitation: meteoAI.precipitation,
           windSpeed: meteoAI.windSpeed,
           condition,
-          stabilityLabel: legacyStabilityLabelForStorage(allForecasts),
+          stabilityLabel: legacyStabilityLabelForStorage(expertData),
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation: meteoAI.coreCalibrationComplete
             ? "Prévision calibrée à partir de preuves physiques récentes par modèle, variable et horizon."
-            : `${meteoAI.methodNote} Les valeurs officielles restent indisponibles jusqu’à qualification de preuves suffisantes.`,
+            : `${meteoAI.methodNote} Les valeurs réellement disponibles restent publiées avec leur statut robuste ou partiellement calibré; seule une absence de donnée bloque un champ.`,
         });
         const fusionAvailableAt = Date.now();
         const fusionArchive = buildMeteoAIDailyFusionArchiveRun({

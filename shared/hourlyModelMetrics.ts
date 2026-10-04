@@ -1,5 +1,14 @@
 import type { PrecipitationModelConsensus } from "./precipitationConsensus";
 
+export type ManualHourlyOverride = {
+  source: "manual_refresh";
+  reason: string;
+  computedAt: string;
+  officialOriginalComputedAt: string;
+  officialOriginalPreserved: true;
+  officialOriginalPointCount: number;
+};
+
 export type HourlyHistoricalEvidenceStatus =
   | "qualified"
   | "insufficient_evidence"
@@ -46,8 +55,9 @@ export type HourlyHistoricalEvidence = {
 
 /**
  * Descriptive summaries of the seven independent hourly forecast models.
- * Null means no valid observations (or no qualified historical weights for an
- * official weighted value); zero is always a valid meteorological value.
+ * Null means no admissible value exists at the exact validTime; missing
+ * historical evidence affects calibration status, never physical availability.
+ * Zero is always a valid meteorological value.
  */
 export type HourlyModelSummary = {
   min: number | null;
@@ -72,10 +82,14 @@ export type HourlyMultiModelMetrics = {
   /** This object is emitted only by the official seven-model hourly engine. */
   source: "official_seven_models";
   bestMatchIncluded: false;
+  /** Models that supplied at least one eligible value at this validTime. */
   expectedModelCount: number;
   modelsExpected: readonly string[];
+  /** Static catalogue, context only; not a performance-scoring denominator. */
+  configuredModelCount: number;
+  modelsConfigured: readonly string[];
   temperature: HourlyModelSummary & {
-    /** Historical-skill weighted official forecast; null without qualified weights. */
+    /** Official historical-skill or robust-fallback forecast; null only without an admissible value. */
     weightedMean: number | null;
     modelsWithData: readonly string[];
     minModel: string | null;

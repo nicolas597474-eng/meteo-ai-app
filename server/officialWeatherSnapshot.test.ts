@@ -117,11 +117,20 @@ describe("buildOfficialWeatherSnapshot", () => {
     const refreshed = mergeManualHourlyForecast(snapshot, [
       { date: "2026-08-12", hour: "14:00", validAt: Date.parse("2026-08-12T12:00:00.000Z"), temp: 99, apparentTemp: 99, precipitation: 1, windSpeed: 99, windGust: 99, windDirection: 0, cloudCover: 99, humidity: 99, uvIndex: 0, condition: "Pluie" },
       { date: "2026-08-12", hour: "15:00", validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 25.2, apparentTemp: 25.2, precipitation: 0.1, windSpeed: 11, windGust: 14, windDirection: 190, cloudCover: 20, humidity: 45, uvIndex: 5, condition: "Nuageux" },
-    ], refreshedAt);
+    ], refreshedAt, undefined, "Rafraîchissement manuel demandé explicitement.");
 
     expect(refreshed.currentSnapshot).toEqual(snapshot.currentSnapshot);
     expect(refreshed.computedAt).toBe(snapshot.computedAt);
     expect(refreshed.hourlyComputedAt).toBe(refreshedAt.toISOString());
+    expect(refreshed.officialHourlyOriginal).toEqual(snapshot.hourly);
+    expect(refreshed.hourlyOverride).toMatchObject({
+      source: "manual_refresh",
+      reason: "Rafraîchissement manuel demandé explicitement.",
+      officialOriginalComputedAt: snapshot.hourlyComputedAt,
+      officialOriginalPreserved: true,
+      officialOriginalPointCount: snapshot.hourly.length,
+    });
+    expect(refreshed.hourlyWeighting.manualOverride).toEqual(refreshed.hourlyOverride);
     expect(refreshed.hourly.find((hour) => hour.validAt === Date.parse("2026-08-12T12:00:00.000Z"))?.temp).toBe(99);
     expect(refreshed.hourly.find((hour) => hour.validAt === Date.parse("2026-08-12T13:00:00.000Z"))?.temp).toBe(25.2);
   });

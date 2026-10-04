@@ -7,6 +7,9 @@ import { randomUUID } from "node:crypto";
 import { conditionFromWmoWeatherCode } from "./weatherConditionLabels";
 import { fetchWeather, getWeatherResponseAttemptCount } from "./weatherFetch";
 import { getParisDateAndHour } from "./parisHourlyTime";
+import { getDailyForecastValidTime } from "./dailyForecastVerification";
+import { OFFICIAL_HOURLY_MODELS } from "./officialModels";
+export { OFFICIAL_HOURLY_MODELS } from "./officialModels";
 import type { HourlyHistoricalEvidence, HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
 import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
@@ -42,17 +45,6 @@ export const WEATHER_SERVICES = {
   inactivePublicCatalogue: ["Meteoblue", "AccuWeather", "Apple Weather", "Weather.com", "Ventusky", "Weatherbit", "World Weather Online", "La Chaîne Météo"] as const,
 };
 
-/** Les seules séries admises dans la prévision horaire officielle. */
-export const OFFICIAL_HOURLY_MODELS = [
-  { name: "AROME", modelId: "meteofrance_arome_france_hd" },
-  { name: "ARPEGE", modelId: "meteofrance_arpege_europe" },
-  { name: "ICON", modelId: "dwd_icon_eu" },
-  { name: "ECMWF", modelId: "ecmwf_ifs025" },
-  { name: "GFS", modelId: "gfs_seamless" },
-  { name: "GEM", modelId: "gem_seamless" },
-  { name: "UKMET", modelId: "ukmo_seamless" },
-] as const;
-
 /** Modèles observés séparément avant toute éventuelle qualification. */
 export const VALIDATION_WEATHER_MODELS = [
   { name: "DMI HARMONIE-DINI", modelId: "dmi_seamless", family: "harmonie" as const },
@@ -65,6 +57,14 @@ export const VALIDATION_WEATHER_MODELS = [
 export type ForecastData = {
   serviceName: string;
   serviceCategory: "public" | "expert";
+  modelId?: string | null;
+  sourceName?: string | null;
+  runId?: string | null;
+  runIdKind?: "capture" | "provider" | "unknown";
+  requestStartedAt?: number | null;
+  availableAt?: number | null;
+  validTime?: number | null;
+  qualityStatus?: "qualified" | "rejected" | "unknown";
   tempMax: number | null;
   tempMin: number | null;
   precipitation: number | null;
@@ -79,7 +79,8 @@ export type ForecastData = {
 export type DailyFusionResolver = (
   targetDate: string,
   forecasts: ForecastData[],
-  issuedAt: number,
+  referenceAt: number,
+  availabilityReasonByModel?: Readonly<Record<string, string>>,
 ) => Promise<ReturnType<typeof computeOfficialDailyForecastWithDiagnostics>>;
 
 export type Collect15DayForecastOptions = {
@@ -108,7 +109,7 @@ export type ValidationForecastData = ForecastData & {
 export async function collectExpertForecastsWithDiagnostics(
   targetDate: string,
   coords?: { lat: number; lon: number },
-): Promise<{ forecasts: ForecastData[]; diagnostics: DailyModelCollectionCoverage[] }> {
+): Promise<{ forecasts: ForecastData[]; diagnostics: DailyModelCollectionCoverage[]; availabilityReasonByModel: Record<string, string> }> {
   const location = coords ?? HONDEGHEM;
   const outcomes = await Promise.all(WEATHER_SERVICES.expert.map(async (service) => {
     const base = {
@@ -119,6 +120,8 @@ export async function collectExpertForecastsWithDiagnostics(
       targetDate,
     };
     try {
+      const requestStartedAt = Date.now();
+      const runId = randomUUID();
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
@@ -138,6 +141,7 @@ export async function collectExpertForecastsWithDiagnostics(
       }
 
       const data = await response.json();
+      const availableAt = Date.now();
       const daily = data && typeof data === "object" && "daily" in data && data.daily && typeof data.daily === "object"
         ? data.daily as Record<string, unknown>
         : null;
@@ -159,6 +163,14 @@ export async function collectExpertForecastsWithDiagnostics(
       const forecast: ForecastData | null = dateIndex < 0 ? null : {
         serviceName: service.name,
         serviceCategory: service.category,
+        modelId: service.modelId,
+        sourceName: "open-meteo",
+        runId,
+        runIdKind: "capture",
+        requestStartedAt,
+        availableAt,
+        validTime: getDailyForecastValidTime(targetDate),
+        qualityStatus: "unknown",
         tempMax: finiteCoverageValue(rawAtDate("temperature_2m_max")),
         tempMin: finiteCoverageValue(rawAtDate("temperature_2m_min")),
         precipitation: finiteCoverageValue(rawAtDate("precipitation_sum")),
@@ -208,6 +220,19 @@ export async function collectExpertForecastsWithDiagnostics(
   return {
     forecasts: outcomes.flatMap((outcome) => outcome.forecast ? [outcome.forecast] : []),
     diagnostics: outcomes.map((outcome) => outcome.diagnostic),
+    availabilityReasonByModel: outcomes.reduce<Record<string, string>>((reasons, outcome) => {
+      const diagnostic = outcome.diagnostic;
+      if (outcome.forecast) return reasons;
+      const reason = diagnostic.errorCode === "target_date_out_of_horizon"
+        ? "Échéance absente de la portée normale du modèle; absence physique non scorable et non pénalisante."
+        : diagnostic.errorCode === "target_date_no_usable_data"
+          ? "Le run existe, mais aucune valeur utilisable n’est renvoyée pour cette variable à cette échéance."
+          : diagnostic.errorCode === "no_usable_data"
+            ? "Le provider n’a renvoyé aucune valeur exploitable pour ce run."
+            : `Run indisponible à la collecte (${diagnostic.errorCode ?? diagnostic.status}).`;
+      reasons[diagnostic.modelName] = reason;
+      return reasons;
+    }, {}),
   };
 }
 
@@ -350,22 +375,63 @@ export type HourlyWeightingUnavailableReason =
   | "no_wet_models"
   | "no_model_data";
 
+export type HourlyCalibrationStatus = "CALIBRATED" | "PARTIALLY_CALIBRATED" | "UNCALIBRATED_ROBUST" | "UNAVAILABLE";
+export type HourlyAvailabilityStatus = "FUSED" | "SINGLE_MODEL" | "UNAVAILABLE";
+
+export type HourlyModelWeightDiagnostic = {
+  modelName: string;
+  modelId: string;
+  sourceName: string;
+  runId: string | null;
+  runIdKind: "capture" | "provider" | "unknown";
+  requestStartedAt: number | null;
+  availableAt: number;
+  validTime: number;
+  horizonMinutes: number;
+  horizonBucket: string | null;
+  calibrationStatus: HourlyCalibrationStatus;
+  rawWeight: number;
+  robustFallbackWeight: number | null;
+  weight: number;
+  contributedToValue: boolean;
+  historicalEvidence?: HourlyHistoricalEvidence;
+};
+
 export type HourlyVariableWeighting = {
   variable: string;
-  method: "historical_skill" | "unavailable";
+  method: "historical_skill" | "mixed" | "robust_fallback" | "single_model" | "unavailable";
+  /** Null when available model runs fall into different history buckets. */
+  horizonBucket: string | null;
+  availabilityStatus: HourlyAvailabilityStatus;
+  calibrationStatus: HourlyCalibrationStatus;
   unavailableReason: HourlyWeightingUnavailableReason | null;
+  expectedModelCount: number;
+  availableModelCount: number;
+  evidenceEligibleModelCount: number;
+  contributingModelCount: number;
+  availableModels: string[];
+  evidenceEligibleModels: string[];
+  modelReasons: Array<{ modelName: string; reason: string; availableAt: number | null; validTime: number | null; horizonMinutes: number | null; horizonBucket: string | null }>;
+  calibrationReasons: Array<{ modelName: string; reason: string; horizonBucket: string | null }>;
   modelsWithData: string[];
-  modelWeights: Array<{ modelName: string; weight: number }>;
+  modelWeights: HourlyModelWeightDiagnostic[];
   minimumComparisons: number | null;
   minimumComparableDays: number | null;
   historicalEvidence?: HourlyHistoricalEvidence[];
 };
 
 export type HourlyPointWeighting = {
-  method: "historical_skill" | "mixed" | "unavailable";
+  method: "historical_skill" | "mixed" | "robust_fallback" | "single_model" | "unavailable";
+  availabilityStatus: HourlyAvailabilityStatus;
+  calibrationStatus: HourlyCalibrationStatus;
+  expectedModelCount: number;
+  availableModelCount: number;
+  evidenceEligibleModelCount: number;
+  contributingModelCount: number;
   horizonBucket: string | null;
   unavailableReason: HourlyWeightingUnavailableReason | null;
   scoredVariables: string[];
+  robustVariables: string[];
   unavailableVariables: string[];
   minimumComparisons: number | null;
   minimumComparableDays: number | null;
@@ -465,6 +531,8 @@ export async function collect15DayForecast(
   ])).join(",");
 
   const modelResults = await Promise.all(models.map(async (model) => {
+    const requestStartedAt = Date.now();
+    const runId = randomUUID();
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
@@ -475,16 +543,34 @@ export async function collect15DayForecast(
       if (model.modelId) url.searchParams.set("models", model.modelId);
 
       const response = await fetchWeather(url.toString(), {}, { timeoutMs: 6_000, attempts: 1 });
-      if (!response.ok) return null;
+      if (!response.ok) return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt: null, runId, errorReason: `HTTP ${response.status}` };
       const data = await response.json();
+      const availableAt = Date.now();
       const daily = data.daily;
-      if (!Array.isArray(daily?.time)) return null;
-      return { name: model.name, modelId: model.modelId, daily };
+      if (!Array.isArray(daily?.time)) return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt, runId, errorReason: "Réponse provider sans série daily.time." };
+      return { name: model.name, modelId: model.modelId, daily, requestStartedAt, availableAt, runId, errorReason: null };
     } catch (error) {
       console.error(`[15Day] Error fetching ${model.name}:`, error);
-      return null;
+      return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt: null, runId, errorReason: error instanceof Error ? error.message : "Source indisponible." };
     }
   }));
+  const collectionReferenceAt = Date.now();
+  const resultByModelName = new Map(modelResults.map((result) => [result.name, result]));
+  const availabilityReasonForDate = (date: string): Record<string, string> => officialModelNames.reduce<Record<string, string>>((reasons, modelName) => {
+    const result = resultByModelName.get(modelName);
+    if (!result) {
+      reasons[modelName] = "Aucun résultat de collecte pour ce modèle.";
+      return reasons;
+    }
+    if (!result.daily) {
+      reasons[modelName] = `Run indisponible: ${result.errorReason ?? "aucune série daily reçue"}.`;
+      return reasons;
+    }
+    if (!Array.isArray(result.daily.time) || !result.daily.time.includes(date)) {
+      reasons[modelName] = "Échéance absente de la portée normale du modèle; absence physique non scorable et non pénalisante.";
+    }
+    return reasons;
+  }, {});
 
   const at = (values: unknown, index: number): number | null =>
     Array.isArray(values) ? finiteCoverageValue(values[index]) : null;
@@ -495,8 +581,8 @@ export async function collect15DayForecast(
   };
 
   for (const result of modelResults) {
-    if (!result) continue;
-    const { name, modelId, daily } = result;
+    if (!result?.daily) continue;
+    const { name, modelId, daily, availableAt, requestStartedAt, runId } = result;
     const bestMatch = modelId == null;
     const requestedDates = daily.time.slice(0, 16);
     for (let index = 0; index < requestedDates.length; index++) {
@@ -509,6 +595,8 @@ export async function collect15DayForecast(
         precipitation: at(daily.precipitation_sum, index),
         windSpeed: at(daily.wind_speed_10m_max, index),
         windGust: at(daily.wind_gusts_10m_max, index),
+        humidity: at(daily.relative_humidity_2m_mean, index),
+        cloudCover: at(daily.cloud_cover_mean, index),
       };
       const hasMetric = Object.values(values).some((value) => value != null);
       if (hasMetric) usedModels.add(name);
@@ -526,13 +614,21 @@ export async function collect15DayForecast(
         const forecast: ForecastData = {
           serviceName: name,
           serviceCategory: "expert",
+          modelId,
+          sourceName: "open-meteo",
+          runId,
+          runIdKind: "capture",
+          requestStartedAt,
+          availableAt,
+          validTime: getDailyForecastValidTime(date),
+          qualityStatus: "unknown",
           tempMax: values.tempMax,
           tempMin: values.tempMin,
           precipitation: values.precipitation,
           windSpeed: values.windSpeed,
           windGust: values.windGust,
-          humidity: null,
-          cloudCover: null,
+          humidity: values.humidity,
+          cloudCover: values.cloudCover,
           condition: null,
         };
         const forecasts = forecastsByDate.get(date) ?? [];
@@ -546,8 +642,8 @@ export async function collect15DayForecast(
           precipitation: values.precipitation,
           windSpeed: values.windSpeed,
           windGust: values.windGust,
-          humidity: null,
-          cloudCover: null,
+          humidity: values.humidity,
+          cloudCover: values.cloudCover,
         });
         agreementInputsByDate.set(date, agreementInputs);
       }
@@ -564,52 +660,76 @@ export async function collect15DayForecast(
 
   const toDiagnostics = (
     sources: readonly ForecastTraceSource[],
-    variable: DailyForecastMetric,
+    variable: DailyForecastMetric | "humidity" | "cloud_cover",
     horizonBucket: DailyOfficialFusionDisplay["horizonBucket"],
-  ) => sources.flatMap((source) => {
-    const sourceHorizon = source.horizonBucket ?? horizonBucket;
-    if (!sourceHorizon) return [];
-    return [{
+  ) => sources.map((source) => ({
       modelName: source.name,
       variable: source.variable ?? variable,
-      horizonBucket: sourceHorizon,
+      horizonBucket: source.horizonBucket ?? horizonBucket,
+      sourceName: source.sourceName,
+      modelId: source.modelId,
+      runId: source.runId,
+      availableAt: source.availableAt,
+      validTime: source.validTime,
+      horizonMinutes: source.horizonMinutes,
+      calibrationStatus: source.calibrationStatus,
       finalWeight: source.finalWeight,
+      rawWeight: source.rawWeight,
+      robustFallbackWeight: source.robustFallbackWeight,
       signedBias: source.signedBias ?? null,
       sampleSize: source.sampleSize ?? null,
       comparisonCount: source.comparisonCount ?? null,
       evaluatedDays: source.evaluatedDays ?? null,
       latestScoreDate: source.latestScoreDate ?? null,
-    }];
-  });
+    }));
 
   const requestDay = requestDate ? Date.parse(`${requestDate}T12:00:00.000Z`) : NaN;
   const days: DayForecast[] = await Promise.all(Array.from(dates).sort().slice(0, 16).map(async (date) => {
     const officialForecasts = forecastsByDate.get(date) ?? [];
-    const fusion = await options.resolveOfficialFusion(date, officialForecasts, options.issuedAt);
+    const fusion = await options.resolveOfficialFusion(date, officialForecasts, collectionReferenceAt, availabilityReasonForDate(date));
     const horizonBucket = fusion.trace.horizonBucket;
+    const agreementInputs = agreementInputsByDate.get(date) ?? [];
+    const physicallyAvailableAgreementModels = agreementInputs.filter((item) =>
+      [item.tempMax, item.tempMin, item.precipitation, item.windSpeed, item.windGust, item.humidity, item.cloudCover]
+        .some((value) => typeof value === "number" && Number.isFinite(value))
+    ).map((item) => item.modelName);
     const modelAgreement = summarizeDailyModelAgreement(
-      agreementInputsByDate.get(date) ?? [],
-      officialModelNames,
+      agreementInputs,
+      physicallyAvailableAgreementModels,
       Number.isFinite(requestDay)
         ? Math.round((Date.parse(`${date}T12:00:00.000Z`) - requestDay) / 86_400_000)
         : null,
     );
     const officialFusion: DailyOfficialFusionDisplay = {
       issuedAt: fusion.trace.issuedAt,
+      referenceAt: fusion.trace.referenceAt,
       horizonBucket,
+      availabilityStatus: {
+        tempMax: fusion.availabilityStatus.tempMax,
+        tempMin: fusion.availabilityStatus.tempMin,
+        precipitation: fusion.availabilityStatus.precipitation,
+        windSpeed: fusion.availabilityStatus.windSpeed,
+        windGust: fusion.availabilityStatus.windGust,
+        humidity: fusion.availabilityStatus.humidity,
+        cloudCover: fusion.availabilityStatus.cloudCover,
+      },
       calibrationStatus: {
         tempMax: fusion.calibrationStatus.tempMax,
         tempMin: fusion.calibrationStatus.tempMin,
         precipitation: fusion.calibrationStatus.precipitation,
         windSpeed: fusion.calibrationStatus.windSpeed,
         windGust: fusion.calibrationStatus.windGust,
+        humidity: fusion.calibrationStatus.humidity,
+        cloudCover: fusion.calibrationStatus.cloudCover,
       },
       sourcesByVariable: {
-        tempMax: toDiagnostics(fusion.trace.parameterSources.temperature, "temperature_max", horizonBucket),
-        tempMin: toDiagnostics(fusion.trace.parameterSources.temperatureMin, "temperature_min", horizonBucket),
+      tempMax: toDiagnostics(fusion.trace.parameterSources.tempMax, "temperature_max", horizonBucket),
+      tempMin: toDiagnostics(fusion.trace.parameterSources.tempMin, "temperature_min", horizonBucket),
         precipitation: toDiagnostics(fusion.trace.parameterSources.precipitation, "precipitation_sum", horizonBucket),
-        windSpeed: toDiagnostics(fusion.trace.parameterSources.wind, "wind_speed_max", horizonBucket),
+      windSpeed: toDiagnostics(fusion.trace.parameterSources.windSpeed, "wind_speed_max", horizonBucket),
         windGust: toDiagnostics(fusion.trace.parameterSources.windGust, "wind_gust_max", horizonBucket),
+        humidity: toDiagnostics(fusion.trace.parameterSources.humidity, "humidity", horizonBucket),
+        cloudCover: toDiagnostics(fusion.trace.parameterSources.cloudCover, "cloud_cover", horizonBucket),
       },
       diagnosticsByVariable: {
         tempMax: fusion.parameterDiagnostics.temperature_max,
@@ -617,21 +737,22 @@ export async function collect15DayForecast(
         precipitation: fusion.parameterDiagnostics.precipitation_sum,
         windSpeed: fusion.parameterDiagnostics.wind_speed_max,
         windGust: fusion.parameterDiagnostics.wind_gust_max,
+        humidity: fusion.parameterDiagnostics.humidity,
+        cloudCover: fusion.parameterDiagnostics.cloud_cover,
       },
     };
-    const precipitationIsQualified = fusion.calibrationStatus.precipitation === "calibrated";
     return {
       date,
       tempMax: fusion.tempMax,
       tempMin: fusion.tempMin,
       precipitation: fusion.precipitation,
-      precipitationConsensus: precipitationIsQualified ? fusion.trace.precipitationConsensus : null,
+      precipitationConsensus: fusion.trace.precipitationConsensus,
       windSpeed: fusion.windSpeed,
       windGust: fusion.windGust,
       // Daily issue-run provenance is absent for these variables, so they remain unavailable.
       windDirection: null,
-      humidity: null,
-      cloudCover: null,
+      humidity: fusion.humidity,
+      cloudCover: fusion.cloudCover,
       condition: null,
       modelAgreement,
       officialFusion,

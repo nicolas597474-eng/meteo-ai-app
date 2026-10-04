@@ -121,7 +121,13 @@ export function normalizeModelWeightsWithCap(
     if (!Number.isFinite(item.rawWeight) || item.rawWeight <= 0) continue;
     grouped.set(item.modelId, (grouped.get(item.modelId) ?? 0) + item.rawWeight);
   }
-  if (grouped.size === 0 || grouped.size * cap + 1e-12 < budget) return null;
+  if (grouped.size === 0) return null;
+
+  // Preserve the configured cap whenever the selected set can satisfy it. When
+  // too few models are actually available, relax only the minimum required cap;
+  // a cap can never be the sole reason a finite forecast becomes unavailable.
+  const effectiveCap = Math.max(cap, budget - cap * (grouped.size - 1));
+  if (grouped.size * effectiveCap + 1e-12 < budget) return null;
 
   const remaining = new Set(grouped.keys());
   const result = new Map<string, number>();
@@ -129,18 +135,41 @@ export function normalizeModelWeightsWithCap(
   while (remaining.size > 0) {
     const totalRaw = Array.from(remaining).reduce((sum, id) => sum + (grouped.get(id) ?? 0), 0);
     if (!(totalRaw > 0)) return null;
-    const overCap = Array.from(remaining).filter((id) => (remainingBudget * (grouped.get(id) ?? 0) / totalRaw) > cap + 1e-12);
+    const overCap = Array.from(remaining).filter((id) => (remainingBudget * (grouped.get(id) ?? 0) / totalRaw) > effectiveCap + 1e-12);
     if (overCap.length === 0) {
       for (const id of Array.from(remaining)) result.set(id, remainingBudget * (grouped.get(id) ?? 0) / totalRaw);
       remainingBudget = 0;
       break;
     }
     for (const id of overCap) {
-      result.set(id, cap);
+      result.set(id, effectiveCap);
       remaining.delete(id);
-      remainingBudget -= cap;
+      remainingBudget -= effectiveCap;
     }
     if (remainingBudget < -1e-12) return null;
   }
   return Math.abs(remainingBudget) <= 1e-9 ? result : null;
+}
+
+/** Bounded robust down-weighting for uncalibrated model-value outliers. */
+export function calculateRobustFallbackMultipliers(
+  items: Array<{ modelId: string; value: number }>,
+): Map<string, number> {
+  const valid = items.filter((item) => Number.isFinite(item.value));
+  const result = new Map<string, number>(valid.map(({ modelId }) => [modelId, 1]));
+  if (valid.length < 3) return result;
+
+  const center = median(valid.map((item) => item.value));
+  const mad = median(valid.map((item) => Math.abs(item.value - center)));
+  for (const item of valid) {
+    const deviation = Math.abs(item.value - center);
+    if (deviation === 0) continue;
+    if (mad === 0) {
+      result.set(item.modelId, 0.25);
+      continue;
+    }
+    const cutoff = 3 * 1.4826 * mad;
+    if (deviation > cutoff) result.set(item.modelId, Math.max(0.25, cutoff / deviation));
+  }
+  return result;
 }

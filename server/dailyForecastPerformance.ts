@@ -35,6 +35,9 @@ export function buildForecastRunArchiveRows(
   for (const forecast of forecasts) {
     const service = MODEL_SERVICES.get(forecast.serviceName);
     if (!service || forecast.serviceCategory !== "expert") continue;
+    // New captures store each model's actual response time. Older/non-diagnostic
+    // callers retain their post-collection timestamp; historical rows are untouched.
+    const modelAvailableAt = finiteOrNull(forecast.availableAt) ?? issuedAt;
 
     const raw = isRecord(forecast.rawData) ? forecast.rawData : null;
     const daily = raw && isRecord(raw.daily) ? raw.daily : null;
@@ -52,7 +55,7 @@ export function buildForecastRunArchiveRows(
           provider: "open-meteo",
           modelId: service.modelId,
           sourceKind: "model_forecast",
-          issuedAt,
+          issuedAt: modelAvailableAt,
           tempMax: finiteOrNull(daily.temperature_2m_max?.[index]),
           tempMin: finiteOrNull(daily.temperature_2m_min?.[index]),
           precipitation: finiteOrNull(daily.precipitation_sum?.[index]),
@@ -76,7 +79,7 @@ export function buildForecastRunArchiveRows(
       provider: "open-meteo",
       modelId: service.modelId,
       sourceKind: "model_forecast",
-      issuedAt,
+      issuedAt: modelAvailableAt,
       tempMax: finiteOrNull(forecast.tempMax),
       tempMin: finiteOrNull(forecast.tempMin),
       precipitation: finiteOrNull(forecast.precipitation),

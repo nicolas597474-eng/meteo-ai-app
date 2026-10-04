@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getParisDate } from "./weatherTime";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
-import { collectExpertForecasts } from "./weatherServices";
+import { collectExpertForecastsWithDiagnostics } from "./weatherServices";
 import { buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { collectOfficialHourlyForecast, OFFICIAL_HOURLY_MODEL_NAMES } from "./officialHourlyForecast";
@@ -94,35 +94,32 @@ function persistedHourlySeriesMatches(
 async function refreshDailyForecast(favorite: ManualFusionFavorite, today: string, locationKey: string): Promise<GranularityResult> {
   const expectedModelCount = OFFICIAL_HOURLY_MODEL_NAMES.length;
   try {
-    const expertData = await collectExpertForecasts(today, { lat: favorite.lat, lon: favorite.lon });
+    const { forecasts: expertData, availabilityReasonByModel } = await collectExpertForecastsWithDiagnostics(today, { lat: favorite.lat, lon: favorite.lon });
     const officialDailyForecasts = expertData.filter((forecast) => OFFICIAL_DAILY_MODEL_NAME_SET.has(forecast.serviceName));
     if (officialDailyForecasts.length === 0) {
       return granularityResult(0, expectedModelCount, null, "Aucun des sept modèles quotidiens officiels n’a renvoyé de prévision.");
     }
     const issuedAt = Date.now();
 
-    const rawForecasts = expertData.map((entry) => ({
-      serviceName: entry.serviceName,
-      tempMax: entry.tempMax,
-      tempMin: entry.tempMin,
-      precipitation: entry.precipitation,
-      windSpeed: entry.windSpeed,
-      windGust: null as number | null,
-      humidity: entry.humidity ?? null,
-      cloudCover: entry.cloudCover ?? null,
-    }));
-    const fusionEvidence = await getDailyFusionPerformanceEvidence(locationKey, today, issuedAt);
+    const rawForecasts = officialDailyForecasts.map((entry) => ({ ...entry, windGust: entry.windGust ?? null }));
+    const fusionEvidence = await getDailyFusionPerformanceEvidence(
+      locationKey,
+      today,
+      officialDailyForecasts.flatMap((entry) => entry.availableAt == null ? [] : [entry.availableAt]),
+    );
     const meteoAI = computeOfficialDailyForecast(rawForecasts, {
       locationKey,
       targetDate: today,
       issuedAt,
+      referenceAt: issuedAt,
       evidenceStoreAvailable: fusionEvidence.available,
       evidence: fusionEvidence.evidence,
+      availabilityReasonByModel,
     });
     const condition = null;
     const explanation = meteoAI.coreCalibrationComplete
       ? `Prévision quotidienne calibrée relancée pour ${favorite.customName ?? favorite.name}, avec des preuves physiques récentes par modèle, variable et horizon. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`
-      : `${meteoAI.methodNote} Les valeurs officielles restent indisponibles jusqu’à qualification des preuves physiques. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`;
+      : `${meteoAI.methodNote} Les valeurs robustes disponibles sont conservées et marquées non calibrées; aucune valeur de comparaison ne remplace la fusion. La météo actuelle observée reste séparée et n’est pas modifiée par cette action.`;
 
     await insertForecasts(expertData.map((entry) => ({
       locationKey,
@@ -167,7 +164,7 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
       windSpeed: meteoAI.windSpeed,
       condition,
       stabilityLabel: legacyStabilityLabelForStorage(expertData),
-      weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace, trigger: "manual" } as any,
+      weights: { version: 3, weightByService: meteoAI.weights, trace: meteoAI.trace, trigger: "manual" } as any,
       explanation,
       computedAt: updatedAt,
     }, { refreshComputedAt: true });
@@ -264,7 +261,14 @@ async function refreshHourlyForecast(favorite: ManualFusionFavorite, today: stri
 
     const updatedAt = persistedModels.size > 0 ? new Date() : null;
     if (persistedModels.size > 0 && updatedAt) {
-      cacheManualHourlyForecast(coords, today, officialHourly.hours, updatedAt, officialHourly.weighting);
+      cacheManualHourlyForecast(
+        coords,
+        today,
+        officialHourly.hours,
+        updatedAt,
+        officialHourly.weighting,
+        "Relance manuelle demandée explicitement; série recalculée par le moteur officiel avec les seuls runs horaires disponibles.",
+      );
     }
     const error = persistedModels.size === 0
       ? "Les données horaires n’ont pas pu être confirmées après leur enregistrement."

@@ -2,7 +2,7 @@ import type { InsertDailyForecastObservationComparison, InsertForecastRun, Forec
 import { getParisDateAndHour, parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 import { getStationSourceKind, type StationSource } from "./stationService";
 import { buildQualifiedDailyObservation, type PhysicalSnapshot } from "./physicalObservationAggregation";
-import { OFFICIAL_HOURLY_MODELS } from "./weatherServices";
+import { OFFICIAL_HOURLY_MODELS } from "./officialModels";
 
 export const METEOAI_DAILY_FUSION_SERVICE_NAME = "MeteoAI";
 export const METEOAI_DAILY_FUSION_MODEL_ID = "meteoai-official-daily-v2";
@@ -190,9 +190,7 @@ export function isComparableDailyForecastObservationPair(
 }
 
 export function getDailyForecastHorizon(issuedAt: number, validDate: string): { bucket: InsertDailyForecastObservationComparison["horizonBucket"]; leadTimeMinutes: number } | null {
-  const followingDate = nextIsoDate(validDate);
-  if (!followingDate) return null;
-  const endOfValidDay = parisLocalHourToUniqueEpochMs(followingDate, 0);
+  const endOfValidDay = getDailyForecastValidTime(validDate);
   const leadMs = endOfValidDay == null ? NaN : endOfValidDay - issuedAt;
   if (!Number.isFinite(leadMs) || leadMs <= 0) return null;
   const leadHours = leadMs / 3_600_000;
@@ -203,6 +201,12 @@ export function getDailyForecastHorizon(issuedAt: number, validDate: string): { 
         : leadHours <= 7 * 24 ? "4-7d"
           : "8-15d";
   return { bucket, leadTimeMinutes: Math.floor(leadMs / 60_000) };
+}
+
+/** End-of-day validTime for a daily value, expressed as a unique Paris-local epoch. */
+export function getDailyForecastValidTime(validDate: string): number | null {
+  const followingDate = nextIsoDate(validDate);
+  return followingDate ? parisLocalHourToUniqueEpochMs(followingDate, 0) : null;
 }
 
 function supportedRun(run: ForecastRun): boolean {

@@ -4,6 +4,7 @@ export const PRECIPITATION_RAIN_THRESHOLD_MM = 0.1 as const;
 export type PrecipitationConditionalMethod =
   | "arithmetic_mean"
   | "historical_skill"
+  | "robust_fallback"
   | "unavailable";
 
 export type PrecipitationModelValue = {
@@ -19,8 +20,12 @@ export type PrecipitationModelValue = {
  */
 export type PrecipitationModelConsensus = {
   thresholdMm: typeof PRECIPITATION_RAIN_THRESHOLD_MM;
+  /** Models physically available for this variable and validTime. */
   expectedModelCount: number;
   modelsExpected: readonly string[];
+  /** Static catalogue, shown for context only and never used as a scoring denominator. */
+  configuredModelCount: number;
+  modelsConfigured: readonly string[];
   availableModelCount: number;
   rainModelCount: number;
   /** Part brute des modèles disponibles au-dessus du seuil, sur une échelle 0–100. */
@@ -43,11 +48,12 @@ export type PrecipitationInput = {
 };
 
 export type PrecipitationConsensusOptions = {
+  configuredModelNames?: readonly string[];
   /**
    * Remplace la moyenne arithmétique par une moyenne conditionnelle fournie,
-   * par exemple lorsqu'elle est issue de poids historiques qualifiés.
-   * Une valeur null explicite signifie qu'aucune estimation conditionnelle
-   * pondérée n'est disponible (aucun poids de secours n'est fabriqué).
+   * par exemple lorsqu'elle est issue de poids historiques qualifiés ou d'un
+   * fallback robuste. Ce consensus reste une estimation, jamais une probabilité.
+   * Une valeur null explicite signifie qu'aucune estimation conditionnelle n'est disponible.
    */
   conditionalMeanMm?: number | null;
   conditionalMeanMethod?: PrecipitationConditionalMethod;
@@ -59,6 +65,7 @@ export function summarizePrecipitationModels(
   options: PrecipitationConsensusOptions = {}
 ): PrecipitationModelConsensus {
   const modelsExpected = Array.from(new Set(expectedModelNames));
+  const modelsConfigured = Array.from(new Set(options.configuredModelNames ?? modelsExpected));
   const expectedSet = new Set(modelsExpected);
   const inputByModel = new Map<string, number>();
 
@@ -132,6 +139,8 @@ export function summarizePrecipitationModels(
     thresholdMm: PRECIPITATION_RAIN_THRESHOLD_MM,
     expectedModelCount: modelsExpected.length,
     modelsExpected,
+    configuredModelCount: modelsConfigured.length,
+    modelsConfigured,
     availableModelCount,
     rainModelCount,
     frequencyPercent,

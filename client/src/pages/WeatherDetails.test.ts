@@ -23,17 +23,18 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("Fusion officielle · preuves par variable");
     expect(timelineSource).toContain("Sources quotidiennes réellement reçues");
     expect(timelineSource).toContain("Best Match · référence dérivée, non contributeur officiel");
-    expect(timelineSource).toContain("Aucun biais n’est appliqué aux valeurs futures");
+    expect(timelineSource).toContain("aucun biais historique n’est appliqué aux valeurs futures");
     expect(timelineSource).toContain("l’heure exacte des runs modèles n’est pas fournie");
     expect(timelineSource).toContain("Best Match");
   });
-  it("expose les trois causes de disponibilité depuis le diagnostic du moteur, sans score de confiance", () => {
-    expect(timelineSource).toContain('case "no_model_values"');
-    expect(timelineSource).toContain('case "insufficient_evidence"');
-    expect(timelineSource).toContain('case "weight_cap_blocked"');
+  it("sépare disponibilité physique, calibration robuste et contributions sans score de confiance", () => {
+    expect(timelineSource).toContain('diagnostic.availabilityStatus === "UNAVAILABLE"');
+    expect(timelineSource).toContain('diagnostic.availabilityStatus === "SINGLE_MODEL"');
+    expect(timelineSource).toContain('diagnostic.calibrationStatus === "PARTIALLY_CALIBRATED"');
+    expect(timelineSource).toContain('diagnostic.calibrationStatus === "CALIBRATED"');
     expect(timelineSource).toContain("diagnosticsByVariable?.[key]");
-    expect(timelineSource).toContain("Valeurs présentes :");
-    expect(timelineSource).toContain("preuves admissibles avant plafond");
+    expect(timelineSource).toContain("Valeurs réellement disponibles :");
+    expect(timelineSource).toContain("preuves historiques qualifiées :");
     expect(timelineSource).toContain("contributeurs effectifs");
     expect(timelineSource).toContain("ils ne constituent ni une note de fiabilité ni un pourcentage de confiance");
     expect(timelineSource).toContain("Une couverture plus faible peut être normale selon l’horizon du modèle.");
