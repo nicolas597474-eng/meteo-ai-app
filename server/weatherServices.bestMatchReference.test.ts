@@ -7,7 +7,7 @@ vi.mock("./weatherFetch", () => ({
 
 import { fetchWeather } from "./weatherFetch";
 import { collect15DayForecast, collectCurrentWeatherSnapshot, collectHourlyForecast, OFFICIAL_HOURLY_MODELS } from "./weatherServices";
-import { computeOfficialDailyForecast } from "./officialForecast";
+import { computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
 import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 const mockedFetchWeather = vi.mocked(fetchWeather);
@@ -173,7 +173,7 @@ describe("collect15DayForecast fusion officielle", () => {
     );
     const result = await collect15DayForecast(undefined, {
       issuedAt,
-      resolveOfficialFusion: (targetDate, forecasts, forecastIssuedAt) => Promise.resolve(computeOfficialDailyForecast(forecasts, {
+      resolveOfficialFusion: (targetDate, forecasts, forecastIssuedAt) => Promise.resolve(computeOfficialDailyForecastWithDiagnostics(forecasts, {
         locationKey,
         targetDate,
         issuedAt: forecastIssuedAt,
@@ -204,6 +204,13 @@ describe("collect15DayForecast fusion officielle", () => {
     });
     expect(today!.tempMax).not.toBe(999);
     expect(today!.officialFusion.sourcesByVariable.tempMax).toHaveLength(7);
+    expect(today!.officialFusion.diagnosticsByVariable?.tempMax).toMatchObject({
+      status: "calibrated",
+      expectedModelCount: 7,
+      availableValueModelCount: 7,
+      evidenceEligibleModelCount: 7,
+      contributingModelCount: 7,
+    });
     expect(today!.officialFusion.sourcesByVariable.tempMin.every((source) => source.variable === "temperature_min" && source.horizonBucket === "6-24h")).toBe(true);
     expect(today!.officialFusion.sourcesByVariable.tempMax.every((source) => source.signedBias != null && source.latestScoreDate === "2026-10-02")).toBe(true);
     expect(today!.precipitationConsensus?.conditionalMeanMethod).toBe("historical_skill");
@@ -221,6 +228,12 @@ describe("collect15DayForecast fusion officielle", () => {
     expect(longRange!.tempMax).toBeNull();
     expect(longRange!.precipitation).toBeNull();
     expect(longRange!.officialFusion.sourcesByVariable.tempMax).toEqual([]);
+    expect(longRange!.officialFusion.diagnosticsByVariable?.tempMax).toMatchObject({
+      status: "weight_cap_blocked",
+      availableValueModelCount: 2,
+      evidenceEligibleModelCount: 2,
+      contributingModelCount: 0,
+    });
     expect(longRange!.bestMatchReference).toBeNull();
   });
 });

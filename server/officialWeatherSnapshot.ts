@@ -3,7 +3,7 @@ import { getParisDate, getParisHour } from "./weatherTime";
 import { collect15DayForecast, collectCurrentWeatherSnapshot, type CurrentWeatherSnapshot, type DayForecast, type HourlyPoint } from "./weatherServices";
 import { findActiveHourlyForecastIndex, keepCurrentAndFutureHourlyForecasts } from "../shared/hourlyForecastTime";
 import { collectOfficialHourlyForecast, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
-import { computeOfficialDailyForecast } from "./officialForecast";
+import { computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 
 export type OfficialWeatherSnapshot = {
@@ -220,7 +220,7 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
         issuedAt: dailyIssuedAt,
         resolveOfficialFusion: async (targetDate, forecasts, issuedAt) => {
           const fusionEvidence = await getDailyFusionPerformanceEvidence(dailyLocationKey, targetDate, issuedAt);
-          return computeOfficialDailyForecast(forecasts, {
+          return computeOfficialDailyForecastWithDiagnostics(forecasts, {
             locationKey: dailyLocationKey,
             targetDate,
             issuedAt,

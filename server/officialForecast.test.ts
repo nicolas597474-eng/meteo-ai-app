@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computeOfficialDailyForecast } from "./officialForecast";
+import { computeOfficialDailyForecast, computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
 import { OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES } from "./weatherServices";
 import { DAILY_FUSION_METRICS, type DailyFusionHorizon, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
 
@@ -102,6 +102,17 @@ describe("computeOfficialDailyForecast", () => {
     const second = computeOfficialDailyForecast(forecasts, options());
 
     expect(first).toEqual(second);
+    const live = computeOfficialDailyForecastWithDiagnostics(forecasts, options());
+    expect(first).not.toHaveProperty("parameterDiagnostics");
+    expect(first.trace).not.toHaveProperty("parameterDiagnostics");
+    expect(live.trace).toEqual(first.trace);
+    expect(live.weights).toEqual(first.weights);
+    expect(live.tempMax).toBe(first.tempMax);
+    expect(live.tempMin).toBe(first.tempMin);
+    expect(live.precipitation).toBe(first.precipitation);
+    expect(live.windSpeed).toBe(first.windSpeed);
+    expect(live.windGust).toBe(first.windGust);
+    expect(live.parameterDiagnostics.temperature_max.status).toBe("calibrated");
     expect(first.coreCalibrationComplete).toBe(true);
     expect(first.tempMax).not.toBeNull();
     expect(first.tempMin).not.toBeNull();
@@ -165,8 +176,8 @@ describe("computeOfficialDailyForecast", () => {
 
   it("garde valeurs, poids, trace et compte officiel invariants face à Best Match pour Tmin/Tmax, pluie, vent et rafales", () => {
     const evidence = sevenModelEvidence();
-    const withoutBestMatch = computeOfficialDailyForecast(sevenModelForecasts, options(evidence));
-    const withBestMatch = computeOfficialDailyForecast(
+    const withoutBestMatch = computeOfficialDailyForecastWithDiagnostics(sevenModelForecasts, options(evidence));
+    const withBestMatch = computeOfficialDailyForecastWithDiagnostics(
       [...sevenModelForecasts, bestMatchForecast],
       options([...evidence, ...bestMatchEvidence()]),
     );
@@ -177,6 +188,13 @@ describe("computeOfficialDailyForecast", () => {
       expect(withBestMatch[metric]).toBe(withoutBestMatch[metric]);
     }
     expect(withBestMatch.weights).toEqual(withoutBestMatch.weights);
+    expect(withBestMatch.parameterDiagnostics).toEqual(withoutBestMatch.parameterDiagnostics);
+    expect(withBestMatch.parameterDiagnostics.temperature_max).toMatchObject({
+      expectedModelCount: 7,
+      availableValueModelCount: 7,
+      evidenceEligibleModelCount: 7,
+      contributingModelCount: 7,
+    });
     expect(Object.keys(withBestMatch.weights)).toEqual(allOfficialServiceNames);
     expect(withBestMatch.weights).not.toHaveProperty("Open-Meteo");
     expect(withBestMatch.trace.sourceCount).toBe(7);
@@ -295,5 +313,74 @@ describe("computeOfficialDailyForecast", () => {
     expect(result.tempMin).not.toBeNull();
     expect(result.trace.parameterSources.temperature).toEqual([]);
     expect(result.trace.excludedSources.some((source) => source.reason.includes("prévision de cette variable indisponible"))).toBe(true);
+  });
+
+  it("distingue une absence réelle de valeur d’un manque de preuve historique", () => {
+    const noValues = computeOfficialDailyForecastWithDiagnostics(
+      forecasts.map((forecast) => ({ ...forecast, tempMax: null })),
+      options(),
+    );
+    const invalidEvidence = qualifiedEvidence().map((item) => item.variable === "temperature_max"
+      ? { ...item, sampleSize: 29, evaluatedDays: 29, comparisonCount: 29 }
+      : item);
+    const noEvidence = computeOfficialDailyForecastWithDiagnostics(forecasts, options(invalidEvidence));
+
+    expect(noValues.parameterDiagnostics.temperature_max).toMatchObject({
+      status: "no_model_values",
+      expectedModelCount: 7,
+      availableValueModelCount: 0,
+      evidenceEligibleModelCount: 0,
+      contributingModelCount: 0,
+    });
+    expect(noValues.tempMax).toBeNull();
+    expect(noEvidence.parameterDiagnostics.temperature_max).toMatchObject({
+      status: "insufficient_evidence",
+      availableValueModelCount: 4,
+      evidenceEligibleModelCount: 0,
+      contributingModelCount: 0,
+    });
+    expect(noEvidence.parameterDiagnostics.temperature_max.modelReasons
+      .filter(({ modelName }) => serviceNames.includes(modelName))
+      .every(({ reason }) => reason.includes("moins de 30 jours indépendants"))).toBe(true);
+    expect(noEvidence.tempMax).toBeNull();
+  });
+
+  it("identifie deux sources à preuve qualifiée bloquées par le plafond et trois sources fusionnables", () => {
+    const twoModels = computeOfficialDailyForecastWithDiagnostics(forecasts.slice(0, 2), options());
+    const threeModels = computeOfficialDailyForecastWithDiagnostics(forecasts.slice(0, 3), options());
+
+    expect(twoModels.parameterDiagnostics.temperature_max).toMatchObject({
+      status: "weight_cap_blocked",
+      availableValueModelCount: 2,
+      evidenceEligibleModelCount: 2,
+      contributingModelCount: 0,
+      evidenceEligibleModels: serviceNames.slice(0, 2),
+    });
+    expect(twoModels.parameterDiagnostics.temperature_max.reason).toContain("plafond individuel de 35 %");
+    expect(twoModels.tempMax).toBeNull();
+
+    expect(threeModels.parameterDiagnostics.temperature_max).toMatchObject({
+      status: "calibrated",
+      availableValueModelCount: 3,
+      evidenceEligibleModelCount: 3,
+      contributingModelCount: 3,
+    });
+    expect(threeModels.trace.parameterSources.temperature).toHaveLength(3);
+    expect(threeModels.trace.parameterSources.temperature.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
+  });
+
+  it("distingue les valeurs de pluie présentes sans modèle au seuil de quantité", () => {
+    const result = computeOfficialDailyForecastWithDiagnostics(
+      forecasts.map((forecast) => ({ ...forecast, precipitation: 0 })),
+      options(),
+    );
+
+    expect(result.parameterDiagnostics.precipitation_sum).toMatchObject({
+      status: "no_rain_contributors",
+      availableValueModelCount: 4,
+      evidenceEligibleModelCount: 0,
+      contributingModelCount: 0,
+    });
+    expect(result.parameterDiagnostics.precipitation_sum.reason).toContain("aucun n’atteint le seuil");
   });
 });

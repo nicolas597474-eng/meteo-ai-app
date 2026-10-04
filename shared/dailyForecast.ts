@@ -11,6 +11,33 @@ export type DailyForecastEvidenceStatus =
   | "insufficient_data"
   | "schema_unavailable";
 
+export type DailyFusionDiagnosticStatus =
+  | "calibrated"
+  | "no_model_values"
+  | "insufficient_evidence"
+  | "weight_cap_blocked"
+  | "evidence_store_unavailable"
+  | "horizon_unavailable"
+  | "no_rain_contributors";
+
+export type DailyFusionModelReason = {
+  modelName: string;
+  reason: string;
+};
+
+/** Counts describe value coverage and actual engine eligibility, never reliability. */
+export type DailyFusionMetricDiagnostic = {
+  status: DailyFusionDiagnosticStatus;
+  expectedModelCount: number;
+  availableValueModelCount: number;
+  evidenceEligibleModelCount: number;
+  contributingModelCount: number;
+  availableModels: string[];
+  evidenceEligibleModels: string[];
+  modelReasons: DailyFusionModelReason[];
+  reason: string;
+};
+
 export type DailyForecastSourceDiagnostic = {
   modelName: string;
   variable: DailyForecastMetric;
@@ -40,6 +67,13 @@ export type DailyOfficialFusionDisplay = {
     precipitation: DailyForecastSourceDiagnostic[];
     windSpeed: DailyForecastSourceDiagnostic[];
     windGust: DailyForecastSourceDiagnostic[];
+  };
+  diagnosticsByVariable?: {
+    tempMax: DailyFusionMetricDiagnostic;
+    tempMin: DailyFusionMetricDiagnostic;
+    precipitation: DailyFusionMetricDiagnostic;
+    windSpeed: DailyFusionMetricDiagnostic;
+    windGust: DailyFusionMetricDiagnostic;
   };
 };
 

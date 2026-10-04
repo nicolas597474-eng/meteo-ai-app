@@ -3,6 +3,7 @@ import { getDailyForecastHorizon } from "./dailyForecastPerformance";
 import { OFFICIAL_HOURLY_MODELS, type ForecastData } from "./weatherServices";
 import type { DailyFusionMetric, DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
 import { PRECIPITATION_RAIN_THRESHOLD_MM, summarizePrecipitationModels, type PrecipitationModelConsensus } from "../shared/precipitationConsensus";
+import type { DailyFusionMetricDiagnostic } from "../shared/dailyForecast";
 
 export type OfficialDailyForecastInput = Pick<ForecastData, "serviceName" | "tempMax" | "tempMin" | "precipitation" | "windSpeed" | "windGust" | "humidity" | "cloudCover">;
 export type DailyCalibrationStatus = "calibrated" | "insufficient_data" | "schema_unavailable";
@@ -122,7 +123,7 @@ function resultStatus(result: FusionResult, options: OfficialDailyForecastOption
 }
 
 /** Official daily model-only fusion. Missing exact production evidence never becomes an equal-weight forecast. */
-export function computeOfficialDailyForecast(
+function computeOfficialDailyForecastInternal(
   forecasts: OfficialDailyForecastInput[],
   options: OfficialDailyForecastOptions,
 ) {
@@ -157,6 +158,7 @@ export function computeOfficialDailyForecast(
   );
 
   const fusions = new Map<DailyFusionMetric, FusionResult>();
+  const metricForecastsByMetric = new Map<DailyFusionMetric, OfficialDailyForecastInput[]>();
   for (const { key } of metrics) {
     const expected = horizonBucket ? { locationKey: options.locationKey, variable: key, horizonBucket } : null;
     const metricForecasts = key === "precipitation_sum"
@@ -165,6 +167,7 @@ export function computeOfficialDailyForecast(
         && Number.isFinite(forecast.precipitation)
         && forecast.precipitation >= PRECIPITATION_RAIN_THRESHOLD_MM)
       : officialForecasts;
+    metricForecastsByMetric.set(key, metricForecasts);
     const sources: FusionSource[] = expected ? metricForecasts.map((forecast) => {
       const service = OFFICIAL_DAILY_MODEL_BY_NAME.get(forecast.serviceName);
       const evidence = options.evidence.find((item) => item.serviceName === forecast.serviceName
@@ -205,6 +208,79 @@ export function computeOfficialDailyForecast(
     : rawPrecipitationConsensus;
   const windFusion = getFusion("wind_speed_max");
   const gustFusion = getFusion("wind_gust_max");
+
+  const buildMetricDiagnostic = (key: DailyFusionMetric): DailyFusionMetricDiagnostic => {
+    const fusion = getFusion(key);
+    const valueByModel = new Map<string, number>();
+    for (const forecast of officialForecasts) {
+      const value = forecastValue(forecast, key);
+      if (typeof value === "number" && Number.isFinite(value)) valueByModel.set(forecast.serviceName, value);
+    }
+    const availableModels = Array.from(valueByModel.keys());
+    const capBlockedSources = fusion.excludedSources.filter((source) => source.reason.includes("plafond individuel"));
+    const capBlockedNames = new Set(capBlockedSources.map((source) => source.name));
+    const contributingNames = new Set(fusion.usedSources.map((source) => source.name));
+    // The engine's cap exclusion is the authoritative signal that these models
+    // passed exact evidence checks but could not be normalized under its cap.
+    const evidenceEligibleModels = Array.from(new Set(Array.from(contributingNames).concat(Array.from(capBlockedNames))));
+    const metricForecastNames = new Set((metricForecastsByMetric.get(key) ?? []).map((forecast) => forecast.serviceName));
+    const engineReasons = new Map(fusion.excludedSources.map((source) => [source.name, source.reason]));
+    const modelReasons = DAILY_PRECIPITATION_MODEL_NAMES.flatMap((modelName) => {
+      if (evidenceEligibleModels.includes(modelName)) return [];
+      if (!valueByModel.has(modelName)) return [{ modelName, reason: "Aucune valeur finie disponible pour cette variable à cette échéance." }];
+      if (!horizonBucket) return [{ modelName, reason: "Aucune tranche d’horizon exacte n’est disponible pour cette date." }];
+      if (key === "precipitation_sum" && !metricForecastNames.has(modelName)) {
+        return [{ modelName, reason: `Valeur disponible, mais sous le seuil de pluie de ${PRECIPITATION_RAIN_THRESHOLD_MM} mm utilisé pour la quantité conditionnelle.` }];
+      }
+      const reason = engineReasons.get(modelName);
+      return [{ modelName, reason: reason ?? "Le moteur n’a pas retenu ce modèle comme contributeur de cette variable." }];
+    });
+
+    let status: DailyFusionMetricDiagnostic["status"];
+    let reason: string;
+    if (availableModels.length === 0) {
+      status = "no_model_values";
+      reason = `Aucun des ${DAILY_PRECIPITATION_MODEL_NAMES.length} modèles officiels ne fournit une valeur finie pour cette variable à cette échéance; cela ne signale pas à lui seul une erreur.`;
+    } else if (!horizonBucket) {
+      status = "horizon_unavailable";
+      reason = "La date ne correspond à aucune tranche d’horizon exacte; aucune preuve d’une autre échéance n’est réutilisée.";
+    } else if (key === "precipitation_sum" && precipitationConsensus.rainModelCount === 0) {
+      status = "no_rain_contributors";
+      reason = `${availableModels.length} modèle(s) fournissent une valeur, mais aucun n’atteint le seuil de pluie de ${precipitationConsensus.thresholdMm} mm utilisé pour la quantité conditionnelle.`;
+    } else if (!options.evidenceStoreAvailable) {
+      status = "evidence_store_unavailable";
+      reason = "L’archive des preuves historiques est indisponible; le moteur ne remplace pas cette preuve par des poids égaux.";
+    } else if (capBlockedSources.length > 0) {
+      status = "weight_cap_blocked";
+      reason = `${evidenceEligibleModels.length} modèle(s) ont une valeur et une preuve exacte admissible, mais la fusion est bloquée par le moteur : ${capBlockedSources[0]!.reason}.`;
+    } else if (fusion.performanceEvidenceStatus === "qualified" && contributingNames.size > 0) {
+      status = "calibrated";
+      reason = `Fusion produite par le moteur avec ${contributingNames.size} contributeur(s) disposant de preuves exactes qualifiées.`;
+    } else {
+      status = "insufficient_evidence";
+      const engineEvidenceReasons = Array.from(new Set(availableModels
+        .map((modelName) => engineReasons.get(modelName))
+        .filter((reason): reason is string => Boolean(reason))));
+      reason = engineEvidenceReasons.length > 0
+        ? `Des valeurs sont présentes, mais aucune preuve historique exacte n’a permis de qualifier un contributeur : ${engineEvidenceReasons.join("; ")}.`
+        : "Des valeurs sont présentes, mais le moteur n’a renvoyé aucun contributeur avec des preuves historiques qualifiées pour ce lieu, cette variable et cet horizon.";
+    }
+
+    return {
+      status,
+      expectedModelCount: DAILY_PRECIPITATION_MODEL_NAMES.length,
+      availableValueModelCount: availableModels.length,
+      evidenceEligibleModelCount: evidenceEligibleModels.length,
+      contributingModelCount: contributingNames.size,
+      availableModels,
+      evidenceEligibleModels,
+      modelReasons,
+      reason,
+    };
+  };
+  const parameterDiagnostics = Object.fromEntries(
+    metrics.map(({ key }) => [key, buildMetricDiagnostic(key)]),
+  ) as Record<DailyFusionMetric, DailyFusionMetricDiagnostic>;
   const calibrationStatus = {
     tempMax: resultStatus(maxFusion, options),
     tempMin: resultStatus(minFusion, options),
@@ -261,7 +337,7 @@ export function computeOfficialDailyForecast(
     && calibrationStatus.tempMin === "calibrated"
     && calibrationStatus.precipitation === "calibrated"
     && calibrationStatus.windSpeed === "calibrated";
-  return {
+  const forecast = {
     tempMax: calibrationStatus.tempMax === "calibrated" ? maxFusion.temperature : null,
     tempMin: calibrationStatus.tempMin === "calibrated" ? minFusion.temperature : null,
     precipitation: calibrationStatus.precipitation === "calibrated" ? precipitationConsensus.consensusEstimateMm : null,
@@ -274,6 +350,24 @@ export function computeOfficialDailyForecast(
     coreCalibrationComplete: coreReady,
     weights,
     trace,
-    methodNote: `Fusion quotidienne ${coreReady ? "calibrée" : "non calibrée"} : ${calibratedCount}/7 variables disposent d’une preuve qualifiée; horizon ${horizon?.bucket ?? "indisponible"}. La pluie est calculée par fréquence brute × quantité conditionnelle et n’est jamais une probabilité calibrée.`,
+    methodNote: `Fusion quotidienne ${coreReady ? "calibrée" : "non calibrée"}: ${calibratedCount}/7 variables disposent d’une preuve qualifiée; horizon ${horizon?.bucket ?? "indisponible"}. La pluie est calculée par fréquence brute × quantité conditionnelle et n’est jamais une probabilité calibrée.`,
   };
+  return { forecast, parameterDiagnostics };
+}
+
+/** Production/archive result: keeps the historical forecast and trace contract unchanged. */
+export function computeOfficialDailyForecast(
+  forecasts: OfficialDailyForecastInput[],
+  options: OfficialDailyForecastOptions,
+) {
+  return computeOfficialDailyForecastInternal(forecasts, options).forecast;
+}
+
+/** Live-only additive diagnostics; callers persisting the forecast should use computeOfficialDailyForecast. */
+export function computeOfficialDailyForecastWithDiagnostics(
+  forecasts: OfficialDailyForecastInput[],
+  options: OfficialDailyForecastOptions,
+) {
+  const { forecast, parameterDiagnostics } = computeOfficialDailyForecastInternal(forecasts, options);
+  return { ...forecast, parameterDiagnostics };
 }

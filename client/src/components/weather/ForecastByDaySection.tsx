@@ -20,7 +20,7 @@ import {
   type ForecastTimelineSelection,
   type IndexedForecastHour,
 } from "@/lib/forecastTimeline";
-import type { DailyForecastEvidenceStatus, DailyOfficialFusionDisplay, DailyForecastSourceDiagnostic } from "@shared/dailyForecast";
+import type { DailyForecastEvidenceStatus, DailyOfficialFusionDisplay, DailyForecastSourceDiagnostic, DailyFusionMetricDiagnostic } from "@shared/dailyForecast";
 
 type PrecipitationMetrics = {
   thresholdMm?: number | null;
@@ -281,6 +281,18 @@ function evidenceStatusLabel(status: DailyForecastEvidenceStatus): string {
   return "indisponible · preuves qualifiées insuffisantes";
 }
 
+function diagnosticStatusLabel(diagnostic: DailyFusionMetricDiagnostic): string {
+  switch (diagnostic.status) {
+    case "calibrated": return "fusion produite avec preuves exactes";
+    case "no_model_values": return "aucune valeur de modèle disponible à cette échéance";
+    case "insufficient_evidence": return "valeurs présentes, preuves historiques qualifiées insuffisantes";
+    case "weight_cap_blocked": return "preuves admissibles, fusion bloquée par le plafond des poids";
+    case "evidence_store_unavailable": return "archive des preuves historiques indisponible";
+    case "horizon_unavailable": return "tranche d’horizon exacte indisponible";
+    case "no_rain_contributors": return "aucun modèle au seuil utilisé pour la quantité de pluie";
+  }
+}
+
 function biasDescription(source: DailyForecastSourceDiagnostic, unit: string): string {
   if (source.signedBias == null) return `${source.modelName} · biais signé indisponible`;
   const bias = source.signedBias.toLocaleString("fr-FR", { signDisplay: "always", maximumFractionDigits: 1 });
@@ -316,9 +328,23 @@ function DailyFusionDiagnostics({ day, sourceLabels }: { day: DailyForecastPoint
       <div className="space-y-1">
         {variables.map(({ label, key, status, unit }) => {
           const sources = fusion.sourcesByVariable[key];
-          return <p key={key}><strong className="text-slate-100">{label} :</strong> {evidenceStatusLabel(status)}{sources.length > 0 ? ` · ${sources.map((source) => `${source.modelName} (${(source.finalWeight * 100).toFixed(1)} %)`).join(", ")}` : ""}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>;
+          const diagnostic = fusion.diagnosticsByVariable?.[key];
+          return <div key={key} className="space-y-1">
+            <p><strong className="text-slate-100">{label} :</strong> {diagnostic ? diagnosticStatusLabel(diagnostic) : evidenceStatusLabel(status)}{sources.length > 0 ? ` · ${sources.map((source) => `${source.modelName} (${(source.finalWeight * 100).toFixed(1)} %)`).join(", ")}` : ""}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>
+            {diagnostic && <div className="pl-2 text-slate-400">
+              <p>Valeurs présentes : {diagnostic.availableValueModelCount}/{diagnostic.expectedModelCount} · preuves admissibles avant plafond : {diagnostic.evidenceEligibleModelCount} · contributeurs effectifs : {diagnostic.contributingModelCount}.</p>
+              <p>{diagnostic.reason}</p>
+              {diagnostic.availableModels.length > 0 && <p>Modèles avec valeur : {diagnostic.availableModels.join(", ")}.</p>}
+              {diagnostic.evidenceEligibleModels.length > 0 && diagnostic.status === "weight_cap_blocked" && <p>Modèles admissibles avant plafond : {diagnostic.evidenceEligibleModels.join(", ")}.</p>}
+              {diagnostic.modelReasons.length > 0 && <details className="mt-1">
+                <summary className="cursor-pointer text-sky-100">Motif par modèle ({diagnostic.modelReasons.length})</summary>
+                <ul className="list-inside list-disc pl-1">{diagnostic.modelReasons.map(({ modelName, reason: modelReason }) => <li key={`${key}-${modelName}`}>{modelName} — {modelReason}</li>)}</ul>
+              </details>}
+            </div>}
+          </div>;
         })}
       </div>
+      <p>Les effectifs ci-dessus décrivent la couverture des valeurs et l’admissibilité au calcul; ils ne constituent ni une note de fiabilité ni un pourcentage de confiance. Une couverture plus faible peut être normale selon l’horizon du modèle.</p>
       <p>Biais historique signé (prévision − observation), diagnostic uniquement; une valeur positive indique une surestimation. Sans preuve qualifiée, le biais reste indisponible.</p>
       <p>Dispersion descriptive indisponible : l’heure exacte des runs modèles n’est pas fournie. Effectifs de valeurs reçues, sans assertion de comparabilité : {availability}. Aucun min/max, étendue ni écart-type n’est publié comme incertitude.</p>
       <div className="rounded-lg border border-sky-100/10 bg-black/15 p-2">

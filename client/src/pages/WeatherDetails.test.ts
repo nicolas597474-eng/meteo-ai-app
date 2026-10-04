@@ -27,6 +27,17 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("l’heure exacte des runs modèles n’est pas fournie");
     expect(timelineSource).toContain("Best Match");
   });
+  it("expose les trois causes de disponibilité depuis le diagnostic du moteur, sans score de confiance", () => {
+    expect(timelineSource).toContain('case "no_model_values"');
+    expect(timelineSource).toContain('case "insufficient_evidence"');
+    expect(timelineSource).toContain('case "weight_cap_blocked"');
+    expect(timelineSource).toContain("diagnosticsByVariable?.[key]");
+    expect(timelineSource).toContain("Valeurs présentes :");
+    expect(timelineSource).toContain("preuves admissibles avant plafond");
+    expect(timelineSource).toContain("contributeurs effectifs");
+    expect(timelineSource).toContain("ils ne constituent ni une note de fiabilité ni un pourcentage de confiance");
+    expect(timelineSource).toContain("Une couverture plus faible peut être normale selon l’horizon du modèle.");
+  });
   it("garde les rubans horizontaux accessibles et n’invente pas d’échéances pour la série quotidienne", () => {
     expect(timelineSource).toContain('aria-label="Jours de prévision défilables"');
     expect(timelineSource).toContain('aria-label="Heures de prévision défilables"');

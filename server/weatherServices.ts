@@ -11,7 +11,7 @@ import type { HourlyHistoricalEvidence, HourlyMultiModelMetrics } from "../share
 import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 import type { BestMatchDailyReference, DailyForecastMetric, DailyOfficialFusionDisplay } from "../shared/dailyForecast";
-import type { computeOfficialDailyForecast, ForecastTraceSource } from "./officialForecast";
+import type { computeOfficialDailyForecastWithDiagnostics, ForecastTraceSource } from "./officialForecast";
 import {
   buildDailyModelCollectionCoverage,
   buildHourlyModelCollectionCoverage,
@@ -80,7 +80,7 @@ export type DailyFusionResolver = (
   targetDate: string,
   forecasts: ForecastData[],
   issuedAt: number,
-) => Promise<ReturnType<typeof computeOfficialDailyForecast>>;
+) => Promise<ReturnType<typeof computeOfficialDailyForecastWithDiagnostics>>;
 
 export type Collect15DayForecastOptions = {
   issuedAt: number;
@@ -610,6 +610,13 @@ export async function collect15DayForecast(
         precipitation: toDiagnostics(fusion.trace.parameterSources.precipitation, "precipitation_sum", horizonBucket),
         windSpeed: toDiagnostics(fusion.trace.parameterSources.wind, "wind_speed_max", horizonBucket),
         windGust: toDiagnostics(fusion.trace.parameterSources.windGust, "wind_gust_max", horizonBucket),
+      },
+      diagnosticsByVariable: {
+        tempMax: fusion.parameterDiagnostics.temperature_max,
+        tempMin: fusion.parameterDiagnostics.temperature_min,
+        precipitation: fusion.parameterDiagnostics.precipitation_sum,
+        windSpeed: fusion.parameterDiagnostics.wind_speed_max,
+        windGust: fusion.parameterDiagnostics.wind_gust_max,
       },
     };
     const precipitationIsQualified = fusion.calibrationStatus.precipitation === "calibrated";
