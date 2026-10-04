@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCollectionDuration, getCollectionHealth } from "./collectionHealth";
+import { countArchivedSnapshotSlots, formatCollectionDuration, getCollectionHealth } from "./collectionHealth";
 
 describe("getCollectionHealth", () => {
   const now = new Date("2026-08-28T12:00:00.000Z");
@@ -12,6 +12,7 @@ describe("getCollectionHealth", () => {
     });
     expect(health.label).toBe("À jour");
     expect(health.status).toBe("up_to_date");
+    expect(health.detail).toBe("Succès de prévisions récent · il y a 2 h");
   });
 
   it("signale une collecte partielle", () => {
@@ -52,5 +53,18 @@ describe("formatCollectionDuration", () => {
     expect(formatCollectionDuration(12_400)).toBe("12 s");
     expect(formatCollectionDuration(72_000)).toBe("1 min 12 s");
     expect(formatCollectionDuration(null)).toBe("Non mesurée");
+  });
+});
+
+describe("countArchivedSnapshotSlots", () => {
+  it("ne compte que les créneaux dont les données sont effectivement archivées", () => {
+    expect(countArchivedSnapshotSlots([
+      { status: "stored" },
+      { status: "no_station" },
+      { status: "failed" },
+      { status: "missing" },
+      { status: "stored" },
+    ])).toBe(2);
+    expect(countArchivedSnapshotSlots(undefined)).toBe(0);
   });
 });

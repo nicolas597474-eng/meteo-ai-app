@@ -20,8 +20,9 @@ import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenance
 import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
 import { PrecipitationConsensusChart } from "@/components/weather/PrecipitationConsensusChart";
-import { getCollectionHealth, formatCollectionDuration } from "@/lib/collectionHealth";
+import { countArchivedSnapshotSlots, getCollectionHealth, formatCollectionDuration } from "@/lib/collectionHealth";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
+import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
@@ -30,7 +31,7 @@ const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
-function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
+function WindRose({ direction }: { direction: number | null }) {
   const dir = direction;
   const cardinalDir = (deg: number) => {
     const dirs = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
@@ -57,49 +58,8 @@ function WindRose({ direction, speed }: { direction: number | null; speed: numbe
         </svg>
       </div>
       <p className="text-[10px] font-bold text-blue-300">{dir == null ? "—" : cardinalDir(dir)}</p>
-      {speed != null && <p className="text-[10px] text-muted-foreground">{speed}km/h</p>}
     </div>
   );
-}
-
-type CurrentStateFieldLike = {
-  value: number | string | null;
-  provenance: {
-    kind: "physical_stations" | "open_meteo_snapshot" | "unavailable";
-    label: string;
-    stationCount: number;
-    stationSources: string[];
-    observedAt: string | null;
-    ageMinutes: number | null;
-    reason: string | null;
-    measurements: Array<{ stationName: string; source: string; observedAt: string; ageMinutes: number }>;
-  };
-};
-
-function formatCurrentStateProvenance(field?: CurrentStateFieldLike | null, snapshotAt?: string | null): string {
-  const provenance = field?.provenance;
-  const observedAt = provenance?.observedAt ?? snapshotAt ?? null;
-  const parsedAt = observedAt ? Date.parse(observedAt) : Number.NaN;
-  const age = provenance
-    ? provenance.ageMinutes
-    : Number.isFinite(parsedAt) && parsedAt <= Date.now()
-      ? Math.floor((Date.now() - parsedAt) / 60_000)
-      : null;
-  const ageLabel = age == null ? "âge inconnu" : age === 0 ? "à l’instant" : `il y a ${age} min`;
-  const timeLabel = Number.isFinite(parsedAt)
-    ? new Date(parsedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
-    : null;
-
-  if (!provenance) return timeLabel ? `Open-Meteo · ${timeLabel} · ${ageLabel}` : "Source/horodatage indisponible";
-  if (provenance.kind === "physical_stations") {
-    const sources = provenance.stationSources.join(" + ") || "stations physiques";
-    const stationLabel = `${provenance.stationCount} station${provenance.stationCount > 1 ? "s" : ""}`;
-    return `${stationLabel} · ${sources} · ${ageLabel}`;
-  }
-  if (provenance.kind === "open_meteo_snapshot") {
-    return `Open-Meteo · ${timeLabel ?? "heure inconnue"} · ${ageLabel}`;
-  }
-  return "Indisponible";
 }
 
 function currentStateFieldTitle(field?: CurrentStateFieldLike | null, snapshotAt?: string | null): string {
@@ -211,6 +171,7 @@ function hourlyCollectionMoment(trace: HourlyCollectionTrace) {
 function DominantRegimePanel({
   regime,
   panelDate,
+  regimeSourceLabel,
   regimeFreshnessLabel,
   regimeSourceUpdatedAt,
   showRegimeMenu,
@@ -224,6 +185,7 @@ function DominantRegimePanel({
 }: {
   regime: any;
   panelDate: string;
+  regimeSourceLabel: string;
   regimeFreshnessLabel: string;
   regimeSourceUpdatedAt: string | null;
   showRegimeMenu: boolean;
@@ -253,7 +215,7 @@ function DominantRegimePanel({
             <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">État du ciel</p>
             <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
             <p className="hidden text-xs leading-tight text-muted-foreground sm:block">{regime.description}</p>
-            <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>
+            <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">{regimeSourceLabel} · {regimeFreshnessLabel}</p>
             <span className="sr-only">Voir les 20 régimes</span>
           </div>
         </button>
@@ -410,7 +372,7 @@ export default function Dashboard() {
     }
   );
   // Réponse officielle consolidée : la même source alimente Dashboard et Détails.
-  const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast, dataUpdatedAt: officialDataUpdatedAt } = trpc.weather.getDetailedForecast.useQuery(
+  const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast } = trpc.weather.getDetailedForecast.useQuery(
     { ...coordsInput, includeExtendedPeriods: false },
     {
       staleTime: 60 * 1000,
@@ -450,6 +412,7 @@ export default function Dashboard() {
     }
   );
   const hourlyCollectionHistory = (collectionHealthReport?.hourlyHistory ?? []) as HourlyCollectionTrace[];
+  const archivedSnapshotSlots = countArchivedSnapshotSlots(hourlyCollectionHistory);
   const technicalFailureStreak = collectionHealthReport?.technicalFailureStreak ?? 0;
   const missingSnapshotSlots = collectionHealthReport?.missingSnapshotSlots ?? 0;
   const latestHourlyCollection = hourlyCollectionHistory[0] ?? null;
@@ -461,7 +424,11 @@ export default function Dashboard() {
       : latestForecastRun?.status === "completed"
         ? "completed"
         : null;
-  const latestForecastSuccessAt = collectionHealthReport?.lastForecastSuccess?.collectedAt ?? latestForecastRun?.collectedAt ?? null;
+  const latestForecastSuccessAt = collectionHealthReport?.lastForecastSuccess?.collectedAt ?? null;
+  const latestForecastSuccessDurationMs = collectionHealthReport?.lastForecastSuccess?.status === "completed" && latestForecastRun?.status === "completed" && latestForecastSuccessAt && latestForecastRun.collectedAt
+    && new Date(latestForecastSuccessAt).getTime() === new Date(latestForecastRun.collectedAt).getTime()
+    ? latestForecastRun.durationMs
+    : null;
   const latestCollectionTraceKey = latestHourlyCollection
     ? [
         latestHourlyCollection.date,
@@ -551,7 +518,7 @@ export default function Dashboard() {
     if (!latestCollectionTraceKey || !latestHourlyCollection) return;
     const previousKey = latestCollectionTraceKeyRef.current;
     latestCollectionTraceKeyRef.current = latestCollectionTraceKey;
-    if (previousKey && previousKey !== latestCollectionTraceKey) {
+    if (previousKey && previousKey !== latestCollectionTraceKey && latestHourlyCollection.status !== "missing") {
       setCollectionUpdateNotice(latestHourlyCollection);
     }
   }, [latestCollectionTraceKey, latestHourlyCollection]);
@@ -637,19 +604,15 @@ export default function Dashboard() {
       : regimeUnavailable
         ? { regime: "unknown", label: "Régime indisponible", emoji: "—", description: officialRegime?.description ?? "Des données météo requises sont absentes ou invalides.", weights: null }
         : dash?.regime;
-  const regimeSourceUpdatedAt = officialRegime?.sourceUpdatedAt
-    ? new Date(officialRegime.sourceUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
-    : null;
-  const regimeAgeMinutes = officialRegime?.sourceUpdatedAt
-    ? Math.max(0, Math.floor((Date.now() - new Date(officialRegime.sourceUpdatedAt).getTime()) / 60000))
-    : officialDataUpdatedAt
-      ? Math.max(0, Math.floor((Date.now() - officialDataUpdatedAt) / 60000))
-      : null;
-  const liveRegimeFreshnessLabel = regimeAgeMinutes == null
-    ? "Mise à jour en cours"
-    : regimeAgeMinutes === 0
-      ? "Mis à jour à l’instant"
-      : `Mis à jour il y a ${regimeAgeMinutes} min`;
+  const regimeProvenance = getRegimeProvenancePresentation({
+    source: officialRegime?.source,
+    sourceLabel: officialRegime?.sourceLabel,
+    sourceUpdatedAt: officialRegime?.sourceUpdatedAt,
+    hasRegime: !!officialPrimaryRegime,
+  });
+  const regimeSourceLabel = regimeProvenance.sourceLabel;
+  const regimeSourceUpdatedAt = regimeProvenance.sourceTimeLabel;
+  const liveRegimeFreshnessLabel = regimeProvenance.freshnessLabel;
   const allRegimeIds = regimeCatalogue.map((candidate: any) => candidate.id);
   const allRegimesExpanded = allRegimeIds.length > 0 && allRegimeIds.every((id) => expandedRegimeIds.includes(id));
   const netatmoStatusLabel: Record<string, string> = {
@@ -676,9 +639,7 @@ export default function Dashboard() {
   const fallbackComputedAtLabel = isDailyFallback
     ? new Date(dailyFallback.computedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
     : null;
-  const regimeFreshnessLabel = isDailyFallback
-    ? `Fusion quotidienne du ${fallbackDateLabel}`
-    : liveRegimeFreshnessLabel;
+  const regimeFreshnessLabel = liveRegimeFreshnessLabel;
   const nextConditionChange = isDailyFallback ? null : findNextConditionChange(hours, currentHour?.hour ?? nowHour, currentHour?.validAt);
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
   const officialSnapshotTemp = currentSnapshot?.temp ?? null;
@@ -778,7 +739,7 @@ export default function Dashboard() {
                       <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">État du ciel</p>
                       <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime?.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime?.description}</p>
-                      <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">Synthèse horaire · {regimeFreshnessLabel}</p>
+                      <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">{regimeSourceLabel} · {regimeFreshnessLabel}</p>
                       <span className="sr-only">Voir les 20 régimes</span>
                     </div>
                   </button>
@@ -864,7 +825,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
+                <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeSourceLabel} · {regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
               </div>
             )}
 
@@ -882,8 +843,8 @@ export default function Dashboard() {
 
             <div className="mb-3">
               <button type="button" onClick={() => setIsCollectionHealthOpen(true)} aria-haspopup="dialog" aria-expanded={isCollectionHealthOpen} aria-controls="collection-health-panel" aria-label={`Ouvrir l’historique des collectes : ${collectionHealth.detail}`} className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left shadow-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${collectionHealth.tone}`}>
-                <span className="flex min-w-0 items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${collectionHealth.dot}`} aria-hidden="true" /><span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-[0.12em] opacity-75">Santé des collectes</span><strong className="block truncate text-[11px]">{collectionHealth.label}</strong><span className="block truncate text-[9px] opacity-80">{collectionHealth.detail}</span>{collectionUpdateNotice && <span className="mt-0.5 flex items-center gap-1 text-[9px] font-semibold text-cyan-100" role="status" aria-live="polite"><Activity className="h-3 w-3 shrink-0" aria-hidden="true" />Actualisé · passage de {hourlyCollectionMoment(collectionUpdateNotice)}</span>}</span></span><span className="shrink-0 text-[9px] font-semibold text-white/80">Détails&nbsp;→</span>
-                <span className="shrink-0 text-right text-[9px] leading-tight opacity-85">{hourlyCollectionHistory.length}/24<br />passages</span>
+                <span className="flex min-w-0 items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${collectionHealth.dot}`} aria-hidden="true" /><span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-[0.12em] opacity-75">Santé des prévisions</span><strong className="block truncate text-[11px]">{collectionHealth.label}</strong><span className="block truncate text-[9px] opacity-80">{collectionHealth.detail}</span>{collectionUpdateNotice && <span className="mt-0.5 flex items-center gap-1 text-[9px] font-semibold text-cyan-100" role="status" aria-live="polite"><Activity className="h-3 w-3 shrink-0" aria-hidden="true" />Trace · {hourlyCollectionMoment(collectionUpdateNotice)} · {hourlyCollectionPresentation(collectionUpdateNotice).label}</span>}</span></span><span className="shrink-0 text-[9px] font-semibold text-white/80">Détails&nbsp;→</span>
+                <span className="shrink-0 text-right text-[9px] leading-tight opacity-85">{collectionHealthReport ? `${archivedSnapshotSlots}/${hourlyCollectionHistory.length}` : "—/24"}<br />créneaux archivés</span>
               </button>
             </div>
 
@@ -931,13 +892,13 @@ export default function Dashboard() {
                 {/* Max / Min */}
                 <div className={dashboardTemperatureLayout.extremes}>
                   <div className={`flex items-center justify-end gap-1 rounded-lg border px-1.5 py-0.5 sm:gap-1.5 ${maxTemperatureTone.container}`}>
-                    <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wide ${maxTemperatureTone.label}`}>max</span>
+                    <span className={`text-[8px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wide ${maxTemperatureTone.label}`}>Max prévue</span>
                     <span className={`${dashboardTemperatureLayout.extremeValue} font-black ${maxTemperatureTone.value}`}>
                       {maxTemperature != null ? Number(maxTemperature).toFixed(1) : "—"}°
                     </span>
                   </div>
                   <div className={`flex items-center justify-end gap-1 rounded-lg border px-1.5 py-0.5 sm:gap-1.5 ${minTemperatureTone.container}`}>
-                    <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wide ${minTemperatureTone.label}`}>min</span>
+                    <span className={`text-[8px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wide ${minTemperatureTone.label}`}>Min prévue</span>
                     <span className={`${dashboardTemperatureLayout.extremeValue} font-black ${minTemperatureTone.value}`}>
                       {minTemperature != null ? Number(minTemperature).toFixed(1) : "—"}°
                     </span>
@@ -973,8 +934,9 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Apparent temp + UV + Wind rose highlight row */}
-            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700/60`}>
+            <section aria-label="Observations actuelles" className="rounded-xl border border-cyan-400/20 bg-cyan-950/10 px-2 pb-2">
+              <p className="pt-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-200/80">Observations actuelles <span className="font-normal normal-case tracking-normal text-slate-400">· provenance propre à chaque champ</span></p>
+            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-cyan-400/20`}>
               {/* Ressenti */}
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
@@ -987,29 +949,35 @@ export default function Dashboard() {
                   {formatCurrentStateProvenance(apparentTemperatureField, currentSnapshot?.capturedAt)}
                 </p>
               </div>
-              {/* UV Index */}
-              <div className="text-center">
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
-                  <Sun className="h-3 w-3" />UV prévu
-                </p>
-                <UVBadge uv={currentUV} />
-              </div>
               {/* Wind Rose */}
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
-                  <Wind className="h-3 w-3" />Direction
+                  <Wind className="h-3 w-3" />Direction du vent
                 </p>
                 <div className="flex justify-center">
-                  <WindRose direction={windDir} speed={windSpeed} />
+                  <WindRose direction={windDir} />
                 </div>
                 <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(windDirectionField, currentSnapshot?.capturedAt)}>
-                  {formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)}
+                  Direction · {formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)}
                 </p>
               </div>
+              <div className="text-center" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
+                  <MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité actuelle
+                </p>
+                <p className="text-lg font-bold sm:text-2xl">{currentHumidity == null ? "—" : `${formatDashboardNumber(currentHumidity)}%`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(humidityField, currentSnapshot?.capturedAt)}</p>
+              </div>
             </div>
+            </section>
 
-            {/* Stats row */}
-            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-slate-700`}>
+            <section aria-label="Prévisions du jour" className="mt-2 rounded-xl border border-sky-400/20 bg-sky-950/10 px-2 pb-2">
+              <p className="pt-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">Prévisions du jour <span className="font-normal normal-case tracking-normal text-slate-400">· valeurs prévues, distinctes des observations</span></p>
+              <div className="mt-2 grid grid-cols-2 gap-1 border-t border-sky-400/20 pt-2 sm:grid-cols-4 sm:gap-2">
+              <div className="text-center">
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-sky-200 sm:mb-0.5 sm:text-xs"><Sun className="h-3 w-3" />UV prévu</p>
+                <UVBadge uv={currentUV} />
+              </div>
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                   <Droplets className="h-3 w-3" />Pluie prévue
@@ -1022,33 +990,15 @@ export default function Dashboard() {
                 </p>
                 <p className="text-sm font-semibold sm:text-lg">{today?.windGust ?? "—"} km/h</p>
               </div>
-                <div className="text-center">
-                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                    <MeteoIcon name="wind_param" size={16} className="shrink-0" />Vent max prévu
-                  </p>
+              <div className="text-center">
+                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-sky-200 sm:mb-0.5 sm:text-xs">
+                  <MeteoIcon name="wind_param" size={16} className="shrink-0" />Vent max prévu
+                </p>
                 <p className="text-sm font-semibold sm:text-lg">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
               </div>
-                <div className="text-center">
-                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                    <MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité actuelle
-                  </p>
-                <p className="text-sm font-semibold sm:text-lg">{currentHumidity ?? "—"}%</p>
-                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
-                  {formatCurrentStateProvenance(humidityField, currentSnapshot?.capturedAt)}
-                </p>
-              </div>
               <div className="text-center">
-                  <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                    <Eye className="h-3 w-3" />Nuages actuels
-                  </p>
-                <p className="text-sm font-semibold sm:text-lg">{currentCloudCover ?? "—"}%</p>
-                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
-                  {formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}
-                </p>
-              </div>
-              <div className="text-center">
-                  <p className="mb-0 flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                    <Thermometer className="h-3 w-3" />Dispersion Tmax
+                  <p className="mb-0 flex items-center justify-center gap-0.5 text-[10px] text-sky-200 sm:mb-0.5 sm:text-xs">
+                    <Thermometer className="h-3 w-3" />Accord sur Tmax prévue
                     <button
                       type="button"
                       onClick={() => setIsForecastInfoOpen((open) => !open)}
@@ -1066,8 +1016,11 @@ export default function Dashboard() {
                 <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement?.tempMax.standardDeviation == null ? "σ population indisponible" : `σ population ${dailyAgreement.tempMax.standardDeviation.toFixed(1)} °C`}</p>
                 <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement ? `${dailyAgreement.tempMax.availableModelCount}/${dailyAgreement.expectedModelCount} modèles · jour demandé ${dailyAgreement.requestDayOffset == null ? "indisponible" : `J+${dailyAgreement.requestDayOffset}`} · heure de run modèle non archivée · accord brut, pas fiabilité · incertitude statistique non mesurée` : "Accord inter-modèles indisponible · incertitude statistique non mesurée"}</p>
               </div>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-1 border-t border-slate-700/70 pt-2 sm:grid-cols-4 sm:gap-2" aria-label="Autres données météorologiques courantes">
+              </div>
+            </section>
+            <section className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-950/10 p-2" aria-label="Autres données météorologiques courantes">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-200/80">Autres observations actuelles</p>
+              <div className="mt-1 grid grid-cols-2 gap-1 border-t border-cyan-400/20 pt-2 sm:grid-cols-4 sm:gap-2">
               <div className="text-center" title={currentStateFieldTitle(precipitationField, currentSnapshot?.capturedAt)}>
                 <p className="text-[10px] text-muted-foreground sm:text-xs"><Droplets className="mr-1 inline h-3 w-3" />Précipitations actuelles</p>
                 <p className="text-sm font-semibold sm:text-lg">{currentPrecipitation == null ? "—" : `${currentPrecipitation.toFixed(1)} mm`}</p>
@@ -1089,9 +1042,15 @@ export default function Dashboard() {
                 <p className="text-sm font-semibold sm:text-lg">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
                 <p className="text-[8px] leading-tight text-slate-400">{currentPressure == null ? "Références source non comparables" : formatCurrentStateProvenance(pressureField)}</p>
               </div>
+              <div className="text-center" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Eye className="mr-1 inline h-3 w-3" />Nuages actuels</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentCloudCover == null ? "—" : `${formatDashboardNumber(currentCloudCover, 0)}%`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}</p>
+              </div>
+              </div>
+            </section>
             </div>
           </div>
-        </div>
 
         <PrecipitationConsensusChart
           summary={isDailyFallback ? dailyFallback.precipitationConsensus : today?.precipitationConsensus}
@@ -1100,8 +1059,8 @@ export default function Dashboard() {
         <Dialog open={isCollectionHealthOpen} onOpenChange={setIsCollectionHealthOpen}>
           <DialogContent id="collection-health-panel" showCloseButton={false} className="max-h-[calc(100dvh-1rem)] overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:max-w-xl" aria-label="Santé des collectes automatiques">
             <DialogHeader><div className="flex items-start justify-between gap-3"><div><DialogTitle className="text-white">Santé des collectes</DialogTitle><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Les 24 derniers créneaux physiques pour ce lieu. Une absence de station qualifiée n’est pas une erreur technique ; un créneau sans trace est affiché explicitement.</p></div><button type="button" onClick={() => setIsCollectionHealthOpen(false)} aria-label="Fermer l’historique des collectes" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-600 text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-4 w-4" /></button></div></DialogHeader>
-            {collectionUpdateNotice && <div className="mt-3 flex items-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-cyan-50" role="status" aria-live="polite"><Activity className="h-4 w-4 shrink-0" aria-hidden="true" /><div><p className="text-[11px] font-semibold">Nouveau snapshot détecté</p><p className="mt-0.5 text-[10px] text-cyan-100/80">Passage de {hourlyCollectionMoment(collectionUpdateNotice)} ajouté à l’historique.</p></div></div>}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-sky-200/75">Prévisions</p><p className="mt-1 text-sm font-semibold text-slate-100">{formatCollectionDateTime(collectionHealthReport?.lastForecastSuccess?.collectedAt)}</p><p className="mt-1 text-[10px] text-slate-400">Dernier succès · {formatCollectionDuration(latestForecastRun?.durationMs)} · prochain passage {collectionHealthReport?.nextForecastRun ? formatCollectionDateTime(collectionHealthReport.nextForecastRun) : "non connu"}.</p></div><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-cyan-200/75">Stations physiques</p><p className="mt-1 text-sm font-semibold text-slate-100">{latestHourlyCollection ? hourlyCollectionMoment(latestHourlyCollection) : "Aucun passage vérifiable"}</p><p className="mt-1 text-[10px] text-slate-400">{technicalFailureStreak ? `${technicalFailureStreak} échec(s) technique(s) consécutif(s).` : "Aucune série d’échecs techniques."}</p></div></div>
+            {collectionUpdateNotice && <div className="mt-3 flex items-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-cyan-50" role="status" aria-live="polite"><Activity className="h-4 w-4 shrink-0" aria-hidden="true" /><div><p className="text-[11px] font-semibold">Trace horaire mise à jour</p><p className="mt-0.5 text-[10px] text-cyan-100/80">Passage de {hourlyCollectionMoment(collectionUpdateNotice)} · {hourlyCollectionPresentation(collectionUpdateNotice).label}.</p></div></div>}
+            <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-sky-200/75">Prévisions</p><p className="mt-1 text-sm font-semibold text-slate-100">{formatCollectionDateTime(collectionHealthReport?.lastForecastSuccess?.collectedAt)}</p><p className="mt-1 text-[10px] text-slate-400">{collectionHealthReport?.lastForecastSuccess?.status === "completed" ? "Dernier succès complet" : collectionHealthReport?.lastForecastSuccess?.status === "partial" ? "Dernier lot partiel" : collectionHealthReport?.lastForecastSuccess ? "Statut du dernier résultat indisponible" : "Aucun succès vérifiable"} · durée {formatCollectionDuration(latestForecastSuccessDurationMs)} · prochain passage {collectionHealthReport?.nextForecastRun ? formatCollectionDateTime(collectionHealthReport.nextForecastRun) : "non connu"}.</p></div><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-cyan-200/75">Stations physiques</p><p className="mt-1 text-sm font-semibold text-slate-100">{latestHourlyCollection ? hourlyCollectionMoment(latestHourlyCollection) : "Aucun passage vérifiable"}</p><p className="mt-1 text-[10px] text-slate-400">{technicalFailureStreak ? `${technicalFailureStreak} échec(s) technique(s) consécutif(s).` : "Aucune série d’échecs techniques."}</p></div></div>
             <div className="mt-3 space-y-2" aria-label="Deux dernières collectes de prévisions">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300">Deux derniers lots de prévisions</p>
               {(collectionHealthReport?.recentForecastRuns ?? []).length > 0 ? collectionHealthReport!.recentForecastRuns.map((run, index) => (
@@ -1115,7 +1074,7 @@ export default function Dashboard() {
                 </article>
               )) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-[10px] text-slate-400">Aucune collecte de prévisions horodatée n’est encore archivée.</p>}
             </div>
-            <div className="mt-3 space-y-2" aria-label="Historique des 24 derniers créneaux horaires">{hourlyCollectionHistory.length ? hourlyCollectionHistory.map((trace) => { const presentation = hourlyCollectionPresentation(trace); return <article key={`${trace.date}-${trace.hour}`} className={`rounded-xl border p-3 ${presentation.className}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-semibold">{hourlyCollectionMoment(trace)} · {presentation.label}</p><p className="mt-1 text-[10px] leading-relaxed opacity-85">{trace.status === "stored" ? `${trace.stationCount} station(s) qualifiée(s) archivée(s).` : trace.status === "no_station" ? `Passage terminé après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""} ; aucune station qualifiée.` : trace.status === "missing" ? "Le créneau est arrivé à échéance sans trace archivée ; la reprise automatique devait le rattraper." : `Échec après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.`}{trace.reason ? ` ${trace.reason}` : ""}</p></div><span className="shrink-0 text-[10px] font-semibold">{trace.status === "stored" ? "✓" : trace.status === "no_station" ? "—" : trace.status === "missing" ? "?" : "!"}</span></div></article>; }) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-xs text-slate-400">Aucun passage horaire n’est encore archivé pour ce lieu.</p>}</div>
+            <div className="mt-3 space-y-2" aria-label="Historique des 24 derniers créneaux horaires">{hourlyCollectionHistory.length ? hourlyCollectionHistory.map((trace) => { const presentation = hourlyCollectionPresentation(trace); return <article key={`${trace.date}-${trace.hour}`} className={`rounded-xl border p-3 ${presentation.className}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-semibold">{hourlyCollectionMoment(trace)} · {presentation.label}</p><p className="mt-1 text-[10px] leading-relaxed opacity-85">{trace.status === "stored" ? `${trace.stationCount} station(s) qualifiée(s) archivée(s) après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.` : trace.status === "no_station" ? `Passage terminé après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""} ; aucune station qualifiée.` : trace.status === "missing" ? "Le créneau est arrivé à échéance sans trace archivée ; la reprise automatique devait le rattraper." : `Échec après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.`}{trace.reason ? ` ${trace.reason}` : ""}</p></div><span className="shrink-0 text-[10px] font-semibold">{trace.status === "stored" ? "✓" : trace.status === "no_station" ? "—" : trace.status === "missing" ? "?" : "!"}</span></div></article>; }) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-xs text-slate-400">Aucun passage horaire n’est encore archivé pour ce lieu.</p>}</div>
           </DialogContent>
         </Dialog>
 
