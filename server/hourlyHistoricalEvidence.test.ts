@@ -28,6 +28,26 @@ describe("summarizeHourlyHistoricalEvidence", () => {
     expect(result.firstScoreDate).toBe("2025-12-25");
   });
 
+  it("qualifies exact leads independently, never pooling a neighboring millisecond horizon", () => {
+    const exactLead = 7_176_000;
+    const dates = daysBefore("2026-01-01", 7);
+    const exactRows = [
+      ...spreadRows(dates, 5, { mae: 2, rmse: 3, bias: -1, horizonMilliseconds: exactLead }),
+      ...spreadRows(dates, 100, { mae: 99, rmse: 100, bias: 50, horizonMilliseconds: exactLead + 1 }),
+    ];
+
+    const exact = summarizeHourlyHistoricalEvidence(exactRows, { ...key, horizonMilliseconds: exactLead });
+    expect(exact.status).toBe("qualified");
+    expect(exact.metrics).toMatchObject({ comparisonCount: 35, evaluatedDays: 7, mae: 2, bias: -1 });
+
+    const sixDays = summarizeHourlyHistoricalEvidence(
+      spreadRows(dates.slice(0, 6), 5, { horizonMilliseconds: exactLead }),
+      { ...key, horizonMilliseconds: exactLead },
+    );
+    expect(sixDays.status).toBe("insufficient_evidence");
+    expect(sixDays.metrics).toMatchObject({ comparisonCount: 30, evaluatedDays: 6 });
+  });
+
   it("leaves insufficient, absent, unavailable, wrong-horizon and incomplete evidence explicit", () => {
     const sixDays = spreadRows(daysBefore("2026-01-01", 6), 5);
     expect(summarizeHourlyHistoricalEvidence(sixDays, key).status).toBe("insufficient_evidence");

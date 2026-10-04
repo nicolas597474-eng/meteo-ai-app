@@ -54,6 +54,16 @@ function projectHourlyWeighting(point: OfficialWeatherSnapshot["hourly"][number]
             latestComputedAt: model.historicalEvidence.latestComputedAt,
           },
         } : {}),
+        ...(model.exactHorizonEvidence ? {
+          exactHorizonEvidence: {
+            status: model.exactHorizonEvidence.status,
+            metrics: model.exactHorizonEvidence.metrics,
+            minimumComparisons: model.exactHorizonEvidence.minimumComparisons,
+            minimumComparableDays: model.exactHorizonEvidence.minimumComparableDays,
+            latestScoreDate: model.exactHorizonEvidence.latestScoreDate,
+            latestComputedAt: model.exactHorizonEvidence.latestComputedAt,
+          },
+        } : {}),
       })),
     })),
   };

@@ -1,7 +1,7 @@
 import { getPhase3HorizonWindow } from "../shared/weatherDataHub";
 import { HOURLY_FORECAST_VARIABLES as HOURLY_SCORING_VARIABLES } from "./hourlyForecastRunScoring";
 import { HOURLY_FORECAST_VARIABLES as ARCHIVED_HOURLY_VARIABLES } from "./forecastVariableCoverage";
-import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
+import { getHourlyForecastEvaluationHistory, makeLocationKey, type HourlyExactHorizonHistoryKey } from "./db";
 import type { HourlyForecastRunValue } from "../drizzle/schema";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDateAndHour } from "./parisHourlyTime";
@@ -66,9 +66,16 @@ type HourlyModelValue = {
 };
 
 type SelectedHourlyModel = SelectedForecastModel<HourlyModelValue>;
+type HourlyHistoricalEvidenceSelection = {
+  evidence: HourlyHistoricalEvidence | null;
+  exactEvidence: HourlyHistoricalEvidence | null;
+  calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" | "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" | "UNCALIBRATED_ROBUST";
+};
 type PreparedHourlyModel = {
   selected: SelectedHourlyModel;
   evidence: HourlyHistoricalEvidence | null;
+  exactEvidence: HourlyHistoricalEvidence | null;
+  calibrationLevel: HourlyHistoricalEvidenceSelection["calibrationLevel"];
   calibrationStatus: HourlyCalibrationStatus;
   reliability: number;
   rawWeight: number;
@@ -379,15 +386,14 @@ function makeDiagnostic(
     value: selected.value,
     reliability: source.reliability,
     historicalScore: source.evidence?.metrics ?? null,
-    calibrationLevel: source.evidence?.metrics
-      ? "EXACT_LOCAL_MODEL_VARIABLE_BUCKET"
-      : "UNCALIBRATED_ROBUST",
+    calibrationLevel: source.calibrationLevel,
     calibrationStatus: source.calibrationStatus,
     rawWeight: source.rawWeight,
     robustFallbackWeight: source.robustFallbackWeight,
     weight: finalWeight,
     contributedToValue: contributes,
     ...(source.evidence ? { historicalEvidence: source.evidence } : {}),
+    ...(source.exactEvidence ? { exactHorizonEvidence: source.exactEvidence } : {}),
   };
 }
 
@@ -397,7 +403,12 @@ function computeVariableForecastValue(input: {
   historyAvailable: boolean;
   referenceAt: number;
   availabilityReasonByModel: Readonly<Record<string, string>>;
-  getHistoricalEvidence: (modelName: OfficialHourlyModelName, variable: OfficialHourlyVariable, horizonBucket: string) => HourlyHistoricalEvidence;
+  getHistoricalEvidence: (
+    modelName: OfficialHourlyModelName,
+    variable: OfficialHourlyVariable,
+    horizonMilliseconds: number,
+    horizonBucket: string,
+  ) => HourlyHistoricalEvidenceSelection;
 }): { result: VariableForecastValue; selectionDiagnostics: ForecastModelEligibilityDiagnostic[] } {
   const { variable, candidates, historyAvailable, referenceAt, availabilityReasonByModel, getHistoricalEvidence } = input;
   const field = FORECAST_FIELD_BY_VARIABLE[variable];
@@ -433,10 +444,13 @@ function computeVariableForecastValue(input: {
     missingReasonByModel: availabilityReasonByModel,
   });
   const valueHistory = selection.eligible.map((selected) => {
-    const evidence = selected.horizonBucket == null || !HISTORY_VARIABLE_SET.has(variable)
-      ? null
-      : getHistoricalEvidence(selected.modelName as OfficialHourlyModelName, variable, selected.horizonBucket);
-    return { selected, evidence };
+    const horizonMilliseconds = selected.availableAt != null && selected.validTime != null
+      ? selected.validTime - selected.availableAt
+      : Number.NaN;
+    const evidence = selected.horizonBucket == null || !HISTORY_VARIABLE_SET.has(variable) || !Number.isSafeInteger(horizonMilliseconds) || horizonMilliseconds <= 0
+      ? { evidence: null, exactEvidence: null, calibrationLevel: "UNCALIBRATED_ROBUST" as const }
+      : getHistoricalEvidence(selected.modelName as OfficialHourlyModelName, variable, horizonMilliseconds, selected.horizonBucket);
+    return { selected, ...evidence };
   });
   const metricsByBucket = new Map<string, number[]>();
   for (const item of valueHistory) {
@@ -447,7 +461,7 @@ function computeVariableForecastValue(input: {
     metricsByBucket.set(key, list);
   }
   const baselineByBucket = new Map(Array.from(metricsByBucket, ([key, values]) => [key, median(values)] as const));
-  const prepared: PreparedHourlyModel[] = valueHistory.map(({ selected, evidence }) => {
+  const prepared: PreparedHourlyModel[] = valueHistory.map(({ selected, evidence, exactEvidence, calibrationLevel }) => {
     const fullyCalibrated = evidence?.status === "qualified" && evidence.metrics != null;
     const partiallyCalibrated = evidence?.metrics != null && ["insufficient_evidence", "incomplete_metrics"].includes(evidence.status);
     const calibrationStatus: HourlyCalibrationStatus = fullyCalibrated
@@ -472,6 +486,8 @@ function computeVariableForecastValue(input: {
     return {
       selected,
       evidence,
+      exactEvidence,
+      calibrationLevel,
       calibrationStatus,
       reliability,
       rawWeight: historicalMultiplier,
@@ -545,8 +561,12 @@ function computeVariableForecastValue(input: {
       ? "Aucune série d’observations physiques n’est disponible pour calibrer cette variable; la valeur reste incluse avec un repli robuste non calibré."
       : !historyAvailable
         ? "Historique indisponible; la valeur reste incluse avec une pondération robuste non calibrée."
-      : item.selected.horizonBucket == null
-        ? "Aucun bucket historique ne correspond à cet horizon; la valeur reste incluse avec une pondération robuste non calibrée."
+        : item.selected.horizonBucket == null
+          ? "Aucun bucket historique ne correspond à cet horizon; la valeur reste incluse avec une pondération robuste non calibrée."
+        : item.exactEvidence?.status === "insufficient_evidence" && !item.evidence?.metrics
+          ? `Preuve strictement au lead exact insuffisante (${item.exactEvidence.metrics?.comparisonCount ?? 0} comparaisons, ${item.exactEvidence.metrics?.evaluatedDays ?? 0} jours); aucune preuve bucket exploitable, repli robuste appliqué.`
+        : item.exactEvidence?.status === "incomplete_metrics" && !item.evidence?.metrics
+          ? "Les métriques disponibles au lead exact sont incomplètes et aucune preuve bucket exploitable n’existe; repli robuste appliqué."
         : item.evidence?.status === "insufficient_evidence"
           ? `Preuve partielle (${item.evidence.metrics?.comparisonCount ?? 0} comparaisons, ${item.evidence.metrics?.evaluatedDays ?? 0} jours); pondération régularisée.`
           : item.evidence?.status === "incomplete_metrics"
@@ -733,11 +753,15 @@ export function computeOfficialHourlyForecast(
   historyScores: readonly OfficialHourlyEvaluationHistoryScore[],
   options: {
     historyAvailable?: boolean;
+    exactHistoryAvailable?: boolean;
+    exactHistoryScores?: readonly OfficialHourlyEvaluationHistoryScore[];
     referenceAt?: number;
     availabilityReasonByModel?: Readonly<Record<string, string>>;
   } = {},
 ): OfficialHourlyForecastResult {
   const historyAvailable = options.historyAvailable !== false;
+  const exactHistoryAvailable = options.exactHistoryAvailable ?? (options.exactHistoryScores != null);
+  const exactHistoryScores = options.exactHistoryScores ?? [];
   const referenceAt = options.referenceAt ?? Date.now();
   const availabilityReasonByModel = options.availabilityReasonByModel ?? {};
   const byValidTime = new Map<number, HourlyModelValue[]>();
@@ -767,19 +791,43 @@ export function computeOfficialHourlyForecast(
     .filter((date): date is string => date != null)
     .sort();
   const beforeDate = forecastDates[0] ?? null;
-  const historicalEvidenceByKey = new Map<string, HourlyHistoricalEvidence>();
-  const getHistoricalEvidence = (modelName: OfficialHourlyModelName, variable: OfficialHourlyVariable, horizonBucket: string) => {
-    const key = [modelName, variable, horizonBucket].join("|");
+  const historicalEvidenceByKey = new Map<string, HourlyHistoricalEvidenceSelection>();
+  const bucketEvidenceByKey = new Map<string, HourlyHistoricalEvidence>();
+  const getHistoricalEvidence = (
+    modelName: OfficialHourlyModelName,
+    variable: OfficialHourlyVariable,
+    horizonMilliseconds: number,
+    horizonBucket: string,
+  ): HourlyHistoricalEvidenceSelection => {
+    const key = [modelName, variable, horizonMilliseconds, horizonBucket].join("|");
     const existing = historicalEvidenceByKey.get(key);
     if (existing) return existing;
-    const result = summarizeHourlyHistoricalEvidence(historyScores, {
+    const baseInput = {
       modelName,
       modelId: MODEL_ID_BY_NAME.get(modelName)!,
       variable,
       horizonBucket,
       beforeDate,
-      historyAvailable,
+    };
+    const exactEvidence = summarizeHourlyHistoricalEvidence(exactHistoryScores, {
+      ...baseInput,
+      horizonMilliseconds,
+      historyAvailable: exactHistoryAvailable,
     });
+    const exactQualified = exactEvidence.status === "qualified" && exactEvidence.metrics != null;
+    const bucketKey = [modelName, variable, horizonBucket].join("|");
+    let bucketEvidence = bucketEvidenceByKey.get(bucketKey);
+    if (!bucketEvidence) {
+      bucketEvidence = summarizeHourlyHistoricalEvidence(historyScores, { ...baseInput, historyAvailable });
+      bucketEvidenceByKey.set(bucketKey, bucketEvidence);
+    }
+    const result: HourlyHistoricalEvidenceSelection = {
+      evidence: exactQualified ? exactEvidence : bucketEvidence,
+      exactEvidence,
+      calibrationLevel: exactQualified
+        ? "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
+        : bucketEvidence.metrics != null ? "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" : "UNCALIBRATED_ROBUST",
+    };
     historicalEvidenceByKey.set(key, result);
     return result;
   };
@@ -894,20 +942,47 @@ export async function collectOfficialHourlyForecast(
     .map((diagnostic) => [diagnostic.modelName, diagnostic.errorCode ?? `Collecte ${diagnostic.status}; ${diagnostic.valuesReceived}/${diagnostic.expectedValueCount} valeurs reçues.`]));
   const referenceAt = Date.now();
   let historyAvailable = false;
+  let exactHistoryAvailable = false;
   let historyScores: OfficialHourlyEvaluationHistoryScore[] = [];
+  let exactHistoryScores: OfficialHourlyEvaluationHistoryScore[] = [];
+  const exactHistoryKeys = new Map<string, HourlyExactHorizonHistoryKey>();
+  for (const forecast of modelForecasts) {
+    if (!MODEL_NAME_SET.has(forecast.modelName)
+      || forecast.sourceName !== "open-meteo"
+      || forecast.modelId !== MODEL_ID_BY_NAME.get(forecast.modelName)
+      || !isFiniteNumber(forecast.availableAt)) continue;
+    for (const hour of forecast.hours) {
+      if (!isFiniteNumber(hour.validAt) || hour.validAt <= forecast.availableAt) continue;
+      const horizonMilliseconds = hour.validAt - forecast.availableAt;
+      if (!Number.isSafeInteger(horizonMilliseconds) || !getPhase3HorizonWindow(horizonMilliseconds / 60_000)) continue;
+      for (const variable of HISTORY_VARIABLES) {
+        if (!isFiniteNumber(hour[FORECAST_FIELD_BY_VARIABLE[variable]])) continue;
+        const key = {
+          modelName: forecast.modelName,
+          modelId: forecast.modelId!,
+          variable,
+          horizonMilliseconds,
+        };
+        exactHistoryKeys.set([key.modelName, key.modelId, key.variable, key.horizonMilliseconds].join("|"), key);
+      }
+    }
+  }
   try {
     const history = await getHourlyForecastEvaluationHistory(
       makeLocationKey(location.lat, location.lon),
       getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
       getParisDateDaysAgo(1),
+      Array.from(exactHistoryKeys.values()),
     );
     historyAvailable = history.available;
     historyScores = history.rows;
+    exactHistoryAvailable = history.exactAvailable;
+    exactHistoryScores = history.exactRows;
   } catch (error) {
     console.warn("[OfficialHourly] Historical scores unavailable; available forecasts will use a robust non-calibrated weighting:", error);
   }
   return {
-    ...computeOfficialHourlyForecast(modelForecasts, historyScores, { historyAvailable, referenceAt, availabilityReasonByModel }),
+    ...computeOfficialHourlyForecast(modelForecasts, historyScores, { historyAvailable, exactHistoryAvailable, exactHistoryScores, referenceAt, availabilityReasonByModel }),
     modelForecasts,
   };
 }

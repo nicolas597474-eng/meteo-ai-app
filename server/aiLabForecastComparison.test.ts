@@ -124,6 +124,16 @@ describe("AI Lab forecast comparison read-model", () => {
       }],
     } as unknown as OfficialWeatherSnapshot;
 
+    const firstModelWeight = detailed.hourly[0]!.forecastWeighting.variableWeightings[0]!.modelWeights[0] as unknown as Record<string, unknown>;
+    firstModelWeight.exactHorizonEvidence = {
+      status: "insufficient_evidence",
+      metrics: { mae: 1, rmse: 1.5, bias: 0.2, comparisonCount: 30, evaluatedDays: 6 },
+      minimumComparisons: 30,
+      minimumComparableDays: 7,
+      latestScoreDate: "2026-09-30",
+      latestComputedAt: "2026-10-01T12:00:00.000Z",
+    };
+
     const result = buildAILabForecastComparisonReadModel(detailed, { lat: 50.756, lon: 2.521 });
     const point = result.hourlyForecast.points[0]!;
     const temperature = point.weighting?.variableWeightings[0]!;
@@ -131,6 +141,12 @@ describe("AI Lab forecast comparison read-model", () => {
     expect(temperature.horizonBucket).toBeNull();
     expect(temperature.modelWeights.map((model) => [model.modelName, model.horizonMinutes, model.horizonBucket, model.weight]))
       .toEqual([["AROME", 108, "0_2h", 0.6], ["ARPEGE", 122, "2_6h", 0.4]]);
+    expect(temperature.modelWeights[0]?.exactHorizonEvidence).toMatchObject({
+      status: "insufficient_evidence",
+      metrics: { comparisonCount: 30, evaluatedDays: 6 },
+      minimumComparisons: 30,
+      minimumComparableDays: 7,
+    });
     expect(temperature.modelReasons[0]).toMatchObject({ modelName: "UKMET", reason: "Aucun run pour cette échéance." });
     expect(point.precipitationAgreement).toMatchObject({ frequencyPercent: 50, rainModelCount: 1, isProbabilityCalibrated: false });
   });

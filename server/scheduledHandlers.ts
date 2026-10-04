@@ -77,6 +77,8 @@ import {
   getPhysicalSnapshotCollectionTracesByDateRange,
   getHourlyForecastRunValues,
   persistHourlyForecastEvaluationScores,
+  persistHourlyForecastExactComparisons,
+  persistHourlyForecastExactEvaluationScores,
   getStationEvidenceSummary,
 } from "./db";
 
@@ -774,6 +776,11 @@ export async function collectObservationsHandler(req: Request, res: Response) {
               bias: score.bias,
             })));
           }
+          const exactComparisonsStored = await persistHourlyForecastExactComparisons(evaluation.exactComparisons.flatMap((comparison) => {
+            if (comparison.forecastRunValueId == null || comparison.observationSnapshotId == null) return [];
+            return [{ ...comparison, forecastRunValueId: comparison.forecastRunValueId, observationSnapshotId: comparison.observationSnapshotId }];
+          }));
+          if (exactComparisonsStored) await persistHourlyForecastExactEvaluationScores(evaluation.exactScores);
           if (hourlyScores.length > 0) {
             await upsertHourlyCompatibilityReliabilityScores(hourlyScores.map((score) => ({
               locationKey: locKey,

@@ -22,6 +22,7 @@ export function normalizeHourlyForecastVariable(value: string): HourlyForecastVa
 }
 
 export type HourlyForecastRunValue = {
+  id?: number;
   captureRunId: string;
   locationKey: string;
   targetDate: string;
@@ -37,6 +38,7 @@ export type HourlyForecastRunValue = {
 };
 
 export type HourlyPhysicalSnapshot = {
+  id?: number;
   locationKey: string;
   date: string;
   hour: number;
@@ -47,6 +49,9 @@ export type HourlyPhysicalSnapshot = {
   windGust?: number | null;
   humidity?: number | null;
   pressure?: number | null;
+  collectedAt?: Date | string | number | null;
+  confidenceScore?: number | null;
+  stationsUsed?: unknown;
 };
 
 export type HourlyForecastRunScore = {
@@ -66,8 +71,58 @@ export type HourlyForecastRunScore = {
   bias: number | null;
 };
 
+export type HourlyExactForecastComparison = {
+  forecastRunValueId: number | null;
+  observationSnapshotId: number | null;
+  captureRunId: string;
+  locationKey: string;
+  sourceName: string;
+  modelName: string;
+  modelId: string | null;
+  variable: HourlyForecastVariable;
+  validTime: number;
+  availableAt: number;
+  horizonMilliseconds: number;
+  horizonMinutes: number;
+  horizonBucket: string;
+  forecastValue: number;
+  forecastUnit: string | null;
+  observedValue: number;
+  observedUnit: string;
+  signedError: number;
+  absoluteError: number;
+  observationDate: string;
+  observationHour: number;
+  observationReferenceAt: number;
+  observationCollectedAt: number | null;
+  stationCount: number;
+  confidenceScore: number | null;
+  stationsUsed: unknown | null;
+};
+
+export type HourlyExactForecastRunScore = {
+  locationKey: string;
+  date: string;
+  sourceName: string;
+  modelName: string;
+  modelId: string | null;
+  variable: HourlyForecastVariable;
+  horizonMilliseconds: number;
+  horizonMinutes: number;
+  horizonBucket: string;
+  observationCount: number;
+  evaluableObservationCount: number;
+  sampleSize: number;
+  coverageRatio: number;
+  mae: number | null;
+  rmse: number | null;
+  bias: number | null;
+};
+
 export type HourlyForecastRunEvaluation = {
   scores: HourlyForecastRunScore[];
+  exactComparisons: HourlyExactForecastComparison[];
+  exactScores: HourlyExactForecastRunScore[];
   compatibilityScores: QualifiedHourlyModelScore[];
 };
 
@@ -106,6 +161,27 @@ function observationValue(snapshot: HourlyPhysicalSnapshot, variable: HourlyFore
   return value != null && Number.isFinite(value) ? value : null;
 }
 
+function observationUnit(variable: HourlyForecastVariable): string {
+  switch (variable) {
+    case "temperature": return "°C";
+    case "precipitation": return "mm";
+    case "wind_speed":
+    case "wind_gust": return "km/h";
+    case "humidity": return "%";
+    case "pressure": return "hPa";
+  }
+}
+
+function epochMilliseconds(value: Date | string | number | null | undefined): number | null {
+  if (value == null) return null;
+  const result = value instanceof Date ? value.getTime() : typeof value === "number" ? value : new Date(value).getTime();
+  return Number.isFinite(result) ? result : null;
+}
+
+function jsonSignature(value: unknown): string {
+  try { return JSON.stringify(value ?? null) ?? "null"; } catch { return "[unserializable]"; }
+}
+
 function equalNullableNumber(left: number | null | undefined, right: number | null | undefined): boolean {
   return (left == null && right == null) || (left != null && right != null && Object.is(left, right));
 }
@@ -141,6 +217,10 @@ function uniqueSnapshots(snapshots: HourlyPhysicalSnapshot[]): HourlyPhysicalSna
   for (const duplicates of Array.from(groups.values())) {
     const first = duplicates[0];
     const identical = duplicates.every((item) => item.stationCount === first.stationCount
+      && item.id === first.id
+      && epochMilliseconds(item.collectedAt) === epochMilliseconds(first.collectedAt)
+      && equalNullableNumber(item.confidenceScore, first.confidenceScore)
+      && jsonSignature(item.stationsUsed) === jsonSignature(first.stationsUsed)
       && (HOURLY_FORECAST_VARIABLES.every((variable) => equalNullableNumber(observationValue(item, variable), observationValue(first, variable)))));
     if (identical) result.push(first);
   }
@@ -254,6 +334,11 @@ export function evaluateHourlyForecastRuns(
   }
 
   const scores: HourlyForecastRunScore[] = [];
+  const exactComparisons: HourlyExactForecastComparison[] = [];
+  const exactScoreGroups = new Map<string, {
+    score: Omit<HourlyExactForecastRunScore, "sampleSize" | "coverageRatio" | "mae" | "rmse" | "bias">;
+    errors: number[];
+  }>();
   const compatibilityForecasts: Array<{
     modelName: string;
     hour: number;
@@ -314,10 +399,67 @@ export function evaluateHourlyForecastRuns(
         const horizon = getPhase3HorizonWindow(horizonMinutes);
         if (!horizon) continue;
         evaluableObservationCountsByHorizon.set(horizon.key, (evaluableObservationCountsByHorizon.get(horizon.key) ?? 0) + 1);
+        const horizonMilliseconds = validTime - opportunityRun.availableAt;
+        if (!Number.isSafeInteger(horizonMilliseconds) || horizonMilliseconds <= 0) continue;
+        const exactKey = [modelKey(model), variable, horizonMilliseconds].join("|");
+        let exactGroup = exactScoreGroups.get(exactKey);
+        if (!exactGroup) {
+          exactGroup = {
+            score: {
+              locationKey: model.locationKey,
+              date: model.targetDate,
+              sourceName: model.sourceName,
+              modelName: model.modelName,
+              modelId: model.modelId,
+              variable,
+              horizonMilliseconds,
+              horizonMinutes,
+              horizonBucket: horizon.key,
+              observationCount: 0,
+              evaluableObservationCount: 0,
+            },
+            errors: [],
+          };
+          exactScoreGroups.set(exactKey, exactGroup);
+        }
+        exactGroup.score.observationCount += 1;
+        exactGroup.score.evaluableObservationCount += 1;
         if (!selected) continue;
+        const signedError = selected.value! - opportunity.observedValue;
         const errors = errorsByHorizon.get(horizon.key) ?? [];
-        errors.push(selected.value! - opportunity.observedValue);
+        errors.push(signedError);
         errorsByHorizon.set(horizon.key, errors);
+        exactGroup.errors.push(signedError);
+        exactComparisons.push({
+          forecastRunValueId: Number.isSafeInteger(selected.id) && selected.id! > 0 ? selected.id! : null,
+          observationSnapshotId: Number.isSafeInteger(opportunity.snapshot.id) && opportunity.snapshot.id! > 0 ? opportunity.snapshot.id! : null,
+          captureRunId: selected.captureRunId,
+          locationKey: selected.locationKey,
+          sourceName: selected.sourceName,
+          modelName: selected.modelName,
+          modelId: selected.modelId,
+          variable,
+          validTime,
+          availableAt: selected.availableAt,
+          horizonMilliseconds,
+          horizonMinutes,
+          horizonBucket: horizon.key,
+          forecastValue: selected.value!,
+          forecastUnit: selected.unit,
+          observedValue: opportunity.observedValue,
+          observedUnit: observationUnit(variable),
+          signedError,
+          absoluteError: Math.abs(signedError),
+          observationDate: opportunity.snapshot.date,
+          observationHour: opportunity.snapshot.hour,
+          observationReferenceAt: validTime,
+          observationCollectedAt: epochMilliseconds(opportunity.snapshot.collectedAt),
+          stationCount: opportunity.snapshot.stationCount,
+          confidenceScore: opportunity.snapshot.confidenceScore != null && Number.isFinite(opportunity.snapshot.confidenceScore)
+            ? opportunity.snapshot.confidenceScore
+            : null,
+          stationsUsed: opportunity.snapshot.stationsUsed ?? null,
+        });
       }
       for (const horizon of PHASE3_HORIZON_WINDOWS) {
         const errors = errorsByHorizon.get(horizon.key) ?? [];
@@ -349,5 +491,17 @@ export function evaluateHourlyForecastRuns(
     modelName: (serviceNameCounts.get(forecast.modelName) ?? 0) > 1 ? `${forecast.modelName} (${forecast.modelName})` : forecast.modelName,
   }));
   const compatibilityScores = scoreQualifiedHourlyModels(compatibilitySnapshots, legacyForecasts);
-  return { scores, compatibilityScores };
+  const exactScores: HourlyExactForecastRunScore[] = Array.from(exactScoreGroups.values()).map(({ score, errors }) => ({
+    ...score,
+    sampleSize: errors.length,
+    coverageRatio: score.evaluableObservationCount > 0 ? errors.length / score.evaluableObservationCount : 0,
+    ...calculateErrors(errors),
+  })).sort((left, right) => left.modelName.localeCompare(right.modelName)
+    || left.variable.localeCompare(right.variable)
+    || left.horizonMilliseconds - right.horizonMilliseconds);
+  exactComparisons.sort((left, right) => left.modelName.localeCompare(right.modelName)
+    || left.variable.localeCompare(right.variable)
+    || left.validTime - right.validTime
+    || left.availableAt - right.availableAt);
+  return { scores, exactComparisons, exactScores, compatibilityScores };
 }

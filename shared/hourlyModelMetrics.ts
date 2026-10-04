@@ -54,6 +54,7 @@ export type HourlyHistoricalEvidence = {
 };
 
 export type HourlyModelCalibrationLevel =
+  | "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
   | "EXACT_LOCAL_MODEL_VARIABLE_BUCKET"
   | "UNCALIBRATED_ROBUST";
 
@@ -79,6 +80,9 @@ export type HourlyFusionWeightModelTrace = {
   contributedToValue: boolean;
   historicalEvidence?: Pick<HourlyHistoricalEvidence,
     "status" | "minimumComparisons" | "minimumComparableDays" | "latestScoreDate" | "latestComputedAt"
+  >;
+  exactHorizonEvidence?: Pick<HourlyHistoricalEvidence,
+    "status" | "metrics" | "minimumComparisons" | "minimumComparableDays" | "latestScoreDate" | "latestComputedAt"
   >;
 };
 

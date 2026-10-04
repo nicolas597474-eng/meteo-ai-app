@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, json, bigint, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, double, json, bigint, uniqueIndex, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -599,6 +599,72 @@ export const hourlyForecastEvaluationScores = mysqlTable("hourly_forecast_evalua
 ]);
 export type HourlyForecastEvaluationScore = typeof hourlyForecastEvaluationScores.$inferSelect;
 export type InsertHourlyForecastEvaluationScore = typeof hourlyForecastEvaluationScores.$inferInsert;
+
+/** Immutable run/observation pairs retained at the exact, unrounded lead time. */
+export const hourlyForecastExactComparisons = mysqlTable("hourly_forecast_exact_comparisons", {
+  id: int("id").autoincrement().primaryKey(),
+  forecastRunValueId: int("forecastRunValueId").notNull(),
+  observationSnapshotId: int("observationSnapshotId").notNull(),
+  captureRunId: varchar("captureRunId", { length: 36 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  sourceName: varchar("sourceName", { length: 64 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }),
+  variable: varchar("variable", { length: 32 }).notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  availableAt: bigint("availableAt", { mode: "number" }).notNull(),
+  horizonMilliseconds: bigint("horizonMilliseconds", { mode: "number" }).notNull(),
+  horizonMinutes: double("horizonMinutes").notNull(),
+  horizonBucket: varchar("horizonBucket", { length: 16 }).notNull(),
+  forecastValue: float("forecastValue").notNull(),
+  forecastUnit: varchar("forecastUnit", { length: 32 }),
+  observedValue: float("observedValue").notNull(),
+  observedUnit: varchar("observedUnit", { length: 32 }).notNull(),
+  signedError: float("signedError").notNull(),
+  absoluteError: float("absoluteError").notNull(),
+  observationDate: varchar("observationDate", { length: 10 }).notNull(),
+  observationHour: int("observationHour").notNull(),
+  observationReferenceAt: bigint("observationReferenceAt", { mode: "number" }).notNull(),
+  observationCollectedAt: bigint("observationCollectedAt", { mode: "number" }),
+  stationCount: int("stationCount").notNull(),
+  confidenceScore: float("confidenceScore"),
+  stationsUsed: json("stationsUsed"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("hourly_exact_comparison_run_snapshot_uq").on(table.forecastRunValueId, table.observationSnapshotId),
+  index("hourly_exact_comparison_location_time_idx").on(table.locationKey, table.validTime),
+  index("hourly_exact_comparison_model_lead_idx").on(table.locationKey, table.modelName, table.variable, table.horizonMilliseconds, table.observationDate),
+]);
+export type HourlyForecastExactComparison = typeof hourlyForecastExactComparisons.$inferSelect;
+export type InsertHourlyForecastExactComparison = typeof hourlyForecastExactComparisons.$inferInsert;
+
+/** Daily exact-lead aggregates, separate from the existing bucket score rows. */
+export const hourlyForecastExactEvaluationScores = mysqlTable("hourly_forecast_exact_evaluation_scores", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  sourceName: varchar("sourceName", { length: 64 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }),
+  variable: varchar("variable", { length: 32 }).notNull(),
+  horizonMilliseconds: bigint("horizonMilliseconds", { mode: "number" }).notNull(),
+  horizonMinutes: double("horizonMinutes").notNull(),
+  horizonBucket: varchar("horizonBucket", { length: 16 }).notNull(),
+  observationCount: int("observationCount").notNull().default(0),
+  evaluableObservationCount: int("evaluableObservationCount").notNull().default(0),
+  sampleSize: int("sampleSize").notNull().default(0),
+  coverageRatio: float("coverageRatio").notNull().default(0),
+  mae: float("mae"),
+  rmse: float("rmse"),
+  bias: float("bias"),
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("hourly_exact_eval_day_model_variable_lead_uq").on(table.locationKey, table.date, table.sourceName, table.modelName, table.variable, table.horizonMilliseconds),
+  index("hourly_exact_eval_location_date_idx").on(table.locationKey, table.date),
+  index("hourly_exact_eval_model_lead_date_idx").on(table.locationKey, table.modelName, table.variable, table.horizonMilliseconds, table.date),
+]);
+export type HourlyForecastExactEvaluationScore = typeof hourlyForecastExactEvaluationScores.$inferSelect;
+export type InsertHourlyForecastExactEvaluationScore = typeof hourlyForecastExactEvaluationScores.$inferInsert;
 
 /** Per-provider scheduled collection evidence; it never participates in scoring or fusion. */
 export const hourlyForecastCollectionResults = mysqlTable("hourly_forecast_collection_results", {

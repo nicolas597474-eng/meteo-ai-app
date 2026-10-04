@@ -214,6 +214,47 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.weighting.status).toBe("mixed");
   });
 
+  it("privilégie le lead exact qualifié puis retombe sur le bucket local ou le robuste si le seuil exact échoue", () => {
+    const exactLead = 12 * 60 * 60_000;
+    const exactRows = historicalScores("temperature", "6_24h", (modelIndex) => 1 + modelIndex, 5)
+      .map((row) => ({ ...row, horizonMilliseconds: exactLead }));
+    const bucketRows = historicalScores("temperature", "6_24h", (modelIndex) => 0.5 + modelIndex * 0.2, 5);
+    const exactResult = computeOfficialHourlyForecast(modelForecasts(), bucketRows, {
+      exactHistoryAvailable: true,
+      exactHistoryScores: exactRows,
+    });
+    const exactArome = variableWeighting(exactResult, "temperature")?.modelWeights[0];
+
+    expect(exactArome).toMatchObject({
+      calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON",
+      historicalScore: { comparisonCount: 35, evaluatedDays: 7, mae: 1 },
+      exactHorizonEvidence: { status: "qualified", metrics: { comparisonCount: 35, evaluatedDays: 7 } },
+    });
+
+    const sixDaysOnly = exactRows.filter((row) => row.date !== "2026-09-26");
+    const bucketFallback = computeOfficialHourlyForecast(modelForecasts(), bucketRows, {
+      exactHistoryAvailable: true,
+      exactHistoryScores: sixDaysOnly,
+    });
+    const bucketArome = variableWeighting(bucketFallback, "temperature")?.modelWeights[0];
+    expect(bucketArome).toMatchObject({
+      calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_BUCKET",
+      historicalScore: { comparisonCount: 35, evaluatedDays: 7, mae: 0.5 },
+      exactHorizonEvidence: { status: "insufficient_evidence", metrics: { comparisonCount: 30, evaluatedDays: 6 } },
+    });
+
+    const robustFallback = computeOfficialHourlyForecast(modelForecasts(), [], {
+      exactHistoryAvailable: true,
+      exactHistoryScores: sixDaysOnly,
+    });
+    expect(variableWeighting(robustFallback, "temperature")?.modelWeights[0]).toMatchObject({
+      calibrationLevel: "UNCALIBRATED_ROBUST",
+      calibrationStatus: "UNCALIBRATED_ROBUST",
+      historicalScore: null,
+      exactHorizonEvidence: { status: "insufficient_evidence", metrics: { comparisonCount: 30, evaluatedDays: 6 } },
+    });
+  });
+
   it("calcule la quantité conditionnelle uniquement parmi les modèles pluvieux et avec leurs poids historiques", () => {
     const forecasts = modelForecasts().map((model, index) => ({
       ...model,

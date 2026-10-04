@@ -72,15 +72,21 @@ function statusLabel(value: string): string {
     CALIBRATED: "calibrée sur preuve historique qualifiée",
     PARTIALLY_CALIBRATED: "calibration historique partielle",
     UNCALIBRATED_ROBUST: "repli robuste non calibré",
+    EXACT_LOCAL_MODEL_VARIABLE_HORIZON: "lead exact local modèle × variable",
     EXACT_LOCAL_MODEL_VARIABLE_BUCKET: "bucket exact lieu × modèle × variable",
+    qualified: "qualifiée",
+    insufficient_evidence: "insuffisante",
+    no_evidence: "aucune preuve",
+    incomplete_metrics: "métriques incomplètes",
+    history_unavailable: "historique indisponible",
   };
   return labels[value] ?? value;
 }
 
 function calibrationLevelLabel(level: string): string {
-  return level === "EXACT_LOCAL_MODEL_VARIABLE_BUCKET"
-    ? "preuve locale (modèle × variable × bucket)"
-    : "repli robuste non calibré";
+  if (level === "EXACT_LOCAL_MODEL_VARIABLE_HORIZON") return "preuve locale (modèle × variable × lead exact)";
+  if (level === "EXACT_LOCAL_MODEL_VARIABLE_BUCKET") return "fallback local (modèle × variable × bucket)";
+  return "repli robuste non calibré";
 }
 
 export function HourlyFusionDebugPanel({
@@ -133,6 +139,9 @@ export function HourlyFusionDebugPanel({
               <p>Score historique (MAE / RMSE / biais) : {model.historicalScore
                 ? `${formatNumber(model.historicalScore.mae)} / ${formatNumber(model.historicalScore.rmse)} / ${formatNumber(model.historicalScore.bias)} · ${model.historicalScore.comparisonCount} comparaisons / ${model.historicalScore.evaluatedDays} jours`
                 : "aucune métrique qualifiée"}. Dernier score : {model.historicalEvidence?.latestScoreDate ?? "date indisponible"}.</p>
+              <p>Preuve strictement au lead exact : {model.exactHorizonEvidence
+                ? `${statusLabel(model.exactHorizonEvidence.status)} · ${model.exactHorizonEvidence.metrics?.comparisonCount ?? 0} comparaisons / ${model.exactHorizonEvidence.metrics?.evaluatedDays ?? 0} jours (seuil ${model.exactHorizonEvidence.minimumComparisons}/${model.exactHorizonEvidence.minimumComparableDays})`
+                : "aucune ligne exacte disponible"}.</p>
               <p>Run {model.runId ?? "inconnu"} · source {model.sourceName} · requête démarrée {formatInstant(model.requestStartedAt)}.</p>
             </li>)}
           </ul>}

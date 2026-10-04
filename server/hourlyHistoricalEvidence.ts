@@ -15,6 +15,8 @@ export type HourlyHistoricalScoreRow = {
   modelId: string | null;
   variable: string;
   horizonBucket: string;
+  /** Present only for the additive exact-lead score table; never rounded or interpolated. */
+  horizonMilliseconds?: number;
   sampleSize: number;
   mae: number | null;
   rmse?: number | null;
@@ -73,7 +75,8 @@ function statusFor(metrics: HistoricalMetricValues | null): "qualified" | "insuf
 
 /**
  * Produces location-filtered raw verification metrics for one exact model ×
- * variable × horizon. MAE/RMSE/bias are pooled by their stored comparison count;
+ * variable × bucket, or one strictly equal millisecond lead when requested.
+ * MAE/RMSE/bias are pooled by their stored comparison count;
  * model aggregators, mismatched IDs, incomplete rows and future dates are excluded.
  */
 export function summarizeHourlyHistoricalEvidence(
@@ -83,6 +86,7 @@ export function summarizeHourlyHistoricalEvidence(
     modelId: string;
     variable: string;
     horizonBucket: string;
+    horizonMilliseconds?: number;
     beforeDate: string | null;
     periodStartDate?: string | null;
     historyAvailable: boolean;
@@ -96,6 +100,9 @@ export function summarizeHourlyHistoricalEvidence(
     && row.modelId === input.modelId
     && row.variable === input.variable
     && row.horizonBucket === input.horizonBucket
+    && (input.horizonMilliseconds == null
+      ? row.horizonMilliseconds == null
+      : row.horizonMilliseconds === input.horizonMilliseconds)
     && validDate(row.date)
     && (input.beforeDate == null || row.date < input.beforeDate)
   ) : [];
