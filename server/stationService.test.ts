@@ -95,6 +95,7 @@ describe("mapMetarObservation", () => {
     }, 50.95, 1.96, 30);
 
     expect(station).toMatchObject({ source: "metar", stationId: "metar-LFAC", windSpeed: 18.5, windGust: 27.8, pressure: 1022, isActive: true });
+    expect(station?.measurementTimes?.windDirection).toBe("2026-08-12T06:30:00.000Z");
     expect(station?.distanceKm).toBeLessThan(30);
   });
 
@@ -107,6 +108,7 @@ describe("mapMetarObservation", () => {
     expect(station?.updatedAt).toBeNull();
     expect(station?.measurementTimes?.temperature).toBeNull();
     expect(station?.measurementTimes?.windSpeed).toBeNull();
+    expect(station?.measurementTimes?.windDirection).toBeNull();
   });
 });
 

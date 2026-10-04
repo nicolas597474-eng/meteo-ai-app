@@ -31,7 +31,7 @@ const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction, speed }: { direction: number | null; speed: number | null }) {
-  const dir = direction ?? 0;
+  const dir = direction;
   const cardinalDir = (deg: number) => {
     const dirs = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
     return dirs[Math.round(deg / 45) % 8];
@@ -48,18 +48,75 @@ function WindRose({ direction, speed }: { direction: number | null; speed: numbe
             return <line key={a} x1={20 + 14*Math.cos(rad)} y1={20 + 14*Math.sin(rad)} x2={20 + 18*Math.cos(rad)} y2={20 + 18*Math.sin(rad)} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />;
           })}
           {/* Arrow pointing in wind direction */}
-          <g transform={`rotate(${dir}, 20, 20)`}>
+          {dir != null ? <g transform={`rotate(${dir}, 20, 20)`}>
             <polygon points="20,4 23,20 20,17 17,20" fill="#60a5fa" opacity="0.9" />
             <polygon points="20,36 23,20 20,23 17,20" fill="rgba(255,255,255,0.2)" />
-          </g>
+          </g> : null}
           {/* Center dot */}
           <circle cx="20" cy="20" r="2" fill="#60a5fa" />
         </svg>
       </div>
-      <p className="text-[10px] font-bold text-blue-300">{cardinalDir(dir)}</p>
+      <p className="text-[10px] font-bold text-blue-300">{dir == null ? "—" : cardinalDir(dir)}</p>
       {speed != null && <p className="text-[10px] text-muted-foreground">{speed}km/h</p>}
     </div>
   );
+}
+
+type CurrentStateFieldLike = {
+  value: number | string | null;
+  provenance: {
+    kind: "physical_stations" | "open_meteo_snapshot" | "unavailable";
+    label: string;
+    stationCount: number;
+    stationSources: string[];
+    observedAt: string | null;
+    ageMinutes: number | null;
+    reason: string | null;
+    measurements: Array<{ stationName: string; source: string; observedAt: string; ageMinutes: number }>;
+  };
+};
+
+function formatCurrentStateProvenance(field?: CurrentStateFieldLike | null, snapshotAt?: string | null): string {
+  const provenance = field?.provenance;
+  const observedAt = provenance?.observedAt ?? snapshotAt ?? null;
+  const parsedAt = observedAt ? Date.parse(observedAt) : Number.NaN;
+  const age = provenance
+    ? provenance.ageMinutes
+    : Number.isFinite(parsedAt) && parsedAt <= Date.now()
+      ? Math.floor((Date.now() - parsedAt) / 60_000)
+      : null;
+  const ageLabel = age == null ? "âge inconnu" : age === 0 ? "à l’instant" : `il y a ${age} min`;
+  const timeLabel = Number.isFinite(parsedAt)
+    ? new Date(parsedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
+    : null;
+
+  if (!provenance) return timeLabel ? `Open-Meteo · ${timeLabel} · ${ageLabel}` : "Source/horodatage indisponible";
+  if (provenance.kind === "physical_stations") {
+    const sources = provenance.stationSources.join(" + ") || "stations physiques";
+    const stationLabel = `${provenance.stationCount} station${provenance.stationCount > 1 ? "s" : ""}`;
+    return `${stationLabel} · ${sources} · ${ageLabel}`;
+  }
+  if (provenance.kind === "open_meteo_snapshot") {
+    return `Open-Meteo · ${timeLabel ?? "heure inconnue"} · ${ageLabel}`;
+  }
+  return "Indisponible";
+}
+
+function currentStateFieldTitle(field?: CurrentStateFieldLike | null, snapshotAt?: string | null): string {
+  const provenance = field?.provenance;
+  if (!provenance) return snapshotAt ? `Snapshot Open-Meteo · ${snapshotAt}` : "Aucune provenance courante disponible.";
+  const measurements = provenance.measurements.map((measurement) =>
+    `${measurement.stationName} (${measurement.source}) · ${measurement.observedAt} · ${measurement.ageMinutes} min`
+  );
+  return [provenance.label, ...measurements, provenance.reason].filter(Boolean).join("\n");
+}
+
+function currentNumber(field?: CurrentStateFieldLike | null): number | null {
+  return typeof field?.value === "number" && Number.isFinite(field.value) ? field.value : null;
+}
+
+function currentString(field?: CurrentStateFieldLike | null): string | null {
+  return typeof field?.value === "string" && field.value.trim() ? field.value : null;
 }
 
 // ─── UV Index indicator ────────────────────────────────────────────────────────
@@ -363,6 +420,10 @@ export default function Dashboard() {
       retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     }
   );
+  const { data: currentDashboardWeather } = trpc.favorites.getCurrentDashboardWeather.useQuery(
+    coordsInput,
+    { staleTime: 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 },
+  );
   const hourlyLoading = officialLoading;
   const hourlyError = officialError;
   const hourlyFetching = officialFetching;
@@ -553,6 +614,10 @@ export default function Dashboard() {
   const hours = officialHours;
   const currentSnapshot = officialForecast?.currentSnapshot ?? null;
   const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
+  const currentFields = currentDashboardWeather?.fields;
+  const hasCurrentDashboardFields = currentDashboardWeather != null;
+  const hasPhysicalCurrentState = Object.values(currentFields ?? {}).some((field) => field.provenance.kind === "physical_stations");
+  const hasAvailableCurrentState = Object.values(currentFields ?? {}).some((field) => field.value != null);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
   const forecastNowMs = Date.now();
   const panelDate = formatDashboardCompactDate(officialForecast?.today ?? dash?.today);
@@ -604,7 +669,7 @@ export default function Dashboard() {
   // L’accord est affiché en unités physiques et demeure distinct de la fiabilité historique.
   const currentHourIndex = findActiveHourlyForecastIndex(hours, forecastNowMs);
   const currentHour = hours[currentHourIndex] ?? null;
-  const isDailyFallback = currentHour == null && currentSnapshot == null && dailyFallback?.kind === "daily_fusion";
+  const isDailyFallback = currentHour == null && currentSnapshot == null && !hasPhysicalCurrentState && dailyFallback?.kind === "daily_fusion";
   const fallbackDateLabel = isDailyFallback
     ? new Date(`${dailyFallback.date}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", timeZone: "Europe/Paris" })
     : null;
@@ -617,29 +682,45 @@ export default function Dashboard() {
   const nextConditionChange = isDailyFallback ? null : findNextConditionChange(hours, currentHour?.hour ?? nowHour, currentHour?.validAt);
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
   const officialSnapshotTemp = currentSnapshot?.temp ?? null;
-  const currentTemp = officialSnapshotTemp;
-  const displayedCondition = currentSnapshot?.condition ?? (isDailyFallback ? dailyFallback.condition : null);
+  const temperatureField = currentFields?.temperature ?? null;
+  const conditionField = currentFields?.condition ?? null;
+  const currentTemp = hasCurrentDashboardFields ? currentNumber(temperatureField) : officialSnapshotTemp;
+  const selectedCondition = hasCurrentDashboardFields ? currentString(conditionField) : currentSnapshot?.condition ?? null;
+  const displayedCondition = selectedCondition ?? (isDailyFallback ? dailyFallback.condition : null);
   const activeFavoriteWeather = {
-    temp: currentTemp,
-    condition: displayedCondition,
+    temp: officialSnapshotTemp,
+    condition: currentSnapshot?.condition ?? (isDailyFallback ? dailyFallback.condition : null),
   };
   const dailyAgreement = today?.modelAgreement ?? null;
   const maxTemperature = isDailyFallback ? dailyFallback.tempMax : today?.tempMax ?? meteoAI?.tempMax ?? null;
   const minTemperature = isDailyFallback ? dailyFallback.tempMin : today?.tempMin ?? meteoAI?.tempMin ?? null;
   const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
   const minTemperatureTone = getExtremeTemperatureTone("min", minTemperature);
-  const apparentTemp = currentSnapshot?.apparentTemp ?? null;
+  const apparentTemperatureField = currentFields?.apparentTemperature ?? null;
+  const apparentTemp = hasCurrentDashboardFields ? currentNumber(apparentTemperatureField) : currentSnapshot?.apparentTemp ?? null;
   const currentUV = currentHour?.uvIndex ?? hours.find((hour) => typeof hour.validAt === "number" && hour.validAt > forecastNowMs && hour.uvIndex != null)?.uvIndex ?? null;
-  const windDir = currentSnapshot?.windDirection ?? null;
-  const windSpeed = currentSnapshot?.windSpeed ?? null;
-  const currentCloudCover = currentSnapshot?.cloudCover ?? null;
-  const currentHumidity = currentSnapshot?.humidity ?? null;
+  const windDirectionField = currentFields?.windDirection ?? null;
+  const windSpeedField = currentFields?.windSpeed ?? null;
+  const windGustField = currentFields?.windGust ?? null;
+  const precipitationField = currentFields?.precipitation ?? null;
+  const cloudCoverField = currentFields?.cloudCover ?? null;
+  const humidityField = currentFields?.humidity ?? null;
+  const pressureField = currentFields?.pressure ?? null;
+  const weatherCodeField = currentFields?.weatherCode ?? null;
+  const currentWeatherCode = hasCurrentDashboardFields ? currentNumber(weatherCodeField) : currentSnapshot?.weatherCode ?? null;
+  const windDir = hasCurrentDashboardFields ? currentNumber(windDirectionField) : currentSnapshot?.windDirection ?? null;
+  const windSpeed = hasCurrentDashboardFields ? currentNumber(windSpeedField) : currentSnapshot?.windSpeed ?? null;
+  const currentWindGust = hasCurrentDashboardFields ? currentNumber(windGustField) : currentSnapshot?.windGust ?? null;
+  const currentPrecipitation = hasCurrentDashboardFields ? currentNumber(precipitationField) : currentSnapshot?.precipitation ?? null;
+  const currentPressure = hasCurrentDashboardFields ? currentNumber(pressureField) : null;
+  const currentCloudCover = hasCurrentDashboardFields ? currentNumber(cloudCoverField) : currentSnapshot?.cloudCover ?? null;
+  const currentHumidity = hasCurrentDashboardFields ? currentNumber(humidityField) : currentSnapshot?.humidity ?? null;
   const collectionHealth = getCollectionHealth({
     lastRunStatus: latestForecastRunStatus,
     lastSuccessAt: latestForecastSuccessAt,
     partial: collectionHealthReport?.lastForecastSuccess?.status === "partial",
   });
-  const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentSnapshot?.precipitation ?? (isDailyFallback ? dailyFallback.precipitation : undefined) ?? undefined, windSpeed: windSpeed ?? undefined });
+  const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : undefined) ?? undefined, windSpeed: windSpeed ?? undefined });
   const dashboardSkyStyle = { "--dashboard-sky-image": `url("${dashboardSkyImage}")` } as CSSProperties;
   const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
   const modelFallbackContributors = locationWeather?.ultraLocal?.modelFallback?.contributors ?? [];
@@ -829,9 +910,9 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Main temperature row */}
+            {/* Main current temperature row: qualified physical estimate or field-level model fallback. */}
             <div className="flex items-start gap-2 sm:gap-6">
-              {/* The main condition and temperature are a distinct model current snapshot. */}
+              {/* The main temperature is selected from the current-state read model, independently of forecasts. */}
               <div className="w-[4.75rem] shrink-0 pt-0.5 sm:w-[5.25rem] sm:pt-0">
                 <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} />
               </div>
@@ -842,10 +923,8 @@ export default function Dashboard() {
                   <p className={dashboardTemperatureLayout.currentValue}>
                     {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
-                  <p className="mt-0.5 text-[9px] leading-tight text-slate-400">
-                    {currentSnapshot?.capturedAt
-                      ? `Snapshot du modèle Open-Meteo · ${new Date(currentSnapshot.capturedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}`
-                      : "Snapshot du modèle Open-Meteo indisponible"}
+                  <p className="mt-0.5 text-[9px] leading-tight text-slate-400" title={currentStateFieldTitle(temperatureField, currentSnapshot?.capturedAt)}>
+                    {formatCurrentStateProvenance(temperatureField, currentSnapshot?.capturedAt)}
                   </p>
                 </div>
 
@@ -869,8 +948,12 @@ export default function Dashboard() {
 
             <div className="mt-1 min-w-0 space-y-0.5 sm:mt-1.5 sm:space-y-1">
               <p className="whitespace-nowrap text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg">
-                <span className="font-semibold text-sky-200/90">{isDailyFallback ? "Tendance quotidienne · " : currentSnapshot ? "État actuel · " : "Snapshot modèle indisponible · "}</span>
+                <span className="font-semibold text-sky-200/90">{isDailyFallback ? "Tendance quotidienne · " : currentSnapshot || hasAvailableCurrentState ? "État actuel · " : "État courant indisponible · "}</span>
                 <span className="text-white">{displayedCondition ?? "Condition indisponible"}</span>
+              </p>
+              <p className="text-[9px] leading-tight text-slate-400" title={currentStateFieldTitle(conditionField, currentSnapshot?.capturedAt)}>
+                {isDailyFallback && !conditionField ? "Tendance quotidienne · pas une observation instantanée" : formatCurrentStateProvenance(conditionField, currentSnapshot?.capturedAt)}
+                {currentWeatherCode == null ? "" : ` · code WMO ${currentWeatherCode}`}
               </p>
               {(nextRegimeChange ?? nextConditionChange) && (
                 <>
@@ -898,7 +981,10 @@ export default function Dashboard() {
                   <Thermometer className="h-3 w-3" />Ressenti
                 </p>
                 <p className="text-lg font-bold sm:text-2xl">
-                  {apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : currentTemp != null ? `${currentTemp.toFixed(1)}°` : "—"}
+                  {apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : "—"}
+                </p>
+                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(apparentTemperatureField, currentSnapshot?.capturedAt)}>
+                  {formatCurrentStateProvenance(apparentTemperatureField, currentSnapshot?.capturedAt)}
                 </p>
               </div>
               {/* UV Index */}
@@ -916,6 +1002,9 @@ export default function Dashboard() {
                 <div className="flex justify-center">
                   <WindRose direction={windDir} speed={windSpeed} />
                 </div>
+                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(windDirectionField, currentSnapshot?.capturedAt)}>
+                  {formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)}
+                </p>
               </div>
             </div>
 
@@ -944,12 +1033,18 @@ export default function Dashboard() {
                     <MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité actuelle
                   </p>
                 <p className="text-sm font-semibold sm:text-lg">{currentHumidity ?? "—"}%</p>
+                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
+                  {formatCurrentStateProvenance(humidityField, currentSnapshot?.capturedAt)}
+                </p>
               </div>
               <div className="text-center">
                   <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
                     <Eye className="h-3 w-3" />Nuages actuels
                   </p>
                 <p className="text-sm font-semibold sm:text-lg">{currentCloudCover ?? "—"}%</p>
+                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
+                  {formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}
+                </p>
               </div>
               <div className="text-center">
                   <p className="mb-0 flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
@@ -970,6 +1065,29 @@ export default function Dashboard() {
                 </p>
                 <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement?.tempMax.standardDeviation == null ? "σ population indisponible" : `σ population ${dailyAgreement.tempMax.standardDeviation.toFixed(1)} °C`}</p>
                 <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement ? `${dailyAgreement.tempMax.availableModelCount}/${dailyAgreement.expectedModelCount} modèles · jour demandé ${dailyAgreement.requestDayOffset == null ? "indisponible" : `J+${dailyAgreement.requestDayOffset}`} · heure de run modèle non archivée · accord, pas fiabilité` : "Accord inter-modèles indisponible"}</p>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1 border-t border-slate-700/70 pt-2 sm:grid-cols-4 sm:gap-2" aria-label="Autres données météorologiques courantes">
+              <div className="text-center" title={currentStateFieldTitle(precipitationField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Droplets className="mr-1 inline h-3 w-3" />Précipitations actuelles</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentPrecipitation == null ? "—" : `${currentPrecipitation.toFixed(1)} mm`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(precipitationField, currentSnapshot?.capturedAt)}</p>
+                <p className="text-[8px] leading-tight text-slate-500">Cumul station non comparable</p>
+              </div>
+              <div className="text-center" title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Vent actuel</p>
+                <p className="text-sm font-semibold sm:text-lg">{windSpeed == null ? "—" : `${windSpeed.toFixed(1)} km/h`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windSpeedField, currentSnapshot?.capturedAt)}</p>
+              </div>
+              <div className="text-center" title={currentStateFieldTitle(windGustField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Rafales actuelles</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentWindGust == null ? "—" : `${currentWindGust.toFixed(1)} km/h`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
+              </div>
+              <div className="text-center" title={currentStateFieldTitle(pressureField)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Thermometer className="mr-1 inline h-3 w-3" />Pression locale</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{currentPressure == null ? "Références source non comparables" : formatCurrentStateProvenance(pressureField)}</p>
               </div>
             </div>
           </div>
@@ -1107,8 +1225,8 @@ export default function Dashboard() {
                 <WeatherStatusBadge compact tone="success" label="Relevés locaux" value={locationWeather.ultraLocal.stationCount > 0 ? `${locationWeather.ultraLocal.stationCount} station(s)` : "Données insuffisantes"} pulse={locationWeather.ultraLocal.stationCount > 0} description="Nombre de stations locales retenues pour le contexte physique. Ce compteur n’est pas un score et ne mesure pas la fiabilité des prévisions." />
               </div>
               {hasMaterialLocalDelta ? <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5" role="status">
-                <div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-amber-100">Écart observé avec le snapshot du modèle</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">Les stations locales et le snapshot Open-Meteo décrivent des sources distinctes. La température principale est l’instantané du modèle; la prévision horaire reste dans sa série dédiée.</p></div><span className="shrink-0 text-sm font-bold text-amber-200">{localOfficialDelta > 0 ? "+" : ""}{localOfficialDelta.toFixed(1)}°</span></div>
-                <p className="mt-1.5 text-[10px] text-slate-400">Snapshot du modèle : {officialSnapshotTemp == null ? "—" : `${officialSnapshotTemp.toFixed(1)}°C`} · synthèse station : {localObservation?.temperature.toFixed(1)}°C{localObservation?.observedAt ? ` · relevé le ${new Date(localObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}` : ""}.</p>
+                <div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-amber-100">Écart du calcul local avec le snapshot du modèle</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">L’indicateur principal utilise les stations physiques retenues ou, champ par champ, le snapshot Open-Meteo. Ce calcul Local/Ultra-local séparé peut comporter une contribution modèle; la prévision horaire reste dans sa série dédiée.</p></div><span className="shrink-0 text-sm font-bold text-amber-200">{localOfficialDelta > 0 ? "+" : ""}{localOfficialDelta.toFixed(1)}°</span></div>
+                <p className="mt-1.5 text-[10px] text-slate-400">Snapshot du modèle : {officialSnapshotTemp == null ? "—" : `${officialSnapshotTemp.toFixed(1)}°C`} · résultat du mode Local/Ultra-local (distinct de l’indicateur principal) : {localObservation?.temperature.toFixed(1)}°C{localObservation?.observedAt ? ` · mesure source la plus récente ${new Date(localObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}` : ""}.</p>
               </div> : null}
               <div className="mt-3 border-t border-emerald-500/15 pt-2">
                 <div className="flex items-center justify-between gap-2">

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-describe("Dashboard officiel avec contexte local", () => {
-  it("préserve la température officielle tout en expliquant la moyenne station pondérée", () => {
+describe("Dashboard avec état courant sourcé par variable", () => {
+  it("préserve les prévisions et affiche la sélection physique ou le snapshot modèle avec sa provenance", () => {
     const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
     expect(source).not.toContain("Prévision officielle consolidée");
     expect(source).toContain("Moyenne locale pondérée");
@@ -31,9 +31,11 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Consulter l’historique complet");
     expect(source).toContain("Modifier mon observation");
     expect(source).toContain("Supprimer cette observation et recalculer la calibration");
-    expect(source).toContain("Écart observé avec le snapshot du modèle");
+    expect(source).toContain("Écart du calcul local avec le snapshot du modèle");
     expect(source).toContain("hasMaterialLocalDelta");
-    expect(source).toContain("La température principale est l’instantané du modèle");
+    expect(source).toContain("getCurrentDashboardWeather.useQuery");
+    expect(source).toContain("formatCurrentStateProvenance");
+    expect(source).toContain("L’indicateur principal utilise les stations physiques retenues ou, champ par champ, le snapshot Open-Meteo");
     expect(source).toContain("Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée.");
     expect(source).toContain("Couverture locale");
     expect(source).toContain("Stations contributrices");
@@ -104,7 +106,7 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain("Fermer les informations de prévision et d’accord inter-modèles");
     expect(source).toContain("Créneaux horaires indisponibles");
     expect(source).toContain("Dernière fusion quotidienne réelle");
-    expect(source).toContain('isDailyFallback ? "Tendance quotidienne · " : currentSnapshot ? "État actuel · " : "Snapshot modèle indisponible · "');
+    expect(source).toContain('isDailyFallback ? "Tendance quotidienne · " : currentSnapshot || hasAvailableCurrentState ? "État actuel · " : "État courant indisponible · "');
     expect(source).toContain('text-[15px] font-medium leading-tight text-slate-100/90 sm:text-lg');
     expect(source).toContain('formatDashboardCompactDate');
     expect(source).not.toContain('<WeatherStatusBadge dense tone="info"');
@@ -118,7 +120,13 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).not.toContain('mb-0.5 flex justify-center sm:mb-3');
     expect(source).toContain('mb-1 flex justify-center sm:mb-1.5');
     expect(source).toContain("État du ciel</p>");
-    expect(source).toContain("Snapshot du modèle Open-Meteo");
+    expect(source).toContain("Open-Meteo");
+    expect(source).toContain('dir == null ? "—" : cardinalDir(dir)');
+    expect(source).toContain("Précipitations actuelles");
+    expect(source).toContain("Pression locale");
+    expect(source).toContain("hasCurrentDashboardFields ? currentNumber(temperatureField) : officialSnapshotTemp");
+    expect(source).toContain("Cumul station non comparable");
+    expect(source).toContain("Références source non comparables");
     expect(source).toContain('{panelDate}');
     expect(source).not.toContain('Tendance · {regimeSourceLabel}');
     expect(source).not.toContain('aria-label="Actualiser la météo maintenant"');

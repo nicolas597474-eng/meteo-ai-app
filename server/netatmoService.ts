@@ -100,6 +100,7 @@ function extractPublicMeasures(station: NetatmoPublicStation) {
       pressure: null as string | null,
       windSpeed: null as string | null,
       windGust: null as string | null,
+      windDirection: null as string | null,
       precipitation: null as string | null,
     },
   };
@@ -134,6 +135,7 @@ function extractPublicMeasures(station: NetatmoPublicStation) {
       const iso = new Date(windTime * 1000).toISOString();
       if (result.measurementTimes.windSpeed === null) result.measurementTimes.windSpeed = iso;
       if (result.measurementTimes.windGust === null) result.measurementTimes.windGust = iso;
+      if (result.measurementTimes.windDirection === null) result.measurementTimes.windDirection = iso;
     }
     if (rainTime !== null && result.measurementTimes.precipitation === null) result.measurementTimes.precipitation = new Date(rainTime * 1000).toISOString();
   }
@@ -182,6 +184,7 @@ export function mapNetatmoPublicStation(station: NetatmoPublicStation, refLat: n
       pressure: measurementTimeFrom(station) ?? publicMeasures.measurementTimes.pressure,
       windSpeed: measurementTimeFrom(anemometer) ?? publicMeasures.measurementTimes.windSpeed,
       windGust: measurementTimeFrom(anemometer) ?? publicMeasures.measurementTimes.windGust,
+      windDirection: measurementTimeFrom(anemometer) ?? publicMeasures.measurementTimes.windDirection,
       precipitation: measurementTimeFrom(rainGauge) ?? publicMeasures.measurementTimes.precipitation,
     },
     reliabilityScore: 72,

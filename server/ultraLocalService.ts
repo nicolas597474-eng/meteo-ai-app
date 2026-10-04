@@ -275,14 +275,15 @@ export function calculateUltraLocal(
   refLat: number,
   refLon: number,
   refAltitude: number | null = null,
-  modelTemperature: number | null = null
+  modelTemperature: number | null = null,
+  options: { recordStationReadings?: boolean; inferReferenceAltitude?: boolean } = {},
 ): UltraLocalResult {
   const config = MODE_CONFIG[mode];
 
   // Determine reference altitude from stations if not provided
-  const effectiveAltitude = refAltitude ?? (
-    stations.find(s => s.altitude != null && s.distanceKm < 5)?.altitude ?? null
-  );
+  const effectiveAltitude = refAltitude ?? (options.inferReferenceAltitude === false
+    ? null
+    : stations.find(s => s.altitude != null && s.distanceKm < 5)?.altitude ?? null);
 
   // Get previous readings for frozen-value / sudden-jump detection
   const prevReadings = getPreviousReadings();
@@ -507,7 +508,7 @@ export function calculateUltraLocal(
   const readingsToRecord = stations
     .filter(s => s.temperature != null)
     .map(s => ({ stationId: s.stationId, temperature: s.temperature! }));
-  recordStationReadings(readingsToRecord);
+  if (options.recordStationReadings !== false) recordStationReadings(readingsToRecord);
 
   return {
     mode,

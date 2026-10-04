@@ -60,7 +60,7 @@ export type StationData = {
   precipitation: number | null;
   updatedAt: string | null; // ISO timestamp
   /** Provider-reported measurement time per variable where available. */
-  measurementTimes?: Partial<Record<"temperature" | "humidity" | "pressure" | "windSpeed" | "windGust" | "precipitation", string | null>>;
+  measurementTimes?: Partial<Record<"temperature" | "humidity" | "pressure" | "windSpeed" | "windGust" | "windDirection" | "precipitation", string | null>>;
   reliabilityScore: number; // 0-100
   updateFrequencyMin: number;
   dataAvailability: number; // 0-1
@@ -368,6 +368,7 @@ async function fetchMeteoFranceStations(
           pressure: r.date ?? null,
           windSpeed: r.date ?? null,
           windGust: r.date ?? null,
+          windDirection: r.date ?? null,
           precipitation: r.date ?? null,
         },
         reliabilityScore: SOURCE_DEFAULTS.meteofrance.reliability,
@@ -428,6 +429,7 @@ export function mapMetarObservation(observation: MetarObservation, lat: number, 
       pressure: observation.reportTime ?? null,
       windSpeed: observation.reportTime ?? null,
       windGust: observation.reportTime ?? null,
+      windDirection: observation.reportTime ?? null,
       precipitation: observation.reportTime ?? null,
     },
     reliabilityScore: SOURCE_DEFAULTS.metar.reliability,
