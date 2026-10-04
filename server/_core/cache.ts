@@ -64,7 +64,7 @@ export class LRUCache<K, V> {
       let oldestKey: K | undefined;
       let oldestTime = Infinity;
       
-      for (const [k, entry] of this.map) {
+      for (const [k, entry] of Array.from(this.map.entries())) {
         if (entry.accessedAt < oldestTime) {
           oldestTime = entry.accessedAt;
           oldestKey = k;

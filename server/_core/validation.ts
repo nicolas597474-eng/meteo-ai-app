@@ -15,29 +15,11 @@ import { ENV } from "./env";
  * Convert ZodError to user-friendly error message
  */
 export function formatZodError(error: ZodError): string {
-  return error.errors
+  return error.issues
     .map((err) => {
       const path = err.path.join(".");
       const message = err.message;
-      
-      // Custom messages for common errors
-      if (err.code === "invalid_type") {
-        return `${path}: Expected ${err.expected}, received ${err.received}`;
-      }
-      if (err.code === "too_small") {
-        return `${path}: Value must be ${err.inclusive ? "at least" : "greater than"} ${err.minimum}`;
-      }
-      if (err.code === "too_big") {
-        return `${path}: Value must be ${err.inclusive ? "at most" : "less than"} ${err.maximum}`;
-      }
-      if (err.code === "invalid_string") {
-        if (err.validation === "regex") {
-          return `${path}: Invalid format`;
-        }
-        return `${path}: ${message}`;
-      }
-      
-      return `${path}: ${message}`;
+      return `${path || "entrée"}: ${message}`;
     })
     .join(", ");
 }
@@ -57,14 +39,12 @@ export function zodErrorToTRPCError(error: ZodError): TRPCError {
 // VALIDATION MIDDLEWARE
 // =============================================================================
 
-import type { AnyProcedure, ProcedureParams } from "@trpc/server";
-
 /**
  * Create a validation middleware for tRPC procedures
  */
 export function createValidationMiddleware<T extends z.ZodTypeAny>(
   schema: T
-): (opts: ProcedureParams) => Promise<{ input: z.infer<T> }> {
+): (opts: { input: unknown }) => Promise<{ input: z.infer<T> }> {
   return async (opts) => {
     const result = schema.safeParse(opts.input);
     

@@ -172,7 +172,11 @@ export const userSettingsSchema = z.object({
     weatherAlerts: z.boolean().default(true),
     dailyForecast: z.boolean().default(true),
     weeklyReport: z.boolean().default(false),
-  }).default({}),
+  }).default({
+    weatherAlerts: true,
+    dailyForecast: true,
+    weeklyReport: false,
+  }),
 });
 
 // =============================================================================

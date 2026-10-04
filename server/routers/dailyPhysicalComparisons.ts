@@ -45,6 +45,13 @@ export const dailyPhysicalComparisonsRouter = router({
         cursor: input.cursor,
         pageSize: input.pageSize,
       });
-      return history;
+      return {
+        ...history,
+        modelOptions: WEATHER_SERVICES.expert.map(model => ({
+          serviceName: model.name,
+          modelId: model.modelId,
+          isDerivedReference: model.modelId === "best_match",
+        })),
+      };
     }),
 });
