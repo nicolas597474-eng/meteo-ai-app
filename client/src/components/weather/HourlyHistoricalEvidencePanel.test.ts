@@ -14,11 +14,11 @@ describe("HourlyHistoricalEvidencePanel coverage indication", () => {
       horizonUnavailableReason: null,
     }));
 
-    expect(html).toContain("Niveau de couverture/confiance indicatif selon le nombre de contributeurs");
+    expect(html).toContain("Nombre de modèles contributeurs pour cette échéance et variable");
     expect(html).toContain("prévision d’un modèle unique (1 contributeur)");
-    expect(html).toContain("confiance réduite (2 contributeurs)");
+    expect(html).toContain("effectif limité (2 contributeurs)");
     expect(html).toContain("calibration UNCALIBRATED_ROBUST");
     expect(html).toContain("calibration CALIBRATED");
-    expect(html).toContain("ni une probabilité ni une confiance statistiquement calibrée");
+    expect(html).toContain("L’incertitude statistique n’est pas mesurée ici; la performance historique");
   });
 });

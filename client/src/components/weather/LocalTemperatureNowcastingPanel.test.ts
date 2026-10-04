@@ -32,5 +32,9 @@ describe("LocalTemperatureNowcastingPanel", () => {
     expect(html).toContain("Best Match exclu");
     expect(html).toContain("Production verrouillée");
     expect(html).toContain("16.9 °C");
+    expect(html).toContain("Indice descriptif de concordance thermique des stations");
+    expect(html).toContain("85/100");
+    expect(html).toContain("Ce score n’est ni une probabilité");
+    expect(html).toContain("confiance météorologique calibrée");
   });
 });

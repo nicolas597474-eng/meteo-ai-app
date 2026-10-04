@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 describe("Dashboard avec état courant sourcé par variable", () => {
   it("préserve les prévisions et affiche la sélection physique ou le snapshot modèle avec sa provenance", () => {
     const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+    const metricDefinitions = readFileSync(new URL("../components/weather/ForecastMetricDefinitions.tsx", import.meta.url), "utf8");
     expect(source).not.toContain("Prévision officielle consolidée");
     expect(source).toContain("Moyenne locale pondérée");
     expect(source).toContain("Mes observations");
@@ -93,8 +94,12 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('text-white">{nextRegimeChange ? nextRegimeChange.label');
     expect(source).not.toContain("Confiance prévision");
     expect(source).toContain("Accord inter-modèles");
-    expect(source).toContain("accord, pas fiabilité");
+    expect(source).toContain("accord brut, pas fiabilité");
     expect(source).toContain("σ population");
+    expect(source).toContain("incertitude statistique non mesurée");
+    expect(metricDefinitions).toContain("Couverture et qualité physiques");
+    expect(metricDefinitions).toContain("Incertitude statistique</strong> : non mesurée dans cette vue");
+    expect(metricDefinitions).toContain("Fiabilité historique");
     expect(source).toContain("jour demandé");
     expect(source).toContain("heure de run modèle non archivée");
     expect(source).toContain("isForecastInfoOpen");

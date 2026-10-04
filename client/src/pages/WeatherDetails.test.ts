@@ -39,8 +39,8 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("contributeurs effectifs");
     expect(timelineSource).toContain("ils ne constituent ni une note de fiabilité ni un pourcentage de confiance");
     expect(timelineSource).toContain("Une couverture plus faible peut être normale selon l’horizon du modèle.");
-    expect(timelineSource).toContain("Niveau de couverture/confiance indicatif selon le nombre de contributeurs");
-    expect(timelineSource).toContain("ni une probabilité ni une confiance statistiquement calibrée");
+    expect(timelineSource).toContain("Nombre de modèles contributeurs :");
+    expect(timelineSource).toContain("Incertitude statistique : non mesurée dans cette vue.");
     expect(timelineSource).toContain("Statut de calibration historique, distinct");
   });
   it("garde les rubans horizontaux accessibles et n’invente pas d’échéances pour la série quotidienne", () => {

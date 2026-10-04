@@ -1064,7 +1064,7 @@ export default function Dashboard() {
                   {dailyAgreement?.tempMax.range == null ? "Étendue indisponible" : `Étendue ${dailyAgreement.tempMax.range.toFixed(1)} °C`}
                 </p>
                 <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement?.tempMax.standardDeviation == null ? "σ population indisponible" : `σ population ${dailyAgreement.tempMax.standardDeviation.toFixed(1)} °C`}</p>
-                <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement ? `${dailyAgreement.tempMax.availableModelCount}/${dailyAgreement.expectedModelCount} modèles · jour demandé ${dailyAgreement.requestDayOffset == null ? "indisponible" : `J+${dailyAgreement.requestDayOffset}`} · heure de run modèle non archivée · accord, pas fiabilité` : "Accord inter-modèles indisponible"}</p>
+                <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement ? `${dailyAgreement.tempMax.availableModelCount}/${dailyAgreement.expectedModelCount} modèles · jour demandé ${dailyAgreement.requestDayOffset == null ? "indisponible" : `J+${dailyAgreement.requestDayOffset}`} · heure de run modèle non archivée · accord brut, pas fiabilité · incertitude statistique non mesurée` : "Accord inter-modèles indisponible · incertitude statistique non mesurée"}</p>
               </div>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-1 border-t border-slate-700/70 pt-2 sm:grid-cols-4 sm:gap-2" aria-label="Autres données météorologiques courantes">

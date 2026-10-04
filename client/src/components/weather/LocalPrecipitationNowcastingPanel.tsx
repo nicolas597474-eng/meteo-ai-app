@@ -99,7 +99,8 @@ export function LocalPrecipitationNowcastingPanel({ report }: { report: Nowcasti
             <div className="rounded-lg border border-white/10 bg-black/15 p-2"><span className="text-[8px] uppercase text-slate-500">Signal local du candidat</span><p className="mt-0.5 font-semibold text-sky-100">{latest.localWetSignal ? "Pluie au snapshot de référence" : "Aucun ajout"}</p></div>
             <div className="rounded-lg border border-white/10 bg-black/15 p-2"><span className="text-[8px] uppercase text-slate-500">Statut candidat</span><p className="mt-0.5 font-semibold text-sky-100">{latest.candidateStatus.replaceAll("_", " ")}</p></div>
           </div>
-          <p><span className="font-semibold text-sky-100">Horizon · </span>{latest.horizonMinutes == null ? "indisponible" : `+${Math.round(latest.horizonMinutes / 60)} h`} · persistance du signal {Math.round(latest.continuationFactor * 100)} % · {latest.stationCount} station(s) qualifiée(s){latest.confidenceScore == null ? "" : ` · confiance station ${latest.confidenceScore.toFixed(0)} %`}.</p>
+          <p><span className="font-semibold text-sky-100">Horizon · </span>{latest.horizonMinutes == null ? "indisponible" : `+${Math.round(latest.horizonMinutes / 60)} h`} · persistance du signal {Math.round(latest.continuationFactor * 100)} % · {latest.stationCount} station(s) qualifiée(s).</p>
+          <p>Accord inter-stations pour les précipitations : non mesuré ici. Le score de snapshot conservé au contrat porte sur la concordance thermique et l’effectif; il n’évalue pas la pluie.</p>
           <p className="text-slate-400"><span className="font-semibold text-slate-300">Pare-feu temporel · </span>prévision archivée disponible {parisTime(latest.forecastAvailableAt)}, snapshot de référence {parisTime(latest.observationReferenceAt)}. Une prévision postérieure à la référence est bloquée.</p>
           <p className="text-slate-400">Raisons : {evidenceList(latest.reasons)}.</p>
         </div>
