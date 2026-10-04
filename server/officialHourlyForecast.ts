@@ -1,4 +1,4 @@
-import { getPhase3HorizonWindow } from "../shared/weatherDataHub";
+import { getForecastHorizonWindow } from "../shared/forecastHorizon";
 import { HOURLY_FORECAST_VARIABLES as HOURLY_SCORING_VARIABLES } from "./hourlyForecastRunScoring";
 import { HOURLY_FORECAST_VARIABLES as ARCHIVED_HOURLY_VARIABLES } from "./forecastVariableCoverage";
 import { getHourlyForecastEvaluationHistory, makeLocationKey, type HourlyExactHorizonHistoryKey } from "./db";
@@ -439,7 +439,7 @@ function computeVariableForecastValue(input: {
     variable,
     validTime: candidates[0]?.hour.validAt ?? Number.NaN,
     referenceAt,
-    horizonBucketForMinutes: (horizonMinutes) => getPhase3HorizonWindow(horizonMinutes)?.key ?? null,
+    horizonBucketForMinutes: (horizonMinutes) => getForecastHorizonWindow(horizonMinutes)?.key ?? null,
     allowUnscoredHorizons: true,
     missingReasonByModel: availabilityReasonByModel,
   });
@@ -954,7 +954,7 @@ export async function collectOfficialHourlyForecast(
     for (const hour of forecast.hours) {
       if (!isFiniteNumber(hour.validAt) || hour.validAt <= forecast.availableAt) continue;
       const horizonMilliseconds = hour.validAt - forecast.availableAt;
-      if (!Number.isSafeInteger(horizonMilliseconds) || !getPhase3HorizonWindow(horizonMilliseconds / 60_000)) continue;
+      if (!Number.isSafeInteger(horizonMilliseconds) || !getForecastHorizonWindow(horizonMilliseconds / 60_000)) continue;
       for (const variable of HISTORY_VARIABLES) {
         if (!isFiniteNumber(hour[FORECAST_FIELD_BY_VARIABLE[variable]])) continue;
         const key = {

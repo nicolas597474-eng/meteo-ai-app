@@ -74,8 +74,8 @@ import { buildWeatherProvenance } from "../weatherProvenance";
 import { buildEveningEvidence } from "../historyEvidence";
 import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHandlers";
 import { buildForecastFlowStatuses } from "../forecastFlowStatus";
-import { getShadowDataHubObservability } from "../weatherDataHubShadow";
-import { getP1ObservationClosure } from "../weatherP1Closure";
+import { buildLocalTemperatureNowcastingReport } from "../localTemperatureNowcastingShadow";
+import { buildLocalPrecipitationNowcastingReport } from "../localPrecipitationNowcastingShadow";
 import { deriveStationPerformanceProfiles } from "../stationPerformanceService";
 import { getStationRankingContract } from "../stationRankingContract";
 import { runHondeghemAromeShadowComparison } from "../aromeHondeghemShadow";
@@ -818,8 +818,8 @@ export const weatherRouter = router({
   /** Historique filtrable des comparaisons physiques de production, protégé dans son sous-routeur. */
   dailyPhysicalComparisons: dailyPhysicalComparisonsRouter,
 
-  /** P1 owner-only observability. This procedure is never used by forecast production. */
-  getShadowDataHubReport: adminProcedure
+  /** Rapports administrateur des nowcastings locaux, indépendants de P1–P8. */
+  getLocalNowcastingReports: adminProcedure
     .input(z.object({
       lat: latitudeSchema.optional(),
       lon: longitudeSchema.optional(),
@@ -829,11 +829,10 @@ export const weatherRouter = router({
       const locationKey = input?.lat != null && input?.lon != null
         ? makeLocationKey(input.lat, input.lon)
         : undefined;
-      const report = await getShadowDataHubObservability(locationKey, input?.lookbackDays ?? 7);
-      if (!report) return null;
+      const lookbackDays = input?.lookbackDays ?? 7;
       return {
-        ...report,
-        observationClosure: locationKey ? await getP1ObservationClosure(locationKey) : null,
+        temperature: await buildLocalTemperatureNowcastingReport(locationKey, lookbackDays),
+        precipitation: await buildLocalPrecipitationNowcastingReport(locationKey, lookbackDays),
       };
     }),
 

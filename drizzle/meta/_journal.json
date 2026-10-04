@@ -365,6 +365,13 @@
       "when": 1791101726854,
       "tag": "0051_hourly_exact_horizon_calibration",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "5",
+      "when": 1791105740447,
+      "tag": "0052_gorgeous_risque",
+      "breakpoints": true
     }
   ]
 }

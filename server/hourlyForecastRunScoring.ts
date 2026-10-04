@@ -1,4 +1,4 @@
-import { getPhase3HorizonWindow, PHASE3_HORIZON_WINDOWS } from "../shared/weatherDataHub";
+import { FORECAST_HORIZON_WINDOWS, getForecastHorizonWindow } from "../shared/forecastHorizon";
 import { scoreQualifiedHourlyModels, type QualifiedHourlyModelScore } from "./qualifiedHourlyScoring";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 
@@ -396,7 +396,7 @@ export function evaluateHourlyForecastRuns(
         const opportunityRun = selected ?? latestAdmissibleRun(candidates, validTime);
         if (!opportunityRun) continue;
         const horizonMinutes = (validTime - opportunityRun.availableAt) / 60_000;
-        const horizon = getPhase3HorizonWindow(horizonMinutes);
+        const horizon = getForecastHorizonWindow(horizonMinutes);
         if (!horizon) continue;
         evaluableObservationCountsByHorizon.set(horizon.key, (evaluableObservationCountsByHorizon.get(horizon.key) ?? 0) + 1);
         const horizonMilliseconds = validTime - opportunityRun.availableAt;
@@ -461,7 +461,7 @@ export function evaluateHourlyForecastRuns(
           stationsUsed: opportunity.snapshot.stationsUsed ?? null,
         });
       }
-      for (const horizon of PHASE3_HORIZON_WINDOWS) {
+      for (const horizon of FORECAST_HORIZON_WINDOWS) {
         const errors = errorsByHorizon.get(horizon.key) ?? [];
         const evaluableObservationCount = evaluableObservationCountsByHorizon.get(horizon.key) ?? 0;
         scores.push({

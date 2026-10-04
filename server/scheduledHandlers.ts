@@ -22,17 +22,12 @@ import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable } from "./hourlyForecastRunScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
-import {
-  executeShadowWriteSafely,
-  persistDailyForecastsToShadow,
-  persistHourlyForecastsToShadow,
-} from "./weatherDataHubShadow";
+import { runOptionalBackgroundTask } from "./optionalBackgroundTask";
 import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow";
 import {
   evaluateLocalPrecipitationNowcastOutcomesForSnapshot,
   rebuildLocalPrecipitationNowcastForSnapshot,
 } from "./localPrecipitationNowcastingShadow";
-import { recordP1ObservationDay } from "./weatherP1Observation";
 import { calculateReliabilityScore } from "./statsEngine";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
 import { collectNearbyStations, calculateGroundTruth, getCandidateStations, getPhysicalActiveStations } from "./stationService";
@@ -230,7 +225,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     if ((trigger === "scheduled" || recoveryOnly) && successfulEvidenceAlreadyArchived) {
       // Un passage normal peut rapprocher les émissions pending du snapshot
       // déjà archivé, sans nouvelle collecte ni réécriture de celui-ci.
-      await executeShadowWriteSafely(`local-precipitation-nowcast-outcome:${locationKey}:${date}:${hour}`, () =>
+      await runOptionalBackgroundTask(`local-precipitation-nowcast-outcome:${locationKey}:${date}:${hour}`, () =>
         evaluateLocalPrecipitationNowcastOutcomesForSnapshot({
           locationKey,
           observationDate: date,
@@ -372,7 +367,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
             };
         // Extension strictement shadow : toute indisponibilité du nowcasting ne
         // peut ni bloquer ni réécrire le snapshot physique ou la prévision publique.
-        await executeShadowWriteSafely(`local-temperature-nowcast:${locationKey}:${date}:${hour}`, () =>
+        await runOptionalBackgroundTask(`local-temperature-nowcast:${locationKey}:${date}:${hour}`, () =>
           rebuildLocalTemperatureNowcastForSnapshot({
             locationKey,
             observationDate: date,
@@ -381,7 +376,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         );
         // Le signal précipitations reste catégoriel : il ne modifie aucun
         // montant officiel et toute indisponibilité reste non bloquante.
-        await executeShadowWriteSafely(`local-precipitation-nowcast:${locationKey}:${date}:${hour}`, async () => {
+        await runOptionalBackgroundTask(`local-precipitation-nowcast:${locationKey}:${date}:${hour}`, async () => {
           await rebuildLocalPrecipitationNowcastForSnapshot({
             locationKey,
             observationDate: date,
@@ -1103,7 +1098,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         }
 
         // Collect expert forecasts for this location
-        const dailyShadowRequestStartedAt = Date.now();
+        const dailyRequestStartedAt = Date.now();
         const dailyCollection = await collectExpertForecastsWithDiagnostics(today, { lat: fav.lat, lon: fav.lon });
         const expertData = dailyCollection.forecasts;
         const dailyDiagnostics = dailyCollection.diagnostics;
@@ -1113,7 +1108,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           archiveRows: [],
           archiveRowsWritten: 0,
         });
-        const dailyShadowReceivedAt = Date.now();
+        const dailyReceivedAt = Date.now();
         const dailyCoverage = getModelCoverage(
           expertData.map((forecast) => forecast.serviceName),
           OFFICIAL_DAILY_COVERAGE_MODELS,
@@ -1129,7 +1124,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // Each scheduled attempt is recorded before its provider request. Best Match is
         // retained as an explicitly non-official reference; only these seven named
         // model ids are eligible for the official hourly engine.
-        const hourlyShadowRequestStartedAt = Date.now();
+        const hourlyRequestStartedAt = Date.now();
         const hourlyAttemptedAt = Date.now();
         const officialModelNames = new Set<string>(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
         const hourlyCollectionCatalog = WEATHER_SERVICES.expert.map((service) => ({
@@ -1167,7 +1162,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         try {
           const collection = await collectHourlyForecastAllModelsWithDiagnostics(today, { lat: fav.lat, lon: fav.lon });
           const hourlyAllModels = collection.forecasts;
-          const hourlyShadowReceivedAt = Date.now();
+          const hourlyReceivedAt = Date.now();
           const forecastsByModel = new Map(hourlyAllModels.map((forecast) => [forecast.modelName, forecast]));
           const diagnosticsByModel = new Map(collection.diagnostics.map((diagnostic) => [diagnostic.modelName, diagnostic]));
 
@@ -1199,8 +1194,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                   captureRunId,
                   sourceName: forecast.sourceName ?? "open-meteo",
                   modelId: forecast.modelId ?? null,
-                  requestStartedAt: forecast.requestStartedAt ?? hourlyShadowRequestStartedAt,
-                  availableAt: forecast.availableAt ?? hourlyShadowReceivedAt,
+                  requestStartedAt: forecast.requestStartedAt ?? hourlyRequestStartedAt,
+                  availableAt: forecast.availableAt ?? hourlyReceivedAt,
                   units: forecast.sourceMetadata?.units ?? {},
                 },
                 archiveValues: hour,
@@ -1291,23 +1286,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           if (hourlyCoverage.missing.length > 0) {
             console.warn(`[Models] ${fav.name}: horaire indisponible — ${hourlyCoverage.missing.join(", ")}`);
           }
-          await executeShadowWriteSafely(`hourly:${locKey}`, async () => {
-            const shadowResult = await persistHourlyForecastsToShadow(hourlyAllModels, {
-              locationKey: locKey,
-              latitude: fav.lat,
-              longitude: fav.lon,
-              targetDate: today,
-              requestStartedAt: hourlyShadowRequestStartedAt,
-              receivedAt: hourlyShadowReceivedAt,
-            });
-            if (!shadowResult.ok) {
-              console.warn(`[DataHubShadow] ${fav.name}: hourly partial — ${shadowResult.errors.join(" | ")}`);
-            } else {
-              console.log(`[DataHubShadow] ${fav.name}: hourly ${shadowResult.sourceCount} source(s), ${shadowResult.valueCount} value(s)`);
-            }
-            return shadowResult;
-          });
-
           try {
             const validationHourly = await collectValidationHourlyForecasts(today, { lat: fav.lat, lon: fav.lon });
             for (const forecast of validationHourly) {
@@ -1422,23 +1400,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         await insertForecasts(forecastRowsForLoc);
         dailyModelsCollected += dailyCoverage.collected.length;
         const issuedAt = Date.now();
-
-        await executeShadowWriteSafely(`daily:${locKey}`, async () => {
-          const shadowResult = await persistDailyForecastsToShadow(expertData, {
-            locationKey: locKey,
-            latitude: fav.lat,
-            longitude: fav.lon,
-            targetDate: today,
-            requestStartedAt: dailyShadowRequestStartedAt,
-            receivedAt: dailyShadowReceivedAt,
-          });
-          if (!shadowResult.ok) {
-            console.warn(`[DataHubShadow] ${fav.name}: daily partial — ${shadowResult.errors.join(" | ")}`);
-          } else {
-            console.log(`[DataHubShadow] ${fav.name}: daily ${shadowResult.sourceCount} source(s), ${shadowResult.valueCount} value(s)`);
-          }
-          return shadowResult;
-        });
 
         // Candidate outputs are archived independently and cannot enter the
         // forecasts table, official fusion or seven-model coverage counters.
@@ -1561,17 +1522,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           hourly: hourlyCoverage,
           dailyVariableCoverage,
         }));
-
-        await executeShadowWriteSafely(`p1.6:${locKey}:${today}`, async () => {
-          const evaluation = await recordP1ObservationDay({
-            observationDate: today,
-            locationKey: locKey,
-          });
-          console.log(
-            `[DataHubShadow] ${fav.name}: P1.6 ${evaluation.verdict} — quotidien ${evaluation.dailySourceCount}/${evaluation.expectedSourceCount}, horaire ${evaluation.hourlySourceCount}/${evaluation.expectedSourceCount}`,
-          );
-          return evaluation;
-        });
 
         locationsProcessed++;
 

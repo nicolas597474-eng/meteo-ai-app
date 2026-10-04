@@ -20,8 +20,8 @@ describe("migration 0051 de calibration horaire au lead exact", () => {
     expect(migrationSql).toContain("UNIQUE(`locationKey`,`date`,`sourceName`,`modelName`,`variable`,`horizonMilliseconds`)");
   });
 
-  it("est la prochaine entrée Drizzle sans prétendre que la migration a été appliquée", () => {
-    expect(migrationJournal.entries.at(-1)).toMatchObject({
+  it("conserve son entrée Drizzle sans prétendre que la migration a été appliquée", () => {
+    expect(migrationJournal.entries.find((entry) => entry.tag === "0051_hourly_exact_horizon_calibration")).toMatchObject({
       idx: 51,
       tag: "0051_hourly_exact_horizon_calibration",
       // The journal records generated migrations; it does not record database application state.
