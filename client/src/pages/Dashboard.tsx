@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, LogIn, X } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -14,6 +14,7 @@ import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
 import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
+import { getLoginUrl } from "@/const";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
@@ -702,7 +703,14 @@ export default function Dashboard() {
 
         {!authLoading && !user && (
           <div role="status" className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-xs text-blue-100">
-            {DASHBOARD_PREVIEW_MESSAGE}
+            <p>{DASHBOARD_PREVIEW_MESSAGE}</p>
+            <a
+              href={getLoginUrl()}
+              className="mt-2 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-blue-300/30 bg-blue-300/10 px-3 py-1.5 font-semibold text-blue-50 transition-colors hover:bg-blue-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+            >
+              <LogIn className="h-3.5 w-3.5" aria-hidden="true" />
+              Se connecter
+            </a>
           </div>
         )}
 
