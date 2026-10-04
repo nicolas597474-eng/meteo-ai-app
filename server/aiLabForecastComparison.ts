@@ -1,4 +1,63 @@
 import type { OfficialWeatherSnapshot } from "./officialWeatherSnapshot";
+import type { HourlyFusionTrace, HourlyPrecipitationAgreementTrace } from "../shared/hourlyModelMetrics";
+
+function projectHourlyWeighting(point: OfficialWeatherSnapshot["hourly"][number]): HourlyFusionTrace | null {
+  const weighting = point.forecastWeighting;
+  if (!weighting || !Array.isArray(weighting.variableWeightings)) return null;
+  return {
+    method: weighting.method,
+    availabilityStatus: weighting.availabilityStatus,
+    calibrationStatus: weighting.calibrationStatus,
+    expectedModelCount: weighting.expectedModelCount,
+    availableModelCount: weighting.availableModelCount,
+    contributingModelCount: weighting.contributingModelCount,
+    horizonBucket: weighting.horizonBucket,
+    modelsWithData: [...weighting.modelsWithData],
+    variableWeightings: weighting.variableWeightings.map((variable) => ({
+      variable: variable.variable,
+      method: variable.method,
+      horizonBucket: variable.horizonBucket,
+      availabilityStatus: variable.availabilityStatus,
+      calibrationStatus: variable.calibrationStatus,
+      expectedModelCount: variable.expectedModelCount,
+      availableModelCount: variable.availableModelCount,
+      evidenceEligibleModelCount: variable.evidenceEligibleModelCount,
+      contributingModelCount: variable.contributingModelCount,
+      coverageLevel: variable.coverageLevel,
+      modelReasons: variable.modelReasons.map((reason) => ({ ...reason })),
+      modelWeights: variable.modelWeights.map((model) => ({
+        modelName: model.modelName,
+        modelId: model.modelId,
+        sourceName: model.sourceName,
+        runId: model.runId,
+        runIdKind: model.runIdKind,
+        requestStartedAt: model.requestStartedAt,
+        availableAt: model.availableAt,
+        validTime: model.validTime,
+        horizonMinutes: model.horizonMinutes,
+        horizonBucket: model.horizonBucket,
+        value: model.value,
+        reliability: model.reliability,
+        historicalScore: model.historicalScore,
+        calibrationLevel: model.calibrationLevel,
+        calibrationStatus: model.calibrationStatus,
+        rawWeight: model.rawWeight,
+        robustFallbackWeight: model.robustFallbackWeight,
+        weight: model.weight,
+        contributedToValue: model.contributedToValue,
+        ...(model.historicalEvidence ? {
+          historicalEvidence: {
+            status: model.historicalEvidence.status,
+            minimumComparisons: model.historicalEvidence.minimumComparisons,
+            minimumComparableDays: model.historicalEvidence.minimumComparableDays,
+            latestScoreDate: model.historicalEvidence.latestScoreDate,
+            latestComputedAt: model.historicalEvidence.latestComputedAt,
+          },
+        } : {}),
+      })),
+    })),
+  };
+}
 
 export function formatAILabLocationLabel(coordinates: { lat: number; lon: number } | null): string {
   if (!coordinates) return "le lieu sélectionné";
@@ -43,6 +102,8 @@ export function buildAILabForecastComparisonReadModel(
         validAt: Number.isFinite(point.validAt) ? point.validAt ?? null : null,
         temp: Number.isFinite(point.temp) ? point.temp : null,
         modelsWithData: [...(point.forecastWeighting?.modelsWithData ?? [])],
+        weighting: projectHourlyWeighting(point),
+        precipitationAgreement: (point.multiModelMetrics?.precipitation ?? null) as HourlyPrecipitationAgreementTrace | null,
       })),
     },
     dailyForecast: {

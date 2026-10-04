@@ -51,6 +51,7 @@ type PreparedHourlyModel = {
   selected: SelectedHourlyModel;
   evidence: HourlyHistoricalEvidence | null;
   calibrationStatus: HourlyCalibrationStatus;
+  reliability: number;
   rawWeight: number;
   robustFallbackWeight: number | null;
   finalWeight: number;
@@ -272,15 +273,6 @@ function maximumCircularSpread(values: unknown[]): number | null {
   return 360 - largestGap;
 }
 
-function hasForecastValue(hour: HourlyModelForecast["hours"][number]): boolean {
-  return [
-    hour.temperature, hour.apparentTemperature, hour.precipitation, hour.windSpeed,
-    hour.windGusts, hour.windDirection, hour.humidity, hour.pressure, hour.cloudCover,
-    hour.weatherCode, hour.uvIndex, hour.dewPoint, hour.visibility, hour.solarRadiation,
-    hour.cloudLow, hour.cloudMid, hour.cloudHigh, hour.snowfall,
-  ].some(isFiniteNumber);
-}
-
 function getCoverageLevel(modelCount: number): ModelCountCoverageLevel {
   return getModelCountCoverageLevel(modelCount);
 }
@@ -311,6 +303,9 @@ function ineligibilityReasonByModel(diagnostics: readonly ForecastModelEligibili
   return diagnostics.filter((item) => !item.eligible).map((item) => ({
     modelName: item.modelName,
     reason: item.reason ?? "Valeur non admissible.",
+    sourceName: item.sourceName,
+    modelId: item.modelId,
+    runId: item.runId,
     availableAt: item.availableAt,
     validTime: item.validTime,
     horizonMinutes: item.horizonMinutes,
@@ -335,6 +330,12 @@ function makeDiagnostic(
     validTime: selected.validTime!,
     horizonMinutes: selected.horizonMinutes,
     horizonBucket: selected.horizonBucket,
+    value: selected.value,
+    reliability: source.reliability,
+    historicalScore: source.evidence?.metrics ?? null,
+    calibrationLevel: source.evidence?.metrics
+      ? "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
+      : "UNCALIBRATED_ROBUST",
     calibrationStatus: source.calibrationStatus,
     rawWeight: source.rawWeight,
     robustFallbackWeight: source.robustFallbackWeight,
@@ -426,6 +427,7 @@ function computeVariableForecastValue(input: {
       selected,
       evidence,
       calibrationStatus,
+      reliability,
       rawWeight: historicalMultiplier,
       robustFallbackWeight: null,
       finalWeight: 0,
@@ -688,7 +690,7 @@ export function computeOfficialHourlyForecast(
     if (!MODEL_NAME_SET.has(forecast.modelName)) continue;
     const modelName = forecast.modelName as OfficialHourlyModelName;
     for (const hour of forecast.hours) {
-      if (!isFiniteNumber(hour.validAt) || !hasForecastValue(hour)) continue;
+      if (!isFiniteNumber(hour.validAt)) continue;
       const values = byValidTime.get(hour.validAt) ?? [];
       values.push({
         modelName,

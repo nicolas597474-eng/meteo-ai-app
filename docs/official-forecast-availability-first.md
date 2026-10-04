@@ -33,6 +33,14 @@ L’interface peut présenter, pour chaque échéance et variable, un **niveau d
 
 Les traces exposent séparément la disponibilité, l’état de calibration, les compteurs de modèles disponibles/contributeurs, les timestamps de run, les poids bruts/robustes/finals et les motifs d’exclusion.
 
+## Calibration horaire et limites des preuves
+
+Pour chaque variable et `validTime`, le bucket de preuve est recherché après calcul de l’horizon exact `(validTime - availableAt) / 60 000`, sans arrondi. Le scoreur historique et la fusion appliquent la même convention, notamment aux frontières entre buckets. Un bucket nul ou une preuve manquante n’exclut pas une valeur admissible : le moteur conserve la prévision et marque le repli `UNCALIBRATED_ROBUST`.
+
+Le schéma de score horaire identifie les preuves par lieu, modèle, variable et bucket. Il ne contient pas de regroupement régional ni de table globale propre à la variable; aucun niveau régional/global, score modèle-variable hors lieu, ni interpolation entre buckets n’est donc inféré. Les preuves restent strictement locales et exactes. Les statistiques admissibles portent sur la fenêtre historique de 365 jours avant le début de la série, exigent au moins 30 comparaisons réparties sur 7 jours pour être qualifiées, et sont lues une fois par série. Les poids actuels régularisent le MAE avec l’effectif et les jours évalués; RMSE, biais, date du dernier score et date de calcul sont exposés à titre diagnostique. Il n’existe pas de seuil de fraîcheur `computedAt` ni de multiplicateur de décroissance horaire configuré; aucun n’est inventé ici.
+
+Dans Weather AI Lab, le mode de débogage sélectionne une cible horaire et affiche, indépendamment par variable, la valeur, les timestamps, l’horizon exact, le bucket, le niveau/statut de calibration, l’effectif et score historiques, le facteur de régularisation, les poids et les raisons d’exclusion. Un bucket agrégé nul peut signifier que plusieurs buckets individuels coexistent; il ne bloque pas la fusion. Pour la pluie, la fréquence des modèles pluvieux reste un accord descriptif (`isProbabilityCalibrated = false`), séparé de la quantité de consensus. La projection AI Lab est en lecture seule et ne lance ni collecte ni requête historique supplémentaire.
+
 ## Chemins auxiliaires qui ne sont pas des fusions officielles
 
 - **Open-Meteo Best Match** est une référence comparative (`officialContributor: false`). Dans les prévisions quotidiennes, il reste dans `bestMatchReference`; dans les longues périodes horaires auxiliaires de `collectHourlyForecast`, il est identifié comme `open_meteo_best_match_reference`. Il n’est jamais un modèle déterministe supplémentaire dans la fusion ni dans son scoring.

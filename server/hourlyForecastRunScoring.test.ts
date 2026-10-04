@@ -56,6 +56,22 @@ describe("evaluateHourlyForecastRuns", () => {
     expect(scoresFor(result).filter((score) => score.sampleSize === 0).every((score) => score.evaluableObservationCount === 0)).toBe(true);
   });
 
+  it("classe le bucket depuis la durée exacte, sans arrondir une échéance proche de la frontière", () => {
+    const validTime = observedAt(12);
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({
+        captureRunId: "run-119-6",
+        validTime,
+        availableAt: validTime - 119.6 * 60_000,
+        variable: "temperature",
+        value: 12,
+      }),
+    ]);
+
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 2 });
+    expect(scoresFor(result).find((score) => score.horizonBucket === "2_6h")?.sampleSize).toBe(0);
+  });
+
   it("ne surcompte pas les doublons et retombe sur une valeur admissible quand le run récent est manquant", () => {
     const validTime = observedAt(12);
     const old = forecast({ captureRunId: "run-old", validTime, availableAt: validTime - 90 * 60_000, variable: "temperature", value: 11 });

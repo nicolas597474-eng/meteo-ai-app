@@ -39,7 +39,11 @@ describe("selectEligibleModelsForHorizon", () => {
     expect(selected.eligible[0]).toMatchObject({ horizonMinutes: 390, horizonBucket: "6-24h", availableAt: referenceAt - 30 * 60_000 });
     expect(selected.diagnostics.find(({ modelName }) => modelName === "AROME")?.reason).toContain("valeur finie");
     expect(selected.diagnostics.find(({ modelName }) => modelName === "GFS")?.reason).toContain("validTime");
-    expect(selected.diagnostics.find(({ modelName }) => modelName === "UKMET")?.reason).toContain("Aucun run");
+    expect(selected.diagnostics.find(({ modelName }) => modelName === "UKMET")).toMatchObject({
+      reason: expect.stringContaining("Aucun run"),
+      validTime,
+      availableAt: null,
+    });
   });
 
   it("ne remplace jamais un availableAt manquant par requestStartedAt", () => {

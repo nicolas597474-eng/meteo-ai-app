@@ -53,6 +53,76 @@ export type HourlyHistoricalEvidence = {
   trend: HourlyHistoricalTrend;
 };
 
+export type HourlyModelCalibrationLevel =
+  | "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
+  | "UNCALIBRATED_ROBUST";
+
+export type HourlyFusionWeightModelTrace = {
+  modelName: string;
+  modelId: string;
+  sourceName: string;
+  runId: string | null;
+  runIdKind: "capture" | "provider" | "unknown";
+  requestStartedAt: number | null;
+  availableAt: number;
+  validTime: number;
+  horizonMinutes: number;
+  horizonBucket: string | null;
+  value: number;
+  reliability: number;
+  historicalScore: HistoricalMetricValues | null;
+  calibrationLevel: HourlyModelCalibrationLevel;
+  calibrationStatus: string;
+  rawWeight: number;
+  robustFallbackWeight: number | null;
+  weight: number;
+  contributedToValue: boolean;
+  historicalEvidence?: Pick<HourlyHistoricalEvidence,
+    "status" | "minimumComparisons" | "minimumComparableDays" | "latestScoreDate" | "latestComputedAt"
+  >;
+};
+
+export type HourlyFusionExcludedModelTrace = {
+  modelName: string;
+  reason: string;
+  sourceName: string | null;
+  modelId: string | null;
+  runId: string | null;
+  availableAt: number | null;
+  validTime: number | null;
+  horizonMinutes: number | null;
+  horizonBucket: string | null;
+};
+
+export type HourlyFusionVariableTrace = {
+  variable: string;
+  method: string;
+  horizonBucket: string | null;
+  availabilityStatus: string;
+  calibrationStatus: string;
+  expectedModelCount: number;
+  availableModelCount: number;
+  evidenceEligibleModelCount: number;
+  contributingModelCount: number;
+  coverageLevel: string;
+  modelReasons: HourlyFusionExcludedModelTrace[];
+  modelWeights: HourlyFusionWeightModelTrace[];
+};
+
+export type HourlyFusionTrace = {
+  method: string;
+  availabilityStatus: string;
+  calibrationStatus: string;
+  expectedModelCount: number;
+  availableModelCount: number;
+  contributingModelCount: number;
+  horizonBucket: string | null;
+  variableWeightings: HourlyFusionVariableTrace[];
+  modelsWithData: string[];
+};
+
+export type HourlyPrecipitationAgreementTrace = PrecipitationModelConsensus;
+
 /**
  * Descriptive summaries of the seven independent hourly forecast models.
  * Null means no admissible value exists at the exact validTime; missing

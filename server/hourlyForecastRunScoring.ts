@@ -305,7 +305,7 @@ export function evaluateHourlyForecastRuns(
         // is excluded from both this ratio and every error-score denominator.
         const opportunityRun = selected ?? latestAdmissibleRun(candidates, validTime);
         if (!opportunityRun) continue;
-        const horizonMinutes = Math.round((validTime - opportunityRun.availableAt) / 60_000);
+        const horizonMinutes = (validTime - opportunityRun.availableAt) / 60_000;
         const horizon = getPhase3HorizonWindow(horizonMinutes);
         if (!horizon) continue;
         evaluableObservationCountsByHorizon.set(horizon.key, (evaluableObservationCountsByHorizon.get(horizon.key) ?? 0) + 1);

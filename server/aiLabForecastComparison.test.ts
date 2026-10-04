@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { OfficialWeatherSnapshot } from "./officialWeatherSnapshot";
 import { buildAILabForecastComparisonReadModel, formatAILabLocationLabel } from "./aiLabForecastComparison";
 
+const validAt = Date.parse("2026-10-02T17:00:00.000Z");
+
 const snapshot = {
   locationKey: "50.756_2.521",
   weatherDate: "2026-10-02",
@@ -84,6 +86,53 @@ describe("AI Lab forecast comparison read-model", () => {
     expect(result.currentSnapshot).not.toEqual(result.hourlyForecast.points[0]);
     expect(result).not.toHaveProperty("stations");
     expect(result).not.toHaveProperty("observation");
+  });
+
+  it("expose les poids par modèle et variable sans imposer un bucket horaire commun", () => {
+    const detailed = {
+      ...snapshot,
+      hourly: [{
+        ...snapshot.hourly[0],
+        forecastWeighting: {
+          method: "mixed",
+          availabilityStatus: "FUSED",
+          calibrationStatus: "PARTIALLY_CALIBRATED",
+          expectedModelCount: 7,
+          availableModelCount: 2,
+          contributingModelCount: 2,
+          horizonBucket: null,
+          modelsWithData: ["AROME", "ARPEGE"],
+          variableWeightings: [{
+            variable: "temperature",
+            method: "mixed",
+            horizonBucket: null,
+            availabilityStatus: "FUSED",
+            calibrationStatus: "PARTIALLY_CALIBRATED",
+            expectedModelCount: 7,
+            availableModelCount: 2,
+            evidenceEligibleModelCount: 1,
+            contributingModelCount: 2,
+            coverageLevel: "LIMITED",
+            modelReasons: [{ modelName: "UKMET", reason: "Aucun run pour cette échéance.", sourceName: null, modelId: null, runId: null, availableAt: null, validTime: null, horizonMinutes: null, horizonBucket: null }],
+            modelWeights: [
+              { modelName: "AROME", modelId: "arome_france", sourceName: "open-meteo", runId: "run-a", runIdKind: "capture", requestStartedAt: validAt - 130 * 60_000, availableAt: validAt - 108 * 60_000, validTime: validAt, horizonMinutes: 108, horizonBucket: "0_2h", value: 12, reliability: 0.5, historicalScore: { mae: 1, rmse: 1.5, bias: 0.2, comparisonCount: 35, evaluatedDays: 7 }, calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON", calibrationStatus: "CALIBRATED", rawWeight: 1.2, robustFallbackWeight: null, weight: 0.6, contributedToValue: true, historicalEvidence: { status: "qualified", minimumComparisons: 30, minimumComparableDays: 7, latestScoreDate: "2026-09-30", latestComputedAt: "2026-10-01T12:00:00.000Z" } },
+              { modelName: "ARPEGE", modelId: "arpege_europe", sourceName: "open-meteo", runId: "run-b", runIdKind: "capture", requestStartedAt: validAt - 150 * 60_000, availableAt: validAt - 122 * 60_000, validTime: validAt, horizonMinutes: 122, horizonBucket: "2_6h", value: 14, reliability: 0.1, historicalScore: null, calibrationLevel: "UNCALIBRATED_ROBUST", calibrationStatus: "UNCALIBRATED_ROBUST", rawWeight: 0.8, robustFallbackWeight: 1, weight: 0.4, contributedToValue: true },
+            ],
+          }],
+        },
+        multiModelMetrics: { precipitation: { thresholdMm: 0.1, expectedModelCount: 2, modelsExpected: ["AROME", "ARPEGE"], configuredModelCount: 7, modelsConfigured: ["AROME", "ARPEGE"], availableModelCount: 2, rainModelCount: 1, frequencyPercent: 50, conditionalMeanMm: 0.4, conditionalMeanMethod: "arithmetic_mean", consensusEstimateMm: 0.2, modelsWithData: ["AROME", "ARPEGE"], modelsPredictingRain: ["AROME"], modelValues: [{ modelName: "AROME", amountMm: 0.4, predictsRain: true }, { modelName: "ARPEGE", amountMm: 0, predictsRain: false }], isProbabilityCalibrated: false } },
+      }],
+    } as unknown as OfficialWeatherSnapshot;
+
+    const result = buildAILabForecastComparisonReadModel(detailed, { lat: 50.756, lon: 2.521 });
+    const point = result.hourlyForecast.points[0]!;
+    const temperature = point.weighting?.variableWeightings[0]!;
+
+    expect(temperature.horizonBucket).toBeNull();
+    expect(temperature.modelWeights.map((model) => [model.modelName, model.horizonMinutes, model.horizonBucket, model.weight]))
+      .toEqual([["AROME", 108, "0_2h", 0.6], ["ARPEGE", 122, "2_6h", 0.4]]);
+    expect(temperature.modelReasons[0]).toMatchObject({ modelName: "UKMET", reason: "Aucun run pour cette échéance." });
+    expect(point.precipitationAgreement).toMatchObject({ frequencyPercent: 50, rainModelCount: 1, isProbabilityCalibrated: false });
   });
 
   it("retains unavailable values as null instead of fabricating a comparison value", () => {
