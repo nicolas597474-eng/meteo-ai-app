@@ -1,3 +1,5 @@
+import type { HourlyFusionTrace, HourlyPrecipitationAgreementTrace } from "@shared/hourlyModelMetrics";
+
 export type AlignmentStatus = "comparable" | "non_comparable" | "unavailable";
 
 export type ForecastAlignmentReadModel = {
@@ -23,6 +25,8 @@ export type ForecastAlignmentReadModel = {
       validAt: number | null;
       temp: number | null;
       modelsWithData: string[];
+      weighting?: HourlyFusionTrace | null;
+      precipitationAgreement?: HourlyPrecipitationAgreementTrace | null;
     }>;
   };
   dailyForecast: {

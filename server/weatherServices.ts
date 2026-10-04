@@ -390,12 +390,17 @@ export type HourlyModelWeightDiagnostic = {
   validTime: number;
   horizonMinutes: number;
   horizonBucket: string | null;
+  value: number;
+  reliability: number;
+  historicalScore: HourlyHistoricalEvidence["metrics"];
+  calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" | "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" | "UNCALIBRATED_ROBUST";
   calibrationStatus: HourlyCalibrationStatus;
   rawWeight: number;
   robustFallbackWeight: number | null;
   weight: number;
   contributedToValue: boolean;
   historicalEvidence?: HourlyHistoricalEvidence;
+  exactHorizonEvidence?: HourlyHistoricalEvidence;
 };
 
 export type HourlyVariableWeighting = {
@@ -413,7 +418,7 @@ export type HourlyVariableWeighting = {
   coverageLevel: ModelCountCoverageLevel;
   availableModels: string[];
   evidenceEligibleModels: string[];
-  modelReasons: Array<{ modelName: string; reason: string; availableAt: number | null; validTime: number | null; horizonMinutes: number | null; horizonBucket: string | null }>;
+  modelReasons: Array<{ modelName: string; reason: string; sourceName: string | null; modelId: string | null; runId: string | null; availableAt: number | null; validTime: number | null; horizonMinutes: number | null; horizonBucket: string | null }>;
   calibrationReasons: Array<{ modelName: string; reason: string; horizonBucket: string | null }>;
   modelsWithData: string[];
   modelWeights: HourlyModelWeightDiagnostic[];

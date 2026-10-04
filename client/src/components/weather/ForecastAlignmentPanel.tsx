@@ -4,6 +4,7 @@ import {
   type AlignmentStatus,
   type ForecastAlignmentReadModel,
 } from "@/lib/forecastAlignment";
+import { HourlyFusionDebugPanel } from "./HourlyFusionDebugPanel";
 
 const parisInstantFormatter = new Intl.DateTimeFormat("fr-FR", {
   timeZone: "Europe/Paris",
@@ -126,6 +127,10 @@ export function ForecastAlignmentPanel({
             ? <p className="mt-1.5 text-[10px] font-semibold text-sky-100">Écarts bruts (extrêmes horaires − extrema quotidiens) : Δ Tmin {formatDifference(day.differenceMin)} · Δ Tmax {formatDifference(day.differenceMax)}.</p>
             : <p className="mt-1.5 text-[10px] leading-relaxed text-amber-100/90">{day.reason}</p>}
         </div>)}</div> : <p className="mt-2 rounded-lg border border-slate-700/70 bg-slate-900/45 px-2.5 py-2 text-[10px] leading-relaxed text-slate-400">Aucune date locale commune exploitable entre les séries horaires et quotidiennes.</p>}
+      </ComparisonCard>
+
+      <ComparisonCard className="md:col-span-2">
+        <HourlyFusionDebugPanel points={comparison.hourlyForecast.points} preferredValidAt={report.snapshotVsHourly.hourlyAt} />
       </ComparisonCard>
     </div>
 

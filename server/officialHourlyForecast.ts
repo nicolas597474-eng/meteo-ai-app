@@ -1,6 +1,7 @@
 import { getPhase3HorizonWindow } from "../shared/weatherDataHub";
-import { HOURLY_FORECAST_VARIABLES } from "./hourlyForecastRunScoring";
-import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
+import { HOURLY_FORECAST_VARIABLES as HOURLY_SCORING_VARIABLES } from "./hourlyForecastRunScoring";
+import { HOURLY_FORECAST_VARIABLES as ARCHIVED_HOURLY_VARIABLES } from "./forecastVariableCoverage";
+import { getHourlyForecastEvaluationHistory, makeLocationKey, type HourlyExactHorizonHistoryKey } from "./db";
 import type { HourlyForecastRunValue } from "../drizzle/schema";
 import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDateAndHour } from "./parisHourlyTime";
@@ -32,8 +33,26 @@ export const OFFICIAL_HOURLY_HISTORY_DAYS = 365;
 
 const MODEL_NAME_SET = new Set<string>(OFFICIAL_HOURLY_MODEL_NAMES);
 const MODEL_ID_BY_NAME = new Map<string, string>(OFFICIAL_HOURLY_MODELS.map((model) => [model.name, model.modelId] as const));
-const HISTORY_VARIABLES = HOURLY_FORECAST_VARIABLES;
-type OfficialHourlyVariable = (typeof HISTORY_VARIABLES)[number];
+const HISTORY_VARIABLES = HOURLY_SCORING_VARIABLES;
+const HISTORY_VARIABLE_SET = new Set<string>(HISTORY_VARIABLES);
+type OfficialHourlyVariable =
+  | "temperature"
+  | "apparent_temperature"
+  | "precipitation"
+  | "wind_speed"
+  | "wind_direction"
+  | "wind_gust"
+  | "humidity"
+  | "pressure"
+  | "cloud_cover"
+  | "weather_code"
+  | "cloud_cover_low"
+  | "cloud_cover_mid"
+  | "cloud_cover_high"
+  | "uv_index"
+  | "dew_point"
+  | "visibility"
+  | "shortwave_radiation";
 
 type HourlyModelValue = {
   modelName: OfficialHourlyModelName;
@@ -47,10 +66,18 @@ type HourlyModelValue = {
 };
 
 type SelectedHourlyModel = SelectedForecastModel<HourlyModelValue>;
+type HourlyHistoricalEvidenceSelection = {
+  evidence: HourlyHistoricalEvidence | null;
+  exactEvidence: HourlyHistoricalEvidence | null;
+  calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" | "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" | "UNCALIBRATED_ROBUST";
+};
 type PreparedHourlyModel = {
   selected: SelectedHourlyModel;
   evidence: HourlyHistoricalEvidence | null;
+  exactEvidence: HourlyHistoricalEvidence | null;
+  calibrationLevel: HourlyHistoricalEvidenceSelection["calibrationLevel"];
   calibrationStatus: HourlyCalibrationStatus;
+  reliability: number;
   rawWeight: number;
   robustFallbackWeight: number | null;
   finalWeight: number;
@@ -65,21 +92,28 @@ type VariableForecastValue = {
 
 const FORECAST_FIELD_BY_VARIABLE: Record<OfficialHourlyVariable, keyof HourlyModelForecast["hours"][number]> = {
   temperature: "temperature",
+  apparent_temperature: "apparentTemperature",
   precipitation: "precipitation",
   wind_speed: "windSpeed",
+  wind_direction: "windDirection",
   wind_gust: "windGusts",
   humidity: "humidity",
   pressure: "pressure",
+  cloud_cover: "cloudCover",
+  weather_code: "weatherCode",
+  cloud_cover_low: "cloudLow",
+  cloud_cover_mid: "cloudMid",
+  cloud_cover_high: "cloudHigh",
+  uv_index: "uvIndex",
+  dew_point: "dewPoint",
+  visibility: "visibility",
+  shortwave_radiation: "solarRadiation",
 };
 
-const ARCHIVED_VARIABLE_FIELD: Readonly<Record<string, keyof HourlyModelForecast["hours"][number]>> = {
-  temperature: "temperature",
-  precipitation: "precipitation",
-  wind_speed: "windSpeed",
-  wind_gust: "windGusts",
-  humidity: "humidity",
-  pressure: "pressure",
-};
+const OFFICIAL_HOURLY_FUSION_VARIABLES = Object.keys(FORECAST_FIELD_BY_VARIABLE) as OfficialHourlyVariable[];
+const ARCHIVED_VARIABLE_FIELD: Readonly<Record<string, keyof HourlyModelForecast["hours"][number]>> = Object.fromEntries(
+  ARCHIVED_HOURLY_VARIABLES.map(({ key, valueField }) => [key, valueField]),
+);
 
 /** Rebuild the latest archived run for each official model without consulting Best Match. */
 export function reconstructOfficialHourlyModelsFromArchive(
@@ -241,6 +275,26 @@ function weightedMean(items: Array<{ value: number | null | undefined; weight: n
   return usable.reduce((sum, item) => sum + item.value! * item.weight, 0) / totalWeight;
 }
 
+function weightedCircularMeanDegrees(items: Array<{ value: number | null | undefined; weight: number }>): number | null {
+  const usable = items.filter((item) => isFiniteNumber(item.value) && Number.isFinite(item.weight) && item.weight > 0);
+  if (usable.length === 0) return null;
+  const radians = usable.map((item) => (item.value! * Math.PI) / 180);
+  const sin = usable.reduce((sum, item, index) => sum + Math.sin(radians[index]!) * item.weight, 0);
+  const cos = usable.reduce((sum, item, index) => sum + Math.cos(radians[index]!) * item.weight, 0);
+  if (Math.hypot(sin, cos) < 1e-12) return null;
+  return ((Math.atan2(sin, cos) * 180 / Math.PI) + 360) % 360;
+}
+
+function weightedMode(items: Array<{ value: number | null | undefined; weight: number }>): number | null {
+  const votes = new Map<number, number>();
+  for (const item of items) {
+    if (!Number.isInteger(item.value) || !Number.isFinite(item.weight) || item.weight <= 0) continue;
+    votes.set(item.value!, (votes.get(item.value!) ?? 0) + item.weight);
+  }
+  return Array.from(votes.entries())
+    .sort(([leftValue, leftWeight], [rightValue, rightWeight]) => rightWeight - leftWeight || leftValue - rightValue)[0]?.[0] ?? null;
+}
+
 function summarizeModelValues(values: unknown[]): {
   min: number | null;
   max: number | null;
@@ -270,15 +324,6 @@ function maximumCircularSpread(values: unknown[]): number | null {
     largestGap = Math.max(largestGap, next - current);
   }
   return 360 - largestGap;
-}
-
-function hasForecastValue(hour: HourlyModelForecast["hours"][number]): boolean {
-  return [
-    hour.temperature, hour.apparentTemperature, hour.precipitation, hour.windSpeed,
-    hour.windGusts, hour.windDirection, hour.humidity, hour.pressure, hour.cloudCover,
-    hour.weatherCode, hour.uvIndex, hour.dewPoint, hour.visibility, hour.solarRadiation,
-    hour.cloudLow, hour.cloudMid, hour.cloudHigh, hour.snowfall,
-  ].some(isFiniteNumber);
 }
 
 function getCoverageLevel(modelCount: number): ModelCountCoverageLevel {
@@ -311,6 +356,9 @@ function ineligibilityReasonByModel(diagnostics: readonly ForecastModelEligibili
   return diagnostics.filter((item) => !item.eligible).map((item) => ({
     modelName: item.modelName,
     reason: item.reason ?? "Valeur non admissible.",
+    sourceName: item.sourceName,
+    modelId: item.modelId,
+    runId: item.runId,
     availableAt: item.availableAt,
     validTime: item.validTime,
     horizonMinutes: item.horizonMinutes,
@@ -335,12 +383,17 @@ function makeDiagnostic(
     validTime: selected.validTime!,
     horizonMinutes: selected.horizonMinutes,
     horizonBucket: selected.horizonBucket,
+    value: selected.value,
+    reliability: source.reliability,
+    historicalScore: source.evidence?.metrics ?? null,
+    calibrationLevel: source.calibrationLevel,
     calibrationStatus: source.calibrationStatus,
     rawWeight: source.rawWeight,
     robustFallbackWeight: source.robustFallbackWeight,
     weight: finalWeight,
     contributedToValue: contributes,
     ...(source.evidence ? { historicalEvidence: source.evidence } : {}),
+    ...(source.exactEvidence ? { exactHorizonEvidence: source.exactEvidence } : {}),
   };
 }
 
@@ -350,7 +403,12 @@ function computeVariableForecastValue(input: {
   historyAvailable: boolean;
   referenceAt: number;
   availabilityReasonByModel: Readonly<Record<string, string>>;
-  getHistoricalEvidence: (modelName: OfficialHourlyModelName, variable: OfficialHourlyVariable, horizonBucket: string) => HourlyHistoricalEvidence;
+  getHistoricalEvidence: (
+    modelName: OfficialHourlyModelName,
+    variable: OfficialHourlyVariable,
+    horizonMilliseconds: number,
+    horizonBucket: string,
+  ) => HourlyHistoricalEvidenceSelection;
 }): { result: VariableForecastValue; selectionDiagnostics: ForecastModelEligibilityDiagnostic[] } {
   const { variable, candidates, historyAvailable, referenceAt, availabilityReasonByModel, getHistoricalEvidence } = input;
   const field = FORECAST_FIELD_BY_VARIABLE[variable];
@@ -386,10 +444,13 @@ function computeVariableForecastValue(input: {
     missingReasonByModel: availabilityReasonByModel,
   });
   const valueHistory = selection.eligible.map((selected) => {
-    const evidence = selected.horizonBucket == null
-      ? null
-      : getHistoricalEvidence(selected.modelName as OfficialHourlyModelName, variable, selected.horizonBucket);
-    return { selected, evidence };
+    const horizonMilliseconds = selected.availableAt != null && selected.validTime != null
+      ? selected.validTime - selected.availableAt
+      : Number.NaN;
+    const evidence = selected.horizonBucket == null || !HISTORY_VARIABLE_SET.has(variable) || !Number.isSafeInteger(horizonMilliseconds) || horizonMilliseconds <= 0
+      ? { evidence: null, exactEvidence: null, calibrationLevel: "UNCALIBRATED_ROBUST" as const }
+      : getHistoricalEvidence(selected.modelName as OfficialHourlyModelName, variable, horizonMilliseconds, selected.horizonBucket);
+    return { selected, ...evidence };
   });
   const metricsByBucket = new Map<string, number[]>();
   for (const item of valueHistory) {
@@ -400,7 +461,7 @@ function computeVariableForecastValue(input: {
     metricsByBucket.set(key, list);
   }
   const baselineByBucket = new Map(Array.from(metricsByBucket, ([key, values]) => [key, median(values)] as const));
-  const prepared: PreparedHourlyModel[] = valueHistory.map(({ selected, evidence }) => {
+  const prepared: PreparedHourlyModel[] = valueHistory.map(({ selected, evidence, exactEvidence, calibrationLevel }) => {
     const fullyCalibrated = evidence?.status === "qualified" && evidence.metrics != null;
     const partiallyCalibrated = evidence?.metrics != null && ["insufficient_evidence", "incomplete_metrics"].includes(evidence.status);
     const calibrationStatus: HourlyCalibrationStatus = fullyCalibrated
@@ -425,7 +486,10 @@ function computeVariableForecastValue(input: {
     return {
       selected,
       evidence,
+      exactEvidence,
+      calibrationLevel,
       calibrationStatus,
+      reliability,
       rawWeight: historicalMultiplier,
       robustFallbackWeight: null,
       finalWeight: 0,
@@ -437,7 +501,7 @@ function computeVariableForecastValue(input: {
   // compares a model at a different lead time or uses absent values as zeros.
   const fallbackGroups = new Map<string, PreparedHourlyModel[]>();
   for (const item of prepared) {
-    if (item.calibrationStatus !== "UNCALIBRATED_ROBUST") continue;
+    if (item.calibrationStatus !== "UNCALIBRATED_ROBUST" || variable === "wind_direction" || variable === "weather_code") continue;
     const horizonKey = item.selected.horizonBucket ?? `unscored-${Math.floor(item.selected.horizonMinutes / 60)}`;
     const group = fallbackGroups.get(horizonKey) ?? [];
     group.push(item);
@@ -480,18 +544,29 @@ function computeVariableForecastValue(input: {
   const availableCalibrationStatuses = prepared.map((item) => item.calibrationStatus);
   const calibrationStatus = getCalibrationStatus(availableCalibrationStatuses);
   const method = getVariableMethod(availabilityStatus, calibrationStatus);
-  const computedValue = variable === "precipitation" && wetModels.length === 0
-    ? (availableCount > 0 ? 0 : null)
-    : weightedMean(valueContributors.map((item) => ({ value: item.selected.value, weight: item.finalWeight })));
+  const contributorValues = valueContributors.map((item) => ({ value: item.selected.value, weight: item.finalWeight }));
+  const computedValue = variable === "weather_code"
+    ? weightedMode(contributorValues)
+    : variable === "wind_direction"
+      ? weightedCircularMeanDegrees(contributorValues)
+      : variable === "precipitation" && wetModels.length === 0
+        ? (availableCount > 0 ? 0 : null)
+        : weightedMean(contributorValues);
   const evidenceEligible = prepared.filter((item) => item.calibrationStatus === "CALIBRATED");
   const minComparisons = prepared.flatMap((item) => item.evidence?.metrics ? [item.evidence.metrics.comparisonCount] : []);
   const minComparableDays = prepared.flatMap((item) => item.evidence?.metrics ? [item.evidence.metrics.evaluatedDays] : []);
   const calibrationReasons = prepared.filter((item) => item.calibrationStatus !== "CALIBRATED").map((item) => ({
     modelName: item.selected.modelName,
-    reason: !historyAvailable
-      ? "Historique indisponible; la valeur reste incluse avec une pondération robuste non calibrée."
-      : item.selected.horizonBucket == null
-        ? "Aucun bucket historique ne correspond à cet horizon; la valeur reste incluse avec une pondération robuste non calibrée."
+    reason: !HISTORY_VARIABLE_SET.has(variable)
+      ? "Aucune série d’observations physiques n’est disponible pour calibrer cette variable; la valeur reste incluse avec un repli robuste non calibré."
+      : !historyAvailable
+        ? "Historique indisponible; la valeur reste incluse avec une pondération robuste non calibrée."
+        : item.selected.horizonBucket == null
+          ? "Aucun bucket historique ne correspond à cet horizon; la valeur reste incluse avec une pondération robuste non calibrée."
+        : item.exactEvidence?.status === "insufficient_evidence" && !item.evidence?.metrics
+          ? `Preuve strictement au lead exact insuffisante (${item.exactEvidence.metrics?.comparisonCount ?? 0} comparaisons, ${item.exactEvidence.metrics?.evaluatedDays ?? 0} jours); aucune preuve bucket exploitable, repli robuste appliqué.`
+        : item.exactEvidence?.status === "incomplete_metrics" && !item.evidence?.metrics
+          ? "Les métriques disponibles au lead exact sont incomplètes et aucune preuve bucket exploitable n’existe; repli robuste appliqué."
         : item.evidence?.status === "insufficient_evidence"
           ? `Preuve partielle (${item.evidence.metrics?.comparisonCount ?? 0} comparaisons, ${item.evidence.metrics?.evaluatedDays ?? 0} jours); pondération régularisée.`
           : item.evidence?.status === "incomplete_metrics"
@@ -565,14 +640,19 @@ function makePoint(
   const windGust = valueFor("wind_gust");
   const humidity = valueFor("humidity");
   const pressure = valueFor("pressure");
+  const windDirectionValue = variableValues.get("wind_direction")!;
+  const cloudCoverValue = variableValues.get("cloud_cover")!;
+  const windDirection = valueFor("wind_direction");
+  const weatherCode = valueFor("weather_code");
   const rawTemperatures = temperatureValue.selected.map(({ selected }) => ({ name: selected.modelName, temperature: selected.value }));
   const temperatureSummary = summarizeModelValues(rawTemperatures.map(({ temperature: value }) => value));
   const temperatureExtremes = [...rawTemperatures].sort((left, right) => left.temperature - right.temperature || left.name.localeCompare(right.name));
   const windSpeedSummary = summarizeModelValues(variableValues.get("wind_speed")!.selected.map(({ selected }) => selected.value));
   const windGustSummary = summarizeModelValues(variableValues.get("wind_gust")!.selected.map(({ selected }) => selected.value));
   const humiditySummary = summarizeModelValues(variableValues.get("humidity")!.selected.map(({ selected }) => selected.value));
-  const availableModels = Array.from(new Set(HISTORY_VARIABLES.flatMap((variable) => variableValues.get(variable)!.weighting.availableModels)));
-  const variableWeightings = HISTORY_VARIABLES.map((variable) => variableValues.get(variable)!.weighting);
+  const cloudCoverSummary = summarizeModelValues(cloudCoverValue.selected.map(({ selected }) => selected.value));
+  const availableModels = Array.from(new Set(OFFICIAL_HOURLY_FUSION_VARIABLES.flatMap((variable) => variableValues.get(variable)!.weighting.availableModels)));
+  const variableWeightings = OFFICIAL_HOURLY_FUSION_VARIABLES.map((variable) => variableValues.get(variable)!.weighting);
   const scoredVariables = variableWeightings.filter((item) => item.calibrationStatus === "CALIBRATED").map((item) => item.variable);
   const robustVariables = variableWeightings.filter((item) => item.calibrationStatus === "PARTIALLY_CALIBRATED" || item.calibrationStatus === "UNCALIBRATED_ROBUST").map((item) => item.variable);
   const unavailableVariables = variableWeightings.filter((item) => item.availabilityStatus === "UNAVAILABLE").map((item) => item.variable);
@@ -590,8 +670,6 @@ function makePoint(
   const counts = variableWeightings.filter((item) => item.availabilityStatus !== "UNAVAILABLE");
   const minimumComparisons = counts.flatMap((item) => item.minimumComparisons == null ? [] : [item.minimumComparisons]);
   const minimumComparableDays = counts.flatMap((item) => item.minimumComparableDays == null ? [] : [item.minimumComparableDays]);
-  const windDirectionValues = variableValues.get("wind_speed")!.selected.map(({ selected }) => selected.metadata.hour.windDirection);
-  const cloudCoverValues = variableValues.get("humidity")!.selected.map(({ selected }) => selected.metadata.hour.cloudCover);
   const condition = precipitation == null ? null : conditionFromWeatherValues(precipitation, null);
   const precipIntensity = precipitation == null || precipitation <= 0
     ? null
@@ -602,23 +680,23 @@ function makePoint(
     hour: `${String(parisTime.hour).padStart(2, "0")}:00`,
     validAt,
     temp: temperature,
-    apparentTemp: null,
+    apparentTemp: valueFor("apparent_temperature"),
     precipitation,
     windSpeed,
     windGust,
-    windDirection: null,
-    cloudCover: null,
+    windDirection,
+    cloudCover: valueFor("cloud_cover"),
     humidity,
-    uvIndex: null,
+    uvIndex: valueFor("uv_index"),
     condition,
-    weatherCode: null,
+    weatherCode,
     pressure,
-    dewPoint: null,
-    visibility: null,
-    solarRadiation: null,
-    cloudLow: null,
-    cloudMid: null,
-    cloudHigh: null,
+    dewPoint: valueFor("dew_point"),
+    visibility: valueFor("visibility"),
+    solarRadiation: valueFor("shortwave_radiation"),
+    cloudLow: valueFor("cloud_cover_low"),
+    cloudMid: valueFor("cloud_cover_mid"),
+    cloudHigh: valueFor("cloud_cover_high"),
     precipType: null,
     precipIntensity,
     multiModelMetrics: {
@@ -640,12 +718,12 @@ function makePoint(
         windSpeed: { range: windSpeedSummary.range, standardDeviation: windSpeedSummary.standardDeviation, availableModelCount: windSpeedSummary.availableModelCount },
         windGust: { range: windGustSummary.range, standardDeviation: windGustSummary.standardDeviation, availableModelCount: windGustSummary.availableModelCount },
         windDirection: {
-          range: maximumCircularSpread(windDirectionValues),
+          range: maximumCircularSpread(windDirectionValue.selected.map(({ selected }) => selected.value)),
           standardDeviation: null,
-          availableModelCount: windDirectionValues.filter(isFiniteNumber).length,
+          availableModelCount: windDirectionValue.selected.length,
         },
         humidity: { range: humiditySummary.range, standardDeviation: humiditySummary.standardDeviation, availableModelCount: humiditySummary.availableModelCount },
-        cloudCover: { range: null, standardDeviation: null, availableModelCount: cloudCoverValues.filter(isFiniteNumber).length },
+        cloudCover: { range: cloudCoverSummary.range, standardDeviation: cloudCoverSummary.standardDeviation, availableModelCount: cloudCoverSummary.availableModelCount },
       },
     },
     forecastWeighting: {
@@ -675,11 +753,15 @@ export function computeOfficialHourlyForecast(
   historyScores: readonly OfficialHourlyEvaluationHistoryScore[],
   options: {
     historyAvailable?: boolean;
+    exactHistoryAvailable?: boolean;
+    exactHistoryScores?: readonly OfficialHourlyEvaluationHistoryScore[];
     referenceAt?: number;
     availabilityReasonByModel?: Readonly<Record<string, string>>;
   } = {},
 ): OfficialHourlyForecastResult {
   const historyAvailable = options.historyAvailable !== false;
+  const exactHistoryAvailable = options.exactHistoryAvailable ?? (options.exactHistoryScores != null);
+  const exactHistoryScores = options.exactHistoryScores ?? [];
   const referenceAt = options.referenceAt ?? Date.now();
   const availabilityReasonByModel = options.availabilityReasonByModel ?? {};
   const byValidTime = new Map<number, HourlyModelValue[]>();
@@ -688,7 +770,7 @@ export function computeOfficialHourlyForecast(
     if (!MODEL_NAME_SET.has(forecast.modelName)) continue;
     const modelName = forecast.modelName as OfficialHourlyModelName;
     for (const hour of forecast.hours) {
-      if (!isFiniteNumber(hour.validAt) || !hasForecastValue(hour)) continue;
+      if (!isFiniteNumber(hour.validAt)) continue;
       const values = byValidTime.get(hour.validAt) ?? [];
       values.push({
         modelName,
@@ -709,19 +791,43 @@ export function computeOfficialHourlyForecast(
     .filter((date): date is string => date != null)
     .sort();
   const beforeDate = forecastDates[0] ?? null;
-  const historicalEvidenceByKey = new Map<string, HourlyHistoricalEvidence>();
-  const getHistoricalEvidence = (modelName: OfficialHourlyModelName, variable: OfficialHourlyVariable, horizonBucket: string) => {
-    const key = [modelName, variable, horizonBucket].join("|");
+  const historicalEvidenceByKey = new Map<string, HourlyHistoricalEvidenceSelection>();
+  const bucketEvidenceByKey = new Map<string, HourlyHistoricalEvidence>();
+  const getHistoricalEvidence = (
+    modelName: OfficialHourlyModelName,
+    variable: OfficialHourlyVariable,
+    horizonMilliseconds: number,
+    horizonBucket: string,
+  ): HourlyHistoricalEvidenceSelection => {
+    const key = [modelName, variable, horizonMilliseconds, horizonBucket].join("|");
     const existing = historicalEvidenceByKey.get(key);
     if (existing) return existing;
-    const result = summarizeHourlyHistoricalEvidence(historyScores, {
+    const baseInput = {
       modelName,
       modelId: MODEL_ID_BY_NAME.get(modelName)!,
       variable,
       horizonBucket,
       beforeDate,
-      historyAvailable,
+    };
+    const exactEvidence = summarizeHourlyHistoricalEvidence(exactHistoryScores, {
+      ...baseInput,
+      horizonMilliseconds,
+      historyAvailable: exactHistoryAvailable,
     });
+    const exactQualified = exactEvidence.status === "qualified" && exactEvidence.metrics != null;
+    const bucketKey = [modelName, variable, horizonBucket].join("|");
+    let bucketEvidence = bucketEvidenceByKey.get(bucketKey);
+    if (!bucketEvidence) {
+      bucketEvidence = summarizeHourlyHistoricalEvidence(historyScores, { ...baseInput, historyAvailable });
+      bucketEvidenceByKey.set(bucketKey, bucketEvidence);
+    }
+    const result: HourlyHistoricalEvidenceSelection = {
+      evidence: exactQualified ? exactEvidence : bucketEvidence,
+      exactEvidence,
+      calibrationLevel: exactQualified
+        ? "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
+        : bucketEvidence.metrics != null ? "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" : "UNCALIBRATED_ROBUST",
+    };
     historicalEvidenceByKey.set(key, result);
     return result;
   };
@@ -744,7 +850,7 @@ export function computeOfficialHourlyForecast(
 
   for (const [validAt, modelValues] of Array.from(byValidTime.entries()).sort((left, right) => left[0] - right[0])) {
     const variableValues = new Map<OfficialHourlyVariable, VariableForecastValue>();
-    for (const variable of HISTORY_VARIABLES) {
+    for (const variable of OFFICIAL_HOURLY_FUSION_VARIABLES) {
       const { result } = computeVariableForecastValue({
         variable,
         candidates: modelValues,
@@ -836,20 +942,47 @@ export async function collectOfficialHourlyForecast(
     .map((diagnostic) => [diagnostic.modelName, diagnostic.errorCode ?? `Collecte ${diagnostic.status}; ${diagnostic.valuesReceived}/${diagnostic.expectedValueCount} valeurs reçues.`]));
   const referenceAt = Date.now();
   let historyAvailable = false;
+  let exactHistoryAvailable = false;
   let historyScores: OfficialHourlyEvaluationHistoryScore[] = [];
+  let exactHistoryScores: OfficialHourlyEvaluationHistoryScore[] = [];
+  const exactHistoryKeys = new Map<string, HourlyExactHorizonHistoryKey>();
+  for (const forecast of modelForecasts) {
+    if (!MODEL_NAME_SET.has(forecast.modelName)
+      || forecast.sourceName !== "open-meteo"
+      || forecast.modelId !== MODEL_ID_BY_NAME.get(forecast.modelName)
+      || !isFiniteNumber(forecast.availableAt)) continue;
+    for (const hour of forecast.hours) {
+      if (!isFiniteNumber(hour.validAt) || hour.validAt <= forecast.availableAt) continue;
+      const horizonMilliseconds = hour.validAt - forecast.availableAt;
+      if (!Number.isSafeInteger(horizonMilliseconds) || !getPhase3HorizonWindow(horizonMilliseconds / 60_000)) continue;
+      for (const variable of HISTORY_VARIABLES) {
+        if (!isFiniteNumber(hour[FORECAST_FIELD_BY_VARIABLE[variable]])) continue;
+        const key = {
+          modelName: forecast.modelName,
+          modelId: forecast.modelId!,
+          variable,
+          horizonMilliseconds,
+        };
+        exactHistoryKeys.set([key.modelName, key.modelId, key.variable, key.horizonMilliseconds].join("|"), key);
+      }
+    }
+  }
   try {
     const history = await getHourlyForecastEvaluationHistory(
       makeLocationKey(location.lat, location.lon),
       getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
       getParisDateDaysAgo(1),
+      Array.from(exactHistoryKeys.values()),
     );
     historyAvailable = history.available;
     historyScores = history.rows;
+    exactHistoryAvailable = history.exactAvailable;
+    exactHistoryScores = history.exactRows;
   } catch (error) {
     console.warn("[OfficialHourly] Historical scores unavailable; available forecasts will use a robust non-calibrated weighting:", error);
   }
   return {
-    ...computeOfficialHourlyForecast(modelForecasts, historyScores, { historyAvailable, referenceAt, availabilityReasonByModel }),
+    ...computeOfficialHourlyForecast(modelForecasts, historyScores, { historyAvailable, exactHistoryAvailable, exactHistoryScores, referenceAt, availabilityReasonByModel }),
     modelForecasts,
   };
 }

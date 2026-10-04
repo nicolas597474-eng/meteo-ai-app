@@ -20,7 +20,7 @@ import { buildQualifiedDailyObservation } from "./physicalObservationAggregation
 import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
-import { evaluateHourlyForecastRuns, isHourlyForecastVariable, type HourlyForecastVariable } from "./hourlyForecastRunScoring";
+import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable } from "./hourlyForecastRunScoring";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import {
   executeShadowWriteSafely,
@@ -77,6 +77,8 @@ import {
   getPhysicalSnapshotCollectionTracesByDateRange,
   getHourlyForecastRunValues,
   persistHourlyForecastEvaluationScores,
+  persistHourlyForecastExactComparisons,
+  persistHourlyForecastExactEvaluationScores,
   getStationEvidenceSummary,
 } from "./db";
 
@@ -750,9 +752,10 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           }
           const evaluation = evaluateHourlyForecastRuns(
             snapshots,
-            hourlyForecastRuns.flatMap((run) => isHourlyForecastVariable(run.variable)
-              ? [{ ...run, variable: run.variable as HourlyForecastVariable }]
-              : []),
+            hourlyForecastRuns.flatMap((run) => {
+              const variable = normalizeHourlyForecastVariable(run.variable);
+              return variable ? [{ ...run, variable }] : [];
+            }),
           );
           const hourlyScores = evaluation.compatibilityScores;
           if (evaluation.scores.length > 0) {
@@ -773,6 +776,11 @@ export async function collectObservationsHandler(req: Request, res: Response) {
               bias: score.bias,
             })));
           }
+          const exactComparisonsStored = await persistHourlyForecastExactComparisons(evaluation.exactComparisons.flatMap((comparison) => {
+            if (comparison.forecastRunValueId == null || comparison.observationSnapshotId == null) return [];
+            return [{ ...comparison, forecastRunValueId: comparison.forecastRunValueId, observationSnapshotId: comparison.observationSnapshotId }];
+          }));
+          if (exactComparisonsStored) await persistHourlyForecastExactEvaluationScores(evaluation.exactScores);
           if (hourlyScores.length > 0) {
             await upsertHourlyCompatibilityReliabilityScores(hourlyScores.map((score) => ({
               locationKey: locKey,

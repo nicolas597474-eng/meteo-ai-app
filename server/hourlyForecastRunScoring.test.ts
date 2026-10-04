@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateHourlyForecastRuns, type HourlyForecastRunValue, type HourlyPhysicalSnapshot } from "./hourlyForecastRunScoring";
+import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable, type HourlyForecastRunValue, type HourlyPhysicalSnapshot } from "./hourlyForecastRunScoring";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 
 const locationKey = "50.756_2.520";
@@ -12,6 +12,7 @@ function snapshot(hour: number, temperature = 10): HourlyPhysicalSnapshot {
 
 function forecast(input: Partial<HourlyForecastRunValue> & Pick<HourlyForecastRunValue, "captureRunId" | "validTime" | "availableAt" | "variable" | "value">): HourlyForecastRunValue {
   return {
+    id: input.id,
     captureRunId: input.captureRunId,
     locationKey: input.locationKey ?? locationKey,
     targetDate: input.targetDate ?? date,
@@ -32,6 +33,24 @@ function scoresFor(result: ReturnType<typeof evaluateHourlyForecastRuns>, variab
 }
 
 describe("evaluateHourlyForecastRuns", () => {
+  it("normalise l'alias archive surface_pressure avant le scoring physique de pression", () => {
+    const validTime = observedAt(12);
+    const variable = normalizeHourlyForecastVariable("surface_pressure");
+    expect(variable).toBe("pressure");
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({
+        captureRunId: "pressure-alias-run",
+        validTime,
+        availableAt: validTime - 60 * 60_000,
+        variable: variable!,
+        value: 1012,
+        unit: "hPa",
+      }),
+    ]);
+
+    expect(scoresFor(result, "pressure").find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 3 });
+  });
+
   it("ignore un run reçu après l’observation et choisit le dernier run admissible", () => {
     const validTime = observedAt(12);
     const result = evaluateHourlyForecastRuns([snapshot(12)], [
@@ -54,6 +73,83 @@ describe("evaluateHourlyForecastRuns", () => {
     expect(scoresFor(result).filter((score) => score.sampleSize > 0).map((score) => score.horizonBucket)).toEqual(["0_2h", "2_6h", "6_24h"]);
     expect(scoresFor(result).filter((score) => score.sampleSize > 0).every((score) => score.coverageRatio === 1)).toBe(true);
     expect(scoresFor(result).filter((score) => score.sampleSize === 0).every((score) => score.evaluableObservationCount === 0)).toBe(true);
+  });
+
+  it("classe le bucket depuis la durée exacte, sans arrondir une échéance proche de la frontière", () => {
+    const validTime = observedAt(12);
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({
+        captureRunId: "run-119-6",
+        validTime,
+        availableAt: validTime - 119.6 * 60_000,
+        variable: "temperature",
+        value: 12,
+      }),
+    ]);
+
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 2 });
+    expect(scoresFor(result).find((score) => score.horizonBucket === "2_6h")?.sampleSize).toBe(0);
+  });
+
+  it("conserve le lead fractionnaire exact et la provenance du snapshot physique sans fusionner deux leads voisins", () => {
+    const firstValidTime = observedAt(12);
+    const secondValidTime = observedAt(13);
+    const firstSnapshot: HourlyPhysicalSnapshot = {
+      ...snapshot(12),
+      id: 701,
+      collectedAt: "2026-09-29T12:05:00.000Z",
+      confidenceScore: 0.93,
+      stationsUsed: [{ stationId: "station-a", observedAt: firstValidTime - 120_000, temperature: 10 }],
+    };
+    const secondSnapshot: HourlyPhysicalSnapshot = {
+      ...snapshot(13),
+      id: 702,
+      collectedAt: "2026-09-29T13:05:00.000Z",
+      confidenceScore: 0.91,
+      stationsUsed: [{ stationId: "station-b", observedAt: secondValidTime - 120_000, temperature: 10 }],
+    };
+    const firstLead = 119.6 * 60_000;
+    const secondLead = 119.7 * 60_000;
+    const result = evaluateHourlyForecastRuns([firstSnapshot, secondSnapshot], [
+      forecast({ id: 801, captureRunId: "fractional-lead-a", validTime: firstValidTime, availableAt: firstValidTime - firstLead, variable: "temperature", value: 12 }),
+      forecast({ id: 802, captureRunId: "fractional-lead-b", validTime: secondValidTime, availableAt: secondValidTime - secondLead, variable: "temperature", value: 9 }),
+    ]);
+
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 2, mae: 1.5 });
+    expect(result.exactScores).toHaveLength(2);
+    expect(result.exactScores.map((score) => score.horizonMilliseconds)).toEqual([firstLead, secondLead]);
+    expect(result.exactScores.map((score) => score.horizonMinutes)).toEqual([119.6, 119.7]);
+    expect(result.exactComparisons).toHaveLength(2);
+    expect(result.exactComparisons[0]).toMatchObject({
+      forecastRunValueId: 801,
+      observationSnapshotId: 701,
+      captureRunId: "fractional-lead-a",
+      horizonMinutes: 119.6,
+      availableAt: firstValidTime - firstLead,
+      observationReferenceAt: firstValidTime,
+      observationCollectedAt: Date.parse("2026-09-29T12:05:00.000Z"),
+      stationCount: 2,
+      confidenceScore: 0.93,
+      observedUnit: "°C",
+      signedError: 2,
+      absoluteError: 2,
+    });
+    expect(result.exactComparisons[0]?.stationsUsed).toEqual(firstSnapshot.stationsUsed);
+  });
+
+  it("exclut du dénominateur évalué un run dont l'horizon dépasse les buckets scorables", () => {
+    const validTime = observedAt(12);
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({
+        captureRunId: "run-outside-scoring-window",
+        validTime,
+        availableAt: validTime - 16 * 24 * 60 * 60_000,
+        variable: "temperature",
+        value: 12,
+      }),
+    ]);
+
+    expect(scoresFor(result).every((score) => score.sampleSize === 0 && score.evaluableObservationCount === 0 && score.coverageRatio === 0)).toBe(true);
   });
 
   it("ne surcompte pas les doublons et retombe sur une valeur admissible quand le run récent est manquant", () => {

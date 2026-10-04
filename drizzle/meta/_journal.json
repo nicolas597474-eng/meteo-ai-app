@@ -358,6 +358,13 @@
       "when": 1791050050707,
       "tag": "0050_prevision-vs-observation",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "5",
+      "when": 1791101726854,
+      "tag": "0051_hourly_exact_horizon_calibration",
+      "breakpoints": true
     }
   ]
 }

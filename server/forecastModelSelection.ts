@@ -77,7 +77,7 @@ export function selectEligibleModelsForHorizon<T>(
       const reason = byModel.has(modelName)
         ? "Aucun run ne correspond exactement à validTime pour cette échéance."
         : options.missingReasonByModel?.[modelName] ?? "Aucun run de ce modèle n’a été reçu pour cette échéance.";
-      diagnostics.push({ modelName, variable: options.variable, eligible: false, reason, sourceName: null, modelId: null, runId: null, availableAt: null, validTime: null, horizonMinutes: null, horizonBucket: null });
+      diagnostics.push({ modelName, variable: options.variable, eligible: false, reason, sourceName: null, modelId: null, runId: null, availableAt: null, validTime: options.validTime, horizonMinutes: null, horizonBucket: null });
       continue;
     }
 
