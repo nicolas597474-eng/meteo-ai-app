@@ -1,7 +1,12 @@
+import React from "react";
 import type { HourlyHistoricalEvidence, HourlyHistoricalEvidenceStatus } from "@shared/hourlyModelMetrics";
+import { getModelCountCoverageLabel, getModelCountCoverageLevel } from "@shared/modelCoverageConfidence";
 
 type VariableWeighting = {
   variable: string;
+  horizonBucket?: string | null;
+  contributingModelCount?: number;
+  calibrationStatus?: "CALIBRATED" | "PARTIALLY_CALIBRATED" | "UNCALIBRATED_ROBUST" | "UNAVAILABLE";
   historicalEvidence?: HourlyHistoricalEvidence[];
 };
 
@@ -105,6 +110,17 @@ export function HourlyHistoricalEvidencePanel({
   horizonUnavailableReason,
 }: Props) {
   const entries = variableWeightings.filter((item) => item.historicalEvidence?.length);
+  const coverageSummary = variableWeightings.flatMap((item) => {
+    if (item.contributingModelCount == null || !Number.isFinite(item.contributingModelCount)) return [];
+    const contributorCount = Math.max(0, Math.floor(item.contributingModelCount));
+    const coverageLevel = getModelCountCoverageLevel(contributorCount);
+    const calibration = item.calibrationStatus ?? "indisponible";
+    const horizon = item.horizonBucket ?? horizonBucket ?? "horizon exact";
+    return [`${VARIABLE_LABELS[item.variable] ?? item.variable} (${horizon}) : ${getModelCountCoverageLabel(coverageLevel)} (${contributorCount} contributeur${contributorCount === 1 ? "" : "s"}) · calibration ${calibration}`];
+  }).join("; ");
+  const coverageNote = coverageSummary ? <div role="note" className="rounded-lg border border-sky-200/10 bg-sky-200/[0.035] p-2">
+    <p className="text-[9px] leading-relaxed text-slate-300"><strong>Niveau de couverture/confiance indicatif selon le nombre de contributeurs, pour cette échéance et variable :</strong> {coverageSummary}. Ce niveau n’est ni une probabilité ni une confiance statistiquement calibrée; le statut de calibration historique indiqué séparément est distinct.</p>
+  </div> : null;
   const hasHorizonContract = horizonBucket !== undefined || horizonUnavailableReason !== undefined;
   const horizonIsUnusable = hasHorizonContract && (
     horizonBucket == null
@@ -118,12 +134,14 @@ export function HourlyHistoricalEvidencePanel({
       : "L’horizon exact n’est pas archivé séparément; aucune échéance voisine n’est utilisée en repli.";
     return <section className="rounded-xl border border-slate-700/60 bg-slate-900/25 p-3" aria-label="Fiabilité historique horaire indisponible pour cet horizon">
       <p className="text-[11px] font-semibold text-slate-200">Fiabilité historique horaire indisponible · horizon exact</p>
+      {coverageNote}
       <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{reason} La dispersion inter-modèles reste distincte d’une comparaison aux observations.</p>
     </section>;
   }
 
   if (entries.length === 0) return <section className="rounded-xl border border-slate-700/60 bg-slate-900/25 p-3" aria-label="Fiabilité historique horaire">
     <p className="text-[11px] font-semibold text-slate-200">Fiabilité historique horaire indisponible</p>
+    {coverageNote}
     <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Aucune preuve horaire par modèle × variable × horizon n’est attachée à ce créneau. L’accord inter-modèles ne remplace pas une comparaison aux observations.</p>
   </section>;
 
@@ -131,9 +149,11 @@ export function HourlyHistoricalEvidencePanel({
   const displayedHorizon = horizonBucket ?? displayedEvidence.find((evidence) => evidence.horizonBucket !== "unavailable")?.horizonBucket ?? null;
   const minimumComparisons = displayedEvidence[0]?.minimumComparisons ?? null;
   const minimumComparableDays = displayedEvidence[0]?.minimumComparableDays ?? null;
-  return <details className="rounded-xl border border-slate-700/60 bg-slate-900/25" aria-label="Fiabilité historique horaire par modèle, variable et horizon">
-    <summary className="cursor-pointer list-none px-3 py-2.5 text-[11px] font-semibold text-slate-100">Fiabilité historique · par modèle × variable × horizon <span className="ml-1 text-[9px] font-normal text-slate-400">{displayedHorizon ? `· ${displayedHorizon}` : "· horizon indisponible"}</span></summary>
-    <div className="space-y-2 border-t border-white/8 px-3 py-3">
+  return <div className="space-y-2">
+    {coverageNote}
+    <details className="rounded-xl border border-slate-700/60 bg-slate-900/25" aria-label="Fiabilité historique horaire par modèle, variable et horizon">
+      <summary className="cursor-pointer list-none px-3 py-2.5 text-[11px] font-semibold text-slate-100">Fiabilité historique · par modèle × variable × horizon <span className="ml-1 text-[9px] font-normal text-slate-400">{displayedHorizon ? `· ${displayedHorizon}` : "· horizon indisponible"}</span></summary>
+      <div className="space-y-2 border-t border-white/8 px-3 py-3">
       <p className="text-[9px] leading-relaxed text-slate-400">Erreur contre les observations physiques archivées, distincte de la dispersion entre prévisions. MAE/RMSE/biais restent des mesures brutes. Qualification affichée uniquement au seuil communiqué ci-dessous pour chaque cellule; Best Match et agrégateurs exclus. Seuil actuellement lu : {minimumComparisons ?? "indisponible"} comparaisons et {minimumComparableDays ?? "indisponible"} jours.</p>
       {entries.map((entry) => {
         const evidence = entry.historicalEvidence ?? [];
@@ -147,6 +167,7 @@ export function HourlyHistoricalEvidencePanel({
           </div>
         </details>;
       })}
-    </div>
-  </details>;
+      </div>
+    </details>
+  </div>;
 }

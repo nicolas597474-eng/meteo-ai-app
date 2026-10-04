@@ -169,6 +169,11 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.hours[0].multiModelMetrics?.precipitation.frequencyPercent).toBeCloseTo(100 / 7, 10);
     expect(result.hours[0].windSpeed).not.toBeNull();
     expect(result.hours[0].apparentTemp).toBeNull();
+    expect(variableWeighting(result, "temperature")).toMatchObject({
+      availableModelCount: 7,
+      contributingModelCount: 7,
+      coverageLevel: "BROAD",
+    });
     const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
     expect(weights).toHaveLength(7);
     expect(weights.reduce((sum, item) => sum + item.weight, 0)).toBeCloseTo(1, 10);
@@ -178,6 +183,13 @@ describe("computeOfficialHourlyForecast", () => {
     expect(Math.min(...weights.map((item) => item.weight))).toBeGreaterThan(0.08);
     expect(result.weighting.bestMatchIncluded).toBe(false);
     expect(result.weighting.modelsConsidered).toEqual(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
+    expect(result.weighting.horizons.find((row) => row.variable === "temperature")?.coverageLevelCounts).toEqual({
+      NONE: 0,
+      SINGLE_MODEL: 0,
+      LIMITED: 0,
+      MODERATE: 0,
+      BROAD: 1,
+    });
     expect(result.weighting.modelsConsidered).not.toContain("best_match");
     expect(result.weighting.modelsWithData).toHaveLength(7);
     expect(result.weighting.status).toBe("mixed");
@@ -342,7 +354,12 @@ describe("computeOfficialHourlyForecast", () => {
     expect(result.weighting.calibrationStatus).toBe("UNCALIBRATED_ROBUST");
     expect(result.hours[0].forecastWeighting?.method).toBe("single_model");
     expect(result.hours[0].temp).toBe(8);
-    expect(variableWeighting(result, "temperature")?.availableModelCount).toBe(1);
+    expect(variableWeighting(result, "temperature")).toMatchObject({
+      availableModelCount: 1,
+      contributingModelCount: 1,
+      coverageLevel: "SINGLE_MODEL",
+    });
+    expect(variableWeighting(result, "temperature")?.modelWeights[0]?.weight).toBe(1);
   });
 
   it("renormalise uniquement les poids historiques des modèles présents et liste les modèles manquants", () => {

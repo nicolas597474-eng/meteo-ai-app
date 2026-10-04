@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
+import { getModelCountCoverageLabel, getModelCountCoverageLevel } from "@shared/modelCoverageConfidence";
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import {
@@ -283,8 +284,8 @@ function evidenceStatusLabel(status: DailyForecastEvidenceStatus): string {
 }
 
 function diagnosticStatusLabel(diagnostic: DailyFusionMetricDiagnostic): string {
-  if (diagnostic.availabilityStatus === "UNAVAILABLE") return "aucune valeur admissible reçue pour cette variable et cette validTime";
-  if (diagnostic.availabilityStatus === "SINGLE_MODEL") return diagnostic.calibrationStatus === "CALIBRATED"
+  if (diagnostic.availabilityStatus === "UNAVAILABLE" || diagnostic.contributingModelCount === 0) return "aucune valeur admissible reçue pour cette variable et cette validTime";
+  if (diagnostic.availabilityStatus === "SINGLE_MODEL" || diagnostic.contributingModelCount === 1) return diagnostic.calibrationStatus === "CALIBRATED"
     ? "prévision single-model · preuve historique qualifiée"
     : "prévision single-model · valeur conservée avec calibration robuste non qualifiée";
   if (diagnostic.calibrationStatus === "CALIBRATED") return "fusion des modèles disponibles · preuves historiques qualifiées";
@@ -343,9 +344,16 @@ function DailyFusionDiagnostics({ day, sourceLabels }: { day: DailyForecastPoint
         {variables.map(({ label, key, status, unit }) => {
           const sources = fusion.sourcesByVariable[key];
           const diagnostic = fusion.diagnosticsByVariable?.[key];
+          const contributingModelCount = diagnostic?.contributingModelCount
+            ?? sources.filter((source) => source.finalWeight > 0).length;
+          const coverageLevel = getModelCountCoverageLevel(contributingModelCount);
+          const coverageLabel = getModelCountCoverageLabel(coverageLevel);
+          const calibrationStatus = diagnostic?.calibrationStatus ?? status;
           return <div key={key} className="space-y-1">
             <p><strong className="text-slate-100">{label} :</strong> {diagnostic ? diagnosticStatusLabel(diagnostic) : evidenceStatusLabel(status)}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map(sourceTraceDescription).join("; ")}</span>}{sources.length > 0 && <span className="block pl-2 text-slate-400">{sources.map((source) => biasDescription(source, unit)).join("; ")}</span>}</p>
-            {diagnostic && <div className="pl-2 text-slate-400">
+            <div className="pl-2 text-slate-400">
+              <p><strong>Niveau de couverture/confiance indicatif selon le nombre de contributeurs :</strong> {coverageLabel} ({contributingModelCount} modèle{contributingModelCount === 1 ? "" : "s"}). Ce niveau descriptif n’est ni une probabilité ni une confiance statistiquement calibrée. Statut de calibration historique, distinct : {calibrationStatus}.</p>
+              {diagnostic && <div className="space-y-1">
               <p>Valeurs réellement disponibles : {diagnostic.availableValueModelCount} · preuves historiques qualifiées : {diagnostic.evidenceEligibleModelCount} · contributeurs effectifs : {diagnostic.contributingModelCount}. Catalogue de référence : {diagnostic.expectedModelCount} modèles; les absences hors portée ne sont pas des échecs et sont exclues des dénominateurs de scoring.</p>
               <p>{diagnostic.reason}</p>
               {diagnostic.availableModels.length > 0 && <p>Modèles avec valeur : {diagnostic.availableModels.join(", ")}.</p>}
@@ -353,7 +361,8 @@ function DailyFusionDiagnostics({ day, sourceLabels }: { day: DailyForecastPoint
                 <summary className="cursor-pointer text-sky-100">Motif par modèle ({diagnostic.modelReasons.length})</summary>
                 <ul className="list-inside list-disc pl-1">{diagnostic.modelReasons.map(({ modelName, reason: modelReason }) => <li key={`${key}-${modelName}`}>{modelName} — {modelReason}</li>)}</ul>
               </details>}
-            </div>}
+              </div>}
+            </div>
           </div>;
         })}
       </div>

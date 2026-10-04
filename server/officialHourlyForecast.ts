@@ -6,6 +6,7 @@ import { conditionFromWeatherValues } from "./weatherConditionLabels";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { getParisDateDaysAgo } from "./weatherTime";
 import { PRECIPITATION_RAIN_THRESHOLD_MM, summarizePrecipitationModels } from "../shared/precipitationConsensus";
+import { getModelCountCoverageLevel, type ModelCountCoverageLevel } from "../shared/modelCoverageConfidence";
 import {
   HONDEGHEM,
   OFFICIAL_HOURLY_MODELS,
@@ -202,6 +203,7 @@ export type OfficialHourlyWeightingSummary = {
     availableModelCount: number;
     evidenceEligibleModelCount: number;
     contributingModelCount: number;
+    coverageLevelCounts: Record<ModelCountCoverageLevel, number>;
     modelNamesWithData: readonly OfficialHourlyModelName[];
   }>;
 };
@@ -279,12 +281,8 @@ function hasForecastValue(hour: HourlyModelForecast["hours"][number]): boolean {
   ].some(isFiniteNumber);
 }
 
-function getCoverageLevel(modelCount: number): "NONE" | "SINGLE_MODEL" | "LIMITED" | "MODERATE" | "BROAD" {
-  if (modelCount <= 0) return "NONE";
-  if (modelCount === 1) return "SINGLE_MODEL";
-  if (modelCount === 2) return "LIMITED";
-  if (modelCount <= 4) return "MODERATE";
-  return "BROAD";
+function getCoverageLevel(modelCount: number): ModelCountCoverageLevel {
+  return getModelCountCoverageLevel(modelCount);
 }
 
 function getAvailabilityStatus(modelCount: number): HourlyAvailabilityStatus {
@@ -503,6 +501,7 @@ function computeVariableForecastValue(input: {
   }));
   const historicalEvidence = prepared.flatMap((item) => item.evidence ? [item.evidence] : []);
   const sourceDiagnostics = prepared.map((item) => makeDiagnostic(item, item.finalWeight, item.contributes));
+  const contributingModelCount = prepared.filter((item) => item.contributes && item.finalWeight > 0).length;
   const buckets = Array.from(new Set(prepared.map((item) => item.selected.horizonBucket)));
   const unavailableReason: HourlyWeightingUnavailableReason | null = availableCount === 0 ? "no_model_data" : null;
   const weighting: HourlyVariableWeighting = {
@@ -515,7 +514,8 @@ function computeVariableForecastValue(input: {
     expectedModelCount: OFFICIAL_HOURLY_MODEL_NAMES.length,
     availableModelCount: availableCount,
     evidenceEligibleModelCount: evidenceEligible.length,
-    contributingModelCount: prepared.filter((item) => item.contributes && item.finalWeight > 0).length,
+    contributingModelCount,
+    coverageLevel: getCoverageLevel(contributingModelCount),
     availableModels: prepared.map((item) => item.selected.modelName),
     evidenceEligibleModels: evidenceEligible.map((item) => item.selected.modelName),
     modelReasons: ineligibilityReasonByModel(selection.diagnostics),
@@ -737,6 +737,7 @@ export function computeOfficialHourlyForecast(
     availableModelCount: number;
     evidenceEligibleModelCount: number;
     contributingModelCount: number;
+    coverageLevelCounts: Record<ModelCountCoverageLevel, number>;
     modelNamesWithData: Set<OfficialHourlyModelName>;
   }>();
   const allModelsWithData = new Set<OfficialHourlyModelName>();
@@ -773,12 +774,14 @@ export function computeOfficialHourlyForecast(
         availableModelCount: 0,
         evidenceEligibleModelCount: 0,
         contributingModelCount: 0,
+        coverageLevelCounts: { NONE: 0, SINGLE_MODEL: 0, LIMITED: 0, MODERATE: 0, BROAD: 0 },
         modelNamesWithData: new Set<OfficialHourlyModelName>(),
       };
       row.hourCount++;
       row.availableModelCount += weighting.availableModelCount;
       row.evidenceEligibleModelCount += weighting.evidenceEligibleModelCount;
       row.contributingModelCount += weighting.contributingModelCount;
+      row.coverageLevelCounts[weighting.coverageLevel] += 1;
       weighting.availableModels.forEach((name) => row.modelNamesWithData.add(name as OfficialHourlyModelName));
       summaryRows.set(key, row);
     }

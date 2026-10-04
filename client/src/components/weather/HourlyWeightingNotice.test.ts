@@ -75,4 +75,35 @@ describe("HourlyWeightingNotice", () => {
     expect(html).toContain("Série officielle d’origine conservée (24 échéances");
     expect(html).toContain("2026-10-04T07:58:00.000Z");
   });
+
+  it("affiche les niveaux indicatifs par variable et horizon, distincts de la calibration", () => {
+    const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
+      status: "mixed",
+      availabilityStatus: "FUSED",
+      calibrationStatus: "PARTIALLY_CALIBRATED",
+      horizons: [{
+        variable: "temperature",
+        horizonBucket: "6_24h",
+        method: "mixed",
+        availabilityStatus: "FUSED",
+        calibrationStatus: "PARTIALLY_CALIBRATED",
+        unavailableReason: null,
+        hourCount: 9,
+        contributingModelCount: 18,
+        coverageLevelCounts: { NONE: 1, SINGLE_MODEL: 1, LIMITED: 2, MODERATE: 3, BROAD: 2 },
+        modelNamesWithData: sevenModels,
+      }],
+    } }));
+
+    expect(html).toContain("Niveau de couverture/confiance indicatif selon le nombre réel de contributeurs, par variable et horizon");
+    expect(html).toContain("confiance élevée sur 2 échéances");
+    expect(html).toContain("confiance moyenne sur 3 échéances");
+    expect(html).toContain("confiance réduite sur 2 échéances");
+    expect(html).toContain("prévision d’un modèle unique sur 1 échéance");
+    expect(html).toContain("indisponible sur 1 échéance");
+    expect(html).toContain("ni une probabilité ni une confiance statistiquement calibrée");
+    expect(html).toContain("CALIBRATED");
+    expect(html).toContain("PARTIALLY_CALIBRATED");
+    expect(html).toContain("UNCALIBRATED_ROBUST");
+  });
 });

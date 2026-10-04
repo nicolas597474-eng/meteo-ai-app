@@ -14,6 +14,7 @@ import {
   summarizePrecipitationModels,
   type PrecipitationModelConsensus,
 } from "../shared/precipitationConsensus";
+import { getModelCountCoverageLevel } from "../shared/modelCoverageConfidence";
 import type {
   DailyForecastHorizon,
   DailyForecastCalibrationStatus,
@@ -134,7 +135,7 @@ function getAvailabilityStatus(count: number): DailyFusionAvailabilityStatus {
 }
 
 function coverageLevel(count: number): DailyFusionCoverageLevel {
-  return count >= 5 ? "BROAD" : count >= 3 ? "MODERATE" : count === 2 ? "LIMITED" : count === 1 ? "SINGLE_MODEL" : "NONE";
+  return getModelCountCoverageLevel(count);
 }
 
 function traceCalibrationStatus(selectedCount: number, qualifiedCount: number): DailyCalibrationStatus {
@@ -374,7 +375,7 @@ function computeOfficialDailyForecastInternal(
       status,
       availabilityStatus: status,
       calibrationStatus: calibration,
-      coverageLevel: coverageLevel(availableCount),
+      coverageLevel: coverageLevel(contributingCount),
       expectedModelCount: DAILY_PRECIPITATION_MODEL_NAMES.length,
       availableValueModelCount: availableCount,
       evidenceEligibleModelCount: qualifiedCount,

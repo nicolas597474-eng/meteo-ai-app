@@ -11,6 +11,7 @@ import { getDailyForecastValidTime } from "./dailyForecastVerification";
 import { OFFICIAL_HOURLY_MODELS } from "./officialModels";
 export { OFFICIAL_HOURLY_MODELS } from "./officialModels";
 import type { HourlyHistoricalEvidence, HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
+import type { ModelCountCoverageLevel } from "../shared/modelCoverageConfidence";
 import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 import type { BestMatchDailyReference, DailyForecastMetric, DailyOfficialFusionDisplay } from "../shared/dailyForecast";
@@ -409,6 +410,7 @@ export type HourlyVariableWeighting = {
   availableModelCount: number;
   evidenceEligibleModelCount: number;
   contributingModelCount: number;
+  coverageLevel: ModelCountCoverageLevel;
   availableModels: string[];
   evidenceEligibleModels: string[];
   modelReasons: Array<{ modelName: string; reason: string; availableAt: number | null; validTime: number | null; horizonMinutes: number | null; horizonBucket: string | null }>;

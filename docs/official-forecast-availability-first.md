@@ -15,6 +15,10 @@ Un modèle contribue uniquement si un run admissible existe réellement pour le 
 
 Une absence à J+7–J+15 (par exemple AROME, ARPEGE ou UKMET hors de leur portée normale) est un fait de **couverture**, pas une erreur de modèle ni une mauvaise performance. Elle ne devient pas un échec dans les classements, les scores ou leurs dénominateurs.
 
+## Niveau indicatif selon le nombre de contributeurs
+
+L’interface peut présenter, pour chaque échéance et variable, un **niveau de couverture/confiance indicatif selon le nombre de modèles effectivement contributeurs** : 0 = indisponible; 1 = prévision d’un modèle unique; 2 = confiance réduite; 3–4 = confiance moyenne; 5 ou plus = confiance élevée. Ces catégories sont uniquement descriptives : elles ne sont ni une probabilité ni une confiance statistiquement calibrée et ne modifient aucune valeur, aucun poids ni aucun score. Elles restent distinctes des statuts historiques `CALIBRATED`, `PARTIALLY_CALIBRATED` et `UNCALIBRATED_ROBUST`.
+
 ## Chemins en production
 
 | Chemin | Rôle | Traitement |

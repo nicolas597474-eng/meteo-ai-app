@@ -1,5 +1,10 @@
 import React from "react";
 import type { ManualHourlyOverride } from "@shared/hourlyModelMetrics";
+import {
+  getModelCountCoverageLabel,
+  MODEL_COUNT_COVERAGE_LEVELS,
+  type ModelCountCoverageLevel,
+} from "@shared/modelCoverageConfidence";
 
 type HourlyWeightingNoticeProps = {
   weighting?: {
@@ -23,6 +28,7 @@ type HourlyWeightingNoticeProps = {
       availableModelCount?: number;
       evidenceEligibleModelCount?: number;
       contributingModelCount?: number;
+      coverageLevelCounts?: Partial<Record<ModelCountCoverageLevel, number>>;
       modelNamesWithData: readonly string[];
     }[];
   } | null;
@@ -77,6 +83,34 @@ function formatUnavailableDetails(rows: NonNullable<HourlyWeightingNoticeProps["
   return Array.from(groups, ([reason, variables]) => `${reason} : ${Array.from(variables).join(", ")}`).join("; ");
 }
 
+function formatCoverageLevelDistribution(rows: NonNullable<HourlyWeightingNoticeProps["weighting"]>["horizons"]): string {
+  const groups = new Map<string, { variable: string; horizon: string; counts: Record<ModelCountCoverageLevel, number> }>();
+  for (const row of rows ?? []) {
+    if (!row.coverageLevelCounts) continue;
+    const horizon = row.horizonBucket ?? "échéance exacte";
+    const key = `${row.variable}|${horizon}`;
+    const group = groups.get(key) ?? {
+      variable: VARIABLE_LABELS[row.variable] ?? row.variable,
+      horizon,
+      counts: { NONE: 0, SINGLE_MODEL: 0, LIMITED: 0, MODERATE: 0, BROAD: 0 },
+    };
+    for (const level of MODEL_COUNT_COVERAGE_LEVELS) {
+      group.counts[level] += row.coverageLevelCounts[level] ?? 0;
+    }
+    groups.set(key, group);
+  }
+
+  const displayOrder: ModelCountCoverageLevel[] = ["BROAD", "MODERATE", "LIMITED", "SINGLE_MODEL", "NONE"];
+  return Array.from(groups.values()).map(({ variable, horizon, counts }) => {
+    const distribution = displayOrder.flatMap((level) => {
+      const count = counts[level];
+      if (count <= 0) return [];
+      return [`${getModelCountCoverageLabel(level)} sur ${count} échéance${count === 1 ? "" : "s"}`];
+    });
+    return `${variable} (${horizon}) : ${distribution.join(", ")}`;
+  }).join("; ");
+}
+
 export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps) {
   if (!weighting) return null;
 
@@ -86,6 +120,7 @@ export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps)
   const partiallyCalibrated = formatGroups(weighting.horizons, "PARTIALLY_CALIBRATED");
   const robust = formatGroups(weighting.horizons, "UNCALIBRATED_ROBUST");
   const unavailable = formatUnavailableDetails(weighting.horizons);
+  const coverageDistribution = formatCoverageLevelDistribution(weighting.horizons);
   const modelsWithData = Array.from(new Set([
     ...(weighting.modelsWithData ?? []),
     ...(weighting.horizons ?? []).flatMap((row) => row.modelNamesWithData),
@@ -106,6 +141,10 @@ export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps)
   return (
     <div role="note" className="rounded-lg border border-sky-200/10 bg-sky-200/[0.035] px-2.5 py-2 text-[10px] leading-relaxed text-slate-400">
       {weighting.manualOverride && <p className="mb-1 rounded-md border border-amber-200/20 bg-amber-200/[0.05] px-2 py-1 text-amber-100"><span className="font-semibold">Override horaire manuel explicite appliqué.</span> {weighting.manualOverride.reason} Série officielle d’origine conservée ({weighting.manualOverride.officialOriginalPointCount} échéances; calcul officiel du {weighting.manualOverride.officialOriginalComputedAt}).</p>}
+      {coverageDistribution && <div className="mb-1 rounded-md border border-sky-200/10 bg-black/10 px-2 py-1">
+        <p><span className="font-semibold text-sky-100">Niveau de couverture/confiance indicatif selon le nombre réel de contributeurs, par variable et horizon :</span> {coverageDistribution}.</p>
+        <p>Ces catégories décrivent uniquement le nombre de modèles : elles ne sont ni une probabilité ni une confiance statistiquement calibrée. Le statut de calibration historique (`CALIBRATED`, `PARTIALLY_CALIBRATED`, `UNCALIBRATED_ROBUST`) est distinct et affiché séparément ci-dessous.</p>
+      </div>}
       {weighting.status === "unavailable" ? (
         <>
           <p><span className="font-semibold text-amber-100">Prévision officielle horaire indisponible : aucun modèle admissible n’a fourni de valeur.</span> {availabilityMessage} {evidenceLabel} Modèles avec données : {modelsLabel}. Best Match est exclu.</p>

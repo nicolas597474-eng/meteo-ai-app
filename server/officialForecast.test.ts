@@ -363,25 +363,28 @@ describe("computeOfficialDailyForecast", () => {
       expectedModelCount: 7,
       availableValueModelCount: 6,
       contributingModelCount: 6,
+      coverageLevel: "BROAD",
     });
     expect(j3.tempMax).not.toBeNull();
     expect(j3.parameterDiagnostics.temperature_max.modelReasons.find(({ modelName }) => modelName === "AROME")?.reason).toContain("Aucun run");
 
     const j7 = run("2026-10-09", ["ECMWF", "GFS", "GEM", "UKMET"]);
     expect(j7.trace.horizonBucket).toBe("4-7d");
-    expect(j7.parameterDiagnostics.temperature_max.availableValueModelCount).toBe(4);
+    expect(j7.parameterDiagnostics.temperature_max).toMatchObject({ availableValueModelCount: 4, coverageLevel: "MODERATE" });
     expect(j7.tempMax).not.toBeNull();
 
     const j15 = run("2026-10-17", ["ECMWF", "GFS"]);
     expect(j15.trace.horizonBucket).toBe("8-15d");
-    expect(j15.parameterDiagnostics.temperature_max.availableValueModelCount).toBe(2);
+    expect(j15.parameterDiagnostics.temperature_max).toMatchObject({ availableValueModelCount: 2, contributingModelCount: 2, coverageLevel: "LIMITED" });
     expect(j15.parameterDiagnostics.temperature_max.contributingModelCount).toBe(2);
     expect(j15.tempMax).not.toBeNull();
+    expect(j15.trace.parameterSources.tempMax.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);
 
     const singleModel = run("2026-10-17", ["ECMWF"]);
-    expect(singleModel.parameterDiagnostics.temperature_max.availabilityStatus).toBe("SINGLE_MODEL");
+    expect(singleModel.parameterDiagnostics.temperature_max).toMatchObject({ availabilityStatus: "SINGLE_MODEL", contributingModelCount: 1, coverageLevel: "SINGLE_MODEL" });
     expect(singleModel.tempMax).not.toBeNull();
     expect(singleModel.trace.parameterSources.tempMax).toHaveLength(1);
+    expect(singleModel.trace.parameterSources.tempMax[0]?.finalWeight).toBe(1);
   });
 
   it("exclut le modèle sans valeur pour cette variable et fusionne les deux contributeurs restants", () => {
@@ -415,6 +418,7 @@ describe("computeOfficialDailyForecast", () => {
       availableValueModelCount: 0,
       evidenceEligibleModelCount: 0,
       contributingModelCount: 0,
+      coverageLevel: "NONE",
     });
     expect(noValues.tempMax).toBeNull();
     expect(noEvidence.parameterDiagnostics.temperature_max).toMatchObject({
@@ -439,6 +443,7 @@ describe("computeOfficialDailyForecast", () => {
       availableValueModelCount: 2,
       evidenceEligibleModelCount: 2,
       contributingModelCount: 2,
+      coverageLevel: "LIMITED",
       evidenceEligibleModels: serviceNames.slice(0, 2),
     });
     expect(twoModels.tempMax).not.toBeNull();
@@ -451,6 +456,7 @@ describe("computeOfficialDailyForecast", () => {
       availableValueModelCount: 3,
       evidenceEligibleModelCount: 3,
       contributingModelCount: 3,
+      coverageLevel: "MODERATE",
     });
     expect(threeModels.trace.parameterSources.tempMax).toHaveLength(3);
     expect(threeModels.trace.parameterSources.tempMax.reduce((sum, source) => sum + source.finalWeight, 0)).toBeCloseTo(1, 8);

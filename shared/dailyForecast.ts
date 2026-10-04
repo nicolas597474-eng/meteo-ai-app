@@ -1,3 +1,5 @@
+import type { ModelCountCoverageLevel } from "./modelCoverageConfidence";
+
 export type DailyForecastMetric =
   | "temperature_max"
   | "temperature_min"
@@ -12,7 +14,7 @@ export type DailyForecastCalibrationStatus =
   | "UNCALIBRATED_ROBUST"
   | "UNAVAILABLE";
 export type DailyFusionAvailabilityStatus = "FUSED" | "SINGLE_MODEL" | "UNAVAILABLE";
-export type DailyFusionCoverageLevel = "NONE" | "SINGLE_MODEL" | "LIMITED" | "MODERATE" | "BROAD";
+export type DailyFusionCoverageLevel = ModelCountCoverageLevel;
 export type DailyFusionVariable = DailyForecastMetric | "humidity" | "cloud_cover";
 
 /** Legacy name retained as a type alias; it describes historical qualification only. */
