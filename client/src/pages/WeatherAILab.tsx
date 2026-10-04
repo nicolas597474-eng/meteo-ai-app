@@ -147,6 +147,49 @@ type HourlyModelCollectionEvidence = {
   variableCoverage: ModelCoverageEvidence | null;
 };
 
+type ProviderRunCaptureEvidence = {
+  model: string;
+  modelId: string;
+  status: string;
+  reasonCode: string | null;
+  leadBasis: string;
+  metadataHttpStatus: number | null;
+  metadataAvailableAt: number | null;
+  providerRunAt: number | null;
+  requestStartedAt: number | null;
+  availableAt: number | null;
+  responseStatus: number | null;
+  collectionLatencyMilliseconds: number | null;
+  valuesStored: number;
+  minimumForecastLeadMilliseconds: number | null;
+  maximumForecastLeadMilliseconds: number | null;
+  capturedAt: Date | string;
+};
+
+function formatProviderRunUtc(value: number | Date | string | null | undefined): string {
+  if (value == null) return "non renseigné";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "horodatage indisponible";
+}
+
+function providerRunStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    succeeded: "Capture du run exact archivée",
+    no_usable_values: "Réponse archivée sans valeur finie exploitable",
+    unmapped_model_id: "Lead de run inconnu · identifiant exact non mappé",
+    metadata_invalid: "Métadonnées officielles absentes ou incohérentes",
+    metadata_stale: "Dernière disponibilité officielle périmée",
+    availability_wait: "Attente prudente de réplication non écoulée",
+    run_timestamp_not_minute_aligned: "Initialisation fournisseur invalide",
+    metadata_unavailable: "Métadonnées officielles indisponibles",
+    request_failed: "Requête Single Runs échouée",
+    request_invalid: "Requête Single Runs non valide",
+    invalid_response: "Réponse Single Runs inexploitable",
+    no_future_valid_times: "Aucun validTime encore futur à la réception",
+  };
+  return labels[status] ?? status;
+}
+
 function formatMeasuredAge(ageMs: number): string {
   if (!Number.isFinite(ageMs)) return "âge indéterminé";
   const totalSeconds = Math.floor(Math.max(0, ageMs) / 1000);
@@ -225,12 +268,16 @@ function VariableCoverageEvidenceSection({ title, evidence, granularity }: {
 function ForecastModelGuideDialog({
   modelName,
   collectionAttempt,
+  providerRunCapture,
+  providerRunAvailable,
   dailyCoverage,
   collectionAvailable,
   onOpenChange,
 }: {
   modelName: string | null;
   collectionAttempt: HourlyModelCollectionEvidence | null;
+  providerRunCapture: ProviderRunCaptureEvidence | null;
+  providerRunAvailable: boolean;
   dailyCoverage: ModelCoverageEvidence | null;
   collectionAvailable: boolean;
   onOpenChange: (open: boolean) => void;
@@ -270,12 +317,35 @@ function ForecastModelGuideDialog({
   const attemptedAtLabel = attemptedAt && Number.isFinite(attemptedAt.getTime())
     ? attemptedAt.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "medium", timeZone: "Europe/Paris" })
     : "heure indisponible";
+  const providerRunLeadRange = providerRunCapture?.minimumForecastLeadMilliseconds != null
+    && providerRunCapture.maximumForecastLeadMilliseconds != null
+    ? `${formatMeasuredAge(providerRunCapture.minimumForecastLeadMilliseconds)} → ${formatMeasuredAge(providerRunCapture.maximumForecastLeadMilliseconds)}`
+    : "non renseigné";
   return <Dialog open={Boolean(modelName)} onOpenChange={onOpenChange}><DialogContent className="max-h-[calc(100dvh-1.5rem)] max-w-[calc(100%-1rem)] overflow-y-auto rounded-2xl border border-sky-400/30 bg-[#0d131d] p-4 text-slate-100 sm:max-w-xl"><DialogHeader><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Comprendre le modèle et vérifier la collecte</p><DialogTitle className="pr-8 text-lg text-slate-50">{guide.name}</DialogTitle><DialogDescription className="pr-8 text-xs leading-relaxed text-slate-300">{guide.overview}</DialogDescription></DialogHeader><dl className="grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-white/10 bg-slate-950/35 p-3"><dt className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Organisme</dt><dd className="mt-1 text-xs font-medium text-slate-100">{guide.provider}</dd></div><div className="rounded-xl border border-white/10 bg-slate-950/35 p-3"><dt className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Périmètre</dt><dd className="mt-1 text-xs font-medium text-slate-100">{guide.coverage}</dd></div></dl><section className="rounded-xl border border-sky-300/15 bg-sky-300/[0.05] p-3"><h3 className="text-xs font-semibold text-sky-100">Comment il fonctionne</h3><p className="mt-1.5 text-[11px] leading-relaxed text-slate-300">{guide.operation}</p></section><section className="rounded-xl border border-violet-300/15 bg-violet-300/[0.05] p-3"><h3 className="text-xs font-semibold text-violet-100">Ce que MeteoAI en fait</h3><p className="mt-1.5 text-[11px] leading-relaxed text-slate-300">{guide.contribution}</p></section><section className="rounded-xl border border-amber-300/15 bg-amber-300/[0.05] p-3"><h3 className="text-xs font-semibold text-amber-100">Limite à connaître</h3><p className="mt-1.5 text-[11px] leading-relaxed text-slate-300">{guide.limit}</p></section>
     <section className="rounded-xl border border-white/10 bg-slate-950/35 p-3" aria-label="Dernière tentative horaire planifiée">
       <h3 className="text-xs font-semibold text-sky-100">Dernière tentative horaire planifiée</h3>
       {!collectionAvailable ? <p className="mt-1.5 text-[11px] leading-relaxed text-amber-100">Le journal détaillé est indisponible (base ou migration non vérifiable). Les compteurs agrégés ne prouvent ni une requête ni une écriture pour ce modèle.</p>
         : !collectionAttempt ? <p className="mt-1.5 text-[11px] leading-relaxed text-slate-300">Aucune trace durable pour ce modèle et ce lieu. L’absence de trace ne permet pas de conclure si un ancien passage a tenté la requête.</p>
           : <><p className={`mt-1.5 text-[11px] font-semibold ${statusTone}`}>{statusLabel}</p><p className="mt-1 text-[10px] text-slate-400">Tentative : {attemptedAtLabel} · {collectionAttempt.requestAttempts} requête(s) fournisseur{collectionAttempt.requestAttempts > 1 ? "s" : ""}{collectionAttempt.modelId ? ` · modèle ${collectionAttempt.modelId}` : ""}</p><div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">Réponse reçue</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.hoursReceived} h · {collectionAttempt.valuesReceived}/{collectionAttempt.expectedValueCount} valeurs valides</p></div><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">Archive immuable confirmée</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.archiveRowsWritten} lignes</p></div><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">Vue horaire confirmée</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.projectionRowsWritten}/{collectionAttempt.hoursReceived} lignes</p></div><div className="rounded-lg border border-white/10 p-2"><span className="text-slate-400">État de la source</span><p className="mt-0.5 font-semibold text-slate-100">{collectionAttempt.isOfficialModel ? "Modèle officiel horaire" : "Référence agrégée, non officielle"}</p></div></div>{collectionAttempt.errorCode && <p className="mt-2 text-[10px] text-amber-100">Motif : {errorLabels[collectionAttempt.errorCode] ?? "Erreur technique classifiée"}.</p>}{collectionAttempt.isOfficialModel ? <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Cette trace prouve uniquement la collecte/écriture. Les preuves historiques qualifient le score, pas l’existence d’une prévision : une valeur disponible reste admissible dans une fusion robuste, et un modèle unique est signalé comme tel. Les absences hors de la portée d’un modèle ne sont pas des échecs de performance.</p> : <p className="mt-2 text-[10px] leading-relaxed text-violet-100">Best Match est conservé comme référence agrégée; il ne peut jamais remplacer l’un des sept modèles ni alimenter le moteur officiel horaire.</p>}</>}
+    </section>
+    <section className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.035] p-3" aria-label="Provenance Single Runs et lead exact du run fournisseur">
+      <h3 className="text-xs font-semibold text-cyan-100">Single Runs · provenance du run fournisseur</h3>
+      <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Archive de recherche séparée. Le lead exact est validTime − providerRunAt; availableAt reste l’heure de réception MeteoAI et le seuil anti-fuite.</p>
+      {!providerRunAvailable ? <p className="mt-1.5 text-[10px] leading-relaxed text-amber-100">Journal indisponible; la migration additive provider-run n’est pas vérifiable. Aucun lead exact n’est supposé.</p>
+        : !providerRunCapture ? <p className="mt-1.5 text-[10px] leading-relaxed text-slate-300">Aucune tentative provider-run archivée pour ce modèle et ce lieu; le lead exact reste inconnu.</p>
+          : <><p className={`mt-1.5 text-[11px] font-semibold ${providerRunCapture.status === "succeeded" ? "text-emerald-200" : "text-amber-200"}`}>{providerRunStatusLabel(providerRunCapture.status)}</p>
+            <p className="mt-1 text-[9px] text-slate-400">{providerRunCapture.modelId} · base de lead « {providerRunCapture.leadBasis} » · capture enregistrée {formatProviderRunUtc(providerRunCapture.capturedAt)}</p>
+            <dl className="mt-2 grid grid-cols-2 gap-2 text-[9px]">
+              <div className="rounded-lg border border-white/10 p-2"><dt className="text-slate-400">providerRunAt · initialisation UTC</dt><dd className="mt-0.5 break-all font-semibold text-slate-100">{formatProviderRunUtc(providerRunCapture.providerRunAt)}</dd></div>
+              <div className="rounded-lg border border-white/10 p-2"><dt className="text-slate-400">Disponibilité officielle UTC</dt><dd className="mt-0.5 break-all font-semibold text-slate-100">{formatProviderRunUtc(providerRunCapture.metadataAvailableAt)}</dd></div>
+              <div className="rounded-lg border border-white/10 p-2"><dt className="text-slate-400">requestStartedAt UTC</dt><dd className="mt-0.5 break-all font-semibold text-slate-100">{formatProviderRunUtc(providerRunCapture.requestStartedAt)}</dd></div>
+              <div className="rounded-lg border border-white/10 p-2"><dt className="text-slate-400">availableAt · réception UTC</dt><dd className="mt-0.5 break-all font-semibold text-slate-100">{formatProviderRunUtc(providerRunCapture.availableAt)}</dd></div>
+              <div className="rounded-lg border border-white/10 p-2"><dt className="text-slate-400">collectionLatency = availableAt − providerRunAt</dt><dd className="mt-0.5 font-semibold text-slate-100">{providerRunCapture.collectionLatencyMilliseconds == null ? "non renseignée" : formatMeasuredAge(providerRunCapture.collectionLatencyMilliseconds)}</dd></div>
+              <div className="rounded-lg border border-white/10 p-2"><dt className="text-slate-400">Plage de forecastLeadTime archivée</dt><dd className="mt-0.5 font-semibold text-slate-100">{providerRunLeadRange} · {providerRunCapture.valuesStored} ligne(s) variables, nulls inclus</dd></div>
+            </dl>
+            {providerRunCapture.reasonCode && <p className="mt-1.5 text-[9px] text-amber-100">Code de statut : <code>{providerRunCapture.reasonCode}</code>.</p>}
+            <p className="mt-1.5 text-[9px] leading-relaxed text-cyan-100/80">La réponse Single Runs est reliée à l’URL exacte; son payload d’audit ne conserve que les validTime futurs. L’évaluation n’admet que availableAt &lt; instant observé; les valeurs visibles et scores historiques ne sont pas remplacés.</p>
+          </>}
     </section>
     <VariableCoverageEvidenceSection title="Couverture quotidienne par champ" evidence={dailyCoverage} granularity="daily" />
     <VariableCoverageEvidenceSection title="Couverture horaire par champ" evidence={collectionAttempt?.variableCoverage ?? null} granularity="hourly" />
@@ -603,6 +673,7 @@ export default function WeatherAILab() {
   const hourlyCollectedModelSet = new Set(forecastCollectionSnapshot?.hourlyCollectedModels ?? []);
   const flowStatusByModel = new Map((forecastCollectionReport?.flowStatuses ?? []).map((status) => [status.model, status]));
   const selectedHourlyModelCollection = (forecastCollectionReport?.hourlyModelCollection?.find((result) => result.model === selectedCollectionModel) ?? null) as HourlyModelCollectionEvidence | null;
+  const selectedProviderRunCapture = forecastCollectionReport?.providerRunCollection?.find((result) => result.model === selectedCollectionModel) ?? null;
   const forecastCollectionTimeLabel = forecastCollectionSnapshot?.collectedAt
     ? formatCollectionTimestamp(forecastCollectionSnapshot.collectedAt)
     : null;
@@ -753,7 +824,7 @@ export default function WeatherAILab() {
     {user?.role === "admin" && localNowcastingReports?.temperature && <LocalTemperatureNowcastingPanel report={localNowcastingReports.temperature} />}
     {user?.role === "admin" && localNowcastingReports?.precipitation && <LocalPrecipitationNowcastingPanel report={localNowcastingReports.precipitation} />}
 
-    <ForecastModelGuideDialog modelName={selectedCollectionModel} collectionAttempt={selectedHourlyModelCollection} dailyCoverage={selectedDailyModelCoverage} collectionAvailable={forecastCollectionReport?.hourlyModelCollectionAvailable ?? false} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
+    <ForecastModelGuideDialog modelName={selectedCollectionModel} collectionAttempt={selectedHourlyModelCollection} providerRunCapture={selectedProviderRunCapture} providerRunAvailable={forecastCollectionReport?.providerRunCollectionAvailable ?? false} dailyCoverage={selectedDailyModelCoverage} collectionAvailable={forecastCollectionReport?.hourlyModelCollectionAvailable ?? false} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
 
     <AILabGlossary />
 

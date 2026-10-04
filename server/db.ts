@@ -22,6 +22,10 @@ import {
   hourlyForecastExactComparisons,
   hourlyForecastExactEvaluationScores,
   hourlyForecastCollectionResults,
+  hourlyForecastProviderRunCaptures,
+  hourlyForecastProviderRunValues,
+  hourlyForecastProviderRunComparisons,
+  hourlyForecastProviderRunScores,
   leadTimeScores,
   InsertForecast,
   InsertForecastRun,
@@ -38,6 +42,10 @@ import {
   InsertHourlyForecastExactComparison,
   InsertHourlyForecastExactEvaluationScore,
   InsertHourlyForecastCollectionResult,
+  InsertHourlyForecastProviderRunCapture,
+  InsertHourlyForecastProviderRunValue,
+  InsertHourlyForecastProviderRunComparison,
+  InsertHourlyForecastProviderRunScore,
   InsertLeadTimeScore,
   weatherStations,
   stationObservations,
@@ -1786,6 +1794,127 @@ export async function getLatestHourlyForecastCollectionResults(locationKey: stri
   } catch {
     console.warn("[HourlyAudit] Detailed collection report is unavailable; verify database migration status.");
     return { available: false, results: [] };
+  }
+}
+
+let providerRunSchemaWarningLogged = false;
+function warnProviderRunSchema(error?: unknown) {
+  if (!providerRunSchemaWarningLogged) {
+    console.warn("[ProviderRunHorizon] Additive provider-run migration is unavailable; existing forecast and bucket-score flows remain unchanged.", error ?? "");
+    providerRunSchemaWarningLogged = true;
+  }
+}
+
+/** Append a request manifest and its Single Runs values atomically; never updates an existing capture. */
+export async function persistHourlyProviderRunCaptureBatch(
+  captures: InsertHourlyForecastProviderRunCapture[],
+  values: InsertHourlyForecastProviderRunValue[],
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  try {
+    await db.transaction(async (tx) => {
+      if (captures.length > 0) await tx.insert(hourlyForecastProviderRunCaptures).values(captures);
+      for (let offset = 0; offset < values.length; offset += 100) {
+        const batch = values.slice(offset, offset + 100);
+        await tx.insert(hourlyForecastProviderRunValues).values(batch);
+      }
+    });
+    return true;
+  } catch (error) {
+    warnProviderRunSchema(error);
+    return false;
+  }
+}
+
+/** Latest append-only attempt per model for the AI Lab's separate Single Runs evidence panel. */
+export async function getLatestHourlyProviderRunCaptures(locationKey: string) {
+  try {
+    const db = await getDb();
+    if (!db) return { available: false, results: [] };
+    const rows = await db.select({
+      id: hourlyForecastProviderRunCaptures.id,
+      modelName: hourlyForecastProviderRunCaptures.modelName,
+      modelId: hourlyForecastProviderRunCaptures.modelId,
+      status: hourlyForecastProviderRunCaptures.status,
+      reasonCode: hourlyForecastProviderRunCaptures.reasonCode,
+      leadBasis: hourlyForecastProviderRunCaptures.leadBasis,
+      metadataHttpStatus: hourlyForecastProviderRunCaptures.metadataHttpStatus,
+      metadataAvailableAt: hourlyForecastProviderRunCaptures.metadataAvailableAt,
+      providerRunAt: hourlyForecastProviderRunCaptures.providerRunAt,
+      requestStartedAt: hourlyForecastProviderRunCaptures.requestStartedAt,
+      availableAt: hourlyForecastProviderRunCaptures.availableAt,
+      responseStatus: hourlyForecastProviderRunCaptures.responseStatus,
+      collectionLatencyMilliseconds: hourlyForecastProviderRunCaptures.collectionLatencyMilliseconds,
+      valuesStored: hourlyForecastProviderRunCaptures.valuesStored,
+      minimumForecastLeadMilliseconds: hourlyForecastProviderRunCaptures.minimumForecastLeadMilliseconds,
+      maximumForecastLeadMilliseconds: hourlyForecastProviderRunCaptures.maximumForecastLeadMilliseconds,
+      capturedAt: hourlyForecastProviderRunCaptures.capturedAt,
+    }).from(hourlyForecastProviderRunCaptures)
+      .where(eq(hourlyForecastProviderRunCaptures.locationKey, locationKey))
+      .orderBy(desc(hourlyForecastProviderRunCaptures.id))
+      .limit(21);
+    const latestByModel = new Map<string, typeof rows[number]>();
+    for (const row of rows) if (!latestByModel.has(row.modelName)) latestByModel.set(row.modelName, row);
+    return { available: true, results: Array.from(latestByModel.values()).sort((left, right) => left.modelName.localeCompare(right.modelName)) };
+  } catch (error) {
+    warnProviderRunSchema(error);
+    return { available: false, results: [] };
+  }
+}
+
+/** Read immutable values for one Paris observation date, retaining exact run and receipt timestamps. */
+export async function getHourlyProviderRunValues(locationKey: string, targetDate: string) {
+  try {
+    const db = await getDb();
+    if (!db) return { available: false, values: [] };
+    const values = await db.select().from(hourlyForecastProviderRunValues).where(and(
+      eq(hourlyForecastProviderRunValues.locationKey, locationKey),
+      eq(hourlyForecastProviderRunValues.targetDate, targetDate),
+    ));
+    return { available: true, values };
+  } catch (error) {
+    warnProviderRunSchema(error);
+    return { available: false, values: [] };
+  }
+}
+
+/** Store immutable provider-run comparisons and refresh only their deterministic aggregate rows. */
+export async function persistHourlyProviderRunEvaluation(input: {
+  comparisons: InsertHourlyForecastProviderRunComparison[];
+  scores: InsertHourlyForecastProviderRunScore[];
+}): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  try {
+    await db.transaction(async (tx) => {
+      const comparisons = input.comparisons.filter((row) => Number.isSafeInteger(row.forecastRunValueId) && row.forecastRunValueId > 0
+        && Number.isSafeInteger(row.observationSnapshotId) && row.observationSnapshotId > 0);
+      for (let offset = 0; offset < comparisons.length; offset += 100) {
+        const batch = comparisons.slice(offset, offset + 100);
+        await tx.insert(hourlyForecastProviderRunComparisons).values(batch).onDuplicateKeyUpdate({
+          set: { forecastRunValueId: sql`${hourlyForecastProviderRunComparisons.forecastRunValueId}` },
+        });
+      }
+      for (const row of input.scores) {
+        await tx.insert(hourlyForecastProviderRunScores).values(row).onDuplicateKeyUpdate({
+          set: {
+            observationCount: row.observationCount,
+            evaluableObservationCount: row.evaluableObservationCount,
+            sampleSize: row.sampleSize,
+            coverageRatio: row.coverageRatio,
+            mae: row.mae,
+            rmse: row.rmse,
+            bias: row.bias,
+            computedAt: new Date(),
+          },
+        });
+      }
+    });
+    return true;
+  } catch (error) {
+    warnProviderRunSchema(error);
+    return false;
   }
 }
 

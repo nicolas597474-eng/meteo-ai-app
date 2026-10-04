@@ -21,6 +21,8 @@ import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows }
 import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable } from "./hourlyForecastRunScoring";
+import { evaluateProviderRunForecasts } from "./providerRunHorizon";
+import { collectProviderRunBatch } from "./providerRunCollection";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { runOptionalBackgroundTask } from "./optionalBackgroundTask";
 import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow";
@@ -74,6 +76,10 @@ import {
   persistHourlyForecastEvaluationScores,
   persistHourlyForecastExactComparisons,
   persistHourlyForecastExactEvaluationScores,
+  getLatestHourlyProviderRunCaptures,
+  persistHourlyProviderRunCaptureBatch,
+  getHourlyProviderRunValues,
+  persistHourlyProviderRunEvaluation,
   getStationEvidenceSummary,
 } from "./db";
 
@@ -740,6 +746,25 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             console.log(`[MeteoAI] ${locName}: ${dailyComparisons.length} comparaison(s) physique(s) ${comparisonsStored ? "archivée(s)" : "en attente de migration"}`);
           }
 
+          // Separate provider-run lead metrics; the existing availability-time/bucket evaluator below is untouched.
+          try {
+            const providerRunArchive = await getHourlyProviderRunValues(locKey, yesterday);
+            if (providerRunArchive.available && providerRunArchive.values.length > 0) {
+              const providerRunEvaluation = evaluateProviderRunForecasts(snapshots, providerRunArchive.values);
+              const providerRunComparisons = providerRunEvaluation.comparisons.filter(
+                (row): row is typeof row & { forecastRunValueId: number; observationSnapshotId: number } =>
+                  row.forecastRunValueId != null && row.observationSnapshotId != null,
+              );
+              const providerRunSaved = await persistHourlyProviderRunEvaluation({
+                comparisons: providerRunComparisons,
+                scores: providerRunEvaluation.scores,
+              });
+              console.log(`[ProviderRunScore] ${locName}: ${providerRunEvaluation.scores.length} score(s), ${providerRunEvaluation.comparisons.length} comparaison(s) ${providerRunSaved ? "archivée(s)" : "en attente de migration"}`);
+            }
+          } catch {
+            console.warn(`[ProviderRunScore] ${locName}: évaluation provider-run ignorée; scores de disponibilité historiques inchangés.`);
+          }
+
           const hourlyForecastRuns = await getHourlyForecastRunValues(locKey, yesterday);
           if (hourlyForecastRuns.length === 0) {
             locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune capture horaire vérifiable archivée; les anciennes séries mutables ne sont pas réutilisées`);
@@ -1364,6 +1389,29 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             }
           }
           hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
+        }
+        // Isolated research sidecar: exact Single Runs evidence never feeds live forecasts or coverage counters.
+        try {
+          const providerRunArchiveState = await getLatestHourlyProviderRunCaptures(locKey);
+          if (!providerRunArchiveState.available) {
+            console.warn(`[ProviderRun] ${fav.name}: tables provider-run absentes; aucune requête Single Runs émise.`);
+          } else {
+            const providerRunBatch = await collectProviderRunBatch({
+              targetDate: today,
+              locationKey: locKey,
+              latitude: fav.lat,
+              longitude: fav.lon,
+            });
+            const persistedProviderRuns = await persistHourlyProviderRunCaptureBatch(providerRunBatch.captures, providerRunBatch.values);
+            const capturedProviderModels = providerRunBatch.captures.filter((capture) => capture.status === "succeeded").length;
+            if (persistedProviderRuns) {
+              console.log(`[ProviderRun] ${fav.name}: ${capturedProviderModels}/${OFFICIAL_HOURLY_MODELS.length} captures Single Runs isolées`);
+            } else {
+              console.warn(`[ProviderRun] ${fav.name}: capture Single Runs non persistée; pipeline horaire inchangé.`);
+            }
+          }
+        } catch {
+          console.warn(`[ProviderRun] ${fav.name}: sidecar Single Runs indisponible; pipeline horaire inchangé.`);
         }
         if (hourlyCoverage.missing.length > 0) {
           errors.push(`${fav.name}: couverture horaire partielle — modèles manquants : ${hourlyCoverage.missing.join(", ")}.`);

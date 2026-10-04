@@ -699,6 +699,135 @@ export const hourlyForecastCollectionResults = mysqlTable("hourly_forecast_colle
 export type HourlyForecastCollectionResult = typeof hourlyForecastCollectionResults.$inferSelect;
 export type InsertHourlyForecastCollectionResult = typeof hourlyForecastCollectionResults.$inferInsert;
 
+/** Exact Single Runs requests and application receipt times; never used by live projections. */
+export const hourlyForecastProviderRunCaptures = mysqlTable("hourly_forecast_provider_run_captures", {
+  id: int("id").autoincrement().primaryKey(),
+  captureRunId: varchar("captureRunId", { length: 36 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  targetDate: varchar("targetDate", { length: 10 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }).notNull(),
+  leadBasis: varchar("leadBasis", { length: 32 }).notNull().default("provider_run"),
+  status: varchar("status", { length: 48 }).notNull(),
+  reasonCode: varchar("reasonCode", { length: 64 }),
+  metadataUrl: varchar("metadataUrl", { length: 512 }),
+  metadataHttpStatus: int("metadataHttpStatus"),
+  metadataAvailableAt: bigint("metadataAvailableAt", { mode: "number" }),
+  providerRunAt: bigint("providerRunAt", { mode: "number" }),
+  requestStartedAt: bigint("requestStartedAt", { mode: "number" }),
+  availableAt: bigint("availableAt", { mode: "number" }),
+  collectionLatencyMilliseconds: bigint("collectionLatencyMilliseconds", { mode: "number" }),
+  requestUrl: text("requestUrl"),
+  responseStatus: int("responseStatus"),
+  responsePayload: json("responsePayload"),
+  valuesStored: int("valuesStored").notNull().default(0),
+  minimumForecastLeadMilliseconds: bigint("minimumForecastLeadMilliseconds", { mode: "number" }),
+  maximumForecastLeadMilliseconds: bigint("maximumForecastLeadMilliseconds", { mode: "number" }),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("provider_run_capture_id_uq").on(table.captureRunId),
+  index("provider_run_capture_location_time_idx").on(table.locationKey, table.capturedAt),
+  index("provider_run_capture_model_time_idx").on(table.locationKey, table.modelName, table.capturedAt),
+]);
+export type HourlyForecastProviderRunCapture = typeof hourlyForecastProviderRunCaptures.$inferSelect;
+export type InsertHourlyForecastProviderRunCapture = typeof hourlyForecastProviderRunCaptures.$inferInsert;
+
+/** Immutable values from one exact Single Runs request; timestamps are not conflated. */
+export const hourlyForecastProviderRunValues = mysqlTable("hourly_forecast_provider_run_values", {
+  id: int("id").autoincrement().primaryKey(),
+  captureRunId: varchar("captureRunId", { length: 36 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  targetDate: varchar("targetDate", { length: 10 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }).notNull(),
+  leadBasis: varchar("leadBasis", { length: 32 }).notNull().default("provider_run"),
+  metadataAvailableAt: bigint("metadataAvailableAt", { mode: "number" }).notNull(),
+  providerRunAt: bigint("providerRunAt", { mode: "number" }).notNull(),
+  requestStartedAt: bigint("requestStartedAt", { mode: "number" }).notNull(),
+  availableAt: bigint("availableAt", { mode: "number" }).notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  forecastLeadTimeMilliseconds: bigint("forecastLeadTimeMilliseconds", { mode: "number" }).notNull(),
+  collectionLatencyMilliseconds: bigint("collectionLatencyMilliseconds", { mode: "number" }).notNull(),
+  variable: varchar("variable", { length: 32 }).notNull(),
+  value: float("value"),
+  unit: varchar("unit", { length: 32 }),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("provider_run_value_identity_uq").on(table.captureRunId, table.validTime, table.variable),
+  index("provider_run_value_location_target_idx").on(table.locationKey, table.targetDate),
+  index("provider_run_value_series_idx").on(table.locationKey, table.modelName, table.variable, table.validTime),
+]);
+export type HourlyForecastProviderRunValue = typeof hourlyForecastProviderRunValues.$inferSelect;
+export type InsertHourlyForecastProviderRunValue = typeof hourlyForecastProviderRunValues.$inferInsert;
+
+/** Immutable provider-run/physical-observation pairs with explicit issue lead and anti-leak receipt time. */
+export const hourlyForecastProviderRunComparisons = mysqlTable("hourly_forecast_provider_run_comparisons", {
+  id: int("id").autoincrement().primaryKey(),
+  forecastRunValueId: int("forecastRunValueId").notNull(),
+  observationSnapshotId: int("observationSnapshotId").notNull(),
+  captureRunId: varchar("captureRunId", { length: 36 }).notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }).notNull(),
+  leadBasis: varchar("leadBasis", { length: 32 }).notNull().default("provider_run"),
+  variable: varchar("variable", { length: 32 }).notNull(),
+  metadataAvailableAt: bigint("metadataAvailableAt", { mode: "number" }).notNull(),
+  providerRunAt: bigint("providerRunAt", { mode: "number" }).notNull(),
+  requestStartedAt: bigint("requestStartedAt", { mode: "number" }).notNull(),
+  availableAt: bigint("availableAt", { mode: "number" }).notNull(),
+  validTime: bigint("validTime", { mode: "number" }).notNull(),
+  forecastLeadTimeMilliseconds: bigint("forecastLeadTimeMilliseconds", { mode: "number" }).notNull(),
+  forecastLeadTimeMinutes: double("forecastLeadTimeMinutes").notNull(),
+  collectionLatencyMilliseconds: bigint("collectionLatencyMilliseconds", { mode: "number" }).notNull(),
+  forecastValue: float("forecastValue").notNull(),
+  forecastUnit: varchar("forecastUnit", { length: 32 }),
+  observedValue: float("observedValue").notNull(),
+  observedUnit: varchar("observedUnit", { length: 32 }).notNull(),
+  signedError: float("signedError").notNull(),
+  absoluteError: float("absoluteError").notNull(),
+  observationDate: varchar("observationDate", { length: 10 }).notNull(),
+  observationHour: int("observationHour").notNull(),
+  observationReferenceAt: bigint("observationReferenceAt", { mode: "number" }).notNull(),
+  observationCollectedAt: bigint("observationCollectedAt", { mode: "number" }),
+  stationCount: int("stationCount").notNull(),
+  confidenceScore: float("confidenceScore"),
+  stationsUsed: json("stationsUsed"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("provider_run_comparison_run_snapshot_uq").on(table.forecastRunValueId, table.observationSnapshotId),
+  index("provider_run_comparison_location_time_idx").on(table.locationKey, table.validTime),
+  index("provider_run_comparison_model_lead_idx").on(table.locationKey, table.modelName, table.variable, table.forecastLeadTimeMilliseconds, table.observationDate),
+]);
+export type HourlyForecastProviderRunComparison = typeof hourlyForecastProviderRunComparisons.$inferSelect;
+export type InsertHourlyForecastProviderRunComparison = typeof hourlyForecastProviderRunComparisons.$inferInsert;
+
+/** Daily exact provider-run lead metrics; kept separate from `availableAt` bucket scores. */
+export const hourlyForecastProviderRunScores = mysqlTable("hourly_forecast_provider_run_scores", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  modelName: varchar("modelName", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }).notNull(),
+  leadBasis: varchar("leadBasis", { length: 32 }).notNull().default("provider_run"),
+  variable: varchar("variable", { length: 32 }).notNull(),
+  forecastLeadTimeMilliseconds: bigint("forecastLeadTimeMilliseconds", { mode: "number" }).notNull(),
+  forecastLeadTimeMinutes: double("forecastLeadTimeMinutes").notNull(),
+  observationCount: int("observationCount").notNull().default(0),
+  evaluableObservationCount: int("evaluableObservationCount").notNull().default(0),
+  sampleSize: int("sampleSize").notNull().default(0),
+  coverageRatio: float("coverageRatio").notNull().default(0),
+  mae: float("mae"),
+  rmse: float("rmse"),
+  bias: float("bias"),
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("provider_run_score_day_model_variable_lead_uq").on(table.locationKey, table.date, table.modelName, table.modelId, table.leadBasis, table.variable, table.forecastLeadTimeMilliseconds),
+  index("provider_run_score_location_date_idx").on(table.locationKey, table.date),
+  index("provider_run_score_model_lead_date_idx").on(table.locationKey, table.modelName, table.variable, table.forecastLeadTimeMilliseconds, table.date),
+]);
+export type HourlyForecastProviderRunScore = typeof hourlyForecastProviderRunScores.$inferSelect;
+export type InsertHourlyForecastProviderRunScore = typeof hourlyForecastProviderRunScores.$inferInsert;
+
 /**
  * Lead-time scoring — per-model, per-location, per-horizon error metrics.
  * Populated during observation collection by comparing forecasts issued N days
