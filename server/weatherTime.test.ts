@@ -4,6 +4,8 @@ import {
   FORECAST_HEARTBEAT_UTC_HOURS,
   getNextParisForecastRun,
   getParisDate,
+  getParisDateDaysAgo,
+  getParisHourlyTimestamps,
   getParisForecastSlot,
   getParisHour,
   PARIS_FORECAST_RUN_HOURS,
@@ -24,6 +26,27 @@ describe("weatherTime — conventions Europe/Paris", () => {
     const instant = new Date("2026-07-01T22:15:00.000Z");
     expect(getParisDate(instant)).toBe("2026-07-02");
     expect(getParisHour(instant)).toBe(0);
+  });
+
+  it("soustrait des jours civils parisiens, et non des blocs de 24 heures autour du DST", () => {
+    expect(getParisDateDaysAgo(1, new Date("2026-03-29T22:30:00.000Z"))).toBe("2026-03-29");
+    expect(getParisDateDaysAgo(1, new Date("2026-10-25T22:30:00.000Z"))).toBe("2026-10-24");
+  });
+
+  it("construit la grille UTC exacte des journées locales courtes, normales et longues", () => {
+    const spring = getParisHourlyTimestamps("2026-03-29");
+    const ordinary = getParisHourlyTimestamps("2026-03-28");
+    const fall = getParisHourlyTimestamps("2026-10-25");
+
+    expect(spring).toHaveLength(23);
+    expect(spring.every((instant) => getParisDate(new Date(instant)) === "2026-03-29")).toBe(true);
+    expect(spring.map((instant) => getParisHour(new Date(instant)))).not.toContain(2);
+    expect(ordinary).toHaveLength(24);
+    expect(ordinary.every((instant) => getParisDate(new Date(instant)) === "2026-03-28")).toBe(true);
+    expect(fall).toHaveLength(25);
+    expect(fall.filter((instant) => getParisHour(new Date(instant)) === 2)).toHaveLength(2);
+    expect(new Set(fall).size).toBe(25);
+    expect(getParisHourlyTimestamps("2026-02-30")).toEqual([]);
   });
 
   it("définit les six heures parisiennes et l'expression UTC de garde", () => {

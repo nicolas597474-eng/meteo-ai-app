@@ -42,6 +42,9 @@ describe("HourlyChart", () => {
     expect(source).toContain("const drawPrecipLabel");
     expect(source).toContain("drawPrecipLabel(barTop - 5)");
     expect(source).toContain("drawPrecipLabel(precipZoneBot - 5)");
+    expect(source).toContain("if (p == null)");
+    expect(source).toContain('ctx.fillText("—", x, precipZoneBot - 5)');
+    expect(source).toContain("cloudCover != null && cloudCover < 30");
     expect(source).not.toContain("rounded-b-xl border border-blue-300/70");
     expect(source).not.toContain("ctx.strokeRect(x + 0.5, 0.5, COL_W - 1, CHART_H - 1)");
     expect(source).not.toContain("ctx.strokeRect(pt.x - labelWidth / 2 - 4");
@@ -72,6 +75,13 @@ describe("HourlyChart", () => {
     expect(source).not.toContain("key={h.hour}");
     expect(source).toContain("{N} h");
     expect(source).not.toContain(">24h⌄</span>");
+  });
+
+  it("distingue visuellement les deux 02:00 du retour DST quand leurs instants UTC diffèrent", () => {
+    expect(source).toContain("formatHourlyDisplay");
+    expect(source).toContain("displayPoints");
+    expect(source).toContain("displayLabel?.offsetLabel");
+    expect(source).toContain("displayLabel.offsetLabel.replace(\"Europe/Paris \", \"\")");
   });
 
   it("marque clairement le passage à demain dans les prévisions 48 h", () => {

@@ -14,50 +14,53 @@ import {
 // summer → few_clouds (temp>22 dry) or summer_heat (temp>32)
 // standard → showers, partly_cloudy, etc. based on conditions
 
+function detectCompleteRegime(input: Parameters<typeof detectWeatherRegime>[0]) {
+  return detectWeatherRegime({ humidity: 60, cloudCover: 40, visibilityKm: 10, ...input });
+}
+
 describe("detectWeatherRegime", () => {
   it("detects windy regime when wind > 50 km/h without heavy precip", () => {
-    const result = detectWeatherRegime({ precipitation: 2, windSpeed: 60, tempMax: 18, tempMin: 12 });
-    expect(result.regime).toBe("windy");
-    expect(result.weights.wind).toBe(0.45);
-    expect(result.weights.precip).toBe(0.15);
+    const result = detectCompleteRegime({ precipitation: 2, windSpeed: 60, tempMax: 18, tempMin: 12 });
+    expect(result?.regime).toBe("windy");
+    expect(result?.weights.wind).toBe(0.45);
+    expect(result?.weights.precip).toBe(0.15);
   });
 
   it("detects rainy regime when precipitation > 3 mm", () => {
-    const result = detectWeatherRegime({ precipitation: 8, windSpeed: 20, tempMax: 14, tempMin: 9 });
-    expect(result.regime).toBe("rainy");
-    expect(result.weights.precip).toBe(0.40);
-    expect(result.weights.temp).toBe(0.20);
+    const result = detectCompleteRegime({ precipitation: 8, windSpeed: 20, tempMax: 14, tempMin: 9 });
+    expect(result?.regime).toBe("rainy");
+    expect(result?.weights.precip).toBe(0.40);
+    expect(result?.weights.temp).toBe(0.20);
   });
 
   it("detects snow regime when avg temp < 5°C with some precip", () => {
-    const result = detectWeatherRegime({ precipitation: 0.5, windSpeed: 15, tempMax: 3, tempMin: -2 });
-    expect(result.regime).toBe("snow");
-    expect(result.weights.temp).toBe(0.40);
+    const result = detectCompleteRegime({ precipitation: 0.5, windSpeed: 15, tempMax: 3, tempMin: -2 });
+    expect(result?.regime).toBe("snow");
+    expect(result?.weights.temp).toBe(0.40);
   });
 
   it("detects few_clouds regime when hot, dry, calm", () => {
-    const result = detectWeatherRegime({ precipitation: 0, windSpeed: 10, tempMax: 30, tempMin: 18 });
-    expect(result.regime).toBe("few_clouds");
-    expect(result.weights.temp).toBe(0.30);
+    const result = detectCompleteRegime({ precipitation: 0, windSpeed: 10, tempMax: 30, tempMin: 18 });
+    expect(result?.regime).toBe("few_clouds");
+    expect(result?.weights.temp).toBe(0.30);
     // Conditions = nébulosité 0,30 + humidité 0,10 + pression 0,10.
-    expect(result.weights.condition).toBe(0.50);
+    expect(result?.weights.condition).toBe(0.50);
   });
 
   it("detects showers for mild conditions with light rain", () => {
-    const result = detectWeatherRegime({ precipitation: 1, windSpeed: 20, tempMax: 17, tempMin: 10 });
-    expect(result.regime).toBe("showers");
-    expect(result.weights.precip).toBeGreaterThan(0.2);
+    const result = detectCompleteRegime({ precipitation: 1, windSpeed: 20, tempMax: 17, tempMin: 10 });
+    expect(result?.regime).toBe("showers");
+    expect(result?.weights.precip).toBeGreaterThan(0.2);
   });
 
-  it("handles null values gracefully (returns a valid regime)", () => {
-    const result = detectWeatherRegime({ precipitation: null, windSpeed: null, tempMax: null, tempMin: null });
-    expect(typeof result.regime).toBe("string");
-    expect(result.regime.length).toBeGreaterThan(0);
+  it("returns unknown rather than filling missing values with defaults", () => {
+    const result = detectWeatherRegime({ precipitation: null, windSpeed: null, tempMax: null, tempMin: null, humidity: null, cloudCover: null, visibilityKm: null });
+    expect(result).toBeNull();
   });
 
   it("detects thunderstorm when wind > 40 and precip > 5", () => {
-    const result = detectWeatherRegime({ precipitation: 10, windSpeed: 55, tempMax: 12, tempMin: 8 });
-    expect(result.regime).toBe("thunderstorm");
+    const result = detectCompleteRegime({ precipitation: 10, windSpeed: 55, tempMax: 12, tempMin: 8 });
+    expect(result?.regime).toBe("thunderstorm");
   });
 });
 
@@ -158,9 +161,10 @@ describe("calculateReliabilityScore — dimensions", () => {
 
   it("weights sum to 1.0 across the four scored dimensions", () => {
     const forecasts = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
-    const observations = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20 }];
+    const observations = [{ tempMax: 25, tempMin: 15, precipitation: 5, windSpeed: 20, humidity: 60, cloudCover: 40, visibilityKm: 10 }];
     const result = calculateReliabilityScore(forecasts, observations);
-    const { temp, precip, wind, condition } = result.weights;
+    expect(result.weights).not.toBeNull();
+    const { temp, precip, wind, condition } = result.weights!;
     // Humidité et pression sont incluses dans la dimension « conditions » :
     // quatre dimensions scorées, dont la somme reste égale à 1.
     const total = temp + precip + wind + condition;
@@ -178,7 +182,7 @@ describe("calculateReliabilityScore — dimensions", () => {
 
   it("auto-detects regime from hot dry observations", () => {
     const forecasts = [{ tempMax: 30, tempMin: 18, precipitation: 0, windSpeed: 10 }];
-    const observations = [{ tempMax: 30, tempMin: 18, precipitation: 0, windSpeed: 10 }];
+    const observations = [{ tempMax: 30, tempMin: 18, precipitation: 0, windSpeed: 10, humidity: 60, cloudCover: 40, visibilityKm: 10 }];
     const result = calculateReliabilityScore(forecasts, observations);
     // With 20-regime system, 30°C dry → few_clouds
     expect(result.regime).toBe("few_clouds");
@@ -188,6 +192,9 @@ describe("calculateReliabilityScore — dimensions", () => {
   it("handles empty arrays gracefully", () => {
     const result = calculateReliabilityScore([], []);
     expect(result.weightedScore).toBeNull();
+    expect(result.regimeStatus).toBe("unknown");
+    expect(result.regime).toBeNull();
+    expect(result.weights).toBeNull();
     expect(result.dimensions.temperature.sampleSize).toBe(0);
     expect(result.dimensions.precipitation.sampleSize).toBe(0);
     expect(result.dimensions.temperature.score).toBeNull();
@@ -199,7 +206,8 @@ describe("calculateReliabilityScore — dimensions", () => {
   it("renormalise uniquement les dimensions réellement observées", () => {
     const result = calculateReliabilityScore(
       [{ tempMax: 22, tempMin: 12, precipitation: null, windSpeed: null, condition: null }],
-      [{ tempMax: 22, tempMin: 12, precipitation: null, windSpeed: null, condition: null }],
+      [{ tempMax: 22, tempMin: 12, precipitation: null, windSpeed: null, condition: null, humidity: 60, cloudCover: 40, visibilityKm: 10 }],
+      "few_clouds",
     );
 
     expect(result.dimensions.temperature.score).toBe(100);
@@ -266,9 +274,31 @@ describe("generateMeteoAIForecast", () => {
     expect(result.windSpeed).toBeCloseTo(10, 0);
   });
 
+  it("preserves a real zero reliability score instead of replacing it with the default", () => {
+    const result = generateMeteoAIForecast(
+      [
+        { tempMax: 40, tempMin: 30, precipitation: 5, windSpeed: 20 },
+        { tempMax: 20, tempMin: 10, precipitation: 0, windSpeed: 5 },
+      ],
+      ["zero", "trusted"],
+      { zero: 0, trusted: 100 },
+    );
+    expect(result.weights).toEqual({ zero: 0, trusted: 100 });
+    expect(result.tempMax).toBe(20);
+    expect(result.precipitation).toBe(0);
+  });
+
+  it("keeps missing forecast variables null rather than synthesizing zero", () => {
+    const result = generateMeteoAIForecast(
+      [{ tempMax: null, tempMin: null, precipitation: null, windSpeed: null }],
+      ["A"],
+      { A: 100 },
+    );
+    expect(result).toMatchObject({ tempMax: null, tempMin: null, precipitation: null, windSpeed: null });
+  });
+
   it("handles empty forecasts", () => {
     const result = generateMeteoAIForecast([], [], {});
-    expect(result.tempMax).toBe(0);
-    expect(result.tempMin).toBe(0);
+    expect(result).toMatchObject({ tempMax: null, tempMin: null, precipitation: null, windSpeed: null });
   });
 });

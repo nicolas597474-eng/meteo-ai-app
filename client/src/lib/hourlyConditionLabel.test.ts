@@ -9,9 +9,10 @@ describe("getHourlyConditionLabel", () => {
     expect(getHourlyConditionLabel(10, 0, "Ciel couvert")).toBe("Ciel couvert");
   });
 
-  it("derives a label from precipitation and cloud cover only when the source condition is absent", () => {
+  it("derives a label from known precipitation or cloud cover only", () => {
     expect(getHourlyConditionLabel(90, 0, null)).toBe("Ciel couvert");
     expect(getHourlyConditionLabel(20, 2, null)).toBe("Averses");
-    expect(getHourlyConditionLabel(null, null, null)).toBe("Ensoleillé");
+    expect(getHourlyConditionLabel(null, 0, null)).toBe("Nébulosité indisponible");
+    expect(getHourlyConditionLabel(null, null, null)).toBe("Conditions indisponibles");
   });
 });

@@ -15,6 +15,7 @@ import {
   getRecentCollectionJobs,
   getRecentScheduledForecastCollectionJobs,
   getLatestHourlyForecastCollectionResults,
+  getStoredHourlyForecasts,
   getHourlyForecastEvaluationHistory,
   getHourlyForecastRunValues,
   insertForecasts,
@@ -44,14 +45,15 @@ import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveSt
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, type ExtendedRegime, type MultiRegimeResult } from "../fusionEngine";
-import { getParisDate, getParisDateDaysAgo, getParisHour, getNextParisForecastRun } from "../weatherTime";
+import { getParisDate, getParisDateDaysAgo, getParisHour, getNextParisForecastRun, getParisHourlyTimestamps } from "../weatherTime";
+import { isCompleteStoredHourlyProjection } from "../hourlyForecastCompleteness";
 import { getActiveParisForecastHours, getFavoritesForecastCadence, getFavoritesForecastScheduleLabel, getRequiredFavoritesForecastHeartbeatCron } from "../forecastScheduleConfig";
 import { getForecastRunDisplayStatus } from "../forecastRunSummary";
 import { buildRecentPhysicalSnapshotSlots } from "../physicalSnapshotHistory";
 import { computeOfficialDailyForecast } from "../officialForecast";
 import { buildForecastRunArchiveRows } from "../dailyForecastPerformance";
 import { buildDailyForecastVerificationReadModel, buildMeteoAIDailyFusionArchiveRun } from "../dailyForecastVerification";
-import { MODEL_FORECAST_HORIZONS } from "../forecastVariableCoverage";
+import { HOURLY_FORECAST_VARIABLES, MODEL_FORECAST_HORIZONS } from "../forecastVariableCoverage";
 import { compareTraceWeights } from "../weightComparison";
 import { findActiveHourlyForecastIndex } from "../../shared/hourlyForecastTime";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
@@ -104,6 +106,7 @@ export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = get
     windSpeed: current.windSpeed ?? null,
     humidity: current.humidity ?? null,
     cloudCover: current.cloudCover ?? null,
+    visibilityKm: current.visibility ?? null,
     updatedAt,
   };
 }
@@ -276,14 +279,15 @@ export const weatherRouter = router({
       allServices: WEATHER_SERVICES.expert,
       totalServices: WEATHER_SERVICES.expert.length,
       dailyFallback,
-      regime: {
+      regime: officialRegime.primary ? {
         id: officialRegime.primary.id,
         label: officialRegime.primary.label,
         emoji: officialRegime.primary.emoji,
         description: officialRegime.description,
         weights: officialRegime.blendedWeights,
-      },
+      } : null,
       multiRegime: {
+        status: officialRegime.status,
         activeRegimes: officialRegime.active,
         confidenceScore: officialRegime.confidence,
         blendedWeights: officialRegime.blendedWeights,
@@ -417,14 +421,15 @@ export const weatherRouter = router({
       ...EXTENDED_REGIME_INFO[key],
     }));
 
-    // Compute current weather parameters for display
+    // Preserve missing source fields; displayed parameters remain null rather than synthetic values.
     const currentParams = {
-      temperature: regimeParams.temperature ?? 15,
-      precipitation: regimeParams.precipitation ?? 0,
-      windSpeed: regimeParams.windSpeed ?? 0,
-      humidity: regimeParams.humidity ?? 60,
-      cloudCover: regimeParams.cloudCover ?? 50,
-      pressure: regimeParams.pressure ?? 1013,
+      temperature: regimeParams.temperature,
+      precipitation: regimeParams.precipitation,
+      windSpeed: regimeParams.windSpeed,
+      humidity: regimeParams.humidity,
+      cloudCover: regimeParams.cloudCover,
+      visibilityKm: regimeParams.visibilityKm,
+      pressure: regimeParams.pressure,
     };
 
     // Determine impact level per parameter based on regime weights
@@ -435,47 +440,48 @@ export const weatherRouter = router({
       return "Faible";
     };
 
-    const paramImpacts = {
+    const paramImpacts = multiRegime.blendedWeights ? {
       temperature: getImpact(multiRegime.blendedWeights.temp),
       precipitation: getImpact(multiRegime.blendedWeights.precip),
       wind: getImpact(multiRegime.blendedWeights.wind),
       cloudCover: getImpact(multiRegime.blendedWeights.condition),
       humidity: getImpact(multiRegime.blendedWeights.humidity),
       pressure: getImpact(multiRegime.blendedWeights.pressure),
-    };
+    } : null;
 
     // Key factors of the moment (top 5 based on current conditions)
     const keyFactors: Array<{ label: string; icon: string }> = [];
-    if (currentParams.cloudCover > 70) keyFactors.push({ label: "Haute couverture nuageuse", icon: "☁️" });
-    if (currentParams.humidity > 75) keyFactors.push({ label: "Humidité élevée", icon: "💧" });
-    if (currentParams.pressure >= 1010 && currentParams.pressure <= 1020) keyFactors.push({ label: "Pression stable", icon: "🌀" });
-    if (currentParams.precipitation > 0.5) keyFactors.push({ label: "Averses possibles", icon: "🌧️" });
-    if (currentParams.windSpeed > 15 && currentParams.windSpeed <= 40) keyFactors.push({ label: `Vent modéré`, icon: "💨" });
-    if (currentParams.windSpeed > 40) keyFactors.push({ label: "Vent fort", icon: "🌬️" });
-    if (currentParams.temperature > 30) keyFactors.push({ label: "Forte chaleur", icon: "🌡️" });
-    if (currentParams.temperature < 5) keyFactors.push({ label: "Froid marqué", icon: "❄️" });
-    if (currentParams.cloudCover < 30) keyFactors.push({ label: "Ciel dégagé", icon: "☀️" });
-    if (currentParams.pressure < 1005) keyFactors.push({ label: "Dépression active", icon: "🌀" });
+    if (currentParams.cloudCover != null && currentParams.cloudCover > 70) keyFactors.push({ label: "Haute couverture nuageuse", icon: "☁️" });
+    if (currentParams.humidity != null && currentParams.humidity > 75) keyFactors.push({ label: "Humidité élevée", icon: "💧" });
+    if (currentParams.pressure != null && currentParams.pressure >= 1010 && currentParams.pressure <= 1020) keyFactors.push({ label: "Pression stable", icon: "🌀" });
+    if (currentParams.precipitation != null && currentParams.precipitation > 0.5) keyFactors.push({ label: "Averses possibles", icon: "🌧️" });
+    if (currentParams.windSpeed != null && currentParams.windSpeed > 15 && currentParams.windSpeed <= 40) keyFactors.push({ label: `Vent modéré`, icon: "💨" });
+    if (currentParams.windSpeed != null && currentParams.windSpeed > 40) keyFactors.push({ label: "Vent fort", icon: "🌬️" });
+    if (currentParams.temperature != null && currentParams.temperature > 30) keyFactors.push({ label: "Forte chaleur", icon: "🌡️" });
+    if (currentParams.temperature != null && currentParams.temperature < 5) keyFactors.push({ label: "Froid marqué", icon: "❄️" });
+    if (currentParams.cloudCover != null && currentParams.cloudCover < 30) keyFactors.push({ label: "Ciel dégagé", icon: "☀️" });
+    if (currentParams.pressure != null && currentParams.pressure < 1005) keyFactors.push({ label: "Dépression active", icon: "🌀" });
     // Keep top 5
     const topFactors = keyFactors.slice(0, 5);
 
     return {
       officialRegime,
       // Legacy single-regime field (kept for backward compat)
-      regime: {
+      regime: multiRegime.primaryRegime ? {
         id: multiRegime.primaryRegime.id,
         label: multiRegime.primaryRegime.label,
         emoji: multiRegime.primaryRegime.emoji,
         description: multiRegime.description,
-        weights: {
+        weights: multiRegime.blendedWeights ? {
           temp: multiRegime.blendedWeights.temp,
           precip: multiRegime.blendedWeights.precip,
           wind: multiRegime.blendedWeights.wind,
           condition: multiRegime.blendedWeights.condition,
-        },
-      },
+        } : null,
+      } : null,
       // New multi-regime data
       multiRegime: {
+        status: officialRegime.status,
         primaryRegime: multiRegime.primaryRegime,
         activeRegimes: multiRegime.activeRegimes,
         blendedWeights: multiRegime.blendedWeights,
@@ -677,7 +683,40 @@ export const weatherRouter = router({
         getPhysicalSnapshotCollectionTracesByDateRange(locationKey, getParisDateDaysAgo(1), getTodayParis()),
         getRecentScheduledForecastCollectionJobs(2),
       ]);
-      const latestHourlyModelCollection = await getLatestHourlyForecastCollectionResults(locationKey);
+      const [latestHourlyModelCollection, currentHourlyProjectionRows] = await Promise.all([
+        getLatestHourlyForecastCollectionResults(locationKey),
+        getStoredHourlyForecasts(locationKey, getParisDate()),
+      ]);
+      const projectionMeasuredAt = Date.now();
+      const expectedProjectionTimes = getParisHourlyTimestamps(getParisDate());
+      const requiredProjectionFields = HOURLY_FORECAST_VARIABLES
+        .filter((variable) => variable.consumerProjected)
+        .map((variable) => variable.valueField);
+      const projectionRowsByModel = new Map<string, typeof currentHourlyProjectionRows>();
+      for (const row of currentHourlyProjectionRows) {
+        const modelRows = projectionRowsByModel.get(row.modelName) ?? [];
+        modelRows.push(row);
+        projectionRowsByModel.set(row.modelName, modelRows);
+      }
+      const currentProjectionByModel = new Map<string, { rowCount: number; collectedAtMs: number; complete: boolean }>();
+      projectionRowsByModel.forEach((rows, modelName) => {
+        const collectedTimes = rows.map((row) => row.collectedAt instanceof Date ? row.collectedAt.getTime() : new Date(row.collectedAt as unknown as string).getTime()).filter(Number.isFinite);
+        if (collectedTimes.length === 0) return;
+        currentProjectionByModel.set(modelName, {
+          rowCount: rows.length,
+          collectedAtMs: Math.min(...collectedTimes),
+          complete: isCompleteStoredHourlyProjection({ rows, expectedValidTimes: expectedProjectionTimes, requiredValueFields: requiredProjectionFields }),
+        });
+      });
+      const getCurrentProjectionSummary = (modelName: string) => {
+        const projection = currentProjectionByModel.get(modelName);
+        return projection ? {
+          rowCount: projection.rowCount,
+          collectedAtMs: projection.collectedAtMs,
+          ageMs: Math.max(0, projectionMeasuredAt - projection.collectedAtMs),
+          complete: projection.complete,
+        } : null;
+      };
       const latestCollection = recentCollections[0] ?? null;
       const recentForecastRuns = recentJobs.map((job) => ({
         status: getForecastRunDisplayStatus(job),
@@ -764,7 +803,13 @@ export const weatherRouter = router({
           expectedValueCount: result.expectedValueCount,
           archiveRowsWritten: result.archiveRowsWritten,
           projectionRowsWritten: result.projectionRowsWritten,
-          variableCoverage: result.variableCoverage ?? null,
+          currentProjection: getCurrentProjectionSummary(result.modelName),
+          variableCoverage: (() => {
+            const currentProjection = getCurrentProjectionSummary(result.modelName);
+            return result.variableCoverage && typeof result.variableCoverage === "object"
+              ? { ...(result.variableCoverage as Record<string, unknown>), currentProjection }
+              : result.variableCoverage ?? null;
+          })(),
           maximumDocumentedDays: MODEL_FORECAST_HORIZONS[result.modelName]?.maximumDocumentedDays ?? null,
           horizonSourceUrl: MODEL_FORECAST_HORIZONS[result.modelName]?.sourceUrl ?? null,
           errorCode: result.errorCode,
@@ -893,7 +938,9 @@ export const weatherRouter = router({
         : null;
       const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt)));
       const activeForecast = hours[findActiveHourlyForecastIndex(hours, new Date(snapshot.computedAt).getTime())];
-      const nextRegimeChange = findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id, activeForecast?.validAt);
+      const nextRegimeChange = officialRegime.primary
+        ? findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id, activeForecast?.validAt)
+        : null;
 
       const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
 
@@ -1041,13 +1088,16 @@ export const weatherRouter = router({
             windSpeed: observation.windSpeed,
             tempMax: observation.tempMax,
             tempMin: observation.tempMin,
+            humidity: observation.humidity ?? null,
+            cloudCover: observation.cloudCover ?? null,
+            visibilityKm: null,
           });
 
           const scoreRows = dayForecasts.map((f) => {
             const score = calculateReliabilityScore(
               [{ tempMax: f.tempMax, tempMin: f.tempMin, precipitation: f.precipitation, windSpeed: f.windSpeed }],
-              [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed }],
-              regimeInfo.regime
+              [{ tempMax: observation.tempMax, tempMin: observation.tempMin, precipitation: observation.precipitation, windSpeed: observation.windSpeed, humidity: observation.humidity ?? null, cloudCover: observation.cloudCover ?? null, visibilityKm: null }],
+              regimeInfo?.regime ?? undefined
             );
             const d = score.dimensions;
             return {
@@ -1158,7 +1208,7 @@ export const weatherRouter = router({
     const officialSnapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
     const liveHours = officialSnapshot.hourly;
     const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours, getParisHour(), new Date(officialSnapshot.computedAt)));
-    const regime = operationalRegime.primary.id;
+    const regime = operationalRegime.primary?.id ?? null;
     const regimeDef = operationalRegime.primary;
     const weights = operationalRegime.blendedWeights;
 
@@ -1236,7 +1286,9 @@ export const weatherRouter = router({
       modelAgreement.tempMax.range == null
         ? `Dispersion Tmax indisponible : ${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} modèles nommés ont une valeur exploitable (au moins deux sont nécessaires pour une étendue).`
         : `L’étendue Tmax entre modèles nommés est de ${modelAgreement.tempMax.range.toFixed(1)} °C (${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} disponibles).`,
-      `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`,
+      regimeDef && weights
+        ? `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`
+        : "Régime indisponible : des champs météo requis sont absents ou invalides; aucune pondération de régime n’est affichée.",
       "La fiabilité historique reste une mesure distincte, disponible uniquement par modèle, variable et horizon lorsque les preuves qualifiées atteignent leurs seuils.",
     ].join(" ");
 
@@ -1247,7 +1299,7 @@ export const weatherRouter = router({
     // 9. Replay steps (7 étapes de la synthèse IA)
     const replaySteps = [
       { step: 1, title: "Collecte des flux", description: `${activeForecasts.length} flux collectés lors du dernier batch planifié via Open-Meteo API (${sourceComposition})`, icon: "📡" },
-      { step: 2, title: "Détection du régime", description: `Régime "${regimeDef.label}" détecté — poids contextuels appliqués`, icon: "🔍" },
+      { step: 2, title: "Détection du régime", description: regimeDef && weights ? `Régime "${regimeDef.label}" détecté — poids contextuels appliqués` : "Données requises absentes ou invalides — régime et poids non calculés", icon: "🔍" },
       { step: 3, title: "Mesures par variable", description: "Les étendues restent en unités physiques et chaque effectif est indiqué séparément.", icon: "📐" },
       { step: 4, title: "Pondération de fusion", description: "Les poids du régime sont des paramètres de calcul, pas une probabilité ni une note de fiabilité.", icon: "⚖️" },
       { step: 5, title: "Accord inter-modèles", description: modelAgreement.tempMax.range == null ? "Étendue Tmax indisponible : effectif inférieur à deux ou valeurs manquantes." : `Étendue Tmax : ${modelAgreement.tempMax.range.toFixed(1)} °C (${modelAgreement.tempMax.availableModelCount} modèles).`, icon: "📊" },
@@ -1273,10 +1325,11 @@ export const weatherRouter = router({
     return {
       date: today,
       regime,
-      regimeLabel: regimeDef.label,
-      regimeEmoji: regimeDef.emoji,
-      regimeDescription: regimeDef.description,
-      weights,
+      regimeStatus: operationalRegime.status,
+      regimeLabel: regimeDef?.label ?? null,
+      regimeEmoji: regimeDef?.emoji ?? null,
+      regimeDescription: regimeDef?.description ?? operationalRegime.description,
+      weights: weights ?? null,
       allRegimes: EXTENDED_REGIME_INFO,
       modelDetails,
       divergence,

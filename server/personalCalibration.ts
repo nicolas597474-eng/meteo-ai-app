@@ -2,7 +2,7 @@ export const PERSONAL_CONDITIONS = [
   "sunny", "few_clouds", "partly_cloudy", "very_cloudy", "overcast", "fog", "few_drops", "drizzle", "light_rain", "rain", "heavy_rain", "showers", "storm", "snow",
 ] as const;
 
-export type PersonalCondition = (typeof PERSONAL_CONDITIONS)[number];
+export type PersonalCondition = (typeof PERSONAL_CONDITIONS)[number] | "unknown";
 
 export const PERSONAL_CONDITION_LABELS: Record<PersonalCondition, string> = {
   sunny: "Ensoleillé",
@@ -19,6 +19,7 @@ export const PERSONAL_CONDITION_LABELS: Record<PersonalCondition, string> = {
   showers: "Averses",
   storm: "Orage",
   snow: "Neige",
+  unknown: "Conditions indisponibles",
 };
 
 type PersonalObservationInput = {
@@ -50,27 +51,36 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 const ema = (current: number | null, next: number | null) => next == null ? current : current == null ? next : EMA_ALPHA * next + (1 - EMA_ALPHA) * current;
 
 export function personalConditionFromForecast(weatherCode: number | null, cloudCover: number | null): PersonalCondition {
-  if (weatherCode === 0) return "sunny";
-  if (weatherCode === 1) return "few_clouds";
-  if (weatherCode === 2) return "partly_cloudy";
-  if (weatherCode === 3) return (cloudCover ?? 100) >= 90 ? "overcast" : "very_cloudy";
-  if (weatherCode != null && weatherCode <= 49) return "fog";
-  if (weatherCode === 51) return "few_drops";
-  if (weatherCode != null && weatherCode <= 55) return "drizzle";
-  if (weatherCode != null && weatherCode <= 59) return "light_rain";
-  if (weatherCode != null && weatherCode <= 63) return "rain";
-  if (weatherCode != null && weatherCode <= 69) return "heavy_rain";
-  if (weatherCode != null && weatherCode <= 79) return "snow";
-  if (weatherCode != null && weatherCode <= 84) return "showers";
-  if (weatherCode != null) return "storm";
-  if ((cloudCover ?? 0) > 80) return "overcast";
-  if ((cloudCover ?? 0) > 65) return "very_cloudy";
-  if ((cloudCover ?? 0) > 50) return "partly_cloudy";
-  if ((cloudCover ?? 0) > 20) return "few_clouds";
+  const code = typeof weatherCode === "number" && Number.isInteger(weatherCode) && weatherCode >= 0 && weatherCode <= 99
+    ? weatherCode
+    : null;
+  if (code === 0) return "sunny";
+  if (code === 1) return "few_clouds";
+  if (code === 2) return "partly_cloudy";
+  if (code === 3) {
+    return typeof cloudCover === "number" && Number.isFinite(cloudCover) && cloudCover < 90
+      ? "very_cloudy"
+      : "overcast";
+  }
+  if (code != null && code <= 49) return "fog";
+  if (code === 51) return "few_drops";
+  if (code != null && code <= 55) return "drizzle";
+  if (code != null && code <= 59) return "light_rain";
+  if (code != null && code <= 63) return "rain";
+  if (code != null && code <= 69) return "heavy_rain";
+  if (code != null && code <= 79) return "snow";
+  if (code != null && code <= 84) return "showers";
+  if (code != null) return "storm";
+  if (typeof cloudCover !== "number" || !Number.isFinite(cloudCover)) return "unknown";
+  if (cloudCover > 80) return "overcast";
+  if (cloudCover > 65) return "very_cloudy";
+  if (cloudCover > 50) return "partly_cloudy";
+  if (cloudCover > 20) return "few_clouds";
   return "sunny";
 }
 
-export function conditionAgreementScore(observed: PersonalCondition, forecast: PersonalCondition): number {
+export function conditionAgreementScore(observed: PersonalCondition, forecast: PersonalCondition): number | null {
+  if (observed === "unknown" || forecast === "unknown") return null;
   if (observed === forecast) return 100;
   const sky = ["sunny", "few_clouds", "partly_cloudy", "very_cloudy", "overcast"];
   const precipitation = ["few_drops", "drizzle", "light_rain", "rain", "heavy_rain", "showers", "storm"];
@@ -100,12 +110,19 @@ export function scorePersonalModelObservation(observation: PersonalObservationIn
     { weight: 0.08, score: windScore },
   ].filter((entry): entry is { weight: number; score: number } => entry.score != null);
   const totalWeight = dimensions.reduce((sum, entry) => sum + entry.weight, 0);
-  const overallScore = dimensions.reduce((sum, entry) => sum + entry.weight * entry.score, 0) / totalWeight;
+  const overallScore = totalWeight > 0
+    ? dimensions.reduce((sum, entry) => sum + entry.weight * entry.score, 0) / totalWeight
+    : null;
   return { temperatureError, temperatureScore, conditionScore, precipitationError, precipitationScore, windScore, overallScore, forecastCondition };
 }
 
 export function updatePersonalCalibration(prior: PriorCalibration | undefined, result: ReturnType<typeof scorePersonalModelObservation>) {
-  const comparisonCount = (prior?.comparisonCount ?? 0) + 1;
+  const hasComparableValue = result.overallScore != null
+    || result.temperatureError != null
+    || result.conditionScore != null
+    || result.precipitationError != null
+    || result.windScore != null;
+  const comparisonCount = (prior?.comparisonCount ?? 0) + (hasComparableValue ? 1 : 0);
   const scoreEma = ema(prior?.scoreEma ?? null, result.overallScore);
   const temperatureMaeEma = ema(prior?.temperatureMaeEma ?? null, result.temperatureError);
   const conditionScoreEma = ema(prior?.conditionScoreEma ?? null, result.conditionScore);

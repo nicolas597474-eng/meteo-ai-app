@@ -107,6 +107,66 @@ describe("hourly variable collection evidence", () => {
       .toMatchObject({ exposedCount: 2, consumerProjected: true });
   });
 
+  it("sépare la grille complète publiée des champs secondaires manquants dans l’archive", () => {
+    const expectedValidTimes = Array.from({ length: 24 }, (_, hour) => Date.parse(`2026-10-03T${String(hour).padStart(2, "0")}:00:00Z`));
+    const hours = expectedValidTimes.map((validAt) => ({
+      ...allHourlyValues,
+      rain: null,
+      showers: null,
+      validAt,
+    }));
+    const coverage = buildHourlyModelCollectionCoverage({
+      modelName: "AROME", modelId: "meteofrance_arome_france_hd", isOfficialModel: true,
+      status: "partial", requestAttempts: 1, errorCode: null, requestedForecastDays: 1,
+      expectedHoursCount: expectedValidTimes.length, expectedValidTimes, projectionReady: true,
+      hours, archiveRowsWritten: expectedValidTimes.length * HOURLY_FORECAST_VARIABLES.length,
+      projectionRowsWritten: expectedValidTimes.length,
+    });
+
+    expect(coverage).toMatchObject({
+      status: "partial", returnedHours: 24, expectedHoursCount: 24, missingHoursCount: 0,
+      projectionReady: true, archiveRowsComplete: true, projectionRowsWritten: 24,
+    });
+    expect(coverage.variables.find((variable) => variable.key === "temperature"))
+      .toMatchObject({ status: "available", requestedCount: 24, receivedCount: 24, exposedCount: 24 });
+    expect(coverage.variables.find((variable) => variable.key === "rain"))
+      .toMatchObject({ status: "missing", requestedCount: 24, receivedCount: 0, archivedCount: 24, exposedCount: 0 });
+  });
+
+  it("diagnostique par variable chaque créneau absent, nul, invalide ou reçu à un autre instant", () => {
+    const expectedValidTimes = [0, 1, 2, 3].map((hour) => Date.parse(`2026-10-03T${String(hour).padStart(2, "0")}:00:00Z`));
+    const coverage = buildHourlyModelCollectionCoverage({
+      modelName: "AROME", modelId: "meteofrance_arome_france_hd", isOfficialModel: true,
+      status: "partial", requestAttempts: 1, errorCode: null, requestedForecastDays: 1,
+      expectedHoursCount: expectedValidTimes.length, expectedValidTimes, projectionReady: false,
+      hours: [
+        { ...allHourlyValues, temperature: 0, validAt: expectedValidTimes[0] },
+        { ...allHourlyValues, temperature: null, validAt: expectedValidTimes[1] },
+        { ...allHourlyValues, temperature: Number.NaN, validAt: expectedValidTimes[3] },
+      ],
+      variableDiagnostics: [{
+        key: "temperature",
+        slots: [
+          { validAt: expectedValidTimes[0], status: "valid", rawType: "number", rawValue: null, rawUnit: "°C" },
+          { validAt: expectedValidTimes[1], status: "provider_null", rawType: "null", rawValue: null, rawUnit: "°C" },
+          { validAt: expectedValidTimes[2], status: "time_mismatch", rawType: null, rawValue: null, rawUnit: "°C" },
+          { validAt: expectedValidTimes[3], status: "invalid_value", rawType: "string", rawValue: "Infinity", rawUnit: "°C" },
+        ],
+      }],
+      archiveRowsWritten: 0, projectionRowsWritten: 0,
+    });
+    const temperature = coverage.variables.find((variable) => variable.key === "temperature")!;
+
+    expect(coverage).toMatchObject({ schemaVersion: 2, expectedHoursCount: 4, missingHoursCount: 1, projectionReady: false });
+    expect(temperature).toMatchObject({ status: "partial", receivedCount: 1, unit: "°C" });
+    expect(temperature.sourceStatusCounts).toMatchObject({ valid: 1, provider_null: 1, time_mismatch: 1, invalid_value: 1 });
+    expect(temperature.sourceIssues).toEqual([
+      { validAt: new Date(expectedValidTimes[1]).toISOString(), status: "provider_null", rawType: "null", rawValue: null, rawUnit: "°C" },
+      { validAt: new Date(expectedValidTimes[2]).toISOString(), status: "time_mismatch", rawType: null, rawValue: null, rawUnit: "°C" },
+      { validAt: new Date(expectedValidTimes[3]).toISOString(), status: "invalid_value", rawType: "string", rawValue: "Infinity", rawUnit: "°C" },
+    ]);
+  });
+
   it("keeps Best Match identifiable as a non-official reference", () => {
     const coverage = buildHourlyModelCollectionCoverage({
       modelName: "best_match", modelId: null, isOfficialModel: false,

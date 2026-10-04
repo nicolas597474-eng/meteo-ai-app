@@ -4,8 +4,9 @@ import { readFileSync } from "node:fs";
 describe("routeur des observations personnelles", () => {
   it("apparie une observation au même lieu et créneau avant de calibrer", () => {
     const source = readFileSync(new URL("./personalObservations.ts", import.meta.url), "utf8");
-    expect(source).toContain("getStoredHourlyForecasts(locationKey, getParisDate(now))");
-    expect(source).toContain("forecast.hour === getParisHour(now)");
+    expect(source).toContain("getHourlyForecastRunValues(locationKey, targetDate)");
+    expect(source).toContain("getLatestCompletePersonalHourlyForecasts(archivedValues, getParisHourlyTimestamps(targetDate))");
+    expect(source).toContain("forecast.validAt === observationValidAt");
     expect(source).toContain("minimumForWeighting: 50");
     expect(source).toContain("scorePersonalModelObservation(input, forecast)");
     expect(source).toContain("precipitation: z.number().min(0).max(500).nullable()");

@@ -93,14 +93,26 @@ export function detectWeatherRegime(params: {
   windSpeed: number | null;
   tempMax: number | null;
   tempMin: number | null;
-}): RegimeInfo {
+  humidity?: number | null;
+  cloudCover?: number | null;
+  visibilityKm?: number | null;
+}): RegimeInfo | null {
   // Delegate to the unified 20-regime system in fusionEngine
-  const avgTemp = ((params.tempMax ?? 15) + (params.tempMin ?? 5)) / 2;
+  const avgTemp = typeof params.tempMax === "number" && Number.isFinite(params.tempMax)
+    && typeof params.tempMin === "number" && Number.isFinite(params.tempMin)
+    ? (params.tempMax + params.tempMin) / 2
+    : null;
   const regime = detectExtendedRegime({
     temperature: avgTemp,
     precipitation: params.precipitation,
     windSpeed: params.windSpeed,
+    humidity: params.humidity,
+    cloudCover: params.cloudCover,
+    visibility: typeof params.visibilityKm === "number" && Number.isFinite(params.visibilityKm)
+      ? params.visibilityKm * 1000
+      : null,
   });
+  if (!regime) return null;
   const info = EXTENDED_REGIME_INFO[regime];
   const weights = toScoredWeights(getRegimeWeights(regime));
   return {
@@ -123,6 +135,7 @@ export type ForecastRow = {
   humidity?: number | null;
   pressure?: number | null;
   cloudCover?: number | null;
+  visibilityKm?: number | null;
   condition?: string | null;
 };
 
@@ -135,6 +148,7 @@ export type ObservationRow = {
   humidity?: number | null;
   pressure?: number | null;
   cloudCover?: number | null;
+  visibilityKm?: number | null;
   condition?: string | null;
 };
 
@@ -219,10 +233,11 @@ export type ScoreResult = {
   normalizedScore: number | null;
   // New dimension-level detail
   dimensions: DimensionScores;
-  regime: WeatherRegime;
-  regimeLabel: string;
-  regimeEmoji: string;
-  weights: RegimeWeights;
+  regimeStatus: "available" | "unknown";
+  regime: WeatherRegime | null;
+  regimeLabel: string | null;
+  regimeEmoji: string | null;
+  weights: RegimeWeights | null;
   laboratory: {
     wind: ScalarDimension;
     gusts: ScalarDimension;
@@ -574,8 +589,8 @@ export function calculateReliabilityScore(
     )
     : null;
 
-  // Detect regime from observations
-  let regimeInfo: RegimeInfo;
+  // Detect regime only from observed, complete and finite inputs.
+  let regimeInfo: RegimeInfo | null;
   if (forcedRegime) {
     const definition = REGIME_DEFINITIONS[forcedRegime];
     regimeInfo = {
@@ -591,25 +606,31 @@ export function calculateReliabilityScore(
     const obsWinds = observations.filter(o => o.windSpeed != null).map(o => o.windSpeed!);
     const obsTempMax = observations.filter(o => o.tempMax != null).map(o => o.tempMax!);
     const obsTempMin = observations.filter(o => o.tempMin != null).map(o => o.tempMin!);
+    const obsHumidity = observations.filter(o => o.humidity != null).map(o => o.humidity!);
+    const obsCloudCover = observations.filter(o => o.cloudCover != null).map(o => o.cloudCover!);
+    const obsVisibility = observations.filter(o => o.visibilityKm != null).map(o => o.visibilityKm!);
     regimeInfo = detectWeatherRegime({
       precipitation: obsPrecips.length > 0 ? mean(obsPrecips) : null,
       windSpeed: obsWinds.length > 0 ? mean(obsWinds) : null,
       tempMax: obsTempMax.length > 0 ? mean(obsTempMax) : null,
       tempMin: obsTempMin.length > 0 ? mean(obsTempMin) : null,
+      humidity: obsHumidity.length > 0 ? mean(obsHumidity) : null,
+      cloudCover: obsCloudCover.length > 0 ? mean(obsCloudCover) : null,
+      visibilityKm: obsVisibility.length > 0 ? mean(obsVisibility) : null,
     });
   }
 
-  const { weights } = regimeInfo;
+  const weights = regimeInfo?.weights ?? null;
 
   // Contextually-weighted final score
-  const measuredDimensions = [
+  const measuredDimensions = weights ? [
     { score: tempDim.score, weight: weights.temp },
     { score: precipDim.score, weight: weights.precip },
     { score: windDim.score, weight: weights.wind },
     { score: condDim.score, weight: weights.condition },
-  ].filter((dimension): dimension is { score: number; weight: number } => dimension.score !== null);
+  ].filter((dimension): dimension is { score: number; weight: number } => dimension.score !== null) : [];
   const measuredWeight = measuredDimensions.reduce((total, dimension) => total + dimension.weight, 0);
-  const weightedScore = measuredWeight > 0
+  const weightedScore = weights && measuredWeight > 0
     ? measuredDimensions.reduce((total, dimension) => total + dimension.score * (dimension.weight / measuredWeight), 0)
     : null;
 
@@ -635,9 +656,10 @@ export function calculateReliabilityScore(
       wind: windDim,
       condition: condDim,
     },
-    regime: regimeInfo.regime,
-    regimeLabel: regimeInfo.label,
-    regimeEmoji: regimeInfo.emoji,
+    regimeStatus: regimeInfo ? "available" : "unknown",
+    regime: regimeInfo?.regime ?? null,
+    regimeLabel: regimeInfo?.label ?? null,
+    regimeEmoji: regimeInfo?.emoji ?? null,
     weights,
     laboratory: {
       wind: laboratoryWind,
@@ -655,34 +677,39 @@ export function generateMeteoAIForecast(
   serviceNames: string[],
   reliabilityScores: Record<string, number>
 ): {
-  tempMax: number;
-  tempMin: number;
-  precipitation: number;
-  windSpeed: number;
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
   weights: Record<string, number>;
 } {
-  const totalScore = serviceNames.reduce((acc, name) => acc + (reliabilityScores[name] || 50), 0);
+  const reliabilityByModel = serviceNames.map((name) => {
+    const score = reliabilityScores[name];
+    return typeof score === "number" && Number.isFinite(score) && score >= 0 ? score : 50;
+  });
+  const totalScore = reliabilityByModel.reduce((acc, score) => acc + score, 0);
   const weights: Record<string, number> = {};
-  serviceNames.forEach(name => {
-    weights[name] = Math.round(((reliabilityScores[name] || 50) / totalScore) * 100);
+  serviceNames.forEach((name, index) => {
+    weights[name] = totalScore > 0 ? Math.round((reliabilityByModel[index] / totalScore) * 100) : 0;
   });
 
   let tempMaxSum = 0, tempMinSum = 0, precipSum = 0, windSum = 0;
   let tempMaxW = 0, tempMinW = 0, precipW = 0, windW = 0;
 
   forecasts.forEach((f, i) => {
-    const w = (reliabilityScores[serviceNames[i]] || 50) / totalScore;
-    if (f.tempMax != null) { tempMaxSum += f.tempMax * w; tempMaxW += w; }
-    if (f.tempMin != null) { tempMinSum += f.tempMin * w; tempMinW += w; }
-    if (f.precipitation != null) { precipSum += f.precipitation * w; precipW += w; }
-    if (f.windSpeed != null) { windSum += f.windSpeed * w; windW += w; }
+    const w = totalScore > 0 && reliabilityByModel[i] != null ? reliabilityByModel[i] / totalScore : 0;
+    if (w <= 0) return;
+    if (typeof f.tempMax === "number" && Number.isFinite(f.tempMax)) { tempMaxSum += f.tempMax * w; tempMaxW += w; }
+    if (typeof f.tempMin === "number" && Number.isFinite(f.tempMin)) { tempMinSum += f.tempMin * w; tempMinW += w; }
+    if (typeof f.precipitation === "number" && Number.isFinite(f.precipitation)) { precipSum += f.precipitation * w; precipW += w; }
+    if (typeof f.windSpeed === "number" && Number.isFinite(f.windSpeed)) { windSum += f.windSpeed * w; windW += w; }
   });
 
   return {
-    tempMax: Math.round((tempMaxW > 0 ? tempMaxSum / tempMaxW : 0) * 10) / 10,
-    tempMin: Math.round((tempMinW > 0 ? tempMinSum / tempMinW : 0) * 10) / 10,
-    precipitation: Math.round((precipW > 0 ? precipSum / precipW : 0) * 10) / 10,
-    windSpeed: Math.round((windW > 0 ? windSum / windW : 0) * 10) / 10,
+    tempMax: tempMaxW > 0 ? Math.round((tempMaxSum / tempMaxW) * 10) / 10 : null,
+    tempMin: tempMinW > 0 ? Math.round((tempMinSum / tempMinW) * 10) / 10 : null,
+    precipitation: precipW > 0 ? Math.round((precipSum / precipW) * 10) / 10 : null,
+    windSpeed: windW > 0 ? Math.round((windSum / windW) * 10) / 10 : null,
     weights,
   };
 }

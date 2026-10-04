@@ -70,6 +70,35 @@ describe("collectHourlyForecast auxiliaire", () => {
     expect(hours[0]?.multiModelMetrics).toBeUndefined();
   });
 
+  it("ne convertit pas des quantités de précipitation null en zéros lors du calcul d’intensité", async () => {
+    mockedFetchWeather.mockResolvedValue(response({
+      hourly: {
+        time: [
+          Date.parse("2026-10-01T01:00:00.000Z") / 1000,
+          Date.parse("2026-10-01T02:00:00.000Z") / 1000,
+          Date.parse("2026-10-01T03:00:00.000Z") / 1000,
+        ],
+        temperature_2m: [10, 10, 10],
+        precipitation: [null, 1, 0],
+        snowfall: [null, null, 0],
+        weather_code: [61, 61, 0],
+      },
+    }));
+
+    const hours = await collectHourlyForecast(
+      "2026-10-01",
+      { lat: 50.7567, lon: 2.5204 },
+      1,
+      { now: Date.parse("2026-10-01T00:00:00.000Z") },
+    );
+
+    expect(hours.map(({ precipitation, precipType, precipIntensity }) => [precipitation, precipType, precipIntensity])).toEqual([
+      [null, null, null],
+      [1, "rain", null],
+      [0, null, null],
+    ]);
+  });
+
   it("retourne le snapshot current avec une provenance modèle explicite", async () => {
     mockedFetchWeather.mockResolvedValue(response({
       current: {

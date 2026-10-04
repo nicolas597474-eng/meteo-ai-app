@@ -117,7 +117,11 @@ const precipitationAgreement: HourlyPrecipitationAgreementTrace = {
 };
 
 const points = [
-  { date: "2026-10-04", hour: "14:00", validAt: firstValidAt, weighting, precipitationAgreement },
+  { date: "2026-10-04", hour: "14:00", validAt: firstValidAt, finalValues: [
+    { variable: "temperature", value: 0, unit: "°C" },
+    { variable: "precipitation", value: 0, unit: "mm" },
+    { variable: "wind_gust", value: null, unit: "km/h" },
+  ], weighting, precipitationAgreement },
   { date: "2026-10-04", hour: "15:00", validAt: secondValidAt, weighting: null, precipitationAgreement: null },
 ];
 
@@ -141,6 +145,11 @@ describe("HourlyFusionDebugPanel", () => {
     expect(html).toContain("2_6h");
     expect(html).toContain("UKMET");
     expect(html).toContain("Aucun run exact valide pour cette échéance.");
+    expect(html).toContain("Valeurs finales de la fusion");
+    expect(html).toContain("0 °C");
+    expect(html).toContain("0 mm");
+    expect(html).toContain("Rafales");
+    expect(html).toContain("indisponible");
     expect(html).toMatch(/accord brut 80\s?%/i);
     expect(html).toContain("probabilité calibrée : non");
     expect(html).not.toContain("Probabilité de pluie : 80 %");

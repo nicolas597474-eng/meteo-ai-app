@@ -40,6 +40,7 @@ export async function rebuildPersonalCalibration(userId: number, locationKey: st
         windSpeed: observation.windSpeed,
         precipitation: observation.precipitation,
       }, snapshot);
+      if (result.overallScore == null) continue;
       const updated = updatePersonalCalibration(calibrationByModel.get(storedScore.modelName), result);
       calibrationByModel.set(storedScore.modelName, updated);
       rebuiltScores.push({

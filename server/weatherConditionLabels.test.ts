@@ -13,6 +13,13 @@ describe("conditionFromWeatherValues", () => {
     expect(conditionFromWeatherValues(2, 36)).toBe("Averses");
   });
 
+  it("ne transforme pas des variables absentes ou invalides en ciel ensoleillé", () => {
+    expect(conditionFromWeatherValues(null, null)).toBe("Conditions indisponibles");
+    expect(conditionFromWeatherValues(0, null)).toBe("Nébulosité indisponible");
+    expect(conditionFromWeatherValues(Number.NaN, Number.POSITIVE_INFINITY)).toBe("Conditions indisponibles");
+    expect(conditionFromWmoWeatherCode(null, null, null)).toBe("Conditions indisponibles");
+  });
+
   it("privilégie le code WMO de la source lorsqu’il décrit le temps présent", () => {
     expect(conditionFromWmoWeatherCode(0, 0, 100)).toBe("Ensoleillé");
     expect(conditionFromWmoWeatherCode(2, 0, 100)).toBe("Partiellement nuageux");

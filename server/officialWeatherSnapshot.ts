@@ -76,6 +76,45 @@ const snapshotCache = new Map<string, CacheEntry>();
 const manualHourlyForecastCache = new Map<string, ManualHourlyForecast>();
 const SNAPSHOT_TTL_MS = 2 * 60_000;
 const EMPTY_HOURLY_SNAPSHOT_TTL_MS = 12_000;
+const HOURLY_NUMERIC_COVERAGE_FIELDS = [
+  "temp", "apparentTemp", "precipitation", "windSpeed", "windGust", "windDirection",
+  "cloudCover", "humidity", "uvIndex", "weatherCode", "pressure", "dewPoint", "visibility",
+  "solarRadiation", "cloudLow", "cloudMid", "cloudHigh",
+] as const;
+
+function hasHourlyValue(point: HourlyPoint): boolean {
+  return HOURLY_NUMERIC_COVERAGE_FIELDS.some((field) => typeof point[field] === "number" && Number.isFinite(point[field]))
+    || [point.condition, point.precipType, point.precipIntensity].some((value) => typeof value === "string" && value.trim() !== "");
+}
+
+/** A manual cache may update values, but must not erase a known exact-time field. */
+export function isHourlyCoverageNonDecreasing(previous: readonly HourlyPoint[], next: readonly HourlyPoint[]): boolean {
+  if (next.length === 0) return previous.length === 0;
+  if (previous.length === 0) return next.some(hasHourlyValue);
+
+  const nextByValidAt = new Map<number, HourlyPoint>();
+  for (const point of next) {
+    if (typeof point.validAt !== "number" || !Number.isFinite(point.validAt) || nextByValidAt.has(point.validAt)) return false;
+    nextByValidAt.set(point.validAt, point);
+  }
+  for (const point of previous) {
+    if (!hasHourlyValue(point)) continue;
+    if (typeof point.validAt !== "number" || !Number.isFinite(point.validAt)) return false;
+    const replacement = nextByValidAt.get(point.validAt);
+    if (!replacement) return false;
+    for (const field of HOURLY_NUMERIC_COVERAGE_FIELDS) {
+      const previousValue = point[field];
+      if (typeof previousValue === "number" && Number.isFinite(previousValue)
+        && !(typeof replacement[field] === "number" && Number.isFinite(replacement[field]))) return false;
+    }
+    for (const field of ["condition", "precipType", "precipIntensity"] as const) {
+      const previousValue = point[field];
+      if (typeof previousValue === "string" && previousValue.trim() !== ""
+        && !(typeof replacement[field] === "string" && replacement[field]!.trim() !== "")) return false;
+    }
+  }
+  return true;
+}
 
 export function getOfficialSnapshotTtlMs(hourly: HourlyPoint[]): number {
   return hourly.length > 0 ? SNAPSHOT_TTL_MS : EMPTY_HOURLY_SNAPSHOT_TTL_MS;
@@ -137,6 +176,8 @@ export function mergeManualHourlyForecast(
   weighting?: OfficialHourlyWeightingSummary,
   reason = "Relance manuelle explicite du moteur horaire officiel multi-modèles.",
 ): OfficialWeatherSnapshot {
+  const currentHours = keepCurrentAndFutureHourlyForecasts(hours, computedAt.getTime());
+  if (!isHourlyCoverageNonDecreasing(snapshot.hourly, currentHours)) return snapshot;
   const officialHourlyOriginal = snapshot.hourlyOverride
     ? snapshot.officialHourlyOriginal ?? snapshot.hourly
     : snapshot.hourly;
@@ -150,7 +191,7 @@ export function mergeManualHourlyForecast(
   };
   return {
     ...snapshot,
-    hourly: keepCurrentAndFutureHourlyForecasts(hours, computedAt.getTime()),
+    hourly: currentHours,
     hourlyWeighting: { ...(weighting ?? snapshot.hourlyWeighting), manualOverride },
     hourlyOverride: manualOverride,
     officialHourlyOriginal,
@@ -195,6 +236,7 @@ export function cacheManualHourlyForecast(
   weighting?: OfficialHourlyWeightingSummary,
   reason = "Relance manuelle explicite du moteur horaire officiel multi-modèles.",
 ): void {
+  if (hours.length === 0 || hours.some((hour) => typeof hour.validAt !== "number" || !Number.isFinite(hour.validAt))) return;
   const cacheLocationKey = preciseCacheLocationKey(coords);
   const manualKey = manualForecastCacheKey(cacheLocationKey, weatherDate);
   const expiresAt = Date.now() + getOfficialSnapshotTtlMs(hours);

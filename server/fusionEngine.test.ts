@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFusion, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
+import { computeFusion, detectExtendedRegime, detectMultiRegime, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
 import { MODEL_FUSION_WEIGHT_CAP, normalizeModelWeightsWithCap, regularizeModelPerformance, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 function station(
@@ -292,5 +292,28 @@ describe("computeFusion — preuve statistique quotidienne exacte", () => {
     expect(rejected.performanceEvidenceStatus).toBe("insufficient");
     expect(rejected.temperature).toBeNull();
     expect(rejected.excludedSources).toHaveLength(3);
+  });
+});
+
+describe("détection de régime sans valeurs météorologiques inventées", () => {
+  const complete = {
+    temperature: 0,
+    precipitation: 0,
+    windSpeed: 0,
+    humidity: 0,
+    visibility: 10_000,
+    cloudCover: 0,
+  };
+
+  it("conserve les zéros valides mais retourne null pour tout champ absent ou non fini", () => {
+    expect(detectMultiRegime(complete)).not.toBeNull();
+    expect(detectExtendedRegime(complete)).toBe("sunny");
+
+    for (const field of Object.keys(complete) as Array<keyof typeof complete>) {
+      expect(detectMultiRegime({ ...complete, [field]: null })).toBeNull();
+      expect(detectMultiRegime({ ...complete, [field]: Number.NaN })).toBeNull();
+      expect(detectExtendedRegime({ ...complete, [field]: null })).toBeNull();
+      expect(detectExtendedRegime({ ...complete, [field]: Number.POSITIVE_INFINITY })).toBeNull();
+    }
   });
 });

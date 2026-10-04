@@ -70,8 +70,31 @@ export function getParisForecastSlot(date = new Date(), runHours: readonly numbe
   };
 }
 
+/** Décale une date civile Europe/Paris sans interpréter le jour comme 24 heures. */
+export function shiftParisCivilDate(date: string, days: number): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(days)) return null;
+  const shifted = new Date(`${date}T00:00:00.000Z`);
+  if (!Number.isFinite(shifted.getTime()) || shifted.toISOString().slice(0, 10) !== date) return null;
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().slice(0, 10);
+}
+
+/** Retourne les instants horaires UTC appartenant à une journée civile Europe/Paris. */
+export function getParisHourlyTimestamps(date: string): number[] {
+  const utcMidnight = Date.parse(`${date}T00:00:00.000Z`);
+  if (!Number.isFinite(utcMidnight) || shiftParisCivilDate(date, 0) !== date) return [];
+
+  const hourMs = 60 * 60 * 1000;
+  const timestamps: number[] = [];
+  for (let validAt = utcMidnight - 4 * hourMs; validAt < utcMidnight + 28 * hourMs; validAt += hourMs) {
+    if (getParisDate(new Date(validAt)) === date) timestamps.push(validAt);
+  }
+  return timestamps;
+}
+
 export function getParisDateDaysAgo(daysAgo: number, now = new Date()): string {
-  return getParisDate(new Date(now.getTime() - daysAgo * 86_400_000));
+  const today = getParisDate(now);
+  return shiftParisCivilDate(today, -Math.trunc(daysAgo)) ?? today;
 }
 
 function parisWallClockToUtc(date: string, hour: number): Date {
@@ -98,8 +121,7 @@ function parisWallClockToUtc(date: string, hour: number): Date {
 }
 
 function nextParisDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  return getParisDate(new Date(Date.UTC(year, month - 1, day + 1, 12, 0, 0)));
+  return shiftParisCivilDate(date, 1) ?? date;
 }
 
 /** Retourne le prochain créneau de prévision dans le fuseau métier Europe/Paris. */

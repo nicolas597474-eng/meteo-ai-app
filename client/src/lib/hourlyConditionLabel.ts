@@ -13,5 +13,5 @@ export function getHourlyConditionLabel(
   if (cloudCover != null || precipitation != null) {
     return conditionFromWeatherValues(precipitation, cloudCover);
   }
-  return "Ensoleillé";
+  return "Conditions indisponibles";
 }

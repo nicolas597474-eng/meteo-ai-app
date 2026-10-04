@@ -17,6 +17,22 @@ describe("hourly forecast persistence confirmations", () => {
     });
   });
 
+  it("archive un lot incomplet sans appeler le writer qui remplace la projection existante", async () => {
+    const archiveRows = vi.fn(async (confirm: (count: number) => void) => {
+      confirm(48 * 20);
+    });
+    const projectionRows = vi.fn(async (confirm: (count: number) => void) => {
+      confirm(24);
+    });
+
+    await expect(withHourlyForecastPersistenceStages(archiveRows, projectionRows, { skipProjection: true })).resolves.toEqual({
+      archiveRowsWritten: 960,
+      projectionRowsWritten: 0,
+    });
+    expect(archiveRows).toHaveBeenCalledOnce();
+    expect(projectionRows).not.toHaveBeenCalled();
+  });
+
   it("does not count uncommitted archive rows or update the projection after archive failure", async () => {
     const projectionRows = vi.fn();
     const error = await withHourlyForecastPersistenceStages(async () => {
@@ -56,7 +72,7 @@ describe("hourly forecast persistence confirmations", () => {
     const schema = readFileSync(new URL("../drizzle/schema.ts", import.meta.url), "utf8");
     const db = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
     const projectionStart = db.indexOf("}, async (confirmCommittedRows) => {");
-    const projectionEnd = db.indexOf("\n  });\n}", projectionStart);
+    const projectionEnd = db.indexOf("\n  }, { skipProjection: options.refreshProjection === false });\n}", projectionStart);
     const projectionWriter = db.slice(projectionStart, projectionEnd);
     expect(schema).toContain('uniqueIndex("hourly_collection_attempt_source_unique").on(table.batchAttemptId, table.locationKey, table.modelName)');
     expect(db).toContain("onDuplicateKeyUpdate({");

@@ -2,8 +2,13 @@
  * Catégorisation française unique du ciel. Les seuils sont identiques au moteur
  * de régimes : >80 couvert, >50 partiellement nuageux, >20 peu nuageux.
  */
+function finiteValue(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 export function cloudCoverLabel(cloudCover: number | null | undefined): string {
-  const cloudValue = cloudCover ?? 0;
+  const cloudValue = finiteValue(cloudCover);
+  if (cloudValue == null) return "Nébulosité indisponible";
   if (cloudValue > 80) return "Ciel couvert";
   if (cloudValue > 50) return "Partiellement nuageux";
   if (cloudValue > 20) return "Peu nuageux";
@@ -11,11 +16,16 @@ export function cloudCoverLabel(cloudCover: number | null | undefined): string {
 }
 
 export function conditionFromWeatherValues(precipitation: number | null | undefined, cloudCover: number | null | undefined): string {
-  const precipitationValue = precipitation ?? 0;
-  if (precipitationValue > 5) return "Pluie forte";
-  if (precipitationValue > 1) return "Averses";
-  if (precipitationValue > 0.2) return "Pluie légère";
-  return cloudCoverLabel(cloudCover);
+  const precipitationValue = finiteValue(precipitation);
+  if (precipitationValue != null && precipitationValue > 5) return "Pluie forte";
+  if (precipitationValue != null && precipitationValue > 1) return "Averses";
+  if (precipitationValue != null && precipitationValue > 0.2) return "Pluie légère";
+
+  const cloudCoverValue = finiteValue(cloudCover);
+  if (cloudCoverValue == null) {
+    return precipitationValue == null ? "Conditions indisponibles" : "Nébulosité indisponible";
+  }
+  return cloudCoverLabel(cloudCoverValue);
 }
 
 /** Traduit le code météo WMO de la source en condition française affichable. */

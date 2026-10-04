@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getParisDate } from "./weatherTime";
+import { getParisHourlyTimestamps } from "./weatherTime";
+import { isCompleteHourlyForecastBatch, isCompleteStoredHourlyProjection } from "./hourlyForecastCompleteness";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { legacyStabilityLabelForStorage } from "./legacyStabilityStorage";
 import { collectExpertForecastsWithDiagnostics } from "./weatherServices";
@@ -10,6 +12,7 @@ import { getParisDateAndHour } from "./parisHourlyTime";
 import { cacheManualHourlyForecast } from "./officialWeatherSnapshot";
 import { acquireForecastRefreshLock, getDailyFusionPerformanceEvidence, getMeteoAIForecastByDate, getStoredHourlyForecasts, insertForecastRuns, insertMeteoAIDailyFusionRun, insertForecasts, insertHourlyForecasts, makeLocationKey, releaseForecastRefreshLock, upsertLocationForecast, upsertMeteoAIForecast } from "./db";
 import { getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
+import { HOURLY_FORECAST_VARIABLES } from "./forecastVariableCoverage";
 
 type ManualFusionFavorite = {
   id: number;
@@ -29,6 +32,8 @@ type GranularityResult = {
   expectedModelCount: number;
   updatedAt: string | null;
   error?: string;
+  projectionRetainedModelCount?: number;
+  retainedProjectionAgeMs?: number | null;
 };
 
 type ManualRefreshResult = {
@@ -198,11 +203,21 @@ async function refreshDailyForecast(favorite: ManualFusionFavorite, today: strin
   }
 }
 
-function toHourlyRows(locationKey: string, date: string, modelName: string, hours: Array<Record<string, any>>, collectedAt: Date) {
+function toHourlyRows(
+  locationKey: string,
+  date: string,
+  modelName: string,
+  hours: Array<Record<string, any>>,
+  collectedAt: Date,
+  captureRun: { captureRunId: string; sourceName: string; modelId: string | null; requestStartedAt: number; availableAt: number; units?: Record<string, string | null | undefined> },
+) {
   return hours.map((hour) => ({
     locationKey,
     date,
     hour: Number(hour.hour),
+    validTime: Number(hour.validAt),
+    captureRun,
+    archiveValues: hour,
     modelName,
     temperature: hour.temperature ?? null,
     apparentTemperature: hour.apparentTemperature ?? null,
@@ -225,25 +240,66 @@ async function refreshHourlyForecast(favorite: ManualFusionFavorite, today: stri
     const officialHourly = await collectOfficialHourlyForecast(today, coords);
     const hourlyModels = officialHourly.modelForecasts;
     const collectedAt = new Date();
+    const expectedValidTimes = getParisHourlyTimestamps(today);
+    const requiredProjectionFields = HOURLY_FORECAST_VARIABLES
+      .filter((variable) => variable.consumerProjected)
+      .map((variable) => variable.valueField);
     const candidates = hourlyModels
       .filter((model) => (OFFICIAL_HOURLY_MODEL_NAMES as readonly string[]).includes(model.modelName))
-      .map((model) => ({
-        modelName: model.modelName,
-        rows: toHourlyRows(locationKey, today, model.modelName, model.hours.filter((hour) => {
-          if (hour.validAt == null) return true;
-          return getParisDateAndHour(hour.validAt)?.date === today;
-        }), collectedAt),
-      }))
+      .map((model) => {
+        const modelHours = model.hours.filter((hour) => hour.validAt != null && getParisDateAndHour(hour.validAt)?.date === today);
+        const captureRun = {
+          captureRunId: model.captureRunId ?? randomUUID(),
+          sourceName: model.sourceName ?? "open-meteo",
+          modelId: model.modelId ?? null,
+          requestStartedAt: model.requestStartedAt ?? collectedAt.getTime(),
+          availableAt: model.availableAt ?? collectedAt.getTime(),
+          units: model.sourceMetadata?.units ?? {},
+        };
+        return {
+          modelName: model.modelName,
+          projectionReady: isCompleteHourlyForecastBatch({
+            rows: modelHours,
+            expectedValidTimes,
+            requiredValueFields: requiredProjectionFields,
+          }),
+          rows: toHourlyRows(locationKey, today, model.modelName, modelHours as Array<Record<string, any>>, collectedAt, captureRun),
+        };
+      })
       .filter((candidate) => candidate.rows.length > 0);
 
     if (candidates.length === 0) {
-      return granularityResult(0, expectedModelCount, null, "Aucun modèle horaire n’a renvoyé de prévision exploitable.");
+      const storedRows = await getStoredHourlyForecasts(locationKey, today);
+      const projectionPreserved = new Set<string>(OFFICIAL_HOURLY_MODEL_NAMES.filter((modelName) => isCompleteStoredHourlyProjection({
+        rows: storedRows.filter((row) => row.modelName === modelName),
+        expectedValidTimes,
+        requiredValueFields: requiredProjectionFields,
+      })));
+      const result = granularityResult(
+        0,
+        expectedModelCount,
+        null,
+        projectionPreserved.size > 0
+          ? "Aucun modèle horaire n’a renvoyé de prévision exploitable; les projections précédentes existantes restent disponibles."
+          : "Aucun modèle horaire n’a renvoyé de prévision exploitable et aucune projection précédente n’existe.",
+      );
+      if (projectionPreserved.size > 0) {
+        result.projectionRetainedModelCount = projectionPreserved.size;
+        const preservedRows = storedRows.filter((row) => projectionPreserved.has(row.modelName));
+        const measuredTimes = preservedRows.map((row) => timestampValue(row.collectedAt)).filter((time): time is number => time != null);
+        result.retainedProjectionAgeMs = measuredTimes.length > 0 ? Math.max(0, Date.now() - Math.min(...measuredTimes)) : null;
+      }
+      return result;
     }
 
     const writeFailures: string[] = [];
+    const incompleteAttemptsArchived = new Set<string>();
     for (const candidate of candidates) {
       try {
-        await insertHourlyForecasts(candidate.rows);
+        await insertHourlyForecasts(candidate.rows, { refreshProjection: candidate.projectionReady });
+        if (!candidate.projectionReady) {
+          incompleteAttemptsArchived.add(candidate.modelName);
+        }
       } catch (error) {
         console.warn(`[ManualFusion] Hourly write failed for ${candidate.modelName}:`, error);
         writeFailures.push(candidate.modelName);
@@ -253,11 +309,20 @@ async function refreshHourlyForecast(favorite: ManualFusionFavorite, today: stri
     const storedRows = await getStoredHourlyForecasts(locationKey, today);
     const persistedModels = new Set<string>();
     for (const candidate of candidates) {
+      if (!candidate.projectionReady || writeFailures.includes(candidate.modelName)) continue;
       const modelRows = storedRows.filter((row) => row.modelName === candidate.modelName) as Array<Record<string, unknown>>;
       if (persistedHourlySeriesMatches(candidate.rows as Array<Record<string, unknown>>, modelRows, collectedAt)) {
         persistedModels.add(candidate.modelName);
       }
     }
+
+    const projectionPreserved = new Set<string>(OFFICIAL_HOURLY_MODEL_NAMES.filter(
+      (modelName) => !persistedModels.has(modelName) && isCompleteStoredHourlyProjection({
+        rows: storedRows.filter((row) => row.modelName === modelName),
+        expectedValidTimes,
+        requiredValueFields: requiredProjectionFields,
+      }),
+    ));
 
     const updatedAt = persistedModels.size > 0 ? new Date() : null;
     if (persistedModels.size > 0 && updatedAt) {
@@ -270,12 +335,27 @@ async function refreshHourlyForecast(favorite: ManualFusionFavorite, today: stri
         "Relance manuelle demandée explicitement; série recalculée par le moteur officiel avec les seuls runs horaires disponibles.",
       );
     }
-    const error = persistedModels.size === 0
-      ? "Les données horaires n’ont pas pu être confirmées après leur enregistrement."
-      : writeFailures.length > 0 || persistedModels.size < expectedModelCount
-        ? "Certaines sources horaires n’ont pas répondu ou n’ont pas pu être enregistrées."
-        : undefined;
-    return granularityResult(persistedModels.size, expectedModelCount, updatedAt, error);
+    const error = writeFailures.length > 0
+      ? "Certaines tentatives n’ont pas pu être confirmées en base; aucune nouvelle projection n’est annoncée pour ces sources."
+      : incompleteAttemptsArchived.size > 0
+        ? projectionPreserved.size > 0
+          ? "Certaines tentatives incomplètes ont été archivées; les projections précédentes existantes ont été conservées."
+          : "Certaines tentatives incomplètes ont été archivées; aucune projection précédente n’existait pour les sources concernées."
+        : persistedModels.size === 0 && projectionPreserved.size === 0
+          ? "Les données horaires n’ont pas pu être confirmées après leur enregistrement."
+          : persistedModels.size < expectedModelCount
+            ? "Certaines sources n’ont pas confirmé un lot complet; les projections précédentes éventuellement présentes restent disponibles."
+            : undefined;
+    const result = granularityResult(persistedModels.size, expectedModelCount, updatedAt, error);
+    if (projectionPreserved.size > 0) {
+      if (incompleteAttemptsArchived.size > 0) result.status = "partial";
+      result.projectionRetainedModelCount = projectionPreserved.size;
+      const preservedRows = storedRows.filter((row) => projectionPreserved.has(row.modelName));
+      const measuredTimes = preservedRows.map((row) => timestampValue(row.collectedAt)).filter((time): time is number => time != null);
+      result.retainedProjectionAgeMs = measuredTimes.length > 0 ? Math.max(0, Date.now() - Math.min(...measuredTimes)) : null;
+      result.error = error ?? "La série horaire incomplète a été archivée sans remplacer la projection existante.";
+    }
+    return result;
   } catch (error) {
     console.error("[ManualFusion] Hourly refresh failed:", error);
     return granularityResult(0, expectedModelCount, null, "La collecte ou l’enregistrement horaire a échoué.");
