@@ -6,7 +6,7 @@ import {
   DAILY_PHYSICAL_COMPARISON_VARIABLES,
 } from "../dailyPhysicalComparisonHistory";
 import { WEATHER_SERVICES } from "../weatherServices";
-import { latitudeSchema, longitudeSchema } from "../weatherInput";
+import { baseCoordinatesSchema } from "../weatherInput";
 
 function isIsoDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -14,13 +14,11 @@ function isIsoDate(value: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-const isoDateSchema = z.string().refine(isIsoDate, "La date doit être une date réelle au format AAAA-MM-JJ.");
+const isoDateSchema = z.string().refine(isIsoDate, "La date doit \u00eatre une date r\u00e9elle au format AAAA-MM-JJ.");
 
 export const dailyPhysicalComparisonsRouter = router({
   getHistory: adminProcedure
-    .input(z.object({
-      lat: latitudeSchema.optional(),
-      lon: longitudeSchema.optional(),
+    .input(baseCoordinatesSchema.safeExtend({
       validDateFrom: isoDateSchema.optional(),
       validDateTo: isoDateSchema.optional(),
       serviceName: z.string().trim().min(1).max(64).optional(),
@@ -29,11 +27,8 @@ export const dailyPhysicalComparisonsRouter = router({
       cursor: z.object({ validDate: isoDateSchema, id: z.number().int().positive() }).optional(),
       pageSize: z.number().int().min(1).max(100).default(25),
     }).superRefine((input, context) => {
-      if ((input.lat === undefined) !== (input.lon === undefined)) {
-        context.addIssue({ code: "custom", path: ["lon"], message: "Fournir latitude et longitude ensemble." });
-      }
       if (input.validDateFrom && input.validDateTo && input.validDateFrom > input.validDateTo) {
-        context.addIssue({ code: "custom", path: ["validDateTo"], message: "La date de fin doit être postérieure ou égale à la date de début." });
+        context.addIssue({ code: "custom", path: ["validDateTo"], message: "La date de fin doit \u00eatre post\u00e9rieure ou \u00e9gale \u00e0 la date de d\u00e9but." });
       }
     }))
     .query(async ({ input }) => {
@@ -50,13 +45,6 @@ export const dailyPhysicalComparisonsRouter = router({
         cursor: input.cursor,
         pageSize: input.pageSize,
       });
-      return {
-        ...history,
-        modelOptions: WEATHER_SERVICES.expert.map(({ name, modelId }) => ({
-          serviceName: name,
-          modelId,
-          isDerivedReference: modelId === "best_match",
-        })),
-      };
+      return history;
     }),
 });
