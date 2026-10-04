@@ -59,8 +59,9 @@ describe("Dashboard officiel avec contexte local", () => {
     expect(source).toContain('aria-label="Fermer le contexte local et revenir au mode Officiel"');
     expect(source).toContain("Données horaires temporairement indisponibles.");
     expect(source).toContain("includeExtendedPeriods: false");
-    expect(source).toContain("const officialHours: any[] = officialForecast?.hours ?? []");
-    expect(source).toContain("const hours: any[] = officialHours");
+    expect(source).toContain("const officialHours = officialForecast?.hours ?? []");
+    expect(source).toContain("const hours = officialHours");
+    expect(source).not.toContain("const officialHours: any[]");
     expect(source).not.toContain("personalizedByHour");
     expect(source).toContain("elle reste séparée de la série horaire officielle");
     expect(source).not.toContain("trpc.weather.getHourlyForecast.useQuery");

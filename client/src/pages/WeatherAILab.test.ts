@@ -125,6 +125,16 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain('operationalStatus?.status ?? "FAILED"');
     expect(source).toContain("Couverture quotidienne par champ");
     expect(source).toContain("Couverture horaire par champ");
+    expect(source).toContain("ancienneté mesurée");
+    expect(source).toContain("projection précédente conservée");
+    expect(source).toContain("currentProjection");
+    expect(source).toContain("currentProjection.complete");
+    expect(source).toContain("lot incomplet ou complétude non confirmée");
+    expect(source).toContain("Aucune limite de péremption n’est appliquée.");
+    expect(source).toContain("sourceStatusCounts");
+    expect(source).toContain("sourceIssues");
+    expect(source).toContain("valeur présente mais invalide");
+    expect(source).toContain("instant reçu sous une autre heure/offset local");
     expect(source).toContain("Prévisions quotidiennes des modèles officiels");
     expect(source).not.toContain("Prévisions quotidiennes des contributeurs");
     expect(source).toContain("Limite du produit documentée");
@@ -192,6 +202,9 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Relancer");
     expect(source).toContain("manualRefreshGranularity(\"Quotidien\"");
     expect(source).toContain("manualRefreshGranularity(\"Horaire\"");
+    expect(source).toContain("Projection précédente conservée pour");
+    expect(source).toContain("retainedProjectionAgeMs");
+    expect(source).toContain("Aucune limite de péremption n’est appliquée.");
     expect(source).toContain("getDashboard.invalidate(coordinates)");
     expect(source).toContain("getDetailedForecast.invalidate(detailedForecastInput)");
     expect(source).toContain("getDashboard.fetch(coordinates)");

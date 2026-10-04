@@ -20,6 +20,7 @@ export class HourlyForecastPersistenceError extends Error {
 export async function withHourlyForecastPersistenceStages(
   writeArchive: (confirmCommittedRows: (count: number) => void) => Promise<void>,
   writeProjection: (confirmCommittedRows: (count: number) => void) => Promise<void>,
+  options: { skipProjection?: boolean } = {},
 ): Promise<{ archiveRowsWritten: number; projectionRowsWritten: number }> {
   let archiveRowsWritten = 0;
   let projectionRowsWritten = 0;
@@ -30,6 +31,7 @@ export async function withHourlyForecastPersistenceStages(
   } catch {
     throw new HourlyForecastPersistenceError("archive_write_failed", archiveRowsWritten, projectionRowsWritten);
   }
+  if (options.skipProjection) return { archiveRowsWritten, projectionRowsWritten };
   try {
     await writeProjection((count) => {
       if (Number.isFinite(count) && count > 0) projectionRowsWritten += Math.floor(count);

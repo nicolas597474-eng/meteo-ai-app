@@ -212,13 +212,14 @@ export function detectExtendedRegime(params: {
   humidity?: number | null;
   visibility?: number | null;
   cloudCover?: number | null;
-}): ExtendedRegime {
-  const t = params.temperature ?? 15;
-  const p = params.precipitation ?? 0;
-  const w = params.windSpeed ?? 0;
-  const h = params.humidity ?? 60;
-  const v = params.visibility ?? 10000;
-  const c = params.cloudCover ?? 50;
+}): ExtendedRegime | null {
+  if (!hasCompleteRegimeInputs(params)) return null;
+  const t = params.temperature;
+  const p = params.precipitation;
+  const w = params.windSpeed;
+  const h = params.humidity;
+  const v = params.visibility;
+  const c = params.cloudCover;
 
   // Extreme events first
   if (w > 60) return "storm";
@@ -303,6 +304,27 @@ export type MultiRegimeResult = {
   description: string;
 };
 
+export type CompleteRegimeInputs = {
+  temperature: number;
+  precipitation: number;
+  windSpeed: number;
+  humidity: number;
+  visibility: number;
+  cloudCover: number;
+};
+
+export function hasCompleteRegimeInputs(params: {
+  temperature?: number | null;
+  precipitation?: number | null;
+  windSpeed?: number | null;
+  humidity?: number | null;
+  visibility?: number | null;
+  cloudCover?: number | null;
+}): params is CompleteRegimeInputs {
+  return [params.temperature, params.precipitation, params.windSpeed, params.humidity, params.visibility, params.cloudCover]
+    .every((value) => typeof value === "number" && Number.isFinite(value));
+}
+
 /**
  * Detect multiple simultaneous weather regimes with influence percentages.
  * Returns the primary regime, all active regimes with their influence,
@@ -315,13 +337,14 @@ export function detectMultiRegime(params: {
   humidity?: number | null;
   visibility?: number | null;
   cloudCover?: number | null;
-}): MultiRegimeResult {
-  const t = params.temperature ?? 15;
-  const p = params.precipitation ?? 0;
-  const w = params.windSpeed ?? 0;
-  const h = params.humidity ?? 60;
-  const v = params.visibility ?? 10000;
-  const c = params.cloudCover ?? 50;
+}): MultiRegimeResult | null {
+  if (!hasCompleteRegimeInputs(params)) return null;
+  const t = params.temperature;
+  const p = params.precipitation;
+  const w = params.windSpeed;
+  const h = params.humidity;
+  const v = params.visibility;
+  const c = params.cloudCover;
 
   // Compute raw scores for each regime (0-100)
   const scores: Record<ExtendedRegime, number> = {

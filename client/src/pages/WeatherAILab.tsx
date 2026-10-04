@@ -95,6 +95,8 @@ type VariableCoverageEvidence = {
   exposedCount: number;
   consumerProjected?: boolean;
   unit?: string | null;
+  sourceStatusCounts?: Partial<Record<string, number>>;
+  sourceIssues?: Array<{ validAt: string; status: string; rawType: string | null; rawValue: string | null; rawUnit: string | null }>;
 };
 
 type ModelCoverageEvidence = {
@@ -117,6 +119,14 @@ type ModelCoverageEvidence = {
   archiveWriteConfirmed?: boolean | null;
   expectedArchiveRows?: number;
   projectionRowsWritten?: number;
+  expectedHoursCount?: number;
+  receivedUniqueHours?: number;
+  missingHoursCount?: number;
+  unexpectedHoursCount?: number;
+  duplicateHoursCount?: number;
+  projectionReady?: boolean;
+  archiveRowsComplete?: boolean;
+  currentProjection?: { rowCount: number; collectedAtMs: number; ageMs: number; complete: boolean } | null;
   variables?: VariableCoverageEvidence[];
 };
 
@@ -137,6 +147,19 @@ type HourlyModelCollectionEvidence = {
   variableCoverage: ModelCoverageEvidence | null;
 };
 
+function formatMeasuredAge(ageMs: number): string {
+  if (!Number.isFinite(ageMs)) return "âge indéterminé";
+  const totalSeconds = Math.floor(Math.max(0, ageMs) / 1000);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `${days} j ${hours} h`;
+  if (hours > 0) return `${hours} h ${minutes} min`;
+  if (minutes > 0) return `${minutes} min ${seconds} s`;
+  return `${seconds} s`;
+}
+
 function VariableCoverageEvidenceSection({ title, evidence, granularity }: {
   title: string;
   evidence: ModelCoverageEvidence | null;
@@ -151,24 +174,47 @@ function VariableCoverageEvidenceSection({ title, evidence, granularity }: {
     request_failed: "échec de requête",
     unconfirmed: "prise en charge non confirmée",
   };
+  const sourceStatusLabels: Record<string, string> = {
+    valid: "valide",
+    normalized: "valeur normalisée / unité convertie",
+    provider_null: "null explicite fournisseur",
+    field_missing: "champ ou index absent",
+    invalid_value: "valeur présente mais invalide",
+    unit_mismatch: "unité incompatible, valeur rejetée",
+    no_model_data: "aucune donnée modèle à cet instant",
+    time_mismatch: "instant reçu sous une autre heure/offset local",
+    source_error: "requête fournisseur en erreur",
+  };
   const first = granularity === "daily" ? evidence?.firstReturnedDate : evidence?.firstValidAt;
   const last = granularity === "daily" ? evidence?.lastReturnedDate : evidence?.lastValidAt;
-  const returned = granularity === "daily" ? evidence?.returnedDays : evidence?.returnedHours;
-  const requested = granularity === "daily" ? evidence?.requestedDays : evidence?.requestedForecastDays;
+  const returned = granularity === "daily" ? evidence?.returnedDays : evidence?.receivedUniqueHours ?? evidence?.returnedHours;
+  const requested = granularity === "daily" ? evidence?.requestedDays : evidence?.expectedHoursCount ?? evidence?.requestedForecastDays;
+  const currentProjection = evidence?.currentProjection ?? null;
   const hasVariables = Array.isArray(evidence?.variables);
 
   return <section className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3">
       <h3 className="text-xs font-semibold text-cyan-100">{title}</h3>
       {!evidence || !hasVariables ? <p className="mt-1.5 text-[10px] leading-relaxed text-slate-300">Cette trace ne contient pas de preuve par champ. Les anciennes données ne sont pas reconstruites.</p> : <>
-      <p className="mt-1.5 text-[10px] leading-relaxed text-slate-300">Fenêtre {granularity === "daily" ? "quotidienne" : "horaire"} demandée : {requested ?? "—"}{granularity === "daily" ? " jours" : " jour(s)"} · {returned ?? 0} pas retourné(s) · {first ?? "—"} → {last ?? "—"}. {evidence.maximumDocumentedDays == null ? "Limite documentée non spécifique à ce flux." : `Limite du produit documentée : jusqu’à ${evidence.maximumDocumentedDays} jours; ce n’est pas une garantie pour chaque réponse.`}</p>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-slate-300">{granularity === "hourly" ? `Grille locale attendue : ${requested ?? "—"} créneau(x) · ${returned ?? 0} reçu(s) · ${evidence.missingHoursCount ?? 0} manquant(s)${evidence.unexpectedHoursCount ? ` · ${evidence.unexpectedHoursCount} hors grille` : ""}${evidence.duplicateHoursCount ? ` · ${evidence.duplicateHoursCount} doublon(s)` : ""}. ${first ?? "—"} → ${last ?? "—"}.` : `Fenêtre quotidienne demandée : ${requested ?? "—"} jours · ${returned ?? 0} pas retourné(s) · ${first ?? "—"} → ${last ?? "—"}.`} {evidence.maximumDocumentedDays == null ? "Limite documentée non spécifique à ce flux." : `Limite du produit documentée : jusqu’à ${evidence.maximumDocumentedDays} jours; ce n’est pas une garantie pour chaque réponse.`}</p>
       <p className="mt-1 text-[10px] leading-relaxed text-cyan-100/80">La limite documentée donne du contexte, mais ne remplace jamais le contrôle de la réponse réelle : le moteur sélectionne les seules valeurs reçues pour la variable et la validTime exactes. Une absence hors portée n’est pas un échec de performance; les métriques utilisent uniquement des paires prévision–observation réellement évaluables.</p>
       {granularity === "daily" && <p className="mt-1 text-[10px] text-slate-400">Date cible : {evidence.targetDateInResponse ? "présente dans la réponse" : "absente de la réponse"} · {evidence.requestAttempts ?? 0} tentative(s). L’archive quotidienne {evidence.archiveWriteConfirmed === false ? "n’est pas confirmée" : "est suivie par champ ci-dessous"}.</p>}
-      {granularity === "hourly" && <p className="mt-1 text-[10px] text-slate-400">Archive : {evidence.archiveRowsWritten ?? 0}/{evidence.expectedArchiveRows ?? 0} lignes · vue horaire : {evidence.projectionRowsWritten ?? 0}/{returned ?? 0} lignes · {evidence.requestAttempts ?? 0} requête(s).</p>}
+      {granularity === "hourly" && <p className="mt-1 text-[10px] text-slate-400">Archive : {evidence.archiveRowsWritten ?? 0}/{evidence.expectedArchiveRows ?? 0} lignes · nouvelle projection : {evidence.projectionRowsWritten ?? 0}/{evidence.expectedHoursCount ?? 0} lignes · projection prête : {evidence.projectionReady ? "oui" : "non"} · projection présente : {currentProjection ? `${currentProjection.complete ? "lot complet selon la grille locale et les champs actifs" : "lot incomplet ou complétude non confirmée"}, ${currentProjection.rowCount} lignes, ancienneté mesurée ${formatMeasuredAge(currentProjection.ageMs)} (depuis ${new Date(currentProjection.collectedAtMs).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "medium", timeZone: "Europe/Paris" })})` : "aucune projection antérieure"} · {evidence.requestAttempts ?? 0} requête(s). Aucune limite de péremption n’est appliquée.</p>}
       {evidence.horizonSourceUrl && <a href={evidence.horizonSourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[9px] font-medium text-cyan-200 underline underline-offset-2">Source de la limite documentée</a>}
       <div className="mt-2 grid gap-1.5 sm:grid-cols-2" aria-label={`${title} par variable`}>
         {evidence.variables!.map((variable) => <div key={variable.key} className="rounded-lg border border-white/10 bg-slate-950/25 px-2.5 py-2">
           <div className="flex items-start justify-between gap-2"><span className="text-[10px] font-semibold text-slate-100">{variable.label}{variable.unit ? ` · ${variable.unit}` : ""}</span><span className="shrink-0 text-[9px] text-cyan-100">{statusLabels[variable.status] ?? variable.status}</span></div>
           <p className="mt-1 text-[9px] leading-relaxed text-slate-400">{variable.requested === false ? "Non demandé" : `${variable.receivedCount}/${variable.requestedCount} valeur(s) reçue(s)`} · archive {variable.archivedCount == null ? "non confirmée" : `${variable.archivedCount}`} · exposé {variable.exposedCount}{granularity === "hourly" && variable.consumerProjected === false ? " (pas dans la projection consommateur)" : ""}{variable.outOfHorizonCount ? ` · hors horizon ${variable.outOfHorizonCount}` : ""}</p>
+          {granularity === "hourly" && variable.sourceStatusCounts && <p className="mt-1 text-[9px] leading-relaxed text-slate-400">Diagnostic brut : {[
+            ["valid", "valide"], ["normalized", "normalisée"], ["provider_null", "null fournisseur"], ["field_missing", "champ absent"],
+            ["invalid_value", "invalide"], ["unit_mismatch", "unité rejetée"], ["no_model_data", "pas de donnée modèle"],
+            ["time_mismatch", "décalage horaire"], ["source_error", "erreur source"],
+          ].filter(([key]) => (variable.sourceStatusCounts?.[key] ?? 0) > 0).map(([key, label]) => `${variable.sourceStatusCounts?.[key]} ${label}`).join(" · ") || "aucun détail source disponible"}</p>}
+          {granularity === "hourly" && (variable.sourceIssues?.length ?? 0) > 0 && <details className="mt-1 text-[9px] text-amber-100/90">
+            <summary className="cursor-pointer">Détail des {variable.sourceIssues!.length} créneau(x) non standard</summary>
+            <ul className="mt-1 space-y-0.5 pl-3">
+              {variable.sourceIssues!.map((issue, index) => <li key={`${issue.validAt}-${index}`} className="break-all">{issue.validAt} · {sourceStatusLabels[issue.status] ?? issue.status}{issue.rawValue != null ? ` · valeur reçue ${issue.rawValue}` : ""}{issue.rawType ? ` (${issue.rawType})` : ""}{issue.rawUnit ? ` · unité ${issue.rawUnit}` : ""}</li>)}
+            </ul>
+          </details>}
           {variable.documentationStatus === "unconfirmed" && <p className="mt-1 text-[9px] text-amber-100">Support de cette moyenne quotidienne non confirmé dans la documentation; aucune dérivation horaire appliquée.</p>}
         </div>)}
       </div>
@@ -190,7 +236,11 @@ function ForecastModelGuideDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const guide = getForecastModelGuide(modelName ?? "Open-Meteo");
-  const statusLabel = collectionAttempt ? ({
+  const statusLabel = collectionAttempt?.status === "partial" && collectionAttempt.errorCode === "partial_archive_projection_published"
+    ? "Archive secondaire partielle · projection complète actualisée"
+    : collectionAttempt?.status === "partial" && collectionAttempt.errorCode === "partial_projection_retained"
+      ? "Lot incomplet · projection précédente conservée"
+      : collectionAttempt ? ({
     attempting: "Tentative en cours ou interrompue",
     succeeded: "Réponse complète et écritures confirmées",
     partial: "Réponse ou persistance partielle",
@@ -213,6 +263,8 @@ function ForecastModelGuideDialog({
     projection_write_failed: "Mise à jour de la vue horaire non confirmée",
     write_failed: "Écriture non confirmée",
     collection_failed: "Collecte interrompue avant le résultat par modèle",
+    partial_archive_projection_published: "Champs d’archive secondaires incomplets; projection complète actualisée",
+    partial_projection_retained: "Un créneau ou champ consommé par la projection manque; la série publiée précédente est conservée",
   };
   const attemptedAt = collectionAttempt ? new Date(collectionAttempt.attemptedAt) : null;
   const attemptedAtLabel = attemptedAt && Number.isFinite(attemptedAt.getTime())
@@ -603,9 +655,13 @@ export default function WeatherAILab() {
     {
       id: "regime",
       title: "Régime détecté",
-      summary: `${data.regimeLabel} ${data.regimeEmoji} : ${data.regimeDescription}`,
-      detail: <p>Ce régime rend visibles les priorités du scénario : température {Math.round(data.weights.temp * 100)} %, précipitations {Math.round(data.weights.precip * 100)} %, vent {Math.round(data.weights.wind * 100)} % et conditions {Math.round(data.weights.condition * 100)} %.</p>,
-      status: hasSnapshot ? "complete" : "partial",
+      summary: data.regimeStatus === "unknown" || !data.regimeLabel
+        ? "Régime indisponible : une ou plusieurs entrées météo requises sont absentes ou invalides."
+        : `${data.regimeLabel} ${data.regimeEmoji ?? ""} : ${data.regimeDescription}`,
+      detail: data.weights
+        ? <p>Ce régime rend visibles les priorités du scénario : température {Math.round(data.weights.temp * 100)} %, précipitations {Math.round(data.weights.precip * 100)} %, vent {Math.round(data.weights.wind * 100)} % et conditions {Math.round(data.weights.condition * 100)} %.</p>
+        : <p>Les pondérations de régime ne sont pas calculées tant que les variables requises ne sont pas toutes disponibles et finies.</p>,
+      status: data.regimeStatus === "available" ? "complete" : "partial",
     },
     {
       id: "weights",
@@ -680,6 +736,7 @@ export default function WeatherAILab() {
       <p className="font-semibold">{manualRefreshResult.status === "refreshed" ? "Prévisions quotidiennes et horaires actualisées." : manualRefreshResult.status === "partial" ? "Résultat partiel : une granularité ou certaines sources n’ont pas abouti." : "Échec de la relance des prévisions."}</p>
       <p className="mt-1">{manualRefreshGranularity("Quotidien", manualRefreshResult.daily)}</p>
       <p className="mt-1">{manualRefreshGranularity("Horaire", manualRefreshResult.hourly)}</p>
+      {(manualRefreshResult.hourly.projectionRetainedModelCount ?? 0) > 0 && <p className="mt-1">Projection précédente conservée pour {manualRefreshResult.hourly.projectionRetainedModelCount} modèle(s) · ancienneté mesurée {manualRefreshResult.hourly.retainedProjectionAgeMs == null ? "indisponible" : formatMeasuredAge(manualRefreshResult.hourly.retainedProjectionAgeMs)}. Aucune limite de péremption n’est appliquée.</p>}
       <p className="mt-1 text-[10px] opacity-80">La relance n’écrit ni le point météo courant ni les observations, qui restent alimentés séparément. Les compteurs des lots planifiés ne sont pas modifiés.</p>
     </div>}
 

@@ -549,8 +549,8 @@ export default function Dashboard() {
   const officialPrimaryRegime = officialRegime?.primary as any;
   const days: any[] = officialForecast?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
-  const officialHours: any[] = officialForecast?.hours ?? [];
-  const hours: any[] = officialHours;
+  const officialHours = officialForecast?.hours ?? [];
+  const hours = officialHours;
   const currentSnapshot = officialForecast?.currentSnapshot ?? null;
   const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
@@ -560,15 +560,18 @@ export default function Dashboard() {
   const localObservedRegime = localPrimaryRegime
     ? { id: localPrimaryRegime.id, label: localPrimaryRegime.label, emoji: localPrimaryRegime.emoji }
     : null;
+  const regimeUnavailable = officialRegime?.status === "unknown" || (!officialPrimaryRegime && !dash?.regime);
   const regime = officialPrimaryRegime
       ? {
           regime: officialPrimaryRegime.id,
           label: officialPrimaryRegime.label,
           emoji: officialPrimaryRegime.emoji,
           description: officialPrimaryRegime.description,
-          weights: officialPrimaryRegime.weights ?? { temp: 0.3, precip: 0.3, wind: 0.2, condition: 0.2 },
+          weights: officialPrimaryRegime.weights ?? null,
         }
-      : dash?.regime;
+      : regimeUnavailable
+        ? { regime: "unknown", label: "Régime indisponible", emoji: "—", description: officialRegime?.description ?? "Des données météo requises sont absentes ou invalides.", weights: null }
+        : dash?.regime;
   const regimeSourceUpdatedAt = officialRegime?.sourceUpdatedAt
     ? new Date(officialRegime.sourceUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
     : null;
@@ -596,7 +599,7 @@ export default function Dashboard() {
   const multiRegime = officialRegime
     ? { activeRegimes: officialRegime.active, confidenceScore: officialRegime.confidence }
     : (dash as any)?.multiRegime ?? null;
-  const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "variable";
+  const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "unknown";
   const regimeConfidence: number | null = multiRegime?.confidenceScore ?? null;
   // L’accord est affiché en unités physiques et demeure distinct de la fiabilité historique.
   const currentHourIndex = findActiveHourlyForecastIndex(hours, forecastNowMs);
@@ -626,7 +629,7 @@ export default function Dashboard() {
   const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
   const minTemperatureTone = getExtremeTemperatureTone("min", minTemperature);
   const apparentTemp = currentSnapshot?.apparentTemp ?? null;
-  const currentUV = currentHour?.uvIndex ?? hours.find((h: any) => h.validAt > forecastNowMs && h.uvIndex != null)?.uvIndex ?? null;
+  const currentUV = currentHour?.uvIndex ?? hours.find((hour) => typeof hour.validAt === "number" && hour.validAt > forecastNowMs && hour.uvIndex != null)?.uvIndex ?? null;
   const windDir = currentSnapshot?.windDirection ?? null;
   const windSpeed = currentSnapshot?.windSpeed ?? null;
   const currentCloudCover = currentSnapshot?.cloudCover ?? null;
@@ -702,16 +705,16 @@ export default function Dashboard() {
                 {/* Weight pills */}
                 <div className="mt-0.5 flex flex-wrap gap-1 sm:mt-1">
                   <span className="rounded-full border border-orange-500/30 bg-orange-500/20 px-1.5 py-px text-[11px] font-medium text-orange-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    🌡 {Math.round((regime?.weights?.temp ?? 0) * 100)}%
+                    🌡 {regime?.weights?.temp == null ? "—" : `${Math.round(regime.weights.temp * 100)}%`}
                   </span>
                   <span className="rounded-full border border-blue-500/30 bg-blue-500/20 px-1.5 py-px text-[11px] font-medium text-blue-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    🌧 {Math.round((regime?.weights?.precip ?? 0) * 100)}%
+                    🌧 {regime?.weights?.precip == null ? "—" : `${Math.round(regime.weights.precip * 100)}%`}
                   </span>
                   <span className="rounded-full border border-cyan-500/30 bg-cyan-500/20 px-1.5 py-px text-[11px] font-medium text-cyan-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    💨 {Math.round((regime?.weights?.wind ?? 0) * 100)}%
+                    💨 {regime?.weights?.wind == null ? "—" : `${Math.round(regime.weights.wind * 100)}%`}
                   </span>
                   <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-1.5 py-px text-[11px] font-medium text-purple-300 sm:px-2 sm:py-0.5 sm:text-xs">
-                    ☁ {Math.round((regime?.weights?.condition ?? 0) * 100)}%
+                    ☁ {regime?.weights?.condition == null ? "—" : `${Math.round(regime.weights.condition * 100)}%`}
                   </span>
                 </div>
                 {showRegimeMenu && (

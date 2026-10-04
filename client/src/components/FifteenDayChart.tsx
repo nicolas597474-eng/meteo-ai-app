@@ -55,15 +55,15 @@ function formatAgreementSpread(measure: DailyAgreementMeasure | undefined, unit:
 function getConditionLabel(cloudCover: number | null, precip: number | null, condition: string | null): string {
   if (condition && /(orage|brouillard|neige|pluie|averse)/i.test(condition)) return condition;
   if (cloudCover != null || precip != null) return conditionFromWeatherValues(precip, cloudCover);
-  return condition ?? "Ensoleillé";
+  return condition ?? "Conditions indisponibles";
 }
 
 function getConditionBg(cloudCover: number | null, precip: number | null, condition: string | null): string {
   const cond = (condition ?? "").toLowerCase();
   if (cond.includes("orage")) return "rgba(148, 163, 184, 0.045)";
-  if ((precip ?? 0) > 3 || cond.includes("pluie") || cond.includes("averse")) return "rgba(148, 163, 184, 0.032)";
-  if ((cloudCover ?? 0) > 75 || cond.includes("couvert")) return "rgba(148, 163, 184, 0.04)";
-  if ((cloudCover ?? 0) < 30 || cond.includes("ensoleillé")) return "rgba(255, 255, 255, 0.025)";
+  if ((precip != null && precip > 3) || cond.includes("pluie") || cond.includes("averse")) return "rgba(148, 163, 184, 0.032)";
+  if ((cloudCover != null && cloudCover > 75) || cond.includes("couvert")) return "rgba(148, 163, 184, 0.04)";
+  if ((cloudCover != null && cloudCover < 30) || cond.includes("ensoleillé")) return "rgba(255, 255, 255, 0.025)";
   return "rgba(255, 255, 255, 0.014)";
 }
 

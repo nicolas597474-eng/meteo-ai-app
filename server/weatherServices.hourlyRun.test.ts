@@ -7,35 +7,32 @@ vi.mock("./weatherFetch", () => ({
 
 import { fetchWeather } from "./weatherFetch";
 import { collectHourlyForecastAllModels, collectHourlyForecastAllModelsWithDiagnostics, OFFICIAL_HOURLY_MODELS } from "./weatherServices";
+import { getParisHourlyTimestamps } from "./weatherTime";
 
 const mockedFetchWeather = vi.mocked(fetchWeather);
-const unixTimes = [
-  Date.parse("2026-10-25T00:00:00Z") / 1000,
-  Date.parse("2026-10-25T01:00:00Z") / 1000,
-  Date.parse("2026-10-25T02:00:00Z") / 1000,
-];
+const unixTimes = getParisHourlyTimestamps("2026-10-25").map((validAt) => validAt / 1000);
 const completeHourly = {
   time: unixTimes,
-  temperature_2m: [10, 11, 12],
-  apparent_temperature: [9, 10, 11],
-  precipitation: [0, 0.1, 0],
-  rain: [0, 0.1, 0],
-  showers: [0, 0, 0],
-  snowfall: [0, 0, 0],
-  wind_speed_10m: [5, 6, 7],
-  wind_gusts_10m: [9, 10, 11],
-  wind_direction_10m: [180, 190, 200],
-  relative_humidity_2m: [80, 81, 82],
-  surface_pressure: [1012, 1011, 1010],
-  cloud_cover: [50, 55, 60],
-  cloud_cover_low: [10, 11, 12],
-  cloud_cover_mid: [20, 21, 22],
-  cloud_cover_high: [20, 23, 26],
-  weather_code: [1, 2, 3],
-  uv_index: [1, 2, 3],
-  dew_point_2m: [5, 6, 7],
-  visibility: [24000, 24000, 24000],
-  shortwave_radiation: [100, 200, 300],
+  temperature_2m: unixTimes.map((_, index) => 10 + index),
+  apparent_temperature: unixTimes.map((_, index) => 9 + index),
+  precipitation: unixTimes.map((_, index) => index % 2 === 0 ? 0 : 0.1),
+  rain: unixTimes.map((_, index) => index % 2 === 0 ? 0 : 0.1),
+  showers: unixTimes.map(() => 0),
+  snowfall: unixTimes.map(() => 0),
+  wind_speed_10m: unixTimes.map((_, index) => 5 + index),
+  wind_gusts_10m: unixTimes.map((_, index) => 9 + index),
+  wind_direction_10m: unixTimes.map((_, index) => 180 + index),
+  relative_humidity_2m: unixTimes.map((_, index) => 80 + index),
+  surface_pressure: unixTimes.map((_, index) => 1012 - index),
+  cloud_cover: unixTimes.map((_, index) => 50 + index),
+  cloud_cover_low: unixTimes.map((_, index) => 10 + index),
+  cloud_cover_mid: unixTimes.map((_, index) => 20 + index),
+  cloud_cover_high: unixTimes.map((_, index) => 20 + index),
+  weather_code: unixTimes.map((_, index) => index % 4),
+  uv_index: unixTimes.map((_, index) => index % 8),
+  dew_point_2m: unixTimes.map((_, index) => 5 + index),
+  visibility: unixTimes.map(() => 24000),
+  shortwave_radiation: unixTimes.map((_, index) => index * 100),
 };
 const completeResponse = () => ({
   timezone: "Europe/Paris",
@@ -71,11 +68,11 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
 
     expect(forecasts).toHaveLength(7);
     expect(result.diagnostics).toHaveLength(7);
-    expect(result.diagnostics.every((item) => item.status === "succeeded" && item.hoursReceived === 3 && item.valuesReceived === 60 && item.expectedValueCount === 60)).toBe(true);
+    expect(result.diagnostics.every((item) => item.status === "succeeded" && item.hoursReceived === 25 && item.valuesReceived === 500 && item.expectedValueCount === 500 && item.expectedHoursCount === 25 && item.projectionReady)).toBe(true);
     expect(forecasts[0].hours[0]).toMatchObject({ rain: 0, showers: 0 });
     expect(forecasts[0].hours[0].visibility).toBe(24);
     expect(forecasts[0].sourceMetadata?.units).toMatchObject({ rain: "mm", showers: "mm", visibility: "km" });
-    expect(forecasts[0].hours.map((hour) => hour.hour)).toEqual([2, 2, 3]);
+    expect(forecasts[0].hours.map((hour) => hour.hour).slice(0, 5)).toEqual([0, 1, 2, 2, 3]);
     expect(forecasts[0].hours.map((hour) => hour.validAt)).toEqual(unixTimes.map((value) => value * 1000));
     expect(new Set(forecasts.map((forecast) => forecast.captureRunId)).size).toBe(7);
     expect(forecasts.every((forecast) => forecast.sourceName === "open-meteo" && forecast.availableAt! >= forecast.requestStartedAt!)).toBe(true);
@@ -111,8 +108,8 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
 
     expect(result.diagnostics).toHaveLength(7);
     expect(result.forecasts).toHaveLength(6);
-    expect(result.diagnostics.find((item) => item.modelId === modelIds[0])).toMatchObject({ status: "succeeded", attemptCount: 2 });
-    expect(result.diagnostics.find((item) => item.modelId === modelIds[1])).toMatchObject({ status: "failed", errorCode: "provider_http_5xx", attemptCount: 2 });
+    expect(result.diagnostics.find((item) => item.modelId === modelIds[0])).toMatchObject({ status: "succeeded", attemptCount: 2, expectedHoursCount: 25, projectionReady: true });
+    expect(result.diagnostics.find((item) => item.modelId === modelIds[1])).toMatchObject({ status: "failed", errorCode: "provider_http_5xx", attemptCount: 2, expectedValueCount: 500, projectionReady: false });
     expect(result.diagnostics.filter((item) => item.status === "succeeded")).toHaveLength(6);
     expect(mockedFetchWeather).toHaveBeenCalledTimes(9);
     expect(JSON.stringify(result.diagnostics)).not.toContain("private/raw upstream body");
@@ -160,6 +157,101 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
     expect(result.diagnostics.find(({ modelName }) => modelName === "best_match")).toMatchObject({ modelId: null, status: "succeeded" });
     const bestMatchRequest = mockedFetchWeather.mock.calls.map(([input]) => new URL(String(input))).find((url) => !url.searchParams.has("models"));
     expect(bestMatchRequest).toBeDefined();
+  });
+
+  it("normalise les nombres textuels et les unités reconnues avant persistance", async () => {
+    const alternateUnits = completeResponse();
+    alternateUnits.hourly.temperature_2m = unixTimes.map(() => "68" as unknown as number);
+    alternateUnits.hourly.precipitation = unixTimes.map(() => 0.1);
+    alternateUnits.hourly.rain = unixTimes.map(() => 0.1);
+    alternateUnits.hourly.showers = unixTimes.map(() => 0.1);
+    alternateUnits.hourly.wind_speed_10m = unixTimes.map(() => 10);
+    alternateUnits.hourly_units.temperature_2m = "°F";
+    alternateUnits.hourly_units.precipitation = "inch";
+    alternateUnits.hourly_units.rain = "inch";
+    alternateUnits.hourly_units.showers = "inch";
+    alternateUnits.hourly_units.wind_speed_10m = "m/s";
+    mockedFetchWeather.mockResolvedValue(response(alternateUnits));
+
+    const result = await collectHourlyForecastAllModelsWithDiagnostics(
+      "2026-10-25",
+      { lat: 50.7567, lon: 2.5204 },
+      { includeBestMatch: false },
+    );
+
+    expect(result.forecasts[0].hours[0]).toMatchObject({ temperature: 20, precipitation: 2.54, windSpeed: 36, visibility: 24 });
+    expect(result.forecasts[0].sourceMetadata?.units).toMatchObject({ temperature: "°C", precipitation: "mm", windSpeed: "km/h", visibility: "km" });
+    expect(result.diagnostics.every((item) => item.status === "succeeded" && item.projectionReady)).toBe(true);
+    expect(result.diagnostics[0].variableDiagnostics?.find((variable) => variable.key === "temperature")?.slots[0])
+      .toMatchObject({ status: "normalized", rawType: "string", rawValue: "68", rawUnit: "°F" });
+  });
+
+  it("conserve la grille complète quand les timestamps sont des chaînes Unix ou ISO explicitement zonées", async () => {
+    for (const time of [
+      unixTimes.map(String),
+      unixTimes.map((seconds) => new Date(seconds * 1000).toISOString()),
+    ]) {
+      const stringTimes = completeResponse();
+      stringTimes.hourly.time = time as unknown as number[];
+      mockedFetchWeather.mockResolvedValue(response(stringTimes));
+
+      const result = await collectHourlyForecastAllModelsWithDiagnostics(
+        "2026-10-25",
+        { lat: 50.7567, lon: 2.5204 },
+        { includeBestMatch: false },
+      );
+
+      expect(result.forecasts).toHaveLength(7);
+      expect(result.diagnostics.every((item) => item.status === "succeeded" && item.projectionReady && item.hoursReceived === 25)).toBe(true);
+      expect(result.forecasts[0].hours.map((hour) => hour.validAt)).toEqual(unixTimes.map((seconds) => seconds * 1000));
+    }
+  });
+
+  it("distingue une température fournisseur absente d’une chaîne numérique normalisée ou invalide", async () => {
+    const mixedValues = completeResponse();
+    mixedValues.hourly.temperature_2m[0] = "12.5" as unknown as number;
+    mixedValues.hourly.temperature_2m[1] = null as unknown as number;
+    mixedValues.hourly.temperature_2m[2] = "Infinity" as unknown as number;
+    mockedFetchWeather.mockResolvedValue(response(mixedValues));
+
+    const result = await collectHourlyForecastAllModelsWithDiagnostics(
+      "2026-10-25",
+      { lat: 50.7567, lon: 2.5204 },
+      { includeBestMatch: false },
+    );
+    const forecast = result.forecasts.find((item) => item.modelName === "AROME")!;
+    const diagnostic = result.diagnostics.find((item) => item.modelName === "AROME")!;
+    const temperature = diagnostic.variableDiagnostics?.find((variable) => variable.key === "temperature")!;
+
+    expect(forecast.hours.slice(0, 3).map((hour) => hour.temperature)).toEqual([12.5, null, null]);
+    expect(temperature.slots.slice(0, 3).map((slot) => slot.status)).toEqual(["normalized", "provider_null", "invalid_value"]);
+    expect(temperature.slots[2]).toMatchObject({ rawType: "string", rawValue: "Infinity", rawUnit: "°C" });
+    expect(diagnostic).toMatchObject({ status: "partial", valuesReceived: 498, expectedValueCount: 500, projectionReady: false });
+  });
+
+  it("distingue les champs d’archive secondaires manquants d’une projection complète", async () => {
+    const partialArchive = completeResponse();
+    for (const key of ["rain", "showers", "snowfall", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "uv_index", "dew_point_2m", "visibility", "shortwave_radiation"]) {
+      partialArchive.hourly[key as keyof typeof partialArchive.hourly] = unixTimes.map(() => null) as never;
+    }
+    mockedFetchWeather.mockResolvedValue(response(partialArchive));
+
+    const result = await collectHourlyForecastAllModelsWithDiagnostics("2026-10-25", { lat: 50.7567, lon: 2.5204 }, { includeBestMatch: false });
+
+    expect(result.forecasts).toHaveLength(7);
+    expect(result.diagnostics.every((item) => item.status === "partial" && item.projectionReady && item.valuesReceived === 250 && item.expectedValueCount === 500)).toBe(true);
+    expect(mockedFetchWeather).toHaveBeenCalledTimes(7);
+  });
+
+  it("retient une réponse exploitable à l’archive mais interdit sa projection si un champ actif manque", async () => {
+    const missingProjectedField = completeResponse();
+    missingProjectedField.hourly.surface_pressure = unixTimes.map(() => null);
+    mockedFetchWeather.mockResolvedValue(response(missingProjectedField));
+
+    const result = await collectHourlyForecastAllModelsWithDiagnostics("2026-10-25", { lat: 50.7567, lon: 2.5204 }, { includeBestMatch: false });
+
+    expect(result.forecasts).toHaveLength(7);
+    expect(result.diagnostics.every((item) => item.status === "partial" && !item.projectionReady && item.valuesReceived === 475 && item.expectedValueCount === 500)).toBe(true);
   });
 
   it("can return the target and next Paris day for the official 48-hour composite", async () => {

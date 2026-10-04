@@ -26,6 +26,23 @@ describe("calibration par observation personnelle", () => {
     expect(personalConditionFromForecast(65, 100)).toBe("heavy_rain");
   });
 
+  it("ne transforme pas une condition absente ou invalide en ciel ensoleillé", () => {
+    expect(personalConditionFromForecast(null, null)).toBe("unknown");
+    expect(personalConditionFromForecast(Number.NaN, null)).toBe("unknown");
+    expect(personalConditionFromForecast(100, null)).toBe("unknown");
+    expect(personalConditionFromForecast(3, null)).toBe("overcast");
+    expect(personalConditionFromForecast(null, 0)).toBe("sunny");
+  });
+
+  it("n’ajoute pas un score de condition lorsqu’une des conditions est unknown", () => {
+    const result = scorePersonalModelObservation(
+      { temperature: null, condition: "unknown", windSpeed: null },
+      { temperature: null, windSpeed: null, weatherCode: null, cloudCover: null },
+    );
+    expect(result).toMatchObject({ conditionScore: null, forecastCondition: "unknown", overallScore: null });
+    expect(updatePersonalCalibration(undefined, result).comparisonCount).toBe(0);
+  });
+
   it("n’accorde aucune influence opérationnelle avant le seuil de preuve", () => {
     const result = scorePersonalModelObservation({ temperature: 24, condition: "overcast", windSpeed: null }, { temperature: 24, windSpeed: null, weatherCode: 3, cloudCover: 100 });
     const early = updatePersonalCalibration(undefined, result);

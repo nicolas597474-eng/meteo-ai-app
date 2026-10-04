@@ -313,6 +313,19 @@ describe("computeOfficialHourlyForecast", () => {
     expect(metrics.precipitation.conditionalMeanMm).not.toBeNull();
   });
 
+  it("conserve la fusion disponible malgré une forte divergence et expose son étendue", () => {
+    const forecasts = modelForecasts().map((model, index) => ({
+      ...model,
+      hours: [{ ...model.hours[0], temperature: index === 0 ? 0 : index === 1 ? 40 : null }],
+    }));
+    const result = computeOfficialHourlyForecast(forecasts, []);
+    const metrics = result.hours[0]?.multiModelMetrics?.temperature;
+
+    expect(result.hours[0]?.temp).toEqual(expect.any(Number));
+    expect(metrics).toMatchObject({ min: 0, max: 40, range: 40, availableModelCount: 2 });
+    expect(variableWeighting(result, "temperature")?.availableModelCount).toBe(2);
+  });
+
   it("ne calcule pas de dispersion avec un seul modèle température valide", () => {
     const forecasts = modelForecasts().map((model, index) => ({
       ...model,

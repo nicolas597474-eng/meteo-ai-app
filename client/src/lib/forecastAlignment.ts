@@ -24,6 +24,7 @@ export type ForecastAlignmentReadModel = {
       hour: string;
       validAt: number | null;
       temp: number | null;
+      finalValues: Array<{ variable: string; value: number | null; unit: string }>;
       modelsWithData: string[];
       weighting?: HourlyFusionTrace | null;
       precipitationAgreement?: HourlyPrecipitationAgreementTrace | null;

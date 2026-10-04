@@ -87,7 +87,8 @@ describe("cadence automatique des prévisions", () => {
     expect(source).toContain("const retryIndexes = firstPass.map");
     expect(source).toContain("modelsToCollect.map((model) => collectModel(model, 2))");
     expect(source).toContain("retryIndexes.map((index) => collectModel(modelsToCollect[index], 1))");
-    expect(source).toContain("const selected = retryQuality > firstQuality ? retry : first");
+    expect(source).toContain("const selected = retryProjectionReady !== firstProjectionReady");
+    expect(source).toContain("retry.diagnostic.valuesReceived > first.diagnostic.valuesReceived");
     expect(source).toContain("forecasts: outcomes.flatMap");
   });
 
@@ -112,7 +113,7 @@ describe("cadence automatique des prévisions", () => {
     const handler = source.slice(start, end);
     const dailyWrite = handler.indexOf("await insertForecasts(forecastRowsForLoc);");
     const dailyCounter = handler.indexOf("dailyModelsCollected += dailyCoverage.collected.length", dailyWrite);
-    const hourlyWrite = handler.indexOf("const writeResult = await insertHourlyForecasts(rows);");
+    const hourlyWrite = handler.indexOf("const writeResult = await insertHourlyForecasts(rows, { refreshProjection: diagnostic.projectionReady });");
     const hourlyCounter = handler.indexOf("hourlyModelsCollected++", hourlyWrite);
 
     expect(handler).toContain("getParisForecastSlot(new Date(), activeHours)");
@@ -121,6 +122,10 @@ describe("cadence automatique des prévisions", () => {
     expect(handler).toContain("getLocationForecastRefreshLockKey(locKey)");
     expect(handler).toContain("await upsertHourlyForecastCollectionResults(initialHourlyResults)");
     expect(handler).toContain("archiveRowsWritten = writeResult.archiveRowsWritten");
+    expect(handler).toContain("expectedHourlyValidTimes = getParisHourlyTimestamps(today)");
+    expect(handler).toContain("projectionReady: diagnostic.projectionReady");
+    expect(handler).toContain("archiveValues: hour");
+    expect(handler).toContain("{ refreshProjection: false }");
     expect(handler).toContain("OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName)");
     expect(handler).toContain("hourlyModelsExpected = uniqueLocations.length * OFFICIAL_HOURLY_COVERAGE_MODELS.length");
     expect(handler.indexOf("collectHourlyForecastAllModelsWithDiagnostics(today")).toBeLessThan(handler.indexOf("if (expertData.length === 0)"));

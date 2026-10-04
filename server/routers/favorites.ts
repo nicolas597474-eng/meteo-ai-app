@@ -119,7 +119,8 @@ export function getModeAlignedFusionConstraints(mode: LocalMode) {
 
 import { collectNearbyStations, rankStations, calculateGroundTruth, getPhysicalActiveStations, fetchCurrentModelReferences } from "../stationService";
 import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
-import { computeFusion, detectMultiRegime, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
+import { computeFusion, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
+import { buildFavoriteHourlyRegime } from "../favoriteRegime";
 import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ultraLocalService";
 import { getPreviousReadings, recordStationReadings } from "../stationReadingsCache";
 import { getParisDate } from "../weatherTime";
@@ -363,18 +364,9 @@ export const favoritesRouter = router({
 
       // Today's synthesis
       const todayForecast = forecast15d[0];
-      // Regime detection using new multi-regime system
-      const avgTemp = todayForecast?.tempMax != null && todayForecast?.tempMin != null
-        ? (todayForecast.tempMax + todayForecast.tempMin) / 2
-        : todayForecast?.tempMax ?? todayForecast?.tempMin ?? 15;
-      const multiRegimeResult = detectMultiRegime({
-        temperature: avgTemp,
-        precipitation: todayForecast?.precipitation ?? 0,
-        windSpeed: todayForecast?.windSpeed ?? 0,
-        cloudCover: todayForecast?.cloudCover ?? null,
-        humidity: null,
-        visibility: null,
-      });
+      // Use one exact hourly point; never ask the regime engine to fill missing fields.
+      const regimeSource = hourly[0] ?? null;
+      const multiRegimeResult = buildFavoriteHourlyRegime(regimeSource);
       const modeUsesLocalStations = localMode !== "standard";
       const confidenceScore = modeUsesLocalStations ? ultraLocalResult.confidenceScore : advancedFusion.confidenceScore;
       const localTemperature = modeUsesLocalStations
@@ -496,12 +488,14 @@ export const favoritesRouter = router({
           },
         },
         currentObservation,
-        multiRegime: {
+        multiRegimeStatus: multiRegimeResult ? "available" : "unknown",
+        multiRegime: multiRegimeResult ? {
+          validAt: regimeSource?.validAt ?? null,
           activeRegimes: multiRegimeResult.activeRegimes,
           confidenceScore: multiRegimeResult.confidenceScore,
           blendedWeights: multiRegimeResult.blendedWeights,
           description: multiRegimeResult.description,
-        },
+        } : null,
       };
     }),
 

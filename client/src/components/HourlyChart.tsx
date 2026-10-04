@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Clock, MapPin, X, Thermometer, Wind, Droplets, Sun, Cloud, Navigation, Gauge, Eye, ChevronDown } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { getHourlyConditionLabel } from "@/lib/hourlyConditionLabel";
+import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLabelLanes";
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
@@ -11,6 +12,7 @@ import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HourData {
+  date?: string | null;
   hour: string;
   validAt?: number;
   temp: number | null;
@@ -48,9 +50,9 @@ function getConditionLabel(cloudCover: number | null, precip: number | null, con
 function getConditionBg(cloudCover: number | null, precip: number | null, condition: string | null): string {
   const cond = (condition ?? "").toLowerCase();
   if (cond.includes("orage")) return "rgba(148, 163, 184, 0.045)";
-  if ((precip ?? 0) > 2 || cond.includes("pluie") || cond.includes("averse")) return "rgba(148, 163, 184, 0.032)";
-  if ((cloudCover ?? 0) > 75 || cond.includes("couvert")) return "rgba(148, 163, 184, 0.04)";
-  if ((cloudCover ?? 0) < 30 || cond.includes("ensoleillé")) return "rgba(255, 255, 255, 0.025)";
+  if ((precip != null && precip > 2) || cond.includes("pluie") || cond.includes("averse")) return "rgba(148, 163, 184, 0.032)";
+  if ((cloudCover != null && cloudCover > 75) || cond.includes("couvert")) return "rgba(148, 163, 184, 0.04)";
+  if ((cloudCover != null && cloudCover < 30) || cond.includes("ensoleillé")) return "rgba(255, 255, 255, 0.025)";
   return "rgba(255, 255, 255, 0.014)";
 }
 
@@ -286,6 +288,12 @@ export default function HourlyChart({ hours, locationName }: Props) {
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const displayPoints = useMemo(() => hours.map((hour) => ({
+    date: hour.date ?? null,
+    hour: hour.hour,
+    validAt: hour.validAt,
+  })), [hours]);
+  const displayLabels = useMemo(() => displayPoints.map((point) => formatHourlyDisplay(point, displayPoints)), [displayPoints]);
 
   useEffect(() => {
     if (selectedHour !== null) detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -435,12 +443,15 @@ export default function HourlyChart({ hours, locationName }: Props) {
     const visibleN = N;
 
     // Temperature curve (orange gradient)
-    const tempPts = hours.slice(0, visibleN).map((h, i) => ({ x: colX(i), y: tempToY(h.temp ?? 0) }));
+    const tempPts = hours.slice(0, visibleN).map((h, i) => ({
+      x: colX(i),
+      y: tempToY(typeof h.temp === "number" && Number.isFinite(h.temp) ? h.temp : 0),
+    }));
     if (tempPts.length > 1) drawTemperatureCurveSegments(ctx, tempPts, hours.map((hour) => hour.temp), "hourly");
     // Points + température affichée à chaque heure
     tempPts.forEach((pt, i) => {
       const v = hours[i].temp;
-      if (v == null) return;
+      if (typeof v !== "number" || !Number.isFinite(v)) return;
       const sel = selectedHour === i || nowHour === i;
       const tone = getTemperatureTone(v, "hourly");
       const isExtreme = tone.status !== "normal";
@@ -486,11 +497,23 @@ export default function HourlyChart({ hours, locationName }: Props) {
     const precipBarTop = precipZoneTop + precipLabelBand;
     const precipH = precipZoneBot - precipBarTop;
     hours.slice(0, visibleN).forEach((h, i) => {
-      const p = h.precipitation ?? 0;
+      const p = h.precipitation;
       const x = colX(i);
-      ctx.fillStyle = p > 0 ? "#dbeafe" : "rgba(191,219,254,0.92)";
       ctx.font = "700 12px system-ui";
       ctx.textAlign = "center";
+      const drawUnavailablePrecipitation = () => {
+        ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
+        ctx.fillText("—", x, precipZoneBot - 5);
+      };
+      if (p == null) {
+        drawUnavailablePrecipitation();
+        return;
+      }
+      if (!Number.isFinite(p)) {
+        drawUnavailablePrecipitation();
+        return;
+      }
+      ctx.fillStyle = p > 0 ? "#dbeafe" : "rgba(191,219,254,0.92)";
       const precipLabel = p.toFixed(1);
       const drawPrecipLabel = (labelY: number) => {
         ctx.fillStyle = p > 0 ? "#dbeafe" : "rgba(191,219,254,0.92)";
@@ -602,10 +625,12 @@ export default function HourlyChart({ hours, locationName }: Props) {
                 const cond = getConditionLabel(h.cloudCover, h.precipitation, h.condition);
                 const isCurrent = i === nowHour;
                 const isNewDay = i > 0 && h.hour === "00:00";
+                const displayLabel = displayLabels[i];
                 return (
                   <div key={`${h.hour}-${i}`} className={`relative flex flex-col items-center justify-start ${isNewDay ? "pt-5" : "pt-2"}`} style={{ width: COL_W }}>
                     {isNewDay && <span className="absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-full border border-sky-300/55 bg-sky-500/20 px-1.5 py-0.5 text-[8px] font-bold text-sky-100">Demain</span>}
-                    <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{h.hour}</span>
+                    <span className={`text-[10px] font-semibold ${isCurrent ? "text-blue-100" : "text-slate-300"}`}>{displayLabel?.hourLabel ?? h.hour}</span>
+                    {displayLabel?.offsetLabel && <span className="text-[8px] leading-none text-sky-200/80" title="Offset exact de l’instant UTC">{displayLabel.offsetLabel.replace("Europe/Paris ", "")}</span>}
                     <span className="mt-1.5"><WeatherIconSVG condition={cond} size={31} /></span>
                   </div>
                 );

@@ -6,6 +6,7 @@ type HourlyDebugPoint = {
   date: string | null;
   hour: string;
   validAt: number | null;
+  finalValues?: Array<{ variable: string; value: number | null; unit: string }>;
   weighting?: HourlyFusionTrace | null;
   precipitationAgreement?: HourlyPrecipitationAgreementTrace | null;
 };
@@ -123,6 +124,23 @@ export function HourlyFusionDebugPanel({
 
     {!selected ? <p className="rounded-lg border border-slate-700 bg-slate-950/35 px-2.5 py-2 text-[10px] text-slate-400">Aucune échéance horaire vérifiable n’est disponible.</p> : <>
       <p className="text-[9px] text-slate-400">TARGET : {formatInstant(selected.validAt)} · {weighting ? `${weighting.contributingModelCount}/${weighting.expectedModelCount} contributeurs tous champs confondus` : "diagnostics de fusion indisponibles"}. La disponibilité et la calibration restent deux statuts distincts.</p>
+
+      {selected.finalValues && <section className="rounded-lg border border-sky-300/15 bg-sky-300/[0.035] p-2" aria-label="Valeurs finales fusionnées par variable">
+        <p className="text-[10px] font-semibold text-sky-100">Valeurs finales de la fusion · cette échéance</p>
+        <p className="mt-0.5 text-[9px] text-slate-400">Valeurs réellement renvoyées par le moteur; zéro est conservé et une valeur null reste indisponible.</p>
+        <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
+          {selected.finalValues.map((finalValue) => {
+            const variableWeighting = weighting?.variableWeightings.find((item) => item.variable === finalValue.variable);
+            const status = variableWeighting
+              ? statusLabel(variableWeighting.availabilityStatus)
+              : finalValue.value == null ? "aucune valeur finale" : "trace de pondération indisponible";
+            const digits = finalValue.variable === "weather_code" ? 0 : 2;
+            return <p key={finalValue.variable} className="rounded-md bg-slate-950/35 px-2 py-1 text-[9px] text-slate-300">
+              {variableLabel(finalValue.variable)} : <span className="font-semibold text-slate-100">{finalValue.value == null ? "indisponible" : `${formatNumber(finalValue.value, digits)} ${finalValue.unit}`}</span> · {status}
+            </p>;
+          })}
+        </div>
+      </section>}
 
       {weighting ? <div className="space-y-1.5">
         {weighting.variableWeightings.map((variable) => <details key={variable.variable} className="rounded-lg border border-slate-700/80 bg-slate-950/30 p-2" open={variable.variable === "temperature"}>

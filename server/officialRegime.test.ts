@@ -1,73 +1,126 @@
 import { describe, expect, it } from "vitest";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "./officialRegime";
 
+const now = Date.parse("2026-08-12T08:00:00.000Z");
+const completeSnapshot = {
+  tempMax: 24,
+  tempMin: 14,
+  precipitation: 0,
+  windSpeed: 10,
+  humidity: 55,
+  cloudCover: 65,
+  visibilityKm: 10,
+  computedAt: new Date("2026-08-12T05:00:00.000Z"),
+};
+
 describe("buildOperationalRegime", () => {
-  it("privilégie une observation plus récente, fraîche et couvrant la nébulosité", () => {
-    const now = Date.parse("2026-08-12T08:00:00.000Z");
+  it("privilégie une observation plus récente, fraîche et complètement renseignée", () => {
     const regime = buildOperationalRegime(
-      { tempMax: 24, tempMin: 14, precipitation: 0, windSpeed: 10, cloudCover: 65, computedAt: new Date("2026-08-12T05:00:00.000Z") },
-      { tempMax: 20, tempMin: 12, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 30, collectedAt: new Date("2026-08-12T07:30:00.000Z") },
+      completeSnapshot,
+      {
+        tempMax: 20,
+        tempMin: 12,
+        precipitation: 0,
+        windSpeed: 8,
+        humidity: 55,
+        cloudCover: 30,
+        visibilityKm: 10,
+        collectedAt: new Date("2026-08-12T07:30:00.000Z"),
+      },
       undefined,
       now,
     );
+    expect(regime.status).toBe("available");
     expect(regime.source).toBe("fresh_observation");
-    expect(regime.primary.id).toBe("few_clouds");
+    expect(regime.primary?.id).toBe("few_clouds");
     expect(regime.sourceAgeMinutes).toBe(30);
   });
 
-  it("conserve la fusion officielle lorsqu’une observation est trop ancienne ou incomplète", () => {
-    const now = Date.parse("2026-08-12T08:00:00.000Z");
+  it("conserve le snapshot complet lorsqu’une observation est trop ancienne ou incomplète", () => {
     const regime = buildOperationalRegime(
-      { tempMax: 24, tempMin: 14, precipitation: 0, windSpeed: 10, cloudCover: 65, computedAt: new Date("2026-08-12T05:00:00.000Z") },
+      completeSnapshot,
       { tempMax: 20, precipitation: 0, windSpeed: 8, cloudCover: 30, collectedAt: new Date("2026-08-12T03:00:00.000Z") },
       undefined,
       now,
     );
+    expect(regime.status).toBe("available");
     expect(regime.source).toBe("official_snapshot");
-    expect(regime.primary.id).toBe("partly_cloudy");
+    expect(regime.primary?.id).toBe("partly_cloudy");
   });
 
-  it("privilégie la prévision horaire actualisée pour une condition actuelle sans observation fraîche", () => {
-    const now = Date.parse("2026-08-12T08:00:00.000Z");
+  it("privilégie une prévision horaire complète et conserve zéro comme valeur réelle", () => {
     const regime = buildOperationalRegime(
-      { tempMax: 24, tempMin: 14, precipitation: 0, windSpeed: 10, cloudCover: 65, computedAt: new Date("2026-08-12T05:00:00.000Z") },
       null,
-      { temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, updatedAt: new Date("2026-08-12T07:55:00.000Z") },
+      null,
+      { temp: 0, precipitation: 0, windSpeed: 0, humidity: 0, cloudCover: 0, visibilityKm: 10, updatedAt: new Date("2026-08-12T07:55:00.000Z") },
       now,
     );
+    expect(regime.status).toBe("available");
     expect(regime.source).toBe("hourly_forecast");
-    expect(regime.primary.id).toBe("sunny");
+    expect(regime.primary?.id).toBe("sunny");
+    expect(regime.params).toMatchObject({ temperature: 0, precipitation: 0, windSpeed: 0, humidity: 0, cloudCover: 0 });
   });
 
-  it("retourne le premier changement de régime dans les créneaux futurs", () => {
+  it("renvoie unknown plutôt que de remplacer une entrée officielle manquante par 15/0/0", () => {
+    const regime = buildOperationalRegime(
+      { ...completeSnapshot, precipitation: null, windSpeed: null, visibilityKm: null },
+      null,
+      undefined,
+      now,
+    );
+    expect(regime.status).toBe("unknown");
+    expect(regime.primary).toBeNull();
+    expect(regime.active).toEqual([]);
+    expect(regime.confidence).toBeNull();
+    expect(regime.blendedWeights).toBeNull();
+    expect(regime.params).toMatchObject({ temperature: 19, precipitation: null, windSpeed: null, visibilityKm: null });
+    expect(regime.description).toMatch(/indisponible/i);
+  });
+
+  it("ne classe pas un instant horaire partiel ou non fini et ne fabrique pas de changement futur", () => {
+    const regime = buildOperationalRegime(
+      null,
+      null,
+      { temp: 18, precipitation: 0, windSpeed: null, humidity: 45, cloudCover: 0, visibilityKm: null, updatedAt: new Date("2026-08-12T07:55:00.000Z") },
+      now,
+    );
+    expect(regime.status).toBe("unknown");
+    expect(regime.primary).toBeNull();
+    expect(regime.params).toMatchObject({ temperature: 18, precipitation: 0, windSpeed: null, visibilityKm: null });
+
+    const nextChange = findNextHourlyRegimeChange([
+      { hour: "09:00", temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, visibilityKm: 10 },
+      { hour: "10:00", temp: 19, precipitation: null, windSpeed: 8, humidity: 45, cloudCover: 95, visibilityKm: 10 },
+    ], "09:00", "sunny");
+    expect(nextChange).toBeNull();
+  });
+
+  it("retourne le premier changement de régime dans les créneaux futurs complets", () => {
     const change = findNextHourlyRegimeChange([
-      { hour: "09:00", temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
-      { hour: "10:00", temp: 19, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
-      { hour: "11:00", temp: 19, precipitation: 0, windSpeed: 10, humidity: 55, cloudCover: 60 },
+      { hour: "09:00", temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, visibilityKm: 10 },
+      { hour: "10:00", temp: 19, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, visibilityKm: 10 },
+      { hour: "11:00", temp: 19, precipitation: 0, windSpeed: 10, humidity: 55, cloudCover: 60, visibilityKm: 10 },
     ], "09:00", "sunny");
     expect(change).toMatchObject({ hour: "11:00", id: "partly_cloudy", cloudCover: 60 });
   });
 
   it("normalise les heures sans zéro initial pour détecter le prochain changement", () => {
     const change = findNextHourlyRegimeChange([
-      { hour: "6:00", temp: 15, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 4 },
-      { hour: "07:00", temp: 16, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 8 },
-      { hour: "08:00", temp: 17, precipitation: 0, windSpeed: 6, humidity: 55, cloudCover: 65 },
+      { hour: "6:00", temp: 15, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 4, visibilityKm: 10 },
+      { hour: "07:00", temp: 16, precipitation: 0, windSpeed: 5, humidity: 50, cloudCover: 8, visibilityKm: 10 },
+      { hour: "08:00", temp: 17, precipitation: 0, windSpeed: 6, humidity: 55, cloudCover: 65, visibilityKm: 10 },
     ], "06:00", "sunny");
-
     expect(change).toMatchObject({ hour: "08:00", id: "partly_cloudy", cloudCover: 65 });
   });
 
   it("utilise validAt pour la seconde heure locale répétée au changement d’heure", () => {
     const hours = [
-      { hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
-      { hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 60 },
-      { hour: "03:00", validAt: Date.parse("2026-10-25T02:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 60 },
-      { hour: "04:00", validAt: Date.parse("2026-10-25T03:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0 },
+      { hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, visibilityKm: 10 },
+      { hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 60, visibilityKm: 10 },
+      { hour: "03:00", validAt: Date.parse("2026-10-25T02:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 60, visibilityKm: 10 },
+      { hour: "04:00", validAt: Date.parse("2026-10-25T03:00:00.000Z"), temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, visibilityKm: 10 },
     ];
-
     const change = findNextHourlyRegimeChange(hours, "02:00", "partly_cloudy", hours[1].validAt);
-
     expect(change).toMatchObject({ hour: "04:00", id: "sunny" });
   });
 });

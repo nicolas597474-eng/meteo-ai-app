@@ -165,4 +165,36 @@ describe("AI Lab forecast comparison read-model", () => {
     expect(result.hourlyForecast.points[0]).toMatchObject({ validAt: null, temp: null });
     expect(result.dailyForecast.days[0]).toMatchObject({ tempMax: null, tempMin: null });
   });
+
+  it("exposes the final per-variable values without converting real zero or missing values", () => {
+    const detailed = {
+      ...snapshot,
+      hourly: [{
+        ...snapshot.hourly[0],
+        apparentTemp: 18.5,
+        precipitation: 0,
+        windSpeed: 0,
+        windGust: null,
+        windDirection: 0,
+        humidity: 70,
+        pressure: 1005,
+        cloudCover: 0,
+        weatherCode: 0,
+      }],
+    } as unknown as OfficialWeatherSnapshot;
+    const point = buildAILabForecastComparisonReadModel(detailed, { lat: 50.756, lon: 2.521 }).hourlyForecast.points[0]!;
+
+    expect(point.finalValues).toEqual([
+      { variable: "temperature", value: 19.5, unit: "°C" },
+      { variable: "apparent_temperature", value: 18.5, unit: "°C" },
+      { variable: "precipitation", value: 0, unit: "mm" },
+      { variable: "wind_speed", value: 0, unit: "km/h" },
+      { variable: "wind_direction", value: 0, unit: "°" },
+      { variable: "wind_gust", value: null, unit: "km/h" },
+      { variable: "humidity", value: 70, unit: "%" },
+      { variable: "pressure", value: 1005, unit: "hPa" },
+      { variable: "cloud_cover", value: 0, unit: "%" },
+      { variable: "weather_code", value: 0, unit: "WMO" },
+    ]);
+  });
 });

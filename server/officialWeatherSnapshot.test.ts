@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, getOfficialWeatherSnapshotCacheKey, mergeManualHourlyForecast, refreshOfficialWeatherSnapshotForecastWindow } from "./officialWeatherSnapshot";
+import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, getOfficialWeatherSnapshotCacheKey, isHourlyCoverageNonDecreasing, mergeManualHourlyForecast, refreshOfficialWeatherSnapshotForecastWindow } from "./officialWeatherSnapshot";
 import { makeLocationKey } from "./db";
 
 const unavailableWeighting = {
@@ -157,6 +157,42 @@ describe("buildOfficialWeatherSnapshot", () => {
     expect(refreshed.hourly).toMatchObject([{ validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 24 }]);
     expect(refreshed.validAt).toBe("2026-08-12T15:00");
     expect(refreshed.currentSnapshot).toEqual(modelCurrentSnapshot);
+  });
+
+  it("refuse une relance horaire vide ou moins couverte sans masquer une série officielle valide", () => {
+    const snapshot = buildOfficialWeatherSnapshot({
+      lat: 50.75646,
+      lon: 2.52085,
+      weatherDate: "2026-08-12",
+      computedAt: new Date("2026-08-12T12:01:00.000Z"),
+      hourlyWeighting: unavailableWeighting,
+      parisHour: "14",
+      hourly: [
+        { date: "2026-08-12", hour: "14:00", validAt: Date.parse("2026-08-12T12:00:00.000Z"), temp: 0, apparentTemp: 0, precipitation: 0, windSpeed: 0, windGust: 0, windDirection: 0, cloudCover: 0, humidity: 0, uvIndex: 0, condition: "Ensoleillé" },
+        { date: "2026-08-12", hour: "15:00", validAt: Date.parse("2026-08-12T13:00:00.000Z"), temp: 12, apparentTemp: 12, precipitation: 0, windSpeed: 4, windGust: 5, windDirection: 10, cloudCover: 10, humidity: 55, uvIndex: 2, condition: "Ensoleillé" },
+      ],
+      currentSnapshot: modelCurrentSnapshot,
+      daily: [],
+      modelsUsed: ["ECMWF"],
+    });
+    const partial = snapshot.hourly.map((point, index) => index === 0 ? { ...point, temp: null } : point);
+    const emptyRefresh = mergeManualHourlyForecast(snapshot, [], new Date("2026-08-12T12:10:00.000Z"));
+    const partialRefresh = mergeManualHourlyForecast(snapshot, partial, new Date("2026-08-12T12:10:00.000Z"));
+
+    expect(isHourlyCoverageNonDecreasing(snapshot.hourly, [])).toBe(false);
+    expect(isHourlyCoverageNonDecreasing(snapshot.hourly, partial)).toBe(false);
+    expect(emptyRefresh).toBe(snapshot);
+    expect(partialRefresh).toBe(snapshot);
+    expect(snapshot.hourly[0].temp).toBe(0);
+
+    const completeRefresh = mergeManualHourlyForecast(
+      snapshot,
+      snapshot.hourly.map((point) => ({ ...point, temp: 0 })),
+      new Date("2026-08-12T12:10:00.000Z"),
+    );
+    expect(completeRefresh.hourly).toHaveLength(2);
+    expect(completeRefresh.hourly[0].temp).toBe(0);
+    expect(completeRefresh.hourlyOverride?.source).toBe("manual_refresh");
   });
 
   it("conserve la date et l’horodatage d’une fusion quotidienne sans la présenter comme horaire", () => {

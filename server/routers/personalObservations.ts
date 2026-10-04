@@ -5,7 +5,7 @@ import {
   getAllPersonalWeatherObservations,
   getPersonalWeatherObservationById,
   getRecentPersonalWeatherObservations,
-  getStoredHourlyForecasts,
+  getHourlyForecastRunValues,
   insertPersonalModelObservationScores,
   insertPersonalWeatherObservation,
   makeLocationKey,
@@ -19,9 +19,10 @@ import {
   scorePersonalModelObservation,
   updatePersonalCalibration,
 } from "../personalCalibration";
-import { getParisDate, getParisHour } from "../weatherTime";
+import { getParisDate, getParisHourlyTimestamps } from "../weatherTime";
 import { conditionFromWmoWeatherCode } from "../weatherConditionLabels";
 import { rebuildPersonalCalibration } from "../personalObservationHistory";
+import { getLatestCompletePersonalHourlyForecasts } from "../personalHourlyForecast";
 
 const observationInput = z.object({
   lat: z.number().min(-90).max(90),
@@ -69,21 +70,25 @@ export const personalObservationsRouter = router({
     .query(async ({ ctx, input }) => {
       const now = new Date();
       const locationKey = makeLocationKey(input.lat, input.lon);
-      const [calibrations, forecasts] = await Promise.all([
+      const targetDate = getParisDate(now);
+      const [calibrations, archivedValues] = await Promise.all([
         getPersonalModelCalibrations(ctx.user.id, locationKey),
-        getStoredHourlyForecasts(locationKey, getParisDate(now)),
+        getHourlyForecastRunValues(locationKey, targetDate),
       ]);
       const qualified = new Map(calibrations.filter((item) => item.evidenceState === "qualified").map((item) => [item.modelName, item.weightMultiplier]));
       if (qualified.size === 0) return { applied: false, hours: [], comparedModels: [] as string[] };
-      const byHour = new Map<number, typeof forecasts>();
-      for (const forecast of forecasts) byHour.set(forecast.hour, [...(byHour.get(forecast.hour) ?? []), forecast]);
-      const hours = Array.from(byHour.entries()).sort(([a], [b]) => a - b).flatMap(([hour, rows]) => {
+      const forecasts = getLatestCompletePersonalHourlyForecasts(archivedValues, getParisHourlyTimestamps(targetDate));
+      const byValidAt = new Map<number, typeof forecasts>();
+      for (const forecast of forecasts) byValidAt.set(forecast.validAt, [...(byValidAt.get(forecast.validAt) ?? []), forecast]);
+      const hours = Array.from(byValidAt.entries()).sort(([a], [b]) => a - b).flatMap(([validAt, rows]) => {
         const weightedRows = rows.filter((row) => qualified.has(row.modelName)).map((row) => ({ row, weight: qualified.get(row.modelName) ?? 1 }));
         if (weightedRows.length === 0) return [];
         const leading = [...weightedRows].sort((a, b) => b.weight - a.weight)[0].row;
         const temperatures = weightedRows.map(({ row }) => row.temperature).filter((value): value is number => value != null);
         return [{
-          hour: `${String(hour).padStart(2, "0")}:00`,
+          date: leading.date,
+          hour: `${String(leading.hour).padStart(2, "0")}:00`,
+          validAt,
           temp: weightedAverage(weightedRows.map(({ row, weight }) => ({ value: row.temperature, weight }))),
           apparentTemp: weightedAverage(weightedRows.map(({ row, weight }) => ({ value: row.apparentTemperature, weight }))),
           precipitation: weightedAverage(weightedRows.map(({ row, weight }) => ({ value: row.precipitation, weight }))),
@@ -145,18 +150,22 @@ export const personalObservationsRouter = router({
     });
     if (!observationId) throw new Error("L’observation n’a pas pu être enregistrée.");
 
-    const [storedForecasts, calibrations] = await Promise.all([
-      getStoredHourlyForecasts(locationKey, getParisDate(now)),
+    const targetDate = getParisDate(now);
+    const [archivedValues, calibrations] = await Promise.all([
+      getHourlyForecastRunValues(locationKey, targetDate),
       getPersonalModelCalibrations(ctx.user.id, locationKey),
     ]);
     const priorByModel = new Map(calibrations.map((calibration) => [calibration.modelName, calibration]));
-    const alignedForecasts = storedForecasts.filter((forecast) => forecast.hour === getParisHour(now));
+    const observationValidAt = Math.floor(observedAt / 3_600_000) * 3_600_000;
+    const storedForecasts = getLatestCompletePersonalHourlyForecasts(archivedValues, getParisHourlyTimestamps(targetDate));
+    const alignedForecasts = storedForecasts.filter((forecast) => forecast.validAt === observationValidAt);
     const modelResults = alignedForecasts.map((forecast) => {
       const result = scorePersonalModelObservation(input, forecast);
       return { forecast, result };
     });
+    const scorableModelResults = modelResults.filter(({ result }) => result.overallScore != null);
 
-    await insertPersonalModelObservationScores(modelResults.map(({ forecast, result }) => ({
+    if (scorableModelResults.length > 0) await insertPersonalModelObservationScores(scorableModelResults.map(({ forecast, result }) => ({
       observationId,
       modelName: forecast.modelName,
       temperatureError: result.temperatureError,
@@ -165,7 +174,7 @@ export const personalObservationsRouter = router({
         precipitationError: result.precipitationError,
         precipitationScore: result.precipitationScore,
         windScore: result.windScore,
-      overallScore: result.overallScore,
+      overallScore: result.overallScore!,
       forecastSnapshot: {
         temperature: forecast.temperature,
         windSpeed: forecast.windSpeed,
@@ -176,7 +185,7 @@ export const personalObservationsRouter = router({
       },
     })));
 
-    for (const { forecast, result } of modelResults) {
+    for (const { forecast, result } of scorableModelResults) {
       const updated = updatePersonalCalibration(priorByModel.get(forecast.modelName), result);
       await upsertPersonalModelCalibration({
         userId: ctx.user.id,
@@ -190,9 +199,12 @@ export const personalObservationsRouter = router({
     return {
       observationId,
       matchedModelCount: modelResults.length,
+      scoredModelCount: scorableModelResults.length,
       notice: modelResults.length === 0
         ? "Observation enregistrée, mais aucune prévision archivée ne correspond encore à ce créneau."
-        : "Observation comparée aux prévisions archivées du même lieu et du même créneau.",
+        : scorableModelResults.length === 0
+          ? "Des prévisions sont alignées, mais aucune paire ne contient de variable comparable valide; aucun score ni poids de calibration n’a été modifié."
+          : "Observation comparée aux prévisions archivées du même lieu et du même créneau.",
     };
   }),
 });

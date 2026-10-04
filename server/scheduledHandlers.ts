@@ -11,10 +11,10 @@ import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, collectExpertForecasts, collectExpertForecastsWithDiagnostics, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
 import { buildHourlyModelCollectionCoverage, confirmDailyArchiveCoverage, HOURLY_FORECAST_VARIABLES, type DailyModelCollectionCoverage } from "./forecastVariableCoverage";
-import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour } from "./weatherTime";
+import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour, getParisHourlyTimestamps } from "./weatherTime";
 import { getActiveParisForecastHours } from "./forecastScheduleConfig";
 import { FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, FORECAST_REFRESH_LOCK_LEASE_MS, getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
-import { conditionFromWeatherValues } from "./weatherConditionLabels";
+import { aggregateForecastCondition } from "./weatherConditionAggregation";
 import { isOperationalObservation } from "./observationProvenance";
 import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
 import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows } from "./dailyForecastPerformance";
@@ -866,10 +866,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
  * Determine majority weather condition from forecasts
  */
 function determineMajorityCondition(forecasts: any[]): string {
-  // Since Open-Meteo doesn't provide text conditions, infer from data
-  const avgPrecip = forecasts.reduce((sum, f) => sum + (f.precipitation ?? 0), 0) / forecasts.length;
-  const avgCloud = forecasts.reduce((sum, f) => sum + (f.cloudCover ?? 50), 0) / forecasts.length;
-  return conditionFromWeatherValues(avgPrecip, avgCloud);
+  return aggregateForecastCondition(forecasts);
 }
 
 /**
@@ -1126,6 +1123,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         // model ids are eligible for the official hourly engine.
         const hourlyRequestStartedAt = Date.now();
         const hourlyAttemptedAt = Date.now();
+        const expectedHourlyValidTimes = getParisHourlyTimestamps(today);
+        const expectedHourlyValueCount = expectedHourlyValidTimes.length * HOURLY_FORECAST_VARIABLES.length;
         const officialModelNames = new Set<string>(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
         const hourlyCollectionCatalog = WEATHER_SERVICES.expert.map((service) => ({
           modelName: service.name === "Open-Meteo" ? "best_match" : service.name,
@@ -1145,7 +1144,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           requestAttempts: 0,
           hoursReceived: 0,
           valuesReceived: 0,
-          expectedValueCount: 0,
+          expectedValueCount: expectedHourlyValueCount,
           archiveRowsWritten: 0,
           projectionRowsWritten: 0,
           errorCode: null,
@@ -1174,7 +1173,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               attemptCount: 0,
               hoursReceived: 0,
               valuesReceived: 0,
-              expectedValueCount: 0,
+              expectedValueCount: expectedHourlyValueCount,
+              expectedHoursCount: expectedHourlyValidTimes.length,
+              projectionReady: false,
               errorCode: "collection_failed",
             };
             const forecast = forecastsByModel.get(model.modelName);
@@ -1212,14 +1213,21 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 weatherCode: hour.weatherCode,
               }));
               try {
-                const writeResult = await insertHourlyForecasts(rows);
+                const writeResult = await insertHourlyForecasts(rows, { refreshProjection: diagnostic.projectionReady });
                 archiveRowsWritten = writeResult.archiveRowsWritten;
                 projectionRowsWritten = writeResult.projectionRowsWritten;
-                finalStatus = diagnostic.status === "succeeded"
-                  && archiveRowsWritten === forecast.hours.length * HOURLY_FORECAST_VARIABLES.length
-                  && projectionRowsWritten === forecast.hours.length
-                  ? "succeeded"
-                  : "partial";
+                finalStatus = diagnostic.status === "failed" || diagnostic.status === "safe_error"
+                  ? diagnostic.status
+                  : diagnostic.status === "succeeded"
+                    && archiveRowsWritten === diagnostic.expectedValueCount
+                    && projectionRowsWritten === diagnostic.expectedHoursCount
+                    ? "succeeded"
+                    : "partial";
+                if (finalStatus === "partial" && !errorCode) {
+                  errorCode = diagnostic.projectionReady
+                    ? "partial_archive_projection_published"
+                    : "partial_projection_retained";
+                }
               } catch (writeError) {
                 if (writeError instanceof HourlyForecastPersistenceError) {
                   archiveRowsWritten = writeError.archiveRowsWritten;
@@ -1242,13 +1250,17 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               requestAttempts: diagnostic.attemptCount,
               errorCode: finalStatus === "succeeded" ? null : errorCode,
               requestedForecastDays: 2,
+              expectedHoursCount: diagnostic.expectedHoursCount,
+              expectedValidTimes: expectedHourlyValidTimes,
+              projectionReady: diagnostic.projectionReady,
+              variableDiagnostics: diagnostic.variableDiagnostics,
               hours: forecast?.hours ?? [],
               units: forecast?.sourceMetadata?.units,
               archiveRowsWritten,
               projectionRowsWritten,
             });
 
-            if (archiveRowsWritten > 0 && OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName) && !persistedHourlyModelNames.has(model.modelName)) {
+            if (diagnostic.valuesReceived > 0 && archiveRowsWritten > 0 && OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName) && !persistedHourlyModelNames.has(model.modelName)) {
               persistedHourlyModelNames.add(model.modelName);
               hourlyModelsCollected++;
             }
@@ -1302,6 +1314,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                   requestStartedAt: forecast.requestStartedAt,
                   availableAt: forecast.availableAt,
                 },
+                archiveValues: hour,
                 modelName: `${modelName} · validation`,
                 temperature: hour.temperature,
                 apparentTemperature: hour.apparentTemperature,
@@ -1312,7 +1325,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 humidity: hour.humidity,
                 cloudCover: hour.cloudCover,
                 weatherCode: hour.weatherCode,
-              })));
+              })), { refreshProjection: false });
             }
             console.log(`[Validation] ${fav.name}: ${validationHourly.length} source(s) horaire(s) candidate(s)`);
           } catch {
@@ -1339,7 +1352,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 requestAttempts: 0,
                 hoursReceived: 0,
                 valuesReceived: 0,
-                expectedValueCount: 0,
+                expectedValueCount: expectedHourlyValueCount,
                 archiveRowsWritten: 0,
                 projectionRowsWritten: 0,
                 errorCode: "collection_failed",

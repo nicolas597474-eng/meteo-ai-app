@@ -28,6 +28,8 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("summary={day.precipitationConsensus}");
     expect(source).toContain("if (p == null) return");
     expect(source).toContain("day.precipitation == null ? \"—\"");
+    expect(source).toContain('return condition ?? "Conditions indisponibles"');
+    expect(source).toContain("cloudCover != null && cloudCover < 30");
     expect(source).not.toContain("getFeltLabelY");
     expect(source).toContain("TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE");
     expect(source).toContain("TEMPERATURE_LABEL_ABOVE_GAP");

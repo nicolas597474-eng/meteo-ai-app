@@ -1646,7 +1646,7 @@ type InsertHourlyForecastWithCapture = InsertHourlyForecast & {
  * Preserves the current latest-series behavior while first appending verified
  * UTC-timed values to the immutable capture archive when run metadata is present.
  */
-export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCapture[]): Promise<{
+export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCapture[], options: { refreshProjection?: boolean } = {}): Promise<{
   archiveRowsWritten: number;
   projectionRowsWritten: number;
 }> {
@@ -1693,8 +1693,8 @@ export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCaptur
       if (runValues.length > 0) {
         await db.transaction(async (tx) => {
           for (let i = 0; i < runValues.length; i += 100) {
-          await tx.insert(hourlyForecastRunValues).values(runValues.slice(i, i + 100));
-        }
+            await tx.insert(hourlyForecastRunValues).values(runValues.slice(i, i + 100));
+          }
         });
         confirmCommittedRows(runValues.length);
       }
@@ -1713,7 +1713,7 @@ export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCaptur
       }
     });
     confirmCommittedRows(rows.length);
-  });
+  }, { skipProjection: options.refreshProjection === false });
 }
 
 /**

@@ -7,6 +7,28 @@ export type VariableCoverageStatus =
   | "request_failed"
   | "unconfirmed";
 
+export type HourlySourceValueStatus =
+  | "valid"
+  | "normalized"
+  | "provider_null"
+  | "field_missing"
+  | "invalid_value"
+  | "unit_mismatch"
+  | "no_model_data"
+  | "time_mismatch"
+  | "source_error";
+
+export type HourlyVariableSourceDiagnostic = {
+  key: string;
+  slots: Array<{
+    validAt: number;
+    status: HourlySourceValueStatus;
+    rawType: string | null;
+    rawValue: string | null;
+    rawUnit: string | null;
+  }>;
+};
+
 export const HOURLY_FORECAST_VARIABLES = [
   { key: "temperature", apiKey: "temperature_2m", label: "Température", valueField: "temperature", unitField: "temperature", defaultUnit: "°C", consumerProjected: true },
   { key: "apparent_temperature", apiKey: "apparent_temperature", label: "Ressenti", valueField: "apparentTemperature", unitField: "apparentTemperature", defaultUnit: "°C", consumerProjected: true },
@@ -234,10 +256,18 @@ export type HourlyVariableCoverage = {
   exposedCount: number;
   consumerProjected: boolean;
   unit: string | null;
+  sourceStatusCounts: Record<HourlySourceValueStatus, number>;
+  sourceIssues: Array<{
+    validAt: string;
+    status: Exclude<HourlySourceValueStatus, "valid">;
+    rawType: string | null;
+    rawValue: string | null;
+    rawUnit: string | null;
+  }>;
 };
 
 export type HourlyModelCollectionCoverage = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   modelName: string;
   modelId: string | null;
   isOfficialModel: boolean;
@@ -246,6 +276,13 @@ export type HourlyModelCollectionCoverage = {
   errorCode: string | null;
   requestedForecastDays: number;
   returnedHours: number;
+  expectedHoursCount: number;
+  receivedUniqueHours: number;
+  missingHoursCount: number;
+  unexpectedHoursCount: number;
+  duplicateHoursCount: number;
+  projectionReady: boolean;
+  archiveRowsComplete: boolean;
   firstValidAt: string | null;
   lastValidAt: string | null;
   maximumDocumentedDays: number | null;
@@ -264,43 +301,93 @@ export function buildHourlyModelCollectionCoverage(input: {
   requestAttempts: number;
   errorCode: string | null;
   requestedForecastDays: number;
+  expectedHoursCount?: number;
+  expectedValidTimes?: readonly number[];
   hours: Array<Record<string, unknown> & { validAt: number }>;
+  projectionReady?: boolean;
   units?: Record<string, unknown> | null;
   archiveRowsWritten: number;
   projectionRowsWritten: number;
+  variableDiagnostics?: HourlyVariableSourceDiagnostic[];
 }): HourlyModelCollectionCoverage {
   const horizon = MODEL_FORECAST_HORIZONS[input.modelName] ?? MODEL_FORECAST_HORIZONS.best_match;
+  const expectedValidTimes = input.expectedValidTimes?.filter((value) => Number.isFinite(value)) ?? [];
+  const expectedHoursCount = input.expectedHoursCount ?? (expectedValidTimes.length || input.hours.length);
+  const expectedTimeSet = expectedValidTimes.length > 0 ? new Set(expectedValidTimes) : null;
+  const receivedTimes = new Set(input.hours.map((hour) => hour.validAt).filter((value) => Number.isFinite(value)));
+  const validTimeCounts = new Map<number, number>();
+  for (const hour of input.hours) {
+    if (Number.isFinite(hour.validAt)) validTimeCounts.set(hour.validAt, (validTimeCounts.get(hour.validAt) ?? 0) + 1);
+  }
+  const duplicateHoursCount = Array.from(validTimeCounts.values()).reduce((count, occurrences) => count + Math.max(0, occurrences - 1), 0);
+  const receivedExpectedTimes = expectedTimeSet
+    ? Array.from(expectedTimeSet).filter((validAt) => receivedTimes.has(validAt)).length
+    : Math.min(expectedHoursCount, receivedTimes.size);
+  const missingHoursCount = Math.max(0, expectedHoursCount - receivedExpectedTimes);
+  const unexpectedHoursCount = Math.max(0, receivedTimes.size - receivedExpectedTimes);
   const archiveVariablesPerHour = HOURLY_FORECAST_VARIABLES.length;
-  const expectedArchiveRows = input.hours.length * archiveVariablesPerHour;
-  const archiveCompleted = expectedArchiveRows > 0 && input.archiveRowsWritten === expectedArchiveRows;
-  const projectionCompleted = input.hours.length > 0 && input.projectionRowsWritten === input.hours.length;
+  const expectedArchiveRows = expectedHoursCount * archiveVariablesPerHour;
+  const archiveRowsComplete = expectedArchiveRows > 0 && input.archiveRowsWritten === expectedArchiveRows;
+  const projectionReady = input.projectionReady ?? (expectedHoursCount > 0 && input.projectionRowsWritten === expectedHoursCount);
+  const projectionCompleted = projectionReady && expectedHoursCount > 0 && input.projectionRowsWritten === expectedHoursCount;
   const variables: HourlyVariableCoverage[] = HOURLY_FORECAST_VARIABLES.map((definition) => {
-    const receivedCount = input.hours.reduce((count, hour) => count + (finiteCoverageValue(hour[definition.valueField]) == null ? 0 : 1), 0);
-    const status: VariableCoverageStatus = input.hours.length === 0
+    const hasValueAt = (validAt: number) => input.hours.some((hour) => hour.validAt === validAt && finiteCoverageValue(hour[definition.valueField]) != null);
+    const receivedCount = expectedTimeSet
+      ? Array.from(expectedTimeSet).reduce((count, validAt) => count + (hasValueAt(validAt) ? 1 : 0), 0)
+      : input.hours.reduce((count, hour) => count + (finiteCoverageValue(hour[definition.valueField]) == null ? 0 : 1), 0);
+    const status: VariableCoverageStatus = expectedHoursCount === 0
       ? "request_failed"
-      : receivedCount === input.hours.length
+      : receivedCount === expectedHoursCount
         ? "available"
         : receivedCount > 0
           ? "partial"
           : "missing";
     const consumerProjected = definition.consumerProjected;
+    const sourceDiagnostic = input.variableDiagnostics?.find((diagnostic) => diagnostic.key === definition.key);
+    const diagnosticTimes = expectedValidTimes.length > 0
+      ? expectedValidTimes
+      : input.hours.map((hour) => hour.validAt).filter((validAt) => Number.isFinite(validAt));
+    const sourceStates = diagnosticTimes.map((validAt) => {
+      const supplied = sourceDiagnostic?.slots.find((slot) => slot.validAt === validAt);
+      if (supplied) return supplied;
+      const hour = input.hours.find((candidate) => candidate.validAt === validAt);
+      const fallbackStatus: HourlySourceValueStatus = input.status === "failed" || input.status === "safe_error"
+        ? "source_error"
+        : !hour ? "no_model_data"
+          : finiteCoverageValue(hour[definition.valueField]) != null ? "valid" : "provider_null";
+      return { validAt, status: fallbackStatus, rawType: null, rawValue: null, rawUnit: null };
+    });
+    const sourceStatusCounts = Object.fromEntries(
+      (["valid", "normalized", "provider_null", "field_missing", "invalid_value", "unit_mismatch", "no_model_data", "time_mismatch", "source_error"] as const)
+        .map((sourceStatus) => [sourceStatus, sourceStates.filter((slot) => slot.status === sourceStatus).length]),
+    ) as Record<HourlySourceValueStatus, number>;
     return {
       key: definition.key,
       label: definition.label,
       requested: true,
       status,
-      requestedCount: input.hours.length,
+      requestedCount: expectedHoursCount,
       receivedCount,
-      missingCount: Math.max(0, input.hours.length - receivedCount),
-      archivedCount: archiveCompleted ? input.hours.length : Math.min(input.hours.length, Math.floor(input.archiveRowsWritten / archiveVariablesPerHour)),
+      missingCount: Math.max(0, expectedHoursCount - receivedCount),
+      archivedCount: archiveRowsComplete ? expectedHoursCount : Math.min(expectedHoursCount, Math.floor(input.archiveRowsWritten / archiveVariablesPerHour)),
       exposedCount: consumerProjected && projectionCompleted ? receivedCount : 0,
       consumerProjected,
       unit: typeof input.units?.[definition.unitField] === "string" ? input.units[definition.unitField] as string : definition.defaultUnit || null,
+      sourceStatusCounts,
+      sourceIssues: sourceStates
+        .filter((slot) => slot.status !== "valid")
+        .map((slot) => ({
+          validAt: new Date(slot.validAt).toISOString(),
+          status: slot.status as Exclude<HourlySourceValueStatus, "valid">,
+          rawType: slot.rawType,
+          rawValue: slot.rawValue,
+          rawUnit: slot.rawUnit,
+        })),
     };
   });
   const validTimes = input.hours.map((hour) => hour.validAt).filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     modelName: input.modelName,
     modelId: input.modelId,
     isOfficialModel: input.isOfficialModel,
@@ -309,6 +396,13 @@ export function buildHourlyModelCollectionCoverage(input: {
     errorCode: input.errorCode,
     requestedForecastDays: input.requestedForecastDays,
     returnedHours: input.hours.length,
+    expectedHoursCount,
+    receivedUniqueHours: receivedTimes.size,
+    missingHoursCount,
+    unexpectedHoursCount,
+    duplicateHoursCount,
+    projectionReady,
+    archiveRowsComplete,
     firstValidAt: validTimes.length ? new Date(validTimes[0]).toISOString() : null,
     lastValidAt: validTimes.length ? new Date(validTimes[validTimes.length - 1]).toISOString() : null,
     maximumDocumentedDays: horizon.maximumDocumentedDays,

@@ -65,8 +65,12 @@ export function drawTemperatureCurveSegments(
   for (let index = 1; index < points.length; index += 1) {
     const previousPoint = points[index - 1];
     const point = points[index];
-    const previousTone = getTemperatureTone(values[index - 1], series);
-    const tone = getTemperatureTone(values[index], series);
+    const previousValue = values[index - 1];
+    const value = values[index];
+    if (typeof previousValue !== "number" || !Number.isFinite(previousValue)
+      || typeof value !== "number" || !Number.isFinite(value)) continue;
+    const previousTone = getTemperatureTone(previousValue, series);
+    const tone = getTemperatureTone(value, series);
     const midpointX = (previousPoint.x + point.x) / 2;
 
     const glow = context.createLinearGradient(previousPoint.x, previousPoint.y, point.x, point.y);
