@@ -95,6 +95,26 @@ export function getCandidateStations(stations: StationData[]): StationData[] {
   return stations.filter((station) => station.qualificationStatus === "candidate");
 }
 
+function getStationFreshnessExclusionReason(station: StationData, nowMs: number): string | null {
+  const ageMin = station.updatedAt
+    ? (nowMs - new Date(station.updatedAt).getTime()) / 60000
+    : 999;
+  if (!Number.isFinite(ageMin)) return "Date de mise à jour invalide";
+  if (ageMin > 180) return `Données trop anciennes (${Math.round(ageMin)} min)`;
+  return null;
+}
+
+function revalidateStationFreshnessAt(station: StationData, nowMs: number): StationData {
+  const exclusionReason = getStationFreshnessExclusionReason(station, nowMs);
+  if (!exclusionReason) return station;
+  if (exclusionReason === "Date de mise à jour invalide" && !station.isActive) return station;
+  return { ...station, isActive: false, exclusionReason };
+}
+
+export function revalidateStationFreshness(stations: StationData[], nowMs = Date.now()): StationData[] {
+  return stations.map((station) => revalidateStationFreshnessAt(station, nowMs));
+}
+
 export type GroundTruthResult = {
   temperature: number | null;
   humidity: number | null;
@@ -617,12 +637,8 @@ async function collectNearbyStationsUncached(
     if (!hasFiniteActivationMeasurement(s)) {
       return { ...s, isActive: false, exclusionReason: "Aucune donnée disponible" };
     }
-    const ageMin = s.updatedAt
-      ? (Date.now() - new Date(s.updatedAt).getTime()) / 60000
-      : 999;
-    if (ageMin > 180) {
-      return { ...s, isActive: false, exclusionReason: `Données trop anciennes (${Math.round(ageMin)} min)` };
-    }
+    const freshnessChecked = revalidateStationFreshnessAt(s, Date.now());
+    if (freshnessChecked !== s) return freshnessChecked;
     if (s.reliabilityScore < 40) {
       return { ...s, isActive: false, exclusionReason: `Priorité technique de source trop basse (${s.reliabilityScore}/100)` };
     }
@@ -642,7 +658,7 @@ export async function collectNearbyStations(
   const cached = nearbyStationsCache.get(cacheKey);
   if (cached?.stations && cached.expiresAt > now) {
     options.onNetatmoStatus?.(options.netatmoUserId === undefined ? "not_connected" : "fresh_cache");
-    return cached.stations;
+    return revalidateStationFreshness(cached.stations, now);
   }
   if (cached?.pending) return cached.pending;
 

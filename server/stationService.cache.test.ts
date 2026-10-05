@@ -9,5 +9,6 @@ describe("cache de collecte des stations proches", () => {
     expect(source).toContain('netatmoUserId ?? "public"');
     expect(source).toContain("if (cached?.pending) return cached.pending");
     expect(source).toContain("collectNearbyStationsUncached(lat, lon, radiusKm, townName, options)");
+    expect(source).toContain("return revalidateStationFreshness(cached.stations, now)");
   });
 });
