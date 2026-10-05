@@ -99,6 +99,34 @@ describe("collectHourlyForecast auxiliaire", () => {
     ]);
   });
 
+  it("n’infère pas la pluie verglaçante depuis la température seule et conserve les phases WMO explicites", async () => {
+    mockedFetchWeather.mockResolvedValue(response({
+      hourly: {
+        time: [1, 2, 3, 4, 5, 6].map((hour) => Date.parse(`2026-10-01T0${hour}:00:00.000Z`) / 1000),
+        temperature_2m: [-2, -2, -2, 8, -2, -2],
+        precipitation: [1, 1, 1, 1, 1, 1],
+        snowfall: [0, 0, 0, 0, 0, 1],
+        weather_code: [null, 61, 67, 71, null, null],
+      },
+    }));
+
+    const hours = await collectHourlyForecast(
+      "2026-10-01",
+      { lat: 50.7567, lon: 2.5204 },
+      1,
+      { now: Date.parse("2026-10-01T00:00:00.000Z") },
+    );
+
+    expect(hours.map(({ precipitation, precipType }) => [precipitation, precipType])).toEqual([
+      [1, null],
+      [1, "rain"],
+      [1, "freezing_rain"],
+      [1, "snow"],
+      [1, null],
+      [1, "snow"],
+    ]);
+  });
+
   it("retourne le snapshot current avec une provenance modèle explicite", async () => {
     mockedFetchWeather.mockResolvedValue(response({
       current: {

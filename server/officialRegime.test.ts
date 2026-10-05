@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOperationalRegime, findNextHourlyRegimeChange } from "./officialRegime";
+import { buildOfficialRegime, buildOperationalRegime, findNextHourlyRegimeChange } from "./officialRegime";
 
 const now = Date.parse("2026-08-12T08:00:00.000Z");
 const completeSnapshot = {
@@ -93,6 +93,35 @@ describe("buildOperationalRegime", () => {
       { hour: "10:00", temp: 19, precipitation: null, windSpeed: 8, humidity: 45, cloudCover: 95, visibilityKm: 10 },
     ], "09:00", "sunny");
     expect(nextChange).toBeNull();
+  });
+
+  it("garde la phase incertaine dans toutes les voies actives en présence de précipitations froides", () => {
+    const coldSnapshot = { ...completeSnapshot, tempMax: 0, tempMin: -2, precipitation: 1 };
+    expect(buildOfficialRegime(coldSnapshot).primary?.id).toBe("winter_precipitation_uncertain");
+
+    const observation = buildOperationalRegime(
+      completeSnapshot,
+      { tempMax: 0, tempMin: -2, precipitation: 1, windSpeed: 8, humidity: 55, cloudCover: 65, visibilityKm: 10, collectedAt: new Date(now - 30 * 60_000) },
+      undefined,
+      now,
+    );
+    expect(observation.source).toBe("fresh_observation");
+    expect(observation.primary?.id).toBe("winter_precipitation_uncertain");
+
+    const hourly = buildOperationalRegime(
+      null,
+      null,
+      { temp: -1, precipitation: 1, windSpeed: 8, humidity: 55, cloudCover: 65, visibilityKm: 10, updatedAt: new Date(now - 5 * 60_000) },
+      now,
+    );
+    expect(hourly.source).toBe("hourly_forecast");
+    expect(hourly.primary?.id).toBe("winter_precipitation_uncertain");
+
+    const nextChange = findNextHourlyRegimeChange([
+      { hour: "09:00", temp: 10, precipitation: 0, windSpeed: 8, humidity: 55, cloudCover: 0, visibilityKm: 10 },
+      { hour: "10:00", temp: -1, precipitation: 1, windSpeed: 8, humidity: 55, cloudCover: 65, visibilityKm: 10 },
+    ], "09:00", "sunny");
+    expect(nextChange).toMatchObject({ id: "winter_precipitation_uncertain", label: "Précipitations hivernales — phase incertaine" });
   });
 
   it("retourne le premier changement de régime dans les créneaux futurs complets", () => {

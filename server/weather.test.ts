@@ -17,12 +17,13 @@ function createPublicContext(): TrpcContext {
 }
 
 describe("weather.getDashboard", () => {
-  it("expose les vingt régimes possibles pour le menu descriptif", async () => {
+  it("expose les vingt-et-un régimes possibles pour le menu descriptif", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     const catalogue = await caller.weather.getRegimeCatalogue();
-    expect(catalogue).toHaveLength(20);
+    expect(catalogue).toHaveLength(21);
     expect(catalogue).toContainEqual(expect.objectContaining({ id: "stable", label: "Été stable" }));
     expect(catalogue).toContainEqual(expect.objectContaining({ id: "thunderstorm", label: "Orages" }));
+    expect(catalogue).toContainEqual(expect.objectContaining({ id: "winter_precipitation_uncertain", label: "Précipitations hivernales — phase incertaine" }));
     expect(catalogue).toContainEqual(expect.objectContaining({
       id: "stable",
       weights: expect.objectContaining({ temp: expect.any(Number), precip: expect.any(Number), wind: expect.any(Number), condition: expect.any(Number) }),

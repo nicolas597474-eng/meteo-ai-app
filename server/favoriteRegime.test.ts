@@ -56,6 +56,13 @@ describe("buildFavoriteHourlyRegime", () => {
     }));
   });
 
+  it("conserve l’incertitude de phase ou utilise le type horaire explicitement fourni", () => {
+    const coldPrecipitation = { ...completePoint, temp: -2, precipitation: 1, cloudCover: 65 };
+    expect(buildFavoriteHourlyRegime(coldPrecipitation)?.primaryRegime.id).toBe("winter_precipitation_uncertain");
+    expect(buildFavoriteHourlyRegime({ ...coldPrecipitation, precipType: "snow" })?.primaryRegime.id).toBe("snow");
+    expect(buildFavoriteHourlyRegime({ ...coldPrecipitation, temp: -1, precipType: "freezing_rain" })?.primaryRegime.id).toBe("freezing_rain");
+  });
+
   it("retourne un état unavailable explicite dans l’API favoris sans fabriquer des champs à 15/0/0", () => {
     const source = readFileSync(new URL("./routers/favorites.ts", import.meta.url), "utf8");
     expect(source).toContain("buildFavoriteHourlyRegime(regimeSource)");
