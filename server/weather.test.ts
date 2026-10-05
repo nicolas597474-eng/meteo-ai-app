@@ -17,10 +17,10 @@ function createPublicContext(): TrpcContext {
 }
 
 describe("weather.getDashboard", () => {
-  it("expose les vingt-et-un régimes possibles pour le menu descriptif", async () => {
+  it("expose les vingt régimes réellement qualifiés pour le menu descriptif", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     const catalogue = await caller.weather.getRegimeCatalogue();
-    expect(catalogue).toHaveLength(21);
+    expect(catalogue).toHaveLength(20);
     expect(catalogue).toContainEqual(expect.objectContaining({ id: "stable", label: "Été stable" }));
     expect(catalogue).toContainEqual(expect.objectContaining({ id: "thunderstorm", label: "Orages" }));
     expect(catalogue).toContainEqual(expect.objectContaining({ id: "winter_precipitation_uncertain", label: "Précipitations hivernales — phase incertaine" }));
@@ -162,11 +162,17 @@ describe("weather.getRanking", () => {
   it("expose le contexte de régime sans classement ou note globale par modèle", async () => {
     const result = await appRouter.createCaller(createPublicContext()).weather.getRanking();
 
-    // Ensure primary is never null - if it is, the test data needs to be fixed
-    expect(result.officialRegime.primary).not.toBeNull();
-    expect(result.officialRegime.primary?.id).toEqual(expect.any(String));
+    // Un régime peut légitimement être inconnu : les valeurs manquantes ne sont
+    // jamais remplacées par des valeurs par défaut pour produire un classement.
+    expect(["available", "unknown"]).toContain(result.officialRegime.status);
+    if (result.officialRegime.status === "available") {
+      expect(result.officialRegime.primary?.id).toEqual(expect.any(String));
+      expect(result.officialRegime.blendedWeights).toEqual(expect.objectContaining({ temp: expect.any(Number) }));
+    } else {
+      expect(result.officialRegime.primary).toBeNull();
+      expect(result.officialRegime.blendedWeights).toBeNull();
+    }
     expect(result.officialRegime.active).toEqual(expect.any(Array));
-    expect(result.officialRegime.blendedWeights).toEqual(expect.objectContaining({ temp: expect.any(Number) }));
     expect(result).not.toHaveProperty("ranking");
     expect(result).not.toHaveProperty("totalServices");
   }, 25_000);
