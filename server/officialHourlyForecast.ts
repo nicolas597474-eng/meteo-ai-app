@@ -572,6 +572,8 @@ function computeVariableForecastValue(input: {
           ? `Preuve partielle (${item.evidence.metrics?.comparisonCount ?? 0} comparaisons, ${item.evidence.metrics?.evaluatedDays ?? 0} jours); pondération régularisée.`
           : item.evidence?.status === "incomplete_metrics"
             ? "Certaines lignes historiques sont incomplètes; la valeur reste incluse avec un repli robuste."
+          : item.evidence?.status === "no_evidence"
+            ? `Aucune preuve historique admissible dans la fenêtre glissante de ${OFFICIAL_HOURLY_HISTORY_DAYS} jours; les archives hors fenêtre sont conservées et exclues des poids; repli robuste appliqué.`
             : "Aucune preuve historique qualifiée pour ce modèle, cette variable et cet horizon; repli robuste appliqué.",
     horizonBucket: item.selected.horizonBucket,
   }));
@@ -765,6 +767,7 @@ export function computeOfficialHourlyForecast(
   const currentHistoryScores = filterCurrentHourlyScoringRows(historyScores);
   const exactHistoryScores = filterCurrentHourlyScoringRows(options.exactHistoryScores ?? []);
   const referenceAt = options.referenceAt ?? Date.now();
+  const periodStartDate = getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS);
   const availabilityReasonByModel = options.availabilityReasonByModel ?? {};
   const byValidTime = new Map<number, HourlyModelValue[]>();
 
@@ -810,6 +813,7 @@ export function computeOfficialHourlyForecast(
       variable,
       horizonBucket,
       beforeDate,
+      periodStartDate,
     };
     const exactEvidence = summarizeHourlyHistoricalEvidence(exactHistoryScores, {
       ...baseInput,

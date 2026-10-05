@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OFFICIAL_HOURLY_MODELS, type HourlyModelForecast } from "./weatherServices";
 import type { HourlyForecastRunValue } from "../drizzle/schema";
 import { computeOfficialHourlyForecast, reconstructOfficialHourlyModelsFromArchive, type OfficialHourlyEvaluationHistoryScore } from "./officialHourlyForecast";
 import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
+import { getParisDateDaysAgo } from "./weatherTime";
+
+beforeAll(() => vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00.000Z") }));
+afterAll(() => vi.useRealTimers());
 
 const validAt = Date.parse("2026-10-01T12:00:00.000Z");
 const availableAt = validAt - 12 * 60 * 60_000;
@@ -672,6 +676,36 @@ describe("computeOfficialHourlyForecast", () => {
 
     expect(variableWeighting(result, "temperature")?.modelWeights.find((item) => item.modelName === "AROME")!.weight)
       .toBeGreaterThan(variableWeighting(result, "temperature")?.modelWeights.find((item) => item.modelName === "UKMET")!.weight ?? 0);
+  });
+
+  it("écarte des poids les preuves bucket et exact au-delà de la fenêtre officielle de 365 jours", () => {
+    const expiredScores = historicalScores().map((row, index) => ({
+      ...row,
+      date: getParisDateDaysAgo(366 + (index % 7)),
+    }));
+    const expiredExactScores = expiredScores.map((row) => ({
+      ...row,
+      horizonMilliseconds: 12 * 60 * 60_000,
+    }));
+    const result = computeOfficialHourlyForecast(modelForecasts(), expiredScores, {
+      exactHistoryAvailable: true,
+      exactHistoryScores: expiredExactScores,
+    });
+    const weighting = variableWeighting(result, "temperature")!;
+    const noHistory = computeOfficialHourlyForecast(modelForecasts(), []);
+    const weights = weighting.modelWeights.map(({ modelName, weight }) => ({ modelName, weight }));
+    const noHistoryWeights = variableWeighting(noHistory, "temperature")!.modelWeights
+      .map(({ modelName, weight }) => ({ modelName, weight }));
+
+    expect(weighting.calibrationStatus).toBe("UNCALIBRATED_ROBUST");
+    expect(weighting.evidenceEligibleModelCount).toBe(0);
+    expect(weighting.modelWeights[0]).toMatchObject({
+      historicalEvidence: { status: "no_evidence" },
+      exactHorizonEvidence: { status: "no_evidence" },
+    });
+    expect(weighting.calibrationReasons[0]?.reason).toContain("365 jours");
+    expect(weights).toEqual(noHistoryWeights);
+    expect(result.hours[0]?.temp).not.toBeNull();
   });
 
   it("signale l’indisponibilité de l’historique et conserve les deux instants de l’heure répétée", () => {
