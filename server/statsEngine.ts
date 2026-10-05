@@ -459,20 +459,27 @@ function calcScalarDimension(
  * ☁️ Cloud cover / Conditions dimension
  * Categorical concordance: maps conditions to 3 categories (clear/partly/overcast).
  */
-function conditionCategory(condition: string | null | undefined, cloudCover: number | null | undefined): number {
+type ConditionCategory = 0 | 1 | 2;
+function conditionCategory(condition: string | null | undefined, cloudCover: number | null | undefined): ConditionCategory | null {
   // 0 = clear, 1 = partly cloudy, 2 = overcast/rain
   if (condition) {
-    const c = condition.toLowerCase();
-    if (c.includes("pluie") || c.includes("orage") || c.includes("couvert")) return 2;
-    if (c.includes("nuageux") || c.includes("averses") || c.includes("partiellement")) return 1;
-    if (c.includes("ensoleillé") || c.includes("clair") || c.includes("dégagé")) return 0;
+    const c = condition.trim().toLowerCase();
+    // The canonical condition sources emit French labels, not slug identifiers.
+    // Do not infer a category from partial words inside unknown IDs such as
+    // "freezing_rain" or "pluie_verglacante".
+    if (!c.includes("_") && !c.includes("-")) {
+      if (c.includes("pluie") || c.includes("orage") || c.includes("couvert")
+        || c.includes("brouillard") || c.includes("bruine") || c.includes("neige")) return 2;
+      if (c.includes("nuageux") || c.includes("averses") || c.includes("partiellement")) return 1;
+      if (c.includes("ensoleillé") || c.includes("clair") || c.includes("dégagé")) return 0;
+    }
   }
   if (cloudCover != null) {
     if (cloudCover > 75) return 2;
     if (cloudCover > 35) return 1;
     return 0;
   }
-  return 1; // unknown → partly cloudy
+  return null;
 }
 
 function calcConditionDimension(forecasts: ForecastRow[], observations: ObservationRow[]): ConditionDimension {
@@ -488,15 +495,15 @@ function calcConditionDimension(forecasts: ForecastRow[], observations: Observat
     const forecastHasCondition = f.condition != null || f.cloudCover != null;
     const observationHasCondition = o.condition != null || o.cloudCover != null;
     if (!forecastHasCondition || !observationHasCondition) continue;
-    const fCat = conditionCategory(f.condition, f.cloudCover);
-    const oCat = conditionCategory(o.condition, o.cloudCover);
-    total++;
-    if (fCat === oCat) matches++;
-
     if (f.cloudCover != null && o.cloudCover != null) {
       cloudPred.push(f.cloudCover);
       cloudActual.push(o.cloudCover);
     }
+    const fCat = conditionCategory(f.condition, f.cloudCover);
+    const oCat = conditionCategory(o.condition, o.cloudCover);
+    if (fCat === null || oCat === null) continue;
+    total++;
+    if (fCat === oCat) matches++;
   }
 
   if (total === 0) {
