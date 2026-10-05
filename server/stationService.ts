@@ -301,6 +301,97 @@ async function fetchOpenMeteoNearbyStations(
 
 // ─── 2. OpenDataSoft SYNOP — real Météo-France official stations ──────────────
 
+function parseFiniteSynopNumber(value: unknown): number | null {
+  if (value == null) return null;
+  const parsed = typeof value === "number" ? value : parseFloat(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function roundFiniteSynopValue(value: number, decimalPlaces: number): number | null {
+  const scale = 10 ** decimalPlaces;
+  const rounded = Math.round(value * scale) / scale;
+  return Number.isFinite(rounded) ? rounded : null;
+}
+
+function hasFiniteActivationMeasurement(
+  station: Pick<StationData, "temperature" | "windSpeed" | "precipitation">,
+): boolean {
+  return Number.isFinite(station.temperature)
+    || Number.isFinite(station.windSpeed)
+    || Number.isFinite(station.precipitation);
+}
+
+function normalizeStationMeasurements(station: StationData): StationData {
+  return {
+    ...station,
+    temperature: Number.isFinite(station.temperature) ? station.temperature : null,
+    humidity: Number.isFinite(station.humidity) ? station.humidity : null,
+    pressure: Number.isFinite(station.pressure) ? station.pressure : null,
+    windSpeed: Number.isFinite(station.windSpeed) ? station.windSpeed : null,
+    windGust: Number.isFinite(station.windGust) ? station.windGust : null,
+    windDirection: Number.isFinite(station.windDirection) ? station.windDirection : null,
+    precipitation: Number.isFinite(station.precipitation) ? station.precipitation : null,
+  };
+}
+
+/** Pure SYNOP record mapper so parsing can be tested without a provider request. */
+export function mapSynopRecord(
+  record: Record<string, unknown>,
+  lat: number,
+  lon: number,
+  radiusKm: number,
+): StationData | null {
+  const stationLat = parseFiniteSynopNumber(record.latitude);
+  const stationLon = parseFiniteSynopNumber(record.longitude);
+  if (stationLat == null || stationLon == null || !stationLat || !stationLon) return null;
+
+  const distanceKm = haversineKm(lat, lon, stationLat, stationLon);
+  if (!Number.isFinite(distanceKm) || distanceKm > radiusKm) return null;
+
+  const temperatureKelvin = parseFiniteSynopNumber(record.t);
+  const windMetersPerSecond = parseFiniteSynopNumber(record.ff);
+  const gustMetersPerSecond = parseFiniteSynopNumber(record.raf10);
+  const pressurePascals = parseFiniteSynopNumber(record.pres);
+  const observationTime = typeof record.date === "string" ? record.date : null;
+  const stationId = `mf-${String(record.numer_sta ?? "unknown")}`;
+  const station: StationData = {
+    stationId,
+    source: "meteofrance",
+    name: typeof record.nom === "string" ? record.nom : `Station MF ${String(record.numer_sta ?? "unknown")}`,
+    lat: stationLat,
+    lon: stationLon,
+    altitude: parseFiniteSynopNumber(record.altitude),
+    distanceKm: Math.round(distanceKm * 10) / 10,
+    temperature: temperatureKelvin == null ? null : roundFiniteSynopValue(temperatureKelvin - 273.15, 1),
+    humidity: parseFiniteSynopNumber(record.u),
+    pressure: pressurePascals == null ? null : roundFiniteSynopValue(pressurePascals / 100, 0),
+    windSpeed: windMetersPerSecond == null ? null : roundFiniteSynopValue(windMetersPerSecond * 3.6, 1),
+    windGust: gustMetersPerSecond == null ? null : roundFiniteSynopValue(gustMetersPerSecond * 3.6, 1),
+    windDirection: parseFiniteSynopNumber(record.dd),
+    precipitation: parseFiniteSynopNumber(record.rr1),
+    updatedAt: observationTime,
+    measurementTimes: {
+      temperature: observationTime,
+      humidity: observationTime,
+      pressure: observationTime,
+      windSpeed: observationTime,
+      windGust: observationTime,
+      windDirection: observationTime,
+      precipitation: observationTime,
+    },
+    reliabilityScore: SOURCE_DEFAULTS.meteofrance.reliability,
+    updateFrequencyMin: SOURCE_DEFAULTS.meteofrance.updateFreqMin,
+    dataAvailability: SOURCE_DEFAULTS.meteofrance.availability,
+    isActive: false,
+  };
+  const isActive = hasFiniteActivationMeasurement(station);
+  return {
+    ...station,
+    isActive,
+    ...(isActive ? {} : { exclusionReason: "Aucune donnée disponible" }),
+  };
+}
+
 async function fetchMeteoFranceStations(
   lat: number,
   lon: number,
@@ -332,51 +423,8 @@ async function fetchMeteoFranceStations(
       if (seenStations.has(stId)) continue;
       seenStations.add(stId);
 
-      const stLat = typeof r.latitude === "number" ? r.latitude : parseFloat(r.latitude ?? "0");
-      const stLon = typeof r.longitude === "number" ? r.longitude : parseFloat(r.longitude ?? "0");
-      if (!stLat || !stLon) continue;
-
-      const dist = haversineKm(lat, lon, stLat, stLon);
-      if (dist > radiusKm) continue;
-
-      // Temperature in Kelvin → Celsius
-      const tempC = r.t != null ? Math.round((parseFloat(r.t) - 273.15) * 10) / 10 : null;
-      // Wind speed in m/s → km/h
-      const windKmh = r.ff != null ? Math.round(parseFloat(r.ff) * 3.6 * 10) / 10 : null;
-      const gustKmh = r.raf10 != null ? Math.round(parseFloat(r.raf10) * 3.6 * 10) / 10 : null;
-      // Pressure in Pa → hPa
-      const presHpa = r.pres != null ? Math.round(parseFloat(r.pres) / 100) : null;
-
-      results.push({
-        stationId: stId,
-        source: "meteofrance" as StationSource,
-        name: r.nom ?? `Station MF ${r.numer_sta}`,
-        lat: stLat,
-        lon: stLon,
-        altitude: r.altitude != null ? parseFloat(r.altitude) : null,
-        distanceKm: Math.round(dist * 10) / 10,
-        temperature: tempC,
-        humidity: r.u != null ? parseFloat(r.u) : null,
-        pressure: presHpa,
-        windSpeed: windKmh,
-        windGust: gustKmh,
-        windDirection: r.dd != null ? parseFloat(r.dd) : null,
-        precipitation: r.rr1 != null ? parseFloat(r.rr1) : null,
-        updatedAt: r.date ?? null,
-        measurementTimes: {
-          temperature: r.date ?? null,
-          humidity: r.date ?? null,
-          pressure: r.date ?? null,
-          windSpeed: r.date ?? null,
-          windGust: r.date ?? null,
-          windDirection: r.date ?? null,
-          precipitation: r.date ?? null,
-        },
-        reliabilityScore: SOURCE_DEFAULTS.meteofrance.reliability,
-        updateFrequencyMin: SOURCE_DEFAULTS.meteofrance.updateFreqMin,
-        dataAvailability: SOURCE_DEFAULTS.meteofrance.availability,
-        isActive: true,
-      });
+      const station = mapSynopRecord(r, lat, lon, radiusKm);
+      if (station) results.push(station);
     }
     return results;
   } catch {
@@ -557,11 +605,13 @@ async function collectNearbyStationsUncached(
   });
 
   // Filter to radius
-  const inRadius = unique.filter(s => s.distanceKm <= radiusKm);
+  const inRadius = unique
+    .map(normalizeStationMeasurements)
+    .filter(s => s.distanceKm <= radiusKm);
 
   // Apply quality exclusion rules
   return inRadius.map(s => {
-    if (s.temperature == null && s.windSpeed == null && s.precipitation == null) {
+    if (!hasFiniteActivationMeasurement(s)) {
       return { ...s, isActive: false, exclusionReason: "Aucune donnée disponible" };
     }
     const ageMin = s.updatedAt
@@ -627,7 +677,7 @@ export const GROUND_TRUTH_IDW_EXPONENT = SPATIAL_FUSION_IDW_EXPONENT;
 export const GROUND_TRUTH_DISTANCE_EPSILON_KM = SPATIAL_FUSION_DISTANCE_EPSILON_KM;
 
 export function calculateGroundTruth(stations: StationData[]): GroundTruthResult {
-  const active = stations.filter(s => s.isActive);
+  const active = stations.filter(s => s.isActive).map(normalizeStationMeasurements);
   const ignored: StationExclusion[] = stations
     .filter(s => !s.isActive)
     .map(s => ({
@@ -706,9 +756,9 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     let sum = 0, wSum = 0;
     activeQualified.forEach((s) => {
       const v = s[field];
-      if (v != null) {
+      if (typeof v === "number" && Number.isFinite(v)) {
         const weight = weightsByStationId.get(s.stationId)!.finalWeight;
-        sum += (v as number) * weight;
+        sum += v * weight;
         wSum += weight;
       }
     });
@@ -716,7 +766,7 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
   }
 
   // Confidence: higher when more stations agree (low std dev) and many stations
-  const temps = activeQualified.map(s => s.temperature).filter((v): v is number => v != null);
+  const temps = activeQualified.map(s => s.temperature).filter((v): v is number => Number.isFinite(v));
   const tempMean = temps.length > 0 ? temps.reduce((a, b) => a + b) / temps.length : 0;
   const tempStd = temps.length > 1
     ? Math.sqrt(temps.reduce((s, v) => s + (v - tempMean) ** 2, 0) / temps.length)

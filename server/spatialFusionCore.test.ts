@@ -41,6 +41,50 @@ describe("noyau spatial commun", () => {
     expect(results[0].altitudeAdjustmentC).toBeCloseTo(-0.065, 3);
   });
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "traite une mesure primaire non finie (%s) comme absente dans le QC",
+    (invalidTemperature) => {
+      const [result] = evaluateSpatialQuality([{
+        id: "invalid-temperature",
+        distanceKm: 1,
+        reliabilityScore: 90,
+        updatedAt: now,
+        temperature: invalidTemperature,
+        windSpeed: null,
+      }], { maxDistanceKm: 10, maxFreshnessMin: 60, minReliabilityScore: 40, maxTempDeviationC: 8 });
+
+      expect(result.passed).toBe(false);
+      expect(result.source.temperature).toBeNull();
+      expect(result.checks.find((check) => check.code === "data")).toMatchObject({
+        passed: false,
+        reason: "Aucune mesure exploitable",
+      });
+    },
+  );
+
+  it("conserve un canal fini et neutralise le canal non fini correspondant", () => {
+    const [result] = evaluateSpatialQuality([{
+      id: "mixed-measurements",
+      distanceKm: 1,
+      reliabilityScore: 90,
+      updatedAt: now,
+      temperature: Number.POSITIVE_INFINITY,
+      windSpeed: 10,
+    }], { maxDistanceKm: 10, maxFreshnessMin: 60, minReliabilityScore: 40, maxTempDeviationC: 8 });
+
+    expect(result.passed).toBe(true);
+    expect(result.source.temperature).toBeNull();
+    expect(result.source.windSpeed).toBe(10);
+  });
+
+  it("ne retourne pas une température ajustée non finie pour une mesure non finie", () => {
+    const [weight] = buildNormalizedSpatialWeights([
+      { id: "invalid-temperature", distanceKm: 1, temperature: Number.NEGATIVE_INFINITY },
+    ]);
+
+    expect(weight.adjustedTemperature).toBeNull();
+  });
+
   it("nomme le seuil reliabilityScore comme une priorité technique de source", () => {
     const [result] = evaluateSpatialQuality([
       { id: "low-priority", distanceKm: 1, reliabilityScore: 39, updatedAt: now, altitude: 50, temperature: 20 },
