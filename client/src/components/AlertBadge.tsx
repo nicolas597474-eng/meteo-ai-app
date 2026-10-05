@@ -1,6 +1,6 @@
 /**
- * AlertBadge — Badge d'alerte visuel animé (pulsation) pour les régimes météo dangereux.
- * Affiche un badge coloré avec icône MeteoAI quand un régime dangereux est détecté.
+ * AlertBadge — Indicateur visuel animé pour les signaux heuristiques de régime.
+ * Le score de régime n'est ni une probabilité ni une confiance météo calibrée.
  */
 import { MeteoIcon } from "@/components/MeteoIcon";
 
@@ -22,7 +22,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     borderClass: "border-red-500/50",
     pulseClass: "animate-pulse",
     meteoIconName: "thunderstorm",
-    label: "Alerte Orage",
+    label: "Signal de régime · Orage",
   },
   storm: {
     colorClass: "text-red-300",
@@ -30,7 +30,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     borderClass: "border-red-500/50",
     pulseClass: "animate-pulse",
     meteoIconName: "storm",
-    label: "Alerte Tempête",
+    label: "Signal de régime · Tempête",
   },
   summer_heat: {
     colorClass: "text-orange-300",
@@ -38,7 +38,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     borderClass: "border-orange-500/50",
     pulseClass: "animate-pulse",
     meteoIconName: "summer_heat",
-    label: "Alerte Canicule",
+    label: "Signal de régime · Chaleur forte",
   },
   freezing_rain: {
     colorClass: "text-cyan-300",
@@ -46,7 +46,7 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     borderClass: "border-cyan-500/50",
     pulseClass: "animate-pulse",
     meteoIconName: "freezing_rain",
-    label: "Alerte Verglas",
+    label: "Signal de régime · Verglas",
   },
   windy: {
     colorClass: "text-teal-300",
@@ -54,19 +54,20 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     borderClass: "border-teal-500/50",
     pulseClass: "animate-pulse",
     meteoIconName: "windy",
-    label: "Alerte Vent fort",
+    label: "Signal de régime · Vent soutenu",
   },
 };
 
 const DANGEROUS_REGIME_IDS = new Set<string>(Object.keys(DANGEROUS_REGIMES));
+const SCORE_EXPLANATION = "Score de régime heuristique non calibré : ce n’est ni une probabilité ni une confiance météorologique.";
 
 interface AlertBadgeProps {
   /** ID du régime actif principal */
   regimeId: string;
-  /** Signal interne de classification du régime; une valeur absente masque le badge. */
-  confidence?: number | null;
-  /** Seuil de confiance minimum pour afficher le badge (défaut: 60) */
-  confidenceThreshold?: number;
+  /** Score interne du régime (dominance ou couverture); une valeur absente masque l’indicateur. */
+  regimeScore?: number | null;
+  /** Seuil interne existant pour afficher l’indicateur (défaut: 60). */
+  regimeScoreThreshold?: number;
   /** À fournir seulement si une source a explicitement typé la pluie verglaçante. */
   freezingRainPhaseConfirmed?: boolean;
   /** Taille compacte (pour les pills) ou normale */
@@ -78,9 +79,9 @@ export function isDangerousRegime(regimeId: string, freezingRainPhaseConfirmed =
   return DANGEROUS_REGIME_IDS.has(regimeId);
 }
 
-export function AlertBadge({ regimeId, confidence, confidenceThreshold = 60, freezingRainPhaseConfirmed = false, compact = false }: AlertBadgeProps) {
-  if (!isDangerousRegime(regimeId, freezingRainPhaseConfirmed) || confidence == null) return null;
-  if (confidence < confidenceThreshold) return null;
+export function AlertBadge({ regimeId, regimeScore, regimeScoreThreshold = 60, freezingRainPhaseConfirmed = false, compact = false }: AlertBadgeProps) {
+  if (!isDangerousRegime(regimeId, freezingRainPhaseConfirmed) || regimeScore == null) return null;
+  if (regimeScore < regimeScoreThreshold) return null;
 
   const config = DANGEROUS_REGIMES[regimeId];
 
@@ -88,6 +89,8 @@ export function AlertBadge({ regimeId, confidence, confidenceThreshold = 60, fre
     return (
       <span
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold border ${config.bgClass} ${config.borderClass} ${config.colorClass} ${config.pulseClass}`}
+        title={SCORE_EXPLANATION}
+        aria-label={`${config.label}. ${SCORE_EXPLANATION}`}
       >
         <MeteoIcon name={config.meteoIconName} size={14} />
         <span>{config.label}</span>
@@ -104,9 +107,7 @@ export function AlertBadge({ regimeId, confidence, confidenceThreshold = 60, fre
       </div>
       <div>
         <p className={`text-xs font-bold ${config.colorClass}`}>{config.label}</p>
-        <p className="text-xs text-muted-foreground">
-          Signal de régime détecté · seuil interne atteint
-        </p>
+        <p className="text-xs text-muted-foreground">{SCORE_EXPLANATION}</p>
       </div>
     </div>
   );

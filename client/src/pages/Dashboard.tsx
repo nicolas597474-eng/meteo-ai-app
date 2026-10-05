@@ -626,12 +626,12 @@ export default function Dashboard() {
     not_connected: "Netatmo : aucune autorisation active pour cette session",
   };
 
-  // Multi-regime data for alert badges
+  // Heuristic multi-regime score for regime-signal badges
   const multiRegime = officialRegime
     ? { activeRegimes: officialRegime.active, confidenceScore: officialRegime.confidence }
     : (dash as any)?.multiRegime ?? null;
   const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "unknown";
-  const regimeConfidence: number | null = multiRegime?.confidenceScore ?? null;
+  const regimeScore: number | null = multiRegime?.confidenceScore ?? null;
   // L’accord est affiché en unités physiques et demeure distinct de la fiabilité historique.
   const currentHourIndex = findActiveHourlyForecastIndex(hours, forecastNowMs);
   const currentHour = hours[currentHourIndex] ?? null;
@@ -875,9 +875,9 @@ export default function Dashboard() {
             )}
 
             {/* ── Alert badge for dangerous regimes ── */}
-            {isDangerousRegime(primaryRegimeId) && regimeConfidence != null && (
+            {isDangerousRegime(primaryRegimeId) && regimeScore != null && (
               <div className="mb-3">
-                <AlertBadge regimeId={primaryRegimeId} confidence={regimeConfidence} confidenceThreshold={60} />
+                <AlertBadge regimeId={primaryRegimeId} regimeScore={regimeScore} regimeScoreThreshold={60} />
               </div>
             )}
 
