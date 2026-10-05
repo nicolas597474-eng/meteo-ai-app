@@ -25,6 +25,7 @@
 
 import { buildNormalizedSpatialWeights } from "./spatialFusionCore";
 import { evaluateStationFieldQuality, getStationMeasurementAgeState, getValidStationMeasurementTimestamp, hasFreshStationMeasurement, type StationMeasurementField } from "./stationMeasurementFreshness";
+import type { StationReadingSnapshot } from "./stationReadingsCache";
 import {
   getEvidenceIneligibilityReason,
   regularizeModelPerformance,
@@ -624,7 +625,8 @@ function normalCDF(x: number): number {
  */
 export function detectAnomalies(
   sources: FusionSource[],
-  previousReadings?: Map<string, { temperature: number; timestamp: number }>
+  previousReadings?: Map<string, StationReadingSnapshot>,
+  referenceAt?: number,
 ): { penalties: Map<string, number>; reports: AnomalyReport[] } {
   const penalties = new Map<string, number>();
   const reports: AnomalyReport[] = [];
@@ -663,33 +665,46 @@ export function detectAnomalies(
     }
 
     // 2. Sudden jump detection (requires previous readings)
-    if (previousReadings) {
+    if (previousReadings && s.type === "station") {
       const prev = previousReadings.get(s.id);
-      if (prev && s.updatedAt) {
-        const ageMin = (Date.now() - prev.timestamp) / 60000;
+      const observedAt = typeof referenceAt === "number" && Number.isFinite(referenceAt)
+        ? getValidStationMeasurementTimestamp(s.measurementTimes, "temperature", referenceAt)
+        : null;
+      if (prev && observedAt != null) {
+        const observationTimestamp = Date.parse(observedAt);
+        if (!Number.isFinite(observationTimestamp)
+          || !Number.isFinite(prev.timestamp)
+          || !Number.isFinite(prev.stableSince)
+          || prev.stableSince > prev.timestamp
+          || observationTimestamp <= prev.timestamp) return;
+        const observationGapMin = (observationTimestamp - prev.timestamp) / 60000;
         const tempDelta = Math.abs(s.temperature - prev.temperature);
+        const unchangedValue = s.temperature === prev.temperature;
+        const stableAgeMin = unchangedValue
+          ? (observationTimestamp - prev.stableSince) / 60000
+          : 0;
         // More than 5°C change in less than 10 minutes is suspicious
-        if (ageMin < 10 && tempDelta > 5) {
+        if (observationGapMin < 10 && tempDelta > 5) {
           const penalty = Math.max(0.2, 1 - (tempDelta - 5) * 0.1);
           penalties.set(s.id, Math.min(penalties.get(s.id)!, penalty));
           reports.push({
             sourceId: s.id,
             sourceName: s.name,
             type: "sudden_jump",
-            description: `Saut de ${tempDelta.toFixed(1)}°C en ${ageMin.toFixed(0)} min (${prev.temperature.toFixed(1)}→${s.temperature.toFixed(1)}°C)`,
+            description: `Saut de ${tempDelta.toFixed(1)}°C en ${observationGapMin.toFixed(0)} min (${prev.temperature.toFixed(1)}→${s.temperature.toFixed(1)}°C)`,
             severity: tempDelta > 10 ? "high" : "medium",
             penaltyApplied: penalty,
           });
         }
         // Frozen value (no change at all for > 60 min)
-        if (ageMin > 60 && tempDelta < 0.01) {
+        if (stableAgeMin > 60 && tempDelta < 0.01) {
           const penalty = 0.5;
           penalties.set(s.id, Math.min(penalties.get(s.id)!, penalty));
           reports.push({
             sourceId: s.id,
             sourceName: s.name,
             type: "frozen_value",
-            description: `Valeur figée à ${s.temperature.toFixed(1)}°C depuis ${ageMin.toFixed(0)} min`,
+            description: `Valeur figée à ${s.temperature.toFixed(1)}°C depuis ${stableAgeMin.toFixed(0)} min`,
             severity: "low",
             penaltyApplied: penalty,
           });
@@ -735,7 +750,7 @@ const DEFAULT_CONFIG: FusionConfig = {
 export function computeFusion(
   sources: FusionSource[],
   config: Partial<FusionConfig> = {},
-  previousReadings?: Map<string, { temperature: number; timestamp: number }>
+  previousReadings?: Map<string, StationReadingSnapshot>
 ): FusionResult {
   const cfg: FusionConfig = { ...DEFAULT_CONFIG, ...config };
   const now = Number.isFinite(cfg.referenceAt) ? cfg.referenceAt! : Date.now();
@@ -875,7 +890,7 @@ export function computeFusion(
 
   // ── Step 2: Anomaly detection ───────────────────────────────────────────────
   const { penalties, reports: anomalyReports } = cfg.anomalyDetectionEnabled
-    ? detectAnomalies(candidates, previousReadings)
+    ? detectAnomalies(candidates, previousReadings, now)
     : { penalties: new Map<string, number>(), reports: [] };
 
   // ── Step 3-8: Poids spatiaux communs pour stations + fusion numérique ───────

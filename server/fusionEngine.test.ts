@@ -155,14 +155,15 @@ describe("computeFusion — fusion IDW avancée", () => {
   });
 
   it("détecte et pénalise une valeur station figée depuis plus d'une heure", () => {
-    const sources = [station("figee", 1, 10), station("reference", 2, 11)];
+    const now = Date.now();
+    const sources = [station("figee", 1, 10, new Date(now - 1)), station("reference", 2, 11, new Date(now - 1))];
     const baseline = computeFusion(sources, {
       altitudeCorrectionEnabled: false,
       anomalyDetectionEnabled: false,
       modelWeightFraction: 0,
     });
     const previousReadings = new Map([
-      ["figee", { temperature: 10, timestamp: Date.now() - 61 * 60 * 1000 }],
+      ["figee", { temperature: 10, timestamp: now - 61 * 60 * 1000, stableSince: now - 61 * 60 * 1000 }],
     ]);
     const result = computeFusion(
       sources,

@@ -317,23 +317,34 @@ export function calculateUltraLocal(
     if (field === "temperature" && prevReadings.size > 0) {
       qualified = qualified.filter((entry) => {
         const previous = prevReadings.get(entry.station.stationId);
-        if (!previous || entry.station.temperature == null) return true;
-        const ageMin = (now - previous.timestamp) / 60_000;
+        const observedAt = getValidStationMeasurementTimestamp(entry.station.measurementTimes, "temperature", now);
+        if (!previous || entry.station.temperature == null || observedAt == null) return true;
+        const observationTimestamp = Date.parse(observedAt);
+        if (!Number.isFinite(observationTimestamp)
+          || !Number.isFinite(previous.timestamp)
+          || !Number.isFinite(previous.stableSince)
+          || previous.stableSince > previous.timestamp
+          || observationTimestamp <= previous.timestamp) return true;
+        const observationGapMin = (observationTimestamp - previous.timestamp) / 60_000;
         const tempDelta = Math.abs(entry.station.temperature - previous.temperature);
-        if (ageMin > 60 && tempDelta < 0.01) {
+        const unchangedValue = entry.station.temperature === previous.temperature;
+        const stableAgeMin = unchangedValue
+          ? (observationTimestamp - previous.stableSince) / 60_000
+          : 0;
+        if (stableAgeMin > 60 && tempDelta < 0.01) {
           entry.checks.push({
             name: "frozen_value",
             passed: false,
-            value: `${entry.station.temperature.toFixed(1)}°C inchangé depuis ${Math.round(ageMin)} min`,
+            value: `${entry.station.temperature.toFixed(1)}°C inchangé depuis ${Math.round(stableAgeMin)} min`,
             threshold: "ΔT > 0.01°C en 60 min",
           });
           return false;
         }
-        if (ageMin < 10 && tempDelta > 5) {
+        if (observationGapMin < 10 && tempDelta > 5) {
           entry.checks.push({
             name: "sudden_jump",
             passed: false,
-            value: `Δ${tempDelta.toFixed(1)}°C en ${Math.round(ageMin)} min`,
+            value: `Δ${tempDelta.toFixed(1)}°C en ${Math.round(observationGapMin)} min`,
             threshold: "ΔT < 5°C en 10 min",
           });
           return false;
@@ -578,9 +589,13 @@ export function calculateUltraLocal(
   const explanation = generateExplanation(mode, contributions.filter((contribution) => contribution.weight > 0), bandBreakdown, microFactors, finalTemp, modelTemperature);
 
   // Record current readings for next cycle's frozen/jump detection
-  const readingsToRecord = stations
-    .filter(s => s.temperature != null)
-    .map(s => ({ stationId: s.stationId, temperature: s.temperature! }));
+  const readingsToRecord = stations.flatMap((station) => {
+    if (station.temperature == null || !Number.isFinite(station.temperature)) return [];
+    const observedAt = getValidStationMeasurementTimestamp(station.measurementTimes, "temperature", now);
+    return observedAt == null
+      ? []
+      : [{ stationId: station.stationId, temperature: station.temperature, observedAt }];
+  });
   if (options.recordStationReadings !== false) recordStationReadings(readingsToRecord);
 
   return {
