@@ -305,7 +305,7 @@ export const EXTENDED_REGIME_INFO: Record<ExtendedRegime, Omit<ExtendedRegimeInf
   frost:           { label: "Gel",        emoji: "🧊",  description: "Températures négatives sans précipitations — risque de gel.",               weights: EXTENDED_REGIME_WEIGHTS.frost },
   freezing_rain:   { label: "Pluie verglaçante",    emoji: "🌧",  description: "Phase de pluie verglaçante explicitement fournie par une source météo.",       weights: EXTENDED_REGIME_WEIGHTS.freezing_rain },
   deep_frost:      { label: "Gel intense",                  emoji: "❄",   description: "Gel intense (T < -5°C) — froid extrême.",                                   weights: EXTENDED_REGIME_WEIGHTS.deep_frost },
-  summer_heat:     { label: "Canicule",             emoji: "🔥",  description: "Températures > 33°C, temps sec et calme.",                                  weights: EXTENDED_REGIME_WEIGHTS.summer_heat },
+  summer_heat:     { label: "Chaleur marquée",      emoji: "🔥",  description: "Signal heuristique fondé sur la température transmise, ponctuelle ou synthétisée ; ni la durée d’un épisode ni le contexte calendaire ne sont évalués.", weights: EXTENDED_REGIME_WEIGHTS.summer_heat },
   storm:           { label: "Tempête",              emoji: "🌀",  description: "Vents violents > 60 km/h — paramètre critique.",                           weights: EXTENDED_REGIME_WEIGHTS.storm },
   variable:        { label: "Temps variable",       emoji: "🌦",  description: "Conditions changeantes, alternance de soleil et nuages.",                  weights: EXTENDED_REGIME_WEIGHTS.variable },
   spring_unstable: { label: "Printemps instable",   emoji: "🌸",  description: "Alternance soleil/averses typique du printemps.",                           weights: EXTENDED_REGIME_WEIGHTS.spring_unstable },

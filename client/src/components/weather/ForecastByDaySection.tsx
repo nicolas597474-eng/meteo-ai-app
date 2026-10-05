@@ -100,7 +100,7 @@ function dateText(date: string): string {
 }
 
 const CONDITION_LABELS: Record<string, string> = {
-  sunny: "Ensoleillé", stable: "Temps stable", summer_heat: "Canicule",
+  sunny: "Ensoleillé", stable: "Temps stable", summer_heat: "Chaleur marquée",
   few_clouds: "Peu nuageux", partly_cloudy: "Partiellement nuageux", overcast: "Ciel couvert",
   cloudy: "Nuageux", cloud_cover: "Ciel couvert", variable: "Temps variable",
   showers: "Averses", rainy: "Pluie", heavy_rain: "Pluie forte", thunderstorm: "Orages",

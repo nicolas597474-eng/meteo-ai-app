@@ -371,6 +371,16 @@ describe("détection de régime sans valeurs météorologiques inventées", () =
     }
   });
 
+  it("décrit summer_heat comme un signal thermique sans prétendre identifier une canicule", () => {
+    const heatInput = { ...complete, temperature: 34, precipitation: 0 };
+
+    expect(detectExtendedRegime(heatInput)).toBe("summer_heat");
+    expect(EXTENDED_REGIME_INFO.summer_heat.label).toBe("Chaleur marquée");
+    expect(EXTENDED_REGIME_INFO.summer_heat.description).toContain("ponctuelle ou synthétisée");
+    expect(EXTENDED_REGIME_INFO.summer_heat.description).toContain("durée");
+    expect(EXTENDED_REGIME_INFO.summer_heat.description).toContain("contexte calendaire");
+  });
+
   it("ne déduit ni neige ni pluie verglaçante de la seule température et quantité de précipitations", () => {
     const coldPrecipitation = { ...complete, temperature: -2, precipitation: 1, cloudCover: 65 };
     const extended = detectExtendedRegime(coldPrecipitation);

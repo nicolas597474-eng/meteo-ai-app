@@ -247,7 +247,7 @@ export default function FifteenDayChart({ days, locationName }: Props) {
   const chartAlerts = useMemo(() => {
     const alerts: Array<{ id: string; label: string; className: string }> = [];
     if (displayDays.some((day) => (day.tempMax ?? 0) >= 33)) {
-      alerts.push({ id: "heat", label: "Canicule · maximum ≥ 33°C", className: "border-orange-400/35 bg-orange-400/10 text-orange-200" });
+      alerts.push({ id: "heat", label: "Chaleur marquée · maximum ≥ 33°C", className: "border-orange-400/35 bg-orange-400/10 text-orange-200" });
     }
     if (displayDays.some((day) => (day.condition ?? "").toLowerCase().includes("orage"))) {
       alerts.push({ id: "storm", label: "Risque d’orage", className: "border-violet-400/35 bg-violet-400/10 text-violet-200" });

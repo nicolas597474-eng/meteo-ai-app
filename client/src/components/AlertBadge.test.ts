@@ -53,6 +53,18 @@ describe("AlertBadge — indicateur heuristique de régime", () => {
     ).toBe("");
   });
 
+  it("garde summer_heat sous la forme d’un signal descriptif de chaleur", () => {
+    const html = renderToStaticMarkup(
+      createElement(AlertBadge, {
+        regimeId: "summer_heat",
+        regimeScore: 60,
+      })
+    );
+
+    expect(html).toContain("Signal de régime · Chaleur forte");
+    expect(html).not.toContain("Canicule");
+  });
+
   it("évite de présenter le signal comme une alerte ou une confiance météo calibrée", () => {
     const html = renderToStaticMarkup(
       createElement(AlertBadge, {
