@@ -28,6 +28,7 @@ import {
 } from "./spatialFusionCore";
 import { getStationRankingScore } from "./stationRankingScore";
 import { evaluateStationFieldQuality, getStationMeasurementAgeState, getStationMeasurementAgeStates, getValidStationMeasurementTimestamp, hasFreshStationMeasurement, type StationFieldQualityResult, type StationMeasurementField, type StationMeasurementTimes } from "./stationMeasurementFreshness";
+import { getStationSourceDiagnosticReason, StationSourceCollectionError, type StationSourceDiagnosticReason } from "./stationSourceDiagnostics";
 
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
 
@@ -70,6 +71,23 @@ export type StationData = {
   qualificationStatus?: "candidate" | "validated" | "excluded";
   sourceTier?: 1 | 2 | 3;
 };
+
+export type StationCollectionSource = "meteofrance" | "metar" | "netatmo" | "opensensemap";
+export type StationSourceDiagnosticStatus = "success_with_data" | "success_empty" | "error" | "not_configured";
+export type StationSourceDiagnostic = {
+  source: StationCollectionSource;
+  status: StationSourceDiagnosticStatus;
+  stationCount: number;
+  /** Safe normalized category only; raw provider errors and responses are never exposed. */
+  reason?: StationSourceDiagnosticReason;
+};
+export type NearbyStationsCollection = {
+  stations: StationData[];
+  sourceDiagnostics: StationSourceDiagnostic[];
+  /** True when these source results were served from the existing short-lived cache. */
+  cacheHit: boolean;
+};
+type CachedNearbyStationsCollection = Pick<NearbyStationsCollection, "stations" | "sourceDiagnostics">;
 
 /**
  * Sources dont les relevés sont associés à une station physique identifiée.
@@ -205,8 +223,8 @@ export function getStationSourcePriorityDefaults(source: StationSource) {
 export const NEARBY_STATIONS_CACHE_TTL_MS = 90_000;
 type NearbyStationsCacheEntry = {
   expiresAt: number;
-  stations?: StationData[];
-  pending?: Promise<StationData[]>;
+  result?: CachedNearbyStationsCollection;
+  pending?: Promise<CachedNearbyStationsCollection>;
 };
 const nearbyStationsCache = new Map<string, NearbyStationsCacheEntry>();
 
@@ -420,39 +438,40 @@ async function fetchMeteoFranceStations(
   lon: number,
   radiusKm: number
 ): Promise<StationData[]> {
-  try {
-    // OpenDataSoft SYNOP dataset — correct field names: latitude, longitude, altitude (not lat/lon/alti)
-    const bbox = Math.max(radiusKm / 80, 0.5); // degrees, ~111km per degree
-    const where = `latitude>${(lat - bbox).toFixed(4)} AND latitude<${(lat + bbox).toFixed(4)} AND longitude>${(lon - bbox).toFixed(4)} AND longitude<${(lon + bbox).toFixed(4)}`;
-    const params = new URLSearchParams({
-      select: "numer_sta,nom,latitude,longitude,altitude,t,u,pres,ff,raf10,rr1,dd,date",
-      where,
-      order_by: "date desc",
-      limit: "30",
-      timezone: "UTC",
-    });
-    const url = `https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/donnees-synop-essentielles-omm/records?${params}`;
+  // OpenDataSoft SYNOP dataset — correct field names: latitude, longitude, altitude (not lat/lon/alti)
+  const bbox = Math.max(radiusKm / 80, 0.5); // degrees, ~111km per degree
+  const where = `latitude>${(lat - bbox).toFixed(4)} AND latitude<${(lat + bbox).toFixed(4)} AND longitude>${(lon - bbox).toFixed(4)} AND longitude<${(lon + bbox).toFixed(4)}`;
+  const params = new URLSearchParams({
+    select: "numer_sta,nom,latitude,longitude,altitude,t,u,pres,ff,raf10,rr1,dd,date",
+    where,
+    order_by: "date desc",
+    limit: "30",
+    timezone: "UTC",
+  });
+  const url = `https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/donnees-synop-essentielles-omm/records?${params}`;
 
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return [];
-    const data = await res.json();
-
-    const results: StationData[] = [];
-    const seenStations = new Set<string>();
-
-    for (const r of (data.results ?? [])) {
-      const stId = `mf-${r.numer_sta}`;
-      // Only take the most recent record per station
-      if (seenStations.has(stId)) continue;
-      seenStations.add(stId);
-
-      const station = mapSynopRecord(r, lat, lon, radiusKm);
-      if (station) results.push(station);
-    }
-    return results;
-  } catch {
-    return [];
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new StationSourceCollectionError("provider_http_error");
+  const data = await res.json() as unknown;
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new StationSourceCollectionError("invalid_response");
+  const records = (data as { results?: unknown }).results ?? [];
+  if (!Array.isArray(records) || records.some((record: unknown) => !record || typeof record !== "object" || Array.isArray(record))) {
+    throw new StationSourceCollectionError("invalid_response");
   }
+
+  const results: StationData[] = [];
+  const seenStations = new Set<string>();
+
+  for (const r of records as Record<string, unknown>[]) {
+    const stId = `mf-${r.numer_sta}`;
+    // Only take the most recent record per station
+    if (seenStations.has(stId)) continue;
+    seenStations.add(stId);
+
+    const station = mapSynopRecord(r, lat, lon, radiusKm);
+    if (station) results.push(station);
+  }
+  return results;
 }
 
 // ─── 3. METAR — official worldwide airport observations (no key required) ─────
@@ -512,25 +531,24 @@ export function mapMetarObservation(observation: MetarObservation, lat: number, 
 }
 
 async function fetchMetarStations(lat: number, lon: number, radiusKm: number): Promise<StationData[]> {
-  try {
-    const latitudePadding = Math.max(radiusKm / 111, 0.25);
-    const longitudePadding = Math.max(radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2)), 0.25);
-    const bbox = [lat - latitudePadding, lon - longitudePadding, lat + latitudePadding, lon + longitudePadding]
-      .map((coordinate) => coordinate.toFixed(4))
-      .join(",");
-    const params = new URLSearchParams({ format: "json", bbox });
-    const response = await fetch(`https://aviationweather.gov/api/data/metar?${params}`, {
-      headers: { "User-Agent": "MeteoAI/1.0 official-station-collector" },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) return [];
-    const observations = await response.json() as MetarObservation[];
-    return observations
-      .map((observation) => mapMetarObservation(observation, lat, lon, radiusKm))
-      .filter((station): station is StationData => station !== null);
-  } catch {
-    return [];
+  const latitudePadding = Math.max(radiusKm / 111, 0.25);
+  const longitudePadding = Math.max(radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2)), 0.25);
+  const bbox = [lat - latitudePadding, lon - longitudePadding, lat + latitudePadding, lon + longitudePadding]
+    .map((coordinate) => coordinate.toFixed(4))
+    .join(",");
+  const params = new URLSearchParams({ format: "json", bbox });
+  const response = await fetch(`https://aviationweather.gov/api/data/metar?${params}`, {
+    headers: { "User-Agent": "MeteoAI/1.0 official-station-collector" },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new StationSourceCollectionError("provider_http_error");
+  const observations = await response.json() as unknown;
+  if (!Array.isArray(observations) || observations.some((observation: unknown) => !observation || typeof observation !== "object" || Array.isArray(observation))) {
+    throw new StationSourceCollectionError("invalid_response");
   }
+  return (observations as MetarObservation[])
+    .map((observation) => mapMetarObservation(observation, lat, lon, radiusKm))
+    .filter((station): station is StationData => station !== null);
 }
 
 // ─── 4. Multi-point Open-Meteo grid references (not physical stations) ─────────
@@ -572,22 +590,54 @@ async function fetchSYNOPReference(
 
 // ─── Main: collect all stations ───────────────────────────────────────────────
 
+function makeSourceDiagnostic<T extends readonly unknown[]>(
+  source: StationCollectionSource,
+  outcome: PromiseSettledResult<T>,
+  netatmoStatus?: import("./netatmoService").NetatmoAvailability,
+): StationSourceDiagnostic {
+  if (outcome.status === "rejected") {
+    return { source, status: "error", stationCount: 0, reason: getStationSourceDiagnosticReason(outcome.reason) };
+  }
+
+  const stationCount = outcome.value.length;
+  if (source === "netatmo" && stationCount === 0) {
+    if (netatmoStatus === "not_connected") return { source, status: "not_configured", stationCount };
+    if (netatmoStatus === "temporarily_unavailable") {
+      return { source, status: "error", stationCount, reason: "source_unavailable" };
+    }
+  }
+  return { source, status: stationCount > 0 ? "success_with_data" : "success_empty", stationCount };
+}
+
 async function collectNearbyStationsUncached(
   lat: number,
   lon: number,
   radiusKm: number = 20,
   townName: string = "Local",
   options: { netatmoUserId?: number; onNetatmoStatus?: (status: import("./netatmoService").NetatmoAvailability) => void } = {},
-): Promise<StationData[]> {
+): Promise<CachedNearbyStationsCollection> {
   const { fetchNetatmoPublicStations } = await import("./netatmoService");
   // Seules les observations de station et les candidats sont assemblés ici.
   // Les modèles sont exposés séparément par fetchCurrentModelReferences().
+  let netatmoStatus: import("./netatmoService").NetatmoAvailability | undefined;
   const [meteoFrance, metar, netatmo, openSenseMap] = await Promise.allSettled([
     fetchMeteoFranceStations(lat, lon, radiusKm),
     fetchMetarStations(lat, lon, radiusKm),
-    fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm, { onStatus: options.onNetatmoStatus }),
+    fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm, {
+      onStatus: (status) => {
+        netatmoStatus = status;
+        options.onNetatmoStatus?.(status);
+      },
+    }),
     fetchOpenSenseMapCandidates(lat, lon, radiusKm),
   ]);
+
+  const sourceDiagnostics = [
+    makeSourceDiagnostic("meteofrance", meteoFrance),
+    makeSourceDiagnostic("metar", metar),
+    makeSourceDiagnostic("netatmo", netatmo, netatmoStatus),
+    makeSourceDiagnostic("opensensemap", openSenseMap),
+  ];
 
   const all: StationData[] = [
     ...(meteoFrance.status === "fulfilled" ? meteoFrance.value : []),
@@ -633,7 +683,7 @@ async function collectNearbyStationsUncached(
     .filter(s => s.distanceKm <= radiusKm);
 
   // Apply quality exclusion rules
-  return inRadius.map(s => {
+  const stations = inRadius.map(s => {
     if (!hasFiniteActivationMeasurement(s)) {
       return { ...s, isActive: false, exclusionReason: "Aucune donnée disponible" };
     }
@@ -644,6 +694,39 @@ async function collectNearbyStationsUncached(
     }
     return s;
   });
+  return { stations, sourceDiagnostics };
+}
+
+export async function collectNearbyStationsWithDiagnostics(
+  lat: number,
+  lon: number,
+  radiusKm: number = 20,
+  townName: string = "Local",
+  options: { netatmoUserId?: number; onNetatmoStatus?: (status: import("./netatmoService").NetatmoAvailability) => void } = {},
+): Promise<NearbyStationsCollection> {
+  const cacheKey = makeNearbyStationsCacheKey(lat, lon, radiusKm, options.netatmoUserId);
+  const now = Date.now();
+  const cached = nearbyStationsCache.get(cacheKey);
+  if (cached?.result && cached.expiresAt > now) {
+    options.onNetatmoStatus?.(options.netatmoUserId === undefined ? "not_connected" : "fresh_cache");
+    return {
+      ...cached.result,
+      stations: revalidateStationFreshness(cached.result.stations, now),
+      cacheHit: true,
+    };
+  }
+  if (cached?.pending) return { ...(await cached.pending), cacheHit: false };
+
+  const pending = collectNearbyStationsUncached(lat, lon, radiusKm, townName, options);
+  nearbyStationsCache.set(cacheKey, { expiresAt: now + NEARBY_STATIONS_CACHE_TTL_MS, pending });
+  try {
+    const result = await pending;
+    nearbyStationsCache.set(cacheKey, { expiresAt: Date.now() + NEARBY_STATIONS_CACHE_TTL_MS, result });
+    return { ...result, cacheHit: false };
+  } catch (error) {
+    nearbyStationsCache.delete(cacheKey);
+    throw error;
+  }
 }
 
 export async function collectNearbyStations(
@@ -653,25 +736,7 @@ export async function collectNearbyStations(
   townName: string = "Local",
   options: { netatmoUserId?: number; onNetatmoStatus?: (status: import("./netatmoService").NetatmoAvailability) => void } = {},
 ): Promise<StationData[]> {
-  const cacheKey = makeNearbyStationsCacheKey(lat, lon, radiusKm, options.netatmoUserId);
-  const now = Date.now();
-  const cached = nearbyStationsCache.get(cacheKey);
-  if (cached?.stations && cached.expiresAt > now) {
-    options.onNetatmoStatus?.(options.netatmoUserId === undefined ? "not_connected" : "fresh_cache");
-    return revalidateStationFreshness(cached.stations, now);
-  }
-  if (cached?.pending) return cached.pending;
-
-  const pending = collectNearbyStationsUncached(lat, lon, radiusKm, townName, options);
-  nearbyStationsCache.set(cacheKey, { expiresAt: now + NEARBY_STATIONS_CACHE_TTL_MS, pending });
-  try {
-    const stations = await pending;
-    nearbyStationsCache.set(cacheKey, { expiresAt: Date.now() + NEARBY_STATIONS_CACHE_TTL_MS, stations });
-    return stations;
-  } catch (error) {
-    nearbyStationsCache.delete(cacheKey);
-    throw error;
-  }
+  return (await collectNearbyStationsWithDiagnostics(lat, lon, radiusKm, townName, options)).stations;
 }
 
 // ─── Ranking ─────────────────────────────────────────────────────────────────

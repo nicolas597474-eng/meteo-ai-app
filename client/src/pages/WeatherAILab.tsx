@@ -763,20 +763,55 @@ export default function WeatherAILab() {
       status: hasSnapshot ? "complete" : "waiting",
     },
   ];
+  const stationSourceLabels: Record<string, string> = {
+    meteofrance: "Météo-France · SYNOP",
+    metar: "METAR",
+    netatmo: "Netatmo",
+    opensensemap: "openSenseMap · candidat",
+  };
+  const stationSourceStatusLabels: Record<string, string> = {
+    success_with_data: "succès avec stations",
+    success_empty: "succès, aucune station retournée",
+    error: "échec technique",
+    not_configured: "non connectée / non configurée",
+  };
+  const stationSourceReasonLabels: Record<string, string> = {
+    network_error: "erreur réseau",
+    timeout: "délai dépassé",
+    provider_http_error: "réponse HTTP fournisseur en erreur",
+    invalid_response: "réponse fournisseur invalide",
+    source_unavailable: "source temporairement indisponible",
+    source_error: "erreur source normalisée",
+  };
+  const stationDiagnosticErrors = (stationData?.sourceDiagnostics ?? []).filter((diagnostic) => diagnostic.status === "error");
+  const stationDiagnosticErrorSources = stationDiagnosticErrors.map((diagnostic) => stationSourceLabels[diagnostic.source] ?? diagnostic.source).join(" · ");
   const stationSteps: SimulationStep[] = [
     {
       id: "station-search",
       title: "Recherche locale",
-      summary: stationData ? `${stationData.totalFound} station(s) trouvée(s) dans un rayon de ${stationData.radiusKm} km.` : stationsError ? "Les stations locales ne sont pas disponibles pour cette consultation." : "Recherche des stations locales en cours.",
+      summary: stationData ? `${stationData.totalFound} station(s) trouvée(s) dans un rayon de ${stationData.radiusKm} km.${stationDiagnosticErrors.length ? ` Échec technique : ${stationDiagnosticErrorSources}. Le résultat peut être partiel.` : ""}` : stationsError ? "Les stations locales ne sont pas disponibles pour cette consultation." : "Recherche des stations locales en cours.",
       detail: <p>La recherche lit les stations réellement retournées autour du lieu actif. Une station trouvée n’est pas automatiquement retenue comme observation physique ni comme preuve de fiabilité.</p>,
-      status: stationData ? "complete" : stationsError ? "partial" : "waiting",
+      status: stationDiagnosticErrors.length > 0 ? "partial" : stationData ? "complete" : stationsError ? "partial" : "waiting",
     },
     {
       id: "station-filter",
       title: "Filtre physique",
-      summary: stationData ? `${physicalStations.length} station(s) physique(s) identifiée(s), dont ${activePhysicalStations.length} active(s).` : "Aucun filtre n’est appliqué sans résultat de recherche.",
-      detail: <div className="space-y-1"><p>Le filtre conserve uniquement les observations de type physique, puis applique leur statut d’activité et les contrôles de qualité disponibles.</p>{stationData?.physicalStationDiagnostics.exclusionReasons.length ? <p className="text-amber-200"><span className="font-semibold">Motifs relevés · </span>{stationData.physicalStationDiagnostics.exclusionReasons.join(" · ")}</p> : stationData ? <p className="text-emerald-200">Aucun motif d’exclusion n’est remonté dans le diagnostic courant.</p> : null}</div>,
-      status: activePhysicalStations.length > 0 ? "complete" : physicalStations.length > 0 ? "partial" : "waiting",
+      summary: stationData ? `${physicalStations.length} station(s) physique(s) identifiée(s), dont ${activePhysicalStations.length} active(s).${stationDiagnosticErrors.length ? ` ${stationDiagnosticErrors.length} source(s) en échec.` : ""}` : "Aucun filtre n’est appliqué sans résultat de recherche.",
+      detail: <div className="space-y-1">
+        <p>Le filtre conserve uniquement les observations de type physique, puis applique leur statut d’activité et les contrôles de qualité disponibles.</p>
+        {stationData?.physicalStationDiagnostics.exclusionReasons.length
+          ? <p className="text-amber-200"><span className="font-semibold">Motifs relevés · </span>{stationData.physicalStationDiagnostics.exclusionReasons.join(" · ")}</p>
+          : stationData ? <p className="text-emerald-200">Aucun motif d’exclusion n’est remonté dans le diagnostic courant.</p> : null}
+        {stationData?.sourceDiagnostics.length ? <div className="mt-1 space-y-0.5" aria-label="Diagnostic normalisé de chaque source de stations">
+          <p className="text-slate-300">État par source{stationData.sourceDiagnosticsFromCache ? " · résultat mémorisé par le cache court" : " · collecte courante"} :</p>
+          <p className="text-[9px] text-slate-500">Compteur des stations retenues par chaque collecteur avant fusion et contrôles de qualité communs.</p>
+          {stationData.sourceDiagnostics.map((diagnostic) => <p key={diagnostic.source} className={diagnostic.status === "error" ? "text-amber-200" : "text-slate-400"}>
+            <span className="font-medium text-slate-200">{stationSourceLabels[diagnostic.source] ?? diagnostic.source}</span> · {stationSourceStatusLabels[diagnostic.status] ?? diagnostic.status} · {diagnostic.stationCount} station(s)
+            {diagnostic.reason ? ` · ${stationSourceReasonLabels[diagnostic.reason] ?? "raison normalisée"}` : ""}
+          </p>)}
+        </div> : null}
+      </div>,
+      status: stationDiagnosticErrors.length > 0 ? "partial" : activePhysicalStations.length > 0 ? "complete" : physicalStations.length > 0 ? "partial" : "waiting",
     },
     {
       id: "station-synthesis",

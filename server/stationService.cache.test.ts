@@ -7,8 +7,10 @@ describe("cache de collecte des stations proches", () => {
     expect(source).toContain("NEARBY_STATIONS_CACHE_TTL_MS = 90_000");
     expect(source).toContain("makeNearbyStationsCacheKey(lat, lon, radiusKm, options.netatmoUserId)");
     expect(source).toContain('netatmoUserId ?? "public"');
-    expect(source).toContain("if (cached?.pending) return cached.pending");
+    expect(source).toContain("if (cached?.pending) return { ...(await cached.pending), cacheHit: false }");
     expect(source).toContain("collectNearbyStationsUncached(lat, lon, radiusKm, townName, options)");
-    expect(source).toContain("return revalidateStationFreshness(cached.stations, now)");
+    expect(source).toContain("if (cached?.result && cached.expiresAt > now)");
+    expect(source).toContain("stations: revalidateStationFreshness(cached.result.stations, now)");
+    expect(source).toContain("sourceDiagnostics: StationSourceDiagnostic[]");
   });
 });

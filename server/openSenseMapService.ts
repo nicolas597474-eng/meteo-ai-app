@@ -1,4 +1,5 @@
 import { fetchWeather } from "./weatherFetch";
+import { StationSourceCollectionError } from "./stationSourceDiagnostics";
 
 type OpenSenseMapMeasurement = {
   value?: string | number;
@@ -112,8 +113,12 @@ export async function fetchOpenSenseMapCandidates(lat: number, lon: number, radi
     full: "true",
   });
   const response = await fetchWeather(`https://api.opensensemap.org/boxes?${params}`, {}, { timeoutMs: 8_000, attempts: 2 });
-  if (!response.ok) return [];
-  const boxes = await response.json() as OpenSenseMapBox[];
+  if (!response.ok) throw new StationSourceCollectionError("provider_http_error");
+  const responseData = await response.json() as unknown;
+  if (!Array.isArray(responseData) || responseData.some((box: unknown) => !box || typeof box !== "object" || Array.isArray(box))) {
+    throw new StationSourceCollectionError("invalid_response");
+  }
+  const boxes = responseData as OpenSenseMapBox[];
   return boxes
     .map((box) => mapOpenSenseMapBox(box, lat, lon, radiusKm))
     .filter((candidate): candidate is OpenSenseMapCandidate => candidate !== null);

@@ -42,7 +42,7 @@ import { collectExpertForecasts, collectObservations, collect15DayForecast, coll
 import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
 import { summarizePrecipitationModels } from "../../shared/precipitationConsensus";
 import { legacyStabilityLabelForStorage } from "../legacyStabilityStorage";
-import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
+import { collectNearbyStations, collectNearbyStationsWithDiagnostics, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
 import { getStationMeasurementAgeStates } from "../stationMeasurementFreshness";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
@@ -1429,13 +1429,14 @@ export const weatherRouter = router({
       const radiusKm = input.radiusKm;
 
       let netatmoStatus: import("../netatmoService").NetatmoAvailability = "not_connected";
-      const [stations, currentModelReferences] = await Promise.all([
-        collectNearbyStations(lat, lon, radiusKm, "Local", {
+      const [stationCollection, currentModelReferences] = await Promise.all([
+        collectNearbyStationsWithDiagnostics(lat, lon, radiusKm, "Local", {
           netatmoUserId: ctx.user?.id,
           onNetatmoStatus: (status) => { netatmoStatus = status; },
         }),
         fetchCurrentModelReferences(lat, lon),
       ]);
+      const stations = stationCollection.stations;
       const ranked = rankStations(stations);
       const physicalStations = getPhysicalActiveStations(ranked);
       const discoveredPhysicalStations = ranked.filter((station) => getStationSourceKind(station.source, station.stationId) === "physical");
@@ -1528,6 +1529,8 @@ export const weatherRouter = router({
           activeCount: physicalStations.length,
           exclusionReasons: Array.from(new Set(excludedPhysicalStations.map((station) => station.exclusionReason).filter((reason): reason is string => Boolean(reason)))).slice(0, 3),
         },
+        sourceDiagnostics: stationCollection.sourceDiagnostics,
+        sourceDiagnosticsFromCache: stationCollection.cacheHit,
         referenceSourceCount: modelReferences.length,
         fetchedAt: new Date().toISOString(),
       };
