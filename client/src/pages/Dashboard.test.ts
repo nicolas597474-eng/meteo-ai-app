@@ -7,6 +7,11 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     const metricDefinitions = readFileSync(new URL("../components/weather/ForecastMetricDefinitions.tsx", import.meta.url), "utf8");
     expect(source).not.toContain("Prévision officielle consolidée");
     expect(source).toContain("Moyenne locale pondérée");
+    expect(source).toContain("<LocalModelContributionNotice");
+    expect(source).toContain("isPlaceholderData={locationWeatherIsPlaceholder}");
+    expect(source).toContain("modelContribution={locationWeather.ultraLocal.modelContribution}");
+    expect(source).toContain("modelWeight={locationWeather.ultraLocal.modelWeight}");
+    expect(source).toContain("usesModelFallback={locationWeather.ultraLocal.usesModelFallback}");
     expect(source).toContain("Mes observations");
     expect(source).toContain('MeteoIcon name="wind_param" size={16}');
     expect(source).toContain('MeteoIcon name="humidity" size={16}');

@@ -11,6 +11,7 @@ import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
+import { LocalModelContributionNotice } from "@/components/LocalModelContributionNotice";
 import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
 import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
@@ -1171,7 +1172,19 @@ export default function Dashboard() {
         {localMode !== "standard" && locationWeather?.ultraLocal && (
           <section className="space-y-2" aria-labelledby="local-context-title">
             <div className="flex items-center justify-between gap-2 px-1">
-              <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
+              <div className="min-w-0">
+                <h2 id="local-context-title" className="text-sm font-semibold text-slate-100">Moyenne locale pondérée</h2>
+                <LocalModelContributionNotice
+                  localMode={localMode}
+                  isPlaceholderData={locationWeatherIsPlaceholder}
+                  estimateTemperature={locationWeather.ultraLocal.temperature}
+                  stationCount={locationWeather.ultraLocal.stationCount}
+                  modelContribution={locationWeather.ultraLocal.modelContribution}
+                  modelWeight={locationWeather.ultraLocal.modelWeight}
+                  usesOfficialFallback={locationWeather.ultraLocal.usesOfficialFallback}
+                  usesModelFallback={locationWeather.ultraLocal.usesModelFallback}
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted-foreground">{locationWeatherFetching && locationWeatherIsPlaceholder ? "Filtre local en cours…" : "n’influence pas la prévision officielle"}</span>
                 <button type="button" onClick={() => handleModeChange("standard")} aria-label="Fermer le contexte local et revenir au mode Officiel" title="Revenir au mode Officiel" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-slate-600/70 bg-slate-900/70 text-slate-200 transition-colors hover:border-sky-300/65 hover:bg-sky-400/15 hover:text-sky-100 active:scale-95">
