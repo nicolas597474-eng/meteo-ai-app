@@ -40,6 +40,42 @@ function station(overrides: Partial<StationData>): StationData {
 }
 
 describe("calculateUltraLocal", () => {
+  it("n’infère jamais la cible depuis une station classée, inactive ou réordonnée", () => {
+    const inactiveHighStation = station({ stationId: "inactive-high", altitude: 400, distanceKm: 1.1, isActive: false });
+    const activeStation = station({ stationId: "active", altitude: 50, distanceKm: 1.4, temperature: 20, humidity: 62, windSpeed: 8 });
+
+    for (const input of [[inactiveHighStation, activeStation], [activeStation, inactiveHighStation]]) {
+      const result = calculateUltraLocal(input, "local", 50.75, 2.52, null, null, { recordStationReadings: false });
+      const contribution = result.stationsUsed.find((entry) => entry.stationId === "active")!;
+      const altitudeCheck = contribution.qualityChecks.find((check) => check.name === "Altitude");
+
+      expect(result.temperature).toBe(20);
+      expect(result.humidity).toBe(62);
+      expect(result.windSpeed).toBe(8);
+      expect(result.stationCount).toBe(1);
+      expect(contribution.temperature).toBe(20);
+      expect(contribution.adjustedTemperature).toBe(20);
+      expect(contribution.altitudeAdjustment).toBe(0);
+      expect(altitudeCheck).toMatchObject({ passed: false, status: "non_verifiable", value: "non vérifiable" });
+      expect(result.altitudeCorrection).toEqual({ applied: false, reason: "reference_altitude_unavailable" });
+    }
+  });
+
+  it("conserve la formule et le cutoff de 200 m quand la cible est fournie explicitement", () => {
+    const result = calculateUltraLocal([
+      station({ stationId: "inside-cutoff", altitude: 130, temperature: 20 }),
+      station({ stationId: "outside-cutoff", altitude: 301, temperature: 25, distanceKm: 2 }),
+    ], "local", 50.75, 2.52, 100, null, { recordStationReadings: false });
+
+    expect(result.stationsUsed.map((entry) => entry.stationId)).toEqual(["inside-cutoff"]);
+    expect(result.stationsUsed[0].altitudeAdjustment).toBeCloseTo(-0.19, 2);
+    expect(result.stationsUsed[0].adjustedTemperature).toBe(19.8);
+    expect(result.stationsUsed[0].qualityChecks.find((check) => check.name === "Altitude"))
+      .toMatchObject({ passed: true, status: "passed" });
+    expect(result.stationsIgnored.find((entry) => entry.stationId === "outside-cutoff")?.reason).toContain("Altitude");
+    expect(result.altitudeCorrection).toEqual({ applied: true, reason: "adjustment_applied" });
+  });
+
   it("favorise la station plus fraîche à distance et fiabilité égales", () => {
     const now = Date.now();
     const result = calculateUltraLocal([

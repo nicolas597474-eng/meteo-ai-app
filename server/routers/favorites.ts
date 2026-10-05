@@ -464,6 +464,7 @@ export const favoritesRouter = router({
         ultraLocal: {
           // À zéro station physique, les modes locaux reprennent exactement la
           // température officielle, sans la présenter comme une observation locale.
+          altitudeCorrection: ultraLocalResult.altitudeCorrection,
           temperature: localModeTemperature.temperature,
           officialTemperature: officialCurrentTemperature,
           usesOfficialFallback: localModeTemperature.usesOfficialFallback,

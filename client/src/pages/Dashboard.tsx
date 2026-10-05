@@ -12,6 +12,7 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { LocalModelContributionNotice } from "@/components/LocalModelContributionNotice";
+import { AltitudeCorrectionNotice } from "@/components/AltitudeCorrectionNotice";
 import { dashboardTemperatureLayout } from "@/lib/dashboardTemperatureLayout";
 import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dashboardLoadState";
@@ -1204,6 +1205,7 @@ export default function Dashboard() {
                 </div>
                 <WeatherStatusBadge compact tone="success" label="Relevés locaux" value={locationWeather.ultraLocal.stationCount > 0 ? `${locationWeather.ultraLocal.stationCount} station(s)` : "Données insuffisantes"} pulse={locationWeather.ultraLocal.stationCount > 0} description="Nombre de stations locales retenues pour le contexte physique. Ce compteur n’est pas un score et ne mesure pas la fiabilité des prévisions." />
               </div>
+              <AltitudeCorrectionNotice correction={locationWeather.ultraLocal.altitudeCorrection} isPlaceholderData={locationWeatherIsPlaceholder} />
               {hasMaterialLocalDelta ? <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5" role="status">
                 <div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-amber-100">Écart du calcul local avec le snapshot du modèle</p><p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">L’indicateur principal utilise les stations physiques retenues ou, champ par champ, le snapshot Open-Meteo. Ce calcul Local/Ultra-local séparé peut comporter une contribution modèle; la prévision horaire reste dans sa série dédiée.</p></div><span className="shrink-0 text-sm font-bold text-amber-200">{localOfficialDelta > 0 ? "+" : ""}{localOfficialDelta.toFixed(1)}°</span></div>
                 <p className="mt-1.5 text-[10px] text-slate-400">Snapshot du modèle : {officialSnapshotTemp == null ? "—" : `${officialSnapshotTemp.toFixed(1)}°C`} · résultat du mode Local/Ultra-local (distinct de l’indicateur principal) : {localObservation?.temperature.toFixed(1)}°C{localObservation?.observedAt ? ` · mesure source la plus récente ${new Date(localObservation.observedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}` : ""}.</p>
@@ -1241,19 +1243,23 @@ export default function Dashboard() {
                     <span className="text-[10px] font-medium text-emerald-200">{localContributors.length}</span>
                   </div>
                   <div className="mt-2 space-y-1.5">
-                    {visibleLocalContributors.map((station: any) => (
-                      <div key={station.stationId} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
-                        <span className="min-w-0 truncate">{station.name} · {station.band} · {station.distanceKm.toFixed(1)} km</span>
-                        <span className="shrink-0 text-emerald-200">{station.adjustedTemperature?.toFixed(1) ?? "—"}° · {Math.round(station.weight * 100)}%</span>
-                      </div>
-                    ))}
+                    {visibleLocalContributors.map((station: any) => {
+                      const hasAppliedAdjustment = Number.isFinite(Number(station.altitudeAdjustment)) && Number(station.altitudeAdjustment) !== 0;
+                      const displayedTemperature = hasAppliedAdjustment ? station.adjustedTemperature : station.temperature;
+                      return (
+                        <div key={station.stationId} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                          <span className="min-w-0 truncate">{station.name} · {station.band} · {station.distanceKm.toFixed(1)} km</span>
+                          <span className="shrink-0 text-emerald-200">{displayedTemperature == null ? "—" : Number(displayedTemperature).toFixed(1)}° · {hasAppliedAdjustment ? "alt. corrigée" : "brute"} · {Math.round(station.weight * 100)}%</span>
+                        </div>
+                      );
+                    })}
                   </div>
                   {localContributors.length > 6 ? (
                     <button type="button" onClick={() => setShowAllLocalContributors((open) => !open)} className="mt-2 min-h-8 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2.5 text-[10px] font-semibold text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300">
                       {showAllLocalContributors ? "Réduire les stations" : `Afficher les ${localContributors.length - 6} autres stations`}
                     </button>
                   ) : null}
-                  <p className="pt-2 text-[10px] leading-relaxed text-slate-400">Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée. La stabilité longue durée exige un historique et n’est pas déduite de ce seul affichage.</p>
+                  <p className="pt-2 text-[10px] leading-relaxed text-slate-400">Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude seulement avec une référence explicite. Sans cible, le contrôle altitude est non vérifiable et les températures restent brutes. La stabilité longue durée exige un historique et n’est pas déduite de ce seul affichage.</p>
                 </div>
               ) : modelFallbackContributors.length > 0 ? (
                 <p className="mt-3 border-t border-emerald-500/15 pt-2 text-[10px] leading-relaxed text-slate-400">Aucune station contributrice n’est disponible dans ce rayon. Contributeurs de repli : {modelFallbackContributors.map((model: any) => `${model.name} ${Math.round(Number(model.weight) * 100)}%`).join(" · ")}. Aucun modèle n’est présenté comme station.</p>
