@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable, type HourlyForecastRunValue, type HourlyPhysicalSnapshot } from "./hourlyForecastRunScoring";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
+import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 
 const locationKey = "50.756_2.520";
 const date = "2026-09-29";
@@ -83,6 +84,8 @@ describe("evaluateHourlyForecastRuns", () => {
     ]);
 
     expect(scoresFor(result, "pressure").find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 3 });
+    expect(scoresFor(result, "pressure").find((score) => score.horizonBucket === "0_2h")?.scoringValidationVersion).toBe(HOURLY_SCORING_VALIDATION_VERSION);
+    expect(result.exactScores[0]?.scoringValidationVersion).toBe(HOURLY_SCORING_VALIDATION_VERSION);
   });
 
   it("ignore un run reçu après l’observation et choisit le dernier run admissible", () => {
@@ -94,6 +97,34 @@ describe("evaluateHourlyForecastRuns", () => {
     ]);
     expect(scoresFor(result).find((score) => score.horizonBucket === "2_6h")).toMatchObject({ sampleSize: 1, mae: 1, bias: -1 });
     expect(scoresFor(result).find((score) => score.horizonBucket === "6_24h")?.sampleSize).toBe(0);
+  });
+
+  it("conserve les métriques existantes mais ne versionne pas un score issu d’un run antérieur à latestCompatibleRun", () => {
+    const validTime = observedAt(12);
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({
+        captureRunId: "older-temperature-run",
+        validTime,
+        availableAt: validTime - 3 * 60 * 60_000,
+        variable: "temperature",
+        value: 9,
+      }),
+      forecast({
+        captureRunId: "latest-wind-run",
+        validTime,
+        availableAt: validTime - 60 * 60_000,
+        variable: "wind_speed",
+        value: 7,
+      }),
+    ]);
+    const temperatureBucket = scoresFor(result, "temperature").find((score) => score.horizonBucket === "2_6h");
+    const temperatureExact = result.exactScores.find((score) => score.variable === "temperature");
+    const windExact = result.exactScores.find((score) => score.variable === "wind_speed");
+
+    expect(temperatureBucket).toMatchObject({ sampleSize: 1, mae: 1, scoringValidationVersion: null });
+    expect(temperatureExact).toMatchObject({ sampleSize: 1, mae: 1, scoringValidationVersion: null });
+    expect(windExact).toMatchObject({ sampleSize: 1, scoringValidationVersion: HOURLY_SCORING_VALIDATION_VERSION });
+    expect(result.exactComparisons).toHaveLength(2);
   });
 
   it("conserve plusieurs exécutions dans la journée et sépare les horizons Phase 3", () => {
@@ -151,6 +182,7 @@ describe("evaluateHourlyForecastRuns", () => {
 
     expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 2, mae: 1.5 });
     expect(result.exactScores).toHaveLength(2);
+    expect(result.exactScores.every((score) => score.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION)).toBe(true);
     expect(result.exactScores.map((score) => score.horizonMilliseconds)).toEqual([firstLead, secondLead]);
     expect(result.exactScores.map((score) => score.horizonMinutes)).toEqual([119.6, 119.7]);
     expect(result.exactComparisons).toHaveLength(2);
@@ -253,6 +285,7 @@ describe("evaluateHourlyForecastRuns", () => {
       sampleSize: 0,
       coverageRatio: 0,
       mae: null,
+      scoringValidationVersion: null,
     });
   });
 
@@ -285,7 +318,12 @@ describe("evaluateHourlyForecastRuns", () => {
       forecast({ captureRunId: "equal-time", validTime, availableAt: measurementTime, variable: "temperature", value: 12 }),
     ]);
 
-    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ observationCount: 1, evaluableObservationCount: 0, sampleSize: 0 });
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({
+      observationCount: 1,
+      evaluableObservationCount: 0,
+      sampleSize: 0,
+      scoringValidationVersion: null,
+    });
   });
 
   it("utilise le plus ancien horodatage des stations qui contribuent au champ", () => {
@@ -303,6 +341,7 @@ describe("evaluateHourlyForecastRuns", () => {
 
     expect(result.exactComparisons).toHaveLength(1);
     expect(result.exactComparisons[0]).toMatchObject({ captureRunId: "before-all", absoluteError: 1 });
+    expect(result.exactScores[0]?.scoringValidationVersion).toBe(HOURLY_SCORING_VALIDATION_VERSION);
   });
 
   it("applique les heures propres au champ sans faire disparaître le vent quand la température est plus ancienne", () => {
@@ -345,7 +384,21 @@ describe("evaluateHourlyForecastRuns", () => {
       mae: null,
       rmse: null,
       bias: null,
+      scoringValidationVersion: null,
     });
+  });
+
+  it("ne marque pas les agrégats issus d’un tie ambigu rejeté par latestCompatibleRun", () => {
+    const validTime = observedAt(12);
+    const shared = { validTime, availableAt: validTime - 30 * 60_000, requestStartedAt: validTime - 31 * 60_000 };
+    const result = evaluateHourlyForecastRuns([snapshot(12)], [
+      forecast({ ...shared, captureRunId: "ambiguous-a", variable: "temperature", value: 9 }),
+      forecast({ ...shared, captureRunId: "ambiguous-b", variable: "temperature", value: 11 }),
+    ]);
+
+    expect(scoresFor(result).every((score) => score.scoringValidationVersion == null)).toBe(true);
+    expect(result.exactComparisons).toHaveLength(0);
+    expect(result.exactScores).toHaveLength(0);
   });
 
   it("protège latest-compatible par champ et conserve une variable vérifiable sans température", () => {

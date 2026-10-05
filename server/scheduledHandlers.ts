@@ -21,6 +21,7 @@ import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows }
 import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable } from "./hourlyForecastRunScoring";
+import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 import { evaluateProviderRunForecasts } from "./providerRunHorizon";
 import { collectProviderRunBatch } from "./providerRunCollection";
 import { computeOfficialDailyForecast } from "./officialForecast";
@@ -782,8 +783,9 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             }),
           );
           const hourlyScores = evaluation.compatibilityScores;
-          if (evaluation.scores.length > 0) {
-            await persistHourlyForecastEvaluationScores(evaluation.scores.map((score) => ({
+          const validatedBucketScores = evaluation.scores.filter((score) => score.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION);
+          if (validatedBucketScores.length > 0) {
+            await persistHourlyForecastEvaluationScores(validatedBucketScores.map((score) => ({
               locationKey: score.locationKey,
               date: score.date,
               sourceName: score.sourceName,
@@ -798,13 +800,16 @@ export async function collectObservationsHandler(req: Request, res: Response) {
               mae: score.mae,
               rmse: score.rmse,
               bias: score.bias,
+              scoringValidationVersion: score.scoringValidationVersion,
             })));
           }
           const exactComparisonsStored = await persistHourlyForecastExactComparisons(evaluation.exactComparisons.flatMap((comparison) => {
             if (comparison.forecastRunValueId == null || comparison.observationSnapshotId == null) return [];
             return [{ ...comparison, forecastRunValueId: comparison.forecastRunValueId, observationSnapshotId: comparison.observationSnapshotId }];
           }));
-          if (exactComparisonsStored) await persistHourlyForecastExactEvaluationScores(evaluation.exactScores);
+          if (exactComparisonsStored) await persistHourlyForecastExactEvaluationScores(
+            evaluation.exactScores.filter((score) => score.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION),
+          );
           if (hourlyScores.length > 0) {
             await upsertHourlyCompatibilityReliabilityScores(hourlyScores.map((score) => ({
               locationKey: locKey,

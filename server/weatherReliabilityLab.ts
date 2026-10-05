@@ -55,7 +55,7 @@ export async function buildReliabilityLaboratory(input: {
   const locationKey = makeLocationKey(input.lat, input.lon);
   const selectedHorizon = getLaboratoryHorizon(input.horizon);
   const trendStartDate = getParisDateDaysAgo(Math.max(period.days, 60));
-  const history = await getHourlyForecastEvaluationHistory(locationKey, trendStartDate, throughDate);
+  const history = await getHourlyForecastEvaluationHistory(locationKey, trendStartDate, throughDate, [], { includeLegacy: true });
   const minimumComparisons = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons;
   const minimumComparableDays = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays;
 
@@ -77,6 +77,7 @@ export async function buildReliabilityLaboratory(input: {
         horizonBucket: null,
         status: "horizon_not_stored" as const,
         reason: "Cet horizon n’est pas archivé séparément; aucune échéance voisine n’est utilisée en repli.",
+        legacyUnversionedRowCount: 0,
         metrics: null,
         minimumComparisons,
         minimumComparableDays,
@@ -96,19 +97,35 @@ export async function buildReliabilityLaboratory(input: {
       periodStartDate: startDate,
       historyAvailable: history.available,
     });
+    const legacyUnversionedRows = (history.legacyRows as HourlyHistoricalScoreRow[]).filter((row) =>
+      row.sourceName === "open-meteo"
+      && row.modelName === model.name
+      && row.modelId === model.modelId
+      && row.variable === variable
+      && row.horizonBucket === selectedHorizon.storageBucket
+      && row.date >= startDate
+      && row.date <= throughDate,
+    );
+    const legacyUnversionedRowCount = legacyUnversionedRows.length;
+    const legacyNote = legacyUnversionedRowCount > 0
+      ? `${legacyUnversionedRowCount} ligne(s) horaire(s) historique(s) sans version de validation, exclue(s) des preuves actuelles et des poids officiels.`
+      : null;
+    const reason = summary.status === "history_unavailable"
+      ? "Historique illisible ou indisponible; aucune preuve actuelle n’est qualifiée."
+      : summary.status === "no_evidence"
+        ? legacyNote ?? "Aucune ligne complète modèle × variable × horizon n’est archivée sur cette période."
+        : summary.status === "incomplete_metrics"
+          ? `Des lignes versionnées existent, mais au moins une métrique requise est absente ou invalide.${legacyNote ? ` ${legacyNote}` : ""}`
+          : summary.status === "insufficient_evidence"
+            ? `Valeurs brutes versionnées disponibles; qualification non atteinte (${summary.metrics?.comparisonCount ?? 0}/${minimumComparisons} comparaisons, ${summary.metrics?.evaluatedDays ?? 0}/${minimumComparableDays} jours).${legacyNote ? ` ${legacyNote}` : ""}`
+            : legacyNote;
     return {
       ...base,
       ...summary,
+      status: summary.status === "no_evidence" && legacyUnversionedRowCount > 0 ? "legacy_unversioned_only" as const : summary.status,
+      legacyUnversionedRowCount,
       horizonLabel: selectedHorizon.label,
-      reason: summary.status === "history_unavailable"
-        ? "Historique illisible ou indisponible; statut séparé de l’absence de comparaisons."
-        : summary.status === "no_evidence"
-          ? "Aucune ligne complète modèle × variable × horizon n’est archivée sur cette période."
-          : summary.status === "incomplete_metrics"
-            ? "Des lignes existent, mais au moins une métrique requise est absente ou invalide."
-            : summary.status === "insufficient_evidence"
-              ? `Valeurs brutes disponibles; qualification non atteinte (${summary.metrics?.comparisonCount ?? 0}/${minimumComparisons} comparaisons, ${summary.metrics?.evaluatedDays ?? 0}/${minimumComparableDays} jours).`
-              : null,
+      reason,
     };
   }));
 
@@ -126,7 +143,7 @@ export async function buildReliabilityLaboratory(input: {
       variables: HOURLY_FORECAST_VARIABLES.map((variable) => ({ key: variable, label: VARIABLE_LABELS[variable], unit: VARIABLE_UNITS[variable] })),
       minimumComparisons,
       minimumComparableDays,
-      note: "Les valeurs restent brutes et exactes au grain modèle × variable × horizon. MAE/RMSE/biais ne sont pas fusionnés en note; Best Match et agrégateurs sont exclus.",
+      note: "Seuls les scores horaires portant la version de validation stricte courante alimentent les preuves et les poids officiels. Les agrégats historiques non versionnés restent consultables séparément dans le diagnostic, mais ne sont jamais traités comme preuve actuelle. MAE/RMSE/biais ne sont pas fusionnés en note; Best Match et agrégateurs sont exclus.",
     },
     metrics: evidence,
     availability: {

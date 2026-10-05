@@ -17,6 +17,7 @@ export type HourlyHistoricalScoreRow = {
   horizonBucket: string;
   /** Present only for the additive exact-lead score table; never rounded or interpolated. */
   horizonMilliseconds?: number;
+  scoringValidationVersion?: number | null;
   sampleSize: number;
   mae: number | null;
   rmse?: number | null;

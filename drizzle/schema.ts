@@ -595,6 +595,7 @@ export const hourlyForecastEvaluationScores = mysqlTable("hourly_forecast_evalua
   rmse: float("rmse"),
   bias: float("bias"), // Forecast minus observation.
   computedAt: timestamp("computedAt").defaultNow().notNull(),
+  scoringValidationVersion: int("scoringValidationVersion"),
 }, (table) => [
   uniqueIndex("hourly_eval_score_day_model_variable_horizon_unique").on(table.locationKey, table.date, table.sourceName, table.modelName, table.variable, table.horizonBucket),
   index("hourly_eval_score_location_date_idx").on(table.locationKey, table.date),
@@ -660,6 +661,7 @@ export const hourlyForecastExactEvaluationScores = mysqlTable("hourly_forecast_e
   rmse: float("rmse"),
   bias: float("bias"),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
+  scoringValidationVersion: int("scoringValidationVersion"),
 }, (table) => [
   uniqueIndex("hourly_exact_eval_day_model_variable_lead_uq").on(table.locationKey, table.date, table.sourceName, table.modelName, table.variable, table.horizonMilliseconds),
   index("hourly_exact_eval_location_date_idx").on(table.locationKey, table.date),

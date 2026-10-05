@@ -1,6 +1,7 @@
 import { FORECAST_HORIZON_WINDOWS, getForecastHorizonWindow } from "../shared/forecastHorizon";
 import { scoreQualifiedHourlyModels, type QualifiedHourlyModelScore } from "./qualifiedHourlyScoring";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
+import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 
 export const HOURLY_FORECAST_VARIABLES = [
   "temperature",
@@ -69,6 +70,7 @@ export type HourlyForecastRunScore = {
   mae: number | null;
   rmse: number | null;
   bias: number | null;
+  scoringValidationVersion: number | null;
 };
 
 export type HourlyExactForecastComparison = {
@@ -117,6 +119,7 @@ export type HourlyExactForecastRunScore = {
   mae: number | null;
   rmse: number | null;
   bias: number | null;
+  scoringValidationVersion: number | null;
 };
 
 export type HourlyForecastRunEvaluation = {
@@ -143,6 +146,10 @@ type ForecastRunGroup = {
 
 function modelKey(value: ModelDescriptor): string {
   return [value.locationKey, value.targetDate, value.sourceName, value.modelName, value.modelId ?? ""].join("|");
+}
+
+function observationModelKey(snapshot: HourlyPhysicalSnapshot, model: ModelDescriptor): string {
+  return `${modelKey(model)}|${snapshot.date}|${snapshot.hour}`;
 }
 
 function forecastSeriesKey(value: Pick<HourlyForecastRunValue, "locationKey" | "targetDate" | "sourceName" | "modelName" | "modelId" | "validTime" | "variable">): string {
@@ -399,9 +406,11 @@ export function evaluateHourlyForecastRuns(
   const scores: HourlyForecastRunScore[] = [];
   const exactComparisons: HourlyExactForecastComparison[] = [];
   const exactScoreGroups = new Map<string, {
-    score: Omit<HourlyExactForecastRunScore, "sampleSize" | "coverageRatio" | "mae" | "rmse" | "bias">;
+    score: Omit<HourlyExactForecastRunScore, "sampleSize" | "coverageRatio" | "mae" | "rmse" | "bias" | "scoringValidationVersion">;
     errors: number[];
+    validationPassed: boolean;
   }>();
+  const latestCompatibleRuns = new Map<string, ForecastRunGroup>();
   const compatibilityForecasts: Array<{
     modelName: string;
     hour: number;
@@ -432,6 +441,7 @@ export function evaluateHourlyForecastRuns(
       });
       const compatibleRun = latestCompatibleRun(eligibleRows, observationAt);
       if (!compatibleRun) continue;
+      latestCompatibleRuns.set(observationModelKey(snapshot, model), compatibleRun);
       const observed = (variable: HourlyForecastVariable) => earliestByVariable.has(variable)
         ? observationValue(snapshot, variable)
         : null;
@@ -478,7 +488,9 @@ export function evaluateHourlyForecastRuns(
       const observedOpportunities = opportunities.filter((opportunity) => opportunity.validTime != null);
       const errorsByHorizon = new Map<string, number[]>();
       const evaluableObservationCountsByHorizon = new Map<string, number>();
+      const latestCompatibleValidationByHorizon = new Map<string, boolean>();
       for (const opportunity of observedOpportunities) {
+        const compatibleRun = latestCompatibleRuns.get(observationModelKey(opportunity.snapshot, model));
         const validTime = opportunity.validTime!;
         const key = forecastSeriesKey({ ...model, validTime, variable });
         const candidates = valuesBySeries.get(key) ?? [];
@@ -513,16 +525,24 @@ export function evaluateHourlyForecastRuns(
               evaluableObservationCount: 0,
             },
             errors: [],
+            validationPassed: true,
           };
           exactScoreGroups.set(exactKey, exactGroup);
         }
         exactGroup.score.observationCount += 1;
         exactGroup.score.evaluableObservationCount += 1;
         if (!selected) continue;
+        const selectedRunPassedLatestCompatible = compatibleRun != null
+          && opportunityRun.captureRunId === compatibleRun.captureRunId;
+        exactGroup.validationPassed = exactGroup.validationPassed && selectedRunPassedLatestCompatible;
         const signedError = selected.value! - opportunity.observedValue;
         const errors = errorsByHorizon.get(horizon.key) ?? [];
         errors.push(signedError);
         errorsByHorizon.set(horizon.key, errors);
+        latestCompatibleValidationByHorizon.set(
+          horizon.key,
+          (latestCompatibleValidationByHorizon.get(horizon.key) ?? true) && selectedRunPassedLatestCompatible,
+        );
         exactGroup.errors.push(signedError);
         exactComparisons.push({
           forecastRunValueId: Number.isSafeInteger(selected.id) && selected.id! > 0 ? selected.id! : null,
@@ -574,6 +594,9 @@ export function evaluateHourlyForecastRuns(
           sampleSize: errors.length,
           coverageRatio: evaluableObservationCount > 0 ? errors.length / evaluableObservationCount : 0,
           ...calculateErrors(errors),
+          scoringValidationVersion: errors.length > 0 && latestCompatibleValidationByHorizon.get(horizon.key) === true
+            ? HOURLY_SCORING_VALIDATION_VERSION
+            : null,
         });
       }
     }
@@ -586,11 +609,12 @@ export function evaluateHourlyForecastRuns(
     modelName: (serviceNameCounts.get(forecast.modelName) ?? 0) > 1 ? `${forecast.modelName} (${forecast.modelName})` : forecast.modelName,
   }));
   const compatibilityScores = scoreQualifiedHourlyModels(compatibilitySnapshots, legacyForecasts);
-  const exactScores: HourlyExactForecastRunScore[] = Array.from(exactScoreGroups.values()).map(({ score, errors }) => ({
+  const exactScores: HourlyExactForecastRunScore[] = Array.from(exactScoreGroups.values()).map(({ score, errors, validationPassed }) => ({
     ...score,
     sampleSize: errors.length,
     coverageRatio: score.evaluableObservationCount > 0 ? errors.length / score.evaluableObservationCount : 0,
     ...calculateErrors(errors),
+    scoringValidationVersion: errors.length > 0 && validationPassed ? HOURLY_SCORING_VALIDATION_VERSION : null,
   })).sort((left, right) => left.modelName.localeCompare(right.modelName)
     || left.variable.localeCompare(right.variable)
     || left.horizonMilliseconds - right.horizonMilliseconds);

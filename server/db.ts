@@ -78,6 +78,7 @@ import { getGroundTruthReferenceBounds } from "./groundTruthReference";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 import { HourlyForecastPersistenceError, withHourlyForecastPersistenceStages } from "./hourlyForecastPersistence";
 import { aggregateDailyForecastPerformance, getDailyForecastHorizon } from "./dailyForecastPerformance";
+import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 import type { DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
 import {
   buildDailyPhysicalComparisonHistoryPage,
@@ -1921,21 +1922,35 @@ export async function persistHourlyProviderRunEvaluation(input: {
 /** Insert or deterministically refresh detailed scores for one observation day. */
 export async function persistHourlyForecastEvaluationScores(rows: InsertHourlyForecastEvaluationScore[]): Promise<void> {
   const db = await getDb();
-  if (!db || rows.length === 0) return;
-  for (const row of rows) {
-    await db.insert(hourlyForecastEvaluationScores).values(row).onDuplicateKeyUpdate({
-      set: {
-        modelId: row.modelId,
-        observationCount: row.observationCount,
-        evaluableObservationCount: row.evaluableObservationCount,
-        sampleSize: row.sampleSize,
-        coverageRatio: row.coverageRatio,
-        mae: row.mae,
-        rmse: row.rmse,
-        bias: row.bias,
-        computedAt: new Date(),
-      },
-    });
+  const validatedRows = rows.filter((row) => row.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION
+    && typeof row.sampleSize === "number" && row.sampleSize > 0
+    && row.mae != null && Number.isFinite(row.mae)
+    && row.rmse != null && Number.isFinite(row.rmse)
+    && row.bias != null && Number.isFinite(row.bias));
+  if (!db || validatedRows.length === 0) return;
+  try {
+    for (const row of validatedRows) {
+      await db.insert(hourlyForecastEvaluationScores).values(row).onDuplicateKeyUpdate({
+        set: {
+          modelId: row.modelId,
+          observationCount: row.observationCount,
+          evaluableObservationCount: row.evaluableObservationCount,
+          sampleSize: row.sampleSize,
+          coverageRatio: row.coverageRatio,
+          mae: row.mae,
+          rmse: row.rmse,
+          bias: row.bias,
+          scoringValidationVersion: HOURLY_SCORING_VALIDATION_VERSION,
+          computedAt: new Date(),
+        },
+      });
+    }
+  } catch (error) {
+    if (isMissingHourlyScoringValidationVersionColumn(error)) {
+      console.warn("[HourlyScoringValidation] Migration 0055 is not applied; no unversioned bucket scores were written.");
+      return;
+    }
+    throw error;
   }
 }
 
@@ -1946,12 +1961,25 @@ export type HourlyExactHorizonHistoryKey = {
   horizonMilliseconds: number;
 };
 
+function isMissingHourlyScoringValidationVersionColumn(error: unknown): boolean {
+  const candidate = error as { code?: unknown; errno?: unknown; message?: unknown };
+  const message = typeof candidate?.message === "string" ? candidate.message : String(error);
+  const missingColumnError = candidate?.code === "ER_BAD_FIELD_ERROR" || candidate?.errno === 1054
+    || /unknown column|doesn't exist|does not exist/i.test(message);
+  return /scoringValidationVersion/i.test(message) && missingColumnError;
+}
+
 let exactHorizonSchemaWarningLogged = false;
 function warnExactHorizonPersistence(error: unknown) {
   const candidate = error as { code?: unknown; errno?: unknown; message?: unknown };
   const message = typeof candidate?.message === "string" ? candidate.message : String(error);
   const missingTable = candidate?.code === "ER_NO_SUCH_TABLE" || candidate?.errno === 1146
     || (/hourly_forecast_exact_(comparisons|evaluation_scores)/i.test(message) && /(doesn't exist|does not exist|unknown table|no such table)/i.test(message));
+  const missingVersionColumn = isMissingHourlyScoringValidationVersionColumn(error);
+  if (missingVersionColumn) {
+    console.warn("[HourlyScoringValidation] Migration 0055 is not applied; no unversioned exact scores were written.");
+    return;
+  }
   if (missingTable) {
     if (!exactHorizonSchemaWarningLogged) {
       console.warn("[HourlyExactCalibration] Additive exact-horizon migration is not applied; bucket calibration remains active.");
@@ -1987,9 +2015,14 @@ export async function persistHourlyForecastExactComparisons(rows: InsertHourlyFo
 export async function persistHourlyForecastExactEvaluationScores(rows: InsertHourlyForecastExactEvaluationScore[]): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
-  if (rows.length === 0) return true;
+  const validatedRows = rows.filter((row) => row.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION
+    && typeof row.sampleSize === "number" && row.sampleSize > 0
+    && row.mae != null && Number.isFinite(row.mae)
+    && row.rmse != null && Number.isFinite(row.rmse)
+    && row.bias != null && Number.isFinite(row.bias));
+  if (validatedRows.length === 0) return true;
   try {
-    for (const row of rows) {
+    for (const row of validatedRows) {
       await db.insert(hourlyForecastExactEvaluationScores).values(row).onDuplicateKeyUpdate({
         set: {
           modelId: row.modelId,
@@ -2002,6 +2035,7 @@ export async function persistHourlyForecastExactEvaluationScores(rows: InsertHou
           mae: row.mae,
           rmse: row.rmse,
           bias: row.bias,
+          scoringValidationVersion: HOURLY_SCORING_VALIDATION_VERSION,
           computedAt: new Date(),
         },
       });
@@ -2029,11 +2063,12 @@ export async function getHourlyForecastEvaluationHistory(
   fromDate: string,
   throughDate: string,
   exactHorizonKeys: readonly HourlyExactHorizonHistoryKey[] = [],
+  options: { includeLegacy?: boolean } = {},
 ) {
   const db = await getDb();
-  if (!db) return { available: false as const, rows: [], exactAvailable: false, exactRows: [] };
+  if (!db) return { available: false as const, rows: [], legacyRows: [], exactAvailable: false, exactRows: [] };
   try {
-    const rows = await db.select({
+    const bucketProjection = {
       date: hourlyForecastEvaluationScores.date,
       sourceName: hourlyForecastEvaluationScores.sourceName,
       modelName: hourlyForecastEvaluationScores.modelName,
@@ -2045,15 +2080,27 @@ export async function getHourlyForecastEvaluationHistory(
       rmse: hourlyForecastEvaluationScores.rmse,
       bias: hourlyForecastEvaluationScores.bias,
       computedAt: hourlyForecastEvaluationScores.computedAt,
-    }).from(hourlyForecastEvaluationScores).where(and(
+      scoringValidationVersion: hourlyForecastEvaluationScores.scoringValidationVersion,
+    };
+    const baseBucketPredicates = [
       eq(hourlyForecastEvaluationScores.locationKey, locationKey),
       gte(hourlyForecastEvaluationScores.date, fromDate),
       lte(hourlyForecastEvaluationScores.date, throughDate),
+    ];
+    const rows = await db.select(bucketProjection).from(hourlyForecastEvaluationScores).where(and(
+      ...baseBucketPredicates,
+      eq(hourlyForecastEvaluationScores.scoringValidationVersion, HOURLY_SCORING_VALIDATION_VERSION),
     )).orderBy(hourlyForecastEvaluationScores.date, hourlyForecastEvaluationScores.modelName);
+    const legacyRows = options.includeLegacy
+      ? await db.select(bucketProjection).from(hourlyForecastEvaluationScores).where(and(
+          ...baseBucketPredicates,
+          isNull(hourlyForecastEvaluationScores.scoringValidationVersion),
+        )).orderBy(hourlyForecastEvaluationScores.date, hourlyForecastEvaluationScores.modelName)
+      : [];
 
     type ExactHistoryRow = Pick<typeof hourlyForecastExactEvaluationScores.$inferSelect,
       "date" | "sourceName" | "modelName" | "modelId" | "variable" | "horizonBucket"
-      | "horizonMilliseconds" | "sampleSize" | "mae" | "rmse" | "bias" | "computedAt"
+      | "horizonMilliseconds" | "sampleSize" | "mae" | "rmse" | "bias" | "computedAt" | "scoringValidationVersion"
     >;
     let exactRows: ExactHistoryRow[] = [];
     let exactAvailable = false;
@@ -2091,11 +2138,13 @@ export async function getHourlyForecastEvaluationHistory(
           rmse: hourlyForecastExactEvaluationScores.rmse,
           bias: hourlyForecastExactEvaluationScores.bias,
           computedAt: hourlyForecastExactEvaluationScores.computedAt,
+          scoringValidationVersion: hourlyForecastExactEvaluationScores.scoringValidationVersion,
         }).from(hourlyForecastExactEvaluationScores).where(and(
           eq(hourlyForecastExactEvaluationScores.locationKey, locationKey),
           eq(hourlyForecastExactEvaluationScores.sourceName, "open-meteo"),
           gte(hourlyForecastExactEvaluationScores.date, fromDate),
           lte(hourlyForecastExactEvaluationScores.date, throughDate),
+          eq(hourlyForecastExactEvaluationScores.scoringValidationVersion, HOURLY_SCORING_VALIDATION_VERSION),
           or(...exactPredicates),
         )).orderBy(hourlyForecastExactEvaluationScores.date, hourlyForecastExactEvaluationScores.modelName, hourlyForecastExactEvaluationScores.variable, hourlyForecastExactEvaluationScores.horizonMilliseconds);
         exactAvailable = true;
@@ -2103,10 +2152,10 @@ export async function getHourlyForecastEvaluationHistory(
         warnExactHorizonPersistence(error);
       }
     }
-    return { available: true as const, rows, exactAvailable, exactRows };
+    return { available: true as const, rows, legacyRows, exactAvailable, exactRows };
   } catch (error) {
     console.warn("[Database] Unable to read hourly forecast evaluation history:", error);
-    return { available: false as const, rows: [], exactAvailable: false, exactRows: [] };
+    return { available: false as const, rows: [], legacyRows: [], exactAvailable: false, exactRows: [] };
   }
 }
 
