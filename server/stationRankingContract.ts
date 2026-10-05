@@ -1,5 +1,10 @@
 import { GROUND_TRUTH_COMPONENT_SHARES, PHYSICAL_STATION_SOURCES, getStationSourcePriorityDefaults, type StationSource } from "./stationService";
 import { STATION_PERFORMANCE_CALCULATION_GATES } from "./stationPerformanceService";
+import {
+  STATION_RANKING_COMPONENT_WEIGHTS,
+  STATION_RANKING_DISTANCE_CUTOFF_KM,
+  STATION_RANKING_FRESHNESS_CUTOFF_MINUTES,
+} from "./stationRankingScore";
 
 const PHYSICAL_SOURCE_NAMES: Record<StationSource, string> = {
   meteofrance: "Météo-France StatIC",
@@ -30,13 +35,31 @@ export function getStationRankingContract() {
   });
 
   return {
-    version: "station-ranking-contract-v2" as const,
+    version: "station-ranking-contract-v3" as const,
     criteria: [
-      { name: "Distance", weight: 40, description: "Le tri existant favorise les stations proches (inverse de la distance)." },
-      { name: "Priorité technique du réseau/source", weight: 30, description: "Priorité fixe par origine utilisée par le classement; ne mesure ni la précision météo ni la performance individuelle de la station." },
-      { name: "Disponibilité estimée de la source", weight: 20, description: "Valeur par défaut de disponibilité du réseau, pas un résultat météorologique mesuré pour cette station." },
-      { name: "Cadence nominale", weight: 10, description: "Cadence de mise à jour déclarée pour la source; ne mesure pas l’exactitude des relevés." },
+      { name: "Distance", weight: 40, description: `Score de proximité borné de 0 à 1 : décroissance linéaire de 0 à ${STATION_RANKING_DISTANCE_CUTOFF_KM} km, puis contribution distance nulle. Part du classement, pas une probabilité.` },
+      { name: "Priorité technique du réseau/source", weight: 30, description: "reliabilityScore normalisé de 0 à 1 : prior technique fixe du réseau/source, pas une précision météorologique historique individuelle." },
+      { name: "Disponibilité estimée de la source", weight: 20, description: "Disponibilité de source bornée de 0 à 1; métadonnée de réseau, pas une mesure individuelle de performance météo." },
+      { name: "Fraîcheur du relevé", weight: 10, description: `Décroît de 1 à 0 sur ${STATION_RANKING_FRESHNESS_CUTOFF_MINUTES} minutes à partir de updatedAt; un horodatage inconnu n’apporte aucun point de fraîcheur.` },
     ],
+    rankingScore: {
+      unit: "points" as const,
+      minimum: 0,
+      maximum: 1,
+      isProbability: false,
+      formula: "0.40 × distanceScore + 0.30 × qualityScore + 0.20 × availabilityScore + 0.10 × freshnessScore",
+      componentWeights: {
+        distance: STATION_RANKING_COMPONENT_WEIGHTS.distance * 100,
+        quality: STATION_RANKING_COMPONENT_WEIGHTS.quality * 100,
+        availability: STATION_RANKING_COMPONENT_WEIGHTS.availability * 100,
+        freshness: STATION_RANKING_COMPONENT_WEIGHTS.freshness * 100,
+      },
+      distanceCutoffKm: STATION_RANKING_DISTANCE_CUTOFF_KM,
+      freshnessCutoffMinutes: STATION_RANKING_FRESHNESS_CUTOFF_MINUTES,
+      unknownDistanceTreatment: "Aucun point de proximité n’est accordé; aucune candidate n’est supprimée par le seul calcul du classement.",
+      unknownFreshnessTreatment: "Aucun point de fraîcheur n’est accordé; l’absence d’horodatage n’est pas présentée comme une observation fraîche.",
+      interpretation: "Score composite de classement, non une probabilité, un pourcentage de précision ou une mesure historique individuelle de la station.",
+    },
     groundTruthWeights: {
       distance: GROUND_TRUTH_COMPONENT_SHARES.distance * 100,
       sourcePriority: GROUND_TRUTH_COMPONENT_SHARES.quality * 100,

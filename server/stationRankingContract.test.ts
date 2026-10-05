@@ -21,10 +21,24 @@ describe("contrat de classement et de performance station", () => {
     expect(contract.sources.every((source) => source.interpretation.includes("ce n’est ni une précision météo"))).toBe(true);
   });
 
-  it("appelle le score une priorité technique et conserve les poids de classement existants", () => {
+  it("décrit un score normalisé en points avec des poids, et non des probabilités", () => {
     expect(contract.criteria.map(({ weight }) => weight)).toEqual([40, 30, 20, 10]);
     expect(contract.criteria[1].name).toBe("Priorité technique du réseau/source");
-    expect(contract.criteria[1].description).toContain("ne mesure ni la précision météo");
+    expect(contract.criteria[1].description).toContain("prior technique fixe du réseau/source");
+    expect(contract.criteria[3].name).toBe("Fraîcheur du relevé");
+    expect(contract.rankingScore).toMatchObject({
+      unit: "points",
+      minimum: 0,
+      maximum: 1,
+      isProbability: false,
+      formula: "0.40 × distanceScore + 0.30 × qualityScore + 0.20 × availabilityScore + 0.10 × freshnessScore",
+      componentWeights: { distance: 40, quality: 30, availability: 20, freshness: 10 },
+      distanceCutoffKm: 20,
+      freshnessCutoffMinutes: 180,
+    });
+    expect(contract.rankingScore.unknownDistanceTreatment).toContain("Aucun point");
+    expect(contract.rankingScore.unknownFreshnessTreatment).toContain("Aucun point");
+    expect(contract.rankingScore.interpretation).toContain("non une probabilité");
     expect(contract.groundTruthWeights).toEqual({
       distance: GROUND_TRUTH_COMPONENT_SHARES.distance * 100,
       sourcePriority: GROUND_TRUTH_COMPONENT_SHARES.quality * 100,
