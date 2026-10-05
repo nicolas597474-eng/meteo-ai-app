@@ -122,7 +122,7 @@ import { collect15DayForecast, collectHourlyForecast } from "../weatherServices"
 import { computeFusion, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
 import { buildFavoriteHourlyRegime } from "../favoriteRegime";
 import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ultraLocalService";
-import { getPreviousReadings, recordStationReadings } from "../stationReadingsCache";
+import { getPreviousReadings } from "../stationReadingsCache";
 import { getParisDate } from "../weatherTime";
 import { buildOfficialModelFallback } from "../modelFallback";
 import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
@@ -316,6 +316,8 @@ export const favoritesRouter = router({
       const physicalStations = getPhysicalActiveStations(ranked);
       const officialCurrentTemperature = currentSnapshot?.temp ?? null;
       const modelFallback = buildOfficialModelFallback(currentModelReferences, meteoAI?.weights);
+      // Snapshot history before calculateUltraLocal records this request's new observations.
+      const previousReadings = getPreviousReadings();
       const ultraLocalResult = calculateUltraLocal(physicalStations, localMode, lat, lon, null, officialCurrentTemperature);
       const modeFusionConstraints = getModeAlignedFusionConstraints(localMode);
 
@@ -324,7 +326,6 @@ export const favoritesRouter = router({
       // Open-Meteo sert de contribution modèle limitée. L'historique est récupéré
       // avant le calcul, puis enrichi après celui-ci pour détecter les valeurs figées
       // ou les sauts brusques lors de l'appel suivant.
-      const previousReadings = getPreviousReadings();
       const fusionSources: FusionSource[] = physicalStations.map((station) => ({
           id: station.stationId,
           name: station.name,
@@ -378,12 +379,6 @@ export const favoritesRouter = router({
           modelWeightFraction: modeFusionConstraints.modelWeightFraction,
         },
         previousReadings
-      );
-
-      recordStationReadings(
-        ranked
-          .filter((station) => station.isActive && station.temperature != null)
-          .map((station) => ({ stationId: station.stationId, temperature: station.temperature! }))
       );
 
       // Standard ground truth (for comparison)

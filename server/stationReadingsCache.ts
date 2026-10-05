@@ -1,80 +1,76 @@
 /**
- * Station Readings Cache — In-memory persistence of previous station readings
- * for frozen-value and sudden-jump detection in the anomaly detection system.
- *
- * This module maintains a rolling window of the last reading per station,
- * keyed by stationId. It is used by the ultra-local calculation pipeline
- * to detect:
- *   - Frozen values (no change for > 60 min → penalty 0.5)
- *   - Sudden jumps (> 5°C in < 10 min → penalty proportional to delta)
- *
- * The cache is process-global and survives across requests within the same
- * server instance. It auto-evicts entries older than 3 hours to prevent
- * memory leaks.
+ * In-memory state for station-temperature anomaly detection.
+ * Provider observation timestamps, never processing time, drive all comparisons.
+ * Entries are still evicted after three hours to bound memory use.
  */
-
-interface StationReading {
+export type StationReadingSnapshot = {
   temperature: number;
-  timestamp: number; // Date.now() at time of recording
-}
+  /** Timestamp of the latest accepted, distinct provider observation. */
+  timestamp: number;
+  /** Provider timestamp at which the current unchanged-value sequence began. */
+  stableSince: number;
+};
+
+export type StationReadingObservation = {
+  stationId: string;
+  temperature: number;
+  observedAt: string;
+};
 
 const MAX_AGE_MS = 3 * 60 * 60 * 1000; // 3 hours
-const cache = new Map<string, StationReading>();
+const cache = new Map<string, StationReadingSnapshot>();
 
 /**
- * Record a station's current reading into the cache.
- * Call this AFTER using getPreviousReadings() so the current cycle
- * can compare against the previous cycle's values.
+ * Record only a valid provider observation. Duplicate or out-of-order provider
+ * timestamps are ignored; a processing-time clock is never used as a substitute.
  */
-export function recordStationReading(stationId: string, temperature: number): void {
-  cache.set(stationId, { temperature, timestamp: Date.now() });
+export function recordStationReading(
+  stationId: string,
+  temperature: number,
+  observedAt: string,
+): void {
+  const timestamp = Date.parse(observedAt);
+  if (!Number.isFinite(timestamp) || !Number.isFinite(temperature)) return;
+
+  const previous = cache.get(stationId);
+  if (previous && timestamp <= previous.timestamp) return;
+
+  const stableSince = previous && temperature === previous.temperature
+    ? previous.stableSince
+    : timestamp;
+  cache.set(stationId, { temperature, timestamp, stableSince });
 }
 
-/**
- * Record multiple station readings at once.
- */
-export function recordStationReadings(
-  readings: Array<{ stationId: string; temperature: number }>
-): void {
-  const now = Date.now();
-  for (const r of readings) {
-    cache.set(r.stationId, { temperature: r.temperature, timestamp: now });
+/** Record multiple timestamped station observations at once. */
+export function recordStationReadings(readings: StationReadingObservation[]): void {
+  for (const reading of readings) {
+    recordStationReading(reading.stationId, reading.temperature, reading.observedAt);
   }
 }
 
 /**
- * Get the previous readings map for use with detectAnomalies / computeFusion.
- * Returns a Map<stationId, { temperature, timestamp }> of all non-expired entries.
+ * Get a snapshot of non-expired readings for detectAnomalies / computeFusion.
+ * The snapshot is copied so later writes cannot change a caller's baseline.
  */
-export function getPreviousReadings(): Map<string, { temperature: number; timestamp: number }> {
+export function getPreviousReadings(): Map<string, StationReadingSnapshot> {
   evictStale();
   return new Map(cache);
 }
 
-/**
- * Evict entries older than MAX_AGE_MS to prevent unbounded memory growth.
- */
+/** Evict readings whose latest provider observation is older than three hours. */
 function evictStale(): void {
   const cutoff = Date.now() - MAX_AGE_MS;
-  const keys = Array.from(cache.keys());
-  for (const key of keys) {
-    const val = cache.get(key);
-    if (val && val.timestamp < cutoff) {
-      cache.delete(key);
-    }
+  for (const [key, value] of Array.from(cache.entries())) {
+    if (value.timestamp < cutoff) cache.delete(key);
   }
 }
 
-/**
- * Get cache size (for diagnostics).
- */
+/** Get cache size (for diagnostics). */
 export function getCacheSize(): number {
   return cache.size;
 }
 
-/**
- * Clear the entire cache (for testing).
- */
+/** Clear the entire cache (for tests). */
 export function clearCache(): void {
   cache.clear();
 }
