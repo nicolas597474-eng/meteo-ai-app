@@ -831,8 +831,16 @@ export async function collectHourlyForecast(
       let precipIntensity: string | null = null;
       const hasPrecipitation = typeof precip === "number" && Number.isFinite(precip);
       const hasSnowfall = typeof snowfall === "number" && Number.isFinite(snowfall);
+      const typedWeatherCode = typeof weatherCode === "number" && Number.isFinite(weatherCode) ? weatherCode : null;
+      const phaseFromWeatherCode = typedWeatherCode === 66 || typedWeatherCode === 67
+        ? "freezing_rain"
+        : typedWeatherCode != null && ((typedWeatherCode >= 71 && typedWeatherCode <= 77) || typedWeatherCode === 85 || typedWeatherCode === 86)
+          ? "snow"
+          : typedWeatherCode != null && ((typedWeatherCode >= 51 && typedWeatherCode <= 55) || (typedWeatherCode >= 61 && typedWeatherCode <= 65) || (typedWeatherCode >= 80 && typedWeatherCode <= 82))
+            ? "rain"
+            : null;
       if ((hasPrecipitation && precip > 0) || (hasSnowfall && snowfall > 0)) {
-        precipType = hasSnowfall && snowfall > 0 ? "snow" : (bestTemp != null && bestTemp <= 0) ? "freezing_rain" : "rain";
+        precipType = phaseFromWeatherCode ?? (hasSnowfall && snowfall > 0 ? "snow" : null);
         const total = hasPrecipitation && hasSnowfall ? precip + snowfall : null;
         precipIntensity = total == null ? null : total > 5 ? "heavy" : total > 1 ? "moderate" : "light";
       }

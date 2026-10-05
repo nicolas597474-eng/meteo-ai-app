@@ -5,12 +5,12 @@ import {
   detectWeatherRegime,
 } from "./statsEngine";
 
-// ─── detectWeatherRegime (now delegates to 20-regime fusionEngine) ────────────
-// The new regime system uses detectExtendedRegime which maps to 20 specific regimes.
+// ─── detectWeatherRegime (now delegates to 21-regime fusionEngine) ────────────
+// The regime system uses detectExtendedRegime, including an explicit phase-uncertain winter precipitation state.
 // Old regimes (storm, rainy, cold_winter, summer, standard) are replaced by:
 // storm → windy (wind>50 without heavy precip), thunderstorm (wind>40+precip>5)
 // rainy → rainy (precip>3)
-// cold_winter → snow (temp<3 + precip) or frost (temp<0)
+// cold_winter → phase-uncertain winter precipitation or frost (dry conditions)
 // summer → few_clouds (temp>22 dry) or summer_heat (temp>32)
 // standard → showers, partly_cloudy, etc. based on conditions
 
@@ -33,10 +33,11 @@ describe("detectWeatherRegime", () => {
     expect(result?.weights.temp).toBe(0.20);
   });
 
-  it("detects snow regime when avg temp < 5°C with some precip", () => {
+  it("keeps precipitation phase uncertain instead of inferring snow from temperature", () => {
     const result = detectCompleteRegime({ precipitation: 0.5, windSpeed: 15, tempMax: 3, tempMin: -2 });
-    expect(result?.regime).toBe("snow");
+    expect(result?.regime).toBe("winter_precipitation_uncertain");
     expect(result?.weights.temp).toBe(0.40);
+    expect(result?.weights.precip).toBe(0.30);
   });
 
   it("detects few_clouds regime when hot, dry, calm", () => {

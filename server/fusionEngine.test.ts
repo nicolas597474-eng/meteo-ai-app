@@ -316,4 +316,37 @@ describe("détection de régime sans valeurs météorologiques inventées", () =
       expect(detectExtendedRegime({ ...complete, [field]: Number.POSITIVE_INFINITY })).toBeNull();
     }
   });
+
+  it("ne déduit ni neige ni pluie verglaçante de la seule température et quantité de précipitations", () => {
+    const coldPrecipitation = { ...complete, temperature: -2, precipitation: 1, cloudCover: 65 };
+    const extended = detectExtendedRegime(coldPrecipitation);
+    const multi = detectMultiRegime(coldPrecipitation);
+
+    expect(extended).toBe("winter_precipitation_uncertain");
+    expect(multi?.primaryRegime.id).toBe("winter_precipitation_uncertain");
+    expect(multi?.activeRegimes.map(({ id }) => id)).not.toContain("freezing_rain");
+    expect(multi?.activeRegimes.map(({ id }) => id)).not.toContain("snow");
+  });
+
+  it("conserve null/unknown si la quantité est absente et ne signale pas de phase froide à quantité nulle", () => {
+    expect(detectExtendedRegime({ ...complete, temperature: -2, precipitation: null })).toBeNull();
+    expect(detectMultiRegime({ ...complete, temperature: -2, precipitation: undefined })).toBeNull();
+    expect(detectExtendedRegime({ ...complete, temperature: -2, precipitation: 0 })).toBe("frost");
+    expect(detectExtendedRegime({ ...complete, temperature: 4, precipitation: 1 })).not.toBe("freezing_rain");
+  });
+
+  it("utilise une phase réellement typée pour pluie, neige et pluie verglaçante", () => {
+    const coldPrecipitation = { ...complete, temperature: -2, precipitation: 1, cloudCover: 65 };
+
+    expect(detectExtendedRegime({ ...coldPrecipitation, precipitationType: "rain" })).toBe("showers");
+    expect(detectExtendedRegime({ ...coldPrecipitation, precipitationType: "snow" })).toBe("snow");
+    expect(detectExtendedRegime({ ...coldPrecipitation, precipitationType: "freezing_rain" })).toBe("freezing_rain");
+
+    const typedRainMulti = detectMultiRegime({ ...coldPrecipitation, precipitationType: "rain" });
+    expect(typedRainMulti?.activeRegimes.map(({ id }) => id)).toContain("showers");
+    expect(typedRainMulti?.activeRegimes.map(({ id }) => id)).not.toContain("freezing_rain");
+    expect(typedRainMulti?.activeRegimes.map(({ id }) => id)).not.toContain("snow");
+    expect(detectMultiRegime({ ...coldPrecipitation, precipitationType: "snow" })?.primaryRegime.id).toBe("snow");
+    expect(detectMultiRegime({ ...coldPrecipitation, temperature: -1, precipitationType: "freezing_rain" })?.primaryRegime.id).toBe("freezing_rain");
+  });
 });

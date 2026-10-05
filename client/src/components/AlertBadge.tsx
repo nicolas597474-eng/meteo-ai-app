@@ -75,16 +75,19 @@ interface AlertBadgeProps {
   confidence?: number | null;
   /** Seuil de confiance minimum pour afficher le badge (défaut: 60) */
   confidenceThreshold?: number;
+  /** À fournir seulement si une source a explicitement typé la pluie verglaçante. */
+  freezingRainPhaseConfirmed?: boolean;
   /** Taille compacte (pour les pills) ou normale */
   compact?: boolean;
 }
 
-export function isDangerousRegime(regimeId: string): regimeId is DangerousRegimeId {
+export function isDangerousRegime(regimeId: string, freezingRainPhaseConfirmed = false): regimeId is DangerousRegimeId {
+  if (regimeId === "freezing_rain") return freezingRainPhaseConfirmed;
   return DANGEROUS_REGIME_IDS.has(regimeId);
 }
 
-export function AlertBadge({ regimeId, confidence, confidenceThreshold = 60, compact = false }: AlertBadgeProps) {
-  if (!isDangerousRegime(regimeId) || confidence == null) return null;
+export function AlertBadge({ regimeId, confidence, confidenceThreshold = 60, freezingRainPhaseConfirmed = false, compact = false }: AlertBadgeProps) {
+  if (!isDangerousRegime(regimeId, freezingRainPhaseConfirmed) || confidence == null) return null;
   if (confidence < confidenceThreshold) return null;
 
   const config = DANGEROUS_REGIMES[regimeId];

@@ -27,6 +27,7 @@ export function buildFavoriteHourlyRegime(
   return detectMultiRegime({
     temperature: point.temp,
     precipitation: point.precipitation,
+    precipitationType: point.precipType ?? null,
     windSpeed: point.windSpeed,
     cloudCover: point.cloudCover,
     humidity: point.humidity,

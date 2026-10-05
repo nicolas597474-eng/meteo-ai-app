@@ -161,9 +161,10 @@ export type ExtendedRegime =
   | "rainy"             // Pluie (précip modérées 2-10mm)
   | "thunderstorm"      // Orages (vent > 35km/h + précip > 5mm)
   | "windy"             // Vent fort (> 40km/h)
-  | "snow"              // Neige (T < 2°C + précip)
+  | "snow"              // Neige explicitement typée par une source
+  | "winter_precipitation_uncertain" // Précipitations froides sans phase typée
   | "frost"             // Verglas / Gel (T < 0°C sans précip)
-  | "freezing_rain"     // Pluie verglaçante (T ~ 0°C + précip)
+  | "freezing_rain"     // Pluie verglaçante explicitement typée par une source
   | "deep_frost"        // Gel intense (T < -5°C)
   | "summer_heat"       // Canicule (> 33°C)
   | "cold_wave"         // Vague de froid (T < -2°C prolongé)
@@ -182,6 +183,15 @@ export type RegimeWeights = {
   pressure: number;
 };
 
+const COLD_PRECIPITATION_REGIME_WEIGHTS: RegimeWeights = {
+  temp: 0.40,
+  precip: 0.30,
+  wind: 0.15,
+  condition: 0.10,
+  humidity: 0.03,
+  pressure: 0.02,
+};
+
 const EXTENDED_REGIME_WEIGHTS: Record<ExtendedRegime, RegimeWeights> = {
   overcast:        { temp: 0.25, precip: 0.15, wind: 0.10, condition: 0.30, humidity: 0.10, pressure: 0.10 },
   partly_cloudy:   { temp: 0.25, precip: 0.15, wind: 0.10, condition: 0.30, humidity: 0.10, pressure: 0.10 },
@@ -192,7 +202,8 @@ const EXTENDED_REGIME_WEIGHTS: Record<ExtendedRegime, RegimeWeights> = {
   rainy:           { temp: 0.20, precip: 0.40, wind: 0.15, condition: 0.15, humidity: 0.05, pressure: 0.05 },
   thunderstorm:    { temp: 0.10, precip: 0.35, wind: 0.35, condition: 0.10, humidity: 0.05, pressure: 0.05 },
   windy:           { temp: 0.15, precip: 0.15, wind: 0.45, condition: 0.15, humidity: 0.05, pressure: 0.05 },
-  snow:            { temp: 0.40, precip: 0.30, wind: 0.15, condition: 0.10, humidity: 0.03, pressure: 0.02 },
+  snow:            COLD_PRECIPITATION_REGIME_WEIGHTS,
+  winter_precipitation_uncertain: COLD_PRECIPITATION_REGIME_WEIGHTS,
   frost:           { temp: 0.50, precip: 0.15, wind: 0.15, condition: 0.10, humidity: 0.05, pressure: 0.05 },
   freezing_rain:   { temp: 0.40, precip: 0.30, wind: 0.15, condition: 0.10, humidity: 0.03, pressure: 0.02 },
   deep_frost:      { temp: 0.55, precip: 0.10, wind: 0.15, condition: 0.10, humidity: 0.05, pressure: 0.05 },
@@ -208,11 +219,13 @@ const EXTENDED_REGIME_WEIGHTS: Record<ExtendedRegime, RegimeWeights> = {
 export function detectExtendedRegime(params: {
   temperature?: number | null;
   precipitation?: number | null;
+  precipitationType?: string | null;
   windSpeed?: number | null;
   humidity?: number | null;
   visibility?: number | null;
   cloudCover?: number | null;
 }): ExtendedRegime | null {
+  const precipitationType = params.precipitationType;
   if (!hasCompleteRegimeInputs(params)) return null;
   const t = params.temperature;
   const p = params.precipitation;
@@ -226,8 +239,10 @@ export function detectExtendedRegime(params: {
   if (w > 35 && p > 5) return "thunderstorm";
   if (w > 40) return "windy";
   // Cold + precipitation
-  if (t <= 0 && p > 0.5) return "freezing_rain";
-  if (t <= 2 && p > 0) return "snow";
+  if (p > 0 && precipitationType === "snow") return "snow";
+  if (t <= 0 && p > 0.5 && precipitationType === "freezing_rain") return "freezing_rain";
+  if (t >= -5 && t <= 2 && p > 0.5 && precipitationType === "rain") return p > 5 ? "rainy" : "showers";
+  if (t <= 2 && p > 0 && precipitationType !== "rain") return "winter_precipitation_uncertain";
   if (t < -5) return "deep_frost";
   if (t < 0) return "frost";
   if (t < -2 && w > 15) return "cold_wave";
@@ -274,9 +289,10 @@ export const EXTENDED_REGIME_INFO: Record<ExtendedRegime, Omit<ExtendedRegimeInf
   rainy:           { label: "Pluie",                emoji: "🌧️", description: "Précipitations modérées à fortes (> 5 mm).",                                weights: EXTENDED_REGIME_WEIGHTS.rainy },
   thunderstorm:    { label: "Orages",               emoji: "⛈️",  description: "Orages — vent fort et précipitations intenses combinés.",                   weights: EXTENDED_REGIME_WEIGHTS.thunderstorm },
   windy:           { label: "Vent fort",            emoji: "💨",  description: "Vents soutenus > 40 km/h.",                                                weights: EXTENDED_REGIME_WEIGHTS.windy },
-  snow:            { label: "Neige",                emoji: "❄️",  description: "Températures < 2°C avec précipitations — risque de neige.",                  weights: EXTENDED_REGIME_WEIGHTS.snow },
+  snow:            { label: "Neige",                emoji: "❄️",  description: "Phase neigeuse explicitement fournie par une source météo.",                  weights: EXTENDED_REGIME_WEIGHTS.snow },
+  winter_precipitation_uncertain: { label: "Précipitations hivernales — phase incertaine", emoji: "🌧️", description: "Précipitations avec température ≤ 2°C ; la phase n’est pas fournie et reste incertaine.", weights: EXTENDED_REGIME_WEIGHTS.winter_precipitation_uncertain },
   frost:           { label: "Verglas / Gel",        emoji: "🧊",  description: "Températures négatives sans précipitations — risque de gel.",               weights: EXTENDED_REGIME_WEIGHTS.frost },
-  freezing_rain:   { label: "Pluie verglaçante",    emoji: "🌧",  description: "Température ~ 0°C avec précipitations — verglas.",                          weights: EXTENDED_REGIME_WEIGHTS.freezing_rain },
+  freezing_rain:   { label: "Pluie verglaçante",    emoji: "🌧",  description: "Phase de pluie verglaçante explicitement fournie par une source météo.",       weights: EXTENDED_REGIME_WEIGHTS.freezing_rain },
   deep_frost:      { label: "Gel",                  emoji: "❄",   description: "Gel intense (T < -5°C) — froid extrême.",                                   weights: EXTENDED_REGIME_WEIGHTS.deep_frost },
   summer_heat:     { label: "Canicule",             emoji: "🔥",  description: "Températures > 33°C, temps sec et calme.",                                  weights: EXTENDED_REGIME_WEIGHTS.summer_heat },
   cold_wave:       { label: "Vague de froid",       emoji: "🧊",  description: "Températures très basses prolongées (< -2°C).",                             weights: EXTENDED_REGIME_WEIGHTS.cold_wave },
@@ -333,11 +349,13 @@ export function hasCompleteRegimeInputs(params: {
 export function detectMultiRegime(params: {
   temperature?: number | null;
   precipitation?: number | null;
+  precipitationType?: string | null;
   windSpeed?: number | null;
   humidity?: number | null;
   visibility?: number | null;
   cloudCover?: number | null;
 }): MultiRegimeResult | null {
+  const precipitationType = params.precipitationType;
   if (!hasCompleteRegimeInputs(params)) return null;
   const t = params.temperature;
   const p = params.precipitation;
@@ -345,6 +363,11 @@ export function detectMultiRegime(params: {
   const h = params.humidity;
   const v = params.visibility;
   const c = params.cloudCover;
+
+  const snowScore = Math.max(0, Math.min(100, (p > 0 && precipitationType === "snow" ? 50 + Math.min(50, Math.max(0, (2 - t) * 10) + p * 5) : 0)));
+  const freezingRainScore = Math.max(0, Math.min(100, (precipitationType === "freezing_rain" && t <= 0 ? t >= -3 && p > 0.5 ? 60 + Math.min(40, p * 10) : t > -5 && p > 0.3 ? 25 : 0 : 0)));
+  const phaseConfirmsSnow = snowScore > 0;
+  const phaseConfirmsFreezingRain = freezingRainScore > 0;
 
   // Compute raw scores for each regime (0-100)
   const scores: Record<ExtendedRegime, number> = {
@@ -355,10 +378,11 @@ export function detectMultiRegime(params: {
     // Precipitation
     rainy:           Math.max(0, Math.min(100, (p > 5 ? 50 + Math.min(50, (p - 5) * 5) : p > 3 ? (p - 3) * 25 : 0))),
     showers:         Math.max(0, Math.min(100, (p > 0.5 && p <= 5 ? 40 + Math.min(40, p * 10) : p > 0.2 ? p * 30 : 0))),
-    // Cold
-    snow:            Math.max(0, Math.min(100, (t <= 2 && p > 0 ? 50 + Math.min(50, (2 - t) * 10 + p * 5) : t < 0 && p > 0 ? 80 : 0))),
+    // Cold precipitation stays phase-uncertain unless a source provides an actual type.
+    winter_precipitation_uncertain: Math.max(0, Math.min(100, (t <= 2 && p > 0 && precipitationType !== "rain" && !phaseConfirmsSnow && !phaseConfirmsFreezingRain ? 50 + Math.min(50, (2 - t) * 10 + p * 5) : 0))),
+    snow:            snowScore,
     frost:           Math.max(0, Math.min(100, (t < 0 && p < 0.5 ? 50 + Math.min(50, (-t) * 10) : t < 2 ? (2 - t) * 20 : 0))),
-    freezing_rain:   Math.max(0, Math.min(100, (t <= 0 && t >= -3 && p > 0.5 ? 60 + Math.min(40, p * 10) : t < 2 && t > -5 && p > 0.3 ? 25 : 0))),
+    freezing_rain:   freezingRainScore,
     deep_frost:      Math.max(0, Math.min(100, (t < -5 ? 60 + Math.min(40, (-t - 5) * 5) : t < -2 ? (Math.abs(t) - 2) * 20 : 0))),
     cold_wave:       Math.max(0, Math.min(100, (t < -2 && w > 15 ? 50 + Math.min(50, (-t) * 5 + w * 0.5) : t < 0 ? 20 : 0))),
     // Heat
