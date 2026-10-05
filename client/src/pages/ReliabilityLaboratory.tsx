@@ -37,6 +37,7 @@ function statusLabel(status: string) {
     case "qualified": return "Seuil d’évidence atteint";
     case "insufficient_evidence": return "Données insuffisantes";
     case "incomplete_metrics": return "Métriques incomplètes";
+    case "legacy_unversioned_only": return "Historique non versionné · exclu";
     case "history_unavailable": return "Historique indisponible";
     case "horizon_not_stored": return "Horizon non archivé séparément";
     default: return "Aucune preuve archivée";
@@ -45,7 +46,7 @@ function statusLabel(status: string) {
 
 function statusTone(status: string): "success" | "warning" | "neutral" | "danger" {
   if (status === "qualified") return "success";
-  if (status === "insufficient_evidence" || status === "incomplete_metrics") return "warning";
+  if (status === "insufficient_evidence" || status === "incomplete_metrics" || status === "legacy_unversioned_only") return "warning";
   if (status === "history_unavailable") return "danger";
   return "neutral";
 }
@@ -128,11 +129,11 @@ export default function ReliabilityLaboratory() {
                 <td className="p-2 text-right font-mono text-slate-300">{row.metrics ? `${row.metrics.comparisonCount} · ${row.metrics.evaluatedDays}` : "—"}<span className="mt-0.5 block text-[9px] text-slate-500">seuil {row.minimumComparisons} · {row.minimumComparableDays} j</span></td>
                 <td className="p-2 text-slate-400">{row.firstScoreDate ?? "—"}<span className="block">→ {row.latestScoreDate ?? "—"}</span>{row.latestComputedAt && <span className="mt-0.5 block text-[9px] text-slate-500">calcul {new Date(row.latestComputedAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</span>}{row.incompleteMetricRows > 0 && <span className="mt-0.5 block text-amber-200">{row.incompleteMetricRows} ligne(s) incomplète(s) exclue(s)</span>}</td>
                 <td className="max-w-[290px] p-2 leading-relaxed text-slate-400">{formatTrend(row)}</td>
-                <td className="p-2"><WeatherStatusBadge compact tone={statusTone(row.status)} label="Statut" value={statusLabel(row.status)} description={row.reason ?? "Valeurs brutes disponibles; le seuil d’évidence documente seulement l’admissibilité au classement."} />{row.reason && <p className="mt-1 max-w-[210px] text-[9px] leading-relaxed text-slate-500">{row.reason}</p>}</td>
+                <td className="p-2"><WeatherStatusBadge compact tone={statusTone(row.status)} label="Statut" value={statusLabel(row.status)} description={row.reason ?? "Valeurs brutes disponibles; le seuil d’évidence documente seulement l’admissibilité au classement."} />{row.reason && <p className="mt-1 max-w-[210px] text-[9px] leading-relaxed text-slate-500">{row.reason}</p>}{row.legacyUnversionedRowCount > 0 && <p className="mt-1 max-w-[210px] text-[9px] leading-relaxed text-amber-200">{row.legacyUnversionedRowCount} score(s) historique(s) sans version ignoré(s)</p>}</td>
               </tr>)}</tbody>
             </table>
           </div>
-          <p className="border-t border-slate-800 px-4 py-3 text-[10px] leading-relaxed text-slate-500">Source : archive immuable des évaluations horaires qualifiées contre observations physiques. Le MAE/RMSE/biais historique ne mesure pas la dispersion entre modèles; cette dernière est présentée séparément sous « accord inter-modèles ».</p>
+          <p className="border-t border-slate-800 px-4 py-3 text-[10px] leading-relaxed text-slate-500">Source : archive immuable des évaluations horaires qualifiées contre observations physiques. Les agrégats non versionnés restent visibles comme diagnostic historique, mais sont exclus des preuves de calibration et des poids officiels. Le MAE/RMSE/biais historique ne mesure pas la dispersion entre modèles; cette dernière est présentée séparément sous « accord inter-modèles ».</p>
         </section>
       </>}
     </div>

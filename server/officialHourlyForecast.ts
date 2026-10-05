@@ -25,6 +25,7 @@ import { calculateRobustFallbackMultipliers, MODEL_FUSION_WEIGHT_CAP, normalizeM
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 import { summarizeHourlyHistoricalEvidence, type HourlyHistoricalScoreRow } from "./hourlyHistoricalEvidence";
 import type { HourlyHistoricalEvidence, ManualHourlyOverride } from "../shared/hourlyModelMetrics";
+import { filterCurrentHourlyScoringRows } from "../shared/hourlyScoringValidation";
 import { selectEligibleModelsForHorizon, type ForecastModelCandidate, type ForecastModelEligibilityDiagnostic, type SelectedForecastModel } from "./forecastModelSelection";
 
 export type OfficialHourlyModelName = (typeof OFFICIAL_HOURLY_MODELS)[number]["name"];
@@ -761,7 +762,8 @@ export function computeOfficialHourlyForecast(
 ): OfficialHourlyForecastResult {
   const historyAvailable = options.historyAvailable !== false;
   const exactHistoryAvailable = options.exactHistoryAvailable ?? (options.exactHistoryScores != null);
-  const exactHistoryScores = options.exactHistoryScores ?? [];
+  const currentHistoryScores = filterCurrentHourlyScoringRows(historyScores);
+  const exactHistoryScores = filterCurrentHourlyScoringRows(options.exactHistoryScores ?? []);
   const referenceAt = options.referenceAt ?? Date.now();
   const availabilityReasonByModel = options.availabilityReasonByModel ?? {};
   const byValidTime = new Map<number, HourlyModelValue[]>();
@@ -818,7 +820,7 @@ export function computeOfficialHourlyForecast(
     const bucketKey = [modelName, variable, horizonBucket].join("|");
     let bucketEvidence = bucketEvidenceByKey.get(bucketKey);
     if (!bucketEvidence) {
-      bucketEvidence = summarizeHourlyHistoricalEvidence(historyScores, { ...baseInput, historyAvailable });
+      bucketEvidence = summarizeHourlyHistoricalEvidence(currentHistoryScores, { ...baseInput, historyAvailable });
       bucketEvidenceByKey.set(bucketKey, bucketEvidence);
     }
     const result: HourlyHistoricalEvidenceSelection = {

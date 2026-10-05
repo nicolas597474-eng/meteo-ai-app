@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { OFFICIAL_HOURLY_MODELS, type HourlyModelForecast } from "./weatherServices";
 import type { HourlyForecastRunValue } from "../drizzle/schema";
 import { computeOfficialHourlyForecast, reconstructOfficialHourlyModelsFromArchive, type OfficialHourlyEvaluationHistoryScore } from "./officialHourlyForecast";
+import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 
 const validAt = Date.parse("2026-10-01T12:00:00.000Z");
 const availableAt = validAt - 12 * 60 * 60_000;
@@ -56,6 +57,7 @@ function historicalScores(
         mae,
         rmse: mae + 0.2,
         bias: 0,
+        scoringValidationVersion: HOURLY_SCORING_VALIDATION_VERSION,
       };
     }),
   );
@@ -134,6 +136,40 @@ describe("reconstructOfficialHourlyModelsFromArchive", () => {
 });
 
 describe("computeOfficialHourlyForecast", () => {
+  it("exclut les scores legacy nuls des poids, conserve les valeurs robustes et accepte la version stricte courante", () => {
+    const legacyRows = historicalScores().map((row) => ({ ...row, scoringValidationVersion: null }));
+    const legacyResult = computeOfficialHourlyForecast(modelForecasts(), legacyRows);
+
+    expect(legacyResult.hours[0]?.temp).not.toBeNull();
+    expect(variableWeighting(legacyResult, "temperature")?.calibrationStatus).toBe("UNCALIBRATED_ROBUST");
+    expect(variableWeighting(legacyResult, "temperature")?.method).toBe("robust_fallback");
+    expect(variableWeighting(legacyResult, "temperature")?.modelWeights[0]?.historicalEvidence).toMatchObject({
+      status: "no_evidence",
+      metrics: null,
+    });
+
+    const currentResult = computeOfficialHourlyForecast(modelForecasts(), historicalScores());
+    expect(variableWeighting(currentResult, "temperature")?.calibrationStatus).toBe("CALIBRATED");
+    expect(variableWeighting(currentResult, "temperature")?.modelWeights[0]?.historicalEvidence).toMatchObject({
+      status: "qualified",
+      metrics: { comparisonCount: 35, evaluatedDays: 7 },
+    });
+
+    const legacyExactRows = historicalScores().map((row) => ({
+      ...row,
+      horizonMilliseconds: 12 * 60 * 60_000,
+      scoringValidationVersion: null,
+    }));
+    const currentBucketWithLegacyExact = computeOfficialHourlyForecast(modelForecasts(), historicalScores(), {
+      exactHistoryAvailable: true,
+      exactHistoryScores: legacyExactRows,
+    });
+    expect(variableWeighting(currentBucketWithLegacyExact, "temperature")?.modelWeights[0]).toMatchObject({
+      calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_BUCKET",
+      exactHorizonEvidence: { status: "no_evidence", metrics: null },
+    });
+  });
+
   it("pondère l’historique exact, exclut Best Match et conserve les autres variables avec leur repli robuste", () => {
     const validArome = modelForecasts()[0]!;
     const mislabeledArome: HourlyModelForecast = {
@@ -501,6 +537,7 @@ describe("computeOfficialHourlyForecast", () => {
         mae,
         rmse: mae + 0.2,
         bias: 0,
+        scoringValidationVersion: HOURLY_SCORING_VALIDATION_VERSION,
       };
     }));
     const result = computeOfficialHourlyForecast(forecasts, scores);

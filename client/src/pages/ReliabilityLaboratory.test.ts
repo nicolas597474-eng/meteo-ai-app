@@ -29,8 +29,10 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
     expect(source).toContain("Données insuffisantes");
     expect(source).toContain("Horizon non archivé séparément");
     expect(source).toContain("Historique indisponible");
+    expect(source).toContain("Historique non versionné · exclu");
     expect(source).toContain("Une cellule « — » signifie non disponible, pas zéro.");
     expect(source).toContain("Aucune métrique n’est estimée");
+    expect(source).toContain("score(s) historique(s) sans version ignoré(s)");
   });
 
   it("conserve la porte d’évidence, les effectifs distincts et les dates des scores", () => {
