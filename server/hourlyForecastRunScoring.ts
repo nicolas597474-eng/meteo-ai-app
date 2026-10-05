@@ -131,6 +131,7 @@ type ObservationOpportunity = {
   snapshot: HourlyPhysicalSnapshot;
   validTime: number | null;
   observedValue: number;
+  earliestContributorObservedAt: number;
 };
 
 type ForecastRunGroup = {
@@ -176,6 +177,65 @@ function epochMilliseconds(value: Date | string | number | null | undefined): nu
   if (value == null) return null;
   const result = value instanceof Date ? value.getTime() : typeof value === "number" ? value : new Date(value).getTime();
   return Number.isFinite(result) ? result : null;
+}
+
+type StationMeasurementField = "temperature" | "precipitation" | "windSpeed" | "windGust" | "humidity" | "pressure";
+
+const STATION_FIELD_BY_VARIABLE: Record<HourlyForecastVariable, StationMeasurementField> = {
+  temperature: "temperature",
+  precipitation: "precipitation",
+  wind_speed: "windSpeed",
+  wind_gust: "windGust",
+  humidity: "humidity",
+  pressure: "pressure",
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Accept only an absolute ISO timestamp; date-only and local-time strings are not measurement evidence. */
+function absoluteMeasurementEpoch(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/i.exec(text);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second, zone] = match;
+  const datePart = `${year}-${month}-${day}`;
+  const calendarDate = new Date(`${datePart}T00:00:00.000Z`);
+  if (!Number.isFinite(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== datePart
+    || Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59) return null;
+  if (zone && zone.toUpperCase() !== "Z") {
+    const [, offsetHour, offsetMinute] = /[+-](\d{2}):(\d{2})$/.exec(zone) ?? [];
+    if (offsetHour == null || offsetMinute == null || Number(offsetHour) > 23 || Number(offsetMinute) > 59) return null;
+  }
+  const parsed = Date.parse(text.replace(/z$/i, "Z"));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Return the conservative earliest measurement time for this field's actual contributors. */
+function earliestContributorObservedAt(
+  snapshot: HourlyPhysicalSnapshot,
+  variable: HourlyForecastVariable,
+): number | null {
+  if (!Array.isArray(snapshot.stationsUsed) || snapshot.stationsUsed.length === 0) return null;
+  const field = STATION_FIELD_BY_VARIABLE[variable];
+  let earliest = Number.POSITIVE_INFINITY;
+  let contributorCount = 0;
+  for (const station of snapshot.stationsUsed) {
+    if (!isRecord(station) || typeof station.stationId !== "string" || station.stationId.trim().length === 0
+      || !isRecord(station.fieldWeights)) return null;
+    if (!Object.prototype.hasOwnProperty.call(station.fieldWeights, field)) continue;
+    const weight = station.fieldWeights[field];
+    if (typeof weight !== "number" || !Number.isFinite(weight) || weight < 0) return null;
+    if (weight === 0) continue;
+    if (!isRecord(station.measurementTimes)) return null;
+    const observedAt = absoluteMeasurementEpoch(station.measurementTimes[field]);
+    if (observedAt == null) return null;
+    earliest = Math.min(earliest, observedAt);
+    contributorCount += 1;
+  }
+  return contributorCount > 0 && Number.isFinite(earliest) ? earliest : null;
 }
 
 function jsonSignature(value: unknown): string {
@@ -239,9 +299,9 @@ function descriptorOf(value: HourlyForecastRunValue): ModelDescriptor {
 
 function latestAdmissibleValue(
   candidates: HourlyForecastRunValue[],
-  observationAt: number,
+  availableBefore: number,
 ): HourlyForecastRunValue | null {
-  const admissible = candidates.filter((candidate) => candidate.availableAt < observationAt
+  const admissible = candidates.filter((candidate) => candidate.availableAt < availableBefore
     && candidate.value != null && Number.isFinite(candidate.value));
   if (admissible.length === 0) return null;
   admissible.sort((left, right) => right.availableAt - left.availableAt
@@ -256,9 +316,9 @@ function latestAdmissibleValue(
 
 function latestAdmissibleRun(
   candidates: HourlyForecastRunValue[],
-  observationAt: number,
+  availableBefore: number,
 ): HourlyForecastRunValue | null {
-  const admissible = candidates.filter((candidate) => candidate.availableAt < observationAt);
+  const admissible = candidates.filter((candidate) => candidate.availableAt < availableBefore);
   if (admissible.length === 0) return null;
   admissible.sort((left, right) => right.availableAt - left.availableAt
     || right.requestStartedAt - left.requestStartedAt
@@ -286,8 +346,10 @@ function latestCompatibleRun(
     run.byVariable.set(row.variable, row);
   }
   const candidates = Array.from(byRun.values()).filter((run) => {
-    const temperature = run.byVariable.get("temperature");
-    return temperature?.value != null && Number.isFinite(temperature.value);
+    return HOURLY_FORECAST_VARIABLES.some((variable) => {
+      const value = run.byVariable.get(variable)?.value;
+      return value != null && Number.isFinite(value);
+    });
   });
   candidates.sort((left, right) => right.availableAt - left.availableAt
     || right.requestStartedAt - left.requestStartedAt
@@ -315,8 +377,9 @@ function calculateErrors(errors: number[]) {
 
 /**
  * Evaluates immutable hourly forecast snapshots against qualified physical observations.
- * A forecast is admissible only when availableAt is strictly before the observation;
- * among admissible values, the most recently received non-missing value is selected.
+ * A field pair requires absolute measurement times for every station with a positive fieldWeight;
+ * availableAt must be strictly before the earliest such measurement and the unchanged validTime.
+ * The lead remains validTime - availableAt, and the latest admissible non-missing value is selected.
  */
 export function evaluateHourlyForecastRuns(
   snapshotsInput: HourlyPhysicalSnapshot[],
@@ -357,10 +420,35 @@ export function evaluateHourlyForecastRuns(
     const matchingModels = Array.from(models.values()).filter((model) => model.locationKey === snapshot.locationKey && model.targetDate === snapshot.date);
     for (const model of matchingModels) {
       const validRows = forecastValues.filter((row) => modelKey(descriptorOf(row)) === modelKey(model) && row.validTime === observationAt);
-      const compatibleRun = latestCompatibleRun(validRows, observationAt);
+      const earliestByVariable = new Map<HourlyForecastVariable, number>();
+      for (const variable of HOURLY_FORECAST_VARIABLES) {
+        const earliest = earliestContributorObservedAt(snapshot, variable);
+        if (earliest != null) earliestByVariable.set(variable, earliest);
+      }
+      const eligibleRows = validRows.filter((row) => {
+        const earliest = earliestByVariable.get(row.variable);
+        // Preserve a positive forecast lead while requiring the field's own measured observation time.
+        return earliest != null && row.availableAt < observationAt && row.availableAt < earliest;
+      });
+      const compatibleRun = latestCompatibleRun(eligibleRows, observationAt);
       if (!compatibleRun) continue;
-      const get = (variable: HourlyForecastVariable) => compatibleRun.byVariable.get(variable)?.value ?? null;
-      compatibilityForecasts.push({
+      const observed = (variable: HourlyForecastVariable) => earliestByVariable.has(variable)
+        ? observationValue(snapshot, variable)
+        : null;
+      const get = (variable: HourlyForecastVariable) => {
+        const value = compatibleRun.byVariable.get(variable)?.value;
+        return value != null && Number.isFinite(value) ? value : null;
+      };
+      const compatibilitySnapshot: HourlyPhysicalSnapshot = {
+        ...snapshot,
+        temperature: observed("temperature"),
+        precipitation: observed("precipitation"),
+        windSpeed: observed("wind_speed"),
+        windGust: observed("wind_gust"),
+        humidity: observed("humidity"),
+        pressure: observed("pressure"),
+      };
+      const compatibilityForecast = {
         modelName: model.modelName,
         hour: snapshot.hour,
         temperature: get("temperature"),
@@ -369,8 +457,12 @@ export function evaluateHourlyForecastRuns(
         windGusts: get("wind_gust"),
         humidity: get("humidity"),
         pressure: get("pressure"),
-      });
-      if (snapshot.temperature != null && Number.isFinite(snapshot.temperature)) compatibilitySnapshots.push(snapshot);
+      };
+      const hasQualifiedPair = HOURLY_FORECAST_VARIABLES.some((variable) =>
+        observed(variable) != null && get(variable) != null);
+      if (!hasQualifiedPair) continue;
+      compatibilityForecasts.push(compatibilityForecast);
+      compatibilitySnapshots.push(compatibilitySnapshot);
     }
   }
 
@@ -379,8 +471,9 @@ export function evaluateHourlyForecastRuns(
     for (const variable of HOURLY_FORECAST_VARIABLES) {
       const opportunities: ObservationOpportunity[] = modelSnapshots.flatMap((snapshot) => {
         const observedValue = observationValue(snapshot, variable);
-        if (observedValue == null) return [];
-        return [{ snapshot, validTime: parisLocalHourToUniqueEpochMs(snapshot.date, snapshot.hour), observedValue }];
+        const earliest = earliestContributorObservedAt(snapshot, variable);
+        if (observedValue == null || earliest == null) return [];
+        return [{ snapshot, validTime: parisLocalHourToUniqueEpochMs(snapshot.date, snapshot.hour), observedValue, earliestContributorObservedAt: earliest }];
       });
       const observedOpportunities = opportunities.filter((opportunity) => opportunity.validTime != null);
       const errorsByHorizon = new Map<string, number[]>();
@@ -389,11 +482,12 @@ export function evaluateHourlyForecastRuns(
         const validTime = opportunity.validTime!;
         const key = forecastSeriesKey({ ...model, validTime, variable });
         const candidates = valuesBySeries.get(key) ?? [];
-        const selected = latestAdmissibleValue(candidates, validTime);
+        const admissionCutoff = Math.min(validTime, opportunity.earliestContributorObservedAt);
+        const selected = latestAdmissibleValue(candidates, admissionCutoff);
         // A recorded exact-time run with a missing variable is an availability
-        // opportunity, but no run at this validTime (e.g. outside model scope)
-        // is excluded from both this ratio and every error-score denominator.
-        const opportunityRun = selected ?? latestAdmissibleRun(candidates, validTime);
+        // opportunity only if it predates both the measurement and the unchanged validTime.
+        // Unverifiable station/field metadata was removed before this denominator is built.
+        const opportunityRun = selected ?? latestAdmissibleRun(candidates, admissionCutoff);
         if (!opportunityRun) continue;
         const horizonMinutes = (validTime - opportunityRun.availableAt) / 60_000;
         const horizon = getForecastHorizonWindow(horizonMinutes);
@@ -473,8 +567,9 @@ export function evaluateHourlyForecastRuns(
           variable,
           horizonBucket: horizon.key,
           observationCount: opportunities.length,
-          // The denominator contains only immutable forecast values from runs that
-          // existed before this exact validTime. Missing/out-of-scope runs never count.
+          // The denominator contains only immutable forecast values from runs before
+          // both this field's earliest contributor measurement and the exact validTime.
+          // Missing/unverifiable observations and out-of-scope runs never count.
           evaluableObservationCount,
           sampleSize: errors.length,
           coverageRatio: evaluableObservationCount > 0 ? errors.length / evaluableObservationCount : 0,

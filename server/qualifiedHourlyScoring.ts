@@ -33,8 +33,8 @@ export type QualifiedHourlyModelScore = {
   precipPod: number | null;
   precipFar: number | null;
   precipCsi: number | null;
-  precipFalsePositives: number;
-  precipFalseNegatives: number;
+  precipFalsePositives: number | null;
+  precipFalseNegatives: number | null;
   maeWind: number | null;
   rmseWind: number | null;
   windScore: number | null;
@@ -53,9 +53,16 @@ export type QualifiedHourlyModelScore = {
 
 const MINIMUM_ALIGNED_HOURS = 18;
 
-/** Scores only exist where an archived model hour and a physical snapshot coincide. */
+/** Scores only exist where an archived model hour and at least one qualified physical field coincide. */
 export function scoreQualifiedHourlyModels(snapshots: PhysicalSnapshot[], forecasts: HourlyForecast[]): QualifiedHourlyModelScore[] {
-  const physicalByHour = new Map(snapshots.filter((snapshot) => snapshot.stationCount > 0 && snapshot.temperature != null).map((snapshot) => [snapshot.hour, snapshot]));
+  const physicalByHour = new Map(snapshots.filter((snapshot) => snapshot.stationCount > 0 && [
+    snapshot.temperature,
+    snapshot.precipitation,
+    snapshot.windSpeed,
+    snapshot.windGust,
+    snapshot.humidity,
+    snapshot.pressure,
+  ].some((value) => typeof value === "number" && Number.isFinite(value))).map((snapshot) => [snapshot.hour, snapshot]));
   const grouped = new Map<string, HourlyForecast[]>();
   for (const forecast of forecasts) grouped.set(forecast.modelName, [...(grouped.get(forecast.modelName) ?? []), forecast]);
 
@@ -88,21 +95,21 @@ export function scoreQualifiedHourlyModels(snapshots: PhysicalSnapshot[], foreca
     return [{
       serviceName,
       sampleSize: pairs.length,
-      maeTemp: score.maeTemp,
-      rmseTemp: score.rmseTemp,
-      biasTemp: score.biasTemp,
-      maePrecip: score.maePrecip,
-      rmsePrecip: score.rmsePrecip,
+      maeTemp: score.dimensions.temperature.sampleSize > 0 ? score.maeTemp : null,
+      rmseTemp: score.dimensions.temperature.sampleSize > 0 ? score.rmseTemp : null,
+      biasTemp: score.dimensions.temperature.sampleSize > 0 ? score.biasTemp : null,
+      maePrecip: score.dimensions.precipitation.sampleSize > 0 ? score.maePrecip : null,
+      rmsePrecip: score.dimensions.precipitation.sampleSize > 0 ? score.rmsePrecip : null,
       precipScore: score.dimensions.precipitation.score,
-      precipPod: score.dimensions.precipitation.pod,
-      precipFar: score.dimensions.precipitation.far,
-      precipCsi: score.dimensions.precipitation.csi,
-      precipFalsePositives: score.dimensions.precipitation.falsePositives,
-      precipFalseNegatives: score.dimensions.precipitation.falseNegatives,
-      maeWind: score.maeWind,
-      rmseWind: score.rmseWind,
+      precipPod: score.dimensions.precipitation.sampleSize > 0 ? score.dimensions.precipitation.pod : null,
+      precipFar: score.dimensions.precipitation.sampleSize > 0 ? score.dimensions.precipitation.far : null,
+      precipCsi: score.dimensions.precipitation.sampleSize > 0 ? score.dimensions.precipitation.csi : null,
+      precipFalsePositives: score.dimensions.precipitation.sampleSize > 0 ? score.dimensions.precipitation.falsePositives : null,
+      precipFalseNegatives: score.dimensions.precipitation.sampleSize > 0 ? score.dimensions.precipitation.falseNegatives : null,
+      maeWind: score.dimensions.wind.sampleSize > 0 ? score.maeWind : null,
+      rmseWind: score.dimensions.wind.sampleSize > 0 ? score.rmseWind : null,
       windScore: score.dimensions.wind.score,
-      windMaeGusts: score.dimensions.wind.maeGusts,
+      windMaeGusts: score.laboratory.gusts.sampleSize > 0 ? score.laboratory.gusts.mae : null,
       weightedScore: score.weightedScore,
       normalizedScore: score.normalizedScore,
       humidityScore: score.laboratory.humidity.score,

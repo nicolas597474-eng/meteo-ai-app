@@ -5,9 +5,43 @@ import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 const locationKey = "50.756_2.520";
 const date = "2026-09-29";
 const observedAt = (hour: number) => parisLocalHourToUniqueEpochMs(date, hour)!;
+const hourlyVariables: HourlyForecastRunValue["variable"][] = ["temperature", "precipitation", "wind_speed", "wind_gust", "humidity", "pressure"];
 
-function snapshot(hour: number, temperature = 10): HourlyPhysicalSnapshot {
-  return { locationKey, date, hour, stationCount: 2, temperature, precipitation: 0, windSpeed: 8, windGust: 12, humidity: 70, pressure: 1015 };
+const stationFields = ["temperature", "precipitation", "windSpeed", "windGust", "humidity", "pressure"];
+
+function stationEvidence(
+  validTime: number,
+  overrides: { fieldWeights?: Record<string, number>; measurementTimes?: Record<string, unknown>; observedAt?: string } = {},
+): unknown[] {
+  const defaultMeasurementTime = new Date(validTime - 5 * 60_000).toISOString();
+  return [{
+    stationId: "station-a",
+    observedAt: overrides.observedAt ?? defaultMeasurementTime,
+    fieldWeights: overrides.fieldWeights ?? Object.fromEntries(stationFields.map((field) => [field, 1])),
+    measurementTimes: overrides.measurementTimes ?? Object.fromEntries(stationFields.map((field) => [field, defaultMeasurementTime])),
+  }];
+}
+
+function snapshot(
+  hour: number,
+  temperature = 10,
+  options: { date?: string; stationsUsed?: unknown } = {},
+): HourlyPhysicalSnapshot {
+  const snapshotDate = options.date ?? date;
+  const validTime = parisLocalHourToUniqueEpochMs(snapshotDate, hour) ?? Date.parse(`${snapshotDate}T00:00:00.000Z`);
+  return {
+    locationKey,
+    date: snapshotDate,
+    hour,
+    stationCount: 2,
+    temperature,
+    precipitation: 0,
+    windSpeed: 8,
+    windGust: 12,
+    humidity: 70,
+    pressure: 1015,
+    stationsUsed: options.stationsUsed === undefined ? stationEvidence(validTime) : options.stationsUsed,
+  };
 }
 
 function forecast(input: Partial<HourlyForecastRunValue> & Pick<HourlyForecastRunValue, "captureRunId" | "validTime" | "availableAt" | "variable" | "value">): HourlyForecastRunValue {
@@ -99,14 +133,14 @@ describe("evaluateHourlyForecastRuns", () => {
       id: 701,
       collectedAt: "2026-09-29T12:05:00.000Z",
       confidenceScore: 0.93,
-      stationsUsed: [{ stationId: "station-a", observedAt: firstValidTime - 120_000, temperature: 10 }],
+      stationsUsed: stationEvidence(firstValidTime, { observedAt: new Date(firstValidTime - 120_000).toISOString() }),
     };
     const secondSnapshot: HourlyPhysicalSnapshot = {
       ...snapshot(13),
       id: 702,
       collectedAt: "2026-09-29T13:05:00.000Z",
       confidenceScore: 0.91,
-      stationsUsed: [{ stationId: "station-b", observedAt: secondValidTime - 120_000, temperature: 10 }],
+      stationsUsed: stationEvidence(secondValidTime, { observedAt: new Date(secondValidTime - 120_000).toISOString() }),
     };
     const firstLead = 119.6 * 60_000;
     const secondLead = 119.7 * 60_000;
@@ -182,7 +216,7 @@ describe("evaluateHourlyForecastRuns", () => {
 
   it("écarte un instant d’observation ambigu à l’heure répétée d’Europe/Paris", () => {
     const fallDate = "2026-10-25";
-    const fallObservation: HourlyPhysicalSnapshot = { ...snapshot(2), date: fallDate, hour: 2 };
+    const fallObservation: HourlyPhysicalSnapshot = snapshot(2, 10, { date: fallDate });
     const result = evaluateHourlyForecastRuns([fallObservation], [
       forecast({ captureRunId: "first-02", targetDate: fallDate, validTime: Date.parse("2026-10-25T00:00:00Z"), availableAt: Date.parse("2026-10-24T20:00:00Z"), variable: "temperature", value: 10 }),
       forecast({ captureRunId: "second-02", targetDate: fallDate, validTime: Date.parse("2026-10-25T01:00:00Z"), availableAt: Date.parse("2026-10-24T21:00:00Z"), variable: "temperature", value: 12 }),
@@ -198,5 +232,169 @@ describe("evaluateHourlyForecastRuns", () => {
     ]);
     expect(scoresFor(result, "temperature").find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, observationCount: 1, evaluableObservationCount: 1, mae: 2 });
     expect(scoresFor(result, "precipitation").find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 0.5 });
+  });
+
+  it("rejette un forecast publié après la mesure réelle même s'il précède l'heure nominale", () => {
+    const validTime = observedAt(12);
+    const measurementTime = validTime - 15 * 60_000;
+    const physical = snapshot(12, 10, {
+      stationsUsed: stationEvidence(validTime, {
+        fieldWeights: { temperature: 1 },
+        measurementTimes: { temperature: new Date(measurementTime).toISOString() },
+      }),
+    });
+    const result = evaluateHourlyForecastRuns([physical], [
+      forecast({ captureRunId: "after-measurement", validTime, availableAt: validTime - 10 * 60_000, variable: "temperature", value: 100 }),
+    ]);
+
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({
+      observationCount: 1,
+      evaluableObservationCount: 0,
+      sampleSize: 0,
+      coverageRatio: 0,
+      mae: null,
+    });
+  });
+
+  it("admet une mesure postérieure à l'heure nominale tout en conservant le lead UTC nominal", () => {
+    const validTime = observedAt(12);
+    const physical = snapshot(12, 10, {
+      stationsUsed: stationEvidence(validTime, {
+        fieldWeights: { temperature: 1 },
+        measurementTimes: { temperature: new Date(validTime + 5 * 60_000).toISOString() },
+      }),
+    });
+    const result = evaluateHourlyForecastRuns([physical], [
+      forecast({ captureRunId: "before-later-measurement", validTime, availableAt: validTime - 10 * 60_000, variable: "temperature", value: 12 }),
+    ]);
+
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 2 });
+    expect(result.exactComparisons[0]).toMatchObject({ validTime, observationReferenceAt: validTime, horizonMilliseconds: 10 * 60_000 });
+  });
+
+  it("rejette strictement l'égalité entre availableAt et le premier horodatage contributeur", () => {
+    const validTime = observedAt(12);
+    const measurementTime = validTime - 10 * 60_000;
+    const physical = snapshot(12, 10, {
+      stationsUsed: stationEvidence(validTime, {
+        fieldWeights: { temperature: 1 },
+        measurementTimes: { temperature: new Date(measurementTime).toISOString() },
+      }),
+    });
+    const result = evaluateHourlyForecastRuns([physical], [
+      forecast({ captureRunId: "equal-time", validTime, availableAt: measurementTime, variable: "temperature", value: 12 }),
+    ]);
+
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ observationCount: 1, evaluableObservationCount: 0, sampleSize: 0 });
+  });
+
+  it("utilise le plus ancien horodatage des stations qui contribuent au champ", () => {
+    const validTime = observedAt(12);
+    const physical = snapshot(12, 10, {
+      stationsUsed: [
+        { stationId: "station-newer", fieldWeights: { temperature: 1 }, measurementTimes: { temperature: new Date(validTime - 5 * 60_000).toISOString() } },
+        { stationId: "station-earliest", fieldWeights: { temperature: 1 }, measurementTimes: { temperature: new Date(validTime - 20 * 60_000).toISOString() } },
+      ],
+    });
+    const result = evaluateHourlyForecastRuns([physical], [
+      forecast({ captureRunId: "after-earliest", validTime, availableAt: validTime - 10 * 60_000, variable: "temperature", value: 100 }),
+      forecast({ captureRunId: "before-all", validTime, availableAt: validTime - 25 * 60_000, variable: "temperature", value: 9 }),
+    ]);
+
+    expect(result.exactComparisons).toHaveLength(1);
+    expect(result.exactComparisons[0]).toMatchObject({ captureRunId: "before-all", absoluteError: 1 });
+  });
+
+  it("applique les heures propres au champ sans faire disparaître le vent quand la température est plus ancienne", () => {
+    const validTime = observedAt(12);
+    const physical = snapshot(12, 10, {
+      stationsUsed: [{
+        stationId: "station-field-times",
+        observedAt: new Date(validTime - 20 * 60_000).toISOString(),
+        fieldWeights: { temperature: 1, windSpeed: 1 },
+        measurementTimes: {
+          temperature: new Date(validTime - 20 * 60_000).toISOString(),
+          windSpeed: new Date(validTime - 5 * 60_000).toISOString(),
+        },
+      }],
+    });
+    const result = evaluateHourlyForecastRuns([physical], [
+      forecast({ captureRunId: "field-specific-run", validTime, availableAt: validTime - 10 * 60_000, variable: "temperature", value: 12 }),
+      forecast({ captureRunId: "field-specific-run", validTime, availableAt: validTime - 10 * 60_000, variable: "wind_speed", value: 10 }),
+    ]);
+
+    expect(scoresFor(result, "temperature").find((score) => score.horizonBucket === "0_2h")).toMatchObject({ observationCount: 1, evaluableObservationCount: 0, sampleSize: 0 });
+    expect(scoresFor(result, "wind_speed").find((score) => score.horizonBucket === "0_2h")).toMatchObject({ observationCount: 1, sampleSize: 1, mae: 2 });
+  });
+
+  it.each([
+    ["metadata absent", null],
+    ["horodatage corrompu", [{ stationId: "station-a", fieldWeights: { temperature: 1 }, measurementTimes: { temperature: "2026-09-29T11:45:00" } }]],
+    ["snapshot legacy sans fieldWeights", [{ stationId: "station-a", observedAt: "2026-09-29T11:45:00.000Z", temperature: 10 }]],
+  ])("exclut sans pénalité une observation dont les preuves sont %s", (_label, stationsUsed) => {
+    const validTime = observedAt(12);
+    const result = evaluateHourlyForecastRuns([snapshot(12, 10, { stationsUsed })], [
+      forecast({ captureRunId: "unverifiable-snapshot", validTime, availableAt: validTime - 30 * 60_000, variable: "temperature", value: 12 }),
+    ]);
+
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({
+      observationCount: 0,
+      evaluableObservationCount: 0,
+      sampleSize: 0,
+      coverageRatio: 0,
+      mae: null,
+      rmse: null,
+      bias: null,
+    });
+  });
+
+  it("protège latest-compatible par champ et conserve une variable vérifiable sans température", () => {
+    const hours = Array.from({ length: 18 }, (_, hour) => hour);
+    const snapshots = hours.map((hour) => {
+      const validTime = observedAt(hour);
+      return snapshot(hour, 10, {
+        stationsUsed: stationEvidence(validTime, {
+          fieldWeights: { windSpeed: 1 },
+          measurementTimes: { windSpeed: new Date(validTime - 5 * 60_000).toISOString() },
+        }),
+      });
+    });
+    const values = hours.flatMap((hour) => {
+      const validTime = observedAt(hour);
+      const availableAt = validTime - 10 * 60_000;
+      return [
+        forecast({ captureRunId: `wind-only-${hour}`, validTime, availableAt, variable: "temperature", value: 100 }),
+        forecast({ captureRunId: `wind-only-${hour}`, validTime, availableAt, variable: "wind_speed", value: 10 }),
+      ];
+    });
+    const result = evaluateHourlyForecastRuns(snapshots, values);
+
+    expect(result.compatibilityScores).toHaveLength(1);
+    expect(result.compatibilityScores[0]).toMatchObject({
+      sampleSize: 18,
+      maeTemp: null,
+      maeWind: 2,
+      maePrecip: null,
+      precipFalsePositives: null,
+    });
+  });
+
+  it("n'autorise pas latest-compatible à réintroduire un forecast postérieur aux mesures", () => {
+    const hours = Array.from({ length: 18 }, (_, hour) => hour);
+    const snapshots = hours.map((hour) => snapshot(hour));
+    const values = hours.flatMap((hour) => {
+      const validTime = observedAt(hour);
+      const availableAt = validTime - 60_000;
+      return hourlyVariables.map((variable) => forecast({
+        captureRunId: `after-measurement-${hour}`,
+        validTime,
+        availableAt,
+        variable,
+        value: 12,
+      }));
+    });
+    const result = evaluateHourlyForecastRuns(snapshots, values);
+
+    expect(result.compatibilityScores).toEqual([]);
   });
 });
