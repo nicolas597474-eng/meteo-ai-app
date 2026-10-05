@@ -28,11 +28,16 @@ function makeStation(
   lon: number,
 ): StationPerformanceStation {
   const readings: StationPerformanceObservation[] = dailyOffsets.flatMap((offset, day) =>
-    [0, 6, 12, 18].map((hour) => ({
-      observedAt: START + day * DAY_MS + hour * HOUR_MS,
-      temperature: 20 + day + offset,
-      precipitation: 0,
-    })),
+    [0, 6, 12, 18].map((hour) => {
+      const observedAt = START + day * DAY_MS + hour * HOUR_MS;
+      const fieldTime = new Date(observedAt).toISOString();
+      return {
+        observedAt,
+        measurementTimes: { temperature: fieldTime, precipitation: fieldTime },
+        temperature: 20 + day + offset,
+        precipitation: 0,
+      };
+    }),
   );
   return {
     stationId,
@@ -85,6 +90,106 @@ describe("deriveStationPerformanceProfiles", () => {
     expect(withModel.estimate?.meanAbsoluteError).toBeGreaterThan(0);
     expect(withModel.estimate?.uncertainty95.lower).toBeLessThanOrEqual(withModel.estimate?.shrunkMeanAbsoluteError ?? 0);
     expect(withModel.estimate?.uncertainty95.upper).toBeGreaterThanOrEqual(withModel.estimate?.shrunkMeanAbsoluteError ?? 0);
+  });
+
+  it("admet une référence mesurée au même instant que la candidate", () => {
+    const result = deriveStationPerformanceProfiles({ stations: crossNetworkFixture(), maxDistanceKm: 20 })
+      .get("netatmo-target")!.variables.temperature;
+
+    expect(result.comparisons).toBe(32);
+    expect(result.referenceNetworks).toEqual(["metar", "meteofrance"]);
+  });
+
+  it("exclut une référence mesurée après la candidate dans le même bucket UTC", () => {
+    const stations = crossNetworkFixture().map((station) => ({
+      ...station,
+      readings: station.readings.map((reading) => {
+        const fieldTime = Date.parse(reading.measurementTimes?.temperature ?? "");
+        return station.stationId === "mf-ref" || station.stationId === "metar-ref"
+          ? { ...reading, measurementTimes: { ...reading.measurementTimes, temperature: new Date(fieldTime + 30_000).toISOString() } }
+          : reading;
+      }),
+    }));
+    const result = deriveStationPerformanceProfiles({ stations, maxDistanceKm: 20 })
+      .get("netatmo-target")!.variables.temperature;
+
+    expect(result.comparisons).toBe(0);
+    expect(result.status).toBe("non_mesuree");
+    expect(result.estimate).toBeNull();
+  });
+
+  it("utilise des horloges indépendantes pour chaque variable", () => {
+    const stations = crossNetworkFixture().map((station) => ({
+      ...station,
+      readings: station.readings.map((reading) => {
+        const base = Date.parse(reading.measurementTimes?.temperature ?? "");
+        const isCandidate = station.stationId === "netatmo-target";
+        const humidityValues: Record<string, number> = {
+          "netatmo-target": 50,
+          "netatmo-peer-1": 48,
+          "netatmo-peer-2": 53,
+          "mf-ref": 49,
+          "metar-ref": 54,
+        };
+        return {
+          ...reading,
+          humidity: humidityValues[station.stationId],
+          measurementTimes: {
+            ...reading.measurementTimes,
+            temperature: new Date(base + (isCandidate ? 10 : 20) * 60_000).toISOString(),
+            humidity: new Date(base + (isCandidate ? 30 : 25) * 60_000).toISOString(),
+          },
+        };
+      }),
+    }));
+    const result = deriveStationPerformanceProfiles({ stations, maxDistanceKm: 20 }).get("netatmo-target")!;
+
+    expect(result.variables.temperature.comparisons).toBe(0);
+    expect(result.variables.humidity.comparisons).toBe(32);
+    expect(result.variables.humidity.status).toBe("mesuree");
+  });
+
+  it("exclut les champs legacy sans timestamp sans empêcher la mesure d’un autre champ", () => {
+    const stations = crossNetworkFixture().map((station) => ({
+      ...station,
+      readings: station.readings.map((reading) => ({
+        ...reading,
+        humidity: station.stationId === "netatmo-target" ? 50
+          : station.stationId === "netatmo-peer-1" ? 48
+            : station.stationId === "netatmo-peer-2" ? 53
+              : station.stationId === "mf-ref" ? 49 : 54,
+        measurementTimes: {
+          ...reading.measurementTimes,
+          temperature: station.stationId === "netatmo-target" ? null : reading.measurementTimes?.temperature ?? null,
+          humidity: reading.measurementTimes?.temperature ?? null,
+        },
+      })),
+    }));
+    const result = deriveStationPerformanceProfiles({ stations, maxDistanceKm: 20 }).get("netatmo-target")!;
+
+    expect(result.variables.temperature.reason).toBe("no_station_observations");
+    expect(result.variables.temperature.comparisons).toBe(0);
+    expect(result.variables.humidity.comparisons).toBe(32);
+    expect(result.variables.humidity.status).toBe("mesuree");
+  });
+
+  it("ignore les timestamps mal formés et coupe les mesures postérieures à asOf", () => {
+    const stations = crossNetworkFixture(1).map((station) => ({
+      ...station,
+      readings: station.readings.map((reading) => ({
+        ...reading,
+        measurementTimes: { ...reading.measurementTimes, temperature: "2026-02-30T12:00:00Z" },
+      })),
+    }));
+    const malformed = deriveStationPerformanceProfiles({ stations, maxDistanceKm: 20, asOf: START + DAY_MS })
+      .get("netatmo-target")!.variables.temperature;
+    const cutoff = deriveStationPerformanceProfiles({ stations: crossNetworkFixture(1), maxDistanceKm: 20, asOf: START + HOUR_MS })
+      .get("netatmo-target")!.variables.temperature;
+
+    expect(malformed.reason).toBe("no_station_observations");
+    expect(malformed.comparisons).toBe(0);
+    expect(cutoff.comparisons).toBe(1);
+    expect(cutoff.status).toBe("non_mesuree");
   });
 
   it("n’utilise pas une autre source au même site que la station cible comme référence indépendante", () => {
@@ -162,6 +267,7 @@ describe("deriveStationPerformanceProfiles", () => {
       const extraDayZeroReadings = [1, 2, 3, 4, 5, 7, 8, 9].map((hour) => ({
         ...firstReading,
         observedAt: START + hour * HOUR_MS,
+        measurementTimes: { ...firstReading.measurementTimes, temperature: new Date(START + hour * HOUR_MS).toISOString() },
       }));
       return { ...station, readings: [...station.readings, ...extraDayZeroReadings] };
     });
@@ -236,6 +342,7 @@ describe("deriveStationPerformanceProfiles", () => {
       readings: station.readings.map((reading) => ({
         ...reading,
         windDirection: directions[station.stationId],
+        measurementTimes: { ...reading.measurementTimes, windDirection: reading.measurementTimes?.temperature ?? null },
       })),
     }));
     const result = deriveStationPerformanceProfiles({ stations, maxDistanceKm: 20 })
