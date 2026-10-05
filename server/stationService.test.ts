@@ -14,6 +14,16 @@ import {
 // ─── Test data helpers ────────────────────────────────────────────────────────
 
 function makeStation(overrides: Partial<StationData> = {}): StationData {
+  const updatedAt = overrides.updatedAt !== undefined ? overrides.updatedAt : new Date().toISOString();
+  const measurementTimes = overrides.measurementTimes ?? {
+    temperature: updatedAt,
+    humidity: updatedAt,
+    pressure: updatedAt,
+    windSpeed: updatedAt,
+    windGust: updatedAt,
+    windDirection: updatedAt,
+    precipitation: updatedAt,
+  };
   return {
     stationId: "test-001",
     source: "openmeteo",
@@ -29,12 +39,13 @@ function makeStation(overrides: Partial<StationData> = {}): StationData {
     windGust: 22,
     windDirection: 270,
     precipitation: 0,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
     reliabilityScore: 80,
     updateFrequencyMin: 60,
     dataAvailability: 0.95,
     isActive: true,
     ...overrides,
+    measurementTimes,
   };
 }
 
@@ -281,6 +292,50 @@ describe("calculateGroundTruth", () => {
     expect(result.pressure).toBe(1015);
     expect(result.stationsUsed).toHaveLength(1);
     expect(result.stationsUsed[0].weight).toBeCloseTo(1.0, 1);
+  });
+
+  it("exclut une température vieille ou sans date sans retirer l’humidité récente des mêmes stations", () => {
+    const now = Date.now();
+    const recent = new Date(now - 5 * 60_000).toISOString();
+    const old = new Date(now - 181 * 60_000).toISOString();
+    const result = calculateGroundTruth([
+      makeStation({
+        stationId: "recent",
+        temperature: 20,
+        humidity: 80,
+        updatedAt: recent,
+        measurementTimes: { temperature: recent, humidity: recent },
+      }),
+      makeStation({
+        stationId: "old-temperature",
+        temperature: 40,
+        humidity: 20,
+        updatedAt: recent,
+        measurementTimes: { temperature: old, humidity: recent },
+      }),
+      makeStation({
+        stationId: "unknown-temperature",
+        temperature: 60,
+        humidity: 50,
+        updatedAt: recent,
+        measurementTimes: { temperature: null, humidity: recent },
+      }),
+    ]);
+
+    expect(result.temperature).toBe(20);
+    expect(result.humidity).toBe(50);
+    expect(result.stationCount).toBe(1);
+    const oldTemperature = result.stationsUsed.find((station) => station.stationId === "old-temperature")!;
+    const unknownTemperature = result.stationsUsed.find((station) => station.stationId === "unknown-temperature")!;
+    expect(oldTemperature.temperature).toBe(40);
+    expect(oldTemperature.fieldWeights?.temperature).toBeUndefined();
+    expect(oldTemperature.fieldWeights?.humidity).toBeGreaterThan(0);
+    expect(unknownTemperature.temperature).toBe(60);
+    expect(unknownTemperature.observedAt).toBeNull();
+    expect(unknownTemperature.measurementTimes?.temperature).toBeNull();
+    expect(unknownTemperature.measurementAgeByField?.temperature).toMatchObject({ observedAt: null, ageMinutes: null, status: "unknown" });
+    expect(unknownTemperature.fieldWeights?.temperature).toBeUndefined();
+    expect(unknownTemperature.fieldWeights?.humidity).toBeGreaterThan(0);
   });
 
   it("weights closer stations more heavily", () => {

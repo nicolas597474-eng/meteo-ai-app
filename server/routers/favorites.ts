@@ -127,6 +127,7 @@ import { getParisDate } from "../weatherTime";
 import { buildOfficialModelFallback } from "../modelFallback";
 import { resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
 import { buildCurrentDashboardWeatherState } from "../currentDashboardWeather";
+import { getValidStationMeasurementTimestamp } from "../stationMeasurementFreshness";
 
 export const favoritesRouter = router({
   /**
@@ -324,9 +325,7 @@ export const favoritesRouter = router({
       // avant le calcul, puis enrichi après celui-ci pour détecter les valeurs figées
       // ou les sauts brusques lors de l'appel suivant.
       const previousReadings = getPreviousReadings();
-      const fusionSources: FusionSource[] = physicalStations
-        .filter((station) => station.temperature != null)
-        .map((station) => ({
+      const fusionSources: FusionSource[] = physicalStations.map((station) => ({
           id: station.stationId,
           name: station.name,
           distanceKm: station.distanceKm,
@@ -339,6 +338,7 @@ export const favoritesRouter = router({
           windDirection: station.windDirection,
           precipitation: station.precipitation,
           updatedAt: station.updatedAt,
+          measurementTimes: station.measurementTimes,
           reliabilityScore: station.reliabilityScore,
           type: "station",
         }));
@@ -408,12 +408,18 @@ export const favoritesRouter = router({
         modelFallbackTemperature: modelFallback?.temperature ?? null,
       });
       const usedLocalSourceIds = new Set(modeUsesLocalStations
-        ? ultraLocalResult.stationsUsed.map((station) => station.stationId)
-        : advancedFusion.usedSources.filter((source) => source.type === "station").map((source) => source.id));
+        ? ultraLocalResult.stationsUsed
+            .filter((station) => (station.fieldWeights?.temperature ?? station.weight) > 0)
+            .map((station) => station.stationId)
+        : advancedFusion.usedSources
+            .filter((source) => source.type === "station" && (source.fieldWeights?.temperature ?? 0) > 0)
+            .map((source) => source.id));
       const latestLocalSourceAt = fusionSources
-        .filter((source) => source.type === "station" && usedLocalSourceIds.has(source.id) && source.updatedAt)
-        .map((source) => new Date(source.updatedAt!))
-        .filter((date) => Number.isFinite(date.getTime()))
+        .filter((source) => source.type === "station" && usedLocalSourceIds.has(source.id))
+        .flatMap((source) => {
+          const observedAt = getValidStationMeasurementTimestamp(source.measurementTimes, "temperature");
+          return observedAt == null ? [] : [new Date(observedAt)];
+        })
         .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
       const currentObservation = buildDashboardCurrentTemperature({
         localMode,
@@ -474,6 +480,10 @@ export const favoritesRouter = router({
           stationsUsed: ultraLocalResult.stationsUsed.map(s => ({
             name: s.name,
             source: s.source,
+            observedAt: s.observedAt,
+            measurementTimes: s.measurementTimes,
+            measurementAgeByField: s.measurementAgeByField,
+            fieldWeights: s.fieldWeights,
             distanceKm: s.distanceKm,
             temperature: s.temperature,
             adjustedTemperature: s.adjustedTemperature,
