@@ -175,4 +175,22 @@ describe("page Fiabilité", () => {
     expect(source).toContain("n’est pas calibré");
     expect(source).not.toContain("minimumPrecipitationEventDays");
   });
+
+  it("signale les limites de la comparaison sur les deux plages sans modifier les séries tracées", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    const panelStart = source.indexOf("Stations vs prévision officielle");
+    const panelEnd = source.indexOf("</section>", panelStart);
+    const comparisonPanel = source.slice(panelStart, panelEnd);
+    const chartStart = source.indexOf("function TemperatureComparison");
+    const rankingPageStart = source.indexOf("export default function Ranking()", chartStart);
+    const chart = source.slice(chartStart, rankingPageStart);
+
+    expect(comparisonPanel).toContain("Comparaison descriptive ; l’heure de disponibilité des prévisions n’est pas vérifiée ici. Ce graphique ne constitue ni une MAE ni un score de fiabilité.");
+    expect(comparisonPanel).toContain('onClick={() => setPeriodDays(1)}');
+    expect(comparisonPanel).toContain('onClick={() => setPeriodDays(7)}');
+    expect(source).toContain("const comparison = periodDays === 1 ? (data?.comparison24h ?? []) : (data?.comparison7d ?? []);");
+    expect(comparisonPanel).toContain("<TemperatureComparison points={comparison} periodDays={periodDays} />");
+    expect(chart).toContain('toPoint("officialTemperature")');
+    expect(chart).toContain('toPoint("stationTemperature")');
+  });
 });
