@@ -265,6 +265,10 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           { netatmoUserId: favorite.userId },
         );
         const physical = getPhysicalActiveStations(discovered);
+        const synthesis = calculateGroundTruth(physical);
+        const measurementTimesByStationId = new Map(
+          synthesis.stationsUsed.map((contribution) => [contribution.stationId, contribution.measurementTimes] as const),
+        );
         await processWithConcurrency(physical, PHYSICAL_STATION_WRITE_CONCURRENCY, async (station) => {
           await upsertWeatherStation({
             stationId: station.stationId,
@@ -289,6 +293,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           const observation = {
             stationId: station.stationId,
             observedAt,
+            measurementTimes: measurementTimesByStationId.get(station.stationId) ?? null,
             temperature: station.temperature,
             humidity: station.humidity,
             pressure: station.pressure,
@@ -301,7 +306,6 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         });
 
         await refreshStationQualityProfiles(physical.map((station) => station.stationId));
-        const synthesis = calculateGroundTruth(physical);
         if (preserveArchivedEvidence && successfulEvidenceAlreadyArchived) {
           locationResult = {
             locationKey,
@@ -1021,6 +1025,10 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             console.warn(`[Stations] ${fav.name}: aucune station physique officielle disponible dans le rayon de ${radiusKm} km`);
           }
 
+          const localSynthesis = calculateGroundTruth(physicalStations);
+          const measurementTimesByStationId = new Map(
+            localSynthesis.stationsUsed.map((contribution) => [contribution.stationId, contribution.measurementTimes] as const),
+          );
           for (const station of physicalStations) {
             await upsertWeatherStation({
               stationId: station.stationId,
@@ -1046,6 +1054,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             await upsertStationObservation({
               stationId: station.stationId,
               observedAt,
+              measurementTimes: measurementTimesByStationId.get(station.stationId) ?? null,
               temperature: station.temperature,
               humidity: station.humidity,
               pressure: station.pressure,
@@ -1084,6 +1093,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             await upsertStationObservation({
               stationId: station.stationId,
               observedAt,
+              measurementTimes: station.measurementTimes ?? null,
               temperature: station.temperature,
               humidity: station.humidity,
               pressure: station.pressure,
@@ -1094,7 +1104,6 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             });
           }
 
-          const localSynthesis = calculateGroundTruth(physicalStations);
           await upsertGroundTruthSnapshot({
             date: today,
             refLat: fav.lat,

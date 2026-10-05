@@ -1684,9 +1684,13 @@ export const weatherRouter = router({
           lat: station.lat,
           lon: station.lon,
           distanceKm: station.distanceKm,
-          readings: station.readings,
+          readings: station.readings.map((reading) => ({
+            ...reading,
+            measurementTimes: reading.measurementTimes ?? null,
+          })),
         })),
         maxDistanceKm: radiusKm,
+        asOf: now,
       });
       const qualityProfiles = await getStationQualityProfiles(stationData.stations.map((station) => station.stationId));
       const qualityByStationId = new Map(qualityProfiles.map((profile) => [profile.stationId, profile]));

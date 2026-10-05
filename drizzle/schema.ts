@@ -1,4 +1,5 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, double, json, bigint, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import type { StationMeasurementTimes } from "../server/stationMeasurementFreshness";
 
 /**
  * Core user table backing auth flow.
@@ -305,6 +306,7 @@ export const stationObservations = mysqlTable("station_observations", {
   windGust: float("windGust"), // km/h
   windDirection: float("windDirection"), // degrees
   precipitation: float("precipitation"), // mm
+  measurementTimes: json("measurementTimes").$type<StationMeasurementTimes | null>(),
   collectedAt: timestamp("collectedAt").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("station_observations_station_time_unique").on(table.stationId, table.observedAt),

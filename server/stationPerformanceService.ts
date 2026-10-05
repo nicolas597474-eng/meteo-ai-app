@@ -1,4 +1,5 @@
 import { getStationSourceKind, PHYSICAL_STATION_SOURCES, type StationSource } from "./stationService";
+import type { StationMeasurementTimes } from "./stationMeasurementFreshness";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 
 export const STATION_PERFORMANCE_VERSION = "station-cross-network-performance-v1" as const;
@@ -42,6 +43,8 @@ type StationPerformanceReason =
 
 export type StationPerformanceObservation = {
   observedAt: number | Date | string;
+  /** Provider-reported timestamp for each measured field; never inferred from observedAt. */
+  measurementTimes?: StationMeasurementTimes | null;
   temperature?: number | null;
   humidity?: number | null;
   pressure?: number | null;
@@ -97,6 +100,8 @@ export type StationPerformanceProfile = {
 export type StationPerformanceInput = {
   stations: readonly StationPerformanceStation[];
   maxDistanceKm?: number;
+  /** Absolute request-time cutoff for field observations. */
+  asOf?: number;
 };
 
 type NormalizedObservation = {
@@ -134,8 +139,24 @@ type RawStationMetric = {
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
-function toEpoch(value: number | Date | string): number | null {
-  const epoch = value instanceof Date ? value.getTime() : typeof value === "number" ? value : Date.parse(value);
+function toAbsoluteMeasurementEpoch(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|([+-])(\d{2}):?(\d{2}))$/i.exec(value);
+  if (!parts) return null;
+  const year = Number(parts[1]);
+  const month = Number(parts[2]);
+  const day = Number(parts[3]);
+  const hour = Number(parts[4]);
+  const minute = Number(parts[5]);
+  const second = Number(parts[6] ?? 0);
+  const offsetHour = Number(parts[9] ?? 0);
+  const offsetMinute = Number(parts[10] ?? 0);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59
+    || offsetHour > 23 || offsetMinute > 59) return null;
+  const calendarDate = new Date(0);
+  calendarDate.setUTCFullYear(year, month - 1, day);
+  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day) return null;
+  const epoch = Date.parse(value);
   return Number.isFinite(epoch) ? epoch : null;
 }
 
@@ -261,21 +282,23 @@ function buildRawStationMetrics(
   stations: readonly StationPerformanceStation[],
   variable: StationPerformanceVariable,
   maxDistanceKm?: number,
+  asOf = Date.now(),
 ): Map<string, RawStationMetric> {
   const eligibleStations = stations.filter((station) => isEligibleStation(station, maxDistanceKm));
-  const byHour = new Map<number, Map<string, NormalizedObservation>>();
+  const byHour = new Map<number, Map<string, NormalizedObservation[]>>();
 
   for (const station of eligibleStations) {
     for (const reading of station.readings) {
-      const observedAt = toEpoch(reading.observedAt);
+      const observedAt = toAbsoluteMeasurementEpoch(reading.measurementTimes?.[variable]);
       const value = reading[variable];
-      if (observedAt === null || !isFiniteNumber(value)) continue;
+      if (observedAt === null || observedAt > asOf || !isFiniteNumber(value)) continue;
       const hour = Math.floor(observedAt / HOUR_MS) * HOUR_MS;
-      const stationValues = byHour.get(hour) ?? new Map<string, NormalizedObservation>();
-      const current = stationValues.get(station.stationId);
-      if (!current || observedAt > current.observedAt) {
-        stationValues.set(station.stationId, { stationId: station.stationId, source: station.source, siteKey: siteKey(station), hour, observedAt, value });
+      const stationValues = byHour.get(hour) ?? new Map<string, NormalizedObservation[]>();
+      const readingsForStation = stationValues.get(station.stationId) ?? [];
+      if (!readingsForStation.some((current) => current.observedAt === observedAt)) {
+        readingsForStation.push({ stationId: station.stationId, source: station.source, siteKey: siteKey(station), hour, observedAt, value });
       }
+      stationValues.set(station.stationId, readingsForStation);
       byHour.set(hour, stationValues);
     }
   }
@@ -287,13 +310,24 @@ function buildRawStationMetrics(
     let minimumAvailableReferenceNetworks = Number.POSITIVE_INFINITY;
     let minimumMatchedReferenceNetworks = Number.POSITIVE_INFINITY;
     const availableReferenceNetworks = new Set<string>();
-    Array.from(byHour.entries()).forEach(([hour, valuesByStation]) => {
-      const candidate = valuesByStation.get(station.stationId);
+    Array.from(byHour.entries()).forEach(([hour, readingsByStation]) => {
+      const candidateReadings = readingsByStation.get(station.stationId) ?? [];
+      const candidate = candidateReadings.reduce<NormalizedObservation | null>(
+        (latest, reading) => !latest || reading.observedAt > latest.observedAt ? reading : latest,
+        null,
+      );
       if (!candidate) return;
       candidateObservations++;
 
       const valuesBySite = new Map<string, NormalizedObservation[]>();
-      Array.from(valuesByStation.values()).forEach((value) => {
+      Array.from(readingsByStation.values()).forEach((stationReadings) => {
+        const value = stationReadings.reduce<NormalizedObservation | null>(
+          (latest, reading) => reading.observedAt <= candidate.observedAt && (!latest || reading.observedAt > latest.observedAt)
+            ? reading
+            : latest,
+          null,
+        );
+        if (!value) return;
         if (value.source === station.source || value.siteKey === candidate.siteKey) return;
         valuesBySite.set(value.siteKey, [...(valuesBySite.get(value.siteKey) ?? []), value]);
       });
@@ -501,9 +535,10 @@ function deriveVariableResult(
 
 export function deriveStationPerformanceProfiles(input: StationPerformanceInput): Map<string, StationPerformanceProfile> {
   const profiles = new Map<string, StationPerformanceProfile>();
+  const asOf = Number.isFinite(input.asOf) ? input.asOf! : Date.now();
 
   for (const { key: variable } of VARIABLE_DEFINITIONS) {
-    const rawMetrics = buildRawStationMetrics(input.stations, variable, input.maxDistanceKm);
+    const rawMetrics = buildRawStationMetrics(input.stations, variable, input.maxDistanceKm, asOf);
     for (const station of input.stations) {
       const existing = profiles.get(station.stationId);
       const variableResult = deriveVariableResult(station, input.stations, variable, rawMetrics, input.maxDistanceKm);

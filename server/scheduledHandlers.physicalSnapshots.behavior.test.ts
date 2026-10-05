@@ -144,6 +144,49 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 1 })]);
   });
 
+  it("archive les timestamps exacts par champ et conserve null sans substituer updatedAt", async () => {
+    const measurementTimes = {
+      temperature: "2026-08-27T15:41:00.000Z",
+      humidity: null,
+      windSpeed: "timestamp-fourni-invalide",
+    };
+    mocks.collectNearbyStations.mockResolvedValue([{
+      stationId: "netatmo-field-times",
+      source: "netatmo",
+      name: "Station témoin",
+      lat: 50.75,
+      lon: 2.5,
+      altitude: null,
+      distanceKm: 1,
+      temperature: 18,
+      humidity: 61,
+      pressure: null,
+      windSpeed: 10,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+      updatedAt: "2026-08-27T15:45:00.000Z",
+      measurementTimes,
+      reliabilityScore: 90,
+      updateFrequencyMin: 5,
+      dataAvailability: 1,
+      isActive: true,
+      qualificationStatus: "validated",
+    }]);
+    mocks.calculateGroundTruth.mockReturnValue({
+      ...qualifiedSynthesis,
+      stationsUsed: [{ stationId: "netatmo-field-times", measurementTimes }],
+    });
+
+    await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.insertStationObservationIfMissing).toHaveBeenCalledWith(expect.objectContaining({
+      stationId: "netatmo-field-times",
+      observedAt: Date.parse("2026-08-27T15:45:00.000Z"),
+      measurementTimes,
+    }));
+  });
+
   it("classe l’absence persistante de station comme no_station après cinq essais, sans alerte technique", async () => {
     const result = await settleWithRetries(
       collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled"),
