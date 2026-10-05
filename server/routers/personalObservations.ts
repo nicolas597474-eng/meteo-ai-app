@@ -157,7 +157,7 @@ export const personalObservationsRouter = router({
     ]);
     const priorByModel = new Map(calibrations.map((calibration) => [calibration.modelName, calibration]));
     const observationValidAt = Math.floor(observedAt / 3_600_000) * 3_600_000;
-    const storedForecasts = getLatestCompletePersonalHourlyForecasts(archivedValues, getParisHourlyTimestamps(targetDate));
+    const storedForecasts = getLatestCompletePersonalHourlyForecasts(archivedValues, getParisHourlyTimestamps(targetDate), observedAt);
     const alignedForecasts = storedForecasts.filter((forecast) => forecast.validAt === observationValidAt);
     const modelResults = alignedForecasts.map((forecast) => {
       const result = scorePersonalModelObservation(input, forecast);

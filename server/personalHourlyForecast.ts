@@ -50,15 +50,18 @@ const REQUIRED_PROJECTION_FIELDS = HOURLY_FORECAST_VARIABLES
 /**
  * Reconstruct the latest complete exact-time run for each model from the existing
  * immutable archive. Partial later attempts stay archived but cannot displace the
- * last complete run. Secondary archive-only variables may remain null.
+ * last complete run. When supplied, availableBefore is an exclusive cutoff applied
+ * before selecting the latest eligible run. Secondary archive-only variables may remain null.
  */
 export function getLatestCompletePersonalHourlyForecasts(
   rows: readonly ArchivedHourlyForecastValue[],
   expectedValidTimes: readonly number[],
+  availableBefore?: number,
 ): PersonalHourlyModelForecast[] {
   if (expectedValidTimes.length === 0) return [];
   const expectedTimes = new Set(expectedValidTimes);
   if (expectedTimes.size !== expectedValidTimes.length || expectedValidTimes.some((time) => !Number.isFinite(time))) return [];
+  if (availableBefore !== undefined && !Number.isFinite(availableBefore)) return [];
 
   const runs = new Map<string, {
     captureRunId: string;
@@ -91,6 +94,7 @@ export function getLatestCompletePersonalHourlyForecasts(
     hours: Map<number, Record<string, unknown>>;
   }>();
   for (const run of Array.from(runs.values())) {
+    if (availableBefore !== undefined && (!Number.isFinite(run.availableAt) || run.availableAt >= availableBefore)) continue;
     const completeRows: Array<Record<string, unknown>> = Array.from(run.hours.values());
     if (!isCompleteHourlyForecastBatch({
       rows: completeRows,
