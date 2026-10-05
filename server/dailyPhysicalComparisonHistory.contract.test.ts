@@ -3,8 +3,14 @@ import { describe, expect, it } from "vitest";
 
 const dbSource = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
 const start = dbSource.indexOf("export async function getDailyPhysicalComparisonHistory(");
-const end = dbSource.indexOf("/** Exact location/horizon evidence", start);
+const end = dbSource.indexOf("export async function getDailyPhysicalComparisonRevisionHistory(", start);
 const readerSource = dbSource.slice(start, end);
+const revisionsStart = dbSource.indexOf("export async function getDailyPhysicalComparisonRevisionHistory(");
+const revisionsEnd = dbSource.indexOf("export async function getDailyFusionPerformanceEvidence(", revisionsStart);
+const revisionsReaderSource = dbSource.slice(revisionsStart, revisionsEnd);
+const scoringStart = dbSource.indexOf("export async function getDailyFusionPerformanceEvidence(");
+const scoringEnd = dbSource.indexOf("/** Upsert the daily local synthesis", scoringStart);
+const scoringReaderSource = dbSource.slice(scoringStart, scoringEnd);
 
 describe("contrat de lecture de l’historique quotidien physique", () => {
   it("ne lit que l’archive de production et exclut explicitement les preuves non physiques/non qualifiées", () => {
@@ -26,5 +32,22 @@ describe("contrat de lecture de l’historique quotidien physique", () => {
     expect(readerSource).toContain('unavailableDailyPhysicalComparisonHistory("database_unavailable")');
     expect(readerSource).toContain("isDailyComparisonTableUnavailable(error)");
     expect(readerSource).toContain('unavailableDailyPhysicalComparisonHistory("table_unavailable")');
+  });
+
+  it("lit le journal append-only séparément et ne reconstruit pas les lignes legacy", () => {
+    expect(revisionsStart).toBeGreaterThanOrEqual(0);
+    expect(revisionsEnd).toBeGreaterThan(revisionsStart);
+    expect(revisionsReaderSource).toContain(".from(dailyForecastObservationComparisonRevisions)");
+    expect(revisionsReaderSource).toContain("db.select()");
+    expect(revisionsReaderSource).not.toContain(".insert(");
+    expect(revisionsReaderSource).not.toContain(".update(");
+    expect(revisionsReaderSource).not.toContain(".delete(");
+  });
+
+  it("ne mélange pas les révisions dans le jeu de preuves du scoring existant", () => {
+    expect(scoringStart).toBeGreaterThanOrEqual(0);
+    expect(scoringEnd).toBeGreaterThan(scoringStart);
+    expect(scoringReaderSource).toContain(".from(dailyForecastObservationComparisons)");
+    expect(scoringReaderSource).not.toContain("dailyForecastObservationComparisonRevisions");
   });
 });

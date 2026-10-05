@@ -94,7 +94,7 @@ export default function DailyPhysicalComparisonsPanel({ coordinates }: { coordin
           <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-sky-200/80">Preuves utilisées pour l’analyse des pondérations</p>
           <h2 id="daily-physical-history-title" className="mt-1 text-base font-semibold text-white">Comparaisons physiques quotidiennes</h2>
           <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-            Archive de production uniquement : prévisions archivées comparées aux observations physiques qualifiées. Ces lignes exposent les preuves enregistrées ; elles ne recalculent ni ne modifient les poids. Open-Meteo Best Match reste une référence dérivée, pas un modèle indépendant.
+            Vue de la projection courante : une ligne par comparaison, utilisée pour les pondérations. Les révisions capturées sont conservées séparément et ne sont pas mélangées au scoring ; aucune version historique manquante n’est reconstruite. Open-Meteo Best Match reste une référence dérivée, pas un modèle indépendant.
           </p>
         </div>
         <span className="rounded-full border border-emerald-300/20 bg-emerald-300/[0.06] px-2.5 py-1 text-[10px] font-semibold text-emerald-100">Lecture seule · physique qualifiée</span>

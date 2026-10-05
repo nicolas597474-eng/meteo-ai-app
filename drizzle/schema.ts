@@ -112,6 +112,40 @@ export const dailyForecastObservationComparisons = mysqlTable("daily_forecast_ob
 export type DailyForecastObservationComparison = typeof dailyForecastObservationComparisons.$inferSelect;
 export type InsertDailyForecastObservationComparison = typeof dailyForecastObservationComparisons.$inferInsert;
 
+/** Append-only snapshots of distinct persisted comparison payloads; no legacy rows are backfilled. */
+export const dailyForecastObservationComparisonRevisions = mysqlTable("daily_forecast_observation_comparison_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  comparisonKey: varchar("comparisonKey", { length: 160 }).notNull(),
+  revisionHash: varchar("revisionHash", { length: 64 }).notNull(),
+  forecastRunId: int("forecastRunId").notNull(),
+  locationKey: varchar("locationKey", { length: 32 }).notNull(),
+  validDate: varchar("validDate", { length: 10 }).notNull(),
+  serviceName: varchar("serviceName", { length: 64 }).notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 96 }).notNull(),
+  horizonBucket: mysqlEnum("horizonBucket", ["0-6h", "6-24h", "1-3d", "4-7d", "8-15d"]).notNull(),
+  leadTimeMinutes: int("leadTimeMinutes").notNull(),
+  variable: mysqlEnum("variable", ["temperature_max", "temperature_min", "precipitation_sum", "wind_speed_max", "wind_gust_max"]).notNull(),
+  forecastValue: float("forecastValue").notNull(),
+  observedValue: float("observedValue").notNull(),
+  signedError: float("signedError").notNull(),
+  absoluteError: float("absoluteError").notNull(),
+  evidenceType: mysqlEnum("evidenceType", ["physical_observation"]).notNull().default("physical_observation"),
+  observationIsQualified: int("observationIsQualified").notNull().default(1),
+  observationCoverageHours: int("observationCoverageHours").notNull(),
+  forecastAvailableAt: bigint("forecastAvailableAt", { mode: "number" }),
+  observationWindowStartAt: bigint("observationWindowStartAt", { mode: "number" }),
+  observationWindowEndAt: bigint("observationWindowEndAt", { mode: "number" }),
+  stationEvidence: json("stationEvidence"),
+  recordedAt: timestamp("recordedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("daily_fc_obs_revision_hash_uq").on(table.comparisonKey, table.revisionHash),
+  index("daily_fc_obs_revision_location_date_idx").on(table.locationKey, table.validDate, table.id),
+  index("daily_fc_obs_revision_selection_idx").on(table.locationKey, table.horizonBucket, table.variable, table.validDate, table.id),
+]);
+export type DailyForecastObservationComparisonRevision = typeof dailyForecastObservationComparisonRevisions.$inferSelect;
+export type InsertDailyForecastObservationComparisonRevision = typeof dailyForecastObservationComparisonRevisions.$inferInsert;
+
 /**
  * Real weather observations from local stations.
  * Each row = one day's actual weather at Hondeghem.
