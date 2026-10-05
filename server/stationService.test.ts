@@ -303,6 +303,26 @@ describe("mapSynopRecord", () => {
     });
   });
 
+  it("active une station pluie seule sans fabriquer température ou vent", () => {
+    const station = mapSynopRecord({
+      ...record,
+      t: null,
+      u: null,
+      pres: null,
+      ff: null,
+      raf10: null,
+      dd: null,
+      rr1: 4.2,
+    }, 50.76, 2.52, 20);
+
+    expect(station).toMatchObject({
+      temperature: null,
+      windSpeed: null,
+      precipitation: 4.2,
+      isActive: true,
+    });
+  });
+
   it("préserve les valeurs finies et leurs conversions existantes", () => {
     const station = mapSynopRecord(record, 50.76, 2.52, 20);
 
@@ -343,6 +363,77 @@ describe("calculateGroundTruth", () => {
     expect(result.pressure).toBe(1015);
     expect(result.stationsUsed).toHaveLength(1);
     expect(result.stationsUsed[0].weight).toBeCloseTo(1.0, 1);
+  });
+
+  it("inclut une station pluie seule uniquement dans l’agrégat précipitation", () => {
+    const result = calculateGroundTruth([makeStation({
+      temperature: null,
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: 4.2,
+    })]);
+
+    expect(result.precipitation).toBe(4.2);
+    expect(result.temperature).toBeNull();
+    expect(result.windSpeed).toBeNull();
+    expect(result.stationCount).toBe(0);
+    expect(result.confidenceScore).toBe(0);
+    expect(result.stationsUsed).toHaveLength(1);
+    expect(result.stationsUsed[0].fieldWeights).toEqual({ precipitation: 1 });
+    expect(result.stationsUsed[0].temperature).toBeNull();
+    expect(result.stationsUsed[0].windSpeed).toBeNull();
+  });
+
+  it("conserve les contributions température et vent sans les mélanger avec la pluie", () => {
+    const temperatureOnly = calculateGroundTruth([makeStation({
+      temperature: 18.5,
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    })]);
+    const windOnly = calculateGroundTruth([makeStation({
+      temperature: null,
+      humidity: null,
+      pressure: null,
+      windSpeed: 12,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    })]);
+
+    expect(temperatureOnly.temperature).toBe(18.5);
+    expect(temperatureOnly.windSpeed).toBeNull();
+    expect(temperatureOnly.precipitation).toBeNull();
+    expect(temperatureOnly.stationsUsed[0].fieldWeights).toEqual({ temperature: 1 });
+    expect(windOnly.temperature).toBeNull();
+    expect(windOnly.windSpeed).toBe(12);
+    expect(windOnly.precipitation).toBeNull();
+    expect(windOnly.stationCount).toBe(0);
+    expect(windOnly.stationsUsed[0].fieldWeights).toEqual({ windSpeed: 1 });
+  });
+
+  it.each(["aucun champ activant", "tous les champs nuls"] as const)("n’invente aucune contribution quand %s", (caseName) => {
+    const result = calculateGroundTruth([makeStation({
+      temperature: null,
+      humidity: caseName === "aucun champ activant" ? 72 : null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    })]);
+
+    expect(result.temperature).toBeNull();
+    expect(result.windSpeed).toBeNull();
+    expect(result.precipitation).toBeNull();
+    expect(result.stationsUsed).toHaveLength(0);
+    expect(result.stationCount).toBe(0);
   });
 
   it("exclut une température vieille ou sans date sans retirer l’humidité récente des mêmes stations", () => {

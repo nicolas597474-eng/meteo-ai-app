@@ -3,6 +3,7 @@ import {
   getStationMeasurementAgeState,
   getValidStationMeasurementTimestamp,
   hasFreshStationMeasurement,
+  evaluateStationFieldQuality,
 } from "./stationMeasurementFreshness";
 
 const now = Date.parse("2026-10-05T10:00:00.000Z");
@@ -48,5 +49,31 @@ describe("station measurement freshness", () => {
     const beyondCutoff = new Date(now - 30 * 60_000 - 1).toISOString();
     expect(hasFreshStationMeasurement({ temperature: atCutoff }, "temperature", 30, now)).toBe(true);
     expect(hasFreshStationMeasurement({ temperature: beyondCutoff }, "temperature", 30, now)).toBe(false);
+  });
+
+  it("qualifies a precipitation-only station only for precipitation without inventing primary values", () => {
+    const source = {
+      id: "rain-only",
+      distanceKm: 1,
+      reliabilityScore: 90,
+      updatedAt: "2026-10-05T09:59:00.000Z",
+      temperature: null,
+      windSpeed: null,
+      precipitation: 4.2,
+      measurementTimes: { precipitation: "2026-10-05T09:59:00.000Z" },
+    };
+    const results = evaluateStationFieldQuality([source], "precipitation", {
+      now,
+      maxDistanceKm: 10,
+      maxFreshnessMin: 60,
+      minReliabilityScore: 40,
+      maxTempDeviationC: 8,
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].passed).toBe(true);
+    expect(results[0].source.temperature).toBeNull();
+    expect(results[0].source.windSpeed).toBeNull();
+    expect(results[0].source.precipitation).toBe(4.2);
   });
 });

@@ -172,4 +172,78 @@ describe("calculateUltraLocal", () => {
     expect(result.bandBreakdown.find((band) => band.band === "20-30 km")?.stationCount).toBe(1);
     expect(result.stationCount).toBe(1);
   });
+
+  it("contribue une station pluie seule uniquement à la précipitation", () => {
+    const result = calculateUltraLocal([station({
+      temperature: null,
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: 4.2,
+    })], "local", 50.75, 2.52, 40, null, { recordStationReadings: false });
+
+    expect(result.precipitation).toBe(4.2);
+    expect(result.temperature).toBeNull();
+    expect(result.windSpeed).toBeNull();
+    expect(result.stationCount).toBe(0);
+    expect(result.stationsUsed).toHaveLength(1);
+    expect(Object.keys(result.stationsUsed[0].fieldWeights ?? {})).toEqual(["precipitation"]);
+    expect(result.stationsUsed[0].fieldWeights?.precipitation).toBeGreaterThan(0);
+    expect(result.stationsUsed[0].temperature).toBeNull();
+    expect(result.stationsUsed[0].windSpeed).toBeNull();
+    expect(result.stationsUsed[0].adjustedTemperature).toBeNull();
+  });
+
+  it("maintient les contributions température et vent strictement indépendantes", () => {
+    const temperatureOnly = calculateUltraLocal([station({
+      temperature: 18.5,
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    })], "local", 50.75, 2.52, 40, null, { recordStationReadings: false });
+    const windOnly = calculateUltraLocal([station({
+      temperature: null,
+      humidity: null,
+      pressure: null,
+      windSpeed: 12,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    })], "local", 50.75, 2.52, 40, null, { recordStationReadings: false });
+
+    expect(temperatureOnly.temperature).toBe(18.5);
+    expect(temperatureOnly.windSpeed).toBeNull();
+    expect(temperatureOnly.precipitation).toBeNull();
+    expect(Object.keys(temperatureOnly.stationsUsed[0].fieldWeights ?? {})).toEqual(["temperature"]);
+    expect(temperatureOnly.stationsUsed[0].fieldWeights?.temperature).toBeGreaterThan(0);
+    expect(windOnly.temperature).toBeNull();
+    expect(windOnly.windSpeed).toBe(12);
+    expect(windOnly.precipitation).toBeNull();
+    expect(windOnly.stationCount).toBe(0);
+    expect(Object.keys(windOnly.stationsUsed[0].fieldWeights ?? {})).toEqual(["windSpeed"]);
+    expect(windOnly.stationsUsed[0].fieldWeights?.windSpeed).toBeGreaterThan(0);
+  });
+
+  it.each(["aucun champ activant", "tous les champs nuls"] as const)("n’invente aucune contribution quand %s", (caseName) => {
+    const result = calculateUltraLocal([station({
+      temperature: null,
+      humidity: caseName === "aucun champ activant" ? 72 : null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    })], "local", 50.75, 2.52, 40, null, { recordStationReadings: false });
+
+    expect(result.temperature).toBeNull();
+    expect(result.windSpeed).toBeNull();
+    expect(result.precipitation).toBeNull();
+    expect(result.stationsUsed).toHaveLength(0);
+    expect(result.stationCount).toBe(0);
+  });
 });

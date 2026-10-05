@@ -86,11 +86,11 @@ export function getStationMeasurementAgeStates(
  * sees that variable's provider timestamp; a different field or updatedAt is
  * never used as a freshness substitute. Temperature coherence is evaluated
  * only for temperature. The shared "temperature or wind" data-presence check
- * continues to require one of those historical primary fields; for a humidity
- * or pressure candidate, a present primary value is projected into the
- * temporary QC view solely to satisfy that structural check. The primary value
- * is not used to establish freshness or coherence for the candidate field, and
- * the original source is returned unchanged.
+ * remains unchanged for other fields; precipitation QC may additionally use
+ * its own finite measurement as data presence, without projecting it into
+ * temperature or wind. For a humidity or pressure candidate, a present primary
+ * value is still projected only into the temporary QC view. The original source
+ * is returned unchanged.
  */
 export function evaluateStationFieldQuality<T extends SpatialFusionSource & { measurementTimes?: StationMeasurementTimes }>(
   sources: readonly T[],
@@ -119,7 +119,10 @@ export function evaluateStationFieldQuality<T extends SpatialFusionSource & { me
           ? source.temperature
           : null,
   }));
-  return evaluateSpatialQuality(qcSources, options).map((result) => ({
+  const fieldOptions = field === "precipitation"
+    ? { ...options, dataField: "precipitation" as const }
+    : options;
+  return evaluateSpatialQuality(qcSources, fieldOptions).map((result) => ({
     source: originalById.get(result.source.id)!,
     passed: result.passed,
     checks: result.checks,

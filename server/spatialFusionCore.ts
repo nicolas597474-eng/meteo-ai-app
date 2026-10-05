@@ -6,6 +6,7 @@ export type SpatialFusionSource = {
   altitude?: number | null;
   temperature?: number | null;
   windSpeed?: number | null;
+  precipitation?: number | null;
 };
 
 export type SpatialQualityCheckCode = "distance" | "freshness" | "reliability" | "data" | "coherence" | "altitude";
@@ -25,6 +26,8 @@ export type SpatialQcOptions = {
   maxTempDeviationC: number;
   refAltitude?: number | null;
   maxAltitudeDifferenceM?: number;
+  /** Permit precipitation to satisfy data presence only for its own field QC. */
+  dataField?: "precipitation";
 };
 
 export type SpatialQcResult<T extends SpatialFusionSource> = {
@@ -78,6 +81,7 @@ export function evaluateSpatialQuality<T extends SpatialFusionSource>(
       ...source,
       temperature: source.temperature == null ? source.temperature : Number.isFinite(source.temperature) ? source.temperature : null,
       windSpeed: source.windSpeed == null ? source.windSpeed : Number.isFinite(source.windSpeed) ? source.windSpeed : null,
+      precipitation: source.precipitation == null ? source.precipitation : Number.isFinite(source.precipitation) ? source.precipitation : null,
     } as T;
     const distance = Number.isFinite(source.distanceKm) ? Math.max(0, source.distanceKm) : Number.POSITIVE_INFINITY;
     const distanceOk = distance <= options.maxDistanceKm;
@@ -92,8 +96,13 @@ export function evaluateSpatialQuality<T extends SpatialFusionSource>(
     const reliabilityOk = reliability >= options.minReliabilityScore;
     checks.push({ code: "reliability", passed: reliabilityOk, value: `${Math.round(reliability)}/100`, threshold: `≥ ${options.minReliabilityScore}/100`, reason: "Priorité technique de source insuffisante" });
 
-    const dataOk = Number.isFinite(normalizedSource.temperature) || Number.isFinite(normalizedSource.windSpeed);
-    checks.push({ code: "data", passed: dataOk, value: dataOk ? "mesure présente" : "aucune mesure", threshold: "température ou vent", reason: "Aucune mesure exploitable" });
+    const dataOk = Number.isFinite(normalizedSource.temperature)
+      || Number.isFinite(normalizedSource.windSpeed)
+      || (options.dataField === "precipitation" && Number.isFinite(normalizedSource.precipitation));
+    const dataThreshold = options.dataField === "precipitation"
+      ? "température, vent ou précipitation"
+      : "température ou vent";
+    checks.push({ code: "data", passed: dataOk, value: dataOk ? "mesure présente" : "aucune mesure", threshold: dataThreshold, reason: "Aucune mesure exploitable" });
 
     let altitudeAdjustmentC = 0;
     const hasReferenceAltitude = options.refAltitude != null && source.altitude != null;
