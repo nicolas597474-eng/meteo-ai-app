@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { DailyForecastObservationComparison } from "../drizzle/schema";
+import type {
+  DailyForecastObservationComparison,
+  DailyForecastObservationComparisonRevision,
+} from "../drizzle/schema";
 import {
   buildDailyPhysicalComparisonHistoryPage,
   DEFAULT_DAILY_COMPARISON_PAGE_SIZE,
@@ -85,6 +88,24 @@ describe("historique des comparaisons physiques quotidiennes", () => {
   it("n’émet pas de page suivante quand il n’y a aucune preuve correspondante", () => {
     const result = buildDailyPhysicalComparisonHistoryPage([], { locationKey });
     expect(result).toEqual({ status: "empty", rows: [], hasMore: false, nextCursor: null });
+  });
+
+  it("préserve les métadonnées de révision dans le lecteur paginé distinct", () => {
+    const { createdAt: _createdAt, ...comparisonFields } = row();
+    const revision: DailyForecastObservationComparisonRevision = {
+      ...comparisonFields,
+      revisionHash: "a".repeat(64),
+      recordedAt: new Date("2026-10-03T02:00:00.000Z"),
+    };
+
+    const result = buildDailyPhysicalComparisonHistoryPage([revision], { locationKey });
+
+    expect(result.status).toBe("available");
+    expect(result.rows[0]).toMatchObject({
+      comparisonKey: revision.comparisonKey,
+      revisionHash: revision.revisionHash,
+      recordedAt: revision.recordedAt,
+    });
   });
 
   it("borne la taille de page et fournit un curseur stable basé sur date valide et id", () => {

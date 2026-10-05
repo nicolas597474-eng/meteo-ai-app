@@ -9,6 +9,7 @@ import {
   forecasts,
   forecastRuns,
   dailyForecastObservationComparisons,
+  dailyForecastObservationComparisonRevisions,
   observations,
   reliabilityScores,
   meteoaiForecast,
@@ -30,6 +31,7 @@ import {
   InsertForecast,
   InsertForecastRun,
   InsertDailyForecastObservationComparison,
+  type DailyForecastObservationComparisonRevision,
   InsertObservation,
   InsertReliabilityScore,
   InsertMeteoAIForecast,
@@ -78,6 +80,7 @@ import { getGroundTruthReferenceBounds } from "./groundTruthReference";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 import { HourlyForecastPersistenceError, withHourlyForecastPersistenceStages } from "./hourlyForecastPersistence";
 import { aggregateDailyForecastPerformance, getDailyForecastHorizon } from "./dailyForecastPerformance";
+import { buildDailyForecastObservationComparisonRevision } from "./dailyForecastComparisonRevisions";
 import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 import type { DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
 import {
@@ -1211,6 +1214,7 @@ function isDailyComparisonTableUnavailable(error: unknown): boolean {
     if (code === "ER_NO_SUCH_TABLE" || code === "42S02" || current.errno === 1146) return true;
     if ((code === "ER_BAD_FIELD_ERROR" || code === "42S22" || current.errno === 1054)
       && (message.includes("daily_forecast_observation_comparisons")
+        || message.includes("daily_forecast_observation_comparison_revisions")
         || message.includes("forecastAvailableAt".toLowerCase())
         || message.includes("observationWindowStartAt".toLowerCase())
         || message.includes("observationWindowEndAt".toLowerCase())
@@ -1222,10 +1226,15 @@ function isDailyComparisonTableUnavailable(error: unknown): boolean {
 function warnDailyComparisonTableUnavailable(): void {
   if (dailyComparisonTableWarningLogged) return;
   dailyComparisonTableWarningLogged = true;
-  console.warn("[MeteoAI] L’archive daily_forecast_observation_comparisons ou ses colonnes de mesure ne sont pas migrées; aucune paire non horodatée n’entre dans la pondération.");
+  console.warn("[MeteoAI] L’archive quotidienne ou son journal de révisions n’est pas migré; aucune projection de comparaison n’est mise à jour sans journal append-only.");
 }
 
-/** Persist exact production forecast/physical-observation pairs; no shadow table is read or written. */
+/**
+ * Append each distinct exact payload to the revision archive, then update the
+ * legacy current projection used by existing scoring readers. Both writes are
+ * atomic; without the additive revision table, no potentially destructive
+ * projection update is made.
+ */
 export async function upsertDailyForecastObservationComparisons(
   rows: InsertDailyForecastObservationComparison[],
 ): Promise<boolean> {
@@ -1233,32 +1242,40 @@ export async function upsertDailyForecastObservationComparisons(
   if (!db) return false;
   if (rows.length === 0) return true;
   try {
-    for (const row of rows) {
-      await db.insert(dailyForecastObservationComparisons).values(row).onDuplicateKeyUpdate({
-        set: {
-          forecastRunId: row.forecastRunId,
-          locationKey: row.locationKey,
-          validDate: row.validDate,
-          serviceName: row.serviceName,
-          provider: row.provider,
-          modelId: row.modelId,
-          horizonBucket: row.horizonBucket,
-          leadTimeMinutes: row.leadTimeMinutes,
-          variable: row.variable,
-          forecastValue: row.forecastValue,
-          observedValue: row.observedValue,
-          signedError: row.signedError,
-          absoluteError: row.absoluteError,
-          evidenceType: row.evidenceType,
-          observationIsQualified: row.observationIsQualified,
-          observationCoverageHours: row.observationCoverageHours,
-          forecastAvailableAt: row.forecastAvailableAt ?? null,
-          observationWindowStartAt: row.observationWindowStartAt ?? null,
-          observationWindowEndAt: row.observationWindowEndAt ?? null,
-          stationEvidence: row.stationEvidence ?? null,
-        },
-      });
-    }
+    await db.transaction(async (tx) => {
+      for (const row of rows) {
+        try {
+          await tx.insert(dailyForecastObservationComparisonRevisions)
+            .values(buildDailyForecastObservationComparisonRevision(row));
+        } catch (error: any) {
+          if (error?.code !== "ER_DUP_ENTRY" && error?.errno !== 1062) throw error;
+        }
+        await tx.insert(dailyForecastObservationComparisons).values(row).onDuplicateKeyUpdate({
+          set: {
+            forecastRunId: row.forecastRunId,
+            locationKey: row.locationKey,
+            validDate: row.validDate,
+            serviceName: row.serviceName,
+            provider: row.provider,
+            modelId: row.modelId,
+            horizonBucket: row.horizonBucket,
+            leadTimeMinutes: row.leadTimeMinutes,
+            variable: row.variable,
+            forecastValue: row.forecastValue,
+            observedValue: row.observedValue,
+            signedError: row.signedError,
+            absoluteError: row.absoluteError,
+            evidenceType: row.evidenceType,
+            observationIsQualified: row.observationIsQualified,
+            observationCoverageHours: row.observationCoverageHours,
+            forecastAvailableAt: row.forecastAvailableAt ?? null,
+            observationWindowStartAt: row.observationWindowStartAt ?? null,
+            observationWindowEndAt: row.observationWindowEndAt ?? null,
+            stationEvidence: row.stationEvidence ?? null,
+          },
+        });
+      }
+    });
     return true;
   } catch (error) {
     if (!isDailyComparisonTableUnavailable(error)) throw error;
@@ -1267,7 +1284,7 @@ export async function upsertDailyForecastObservationComparisons(
   }
 }
 
-/** Read-only production archive history. No shadow table is queried by this path. */
+/** Read-only latest projection used for scoring/history display; use the revision reader for captured versions. */
 export async function getDailyPhysicalComparisonHistory(
   filters: DailyPhysicalComparisonHistoryFilters,
 ) {
@@ -1314,7 +1331,57 @@ export async function getDailyPhysicalComparisonHistory(
   }
 }
 
-/** Exact location/horizon evidence, with no current-day leakage or adjacent-horizon fallback. */
+/** Read only explicitly captured revisions; legacy rows are intentionally not backfilled or inferred. */
+export async function getDailyPhysicalComparisonRevisionHistory(
+  filters: DailyPhysicalComparisonHistoryFilters,
+) {
+  const db = await getDb();
+  if (!db) return unavailableDailyPhysicalComparisonHistory<DailyForecastObservationComparisonRevision>("database_unavailable");
+
+  const pageSize = normalizeDailyComparisonPageSize(filters.pageSize);
+  const conditions = [
+    eq(dailyForecastObservationComparisonRevisions.locationKey, filters.locationKey),
+    eq(dailyForecastObservationComparisonRevisions.evidenceType, "physical_observation"),
+    eq(dailyForecastObservationComparisonRevisions.observationIsQualified, 1),
+    isNotNull(dailyForecastObservationComparisonRevisions.forecastAvailableAt),
+    isNotNull(dailyForecastObservationComparisonRevisions.observationWindowStartAt),
+    isNotNull(dailyForecastObservationComparisonRevisions.observationWindowEndAt),
+    isNotNull(dailyForecastObservationComparisonRevisions.stationEvidence),
+    lt(dailyForecastObservationComparisonRevisions.forecastAvailableAt, dailyForecastObservationComparisonRevisions.observationWindowStartAt),
+  ];
+  if (filters.validDateFrom) conditions.push(gte(dailyForecastObservationComparisonRevisions.validDate, filters.validDateFrom));
+  if (filters.validDateTo) conditions.push(lte(dailyForecastObservationComparisonRevisions.validDate, filters.validDateTo));
+  if (filters.serviceName) conditions.push(eq(dailyForecastObservationComparisonRevisions.serviceName, filters.serviceName));
+  if (filters.variable) conditions.push(eq(dailyForecastObservationComparisonRevisions.variable, filters.variable));
+  if (filters.horizonBucket) conditions.push(eq(dailyForecastObservationComparisonRevisions.horizonBucket, filters.horizonBucket));
+  if (filters.cursor) {
+    const cursorCondition = or(
+      lt(dailyForecastObservationComparisonRevisions.validDate, filters.cursor.validDate),
+      and(
+        eq(dailyForecastObservationComparisonRevisions.validDate, filters.cursor.validDate),
+        lt(dailyForecastObservationComparisonRevisions.id, filters.cursor.id),
+      ),
+    );
+    if (cursorCondition) conditions.push(cursorCondition);
+  }
+
+  try {
+    const rows = await db.select().from(dailyForecastObservationComparisonRevisions)
+      .where(and(...conditions))
+      .orderBy(desc(dailyForecastObservationComparisonRevisions.validDate), desc(dailyForecastObservationComparisonRevisions.id))
+      .limit(pageSize + 1);
+    return buildDailyPhysicalComparisonHistoryPage(rows, { ...filters, pageSize });
+  } catch (error) {
+    if (!isDailyComparisonTableUnavailable(error)) throw error;
+    warnDailyComparisonTableUnavailable();
+    return unavailableDailyPhysicalComparisonHistory<DailyForecastObservationComparisonRevision>("table_unavailable");
+  }
+}
+
+/**
+ * Exact location/horizon evidence from the unchanged current projection; the
+ * append-only revision ledger is deliberately not aggregated into scores.
+ */
 export async function getDailyFusionPerformanceEvidence(
   locationKey: string,
   targetDate: string,

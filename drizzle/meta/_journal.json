@@ -393,6 +393,13 @@
       "when": 1791209262249,
       "tag": "0055_hourly_scoring_validation_version",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "5",
+      "when": 1791216861005,
+      "tag": "0056_daily_comparison_revisions",
+      "breakpoints": true
     }
   ]
 }

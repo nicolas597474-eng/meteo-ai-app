@@ -1,4 +1,7 @@
-import type { DailyForecastObservationComparison } from "../drizzle/schema";
+import type {
+  DailyForecastObservationComparison,
+  DailyForecastObservationComparisonRevision,
+} from "../drizzle/schema";
 import { isComparableDailyForecastObservationPair } from "./dailyForecastVerification";
 
 export const DAILY_PHYSICAL_COMPARISON_VARIABLES = [
@@ -37,10 +40,25 @@ export type DailyPhysicalComparisonHistoryUnavailableReason =
   | "database_unavailable"
   | "table_unavailable";
 
-export type DailyPhysicalComparisonHistoryPage =
+type DailyPhysicalComparisonHistoryRecord = Pick<DailyForecastObservationComparison,
+  | "id"
+  | "locationKey"
+  | "evidenceType"
+  | "observationIsQualified"
+  | "forecastAvailableAt"
+  | "observationWindowStartAt"
+  | "observationWindowEndAt"
+  | "stationEvidence"
+  | "validDate"
+  | "serviceName"
+  | "variable"
+  | "horizonBucket"
+>;
+
+export type DailyPhysicalComparisonHistoryPage<T extends DailyPhysicalComparisonHistoryRecord = DailyForecastObservationComparison> =
   | {
       status: "available";
-      rows: DailyForecastObservationComparison[];
+      rows: T[];
       hasMore: boolean;
       nextCursor: DailyPhysicalComparisonCursor | null;
     }
@@ -67,7 +85,7 @@ export function normalizeDailyComparisonPageSize(pageSize?: number): number {
 }
 
 function matchesDailyPhysicalComparison(
-  row: DailyForecastObservationComparison,
+  row: DailyPhysicalComparisonHistoryRecord,
   filters: DailyPhysicalComparisonHistoryFilters,
 ): boolean {
   if (row.locationKey !== filters.locationKey) return false;
@@ -86,10 +104,10 @@ function matchesDailyPhysicalComparison(
   return true;
 }
 
-export function buildDailyPhysicalComparisonHistoryPage(
-  queryRows: DailyForecastObservationComparison[],
+export function buildDailyPhysicalComparisonHistoryPage<T extends DailyPhysicalComparisonHistoryRecord>(
+  queryRows: T[],
   filters: DailyPhysicalComparisonHistoryFilters,
-): DailyPhysicalComparisonHistoryPage {
+): DailyPhysicalComparisonHistoryPage<T> {
   const pageSize = normalizeDailyComparisonPageSize(filters.pageSize);
   const matchingRows = queryRows
     .filter((row) => matchesDailyPhysicalComparison(row, filters))
@@ -108,8 +126,10 @@ export function buildDailyPhysicalComparisonHistoryPage(
   };
 }
 
-export function unavailableDailyPhysicalComparisonHistory(
+export function unavailableDailyPhysicalComparisonHistory<T extends DailyPhysicalComparisonHistoryRecord = DailyForecastObservationComparison>(
   reason: DailyPhysicalComparisonHistoryUnavailableReason,
-): DailyPhysicalComparisonHistoryPage {
+): DailyPhysicalComparisonHistoryPage<T> {
   return { status: "unavailable", reason, rows: [], hasMore: false, nextCursor: null };
 }
+
+export type DailyPhysicalComparisonRevisionHistoryPage = DailyPhysicalComparisonHistoryPage<DailyForecastObservationComparisonRevision>;
