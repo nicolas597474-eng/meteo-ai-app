@@ -87,6 +87,28 @@ describe("noyau spatial commun", () => {
     expect(result.source.windSpeed).toBe(10);
   });
 
+  it("n’admet une pluie seule que lorsque le QC vise explicitement la précipitation", () => {
+    const rainOnly = {
+      id: "rain-only",
+      distanceKm: 1,
+      reliabilityScore: 90,
+      updatedAt: now,
+      temperature: null,
+      windSpeed: null,
+      precipitation: 4.2,
+    };
+    const options = { maxDistanceKm: 10, maxFreshnessMin: 60, minReliabilityScore: 40, maxTempDeviationC: 8 };
+    const [defaultResult] = evaluateSpatialQuality([rainOnly], options);
+    const [precipitationResult] = evaluateSpatialQuality([rainOnly], { ...options, dataField: "precipitation" });
+
+    expect(defaultResult.passed).toBe(false);
+    expect(precipitationResult.passed).toBe(true);
+    expect(precipitationResult.source.temperature).toBeNull();
+    expect(precipitationResult.source.windSpeed).toBeNull();
+    expect(precipitationResult.source.precipitation).toBe(4.2);
+    expect(precipitationResult.checks.find((check) => check.code === "data")?.passed).toBe(true);
+  });
+
   it("ne retourne pas une température ajustée non finie pour une mesure non finie", () => {
     const [weight] = buildNormalizedSpatialWeights([
       { id: "invalid-temperature", distanceKm: 1, temperature: Number.NEGATIVE_INFINITY },
