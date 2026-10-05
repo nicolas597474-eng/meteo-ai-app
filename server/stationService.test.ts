@@ -134,17 +134,14 @@ describe("rankStations", () => {
     expect(ranked[0].stationId).toBe("near");
   });
 
-  it("can rank a higher-reliability far station above a low-reliability near station", () => {
+  it("ranks a higher-priority station 8 km away above a near station at the minimum active priority", () => {
+    const now = Date.parse("2026-10-05T08:00:00.000Z");
     const stations = [
-      makeStation({ stationId: "reliable-far", distanceKm: 8.0, reliabilityScore: 95 }),
-      makeStation({ stationId: "unreliable-near", distanceKm: 0.5, reliabilityScore: 20 }),
+      makeStation({ stationId: "reliable-far", distanceKm: 8.0, reliabilityScore: 95, updatedAt: new Date(now).toISOString() }),
+      makeStation({ stationId: "low-priority-near", distanceKm: 0.5, reliabilityScore: 40, updatedAt: new Date(now).toISOString() }),
     ];
-    const ranked = rankStations(stations);
-    // Near station still wins due to 40% distance weight unless reliability difference is extreme
-    // Just verify both are present and ordered
-    expect(ranked).toHaveLength(2);
-    expect(ranked.map(s => s.stationId)).toContain("reliable-far");
-    expect(ranked.map(s => s.stationId)).toContain("unreliable-near");
+    const ranked = rankStations(stations, now);
+    expect(ranked.map((station) => station.stationId)).toEqual(["reliable-far", "low-priority-near"]);
   });
 
   it("does not mutate the input array", () => {

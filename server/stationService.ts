@@ -27,6 +27,7 @@ import {
   SPATIAL_FUSION_DISTANCE_EPSILON_KM,
   SPATIAL_FUSION_IDW_EXPONENT,
 } from "./spatialFusionCore";
+import { getStationRankingScore } from "./stationRankingScore";
 
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
 
@@ -606,24 +607,16 @@ export async function collectNearbyStations(
 
 // ─── Ranking ─────────────────────────────────────────────────────────────────
 
-export function rankStations(stations: StationData[]): StationData[] {
+export function rankStations(stations: StationData[], nowMs = Date.now()): StationData[] {
+  const scoreByStation = new Map<StationData, number>();
+  for (const station of stations) scoreByStation.set(station, getStationRankingScore(station, nowMs));
+
   return [...stations].sort((a, b) => {
     // Active first
     if (a.isActive && !b.isActive) return -1;
     if (!a.isActive && b.isActive) return 1;
 
-    // Composite rank: 40% distance + 30% reliability + 20% availability + 10% update freq
-    const scoreA =
-      (1 / (a.distanceKm + 0.1)) * 40 +
-      (a.reliabilityScore / 100) * 30 +
-      a.dataAvailability * 20 +
-      (1 / (a.updateFrequencyMin + 1)) * 10;
-    const scoreB =
-      (1 / (b.distanceKm + 0.1)) * 40 +
-      (b.reliabilityScore / 100) * 30 +
-      b.dataAvailability * 20 +
-      (1 / (b.updateFrequencyMin + 1)) * 10;
-    return scoreB - scoreA;
+    return scoreByStation.get(b)! - scoreByStation.get(a)!;
   });
 }
 
