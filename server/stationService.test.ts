@@ -7,6 +7,7 @@ import {
   getPhysicalActiveStations,
   getStationSourceKind,
   mapSynopRecord,
+  revalidateStationFreshness,
   mapMetarObservation,
   type StationData,
 } from "./stationService";
@@ -197,6 +198,56 @@ describe("getCandidateStations", () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0].stationId).toBe("opensensemap-box-1");
     expect(getStationSourceKind(candidates[0].source, candidates[0].stationId)).toBe("reference");
+  });
+});
+
+describe("présélection de fraîcheur des stations", () => {
+  const now = Date.parse("2026-10-05T10:00:00.000Z");
+
+  it.each([
+    ["absente", null],
+    ["invalide", "not-a-date"],
+  ] as const)("désactive une station avec une date %s sans supprimer ses mesures", (_label, updatedAt) => {
+    const [station] = revalidateStationFreshness([makeStation({ updatedAt })], now);
+
+    expect(station.isActive).toBe(false);
+    expect(station.temperature).toBe(18.5);
+    expect(station.humidity).toBe(72);
+    expect(station.pressure).toBe(1013);
+    expect(station.exclusionReason).toBeTruthy();
+  });
+
+  it.each([
+    ["juste avant", 180 * 60_000 - 1, true],
+    ["exactement à", 180 * 60_000, true],
+    ["juste après", 180 * 60_000 + 1, false],
+  ] as const)("conserve la frontière de 180 minutes (%s)", (_label, ageMs, expectedActive) => {
+    const updatedAt = new Date(now - ageMs).toISOString();
+    const [station] = revalidateStationFreshness([makeStation({ updatedAt })], now);
+
+    expect(station.isActive).toBe(expectedActive);
+  });
+
+  it("conserve le traitement actuel d’une date future", () => {
+    const updatedAt = new Date(now + 60_000).toISOString();
+    const [station] = revalidateStationFreshness([makeStation({ updatedAt })], now);
+
+    expect(station.isActive).toBe(true);
+  });
+
+  it("revalide une station mise en cache qui franchit le cutoff avant l’expiration du TTL", () => {
+    const cachedAt = now;
+    const updatedAt = new Date(cachedAt - (180 * 60_000 - 30_000)).toISOString();
+    const cachedStations = revalidateStationFreshness([makeStation({ updatedAt })], cachedAt);
+    const cacheHitAt = cachedAt + 60_000;
+    const [station] = revalidateStationFreshness(cachedStations, cacheHitAt);
+
+    expect(cacheHitAt - cachedAt).toBeLessThan(90_000);
+    expect(cachedStations[0].isActive).toBe(true);
+    expect(station.isActive).toBe(false);
+    expect(station.temperature).toBe(18.5);
+    expect(station.humidity).toBe(72);
+    expect(station.updatedAt).toBe(updatedAt);
   });
 });
 
