@@ -43,6 +43,7 @@ import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
 import { summarizePrecipitationModels } from "../../shared/precipitationConsensus";
 import { legacyStabilityLabelForStorage } from "../legacyStabilityStorage";
 import { collectNearbyStations, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
+import { getStationMeasurementAgeStates } from "../stationMeasurementFreshness";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, type ExtendedRegime, type MultiRegimeResult } from "../fusionEngine";
@@ -1458,6 +1459,10 @@ export const weatherRouter = router({
           stationId: s.stationId,
           name: s.name,
           source: s.source,
+          observedAt: s.observedAt,
+          measurementTimes: s.measurementTimes,
+          measurementAgeByField: s.measurementAgeByField,
+          fieldWeights: s.fieldWeights,
           distanceKm: s.distanceKm,
           weight: s.weight,
           distanceWeight: s.distanceWeight,
@@ -1501,6 +1506,8 @@ export const weatherRouter = router({
           windDirection: s.windDirection,
           precipitation: s.precipitation,
           updatedAt: s.updatedAt,
+          measurementTimes: s.measurementTimes ?? null,
+          measurementAgeByField: getStationMeasurementAgeStates(s.measurementTimes),
           reliabilityScore: s.reliabilityScore,
           updateFrequencyMin: s.updateFrequencyMin,
           dataAvailability: s.dataAvailability,
@@ -1554,6 +1561,10 @@ export const weatherRouter = router({
           stationId: s.stationId,
           name: s.name,
           source: s.source,
+          observedAt: s.observedAt,
+          measurementTimes: s.measurementTimes,
+          measurementAgeByField: s.measurementAgeByField,
+          fieldWeights: s.fieldWeights,
           distanceKm: s.distanceKm,
           weight: s.weight,
           distanceWeight: s.distanceWeight,

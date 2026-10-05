@@ -107,6 +107,33 @@ describe("buildCurrentDashboardWeatherState", () => {
     expect(build([staleTime]).fields.temperature).toMatchObject({ value: 25, provenance: { kind: "open_meteo_snapshot" } });
   });
 
+  it("expose les températures anciennes/inconnues sans les fusionner et conserve les champs frais de ces stations", () => {
+    const unknownTime = station({
+      stationId: "mf-unknown-temperature",
+      temperature: 18,
+      humidity: 80,
+      measurementTimes: { ...station().measurementTimes, temperature: null, humidity: freshAt },
+    });
+    const staleTime = station({
+      stationId: "mf-stale-temperature",
+      temperature: 35,
+      humidity: 40,
+      measurementTimes: {
+        ...station().measurementTimes,
+        temperature: new Date(nowMs - 90 * 60_000).toISOString(),
+        humidity: freshAt,
+      },
+    });
+    const state = build([unknownTime, staleTime]);
+
+    expect(state.fields.temperature).toMatchObject({ value: 25, provenance: { kind: "open_meteo_snapshot" } });
+    expect(state.fields.temperature.observations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stationId: "mf-unknown-temperature", value: 18, ageStatus: "unknown", ageMinutes: null, contributes: false }),
+      expect.objectContaining({ stationId: "mf-stale-temperature", value: 35, ageStatus: "known", ageMinutes: 90, contributes: false }),
+    ]));
+    expect(state.fields.humidity).toMatchObject({ value: 60, provenance: { kind: "physical_stations", stationCount: 2 } });
+  });
+
   it("retourne indisponible lorsqu’il n’y a ni station physique ni snapshot modèle", () => {
     const state = buildCurrentDashboardWeatherState({ lat: 50.75, lon: 2.52, snapshot: null, stations: [], nowMs });
     expect(state.fields.temperature).toMatchObject({ value: null, provenance: { kind: "unavailable" } });

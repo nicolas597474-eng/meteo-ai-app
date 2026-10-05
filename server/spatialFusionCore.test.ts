@@ -6,13 +6,23 @@ import { calculateUltraLocal } from "./ultraLocalService";
 
 const now = new Date().toISOString();
 function station(overrides: Partial<StationData>): StationData {
+  const updatedAt = overrides.updatedAt ?? now;
   return {
     stationId: "station", source: "meteofrance", name: "Station physique",
     lat: 50.75, lon: 2.52, altitude: 40, distanceKm: 1,
     temperature: 20, humidity: 60, pressure: 1015, windSpeed: 10, windGust: 15,
-    windDirection: 180, precipitation: 0, updatedAt: now, reliabilityScore: 80,
+    windDirection: 180, precipitation: 0, updatedAt, reliabilityScore: 80,
     updateFrequencyMin: 10, dataAvailability: 0.95, isActive: true,
     qualificationStatus: "validated", sourceTier: 1, ...overrides,
+    measurementTimes: overrides.measurementTimes ?? {
+      temperature: updatedAt,
+      humidity: updatedAt,
+      pressure: updatedAt,
+      windSpeed: updatedAt,
+      windGust: updatedAt,
+      windDirection: updatedAt,
+      precipitation: updatedAt,
+    },
   };
 }
 
@@ -105,7 +115,7 @@ describe("noyau spatial commun", () => {
       id: item.stationId, name: item.name, distanceKm: item.distanceKm, altitude: item.altitude,
       temperature: item.temperature, humidity: item.humidity, pressure: item.pressure,
       windSpeed: item.windSpeed, windGust: item.windGust, precipitation: item.precipitation,
-      updatedAt: item.updatedAt, reliabilityScore: item.reliabilityScore, type: "station",
+      updatedAt: item.updatedAt, measurementTimes: item.measurementTimes, reliabilityScore: item.reliabilityScore, type: "station",
     }));
     const advanced = computeFusion(sources, {
       maxDistanceKm: 20, maxFreshnessMin: 120, minReliabilityScore: 30,

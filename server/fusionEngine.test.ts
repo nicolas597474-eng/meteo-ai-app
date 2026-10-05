@@ -8,6 +8,7 @@ function station(
   temperature: number,
   updatedAt = new Date()
 ): FusionSource {
+  const observedAt = updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt;
   return {
     id,
     name: id,
@@ -17,6 +18,15 @@ function station(
     pressure: 1015,
     windSpeed: 12,
     updatedAt,
+    measurementTimes: {
+      temperature: observedAt,
+      humidity: observedAt,
+      pressure: observedAt,
+      windSpeed: observedAt,
+      windGust: observedAt,
+      windDirection: observedAt,
+      precipitation: observedAt,
+    },
     reliabilityScore: 85,
     maeTemp: 1,
     type: "station",
@@ -75,6 +85,49 @@ describe("computeFusion — fusion IDW avancée", () => {
     // normalisées distance/qualité/fraîcheur du noyau spatial commun.
     expect(result.temperature!).toBeLessThan(15);
     expect(result.usedSources[0]?.name).toBe("proche");
+  });
+
+  it("qualifie chaque mesure station avec son horodatage propre et conserve les autres champs frais", () => {
+    const now = Date.now();
+    const recent = new Date(now - 5 * 60_000).toISOString();
+    const old = new Date(now - 31 * 60_000).toISOString();
+    const source = (id: string, temperature: number, humidity: number, temperatureAt: string | null): FusionSource => ({
+      ...station(id, 1, temperature, new Date(now)),
+      humidity,
+      updatedAt: recent,
+      measurementTimes: {
+        temperature: temperatureAt,
+        humidity: recent,
+        pressure: null,
+        windSpeed: recent,
+        windGust: null,
+        windDirection: null,
+        precipitation: null,
+      },
+    });
+    const result = computeFusion([
+      source("fresh", 20, 80, recent),
+      source("old-temperature", 50, 20, old),
+      source("unknown-temperature", 80, 40, null),
+    ], {
+      referenceAt: now,
+      maxFreshnessMin: 30,
+      altitudeCorrectionEnabled: false,
+      anomalyDetectionEnabled: false,
+      modelWeightFraction: 0,
+    });
+
+    expect(result.temperature).toBe(20);
+    expect(result.humidity).toBe(46.7);
+    expect(result.stationCount).toBe(1);
+    const oldTemperature = result.usedSources.find((item) => item.id === "old-temperature")!;
+    const unknownTemperature = result.usedSources.find((item) => item.id === "unknown-temperature")!;
+    expect(oldTemperature.fieldWeights?.temperature).toBeUndefined();
+    expect(oldTemperature.fieldWeights?.humidity).toBeGreaterThan(0);
+    expect(oldTemperature.measurementObservations?.temperature).toMatchObject({ value: 50, ageStatus: "known", contributes: false });
+    expect(unknownTemperature.fieldWeights?.temperature).toBeUndefined();
+    expect(unknownTemperature.fieldWeights?.humidity).toBeGreaterThan(0);
+    expect(unknownTemperature.measurementObservations?.temperature).toMatchObject({ value: 80, observedAt: null, ageMinutes: null, ageStatus: "unknown", contributes: false });
   });
 
   it("évalue la fraîcheur d’un run à l’instant de référence de sa fusion", () => {

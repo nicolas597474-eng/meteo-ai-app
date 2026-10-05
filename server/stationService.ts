@@ -22,12 +22,12 @@ import { WEATHER_SERVICES } from "./weatherServices";
 import type { CurrentModelReference } from "./modelReferenceCoherence";
 import {
   buildNormalizedSpatialWeights,
-  evaluateSpatialQuality,
   SPATIAL_FUSION_COMPONENT_SHARES,
   SPATIAL_FUSION_DISTANCE_EPSILON_KM,
   SPATIAL_FUSION_IDW_EXPONENT,
 } from "./spatialFusionCore";
 import { getStationRankingScore } from "./stationRankingScore";
+import { evaluateStationFieldQuality, getStationMeasurementAgeState, getStationMeasurementAgeStates, getValidStationMeasurementTimestamp, hasFreshStationMeasurement, type StationFieldQualityResult, type StationMeasurementField, type StationMeasurementTimes } from "./stationMeasurementFreshness";
 
 export const HONDEGHEM = { lat: 50.7567, lon: 2.5204 };
 
@@ -61,7 +61,7 @@ export type StationData = {
   precipitation: number | null;
   updatedAt: string | null; // ISO timestamp
   /** Provider-reported measurement time per variable where available. */
-  measurementTimes?: Partial<Record<"temperature" | "humidity" | "pressure" | "windSpeed" | "windGust" | "windDirection" | "precipitation", string | null>>;
+  measurementTimes?: StationMeasurementTimes;
   reliabilityScore: number; // 0-100
   updateFrequencyMin: number;
   dataAvailability: number; // 0-1
@@ -115,6 +115,9 @@ export type StationContribution = {
   /** Source-reported measurement time; never the snapshot collection/archive time. */
   observedAt: string | null;
   measurementTimes: StationData["measurementTimes"] | null;
+  measurementAgeByField?: ReturnType<typeof getStationMeasurementAgeStates>;
+  /** Weights keyed by the field whose own observation time qualified it. */
+  fieldWeights?: Partial<Record<StationMeasurementField, number>>;
   distanceKm: number;
   weight: number; // 0-1 final weight
   distanceWeight: number; // part normalisée de la composante distance
@@ -688,91 +691,128 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
       reason: s.exclusionReason ?? "Raison inconnue",
     }));
 
-  if (active.length === 0) {
-    return {
-      temperature: null, humidity: null, pressure: null,
-      windSpeed: null, windGust: null, precipitation: null,
-      stationsUsed: [], stationsIgnored: ignored,
-      stationCount: 0, confidenceScore: 0,
-    };
-  }
-
-  // Le Ground Truth partage le QC et le noyau spatial de référence avec les
-  // modes Local/Ultra-local. Ses contraintes restent celles de la collecte
-  // physique (180 min, fiabilité >= 40, pas de correction d’altitude sans
-  // altitude connue du point favori).
   const now = Date.now();
-  const spatialQc = evaluateSpatialQuality(active.map((station) => ({ ...station, id: station.stationId })), {
+  const fields = ["temperature", "humidity", "pressure", "windSpeed", "windGust", "precipitation"] as const;
+  type GroundTruthField = (typeof fields)[number];
+  type GroundTruthSpatialSource = StationData & { id: string };
+  const sourceById = new Map(active.map((station) => [station.stationId, station]));
+  const spatialSources = active.map((station) => ({ ...station, id: station.stationId }));
+  // Le Ground Truth conserve le cutoff existant de 180 min et les filtres
+  // distance/fiabilité/cohérence; seul le champ dont la date est testée change.
+  const qcByField = new Map<GroundTruthField, Map<string, StationFieldQualityResult<GroundTruthSpatialSource>>>();
+  type FieldWeight = { finalWeight: number; distanceWeight: number; qualityWeight: number; freshnessWeight: number };
+  const weightsByField = new Map<GroundTruthField, Map<string, FieldWeight>>();
+  const qualifiedByField = new Map<GroundTruthField, Set<string>>();
+  const qcOptions = {
     now,
     maxDistanceKm: Math.max(...active.map((station) => station.distanceKm), 0),
     maxFreshnessMin: 180,
     minReliabilityScore: 40,
     maxTempDeviationC: 8,
-  });
-  const qualified = spatialQc.filter((result) => result.passed);
-  ignored.push(...spatialQc.filter((result) => !result.passed).map((result) => ({
-    stationId: result.source.stationId,
-    name: result.source.name,
-    source: result.source.source,
-    distanceKm: result.source.distanceKm,
-    reason: result.checks.filter((check) => !check.passed).map((check) => check.reason).join(" ; "),
-  })));
-  if (qualified.length === 0) {
-    return {
-      temperature: null, humidity: null, pressure: null,
-      windSpeed: null, windGust: null, precipitation: null,
-      stationsUsed: [], stationsIgnored: ignored,
-      stationCount: 0, confidenceScore: 0,
-    };
-  }
-  const activeQualified = qualified.map((result) => result.source);
-  const weights = buildNormalizedSpatialWeights(activeQualified, { now });
-  const weightsByStationId = new Map(weights.map((weight) => [weight.source.stationId, weight]));
-
-  const contributions: StationContribution[] = activeQualified.map((s) => {
-    const weight = weightsByStationId.get(s.stationId)!;
-    return {
-    stationId: s.stationId,
-    name: s.name,
-    source: s.source,
-    observedAt: s.updatedAt,
-    measurementTimes: s.measurementTimes ?? null,
-    distanceKm: s.distanceKm,
-    weight: Math.round(weight.finalWeight * 1000) / 1000,
-    distanceWeight: Math.round(weight.distanceWeight * 1000) / 1000,
-    qualityWeight: Math.round(weight.qualityWeight * 1000) / 1000,
-    freshnessWeight: Math.round(weight.freshnessWeight * 1000) / 1000,
-    temperature: s.temperature,
-    humidity: s.humidity,
-    pressure: s.pressure,
-    windSpeed: s.windSpeed,
-    windGust: s.windGust,
-    precipitation: s.precipitation,
   };
-  });
 
-  // Weighted average for each variable
-  function weightedAvg(field: keyof Pick<StationData, "temperature" | "humidity" | "pressure" | "windSpeed" | "windGust" | "precipitation">): number | null {
-    let sum = 0, wSum = 0;
-    activeQualified.forEach((s) => {
-      const v = s[field];
-      if (typeof v === "number" && Number.isFinite(v)) {
-        const weight = weightsByStationId.get(s.stationId)!.finalWeight;
-        sum += v * weight;
-        wSum += weight;
-      }
-    });
-    return wSum > 0 ? Math.round((sum / wSum) * 10) / 10 : null;
+  for (const field of fields) {
+    const qc = evaluateStationFieldQuality(spatialSources, field, qcOptions);
+    qcByField.set(field, new Map(qc.map((result) => [result.source.stationId, result])));
+    const passed = qc.filter((result) => result.passed);
+    const timedSources = passed.map((result) => ({
+      ...result.source,
+      updatedAt: getValidStationMeasurementTimestamp(result.source.measurementTimes, field, now),
+    }));
+    const weights = buildNormalizedSpatialWeights(timedSources, { now });
+    weightsByField.set(field, new Map(weights.map((weight) => [weight.source.stationId, {
+      finalWeight: weight.finalWeight,
+      distanceWeight: weight.distanceWeight,
+      qualityWeight: weight.qualityWeight,
+      freshnessWeight: weight.freshnessWeight,
+    }])));
+    qualifiedByField.set(field, new Set(passed.map((result) => result.source.stationId)));
   }
 
-  // Confidence: higher when more stations agree (low std dev) and many stations
-  const temps = activeQualified.map(s => s.temperature).filter((v): v is number => Number.isFinite(v));
+  const usedStationIds = new Set(Array.from(qualifiedByField.values()).flatMap((ids) => Array.from(ids)));
+  const temperatureIds = qualifiedByField.get("temperature") ?? new Set<string>();
+  for (const station of active) {
+    if (usedStationIds.has(station.stationId)) continue;
+    const reasons: string[] = [];
+    for (const field of fields) {
+      const value = station[field];
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      if (!hasFreshStationMeasurement(station.measurementTimes, field, 180, now)) {
+        const age = getStationMeasurementAgeState(station.measurementTimes, field, now);
+        reasons.push(`${field}: ${age.status === "unknown" ? "âge inconnu" : `âge ${age.ageMinutes} min, au-delà de 180 min`}`);
+        continue;
+      }
+      const failed = qcByField.get(field)?.get(station.stationId);
+      if (failed && !failed.passed) reasons.push(`${field}: ${failed.checks.filter((check) => !check.passed).map((check) => check.reason).join(", ")}`);
+    }
+    const activationDataExists = Number.isFinite(station.temperature) || Number.isFinite(station.windSpeed) || Number.isFinite(station.precipitation);
+    ignored.push({
+      stationId: station.stationId,
+      name: station.name,
+      source: station.source,
+      distanceKm: station.distanceKm,
+      reason: !activationDataExists
+        ? "Aucune mesure exploitable"
+        : reasons.join(" ; ") || "Aucune mesure datée et fraîche qualifiée par variable.",
+    });
+  }
+
+  function weightedAvg(field: GroundTruthField): number | null {
+    let sum = 0;
+    let weightSum = 0;
+    const fieldWeights = weightsByField.get(field);
+    fieldWeights?.forEach((weight, stationId) => {
+      const value = sourceById.get(stationId)?.[field];
+      if (typeof value !== "number" || !Number.isFinite(value)) return;
+      sum += value * weight.finalWeight;
+      weightSum += weight.finalWeight;
+    });
+    return weightSum > 0 ? Math.round((sum / weightSum) * 10) / 10 : null;
+  }
+
+  const contributions: StationContribution[] = Array.from(usedStationIds).map((stationId) => {
+    const station = sourceById.get(stationId)!;
+    const tempWeight = weightsByField.get("temperature")?.get(stationId);
+    const fieldWeights = Object.fromEntries(
+      fields.flatMap((field) => {
+        const weight = weightsByField.get(field)?.get(stationId);
+        return weight == null ? [] : [[field, Math.round(weight.finalWeight * 1000) / 1000]];
+      }),
+    ) as Partial<Record<StationMeasurementField, number>>;
+    return {
+      stationId: station.stationId,
+      name: station.name,
+      source: station.source,
+      observedAt: getValidStationMeasurementTimestamp(station.measurementTimes, "temperature", now),
+      measurementTimes: station.measurementTimes ?? null,
+      measurementAgeByField: getStationMeasurementAgeStates(station.measurementTimes, now),
+      fieldWeights,
+      distanceKm: station.distanceKm,
+      weight: Math.round((tempWeight?.finalWeight ?? 0) * 1000) / 1000,
+      distanceWeight: tempWeight?.distanceWeight ?? 0,
+      qualityWeight: tempWeight?.qualityWeight ?? 0,
+      freshnessWeight: tempWeight?.freshnessWeight ?? 0,
+      temperature: station.temperature,
+      humidity: station.humidity,
+      pressure: station.pressure,
+      windSpeed: station.windSpeed,
+      windGust: station.windGust,
+      precipitation: station.precipitation,
+    };
+  });
+
+  // Confidence remains temperature-specific; other variables cannot supply it.
+  const temperatureStations = Array.from(temperatureIds).flatMap((id) => {
+    const station = sourceById.get(id);
+    return station && typeof station.temperature === "number" && Number.isFinite(station.temperature) ? [station] : [];
+  });
+  const temps = temperatureStations.map((station) => station.temperature!);
   const tempMean = temps.length > 0 ? temps.reduce((a, b) => a + b) / temps.length : 0;
   const tempStd = temps.length > 1
     ? Math.sqrt(temps.reduce((s, v) => s + (v - tempMean) ** 2, 0) / temps.length)
     : 0;
-  const confidenceScore = Math.max(0, Math.min(100, Math.round(
-    100 - tempStd * 10 - Math.max(0, 5 - activeQualified.length) * 5
+  const confidenceScore = temperatureStations.length === 0 ? 0 : Math.max(0, Math.min(100, Math.round(
+    100 - tempStd * 10 - Math.max(0, 5 - temperatureStations.length) * 5
   )));
 
   return {
@@ -784,7 +824,7 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
     precipitation: weightedAvg("precipitation"),
     stationsUsed: contributions,
     stationsIgnored: ignored,
-    stationCount: activeQualified.length,
+    stationCount: temperatureIds.size,
     confidenceScore,
   };
 }

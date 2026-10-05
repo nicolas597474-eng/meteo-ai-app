@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calculateUltraLocal } from "./ultraLocalService";
+import { calculateUltraLocal, getUltraLocalConfig } from "./ultraLocalService";
 import type { StationData } from "./stationService";
 
 function station(overrides: Partial<StationData>): StationData {
+  const updatedAt = overrides.updatedAt !== undefined ? overrides.updatedAt : new Date().toISOString();
   return {
     stationId: "station",
     source: "meteofrance",
@@ -18,7 +19,7 @@ function station(overrides: Partial<StationData>): StationData {
     windGust: 15,
     windDirection: 180,
     precipitation: 0,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
     reliabilityScore: 80,
     updateFrequencyMin: 10,
     dataAvailability: 0.95,
@@ -26,6 +27,15 @@ function station(overrides: Partial<StationData>): StationData {
     qualificationStatus: "validated",
     sourceTier: 1,
     ...overrides,
+    measurementTimes: overrides.measurementTimes ?? {
+      temperature: updatedAt,
+      humidity: updatedAt,
+      pressure: updatedAt,
+      windSpeed: updatedAt,
+      windGust: updatedAt,
+      windDirection: updatedAt,
+      precipitation: updatedAt,
+    },
   };
 }
 
@@ -97,6 +107,50 @@ describe("calculateUltraLocal", () => {
     expect(result.confidenceByParameter.precipitation).not.toBeNull();
     expect(result.confidenceByParameter.windSpeed).not.toBeNull();
     expect(result.confidenceByParameter.windGust).not.toBeNull();
+  });
+
+  it.each(["local", "ultra-local"] as const)("filtre par champ dans le mode %s sans effacer les observations brutes", (mode) => {
+    const now = Date.now();
+    const recent = new Date(now - 5 * 60_000).toISOString();
+    const cutoff = getUltraLocalConfig(mode).config.maxFreshnessMin;
+    const old = new Date(now - (cutoff + 1) * 60_000).toISOString();
+    const result = calculateUltraLocal([
+      station({
+        stationId: "fresh",
+        temperature: 20,
+        humidity: 80,
+        updatedAt: recent,
+        measurementTimes: { temperature: recent, humidity: recent },
+      }),
+      station({
+        stationId: "old-temperature",
+        temperature: 50,
+        humidity: 20,
+        updatedAt: recent,
+        measurementTimes: { temperature: old, humidity: recent },
+      }),
+      station({
+        stationId: "unknown-temperature",
+        temperature: 80,
+        humidity: 40,
+        updatedAt: recent,
+        measurementTimes: { temperature: null, humidity: recent },
+      }),
+    ], mode, 50.75, 2.52, 40, null, { recordStationReadings: false });
+
+    expect(result.temperature).toBe(20);
+    expect(result.humidity).toBe(46.7);
+    expect(result.stationCount).toBe(1);
+    const oldTemperature = result.stationsUsed.find((item) => item.stationId === "old-temperature")!;
+    const unknownTemperature = result.stationsUsed.find((item) => item.stationId === "unknown-temperature")!;
+    expect(oldTemperature.temperature).toBe(50);
+    expect(oldTemperature.fieldWeights?.temperature).toBeUndefined();
+    expect(oldTemperature.fieldWeights?.humidity).toBeGreaterThan(0);
+    expect(unknownTemperature.temperature).toBe(80);
+    expect(unknownTemperature.observedAt).toBeNull();
+    expect(unknownTemperature.measurementAgeByField?.temperature).toMatchObject({ observedAt: null, ageMinutes: null, status: "unknown" });
+    expect(unknownTemperature.fieldWeights?.temperature).toBeUndefined();
+    expect(unknownTemperature.fieldWeights?.humidity).toBeGreaterThan(0);
   });
 
   it("limite strictement l’Ultra-local aux stations situées dans les 10 km", () => {

@@ -23,7 +23,8 @@
  * le MAE de manière statistiquement significative (p < 0.05, n >= 10 observations)
  */
 
-import { buildNormalizedSpatialWeights, evaluateSpatialQuality } from "./spatialFusionCore";
+import { buildNormalizedSpatialWeights } from "./spatialFusionCore";
+import { evaluateStationFieldQuality, getStationMeasurementAgeState, getValidStationMeasurementTimestamp, hasFreshStationMeasurement, type StationMeasurementField } from "./stationMeasurementFreshness";
 import {
   getEvidenceIneligibilityReason,
   regularizeModelPerformance,
@@ -55,6 +56,8 @@ export type FusionSource = {
   uvIndex?: number | null;
   visibility?: number | null;
   updatedAt?: Date | string | null;
+  /** Provider-reported time per station field; global updatedAt is never a field-time fallback. */
+  measurementTimes?: Partial<Record<StationMeasurementField, string | null>>;
   reliabilityScore?: number; // Prior source/réseau 0-100; pas une performance individuelle mesurée
   // Per-parameter historical MAE (lower = better, used for adaptive weighting)
   maeTemp?: number | null;
@@ -131,6 +134,16 @@ export type UsedSource = {
   altitudeAdjustmentC: number;
   temperature: number | null;
   adjustedTemperature: number | null;
+  measurementTimes?: Partial<Record<StationMeasurementField, string | null>> | null;
+  measurementObservations?: Partial<Record<StationMeasurementField, {
+    value: number | null;
+    observedAt: string | null;
+    ageMinutes: number | null;
+    ageStatus: "known" | "unknown";
+    contributes: boolean;
+  }>>;
+  fieldWeights?: Partial<Record<StationMeasurementField, number>>;
+  contributedParameters?: StationMeasurementField[];
 };
 
 export type ExcludedSource = {
@@ -730,6 +743,8 @@ export function computeFusion(
   // ── Step 1: Filter sources ──────────────────────────────────────────────────
   const excluded: ExcludedSource[] = [];
   const candidates: FusionSource[] = [];
+  const stationFields = ["temperature", "humidity", "pressure", "windSpeed", "windGust", "windDirection", "precipitation"] as const;
+  const originalStationById = new Map(sources.filter((source) => source.type === "station").map((source) => [source.id, source]));
 
   for (const s of sources) {
     // Distance filter
@@ -737,13 +752,42 @@ export function computeFusion(
       excluded.push({ id: s.id, name: s.name, reason: `Distance ${s.distanceKm.toFixed(1)}km > ${cfg.maxDistanceKm}km`, temperature: s.temperature ?? null });
       continue;
     }
-    // Freshness filter
-    const ageMin = s.updatedAt
-      ? (now - new Date(s.updatedAt).getTime()) / 60000
-      : 999;
-    if (ageMin > cfg.maxFreshnessMin) {
-      excluded.push({ id: s.id, name: s.name, reason: `Données trop anciennes (${Math.round(ageMin)} min > ${cfg.maxFreshnessMin} min)`, temperature: s.temperature ?? null });
-      continue;
+    let candidateSource = s;
+    if (s.type === "station") {
+      const observedFields = stationFields.flatMap((field) => {
+        const value = s[field];
+        const observedAt = getValidStationMeasurementTimestamp(s.measurementTimes, field, now);
+        return typeof value === "number" && Number.isFinite(value)
+          && observedAt != null && hasFreshStationMeasurement(s.measurementTimes, field, cfg.maxFreshnessMin, now)
+          ? [{ field, observedAt }]
+          : [];
+      });
+      if (observedFields.length === 0) {
+        excluded.push({ id: s.id, name: s.name, reason: "Aucune mesure station avec horodatage propre valide dans la fenêtre de fraîcheur du mode", temperature: s.temperature ?? null });
+        continue;
+      }
+      const newestFieldTime = observedFields
+        .map(({ observedAt }) => observedAt)
+        .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+      const temperatureTime = observedFields.find(({ field }) => field === "temperature")?.observedAt;
+      const fieldValues = Object.fromEntries(stationFields.map((field) => {
+        const value = s[field];
+        const isFresh = typeof value === "number" && Number.isFinite(value)
+          && hasFreshStationMeasurement(s.measurementTimes, field, cfg.maxFreshnessMin, now);
+        return [field, isFresh ? value : null];
+      })) as Pick<FusionSource, typeof stationFields[number]>;
+      // This representative time is used only for the legacy source-level trace;
+      // every field's QC and fusion weight below use its own measurement time.
+      candidateSource = { ...s, ...fieldValues, updatedAt: temperatureTime ?? newestFieldTime };
+    } else {
+      // Existing model/service freshness behavior is deliberately unchanged.
+      const ageMin = s.updatedAt
+        ? (now - new Date(s.updatedAt).getTime()) / 60000
+        : 999;
+      if (ageMin > cfg.maxFreshnessMin) {
+        excluded.push({ id: s.id, name: s.name, reason: `Données trop anciennes (${Math.round(ageMin)} min > ${cfg.maxFreshnessMin} min)`, temperature: s.temperature ?? null });
+        continue;
+      }
     }
     // Reliability filter
     const reliability = s.reliabilityScore ?? 50;
@@ -768,34 +812,52 @@ export function computeFusion(
         continue;
       }
     }
-    candidates.push(s);
+    candidates.push(candidateSource);
   }
 
-  // Les stations utilisent le QC spatial partagé avec Ground Truth et Ultra-local.
-  // Les modèles restent dans leur pipeline numérique propre et ne sont pas assimilés
-  // à des observations physiques.
+  // QC spatial indépendamment par variable; une mesure absente, inconnue ou
+  // périmée ne retire pas les autres champs datés de la même station.
   const preliminaryStations = candidates.filter(source => source.type === "station");
-  const spatialQc = evaluateSpatialQuality(preliminaryStations, {
-    now,
-    maxDistanceKm: cfg.maxDistanceKm,
-    maxFreshnessMin: cfg.maxFreshnessMin,
-    minReliabilityScore: cfg.minReliabilityScore,
-    maxTempDeviationC: cfg.maxTempDeviationC,
-    refAltitude: cfg.altitudeCorrectionEnabled ? cfg.refAltitude : null,
-  });
-  const rejectedStationIds = new Set(spatialQc.filter(result => !result.passed).map(result => result.source.id));
-  for (const result of spatialQc.filter(result => !result.passed)) {
+  const fieldQualityByField = new Map<StationMeasurementField, ReturnType<typeof evaluateStationFieldQuality<FusionSource>>>();
+  const qualifiedIdsByField = new Map<StationMeasurementField, Set<string>>();
+  for (const field of stationFields) {
+    const results = evaluateStationFieldQuality(preliminaryStations, field, {
+      now,
+      maxDistanceKm: cfg.maxDistanceKm,
+      maxFreshnessMin: cfg.maxFreshnessMin,
+      minReliabilityScore: cfg.minReliabilityScore,
+      maxTempDeviationC: cfg.maxTempDeviationC,
+      refAltitude: cfg.altitudeCorrectionEnabled ? cfg.refAltitude : null,
+    });
+    fieldQualityByField.set(field, results);
+    qualifiedIdsByField.set(field, new Set(results.filter((result) => result.passed).map((result) => result.source.id)));
+  }
+  const anyQualifiedStationIds = new Set(Array.from(qualifiedIdsByField.values()).flatMap((ids) => Array.from(ids)));
+  for (const source of preliminaryStations) {
+    if (anyQualifiedStationIds.has(source.id)) continue;
+    const failedReasons = Array.from(fieldQualityByField.values())
+      .flatMap((results) => results.filter((result) => result.source.id === source.id && !result.passed))
+      .flatMap((result) => result.checks.filter((check) => !check.passed).map((check) => check.reason));
     excluded.push({
-      id: result.source.id,
-      name: result.source.name,
-      reason: result.checks.filter(check => !check.passed).map(check => check.reason).join(" ; "),
-      temperature: result.source.temperature ?? null,
+      id: source.id,
+      name: source.name,
+      reason: failedReasons.join(" ; ") || "Aucune mesure station qualifiée par variable",
+      temperature: source.temperature ?? null,
     });
   }
-  if (rejectedStationIds.size > 0) {
-    for (let index = candidates.length - 1; index >= 0; index--) {
-      if (candidates[index].type === "station" && rejectedStationIds.has(candidates[index].id)) candidates.splice(index, 1);
-    }
+  for (let index = candidates.length - 1; index >= 0; index--) {
+    if (candidates[index].type === "station" && !anyQualifiedStationIds.has(candidates[index].id)) candidates.splice(index, 1);
+  }
+
+  // Sanitize fields rejected by their own QC without affecting other fields.
+  for (let index = 0; index < candidates.length; index++) {
+    const source = candidates[index];
+    if (source.type !== "station") continue;
+    const qualifiedFields = Object.fromEntries(stationFields.map((field) => [
+      field,
+      qualifiedIdsByField.get(field)?.has(source.id) ? source[field] : null,
+    ])) as Pick<FusionSource, typeof stationFields[number]>;
+    candidates[index] = { ...source, ...qualifiedFields };
   }
 
   if (candidates.length === 0) {
@@ -819,6 +881,7 @@ export function computeFusion(
   // ── Step 3-8: Poids spatiaux communs pour stations + fusion numérique ───────
   const stationsOnly = candidates.filter(s => s.type === "station");
   const modelsOnly = candidates.filter(s => s.type !== "station");
+  type StationFieldWeight = ReturnType<typeof buildNormalizedSpatialWeights<FusionSource>>[number];
   const regularizedPerformanceById = new Map<string, RegularizedPerformance>();
   const performanceGroups = new Map<string, { context: ModelPerformanceContext; sources: FusionSource[] }>();
   const performanceContextFor = (source: FusionSource) => source.performanceContext ?? cfg.performanceContext;
@@ -867,6 +930,23 @@ export function computeFusion(
     performanceMultiplierById,
     anomalyPenaltyById: penalties,
   });
+  const stationSpatialWeightsByField = new Map<StationMeasurementField, Map<string, StationFieldWeight>>();
+  for (const field of stationFields) {
+    const qualified = (fieldQualityByField.get(field) ?? []).filter((result) => result.passed);
+    const timedSources = qualified.map(({ source }) => ({
+      ...source,
+      updatedAt: getValidStationMeasurementTimestamp(source.measurementTimes, field, now),
+      temperature: field === "temperature" ? source.temperature : null,
+    }));
+    const weights = buildNormalizedSpatialWeights(timedSources, {
+      now,
+      refAltitude: cfg.altitudeCorrectionEnabled ? cfg.refAltitude : null,
+      idwExponent: cfg.idwExponent,
+      performanceMultiplierById,
+      anomalyPenaltyById: penalties,
+    });
+    stationSpatialWeightsByField.set(field, new Map(weights.map((weight) => [weight.source.id, weight])));
+  }
 
   function computeModelRawWeight(source: FusionSource): number {
     const ageMin = source.updatedAt ? Math.max(0, (now - new Date(source.updatedAt).getTime()) / 60000) : 30;
@@ -971,10 +1051,18 @@ export function computeFusion(
     "windGust" | "precipitation" | "cloudCover" | "dewPoint" | "uvIndex" | "visibility">
   ): number | null {
     let sum = 0, wSum = 0;
-    for (const { source, weight, altAdj } of allWeighted) {
+    for (const { source, weight: sourceWeight, altAdj: sourceAltAdj } of allWeighted) {
+      let weight = sourceWeight;
+      let altAdj = sourceAltAdj;
+      if (source.type === "station") {
+        const stationFieldWeight = stationSpatialWeightsByField.get(field as StationMeasurementField)?.get(source.id);
+        if (!stationFieldWeight) continue;
+        weight = stationFieldWeight.finalWeight * stationFraction;
+        altAdj = field === "temperature" ? stationFieldWeight.altitudeAdjustmentC : 0;
+      }
       const base = source[field];
       const v = field === "temperature" && source.type === "station" && base != null ? (base as number) + altAdj : base;
-      if (v != null) {
+      if (typeof v === "number" && Number.isFinite(v) && weight > 0) {
         sum += (v as number) * weight;
         wSum += weight;
       }
@@ -985,8 +1073,12 @@ export function computeFusion(
   // Wind direction: circular mean
   function circularMeanDeg(): number | null {
     let sinSum = 0, cosSum = 0, wSum = 0;
-    for (const { source, weight } of allWeighted) {
-      if (source.windDirection != null) {
+    for (const { source, weight: sourceWeight } of allWeighted) {
+      const stationWeight = source.type === "station"
+        ? stationSpatialWeightsByField.get("windDirection")?.get(source.id)?.finalWeight
+        : undefined;
+      const weight = source.type === "station" ? (stationWeight ?? 0) * stationFraction : sourceWeight;
+      if (typeof source.windDirection === "number" && Number.isFinite(source.windDirection) && weight > 0) {
         const rad = (source.windDirection * Math.PI) / 180;
         sinSum += Math.sin(rad) * weight;
         cosSum += Math.cos(rad) * weight;
@@ -1012,18 +1104,23 @@ export function computeFusion(
   const apparentTemp = weightedAvg("apparentTemp");
 
   // ── Step 10: Correction d’altitude déjà appliquée dans le noyau spatial ─────
-  const altitudeContributors = allWeighted.filter(weight => weight.source.type === "station" && weight.source.temperature != null && weight.weight > 0);
-  const altitudeTotal = altitudeContributors.reduce((sum, weight) => sum + weight.weight, 0);
+  const temperatureStationWeights = stationSpatialWeightsByField.get("temperature") ?? new Map<string, StationFieldWeight>();
+  const altitudeContributors = Array.from(temperatureStationWeights.values());
+  const altitudeTotal = altitudeContributors.reduce((sum, spatial) => sum + spatial.finalWeight * stationFraction, 0);
   const altitudeAdjustmentC = altitudeTotal > 0
-    ? altitudeContributors.reduce((sum, weight) => sum + weight.altAdj * weight.weight, 0) / altitudeTotal
+    ? altitudeContributors.reduce((sum, spatial) => sum + spatial.altitudeAdjustmentC * spatial.finalWeight * stationFraction, 0) / altitudeTotal
     : 0;
 
   // ── Step 11: Confidence score ────────────────────────────────────────────────
-  const stationCount = stationsOnly.length;
+  const stationCount = temperatureStationWeights.size;
   const modelCount = modelWeights.length;
-  const temps = allWeighted
-    .filter(weight => weight.source.temperature != null)
-    .map(weight => weight.source.temperature! + (weight.source.type === "station" ? weight.altAdj : 0));
+  const temps = [
+    ...Array.from(temperatureStationWeights.values()).flatMap((spatial) =>
+      spatial.adjustedTemperature == null ? [] : [spatial.adjustedTemperature]),
+    ...allWeighted.flatMap((entry) => entry.source.type !== "station" && typeof entry.source.temperature === "number" && Number.isFinite(entry.source.temperature)
+      ? [entry.source.temperature]
+      : []),
+  ];
   const tempMean = temps.length > 0 ? temps.reduce((a, b) => a + b, 0) / temps.length : 0;
   const tempStd = temps.length > 1
     ? Math.sqrt(temps.reduce((s, v) => s + Math.pow(v - tempMean, 2), 0) / temps.length)
@@ -1046,6 +1143,26 @@ export function computeFusion(
   // ── Build used sources list ──────────────────────────────────────────────────
   const usedSources: UsedSource[] = allWeighted.map(({ source: s, weight, rawWeight, robustnessWeight, distW, qualW, freshW, perfW, altAdj }) => {
     const performance = regularizedPerformanceById.get(s.id);
+    const rawStation = s.type === "station" ? originalStationById.get(s.id) : undefined;
+    const fieldWeights = s.type === "station"
+      ? Object.fromEntries(stationFields.flatMap((field) => {
+        const fieldWeight = stationSpatialWeightsByField.get(field)?.get(s.id)?.finalWeight;
+        return fieldWeight == null || fieldWeight <= 0 ? [] : [[field, Math.round(fieldWeight * stationFraction * 1_000_000_000) / 1_000_000_000]];
+      })) as Partial<Record<StationMeasurementField, number>>
+      : undefined;
+    const measurementObservations = s.type === "station"
+      ? Object.fromEntries(stationFields.map((field) => {
+        const age = getStationMeasurementAgeState(rawStation?.measurementTimes, field, now);
+        const rawValue = rawStation?.[field];
+        return [field, {
+          value: typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue : null,
+          observedAt: age.observedAt,
+          ageMinutes: age.ageMinutes,
+          ageStatus: age.status,
+          contributes: stationSpatialWeightsByField.get(field)?.has(s.id) ?? false,
+        }];
+      })) as UsedSource["measurementObservations"]
+      : undefined;
     return {
       id: s.id,
       name: s.name,
@@ -1067,6 +1184,10 @@ export function computeFusion(
       adjustedTemperature: s.temperature != null
         ? Math.round((s.temperature + altAdj) * 10) / 10
         : null,
+      measurementTimes: s.type === "station" ? s.measurementTimes ?? null : undefined,
+      measurementObservations,
+      fieldWeights,
+      contributedParameters: fieldWeights ? Object.keys(fieldWeights) as StationMeasurementField[] : undefined,
     };
   });
 

@@ -30,7 +30,8 @@ import { getPreviousReadings, recordStationReadings } from "./stationReadingsCac
  */
 
 import { StationData, StationContribution, StationExclusion, haversineKm } from "./stationService";
-import { buildNormalizedSpatialWeights, evaluateSpatialQuality } from "./spatialFusionCore";
+import { buildNormalizedSpatialWeights, type SpatialQualityCheck } from "./spatialFusionCore";
+import { evaluateStationFieldQuality, getStationMeasurementAgeState, getStationMeasurementAgeStates, getValidStationMeasurementTimestamp, hasFreshStationMeasurement, type StationFieldQualityResult, type StationMeasurementField } from "./stationMeasurementFreshness";
 
 export type LocalMode = "standard" | "local" | "ultra-local";
 
@@ -70,6 +71,8 @@ export type UltraLocalContribution = StationContribution & {
   qualityChecks: QualityCheck[];
   altitudeAdjustment: number; // °C correction for altitude
   adjustedTemperature: number | null; // temperature after altitude correction
+  /** Field-specific station weights; the legacy weight remains the temperature weight. */
+  fieldWeights?: Partial<Record<StationMeasurementField, number>>;
 };
 
 export type UltraLocalExclusion = StationExclusion & {
@@ -158,33 +161,22 @@ const MODE_CONFIG: Record<LocalMode, {
 
 // ─── Quality Verification ────────────────────────────────────────────────────
 
-function verifyStationQuality(
-  station: StationData,
-  allStations: StationData[],
-  config: typeof MODE_CONFIG["ultra-local"],
-  refAltitude: number | null
-): { passed: boolean; checks: QualityCheck[]; altAdj: number } {
-  const maxDistanceKm = Math.max(...config.radiusBands.map((band) => band.maxKm));
-  const evaluations = evaluateSpatialQuality(
-    allStations.filter((candidate) => candidate.isActive).map((candidate) => ({ ...candidate, id: candidate.stationId })),
-    {
-      maxDistanceKm,
-      maxFreshnessMin: config.maxFreshnessMin,
-      minReliabilityScore: config.minReliability,
-      maxTempDeviationC: config.maxTempDeviation,
-      refAltitude: config.altitudeCorrection ? refAltitude : null,
-    },
-  );
-  const evaluation = evaluations.find((candidate) => candidate.source.stationId === station.stationId);
-  if (!evaluation) {
-    return { passed: false, checks: [{ name: "Disponibilité", passed: false, value: "Station absente", threshold: "Station active" }], altAdj: 0 };
-  }
-  const labels = { distance: "Distance", freshness: "Fraîcheur", reliability: "Qualité historique", data: "Disponibilité", coherence: "Cohérence", altitude: "Altitude" } as const;
-  return {
-    passed: evaluation.passed,
-    checks: evaluation.checks.map((check) => ({ name: labels[check.code], passed: check.passed, value: check.value, threshold: check.threshold })),
-    altAdj: evaluation.altitudeAdjustmentC,
-  };
+const QUALITY_CHECK_LABELS: Record<SpatialQualityCheck["code"], string> = {
+  distance: "Distance",
+  freshness: "Fraîcheur",
+  reliability: "Qualité historique",
+  data: "Disponibilité",
+  coherence: "Cohérence",
+  altitude: "Altitude",
+};
+
+function mapSpatialChecks(checks: SpatialQualityCheck[]): QualityCheck[] {
+  return checks.map((check) => ({
+    name: QUALITY_CHECK_LABELS[check.code],
+    passed: check.passed,
+    value: check.value,
+    threshold: check.threshold,
+  }));
 }
 
 // ─── Microclimate Detection ──────────────────────────────────────────────────
@@ -279,155 +271,168 @@ export function calculateUltraLocal(
   options: { recordStationReadings?: boolean; inferReferenceAltitude?: boolean } = {},
 ): UltraLocalResult {
   const config = MODE_CONFIG[mode];
-
-  // Determine reference altitude from stations if not provided
   const effectiveAltitude = refAltitude ?? (options.inferReferenceAltitude === false
     ? null
     : stations.find(s => s.altitude != null && s.distanceKm < 5)?.altitude ?? null);
-
-  // Get previous readings for frozen-value / sudden-jump detection
+  const now = Date.now();
   const prevReadings = getPreviousReadings();
+  const fields = ["temperature", "humidity", "pressure", "windSpeed", "windGust", "precipitation"] as const;
+  type Field = (typeof fields)[number];
+  type SpatialSource = StationData & { id: string };
+  type QualifiedFieldStation = { station: StationData; checks: QualityCheck[]; altAdj: number };
+  type FieldWeight = {
+    station: StationData;
+    weight: number;
+    coreWeight: { distanceWeight: number; qualityWeight: number; freshnessWeight: number; altitudeAdjustmentC: number; adjustedTemperature: number | null };
+    band: string;
+    bandWeight: number;
+    checks: QualityCheck[];
+  };
+  const stationById = new Map(stations.map((station) => [station.stationId, station]));
+  const activeSources: SpatialSource[] = stations
+    .filter((station) => station.isActive && station.qualificationStatus !== "excluded")
+    .map((station) => ({ ...station, id: station.stationId }));
+  const qcOptions = {
+    now,
+    maxDistanceKm: Math.max(...config.radiusBands.map((band) => band.maxKm)),
+    maxFreshnessMin: config.maxFreshnessMin,
+    minReliabilityScore: config.minReliability,
+    maxTempDeviationC: config.maxTempDeviation,
+    refAltitude: config.altitudeCorrection ? effectiveAltitude : null,
+  };
+  const qcByField = new Map<Field, Map<string, StationFieldQualityResult<SpatialSource>>>();
+  const qualifiedByField = new Map<Field, QualifiedFieldStation[]>();
 
-  // Quality verification for all stations (enhanced with frozen/jump detection)
-  const verified: { station: StationData; passed: boolean; checks: QualityCheck[]; altAdj: number }[] =
-    stations.map(s => {
-      const result = verifyStationQuality(s, stations, config, effectiveAltitude);
-      // Additional check: frozen value detection from cache
-      if (s.temperature != null && prevReadings.size > 0) {
-        const prev = prevReadings.get(s.stationId);
-        if (prev) {
-          const ageMin = (Date.now() - prev.timestamp) / 60000;
-          const tempDelta = Math.abs(s.temperature - prev.temperature);
-          // Frozen: no change for > 60 min
-          if (ageMin > 60 && tempDelta < 0.01) {
-            result.checks.push({
-              name: "frozen_value",
-              passed: false,
-              value: `${s.temperature.toFixed(1)}°C inchangé depuis ${Math.round(ageMin)} min`,
-              threshold: "ΔT > 0.01°C en 60 min",
-            });
-            result.passed = false;
-          }
-          // Sudden jump: > 5°C in < 10 min
-          if (ageMin < 10 && tempDelta > 5) {
-            result.checks.push({
-              name: "sudden_jump",
-              passed: false,
-              value: `Δ${tempDelta.toFixed(1)}°C en ${Math.round(ageMin)} min`,
-              threshold: "ΔT < 5°C en 10 min",
-            });
-            result.passed = false;
-          }
+  for (const field of fields) {
+    const evaluations = evaluateStationFieldQuality(activeSources, field, qcOptions);
+    qcByField.set(field, new Map(evaluations.map((result) => [result.source.stationId, result])));
+    let qualified = evaluations.filter((result) => result.passed).map((result) => ({
+      station: stationById.get(result.source.stationId)!,
+      checks: mapSpatialChecks(result.checks),
+      altAdj: result.altitudeAdjustmentC,
+    }));
+
+    // History checks continue to apply only to the temperature observation;
+    // they cannot remove the same station's separately timestamped fields.
+    if (field === "temperature" && prevReadings.size > 0) {
+      qualified = qualified.filter((entry) => {
+        const previous = prevReadings.get(entry.station.stationId);
+        if (!previous || entry.station.temperature == null) return true;
+        const ageMin = (now - previous.timestamp) / 60_000;
+        const tempDelta = Math.abs(entry.station.temperature - previous.temperature);
+        if (ageMin > 60 && tempDelta < 0.01) {
+          entry.checks.push({
+            name: "frozen_value",
+            passed: false,
+            value: `${entry.station.temperature.toFixed(1)}°C inchangé depuis ${Math.round(ageMin)} min`,
+            threshold: "ΔT > 0.01°C en 60 min",
+          });
+          return false;
         }
-      }
-      return { station: s, passed: result.passed, checks: result.checks, altAdj: result.altAdj };
-    });
-
-  const activeStations = verified.filter(v => v.passed);
-  const excludedStations = verified.filter(v => !v.passed);
-
-  // Build exclusion list
-  const stationsIgnored: UltraLocalExclusion[] = excludedStations.map(v => ({
-    stationId: v.station.stationId,
-    name: v.station.name,
-    source: v.station.source,
-    distanceKm: v.station.distanceKm,
-    reason: v.checks.filter(c => !c.passed).map(c => `${c.name}: ${c.value} (seuil: ${c.threshold})`).join("; "),
-    temperature: v.station.temperature,
-    checks: v.checks,
-  }));
-
-  // Assign stations to radius bands
-  const bandBreakdown: BandBreakdown[] = config.radiusBands.map(band => {
-    const bandStations = activeStations.filter(
-      v => v.station.distanceKm >= band.minKm && v.station.distanceKm < band.maxKm
-    );
-    const temps = bandStations
-      .map(v => (v.station.temperature != null ? v.station.temperature + v.altAdj : null))
-      .filter((t): t is number => t != null);
-    return {
-      band: band.label,
-      minKm: band.minKm,
-      maxKm: band.maxKm,
-      allocatedWeight: band.weight,
-      effectiveWeight: band.weight, // will be recalculated
-      stationCount: bandStations.length,
-      avgTemperature: temps.length > 0 ? Math.round((temps.reduce((a, b) => a + b, 0) / temps.length) * 10) / 10 : null,
-    };
-  });
-
-  // Redistribute weights from empty bands
-  const bandsWithData = bandBreakdown.filter(b => b.stationCount > 0);
-  const emptyBandWeight = bandBreakdown
-    .filter(b => b.stationCount === 0)
-    .reduce((sum, b) => sum + b.allocatedWeight, 0);
-
-  if (bandsWithData.length > 0 && emptyBandWeight > 0) {
-    const totalActiveWeight = bandsWithData.reduce((sum, b) => sum + b.allocatedWeight, 0);
-    bandsWithData.forEach(b => {
-      b.effectiveWeight = b.allocatedWeight + (emptyBandWeight * (b.allocatedWeight / totalActiveWeight));
-    });
+        if (ageMin < 10 && tempDelta > 5) {
+          entry.checks.push({
+            name: "sudden_jump",
+            passed: false,
+            value: `Δ${tempDelta.toFixed(1)}°C en ${Math.round(ageMin)} min`,
+            threshold: "ΔT < 5°C en 10 min",
+          });
+          return false;
+        }
+        return true;
+      });
+    }
+    qualifiedByField.set(field, qualified);
   }
-  bandBreakdown.filter(b => b.stationCount === 0).forEach(b => { b.effectiveWeight = 0; });
 
-  // Calculate weighted temperature
+  function makeBandBreakdown(qualified: QualifiedFieldStation[], field: Field): BandBreakdown[] {
+    const breakdown = config.radiusBands.map((band) => {
+      const bandStations = qualified.filter(({ station }) => station.distanceKm >= band.minKm && station.distanceKm < band.maxKm);
+      const values = bandStations.flatMap(({ station, altAdj }) => {
+        const value = station[field];
+        if (typeof value !== "number" || !Number.isFinite(value)) return [];
+        return [field === "temperature" ? value + altAdj : value];
+      });
+      return {
+        band: band.label,
+        minKm: band.minKm,
+        maxKm: band.maxKm,
+        allocatedWeight: band.weight,
+        effectiveWeight: band.weight,
+        stationCount: bandStations.length,
+        avgTemperature: field === "temperature" && values.length > 0
+          ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10
+          : null,
+      };
+    });
+    const bandsWithData = breakdown.filter((band) => band.stationCount > 0);
+    const emptyWeight = breakdown.filter((band) => band.stationCount === 0).reduce((sum, band) => sum + band.allocatedWeight, 0);
+    if (bandsWithData.length > 0 && emptyWeight > 0) {
+      const activeWeight = bandsWithData.reduce((sum, band) => sum + band.allocatedWeight, 0);
+      bandsWithData.forEach((band) => {
+        band.effectiveWeight = band.allocatedWeight + (emptyWeight * (band.allocatedWeight / activeWeight));
+      });
+    }
+    breakdown.filter((band) => band.stationCount === 0).forEach((band) => { band.effectiveWeight = 0; });
+    return breakdown;
+  }
+
+  const temperatureQualified = qualifiedByField.get("temperature") ?? [];
+  const bandBreakdown = makeBandBreakdown(temperatureQualified, "temperature");
+
+  function weightsForField(field: Field, qualified: QualifiedFieldStation[], breakdown: BandBreakdown[]): Map<string, FieldWeight> {
+    const result = new Map<string, FieldWeight>();
+    for (const band of config.radiusBands) {
+      const bandInfo = breakdown.find((entry) => entry.band === band.label)!;
+      if (bandInfo.stationCount === 0) continue;
+      const bandStations = qualified.filter(({ station }) => station.distanceKm >= band.minKm && station.distanceKm < band.maxKm);
+      const timedSources = bandStations.map(({ station }) => ({
+        ...station,
+        id: station.stationId,
+        updatedAt: getValidStationMeasurementTimestamp(station.measurementTimes, field, now),
+        temperature: field === "temperature" ? station.temperature : null,
+      }));
+      const coreWeights = buildNormalizedSpatialWeights(timedSources, {
+        now,
+        refAltitude: config.altitudeCorrection ? effectiveAltitude : null,
+      });
+      bandStations.forEach((entry, index) => {
+        const core = coreWeights[index];
+        result.set(entry.station.stationId, {
+          station: entry.station,
+          weight: core.finalWeight * bandInfo.effectiveWeight,
+          coreWeight: {
+            distanceWeight: core.distanceWeight,
+            qualityWeight: core.qualityWeight,
+            freshnessWeight: core.freshnessWeight,
+            altitudeAdjustmentC: core.altitudeAdjustmentC,
+            adjustedTemperature: core.adjustedTemperature,
+          },
+          band: band.label,
+          bandWeight: bandInfo.effectiveWeight,
+          checks: entry.checks,
+        });
+      });
+    }
+    return result;
+  }
+
+  const weightsByField = new Map<Field, Map<string, FieldWeight>>();
+  for (const field of fields) {
+    const qualified = qualifiedByField.get(field) ?? [];
+    const breakdown = field === "temperature" ? bandBreakdown : makeBandBreakdown(qualified, field);
+    weightsByField.set(field, weightsForField(field, qualified, breakdown));
+  }
+
+  const temperatureWeights = weightsByField.get("temperature") ?? new Map<string, FieldWeight>();
   let weightedTemp = 0;
   let totalWeight = 0;
-  const contributions: UltraLocalContribution[] = [];
+  temperatureWeights.forEach((entry) => {
+    if (entry.coreWeight.adjustedTemperature == null || entry.weight <= 0) return;
+    weightedTemp += entry.coreWeight.adjustedTemperature * entry.weight;
+    totalWeight += entry.weight;
+  });
 
-  for (const band of config.radiusBands) {
-    const bandInfo = bandBreakdown.find(b => b.band === band.label)!;
-    if (bandInfo.stationCount === 0) continue;
-
-    const bandStations = activeStations.filter(
-      v => v.station.distanceKm >= band.minKm && v.station.distanceKm < band.maxKm
-    );
-
-    // Le QC commun est déjà appliqué. Le même noyau spatial normalisé sert
-    // désormais au Ground Truth et à l’Ultra-local ; les bandes restent les
-    // contraintes propres au mode Ultra-local, appliquées après l’IDW intra-bande.
-    const inBandWeights = buildNormalizedSpatialWeights(
-      bandStations.map(({ station }) => ({ ...station, id: station.stationId })),
-      { refAltitude: config.altitudeCorrection ? effectiveAltitude : null },
-    );
-
-      bandStations.forEach((v, i) => {
-        const coreWeight = inBandWeights[i];
-        const stationWeight = coreWeight.finalWeight * bandInfo.effectiveWeight;
-        const adjustedTemp = coreWeight.adjustedTemperature;
-
-      if (adjustedTemp != null) {
-        weightedTemp += adjustedTemp * stationWeight;
-        totalWeight += stationWeight;
-      }
-
-      contributions.push({
-        stationId: v.station.stationId,
-        name: v.station.name,
-        source: v.station.source,
-        observedAt: v.station.updatedAt,
-        measurementTimes: v.station.measurementTimes ?? null,
-        distanceKm: v.station.distanceKm,
-        weight: Math.round(stationWeight * 1000) / 1000,
-        distanceWeight: Math.round(coreWeight.distanceWeight * 1000) / 1000,
-        qualityWeight: Math.round(coreWeight.qualityWeight * 1000) / 1000,
-        freshnessWeight: Math.round(coreWeight.freshnessWeight * 1000) / 1000,
-        temperature: v.station.temperature,
-        humidity: v.station.humidity,
-        pressure: v.station.pressure,
-        windSpeed: v.station.windSpeed,
-        windGust: v.station.windGust,
-        precipitation: v.station.precipitation,
-        band: band.label,
-        bandWeight: bandInfo.effectiveWeight,
-        qualityChecks: v.checks,
-        altitudeAdjustment: Math.round(v.altAdj * 100) / 100,
-        adjustedTemperature: adjustedTemp != null ? Math.round(adjustedTemp * 10) / 10 : null,
-      });
-    });
-  }
-
-  // Add model contribution
+  // Add the existing model share only when a qualified station temperature exists.
   const effectiveModelWeight = config.modelWeight;
   if (modelTemperature != null && totalWeight > 0) {
     weightedTemp += modelTemperature * effectiveModelWeight;
@@ -440,26 +445,15 @@ export function calculateUltraLocal(
     : [];
   const microAdjustment = microFactors.reduce((sum, f) => sum + f.adjustment * f.confidence, 0);
 
-  // Final temperature
   let finalTemp: number | null = null;
   if (totalWeight > 0) {
     finalTemp = Math.round(((weightedTemp / totalWeight) + microAdjustment) * 10) / 10;
   }
-
-  // The contribution order follows distance bands, while activeStations retains input
-  // order. Resolve the weight by station id so each variable uses its own station's
-  // contribution rather than the contribution at the same array index.
-  const contributionWeightByStation = new Map(
-    contributions.map(contribution => [contribution.stationId, contribution.weight])
-  );
-  type NonTemperatureParameter = Exclude<UltraLocalParameter, "temperature">;
   type WeightedValue = { value: number; weight: number };
-
-  function weightedValues(field: NonTemperatureParameter): WeightedValue[] {
-    return activeStations.flatMap(({ station }) => {
-      const value = station[field] as number | null;
-      const weight = contributionWeightByStation.get(station.stationId) ?? 0;
-      return value != null && weight > 0 ? [{ value, weight }] : [];
+  function weightedValues(field: Exclude<UltraLocalParameter, "temperature">): WeightedValue[] {
+    return Array.from(weightsByField.get(field)?.values() ?? []).flatMap((entry) => {
+      const value = entry.station[field];
+      return typeof value === "number" && Number.isFinite(value) && entry.weight > 0 ? [{ value, weight: entry.weight }] : [];
     });
   }
 
@@ -487,9 +481,9 @@ export function calculateUltraLocal(
     return Math.max(0, Math.min(100, Math.round(100 - agreementPenalty - availabilityPenalty)));
   }
 
-  const temperatureValues: WeightedValue[] = contributions.flatMap((contribution) => {
-    const value = contribution.adjustedTemperature ?? contribution.temperature;
-    return value != null && contribution.weight > 0 ? [{ value, weight: contribution.weight }] : [];
+  const temperatureValues: WeightedValue[] = Array.from(temperatureWeights.values()).flatMap((entry) => {
+    const value = entry.coreWeight.adjustedTemperature;
+    return value != null && entry.weight > 0 ? [{ value, weight: entry.weight }] : [];
   });
   const confidenceByParameter: Record<UltraLocalParameter, number | null> = {
     temperature: confidenceForValues(temperatureValues, 4),
@@ -501,8 +495,87 @@ export function calculateUltraLocal(
   };
   const confidenceScore = confidenceByParameter.temperature;
 
+  // Keep one observation row per station used by any field. The legacy weight
+  // and its component scores remain temperature-specific; fieldWeights names
+  // the independently qualified variables.
+  const fieldWeightsByStation = new Map<string, Partial<Record<StationMeasurementField, number>>>();
+  for (const field of fields) {
+    weightsByField.get(field)?.forEach((entry, stationId) => {
+      const map = fieldWeightsByStation.get(stationId) ?? {};
+      map[field] = Math.round(entry.weight * 1000) / 1000;
+      fieldWeightsByStation.set(stationId, map);
+    });
+  }
+  const contributions: UltraLocalContribution[] = Array.from(fieldWeightsByStation.keys()).map((stationId) => {
+    const station = stationById.get(stationId)!;
+    const temperatureEntry = temperatureWeights.get(stationId);
+    const anyEntry = fields.map((field) => weightsByField.get(field)?.get(stationId)).find(Boolean)!;
+    return {
+      stationId,
+      name: station.name,
+      source: station.source,
+      observedAt: getValidStationMeasurementTimestamp(station.measurementTimes, "temperature", now),
+      measurementTimes: station.measurementTimes ?? null,
+      measurementAgeByField: getStationMeasurementAgeStates(station.measurementTimes, now),
+      fieldWeights: fieldWeightsByStation.get(stationId),
+      distanceKm: station.distanceKm,
+      weight: Math.round((temperatureEntry?.weight ?? 0) * 1000) / 1000,
+      distanceWeight: temperatureEntry ? Math.round(temperatureEntry.coreWeight.distanceWeight * 1000) / 1000 : 0,
+      qualityWeight: temperatureEntry ? Math.round(temperatureEntry.coreWeight.qualityWeight * 1000) / 1000 : 0,
+      freshnessWeight: temperatureEntry ? Math.round(temperatureEntry.coreWeight.freshnessWeight * 1000) / 1000 : 0,
+      temperature: station.temperature,
+      humidity: station.humidity,
+      pressure: station.pressure,
+      windSpeed: station.windSpeed,
+      windGust: station.windGust,
+      precipitation: station.precipitation,
+      band: temperatureEntry?.band ?? anyEntry.band,
+      bandWeight: temperatureEntry?.bandWeight ?? 0,
+      qualityChecks: temperatureEntry?.checks ?? [],
+      altitudeAdjustment: temperatureEntry ? Math.round(temperatureEntry.coreWeight.altitudeAdjustmentC * 100) / 100 : 0,
+      adjustedTemperature: temperatureEntry?.coreWeight.adjustedTemperature != null
+        ? Math.round(temperatureEntry.coreWeight.adjustedTemperature * 10) / 10
+        : null,
+    };
+  });
+
+  const usedIds = new Set(fieldWeightsByStation.keys());
+  const stationsIgnored: UltraLocalExclusion[] = stations.flatMap((station) => {
+    if (usedIds.has(station.stationId)) return [];
+    const checks: QualityCheck[] = [];
+    const reasons: string[] = [];
+    for (const field of fields) {
+      const value = station[field];
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      if (!hasFreshStationMeasurement(station.measurementTimes, field, config.maxFreshnessMin, now)) {
+        const age = getStationMeasurementAgeState(station.measurementTimes, field, now);
+        const detail = age.status === "unknown" ? "âge inconnu (horodatage propre absent ou invalide)" : `âge ${age.ageMinutes} min, au-delà du cutoff ${config.maxFreshnessMin} min`;
+        reasons.push(`${field}: ${detail}`);
+        checks.push({ name: `${field} — Fraîcheur`, passed: false, value: detail, threshold: `≤ ${config.maxFreshnessMin} min` });
+        continue;
+      }
+      const failed = qcByField.get(field)?.get(station.stationId);
+      if (failed && !failed.passed) {
+        const fieldChecks = mapSpatialChecks(failed.checks).filter((check) => !check.passed);
+        reasons.push(`${field}: ${fieldChecks.map((check) => `${check.name} (${check.value})`).join(", ")}`);
+        checks.push(...fieldChecks.map((check) => ({ ...check, name: `${field} — ${check.name}` })));
+      }
+    }
+    if (!station.isActive) reasons.unshift(station.exclusionReason ?? "Station inactive");
+    if (reasons.length === 0) reasons.push("Aucune mesure exploitable dans les variables prises en charge.");
+    return [{
+      stationId: station.stationId,
+      name: station.name,
+      source: station.source,
+      distanceKm: station.distanceKm,
+      reason: reasons.join("; "),
+      temperature: station.temperature,
+      checks,
+    }];
+  });
+
   // Generate explanation
-  const explanation = generateExplanation(mode, contributions, bandBreakdown, microFactors, finalTemp, modelTemperature);
+  const explanation = generateExplanation(mode, contributions.filter((contribution) => contribution.weight > 0), bandBreakdown, microFactors, finalTemp, modelTemperature);
 
   // Record current readings for next cycle's frozen/jump detection
   const readingsToRecord = stations
@@ -525,9 +598,7 @@ export function calculateUltraLocal(
     bandBreakdown,
     microclimateAdjustment: Math.round(microAdjustment * 10) / 10,
     microclimateFactors: microFactors,
-    stationCount: contributions.filter(
-      (contribution) => contribution.adjustedTemperature != null || contribution.temperature != null
-    ).length,
+    stationCount: temperatureWeights.size,
     confidenceScore,
     confidenceByParameter,
     explanation,

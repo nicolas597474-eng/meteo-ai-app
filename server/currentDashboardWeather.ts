@@ -1,7 +1,8 @@
 import { buildNormalizedSpatialWeights } from "./spatialFusionCore";
 import { calculateUltraLocal, getUltraLocalConfig } from "./ultraLocalService";
-import { getPhysicalActiveStations, type StationData, type StationSource } from "./stationService";
+import { getPhysicalActiveStations, getStationSourceKind, type StationData, type StationSource } from "./stationService";
 import type { CurrentWeatherSnapshot } from "./weatherServices";
+import { getStationMeasurementAgeState, hasFreshStationMeasurement } from "./stationMeasurementFreshness";
 
 export type CurrentDashboardFieldKey =
   | "temperature"
@@ -18,6 +19,17 @@ export type CurrentDashboardFieldKey =
 
 export type CurrentDashboardField = {
   value: number | string | null;
+  /** Raw finite station observations, including those with unknown/stale field age. */
+  observations?: Array<{
+    stationId: string;
+    stationName: string;
+    source: StationSource;
+    value: number;
+    observedAt: string | null;
+    ageMinutes: number | null;
+    ageStatus: "known" | "unknown";
+    contributes: boolean;
+  }>;
   provenance: {
     kind: "physical_stations" | "open_meteo_snapshot" | "unavailable";
     label: string;
@@ -29,6 +41,7 @@ export type CurrentDashboardField = {
     ageMinutes: number | null;
     reason: string | null;
     measurements: Array<{
+      stationId: string;
       stationName: string;
       source: StationSource;
       observedAt: string;
@@ -103,15 +116,19 @@ function getEligibleFieldStations(
     return { eligible: [], reason: "Aucune valeur physique exploitable pour ce champ." };
   }
   const withTime = withValue.flatMap((station) => {
-    const observedAt = station.measurementTimes?.[field];
-    const age = ageMinutes(observedAt, nowMs);
-    if (observedAt == null || age == null) return [];
-    return [{ station, observedAt, ageMinutes: age }];
+    const age = getStationMeasurementAgeState(station.measurementTimes, field, nowMs);
+    if (age.status !== "known" || age.observedAt == null || age.ageMinutes == null) return [];
+    return [{ station, observedAt: age.observedAt, ageMinutes: age.ageMinutes }];
   });
   if (withTime.length === 0) {
     return { eligible: [], reason: "Horodatage propre à la mesure absent, futur ou non fiable." };
   }
-  const fresh = withTime.filter((entry) => entry.ageMinutes <= MAX_LOCAL_FRESHNESS_MINUTES);
+  const fresh = withTime.filter((entry) => hasFreshStationMeasurement(
+    entry.station.measurementTimes,
+    field,
+    MAX_LOCAL_FRESHNESS_MINUTES,
+    nowMs,
+  ));
   if (fresh.length === 0) {
     return { eligible: [], reason: `Toutes les mesures dépassent la fraîcheur Locale établie (${MAX_LOCAL_FRESHNESS_MINUTES} min).` };
   }
@@ -190,6 +207,7 @@ function makeProvenance(
   contributions: Array<{ station: StationData; observedAt: string; ageMinutes: number }>,
 ): CurrentDashboardField["provenance"] {
   const measurements = contributions.map(({ station, observedAt, ageMinutes: age }) => ({
+    stationId: station.stationId,
     stationName: station.name,
     source: station.source,
     observedAt,
@@ -287,6 +305,25 @@ function aggregatePhysicalField(
   return aggregateOtherPhysicalField(field, eligible, options.nowMs);
 }
 
+function rawFieldObservations(field: PhysicalField, stations: StationData[], nowMs: number) {
+  return stations
+    .filter((station) => getStationSourceKind(station.source, station.stationId) === "physical" && station.qualificationStatus !== "excluded")
+    .flatMap((station) => {
+      const value = station[field];
+      if (typeof value !== "number" || !Number.isFinite(value)) return [];
+      const age = getStationMeasurementAgeState(station.measurementTimes, field, nowMs);
+      return [{
+        stationId: station.stationId,
+        stationName: station.name,
+        source: station.source,
+        value,
+        observedAt: age.observedAt,
+        ageMinutes: age.ageMinutes,
+        ageStatus: age.status,
+      }];
+    });
+}
+
 /**
  * Read-model for Dashboard present conditions only. Every physical field is
  * validated against its own value and measurement time; only temperature uses
@@ -307,8 +344,17 @@ export function buildCurrentDashboardWeatherState(input: {
     : null;
   const physicalOptions = { lat: input.lat, lon: input.lon, elevationM, nowMs };
   const fallback = (value: number | string | null, reason: string) => modelField(value, snapshot?.capturedAt, nowMs, reason);
-  const localOrFallback = (field: PhysicalField, modelValue: number | null, reason: string): CurrentDashboardField =>
-    aggregatePhysicalField(field, input.stations, physicalOptions) ?? fallback(modelValue, reason);
+  const localOrFallback = (field: PhysicalField, modelValue: number | null, reason: string): CurrentDashboardField => {
+    const aggregate = aggregatePhysicalField(field, input.stations, physicalOptions);
+    const contributingIds = new Set(aggregate?.provenance.kind === "physical_stations"
+      ? aggregate.provenance.measurements.map((measurement) => measurement.stationId)
+      : []);
+    const observations = rawFieldObservations(field, input.stations, nowMs).map((observation) => ({
+      ...observation,
+      contributes: contributingIds.has(observation.stationId),
+    }));
+    return { ...(aggregate ?? fallback(modelValue, reason)), observations };
+  };
   const tempReason = elevationM == null
     ? "Altitude du lieu absente du snapshot : le contrôle/correctif d’altitude n’est pas deviné."
     : "Aucune station physique ne passe les contrôles température/altitude existants.";
