@@ -105,7 +105,7 @@ const CONDITION_LABELS: Record<string, string> = {
   cloudy: "Nuageux", cloud_cover: "Ciel couvert", variable: "Temps variable",
   showers: "Averses", rainy: "Pluie", heavy_rain: "Pluie forte", thunderstorm: "Orages",
   storm: "Tempête", snow: "Neige", freezing_rain: "Pluie verglaçante", sleet: "Neige fondue",
-  frost: "Gel", deep_frost: "Vague de froid", clear_night: "Ciel dégagé", fog: "Brouillard",
+  frost: "Gel", deep_frost: "Gel intense", clear_night: "Ciel dégagé", fog: "Brouillard",
   wind_moderate: "Vent modéré", windy: "Vent fort",
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFusion, detectExtendedRegime, detectMultiRegime, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
+import { computeFusion, detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
 import { MODEL_FUSION_WEIGHT_CAP, normalizeModelWeightsWithCap, regularizeModelPerformance, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 function station(
@@ -348,5 +348,31 @@ describe("détection de régime sans valeurs météorologiques inventées", () =
     expect(typedRainMulti?.activeRegimes.map(({ id }) => id)).not.toContain("snow");
     expect(detectMultiRegime({ ...coldPrecipitation, precipitationType: "snow" })?.primaryRegime.id).toBe("snow");
     expect(detectMultiRegime({ ...coldPrecipitation, temperature: -1, precipitationType: "freezing_rain" })?.primaryRegime.id).toBe("freezing_rain");
+  });
+
+  it("n’émet plus de vague de froid et conserve gel, gel intense et vent fort séparés", () => {
+    const isolatedCold = { ...complete, temperature: -1 };
+    const coldAndWindy = { ...complete, temperature: -4, windSpeed: 20 };
+
+    expect(detectExtendedRegime(isolatedCold)).toBe("frost");
+    expect(detectExtendedRegime(coldAndWindy)).toBe("frost");
+    for (const input of [isolatedCold, coldAndWindy]) {
+      const result = detectMultiRegime(input);
+      expect(result?.primaryRegime.id).not.toBe("cold_wave");
+      expect(result?.activeRegimes.map(({ id }) => id)).not.toContain("cold_wave");
+    }
+
+    const frostInput = { ...complete, temperature: -2, cloudCover: 65 };
+    const deepFrostInput = { ...complete, temperature: -6, cloudCover: 65 };
+    const windyInput = { ...complete, temperature: 10, windSpeed: 45, cloudCover: 65 };
+
+    expect(detectExtendedRegime(frostInput)).toBe("frost");
+    expect(EXTENDED_REGIME_INFO.frost.label).toBe("Gel");
+    expect(detectMultiRegime(frostInput)?.activeRegimes.map(({ id }) => id)).toContain("frost");
+    expect(detectExtendedRegime(deepFrostInput)).toBe("deep_frost");
+    expect(EXTENDED_REGIME_INFO.deep_frost.label).toBe("Gel intense");
+    expect(detectMultiRegime(deepFrostInput)?.activeRegimes.map(({ id }) => id)).toContain("deep_frost");
+    expect(detectExtendedRegime(windyInput)).toBe("windy");
+    expect(detectMultiRegime(windyInput)?.activeRegimes.map(({ id }) => id)).toContain("windy");
   });
 });

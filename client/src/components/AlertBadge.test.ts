@@ -40,4 +40,16 @@ describe("AlertBadge — preuve de pluie verglaçante", () => {
       )
     ).toBe("");
   });
+
+  it("ne traite pas une vague de froid ponctuelle comme une alerte", () => {
+    expect(isDangerousRegime("cold_wave")).toBe(false);
+    expect(
+      renderToStaticMarkup(
+        createElement(AlertBadge, {
+          regimeId: "cold_wave",
+          confidence: 100,
+        })
+      )
+    ).toBe("");
+  });
 });
