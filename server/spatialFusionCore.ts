@@ -74,6 +74,11 @@ export function evaluateSpatialQuality<T extends SpatialFusionSource>(
   const now = options.now ?? Date.now();
   const prelim = sources.map((source) => {
     const checks: SpatialQualityCheck[] = [];
+    const normalizedSource = {
+      ...source,
+      temperature: source.temperature == null ? source.temperature : Number.isFinite(source.temperature) ? source.temperature : null,
+      windSpeed: source.windSpeed == null ? source.windSpeed : Number.isFinite(source.windSpeed) ? source.windSpeed : null,
+    } as T;
     const distance = Number.isFinite(source.distanceKm) ? Math.max(0, source.distanceKm) : Number.POSITIVE_INFINITY;
     const distanceOk = distance <= options.maxDistanceKm;
     checks.push({ code: "distance", passed: distanceOk, value: Number.isFinite(distance) ? `${distance.toFixed(1)} km` : "inconnue", threshold: `≤ ${options.maxDistanceKm} km`, reason: "Distance hors périmètre" });
@@ -87,7 +92,7 @@ export function evaluateSpatialQuality<T extends SpatialFusionSource>(
     const reliabilityOk = reliability >= options.minReliabilityScore;
     checks.push({ code: "reliability", passed: reliabilityOk, value: `${Math.round(reliability)}/100`, threshold: `≥ ${options.minReliabilityScore}/100`, reason: "Priorité technique de source insuffisante" });
 
-    const dataOk = source.temperature != null || source.windSpeed != null;
+    const dataOk = Number.isFinite(normalizedSource.temperature) || Number.isFinite(normalizedSource.windSpeed);
     checks.push({ code: "data", passed: dataOk, value: dataOk ? "mesure présente" : "aucune mesure", threshold: "température ou vent", reason: "Aucune mesure exploitable" });
 
     let altitudeAdjustmentC = 0;
@@ -102,15 +107,15 @@ export function evaluateSpatialQuality<T extends SpatialFusionSource>(
       threshold: altitudeDifference == null ? "référence indisponible" : altitudeOk ? `correction ${altitudeAdjustmentC >= 0 ? "+" : ""}${altitudeAdjustmentC.toFixed(2)} °C` : `≤ ${options.maxAltitudeDifferenceM ?? 200} m`,
       reason: "Écart d’altitude excessif",
     });
-    return { source, checks, altitudeAdjustmentC };
+    return { source: normalizedSource, checks, altitudeAdjustmentC };
   });
 
   const prelimPassed = prelim.filter(({ checks }) => checks.every((check) => check.passed));
-  const temperatures = prelimPassed.map(({ source }) => source.temperature).filter((temperature): temperature is number => temperature != null).sort((a, b) => a - b);
+  const temperatures = prelimPassed.map(({ source }) => source.temperature).filter((temperature): temperature is number => Number.isFinite(temperature)).sort((a, b) => a - b);
   const median = temperatures.length >= 3 ? temperatures[Math.floor(temperatures.length / 2)] : null;
 
   return prelim.map((entry) => {
-    const temperature = entry.source.temperature;
+    const temperature = Number.isFinite(entry.source.temperature) ? entry.source.temperature! : null;
     const deviation = median != null && temperature != null ? Math.abs(temperature - median) : null;
     const coherenceOk = deviation == null || deviation <= options.maxTempDeviationC;
     entry.checks.push({
@@ -177,6 +182,9 @@ export function buildNormalizedSpatialWeights<T extends SpatialFusionSource>(
     const altitudeAdjustmentC = options.refAltitude != null && source.altitude != null
       ? -(((source.altitude - options.refAltitude) / 100) * SPATIAL_FUSION_LAPSE_RATE_C_PER_100M)
       : 0;
+    const temperature = typeof source.temperature === "number" && Number.isFinite(source.temperature)
+      ? source.temperature
+      : null;
     return {
       source,
       finalWeight: finalWeights[index],
@@ -186,7 +194,7 @@ export function buildNormalizedSpatialWeights<T extends SpatialFusionSource>(
       performanceWeight: Math.max(0, options.performanceMultiplierById?.get(source.id) ?? 1),
       anomalyPenalty: Math.max(0, Math.min(1, options.anomalyPenaltyById?.get(source.id) ?? 1)),
       altitudeAdjustmentC,
-      adjustedTemperature: source.temperature == null ? null : source.temperature + altitudeAdjustmentC,
+      adjustedTemperature: temperature == null ? null : temperature + altitudeAdjustmentC,
     };
   });
 }

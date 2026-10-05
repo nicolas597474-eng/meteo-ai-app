@@ -6,6 +6,7 @@ import {
   getCandidateStations,
   getPhysicalActiveStations,
   getStationSourceKind,
+  mapSynopRecord,
   mapMetarObservation,
   type StationData,
 } from "./stationService";
@@ -188,6 +189,74 @@ describe("getCandidateStations", () => {
   });
 });
 
+describe("mapSynopRecord", () => {
+  const record = {
+    numer_sta: "12345",
+    nom: "Station de test",
+    latitude: 50.76,
+    longitude: 2.52,
+    altitude: 40,
+    t: 293.15,
+    u: 70,
+    pres: 101325,
+    ff: 5,
+    raf10: 7,
+    dd: 180,
+    rr1: 0,
+    date: "2026-10-05T08:00:00Z",
+  };
+
+  it.each([
+    { sourceField: "t", stationField: "temperature", rawValue: "NaN" },
+    { sourceField: "u", stationField: "humidity", rawValue: "Infinity" },
+    { sourceField: "pres", stationField: "pressure", rawValue: "-Infinity" },
+    { sourceField: "ff", stationField: "windSpeed", rawValue: "NaN" },
+    { sourceField: "raf10", stationField: "windGust", rawValue: "Infinity" },
+    { sourceField: "dd", stationField: "windDirection", rawValue: "-Infinity" },
+    { sourceField: "rr1", stationField: "precipitation", rawValue: "NaN" },
+    { sourceField: "altitude", stationField: "altitude", rawValue: "Infinity" },
+    { sourceField: "t", stationField: "temperature", rawValue: Number.MAX_VALUE },
+    { sourceField: "ff", stationField: "windSpeed", rawValue: Number.MAX_VALUE },
+  ] as const)("convertit le champ SYNOP $sourceField non fini en null", ({ sourceField, stationField, rawValue }) => {
+    const station = mapSynopRecord({ ...record, [sourceField]: rawValue }, 50.76, 2.52, 20);
+
+    expect(station).not.toBeNull();
+    expect(station?.[stationField]).toBeNull();
+  });
+
+  it("n’active pas un enregistrement dont toutes les mesures activantes sont non finies", () => {
+    const station = mapSynopRecord({
+      ...record,
+      t: "NaN",
+      ff: "Infinity",
+      rr1: "-Infinity",
+    }, 50.76, 2.52, 20);
+
+    expect(station).toMatchObject({
+      temperature: null,
+      windSpeed: null,
+      precipitation: null,
+      isActive: false,
+      exclusionReason: "Aucune donnée disponible",
+    });
+  });
+
+  it("préserve les valeurs finies et leurs conversions existantes", () => {
+    const station = mapSynopRecord(record, 50.76, 2.52, 20);
+
+    expect(station).toMatchObject({
+      temperature: 20,
+      humidity: 70,
+      pressure: 1013,
+      windSpeed: 18,
+      windGust: 25.2,
+      windDirection: 180,
+      precipitation: 0,
+      isActive: true,
+    });
+  });
+});
+
 // ─── calculateGroundTruth ─────────────────────────────────────────────────────
 
 describe("calculateGroundTruth", () => {
@@ -269,6 +338,40 @@ describe("calculateGroundTruth", () => {
     expect(result.temperature).not.toBeNull();
     // humidity only from s2
     expect(result.humidity).toBe(70);
+  });
+
+  it.each([
+    "temperature",
+    "humidity",
+    "pressure",
+    "windSpeed",
+    "windGust",
+    "precipitation",
+  ] as const)("convertit la mesure non finie %s en absence avant contribution et moyenne", (field) => {
+    const result = calculateGroundTruth([
+      makeStation({ stationId: "finite", [field]: 20 }),
+      makeStation({ stationId: "non-finite", [field]: Number.POSITIVE_INFINITY }),
+    ]);
+
+    expect(result[field]).toBe(20);
+    expect(result.stationsUsed.find((station) => station.stationId === "non-finite")?.[field]).toBeNull();
+  });
+
+  it("n’active ni ne couvre une station dont les seules mesures activantes sont non finies", () => {
+    const result = calculateGroundTruth([
+      makeStation({
+        temperature: Number.NaN,
+        windSpeed: Number.POSITIVE_INFINITY,
+        precipitation: Number.NEGATIVE_INFINITY,
+      }),
+    ]);
+
+    expect(result.stationCount).toBe(0);
+    expect(result.stationsUsed).toHaveLength(0);
+    expect(result.temperature).toBeNull();
+    expect(result.windSpeed).toBeNull();
+    expect(result.precipitation).toBeNull();
+    expect(result.stationsIgnored[0]?.reason).toContain("Aucune mesure exploitable");
   });
 
   it("moves ignored stations to stationsIgnored list", () => {
