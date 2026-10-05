@@ -143,7 +143,7 @@ export type GroundTruthResult = {
   stationsUsed: StationContribution[];
   stationsIgnored: StationExclusion[];
   stationCount: number;
-  confidenceScore: number;
+  confidenceScore: number | null;
 };
 
 export type StationContribution = {
@@ -892,7 +892,7 @@ export function calculateGroundTruth(stations: StationData[]): GroundTruthResult
   const tempStd = temps.length > 1
     ? Math.sqrt(temps.reduce((s, v) => s + (v - tempMean) ** 2, 0) / temps.length)
     : 0;
-  const confidenceScore = temperatureStations.length === 0 ? 0 : Math.max(0, Math.min(100, Math.round(
+  const confidenceScore = temperatureStations.length === 0 ? null : Math.max(0, Math.min(100, Math.round(
     100 - tempStd * 10 - Math.max(0, 5 - temperatureStations.length) * 5
   )));
 

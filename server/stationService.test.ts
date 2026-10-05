@@ -342,12 +342,12 @@ describe("mapSynopRecord", () => {
 // ─── calculateGroundTruth ─────────────────────────────────────────────────────
 
 describe("calculateGroundTruth", () => {
-  it("returns zero confidence and null values when no active stations", () => {
+  it("returns null confidence and null values when no active stations", () => {
     const result = calculateGroundTruth([
       makeStation({ isActive: false, exclusionReason: "No data" }),
     ]);
     expect(result.stationCount).toBe(0);
-    expect(result.confidenceScore).toBe(0);
+    expect(result.confidenceScore).toBeNull();
     expect(result.temperature).toBeNull();
     expect(result.stationsIgnored).toHaveLength(1);
     expect(result.stationsUsed).toHaveLength(0);
@@ -363,6 +363,17 @@ describe("calculateGroundTruth", () => {
     expect(result.pressure).toBe(1015);
     expect(result.stationsUsed).toHaveLength(1);
     expect(result.stationsUsed[0].weight).toBeCloseTo(1.0, 1);
+    expect(result.confidenceScore).toBe(80);
+  });
+
+  it("conserve exactement le score existant lorsque des températures sont qualifiées", () => {
+    const result = calculateGroundTruth([
+      makeStation({ stationId: "a", temperature: 18 }),
+      makeStation({ stationId: "b", temperature: 20 }),
+    ]);
+    expect(result.stationCount).toBe(2);
+    expect(result.temperature).toBe(19);
+    expect(result.confidenceScore).toBe(75);
   });
 
   it("inclut une station pluie seule uniquement dans l’agrégat précipitation", () => {
@@ -380,7 +391,7 @@ describe("calculateGroundTruth", () => {
     expect(result.temperature).toBeNull();
     expect(result.windSpeed).toBeNull();
     expect(result.stationCount).toBe(0);
-    expect(result.confidenceScore).toBe(0);
+    expect(result.confidenceScore).toBeNull();
     expect(result.stationsUsed).toHaveLength(1);
     expect(result.stationsUsed[0].fieldWeights).toEqual({ precipitation: 1 });
     expect(result.stationsUsed[0].temperature).toBeNull();
@@ -415,6 +426,8 @@ describe("calculateGroundTruth", () => {
     expect(windOnly.windSpeed).toBe(12);
     expect(windOnly.precipitation).toBeNull();
     expect(windOnly.stationCount).toBe(0);
+    expect(windOnly.confidenceScore).toBeNull();
+    expect(windOnly.stationsUsed).toHaveLength(1);
     expect(windOnly.stationsUsed[0].fieldWeights).toEqual({ windSpeed: 1 });
   });
 
