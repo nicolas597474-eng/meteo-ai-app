@@ -4,7 +4,7 @@
  */
 import { MeteoIcon } from "@/components/MeteoIcon";
 
-export type DangerousRegimeId = "thunderstorm" | "storm" | "summer_heat" | "cold_wave" | "freezing_rain" | "windy";
+export type DangerousRegimeId = "thunderstorm" | "storm" | "summer_heat" | "freezing_rain" | "windy";
 
 interface DangerousRegimeConfig {
   colorClass: string;
@@ -39,14 +39,6 @@ const DANGEROUS_REGIMES: Record<DangerousRegimeId, DangerousRegimeConfig> = {
     pulseClass: "animate-pulse",
     meteoIconName: "summer_heat",
     label: "Alerte Canicule",
-  },
-  cold_wave: {
-    colorClass: "text-blue-300",
-    bgClass: "bg-blue-500/20",
-    borderClass: "border-blue-500/50",
-    pulseClass: "animate-pulse",
-    meteoIconName: "deep_frost",
-    label: "Alerte Vague de froid",
   },
   freezing_rain: {
     colorClass: "text-cyan-300",

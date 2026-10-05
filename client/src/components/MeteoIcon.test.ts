@@ -45,6 +45,12 @@ describe("MeteoIcon", () => {
     expect(source).toContain("style={shellSizeStyle}");
   });
 
+  it("garde une icône de gel intense sans alias vague de froid", () => {
+    expect(source).toContain('c === "deep_frost" || c === "gel intense"');
+    expect(source).not.toContain('c === "vague de froid"');
+    expect(source).not.toContain('c === "cold_wave"');
+  });
+
   it("respecte les variantes responsive cachées afin de ne jamais dupliquer une icône", () => {
     expect(styles).toContain(".meteo-icon-shell.hidden { display: none; }");
     expect(styles).toContain(".meteo-icon-shell.sm\\:block { display: block; }");

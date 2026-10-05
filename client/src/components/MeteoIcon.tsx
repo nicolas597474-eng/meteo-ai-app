@@ -224,9 +224,8 @@ export function getIconNameFromCondition(condition: string | null | undefined): 
   if (c === "snow" || c === "neige") return "snow";
   if (c === "frost" || c === "gel") return "frost";
   if (c === "freezing_rain" || c === "pluie verglaçante" || c === "verglas") return "freezing_rain";
-  if (c === "deep_frost" || c === "vague de froid") return "deep_frost";
+  if (c === "deep_frost" || c === "gel intense") return "deep_frost";
   if (c === "summer_heat" || c === "canicule") return "summer_heat";
-  if (c === "cold_wave") return "deep_frost";
   if (c === "storm" || c === "tempête") return "storm";
   if (c === "variable" || c === "temps variable") return "variable";
   if (c === "spring_unstable" || c === "printemps instable") return "spring_unstable";
@@ -479,7 +478,7 @@ const ICONS: Record<string, React.ReactNode> = {
     </>
   ),
 
-  // Vague de froid — thermomètre bleu
+  // Gel intense — thermomètre bleu
   deep_frost: (
     <>
       <rect x="28" y="8" width="8" height="40" rx="4" fill="#1e3a5f" stroke="#60a5fa" strokeWidth="1.5"/>

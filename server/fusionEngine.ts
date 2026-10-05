@@ -167,7 +167,6 @@ export type ExtendedRegime =
   | "freezing_rain"     // Pluie verglaçante explicitement typée par une source
   | "deep_frost"        // Gel intense (T < -5°C)
   | "summer_heat"       // Canicule (> 33°C)
-  | "cold_wave"         // Vague de froid (T < -2°C prolongé)
   | "storm"             // Tempête (vent > 60km/h)
   | "variable"          // Temps variable (conditions changeantes)
   | "spring_unstable"   // Printemps instable (alternance soleil/averses)
@@ -208,7 +207,6 @@ const EXTENDED_REGIME_WEIGHTS: Record<ExtendedRegime, RegimeWeights> = {
   freezing_rain:   { temp: 0.40, precip: 0.30, wind: 0.15, condition: 0.10, humidity: 0.03, pressure: 0.02 },
   deep_frost:      { temp: 0.55, precip: 0.10, wind: 0.15, condition: 0.10, humidity: 0.05, pressure: 0.05 },
   summer_heat:     { temp: 0.45, precip: 0.10, wind: 0.15, condition: 0.15, humidity: 0.10, pressure: 0.05 },
-  cold_wave:       { temp: 0.50, precip: 0.15, wind: 0.20, condition: 0.10, humidity: 0.03, pressure: 0.02 },
   storm:           { temp: 0.10, precip: 0.25, wind: 0.45, condition: 0.10, humidity: 0.05, pressure: 0.05 },
   variable:        { temp: 0.25, precip: 0.25, wind: 0.20, condition: 0.15, humidity: 0.10, pressure: 0.05 },
   spring_unstable: { temp: 0.25, precip: 0.30, wind: 0.15, condition: 0.15, humidity: 0.10, pressure: 0.05 },
@@ -245,7 +243,6 @@ export function detectExtendedRegime(params: {
   if (t <= 2 && p > 0 && precipitationType !== "rain") return "winter_precipitation_uncertain";
   if (t < -5) return "deep_frost";
   if (t < 0) return "frost";
-  if (t < -2 && w > 15) return "cold_wave";
   // Fog
   if (v < 1000 && h > 90) return "fog";
   // Precipitation regimes
@@ -291,11 +288,10 @@ export const EXTENDED_REGIME_INFO: Record<ExtendedRegime, Omit<ExtendedRegimeInf
   windy:           { label: "Vent fort",            emoji: "💨",  description: "Vents soutenus > 40 km/h.",                                                weights: EXTENDED_REGIME_WEIGHTS.windy },
   snow:            { label: "Neige",                emoji: "❄️",  description: "Phase neigeuse explicitement fournie par une source météo.",                  weights: EXTENDED_REGIME_WEIGHTS.snow },
   winter_precipitation_uncertain: { label: "Précipitations hivernales — phase incertaine", emoji: "🌧️", description: "Précipitations avec température ≤ 2°C ; la phase n’est pas fournie et reste incertaine.", weights: EXTENDED_REGIME_WEIGHTS.winter_precipitation_uncertain },
-  frost:           { label: "Verglas / Gel",        emoji: "🧊",  description: "Températures négatives sans précipitations — risque de gel.",               weights: EXTENDED_REGIME_WEIGHTS.frost },
+  frost:           { label: "Gel",        emoji: "🧊",  description: "Températures négatives sans précipitations — risque de gel.",               weights: EXTENDED_REGIME_WEIGHTS.frost },
   freezing_rain:   { label: "Pluie verglaçante",    emoji: "🌧",  description: "Phase de pluie verglaçante explicitement fournie par une source météo.",       weights: EXTENDED_REGIME_WEIGHTS.freezing_rain },
-  deep_frost:      { label: "Gel",                  emoji: "❄",   description: "Gel intense (T < -5°C) — froid extrême.",                                   weights: EXTENDED_REGIME_WEIGHTS.deep_frost },
+  deep_frost:      { label: "Gel intense",                  emoji: "❄",   description: "Gel intense (T < -5°C) — froid extrême.",                                   weights: EXTENDED_REGIME_WEIGHTS.deep_frost },
   summer_heat:     { label: "Canicule",             emoji: "🔥",  description: "Températures > 33°C, temps sec et calme.",                                  weights: EXTENDED_REGIME_WEIGHTS.summer_heat },
-  cold_wave:       { label: "Vague de froid",       emoji: "🧊",  description: "Températures très basses prolongées (< -2°C).",                             weights: EXTENDED_REGIME_WEIGHTS.cold_wave },
   storm:           { label: "Tempête",              emoji: "🌀",  description: "Vents violents > 60 km/h — paramètre critique.",                           weights: EXTENDED_REGIME_WEIGHTS.storm },
   variable:        { label: "Temps variable",       emoji: "🌦",  description: "Conditions changeantes, alternance de soleil et nuages.",                  weights: EXTENDED_REGIME_WEIGHTS.variable },
   spring_unstable: { label: "Printemps instable",   emoji: "🌸",  description: "Alternance soleil/averses typique du printemps.",                           weights: EXTENDED_REGIME_WEIGHTS.spring_unstable },
@@ -384,7 +380,6 @@ export function detectMultiRegime(params: {
     frost:           Math.max(0, Math.min(100, (t < 0 && p < 0.5 ? 50 + Math.min(50, (-t) * 10) : t < 2 ? (2 - t) * 20 : 0))),
     freezing_rain:   freezingRainScore,
     deep_frost:      Math.max(0, Math.min(100, (t < -5 ? 60 + Math.min(40, (-t - 5) * 5) : t < -2 ? (Math.abs(t) - 2) * 20 : 0))),
-    cold_wave:       Math.max(0, Math.min(100, (t < -2 && w > 15 ? 50 + Math.min(50, (-t) * 5 + w * 0.5) : t < 0 ? 20 : 0))),
     // Heat
     summer_heat:     Math.max(0, Math.min(100, (t > 33 ? 60 + Math.min(40, (t - 33) * 5) : t > 28 ? (t - 28) * 12 : 0))),
     // Fog
