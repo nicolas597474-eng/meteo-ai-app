@@ -17,7 +17,7 @@ import { getPreviousReadings, recordStationReadings } from "./stationReadingsCac
  * Quality verification before using a station:
  *   1. Freshness: last measurement must be recent (< 30 min for ultra-local)
  *   2. Coherence: temperature must not deviate > 5°C from neighbors
- *   3. Altitude: adjust for elevation differences
+ *   3. Altitude: adjust for elevation differences only with an explicit target altitude
  *   4. Priorité technique source : le score fixe du réseau doit atteindre le seuil
  *   5. Stability: no erratic jumps in recent readings
  *
@@ -26,7 +26,7 @@ import { getPreviousReadings, recordStationReadings } from "./stationReadingsCac
  *   - Valley cold pools
  *   - Forest cooling
  *   - Water body effects (sea, rivers)
- *   - Altitude corrections (-0.65°C per 100m)
+ *   - Altitude corrections (-0.65°C per 100m) only when the caller supplies a target altitude
  */
 
 import { StationData, StationContribution, StationExclusion, haversineKm } from "./stationService";
@@ -62,7 +62,20 @@ export type UltraLocalResult = {
   stationCount: number;
   confidenceScore: number | null;
   confidenceByParameter: Record<UltraLocalParameter, number | null>;
+  altitudeCorrection: AltitudeCorrectionProvenance;
   explanation: string;
+};
+
+export type AltitudeCorrectionProvenance = {
+  applied: boolean;
+  reason:
+    | "adjustment_applied"
+    | "adjustment_applied_with_unverifiable_stations"
+    | "reference_altitude_unavailable"
+    | "station_altitude_unavailable"
+    | "no_temperature_contributions"
+    | "no_altitude_difference"
+    | "mode_disabled";
 };
 
 export type UltraLocalContribution = StationContribution & {
@@ -83,6 +96,7 @@ export type UltraLocalExclusion = StationExclusion & {
 export type QualityCheck = {
   name: string;
   passed: boolean;
+  status?: "passed" | "failed" | "non_verifiable";
   value: string;
   threshold: string;
 };
@@ -171,12 +185,18 @@ const QUALITY_CHECK_LABELS: Record<SpatialQualityCheck["code"], string> = {
 };
 
 function mapSpatialChecks(checks: SpatialQualityCheck[]): QualityCheck[] {
-  return checks.map((check) => ({
-    name: QUALITY_CHECK_LABELS[check.code],
-    passed: check.passed,
-    value: check.value,
-    threshold: check.threshold,
-  }));
+  return checks.map((check) => {
+    const status = check.code === "altitude" && check.value === "non vérifiable"
+      ? "non_verifiable"
+      : check.passed ? "passed" : "failed";
+    return {
+      name: QUALITY_CHECK_LABELS[check.code],
+      passed: status === "passed",
+      status,
+      value: check.value,
+      threshold: check.threshold,
+    };
+  });
 }
 
 // ─── Microclimate Detection ──────────────────────────────────────────────────
@@ -268,12 +288,14 @@ export function calculateUltraLocal(
   refLon: number,
   refAltitude: number | null = null,
   modelTemperature: number | null = null,
-  options: { recordStationReadings?: boolean; inferReferenceAltitude?: boolean } = {},
+  options: {
+    recordStationReadings?: boolean;
+    /** Retained for caller compatibility; station-derived reference altitudes are never inferred. */
+    inferReferenceAltitude?: boolean;
+  } = {},
 ): UltraLocalResult {
   const config = MODE_CONFIG[mode];
-  const effectiveAltitude = refAltitude ?? (options.inferReferenceAltitude === false
-    ? null
-    : stations.find(s => s.altitude != null && s.distanceKm < 5)?.altitude ?? null);
+  const effectiveAltitude = refAltitude;
   const now = Date.now();
   const prevReadings = getPreviousReadings();
   const fields = ["temperature", "humidity", "pressure", "windSpeed", "windGust", "precipitation"] as const;
@@ -435,6 +457,29 @@ export function calculateUltraLocal(
   }
 
   const temperatureWeights = weightsByField.get("temperature") ?? new Map<string, FieldWeight>();
+  const temperatureContributors = Array.from(temperatureWeights.values()).filter((entry) => entry.weight > 0);
+  const altitudeKnownContributors = temperatureContributors.filter((entry) => entry.station.altitude != null);
+  const hasUnverifiableStationAltitude = temperatureContributors.some((entry) => entry.station.altitude == null);
+  const hasNonZeroAltitudeAdjustment = altitudeKnownContributors.some((entry) => entry.coreWeight.altitudeAdjustmentC !== 0);
+  let altitudeCorrection: AltitudeCorrectionProvenance;
+  if (!config.altitudeCorrection) {
+    altitudeCorrection = { applied: false, reason: "mode_disabled" };
+  } else if (effectiveAltitude == null) {
+    altitudeCorrection = { applied: false, reason: "reference_altitude_unavailable" };
+  } else if (temperatureContributors.length === 0) {
+    altitudeCorrection = { applied: false, reason: "no_temperature_contributions" };
+  } else if (hasNonZeroAltitudeAdjustment) {
+    altitudeCorrection = {
+      applied: true,
+      reason: hasUnverifiableStationAltitude
+        ? "adjustment_applied_with_unverifiable_stations"
+        : "adjustment_applied",
+    };
+  } else if (hasUnverifiableStationAltitude || altitudeKnownContributors.length === 0) {
+    altitudeCorrection = { applied: false, reason: "station_altitude_unavailable" };
+  } else {
+    altitudeCorrection = { applied: false, reason: "no_altitude_difference" };
+  }
   let weightedTemp = 0;
   let totalWeight = 0;
   temperatureWeights.forEach((entry) => {
@@ -567,7 +612,7 @@ export function calculateUltraLocal(
       }
       const failed = qcByField.get(field)?.get(station.stationId);
       if (failed && !failed.passed) {
-        const fieldChecks = mapSpatialChecks(failed.checks).filter((check) => !check.passed);
+        const fieldChecks = mapSpatialChecks(failed.checks).filter((check) => check.status !== "non_verifiable" && !check.passed);
         reasons.push(`${field}: ${fieldChecks.map((check) => `${check.name} (${check.value})`).join(", ")}`);
         checks.push(...fieldChecks.map((check) => ({ ...check, name: `${field} — ${check.name}` })));
       }
@@ -616,6 +661,7 @@ export function calculateUltraLocal(
     stationCount: temperatureWeights.size,
     confidenceScore,
     confidenceByParameter,
+    altitudeCorrection,
     explanation,
   };
 }
@@ -678,7 +724,7 @@ export function getUltraLocalConfig(mode: LocalMode) {
     description: mode === "ultra-local"
       ? "Utilise uniquement les stations situées dans les 10 km, avec priorité aux moins de 2 km (60%). Vérification stricte de la qualité et fraîcheur des données."
       : mode === "local"
-        ? "Utilise les stations situées dans les 30 km, avec priorité aux moins de 5 km (45%). Correction d'altitude activée."
+        ? "Utilise les stations situées dans les 30 km, avec priorité aux moins de 5 km (45%). L’altitude n’est corrigée qu’avec une référence explicite."
         : "Pondération équilibrée entre distance, qualité et fraîcheur. Rayon de 20 km.",
   };
 }

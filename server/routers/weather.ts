@@ -1456,6 +1456,7 @@ export const weatherRouter = router({
         windSpeed: ultraResult.windSpeed,
         windGust: ultraResult.windGust,
         precipitation: ultraResult.precipitation,
+        altitudeCorrection: ultraResult.altitudeCorrection,
         stationsUsed: ultraResult.stationsUsed.map(s => ({
           stationId: s.stationId,
           name: s.name,
@@ -1560,6 +1561,7 @@ export const weatherRouter = router({
         windSpeed: result.windSpeed,
         windGust: result.windGust,
         precipitation: result.precipitation,
+        altitudeCorrection: result.altitudeCorrection,
         stationsUsed: result.stationsUsed.map(s => ({
           stationId: s.stationId,
           name: s.name,
@@ -1619,7 +1621,13 @@ export const weatherRouter = router({
           // Unified engine — same as Mode Local in Dashboard
           const gt = calculateUltraLocal(ranked, "local", lat, lon, null, null);
           const used = gt.stationsUsed.find(s => s.stationId === input.stationId);
-          return used ? { weight: used.weight, distanceWeight: used.distanceWeight, qualityWeight: used.qualityWeight, freshnessWeight: used.freshnessWeight } : null;
+          return used ? {
+            weight: used.weight,
+            distanceWeight: used.distanceWeight,
+            qualityWeight: used.qualityWeight,
+            freshnessWeight: used.freshnessWeight,
+            altitudeCorrection: gt.altitudeCorrection,
+          } : null;
         })(),
       };
     }),

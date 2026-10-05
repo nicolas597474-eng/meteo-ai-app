@@ -8,6 +8,8 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).not.toContain("Prévision officielle consolidée");
     expect(source).toContain("Moyenne locale pondérée");
     expect(source).toContain("<LocalModelContributionNotice");
+    expect(source).toContain("<AltitudeCorrectionNotice correction={locationWeather.ultraLocal.altitudeCorrection}");
+    expect(source).toContain('"alt. corrigée" : "brute"');
     expect(source).toContain("isPlaceholderData={locationWeatherIsPlaceholder}");
     expect(source).toContain("modelContribution={locationWeather.ultraLocal.modelContribution}");
     expect(source).toContain("modelWeight={locationWeather.ultraLocal.modelWeight}");
@@ -42,7 +44,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("getCurrentDashboardWeather.useQuery");
     expect(source).toContain("formatCurrentStateProvenance");
     expect(source).toContain("L’indicateur principal utilise les stations physiques retenues ou, champ par champ, le snapshot Open-Meteo");
-    expect(source).toContain("Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude si renseignée.");
+    expect(source).toContain("Contrôles calculés à cette requête : distance, fraîcheur, fiabilité, cohérence et altitude seulement avec une référence explicite.");
     expect(source).toContain("Couverture locale");
     expect(source).toContain("Stations contributrices");
     expect(source).toContain("localCoverageBands");
