@@ -647,6 +647,29 @@ describe("computeOfficialHourlyForecast", () => {
     expect(weights.reduce((sum, model) => sum + model.weight, 0)).toBeCloseTo(1, 10);
   });
 
+  it("ne compte pas comme absence de contributeurs les heures écoulées sans prévision admissible", () => {
+    const referenceAt = validAt + 30 * 60_000;
+    const elapsedTimes = [validAt - 60 * 60_000, validAt, validAt + 60 * 60_000];
+    const forecasts = modelForecasts(elapsedTimes[2], referenceAt).map((model) => ({
+      ...model,
+      hours: elapsedTimes.map((time) => ({
+        ...model.hours[0]!,
+        validAt: time,
+        hour: new Date(time).getUTCHours(),
+      })),
+    }));
+    const result = computeOfficialHourlyForecast(forecasts, [], { referenceAt });
+
+    expect(result.hours).toHaveLength(3);
+    expect(result.hours[0]?.temp).toBeNull();
+    expect(result.hours[1]?.temp).toBeNull();
+    expect(result.hours[2]?.temp).not.toBeNull();
+    expect(result.weighting.horizons).toHaveLength(17);
+    expect(result.weighting.horizons.every((row) => row.hourCount === 1)).toBe(true);
+    expect(result.weighting.horizons.every((row) => row.availabilityStatus !== "UNAVAILABLE")).toBe(true);
+    expect(result.weighting.horizons.find((row) => row.variable === "temperature")?.coverageLevelCounts.BROAD).toBe(1);
+  });
+
   it("garde une échéance existante avec UNAVAILABLE quand aucun modèle n’a de valeur", () => {
     const forecasts = modelForecasts().map((model) => ({
       ...model,

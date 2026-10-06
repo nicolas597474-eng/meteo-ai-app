@@ -6,7 +6,7 @@ import { HourlyWeightingNotice } from "./HourlyWeightingNotice";
 const sevenModels = ["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"];
 
 describe("HourlyWeightingNotice", () => {
-  it("annonce l’indisponibilité physique uniquement quand aucun modèle n’a fourni de valeur", () => {
+  it("annonce l’indisponibilité des modèles uniquement quand aucune prévision admissible n’existe", () => {
     const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
       status: "unavailable",
       availabilityStatus: "UNAVAILABLE",
@@ -29,11 +29,37 @@ describe("HourlyWeightingNotice", () => {
     } }));
 
     expect(html).toContain("Prévision officielle horaire indisponible");
-    expect(html).toContain("aucune valeur réelle reçue pour cette variable et cette échéance");
+    expect(html).toContain("aucune prévision admissible pour cette variable et cette échéance");
     expect(html).toContain("30 comparaisons sur 7 jours");
     expect(html).toContain("Modèles avec données : aucun modèle");
     expect(html).toContain("Best Match est exclu");
     expect(html).not.toContain("Repli égalitaire");
+  });
+
+  it("ne présente pas un horizon inconnu comme une échéance exacte", () => {
+    const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
+      status: "unavailable",
+      availabilityStatus: "UNAVAILABLE",
+      calibrationStatus: "UNAVAILABLE",
+      historyStatus: "available",
+      modelsWithData: [],
+      horizons: [{
+        variable: "temperature",
+        horizonBucket: null,
+        method: "unavailable",
+        availabilityStatus: "UNAVAILABLE",
+        calibrationStatus: "UNAVAILABLE",
+        unavailableReason: "no_model_data",
+        hourCount: 1,
+        availableModelCount: 0,
+        coverageLevelCounts: { NONE: 1 },
+        modelNamesWithData: [],
+      }],
+    } }));
+
+    expect(html).toContain("température (horizon non déterminé)");
+    expect(html).toContain("aucune prévision admissible pour cette variable et cette échéance");
+    expect(html).not.toContain("échéance exacte");
   });
 
   it("distingue les variables calibrées du repli robuste disponible", () => {

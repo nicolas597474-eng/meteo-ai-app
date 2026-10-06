@@ -874,6 +874,7 @@ export function computeOfficialHourlyForecast(
     point.forecastWeighting?.modelsWithData.forEach((name) => allModelsWithData.add(name as OfficialHourlyModelName));
 
     for (const weighting of point.forecastWeighting?.variableWeightings ?? []) {
+      if (validAt <= referenceAt && weighting.availabilityStatus === "UNAVAILABLE") continue;
       const key = `${weighting.variable}|${weighting.horizonBucket ?? "mixed"}|${weighting.method}|${weighting.calibrationStatus}|${weighting.availabilityStatus}|${weighting.unavailableReason ?? ""}`;
       const row = summaryRows.get(key) ?? {
         variable: weighting.variable,
