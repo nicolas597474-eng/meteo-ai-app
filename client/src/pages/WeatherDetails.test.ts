@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 const pageSource = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url), "utf8");
 const timelineSource = readFileSync(new URL("../components/weather/ForecastByDaySection.tsx", import.meta.url), "utf8");
+const hourlyPanelSource = readFileSync(new URL("../components/weather/HourlySelectedDetailsPanel.tsx", import.meta.url), "utf8");
 const selectedDetailsSource = readFileSync(new URL("../lib/hourlySelectedDetails.ts", import.meta.url), "utf8");
 const displayDaysSource = readFileSync(new URL("../lib/forecastDayDisplay.ts", import.meta.url), "utf8");
 describe("page Prévisions détaillées", () => {
@@ -57,27 +58,47 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("Aucune série horaire officielle disponible pour cette date");
     expect(timelineSource).toContain("Extrêmes journaliers indisponibles");
   });
-  it("n’affiche que les champs fournis, distingue les fréquences brutes et laisse l’AQI indisponible", () => {
-    for (const title of ["Précipitations", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité", "Rayonnement solaire"]) {
+  it("affiche tous les champs horaires autorisés, exclut les rubriques interdites et signale les variables non fournies", () => {
+    for (const title of ["Condition", "Température de l’air", "Température ressentie", "Précipitations", "Vent moyen", "Rafales", "Direction du vent", "Humidité relative", "Point de rosée", "Nébulosité totale", "Nuages bas", "Nuages moyens", "Nuages hauts", "Pression atmosphérique", "Indice UV", "Visibilité"]) {
       expect(selectedDetailsSource).toContain(`"${title}"`);
     }
-    expect(selectedDetailsSource).toContain("rafales");
-    expect(selectedDetailsSource).toContain("direction");
-    expect(selectedDetailsSource).toContain("Type et intensité");
-    expect(selectedDetailsSource).toContain("weatherCode");
-    expect(selectedDetailsSource).toContain("Non disponible");
-    expect(selectedDetailsSource).toContain("Aucune donnée horaire de qualité de l’air");
-    expect(timelineSource).toContain("Soleil");
+    for (const excluded of ["Type et intensité", "Rayonnement solaire", "Code météo", "precipType", "precipIntensity", "solarRadiation", "weatherCode"]) {
+      expect(selectedDetailsSource).not.toContain(excluded);
+    }
+    expect(hourlyPanelSource).toContain("Variables non fournies par le backend");
+    expect(hourlyPanelSource).toContain("qualité de l’air et probabilité calibrée de précipitations");
     expect(selectedDetailsSource).toContain("fréquence descriptive brute, pas une probabilité calibrée");
     expect(timelineSource).toContain("jamais une probabilité de pluie calibrée");
     expect(timelineSource).toContain("buildDailyDetailCategories");
     expect(timelineSource).toContain("L’indice de qualité de l’air ne fait pas partie des données renvoyées à cette page");
     expect(timelineSource).toContain("Aucune valeur n’est demandée, déduite ou inventée");
   });
+  it("garde toutes les mesures visibles et colorées sur mobile, sans hauteur fixe, avec les histogrammes accessibles séparément", () => {
+    expect(hourlyPanelSource).toContain("Mesures météo de l’échéance horaire sélectionnée");
+    expect(hourlyPanelSource).toContain("grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3");
+    expect(hourlyPanelSource).toContain("grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4");
+    expect(hourlyPanelSource).toContain("data-hourly-detail-field={detail.key}");
+    expect(hourlyPanelSource).toContain("style={{ borderColor: detail.color, backgroundColor: \"#020617\" }}");
+    expect(hourlyPanelSource).toContain("style={{ color: detail.color }}");
+    expect(hourlyPanelSource).not.toMatch(/max-h-|maxHeight\s*:|height\s*:/);
+    expect(timelineSource).toContain("Tendances horaires des mesures");
+  });
+  it("affiche les mêmes données de validTime sous la température et conserve le bloc Valeurs pour l’échéance sélectionnée", () => {
+    expect(timelineSource).toContain("buildHourlySelectedDetails(selectedEntry.hour, hourTime(selectedEntry, hours))");
+    expect(timelineSource.match(/details={selectedHourlyDetails}/g)).toHaveLength(2);
+    expect(timelineSource).toContain('variant="summary"');
+    expect(timelineSource).toContain('variant="details"');
+    expect(timelineSource).toContain("Données météo de l’échéance sélectionnée · ${hourTime(selectedEntry, hours)}");
+    expect(timelineSource).toContain("validTime UTC : ${selectedValidTimeUtc} · Source : ${selectedSourceLabel} · ${selectedMethodLabel}");
+    expect(timelineSource).toContain("Valeurs pour l’échéance sélectionnée · {hourTime(selectedEntry, hours)}");
+    expect(timelineSource.indexOf('variant="summary"')).toBeGreaterThan(timelineSource.indexOf("formatOptionalForecastValue(selectedEntry?.hour.temp, 1, \"°\")"));
+    expect(timelineSource.indexOf('variant="summary"')).toBeLessThan(timelineSource.indexOf('aria-label="Heures de prévision défilables"'));
+  });
   it("lie les valeurs affichées à l’heure cliquée et expose son validTime et sa source", () => {
+    expect(timelineSource).toContain("buildHourlySelectedDetails(selectedEntry.hour, hourTime(selectedEntry, hours))");
     expect(timelineSource).toContain("buildHourlyDetailCategories(selectedEntry, hours, indexedHours, histogramStartValidAt)");
     expect(timelineSource).toContain("getHourlyHistogramStartValidAt(");
-    expect(timelineSource).toContain("buildHourlyHistogramSeries(detail.key, indexedHours, startValidAt)");
+    expect(timelineSource).toContain("buildHourlyHistogramSeries(detail.histogramCategory, indexedHours, startValidAt)");
     expect(timelineSource).toContain("<HourlyMiniHistogram");
     expect(timelineSource).toContain("allHours={hours}");
     expect(timelineSource).toContain("selectedEntry.hour.validAt");
