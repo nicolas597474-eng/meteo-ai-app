@@ -3874,4 +3874,4 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Ne modifier ni pondérations, archivage officiel, pipeline de prévision, intégration Météo-France/AROME shadow, base ou migrations. La comparaison ne rend aucun champ de secours actif.
 - [x] Valider uniquement avec fixtures synthétiques; aucun appel réel à OpenWeather ou autre API météo pendant la tâche.
 - [x] `pnpm check`, tests ciblés (13/13), suite complète (204 fichiers, 1 014 tests réussis, 2 ignorés), `pnpm build` et `git diff --check`.
-- [ ] Commit et PR dédiée vers `main`, sans fusion ni déploiement.
+- [x] Commit et PR dédiée #80 ouverts vers `main`, sans fusion ni déploiement.
