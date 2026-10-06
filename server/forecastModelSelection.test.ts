@@ -60,6 +60,47 @@ describe("selectEligibleModelsForHorizon", () => {
     expect(selected.diagnostics[0].reason).toContain("aucun horodatage de requête");
   });
 
+  it("calcule le lead horaire depuis providerRunAt, jamais depuis l’heure de réception", () => {
+    const providerRunAt = validTime - 8 * 60 * 60_000;
+    const availableAt = referenceAt - 30 * 60_000;
+    const selected = selectEligibleModelsForHorizon([
+      candidate("ECMWF", 12, availableAt, { providerRunAt }),
+    ], {
+      expectedModelNames: ["ECMWF"],
+      variable: "temperature",
+      validTime,
+      referenceAt,
+      leadTimeBasis: "provider_run_at",
+      horizonBucketForMinutes: bucketFor,
+    });
+
+    expect(selected.eligible[0]).toMatchObject({
+      availableAt,
+      providerRunAt,
+      horizonMinutes: 480,
+      horizonBucket: "6-24h",
+    });
+  });
+
+  it("laisse le lead horaire inconnu quand providerRunAt n’est pas attesté", () => {
+    const selected = selectEligibleModelsForHorizon([
+      candidate("ECMWF", 12, referenceAt - 30 * 60_000),
+      candidate("AROME", 10, referenceAt - 30 * 60_000, { providerRunAt: referenceAt }),
+    ], {
+      expectedModelNames: ["ECMWF", "AROME"],
+      variable: "temperature",
+      validTime,
+      referenceAt,
+      leadTimeBasis: "provider_run_at",
+      allowUnknownLead: true,
+      horizonBucketForMinutes: bucketFor,
+    });
+
+    expect(selected.eligible).toHaveLength(2);
+    expect(selected.eligible.every((item) => item.horizonMinutes === null && item.horizonBucket === null)).toBe(true);
+    expect(selected.diagnostics.every((item) => item.eligible && item.horizonMinutes === null && item.horizonBucket === null)).toBe(true);
+  });
+
   it("permet une échéance positive hors des tranches historisées sans emprunter une autre tranche", () => {
     const selected = selectEligibleModelsForHorizon([
       candidate("ECMWF", 14, validTime - 16 * 24 * 60 * 60_000),

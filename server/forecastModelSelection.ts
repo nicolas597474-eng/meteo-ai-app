@@ -6,6 +6,7 @@ export type ForecastModelCandidate<T> = {
   runIdKind?: "capture" | "provider" | "unknown";
   requestStartedAt?: number | null;
   availableAt: number | null;
+  providerRunAt?: number | null;
   validTime: number | null;
   value: unknown;
   qualityStatus?: "qualified" | "rejected" | "unknown";
@@ -15,7 +16,7 @@ export type ForecastModelCandidate<T> = {
 
 export type SelectedForecastModel<T> = ForecastModelCandidate<T> & {
   value: number;
-  horizonMinutes: number;
+  horizonMinutes: number | null;
   horizonBucket: string | null;
 };
 
@@ -39,15 +40,19 @@ export type SelectEligibleModelsForHorizonOptions = {
   validTime: number;
   referenceAt: number;
   horizonBucketForMinutes: (horizonMinutes: number) => string | null;
+  /** Timestamp used as the forecast-run origin; daily fusion keeps its legacy availability basis. */
+  leadTimeBasis?: "available_at" | "provider_run_at";
   /** A positive lead time may still be forecastable even when no historical bucket exists. */
   allowUnscoredHorizons?: boolean;
+  /** Keep a valid value in robust fusion when providerRunAt is not attested, while leaving its lead unknown. */
+  allowUnknownLead?: boolean;
   missingReasonByModel?: Readonly<Record<string, string>>;
 };
 
 /**
  * Availability-first selection shared by the official daily and hourly engines.
  * Missing observations are not interpreted as dry/zero values and a request start
- * is never substituted for a model's actual availableAt timestamp.
+ * is never substituted for availableAt or for a provider run timestamp.
  */
 export function selectEligibleModelsForHorizon<T>(
   candidates: readonly ForecastModelCandidate<T>[],
@@ -99,19 +104,41 @@ export function selectEligibleModelsForHorizon<T>(
       else if (candidate.availableAt == null || !Number.isFinite(candidate.availableAt)) reason = "availableAt absent ou invalide; aucun horodatage de requête ne lui est substitué.";
       else if (!Number.isFinite(options.referenceAt) || candidate.availableAt > options.referenceAt) reason = "Le run n’était pas encore disponible à l’instant de référence de la fusion.";
       else {
-        const horizonMinutes = (options.validTime - candidate.availableAt) / 60_000;
-        if (!Number.isFinite(horizonMinutes) || horizonMinutes <= 0) reason = "validTime n’est pas postérieur à availableAt : la valeur ne constitue pas une prévision pour cette échéance.";
-        else {
-          const horizonBucket = options.horizonBucketForMinutes(horizonMinutes);
-          if (horizonBucket == null && !options.allowUnscoredHorizons) reason = "Horizon non classé; aucune preuve d’une autre échéance n’est réutilisée.";
-          else {
-            selected = { ...candidate, value: candidate.value, horizonMinutes, horizonBucket };
+        const leadTimeAt = options.leadTimeBasis === "provider_run_at" ? candidate.providerRunAt : candidate.availableAt;
+        const providerRunAtUnattested = options.leadTimeBasis === "provider_run_at"
+          && !(leadTimeAt != null && Number.isSafeInteger(leadTimeAt) && leadTimeAt <= candidate.availableAt);
+        if (providerRunAtUnattested) {
+          if (options.allowUnknownLead) {
+            selected = { ...candidate, value: candidate.value, horizonMinutes: null, horizonBucket: null };
             break;
+          }
+          reason = "providerRunAt absent, invalide ou incohérent; aucun autre horodatage ne lui est substitué.";
+        } else if (leadTimeAt == null || !Number.isFinite(leadTimeAt)) {
+          reason = "availableAt absent ou invalide; aucun horodatage de requête ne lui est substitué.";
+        } else {
+          const horizonMinutes = (options.validTime - leadTimeAt) / 60_000;
+          if (!Number.isFinite(horizonMinutes) || horizonMinutes <= 0) {
+            reason = options.leadTimeBasis === "provider_run_at"
+              ? "validTime n’est pas postérieur à providerRunAt : la valeur ne constitue pas une prévision pour cette échéance."
+              : "validTime n’est pas postérieur à availableAt : la valeur ne constitue pas une prévision pour cette échéance.";
+          } else {
+            const horizonBucket = options.horizonBucketForMinutes(horizonMinutes);
+            if (horizonBucket == null && !options.allowUnscoredHorizons) reason = "Horizon non classé; aucune preuve d’une autre échéance n’est réutilisée.";
+            else {
+              selected = { ...candidate, value: candidate.value, horizonMinutes, horizonBucket };
+              break;
+            }
           }
         }
       }
-      const horizonMinutes = candidate.availableAt != null && Number.isFinite(candidate.availableAt)
-        ? (options.validTime - candidate.availableAt) / 60_000
+      const leadTimeAt = options.leadTimeBasis === "provider_run_at" ? candidate.providerRunAt : candidate.availableAt;
+      const usableLeadTimeAt = leadTimeAt != null
+        && Number.isFinite(leadTimeAt)
+        && (options.leadTimeBasis !== "provider_run_at" || (Number.isSafeInteger(leadTimeAt) && candidate.availableAt != null && leadTimeAt <= candidate.availableAt))
+        ? leadTimeAt
+        : null;
+      const horizonMinutes = usableLeadTimeAt != null
+        ? (options.validTime - usableLeadTimeAt) / 60_000
         : null;
       lastDiagnostic = {
         ...base,
