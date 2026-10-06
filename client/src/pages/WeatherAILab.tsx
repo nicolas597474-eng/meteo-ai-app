@@ -166,6 +166,22 @@ type ProviderRunCaptureEvidence = {
   capturedAt: Date | string;
 };
 
+type ProviderRunModelSupportEvidence = {
+  model: string;
+  forecastModelId: string;
+  openMeteoModelId: string;
+  appIdMatchesDocumentedId: boolean;
+  singleRunModelId: string;
+  singleRunEndpointSupportedForDocumentedId: boolean;
+  metadataMappingVerified: boolean;
+  maximumDocumentedForecastDays: number;
+  horizonDescription: string;
+  documentedCalibrationVariables: string[];
+  modelDocumentationUrl: string;
+  singleRunsDocumentationUrl: string;
+  captureUnavailableReason: string | null;
+};
+
 function formatProviderRunUtc(value: number | Date | string | null | undefined): string {
   if (value == null) return "non renseigné";
   const date = value instanceof Date ? value : new Date(value);
@@ -269,6 +285,7 @@ function ForecastModelGuideDialog({
   modelName,
   collectionAttempt,
   providerRunCapture,
+  providerRunSupport,
   providerRunAvailable,
   dailyCoverage,
   collectionAvailable,
@@ -277,6 +294,7 @@ function ForecastModelGuideDialog({
   modelName: string | null;
   collectionAttempt: HourlyModelCollectionEvidence | null;
   providerRunCapture: ProviderRunCaptureEvidence | null;
+  providerRunSupport: ProviderRunModelSupportEvidence | null;
   providerRunAvailable: boolean;
   dailyCoverage: ModelCoverageEvidence | null;
   collectionAvailable: boolean;
@@ -330,6 +348,13 @@ function ForecastModelGuideDialog({
     </section>
     <section className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.035] p-3" aria-label="Provenance Single Runs et lead exact du run fournisseur">
       <h3 className="text-xs font-semibold text-cyan-100">Single Runs · provenance du run fournisseur</h3>
+      {providerRunSupport && <div className="mt-2 rounded-lg border border-cyan-300/10 bg-slate-950/30 p-2.5 text-[9px] leading-relaxed text-slate-300">
+        <p><span className="font-semibold text-cyan-100">ID Open-Meteo documenté :</span> <code>{providerRunSupport.openMeteoModelId}</code>{providerRunSupport.appIdMatchesDocumentedId ? " · identique à l’ID utilisé par MeteoAI" : ` · différent de l’alias MeteoAI ${providerRunSupport.forecastModelId}`}</p>
+        <p className="mt-1"><span className="font-semibold text-cyan-100">Endpoint Single Runs :</span> {providerRunSupport.singleRunEndpointSupportedForDocumentedId ? `documenté pour ${providerRunSupport.singleRunModelId}` : "non confirmé"}. {providerRunSupport.metadataMappingVerified ? "Le mapping exact est activé pour la preuve séparée." : providerRunSupport.captureUnavailableReason ?? "Le mapping exact n’est pas activé."}</p>
+        <p className="mt-1"><span className="font-semibold text-cyan-100">Horizon documenté :</span> {providerRunSupport.horizonDescription} La capture de recherche existante reste limitée à 2 jours.</p>
+        <p className="mt-1"><span className="font-semibold text-cyan-100">Variables de calibration documentées pour l’ID ci-dessus :</span> {providerRunSupport.documentedCalibrationVariables.join(", ")}. Cela décrit la documentation du modèle, pas la disponibilité d’une valeur pour chaque lieu ou run; seule une capture séparée peut l’établir.</p>
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1"><a href={providerRunSupport.modelDocumentationUrl} target="_blank" rel="noreferrer" className="text-cyan-200 underline underline-offset-2">Documentation du modèle</a><a href={providerRunSupport.singleRunsDocumentationUrl} target="_blank" rel="noreferrer" className="text-cyan-200 underline underline-offset-2">Documentation Single Runs</a></div>
+      </div>}
       <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Archive de recherche séparée. Le lead exact est validTime − providerRunAt; availableAt reste l’heure de réception MeteoAI et le seuil anti-fuite.</p>
       {!providerRunAvailable ? <p className="mt-1.5 text-[10px] leading-relaxed text-amber-100">Journal indisponible; la migration additive provider-run n’est pas vérifiable. Aucun lead exact n’est supposé.</p>
         : !providerRunCapture ? <p className="mt-1.5 text-[10px] leading-relaxed text-slate-300">Aucune tentative provider-run archivée pour ce modèle et ce lieu; le lead exact reste inconnu.</p>
@@ -674,6 +699,7 @@ export default function WeatherAILab() {
   const flowStatusByModel = new Map((forecastCollectionReport?.flowStatuses ?? []).map((status) => [status.model, status]));
   const selectedHourlyModelCollection = (forecastCollectionReport?.hourlyModelCollection?.find((result) => result.model === selectedCollectionModel) ?? null) as HourlyModelCollectionEvidence | null;
   const selectedProviderRunCapture = forecastCollectionReport?.providerRunCollection?.find((result) => result.model === selectedCollectionModel) ?? null;
+  const selectedProviderRunSupport = (forecastCollectionReport?.providerRunSupport?.find((result) => result.model === selectedCollectionModel) ?? null) as ProviderRunModelSupportEvidence | null;
   const forecastCollectionTimeLabel = forecastCollectionSnapshot?.collectedAt
     ? formatCollectionTimestamp(forecastCollectionSnapshot.collectedAt)
     : null;
@@ -859,7 +885,7 @@ export default function WeatherAILab() {
     {user?.role === "admin" && localNowcastingReports?.temperature && <LocalTemperatureNowcastingPanel report={localNowcastingReports.temperature} />}
     {user?.role === "admin" && localNowcastingReports?.precipitation && <LocalPrecipitationNowcastingPanel report={localNowcastingReports.precipitation} />}
 
-    <ForecastModelGuideDialog modelName={selectedCollectionModel} collectionAttempt={selectedHourlyModelCollection} providerRunCapture={selectedProviderRunCapture} providerRunAvailable={forecastCollectionReport?.providerRunCollectionAvailable ?? false} dailyCoverage={selectedDailyModelCoverage} collectionAvailable={forecastCollectionReport?.hourlyModelCollectionAvailable ?? false} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
+    <ForecastModelGuideDialog modelName={selectedCollectionModel} collectionAttempt={selectedHourlyModelCollection} providerRunCapture={selectedProviderRunCapture} providerRunSupport={selectedProviderRunSupport} providerRunAvailable={forecastCollectionReport?.providerRunCollectionAvailable ?? false} dailyCoverage={selectedDailyModelCoverage} collectionAvailable={forecastCollectionReport?.hourlyModelCollectionAvailable ?? false} onOpenChange={(open) => { if (!open) setSelectedCollectionModel(null); }} />
 
     <AILabGlossary />
 

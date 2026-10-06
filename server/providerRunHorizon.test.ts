@@ -8,6 +8,7 @@ import {
   SINGLE_RUN_AVAILABILITY_SAFETY_DELAY_MS,
   type ProviderRunForecastValue,
 } from "./providerRunHorizon";
+import { PROVIDER_RUN_MODEL_CAPABILITIES } from "./providerRunCapabilities";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 
 const locationKey = "50.123_2.456";
@@ -40,6 +41,39 @@ function value(overrides: Partial<ProviderRunForecastValue> = {}): ProviderRunFo
 }
 
 describe("provider-run horizon provenance", () => {
+  it("décrit les sept modèles sans assimiler les alias GFS/GEM à d’autres IDs", () => {
+    expect(PROVIDER_RUN_MODEL_CAPABILITIES).toHaveLength(7);
+    expect(PROVIDER_RUN_MODEL_CAPABILITIES.map((capability) => capability.modelName))
+      .toEqual(["AROME", "ARPEGE", "ICON", "ECMWF", "GFS", "GEM", "UKMET"]);
+    expect(PROVIDER_RUN_MODEL_CAPABILITIES.every((capability) => capability.documentedCalibrationVariables.length === 6))
+      .toBe(true);
+    expect(Object.keys(DIRECT_SINGLE_RUN_METADATA_MODEL_IDS).sort())
+      .toEqual(["AROME", "ARPEGE", "ECMWF", "ICON", "UKMET"]);
+    expect(DIRECT_SINGLE_RUN_METADATA_MODEL_IDS).toMatchObject({
+      AROME: "meteofrance_arome_france_hd",
+      ARPEGE: "meteofrance_arpege_europe",
+      ICON: "dwd_icon_eu",
+      ECMWF: "ecmwf_ifs025",
+      UKMET: "ukmo_seamless",
+    });
+    expect(PROVIDER_RUN_MODEL_CAPABILITIES.find((capability) => capability.modelName === "GFS"))
+      .toMatchObject({
+        forecastModelId: "gfs_seamless",
+        openMeteoModelId: "ncep_gfs_seamless",
+        appIdMatchesDocumentedId: false,
+        singleRunEndpointSupportedForDocumentedId: true,
+        metadataMappingVerified: false,
+      });
+    expect(PROVIDER_RUN_MODEL_CAPABILITIES.find((capability) => capability.modelName === "GEM"))
+      .toMatchObject({
+        forecastModelId: "gem_seamless",
+        openMeteoModelId: "cmc_gem_seamless",
+        appIdMatchesDocumentedId: false,
+        singleRunEndpointSupportedForDocumentedId: true,
+        metadataMappingVerified: false,
+      });
+  });
+
   it("sélectionne le dernier cycle publié à partir des métadonnées, après le délai prudent de 10 minutes", () => {
     const selected = resolveProviderRunSelection({
       modelName: "AROME",
@@ -56,6 +90,19 @@ describe("provider-run horizon provenance", () => {
     expect(selected.metadataAvailableAt).toBe(metadataAt);
     expect(selected.runParameter).toBe("2026-10-04T15:00");
     expect(selected.metadataUrl).toContain("/meteofrance_arome_france_hd/static/meta.json");
+
+    const ukmet = resolveProviderRunSelection({
+      modelName: "UKMET",
+      modelId: DIRECT_SINGLE_RUN_METADATA_MODEL_IDS.UKMET,
+      metadata: {
+        last_run_initialisation_time: runAt / 1000,
+        last_run_availability_time: metadataAt / 1000,
+        update_interval_seconds: 21_600,
+      },
+      now: requestStartedAt,
+    });
+    expect(ukmet.status).toBe("selected");
+    expect(ukmet.metadataUrl).toContain("/ukmo_seamless/static/meta.json");
   });
 
   it("n’envoie aucune requête pour un cycle pas encore répliqué, des métadonnées périmées ou un alias non mappé", () => {
@@ -80,12 +127,10 @@ describe("provider-run horizon provenance", () => {
     });
     expect(futureRun.status).toBe("metadata_invalid");
     expect(futureRun.providerRunAt).toBeNull();
-    expect(resolveProviderRunSelection({
-      modelName: "GFS",
-      modelId: "gfs_seamless",
-      metadata,
-      now: requestStartedAt,
-    }).status).toBe("unmapped_model_id");
+    for (const [modelName, modelId] of [["GFS", "gfs_seamless"], ["GEM", "gem_seamless"]]) {
+      expect(resolveProviderRunSelection({ modelName, modelId, metadata, now: requestStartedAt }).status)
+        .toBe("unmapped_model_id");
+    }
   });
 
   it("garde sans changement l’ID Forecast dans l’URL exacte Single Runs et son run UTC", () => {
@@ -97,8 +142,10 @@ describe("provider-run horizon provenance", () => {
       expect(url.searchParams.get("timezone")).toBe("UTC");
       expect(url.searchParams.get("forecast_days")).toBe("2");
     }
-    expect(() => buildSingleRunRequestUrl({ modelName: "GFS", modelId: "gfs_seamless", latitude: 50, longitude: 2, providerRunAt: runAt }))
-      .toThrow(/not enabled/i);
+    for (const [modelName, modelId] of [["GFS", "gfs_seamless"], ["GEM", "gem_seamless"]]) {
+      expect(() => buildSingleRunRequestUrl({ modelName, modelId, latitude: 50, longitude: 2, providerRunAt: runAt }))
+        .toThrow(/not enabled/i);
+    }
   });
 
   it("archive seulement les validTime encore futurs et calcule séparément lead fournisseur et latence de collecte", () => {
