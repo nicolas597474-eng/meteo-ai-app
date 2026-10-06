@@ -11,6 +11,7 @@ export type CollectionHealth = {
 export type CollectionHealthInput = {
   lastRunStatus?: "completed" | "failed" | "partial" | null;
   lastSuccessAt?: string | Date | null;
+  /** Must describe the same latest global batch as lastRunStatus, not a local snapshot. */
   partial?: boolean;
   now?: Date;
   staleAfterMs?: number;

@@ -34,6 +34,22 @@ describe("buildOperationalRegime", () => {
     expect(regime.source).toBe("fresh_observation");
     expect(regime.primary?.id).toBe("few_clouds");
     expect(regime.sourceAgeMinutes).toBe(30);
+    expect(Object.fromEntries(regime.inputDiagnostics.map(({ key, value }) => [key, value]))).toMatchObject({
+      temperature: regime.params.temperature,
+      precipitation: regime.params.precipitation,
+      windSpeed: regime.params.windSpeed,
+      humidity: regime.params.humidity,
+      cloudCover: regime.params.cloudCover,
+      visibilityKm: regime.params.visibilityKm,
+    });
+    expect(regime.inputDiagnostics.find((input) => input.key === "visibilityKm")).toMatchObject({
+      value: 10,
+      status: "available",
+      source: "fresh_observation",
+      sourceUpdatedAt: "2026-08-12T07:30:00.000Z",
+      validAt: "2026-08-12T07:30:00.000Z",
+      sourceAgeMinutes: 30,
+    });
   });
 
   it("conserve le snapshot complet lorsqu’une observation est trop ancienne ou incomplète", () => {
@@ -46,19 +62,49 @@ describe("buildOperationalRegime", () => {
     expect(regime.status).toBe("available");
     expect(regime.source).toBe("official_snapshot");
     expect(regime.primary?.id).toBe("partly_cloudy");
+    expect(regime.inputDiagnostics.every((input) => input.source === "official_snapshot")).toBe(true);
+    expect(regime.inputDiagnostics.find((input) => input.key === "temperature")?.value).toBe(regime.params.temperature);
   });
 
   it("privilégie une prévision horaire complète et conserve zéro comme valeur réelle", () => {
     const regime = buildOperationalRegime(
       null,
       null,
-      { temp: 0, precipitation: 0, windSpeed: 0, humidity: 0, cloudCover: 0, visibilityKm: 10, updatedAt: new Date("2026-08-12T07:55:00.000Z") },
+      { temp: 0, precipitation: 0, windSpeed: 0, humidity: 0, cloudCover: 0, visibilityKm: 10, updatedAt: new Date("2026-08-12T07:55:00.000Z"), sourceUpdatedAt: new Date("2026-08-12T07:55:00.000Z"), validAt: Date.parse("2026-08-12T08:00:00.000Z"), sourceLabel: "Prévision horaire officielle · 7 modèles" },
       now,
     );
     expect(regime.status).toBe("available");
     expect(regime.source).toBe("hourly_forecast");
     expect(regime.primary?.id).toBe("sunny");
     expect(regime.params).toMatchObject({ temperature: 0, precipitation: 0, windSpeed: 0, humidity: 0, cloudCover: 0 });
+    expect(regime.inputDiagnostics.every((input) => input.source === "hourly_forecast" && input.sourceLabel === "Prévision horaire officielle · 7 modèles")).toBe(true);
+    expect(regime.inputDiagnostics.find((input) => input.key === "temperature")).toMatchObject({ value: 0, status: "available", validAt: "2026-08-12T08:00:00.000Z" });
+  });
+
+  it("signale une série horaire périmée sans modifier le choix fondé sur updatedAt", () => {
+    const actualSourceAt = new Date(now - 25 * 60_000);
+    const regime = buildOperationalRegime(
+      null,
+      null,
+      {
+        temp: 18,
+        precipitation: 0,
+        windSpeed: 8,
+        humidity: 45,
+        cloudCover: 0,
+        visibilityKm: 10,
+        updatedAt: new Date(now - 60_000),
+        sourceUpdatedAt: actualSourceAt,
+        validAt: now,
+      },
+      now,
+    );
+
+    expect(regime.source).toBe("hourly_forecast");
+    expect(regime.status).toBe("available");
+    expect(regime.sourceUpdatedAt).toBe(actualSourceAt.toISOString());
+    expect(regime.sourceAgeMinutes).toBe(25);
+    expect(regime.inputDiagnostics.every((input) => input.status === "stale")).toBe(true);
   });
 
   it("renvoie unknown plutôt que de remplacer une entrée officielle manquante par 15/0/0", () => {
@@ -75,18 +121,23 @@ describe("buildOperationalRegime", () => {
     expect(regime.blendedWeights).toBeNull();
     expect(regime.params).toMatchObject({ temperature: 19, precipitation: null, windSpeed: null, visibilityKm: null });
     expect(regime.description).toMatch(/indisponible/i);
+    expect(regime.inputDiagnostics).toHaveLength(6);
+    expect(regime.inputDiagnostics.find((input) => input.key === "visibilityKm")).toMatchObject({ value: null, status: "missing", source: "official_snapshot" });
   });
 
   it("ne classe pas un instant horaire partiel ou non fini et ne fabrique pas de changement futur", () => {
     const regime = buildOperationalRegime(
       null,
       null,
-      { temp: 18, precipitation: 0, windSpeed: null, humidity: 45, cloudCover: 0, visibilityKm: null, updatedAt: new Date("2026-08-12T07:55:00.000Z") },
+      { temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, visibilityKm: null, updatedAt: new Date("2026-08-12T07:55:00.000Z"), validAt: Date.parse("2026-08-12T08:00:00.000Z") },
       now,
     );
     expect(regime.status).toBe("unknown");
     expect(regime.primary).toBeNull();
-    expect(regime.params).toMatchObject({ temperature: 18, precipitation: 0, windSpeed: null, visibilityKm: null });
+    expect(regime.params).toMatchObject({ temperature: 18, precipitation: 0, windSpeed: 8, visibilityKm: null });
+    expect(regime.source).toBe("hourly_forecast_partial");
+    expect(regime.inputDiagnostics.find((input) => input.key === "visibilityKm")).toMatchObject({ value: null, status: "missing", source: "hourly_forecast_partial", validAt: "2026-08-12T08:00:00.000Z" });
+    expect(regime.inputDiagnostics.find((input) => input.key === "windSpeed")).toMatchObject({ value: 8, status: "available" });
 
     const nextChange = findNextHourlyRegimeChange([
       { hour: "09:00", temp: 18, precipitation: 0, windSpeed: 8, humidity: 45, cloudCover: 0, visibilityKm: 10 },
@@ -151,5 +202,19 @@ describe("buildOperationalRegime", () => {
     ];
     const change = findNextHourlyRegimeChange(hours, "02:00", "partly_cloudy", hours[1].validAt);
     expect(change).toMatchObject({ hour: "04:00", id: "sunny" });
+  });
+
+  it("ne fabrique ni source ni valeurs quand le snapshot est absent", () => {
+    const regime = buildOfficialRegime(null, now);
+    expect(regime.status).toBe("unknown");
+    expect(regime.inputDiagnostics).toHaveLength(6);
+    expect(regime.inputDiagnostics.every((input) => input.value === null && input.status === "missing" && input.source === null && input.sourceLabel === "Aucun snapshot quotidien disponible")).toBe(true);
+  });
+
+  it("distingue une entrée non finie d’une entrée absente dans le snapshot utilisé", () => {
+    const regime = buildOfficialRegime({ ...completeSnapshot, humidity: Number.NaN }, now);
+    expect(regime.status).toBe("unknown");
+    expect(regime.inputDiagnostics.find((input) => input.key === "humidity")).toMatchObject({ value: null, status: "invalid", source: "official_snapshot" });
+    expect(regime.inputDiagnostics.find((input) => input.key === "visibilityKm")).toMatchObject({ value: 10, status: "available" });
   });
 });

@@ -1,4 +1,10 @@
 import { detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO } from "./fusionEngine";
+import {
+  OFFICIAL_REGIME_INPUTS,
+  type OfficialRegimeInputDiagnostic,
+  type RegimeInputKey,
+  type RegimeInputSource,
+} from "../shared/regimeInputDiagnostics";
 
 type RegimeParameters = {
   temperature: number | null;
@@ -50,7 +56,14 @@ export type CurrentHourlyRegimeForecast = {
   cloudCover?: number | null;
   /** Open-Meteo HourlyPoint visibility, in km. */
   visibilityKm?: number | null;
+  /** Timestamp used by the current regime selector's freshness window. */
   updatedAt?: Date | string | null;
+  /** Actual computation time of the hourly source, for diagnostics only. */
+  sourceUpdatedAt?: Date | string | null;
+  /** Exact HourlyPoint validity instant (Unix milliseconds). */
+  validAt?: number | null;
+  /** Supplied by the route that knows which hourly read-model produced the point. */
+  sourceLabel?: string | null;
 } | null | undefined;
 
 export type HourlyRegimePoint = {
@@ -64,6 +77,16 @@ export type HourlyRegimePoint = {
   /** Open-Meteo HourlyPoint visibility, in km. */
   visibilityKm?: number | null;
 };
+
+type DiagnosticSource = {
+  source: RegimeInputSource | null;
+  sourceLabel: string | null;
+  sourceUpdatedAt: Date | string | null | undefined;
+  validAt?: Date | string | number | null;
+  staleAfterMs?: number | null;
+};
+
+type RawRegimeInputValues = Record<RegimeInputKey, unknown | unknown[]>;
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -82,6 +105,12 @@ function toTimestamp(value: Date | string | null | undefined) {
 function toIsoTimestamp(value: Date | string | null | undefined) {
   const timestamp = toTimestamp(value);
   return timestamp == null ? null : new Date(timestamp).toISOString();
+}
+
+function toIsoEpochMilliseconds(value: number | null | undefined) {
+  if (!isFiniteNumber(value)) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
 function averageTemperature(data: { tempMax?: number | null; tempMin?: number | null }) {
@@ -152,7 +181,96 @@ function dataCoverage(params: RegimeParameters) {
     .filter(isFiniteNumber).length;
 }
 
-function unavailableRegime(params: RegimeParameters, snapshotComputedAt: string | null) {
+function rawSnapshotValues(snapshot: OfficialSnapshot): RawRegimeInputValues {
+  return {
+    temperature: [snapshot?.tempMax, snapshot?.tempMin],
+    precipitation: snapshot?.precipitation,
+    windSpeed: snapshot?.windSpeed,
+    humidity: snapshot?.humidity,
+    cloudCover: snapshot?.cloudCover,
+    visibilityKm: snapshot?.visibilityKm,
+  };
+}
+
+function rawObservationValues(observation: FreshRegimeObservation): RawRegimeInputValues {
+  return {
+    temperature: [observation?.tempMax, observation?.tempMin],
+    precipitation: observation?.precipitation,
+    windSpeed: observation?.windSpeed,
+    humidity: observation?.humidity,
+    cloudCover: observation?.cloudCover,
+    visibilityKm: observation?.visibilityKm,
+  };
+}
+
+function rawHourlyValues(hourly: CurrentHourlyRegimeForecast): RawRegimeInputValues {
+  return {
+    temperature: hourly?.temp,
+    precipitation: hourly?.precipitation,
+    windSpeed: hourly?.windSpeed,
+    humidity: hourly?.humidity,
+    cloudCover: hourly?.cloudCover,
+    visibilityKm: hourly?.visibilityKm,
+  };
+}
+
+function rawValuesList(value: unknown | unknown[]): unknown[] {
+  return Array.isArray(value) ? value : [value];
+}
+
+function fieldStatus(
+  rawValue: unknown | unknown[],
+  selectedValue: number | null,
+  sourceAgeMs: number | null,
+  staleAfterMs: number | null | undefined,
+): OfficialRegimeInputDiagnostic["status"] {
+  const rawValues = rawValuesList(rawValue);
+  const containsInvalidValue = rawValues.some((value) => value != null && !isFiniteNumber(value));
+  if (selectedValue == null) return containsInvalidValue ? "invalid" : "missing";
+  if (staleAfterMs != null && sourceAgeMs != null && sourceAgeMs > staleAfterMs) return "stale";
+  return "available";
+}
+
+function buildInputDiagnostics(
+  params: RegimeParameters,
+  rawValues: RawRegimeInputValues,
+  source: DiagnosticSource,
+  nowMs: number,
+): OfficialRegimeInputDiagnostic[] {
+  const sourceTimestamp = toTimestamp(source.sourceUpdatedAt);
+  const sourceAgeMs = sourceTimestamp == null || sourceTimestamp > nowMs ? null : nowMs - sourceTimestamp;
+  const sourceUpdatedAt = toIsoTimestamp(source.sourceUpdatedAt);
+  const validAt = typeof source.validAt === "number"
+    ? toIsoEpochMilliseconds(source.validAt)
+    : toIsoTimestamp(source.validAt);
+  const selectedValues: Record<RegimeInputKey, number | null> = {
+    temperature: params.temperature,
+    precipitation: params.precipitation,
+    windSpeed: params.windSpeed,
+    humidity: params.humidity,
+    cloudCover: params.cloudCover,
+    visibilityKm: params.visibilityKm,
+  };
+
+  return OFFICIAL_REGIME_INPUTS.map(({ key, label, unit }) => ({
+    key,
+    label,
+    unit,
+    value: selectedValues[key],
+    status: fieldStatus(rawValues[key], selectedValues[key], sourceAgeMs, source.staleAfterMs),
+    source: source.source,
+    sourceLabel: source.sourceLabel,
+    sourceUpdatedAt,
+    validAt,
+    sourceAgeMinutes: sourceAgeMs == null ? null : Math.max(0, Math.round(sourceAgeMs / 60_000)),
+  }));
+}
+
+function unavailableRegime(
+  params: RegimeParameters,
+  snapshotComputedAt: string | null,
+  inputDiagnostics: OfficialRegimeInputDiagnostic[],
+) {
   return {
     status: "unknown" as const,
     primary: null,
@@ -162,20 +280,24 @@ function unavailableRegime(params: RegimeParameters, snapshotComputedAt: string 
     description: "Régime indisponible : une ou plusieurs données météorologiques requises sont absentes ou invalides.",
     params,
     snapshotComputedAt,
+    inputDiagnostics,
   };
 }
 
 /**
- * Persisted multi-model snapshot. Every input used by the detector must be
- * present and finite; missing values are never replaced with climatological
- * defaults. Visibility is optional in the legacy daily snapshot, so that
- * snapshot remains explicitly unknown unless it actually contains visibility.
+ * Persisted daily multi-model snapshot. The diagnostic mirrors the six values
+ * passed to the detector; no current-condition or station stream is substituted.
  */
-export function buildOfficialRegime(snapshot: OfficialSnapshot) {
+export function buildOfficialRegime(snapshot: OfficialSnapshot, nowMs = Date.now()) {
   const params = snapshotParameters(snapshot);
   const snapshotComputedAt = toIsoTimestamp(snapshot?.computedAt);
+  const inputDiagnostics = buildInputDiagnostics(params, rawSnapshotValues(snapshot), {
+    source: snapshot == null ? null : "official_snapshot",
+    sourceLabel: snapshot == null ? "Aucun snapshot quotidien disponible" : "Fusion quotidienne multi-modèles",
+    sourceUpdatedAt: snapshot?.computedAt,
+  }, nowMs);
   const multiRegime = detectMultiRegime(detectionParameters(params));
-  if (!multiRegime) return unavailableRegime(params, snapshotComputedAt);
+  if (!multiRegime) return unavailableRegime(params, snapshotComputedAt, inputDiagnostics);
 
   return {
     status: "available" as const,
@@ -186,6 +308,7 @@ export function buildOfficialRegime(snapshot: OfficialSnapshot) {
     description: multiRegime.description,
     params,
     snapshotComputedAt,
+    inputDiagnostics,
   };
 }
 
@@ -200,7 +323,7 @@ export function buildOperationalRegime(
   currentHourly?: CurrentHourlyRegimeForecast,
   nowMs = Date.now(),
 ) {
-  const official = buildOfficialRegime(snapshot);
+  const official = buildOfficialRegime(snapshot, nowMs);
   const snapshotAt = toTimestamp(snapshot?.computedAt);
   const observationAt = toTimestamp(observation?.collectedAt);
   const observationParams = observationParameters(observation);
@@ -213,6 +336,13 @@ export function buildOperationalRegime(
 
   if (observationRegime) {
     const info = EXTENDED_REGIME_INFO[observationRegime];
+    const inputDiagnostics = buildInputDiagnostics(observationParams, rawObservationValues(observation), {
+      source: "fresh_observation",
+      sourceLabel: "Observation physique qualifiée récente",
+      sourceUpdatedAt: observation?.collectedAt,
+      validAt: observation?.collectedAt,
+      staleAfterMs: 3 * 60 * 60 * 1000,
+    }, nowMs);
     return {
       status: "available" as const,
       primary: { id: observationRegime, ...info },
@@ -227,10 +357,16 @@ export function buildOperationalRegime(
       sourceLabel: "Observation récente validée",
       sourceAgeMinutes: Math.max(0, Math.round((nowMs - observationAt!) / 60000)),
       dataCoverage: observationCoverage,
+      inputDiagnostics,
     };
   }
 
   const hourlyAt = toTimestamp(currentHourly?.updatedAt);
+  const hourlySourceAt = toTimestamp(currentHourly?.sourceUpdatedAt);
+  const hourlySourceAgeMinutes = hourlySourceAt == null || hourlySourceAt > nowMs
+    ? null
+    : Math.max(0, Math.round((nowMs - hourlySourceAt) / 60000));
+  const hourlySourceLabel = currentHourly?.sourceLabel?.trim() || "Prévision horaire actualisée";
   const hourlyParams = hourlyParameters(currentHourly);
   const hourlyCoverage = dataCoverage(hourlyParams);
   const hourlyIsFresh = hourlyAt != null && nowMs - hourlyAt >= 0 && nowMs - hourlyAt <= 20 * 60 * 1000;
@@ -241,6 +377,13 @@ export function buildOperationalRegime(
   // A complete hourly forecast is explicitly a forecast, never a physical observation.
   if (hourlyRegime) {
     const info = EXTENDED_REGIME_INFO[hourlyRegime];
+    const inputDiagnostics = buildInputDiagnostics(hourlyParams, rawHourlyValues(currentHourly), {
+      source: "hourly_forecast",
+      sourceLabel: hourlySourceLabel,
+      sourceUpdatedAt: currentHourly?.sourceUpdatedAt,
+      validAt: currentHourly?.validAt,
+      staleAfterMs: 20 * 60 * 1000,
+    }, nowMs);
     return {
       status: "available" as const,
       primary: { id: hourlyRegime, ...info },
@@ -251,21 +394,29 @@ export function buildOperationalRegime(
       params: hourlyParams,
       snapshotComputedAt: official.snapshotComputedAt,
       source: "hourly_forecast" as const,
-      sourceUpdatedAt: new Date(hourlyAt!).toISOString(),
-      sourceLabel: "Prévision horaire actualisée",
-      sourceAgeMinutes: Math.max(0, Math.round((nowMs - hourlyAt!) / 60000)),
+      sourceUpdatedAt: toIsoTimestamp(currentHourly?.sourceUpdatedAt),
+      sourceLabel: hourlySourceLabel,
+      sourceAgeMinutes: hourlySourceAgeMinutes,
       dataCoverage: hourlyCoverage,
+      inputDiagnostics,
     };
   }
 
   const officialCoverage = dataCoverage(official.params);
   if (officialCoverage === 0 && hourlyIsFresh && hourlyCoverage > 0) {
+    const inputDiagnostics = buildInputDiagnostics(hourlyParams, rawHourlyValues(currentHourly), {
+      source: "hourly_forecast_partial",
+      sourceLabel: `${hourlySourceLabel} — régime non calculé`,
+      sourceUpdatedAt: currentHourly?.sourceUpdatedAt,
+      validAt: currentHourly?.validAt,
+      staleAfterMs: 20 * 60 * 1000,
+    }, nowMs);
     return {
-      ...unavailableRegime(hourlyParams, official.snapshotComputedAt),
+      ...unavailableRegime(hourlyParams, official.snapshotComputedAt, inputDiagnostics),
       source: "hourly_forecast_partial" as const,
-      sourceUpdatedAt: new Date(hourlyAt!).toISOString(),
-      sourceLabel: "Prévision horaire partielle — régime non calculé",
-      sourceAgeMinutes: Math.max(0, Math.round((nowMs - hourlyAt!) / 60000)),
+      sourceUpdatedAt: toIsoTimestamp(currentHourly?.sourceUpdatedAt),
+      sourceLabel: `${hourlySourceLabel} — régime non calculé`,
+      sourceAgeMinutes: hourlySourceAgeMinutes,
       dataCoverage: hourlyCoverage,
     };
   }
@@ -273,7 +424,7 @@ export function buildOperationalRegime(
     ...official,
     source: "official_snapshot" as const,
     sourceUpdatedAt: official.snapshotComputedAt,
-    sourceLabel: official.status === "available" ? "Fusion officielle multi-modèles" : "Régime indisponible",
+    sourceLabel: snapshot == null ? "Aucun snapshot quotidien disponible" : "Fusion quotidienne multi-modèles",
     sourceAgeMinutes: snapshotAt == null ? null : Math.max(0, Math.round((nowMs - snapshotAt) / 60000)),
     dataCoverage: officialCoverage,
   };

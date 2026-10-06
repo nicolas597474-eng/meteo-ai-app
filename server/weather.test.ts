@@ -44,11 +44,15 @@ describe("weather.getDashboard", () => {
 
   it("conserve l’horodatage du snapshot source quand il est fourni", () => {
     const sourceUpdatedAt = new Date("2026-08-12T12:01:00.000Z");
+    const sourceComputedAt = new Date("2026-08-12T11:45:00.000Z");
     const current = getCurrentHourlyRegimeInput([
-      { hour: "14:00", temp: 23.4, precipitation: 0, windSpeed: 9, humidity: 50, cloudCover: 12 },
-    ], 14, sourceUpdatedAt);
+      { hour: "14:00", validAt: Date.parse("2026-08-12T12:00:00.000Z"), temp: 23.4, precipitation: 0, windSpeed: 9, humidity: 50, cloudCover: 12 },
+    ], 14, sourceUpdatedAt, "Prévision horaire officielle · 7 modèles", sourceComputedAt);
 
     expect(current?.updatedAt).toEqual(sourceUpdatedAt);
+    expect(current?.sourceUpdatedAt).toEqual(sourceComputedAt);
+    expect(current?.validAt).toBe(Date.parse("2026-08-12T12:00:00.000Z"));
+    expect(current?.sourceLabel).toBe("Prévision horaire officielle · 7 modèles");
   });
 
   it("utilise validAt pour distinguer les deux heures locales répétées", () => {

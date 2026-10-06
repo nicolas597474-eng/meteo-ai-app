@@ -91,9 +91,9 @@ function getTodayParis(): string {
   return getParisDate();
 }
 
-export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), sourceUpdatedAt?: Date | string) {
+export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), selectionUpdatedAt?: Date | string, sourceLabel?: string, sourceComputedAt?: Date | string | null) {
   const hourNumber = Number(currentHour);
-  const updatedAt = sourceUpdatedAt == null ? new Date() : new Date(sourceUpdatedAt);
+  const updatedAt = selectionUpdatedAt == null ? new Date() : new Date(selectionUpdatedAt);
   const activeIndex = Number.isFinite(updatedAt.getTime())
     ? findActiveHourlyForecastIndex(hours, updatedAt.getTime())
     : -1;
@@ -109,7 +109,10 @@ export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = get
     humidity: current.humidity ?? null,
     cloudCover: current.cloudCover ?? null,
     visibilityKm: current.visibility ?? null,
+    validAt: typeof current.validAt === "number" ? current.validAt : null,
     updatedAt,
+    sourceUpdatedAt: sourceComputedAt ?? null,
+    sourceLabel: sourceLabel ?? null,
   };
 }
 
@@ -247,7 +250,7 @@ export const weatherRouter = router({
       ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
       : null;
 
-    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly, getParisHour(), new Date(officialSnapshot.computedAt)));
+    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly, getParisHour(), new Date(officialSnapshot.computedAt), "Prévision horaire officielle · 7 modèles", officialSnapshot.hourlyComputedAt));
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
     const modelIndicator = buildModelIndicator(trace);
 
@@ -958,7 +961,7 @@ export const weatherRouter = router({
       const dailyFallback = hours.length === 0
         ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
         : null;
-      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt)));
+      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt), "Prévision horaire officielle · 7 modèles", snapshot.hourlyComputedAt));
       const activeForecast = hours[findActiveHourlyForecastIndex(hours, new Date(snapshot.computedAt).getTime())];
       const nextRegimeChange = officialRegime.primary
         ? findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id, activeForecast?.validAt)
@@ -987,6 +990,7 @@ export const weatherRouter = router({
           sourceUpdatedAt: officialRegime.sourceUpdatedAt,
           sourceAgeMinutes: officialRegime.sourceAgeMinutes,
           dataCoverage: officialRegime.dataCoverage,
+          inputDiagnostics: officialRegime.inputDiagnostics,
         },
         nextRegimeChange,
         trace: trace
@@ -1229,7 +1233,7 @@ export const weatherRouter = router({
     // couvre notamment la nébulosité.
     const officialSnapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
     const liveHours = officialSnapshot.hourly;
-    const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours, getParisHour(), new Date(officialSnapshot.computedAt)));
+    const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours, getParisHour(), new Date(officialSnapshot.computedAt), "Prévision horaire officielle · 7 modèles", officialSnapshot.hourlyComputedAt));
     const regime = operationalRegime.primary?.id ?? null;
     const regimeDef = operationalRegime.primary;
     const weights = operationalRegime.blendedWeights;
