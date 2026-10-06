@@ -11,6 +11,7 @@ import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, collectExpertForecasts, collectExpertForecastsWithDiagnostics, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
 import { buildHourlyModelCollectionCoverage, confirmDailyArchiveCoverage, HOURLY_FORECAST_VARIABLES, type DailyModelCollectionCoverage } from "./forecastVariableCoverage";
+import { isHourlyForecastArchiveComplete, isHourlyForecastRunHealthy } from "./forecastHealth";
 import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour, getParisHourlyTimestamps } from "./weatherTime";
 import { getActiveParisForecastHours } from "./forecastScheduleConfig";
 import { FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, FORECAST_REFRESH_LOCK_LEASE_MS, getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
@@ -1155,7 +1156,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           errors.push(`${fav.name}: couverture quotidienne partielle — modèles manquants : ${dailyCoverage.missing.join(", ")}.`);
         }
         let hourlyCoverage = getModelCoverage([], OFFICIAL_HOURLY_COVERAGE_MODELS);
-        const persistedHourlyModelNames = new Set<string>();
+        const archivedHourlyModelNames = new Set<string>();
+        const journaledHourlyModelNames = new Set<string>();
 
         // Each scheduled attempt is recorded before its provider request. Best Match is
         // retained as an explicitly non-official reference; only these seven named
@@ -1299,10 +1301,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               projectionRowsWritten,
             });
 
-            if (diagnostic.valuesReceived > 0 && archiveRowsWritten > 0 && OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName) && !persistedHourlyModelNames.has(model.modelName)) {
-              persistedHourlyModelNames.add(model.modelName);
-              hourlyModelsCollected++;
+            if (OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName)
+              && isHourlyForecastArchiveComplete({ archiveRowsWritten, expectedValueCount: diagnostic.expectedValueCount })) {
+              archivedHourlyModelNames.add(model.modelName);
             }
+            let resultJournaled = false;
             try {
               await upsertHourlyForecastCollectionResults([{
                 collectionJobId: jobId,
@@ -1326,13 +1329,26 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 attemptedAt: hourlyAttemptedAt,
                 completedAt: Date.now(),
               }]);
+              resultJournaled = true;
             } catch {
               errors.push(`${fav.name}: résultat horaire de ${model.modelName} non journalisé.`);
               console.warn(`[HourlyAudit] ${fav.name}/${model.modelName}: could not persist final result.`);
             }
+            if (isHourlyForecastRunHealthy({
+              isOfficialModel: OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName),
+              status: finalStatus,
+              archiveRowsWritten,
+              expectedValueCount: diagnostic.expectedValueCount,
+              projectionRowsWritten,
+              expectedHoursCount: diagnostic.expectedHoursCount,
+              resultJournaled,
+            }) && !journaledHourlyModelNames.has(model.modelName)) {
+              journaledHourlyModelNames.add(model.modelName);
+              hourlyModelsCollected++;
+            }
           }
 
-          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
+          hourlyCoverage = getModelCoverage(Array.from(archivedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
           console.log(`[Models] ${fav.name}: horaire archivé ${hourlyCoverage.collected.length}/${hourlyCoverage.expected.length}`);
           if (hourlyCoverage.missing.length > 0) {
             console.warn(`[Models] ${fav.name}: horaire indisponible — ${hourlyCoverage.missing.join(", ")}`);
@@ -1402,7 +1418,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               // A failed audit write cannot suppress the other provider attempts.
             }
           }
-          hourlyCoverage = getModelCoverage(Array.from(persistedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
+          hourlyCoverage = getModelCoverage(Array.from(archivedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
         }
         // Isolated research sidecar: exact Single Runs evidence never feeds live forecasts or coverage counters.
         try {
