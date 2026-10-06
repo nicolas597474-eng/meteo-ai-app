@@ -3863,4 +3863,5 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Constater que la documentation/code consultés n’établissent pas l’ID exact de couverture WCS AROME; ne pas inventer un mapping ni ajouter de comparaison direction silencieuse.
 - [x] Ajouter un contrôle admin explicite au clic, limité à GetCapabilities/DescribeCoverage, qui expose l’ID retourné et vérifie les degrés, l’axe vertical 10 m et les échéances du même run; aucun raster, valeur Single Runs, collecte, écriture DB ou changement du moteur officiel.
 - [x] Ajouter des fixtures synthétiques pour le champ confirmé, le champ incomplet, l’absence de nom direction/DD, la hauteur/unité et l’absence de téléchargement de valeurs.
-- [ ] Exécuter pnpm check, les tests Vitest pertinents, le build et git diff --check; ouvrir une PR séparée sans fusion ni publication.
+- [x] Vérifications : `pnpm check` réussi; 20 tests Vitest ciblés réussis; `pnpm build` réussi avec avertissements existants (variables Analytics, asset runtime, gros chunks); `git diff --check` propre.
+- [x] Commit `79bd71b` poussé sur `feat/verification-direction-vent-arome-shadow`; PR [#79](https://github.com/nicolas597474-eng/meteo-ai-app/pull/79) ouverte vers `main`, sans fusion ni déploiement.
