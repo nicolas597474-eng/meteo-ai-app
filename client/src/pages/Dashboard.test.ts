@@ -215,4 +215,28 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(ventMaxIndex).toBeGreaterThan(-1);
     expect(agreementIndex).toBeGreaterThan(ventMaxIndex);
   });
+
+  it("regroupe toutes les observations actuelles avant les prévisions du jour", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+    const observationsStart = source.indexOf('<section aria-label="Observations actuelles"');
+    const forecastStart = source.indexOf('<section aria-label="Prévisions du jour"');
+    expect(observationsStart).toBeGreaterThanOrEqual(0);
+    expect(forecastStart).toBeGreaterThan(observationsStart);
+
+    const observationsSection = source.slice(observationsStart, forecastStart);
+    for (const metric of [
+      "Ressenti",
+      "Direction du vent",
+      "Humidité actuelle",
+      "Précipitations actuelles",
+      "Vent actuel",
+      "Rafales actuelles",
+      "Pression locale",
+      "Nuages actuels",
+    ]) {
+      expect(observationsSection).toContain(metric);
+    }
+    expect(observationsSection).not.toContain("Autres observations actuelles");
+    expect(source.match(/<section aria-label="Observations actuelles"/g)).toHaveLength(1);
+  });
 });
