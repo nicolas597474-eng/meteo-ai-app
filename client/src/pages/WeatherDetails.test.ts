@@ -79,4 +79,11 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("forecast-details-page");
     expect(pageSource).toContain("pb-24");
   });
+  it("sépare la vérification admin du catalogue de la comparaison de valeurs AROME/Single Runs", () => {
+    expect(pageSource).toContain("trpc.weather.verifyHondeghemAromeWindDirection.useMutation()");
+    expect(pageSource).toContain('onClick={() => windDirectionVerification.mutate()}');
+    expect(pageSource).toContain("ne télécharge ni raster AROME ni valeurs Single Runs");
+    expect(pageSource).toContain("elle ne télécharge ni raster AROME ni valeurs Single Runs et n’intègre pas automatiquement le champ");
+    expect(pageSource).toContain('{user?.role === "admin" && <MeteoSurface');
+  });
 });

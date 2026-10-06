@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getPointFromGeoTiffBytes, runHondeghemAromeShadowComparison } from "./aromeHondeghemShadow";
+import { getPointFromGeoTiffBytes, runHondeghemAromeShadowComparison, verifyHondeghemAromeWindDirectionAvailability } from "./aromeHondeghemShadow";
 
 const RUN = "2026-09-29T00:00:00Z";
 const coverageIds = [
@@ -8,9 +8,9 @@ const coverageIds = [
   "WIND_SPEED__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___2026-09-29T00.00.00Z",
 ];
 const capabilities = (ids = coverageIds, includeGeoTiff = true) => `<wcs:Capabilities><ows:OperationsMetadata><ows:Operation name="GetCoverage"><ows:Parameter name="format"><ows:AllowedValues>${includeGeoTiff ? "<ows:Value>image/tiff</ows:Value>" : ""}<ows:Value>application/wmo-grib</ows:Value></ows:AllowedValues></ows:Parameter></ows:Operation></ows:OperationsMetadata><wcs:Contents>${ids.map((id) => `<wcs:CoverageSummary><wcs:CoverageId>${id}</wcs:CoverageId></wcs:CoverageSummary>`).join("")}</wcs:Contents></wcs:Capabilities>`;
-const coverageDescription = (metric: "temperature" | "precipitation" | "windSpeed") => {
-  const unit = metric === "temperature" ? "K" : metric === "windSpeed" ? "m s-1" : "kg m-2";
-  const heights = metric === "temperature" ? "2" : metric === "windSpeed" ? "10" : "0";
+const coverageDescription = (metric: "temperature" | "precipitation" | "windSpeed" | "windDirection") => {
+  const unit = metric === "temperature" ? "K" : metric === "windSpeed" ? "m s-1" : metric === "windDirection" ? "degree" : "kg m-2";
+  const heights = metric === "temperature" ? "2" : metric === "windSpeed" || metric === "windDirection" ? "10" : "0";
   return `<wcs:CoverageDescriptions><wcs:CoverageDescription><gml:boundedBy><gml:EnvelopeWithTimePeriod axisLabels="long lat height time" uomLabels="deg deg m ISO8601"><gml:beginPosition>${RUN}</gml:beginPosition><gml:endPosition>2026-09-29T02:00:00Z</gml:endPosition></gml:EnvelopeWithTimePeriod></gml:boundedBy><gml:domainSet><gmlrgrid:ReferenceableGridByVectors><gmlrgrid:generalGridAxis><gmlrgrid:GeneralGridAxis><gmlrgrid:offsetVector srsDimension="4" axisLabels="long lat height time" uomLabels="deg deg m s"/><gmlrgrid:gridAxesSpanned>height</gmlrgrid:gridAxesSpanned><gmlrgrid:coefficients>${heights}</gmlrgrid:coefficients></gmlrgrid:GeneralGridAxis></gmlrgrid:generalGridAxis><gmlrgrid:generalGridAxis><gmlrgrid:GeneralGridAxis><gmlrgrid:offsetVector srsDimension="4" axisLabels="long lat height time" uomLabels="deg deg m s"/><gmlrgrid:gridAxesSpanned>time</gmlrgrid:gridAxesSpanned><gmlrgrid:coefficients>0 3600 7200</gmlrgrid:coefficients></gmlrgrid:GeneralGridAxis></gmlrgrid:generalGridAxis></gmlrgrid:ReferenceableGridByVectors></gml:domainSet><swe:rangeType><swe:DataRecord><swe:field><swe:Quantity><swe:uom code="${unit}"/></swe:Quantity></swe:field></swe:DataRecord></swe:rangeType></wcs:CoverageDescription></wcs:CoverageDescriptions>`;
 };
 const openMeteo = {
@@ -61,6 +61,75 @@ function createFetchMock(options?: { missingPrecip?: boolean; authStatus?: numbe
 
 describe("AROME Hondeghem shadow comparison", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("n’envoie aucune requête si l’identifiant OAuth manque pour la vérification de métadonnées", async () => {
+    const fetchImpl = vi.fn();
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "", fetchImpl: fetchImpl as typeof fetch });
+    expect(result.status).toBe("missing-key");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("découvre l’ID réel au clic et confirme seulement les métadonnées 10 m, degrés et temps du run", async () => {
+    const syntheticDirectionId = "SYNTHETIC_WIND_DIRECTION_FIELD___2026-09-29T00.00.00Z";
+    const requests: URL[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(input.toString());
+      requests.push(url);
+      if (url.pathname === "/token") return response(JSON.stringify({ access_token: "synthetic-access-token" }));
+      if (url.pathname.endsWith("/GetCapabilities")) return response(capabilities([...coverageIds, syntheticDirectionId]));
+      if (url.pathname.endsWith("/DescribeCoverage")) return response(coverageDescription("windDirection"));
+      throw new Error(`Unexpected verification URL: ${url.origin}${url.pathname}`);
+    });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({
+      oauthApplicationId: "synthetic-application-id",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T01:00:00Z"),
+    });
+
+    expect(result.status).toBe("verified");
+    expect(result.run).toBe(RUN);
+    expect(result.candidates).toEqual([expect.objectContaining({
+      coverageId: syntheticDirectionId,
+      run: RUN,
+      unit: "degree",
+      heights: [10],
+      heightAxisUnit: "m",
+      validTimeCount: 3,
+      metadataConfirmed: true,
+      issues: [],
+    })]);
+    expect(requests.some((url) => url.hostname === "single-runs-api.open-meteo.com")).toBe(false);
+    expect(requests.some((url) => url.pathname.endsWith("/GetCoverage"))).toBe(false);
+  });
+
+  it("ne confirme pas un champ candidat dont l’unité n’est pas angulaire ou dont la hauteur n’est pas 10 m", async () => {
+    const syntheticDirectionId = "SYNTHETIC_WIND_DIRECTION_FIELD___2026-09-29T00.00.00Z";
+    const invalidDescription = coverageDescription("windDirection").replace('code="degree"', 'code="m/s"').replace("<gmlrgrid:coefficients>10</gmlrgrid:coefficients>", "<gmlrgrid:coefficients>2</gmlrgrid:coefficients>");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(input.toString());
+      if (url.pathname === "/token") return response(JSON.stringify({ access_token: "synthetic-access-token" }));
+      if (url.pathname.endsWith("/GetCapabilities")) return response(capabilities([...coverageIds, syntheticDirectionId]));
+      if (url.pathname.endsWith("/DescribeCoverage")) return response(invalidDescription);
+      throw new Error(`Unexpected verification URL: ${url.origin}${url.pathname}`);
+    });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch });
+    expect(result.status).toBe("not-confirmed");
+    expect(result.candidates[0]).toMatchObject({ metadataConfirmed: false, unit: "m/s", heights: [2] });
+    expect(result.candidates[0].issues.join(" ")).toMatch(/degrés|10 m/);
+  });
+
+  it("signale un catalogue sans identifiant direction reconnaissable sans affirmer que le champ n’existe pas", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(input.toString());
+      if (url.pathname === "/token") return response(JSON.stringify({ access_token: "synthetic-access-token" }));
+      if (url.pathname.endsWith("/GetCapabilities")) return response(capabilities());
+      throw new Error(`Unexpected verification URL: ${url.origin}${url.pathname}`);
+    });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch });
+    expect(result.status).toBe("not-advertised");
+    expect(result.message).toContain("ne prouve pas l’absence");
+    expect(result.candidates).toEqual([]);
+  });
 
   it("does not send any request when the OAuth2 application identifier is missing", async () => {
     const fetchImpl = vi.fn();

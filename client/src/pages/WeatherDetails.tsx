@@ -36,6 +36,7 @@ export default function WeatherDetails() {
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
   const [slowLoad, setSlowLoad] = useState(false);
   const aromeShadow = trpc.weather.compareHondeghemAromeShadow.useMutation();
+  const windDirectionVerification = trpc.weather.verifyHondeghemAromeWindDirection.useMutation();
 
   const isHondeghem = !activeLocation || (
     Math.abs(activeLocation.lat - 50.7567) < 0.001 && Math.abs(activeLocation.lon - 2.5204) < 0.001
@@ -110,8 +111,24 @@ export default function WeatherDetails() {
             <button type="button" onClick={() => aromeShadow.mutate()} disabled={!isHondeghem || aromeShadow.isPending} className="min-h-10 shrink-0 rounded-xl border border-violet-200/35 bg-violet-300/10 px-3 py-2 text-xs font-semibold text-violet-100 disabled:cursor-not-allowed disabled:opacity-50">
               {aromeShadow.isPending ? "Comparaison en cours…" : aromeShadow.data ? "Relancer la comparaison" : "Comparer les runs"}
             </button>
+            <button type="button" onClick={() => windDirectionVerification.mutate()} disabled={!isHondeghem || windDirectionVerification.isPending} className="min-h-10 shrink-0 rounded-xl border border-cyan-200/35 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50">
+              {windDirectionVerification.isPending ? "Vérification du catalogue…" : "Vérifier DD(10 m)"}
+            </button>
           </div>
           {!isHondeghem && <p className="mt-3 rounded-xl border border-amber-200/20 bg-amber-200/[0.05] p-2 text-[10px] text-amber-100">Cette comparaison est limitée à Hondeghem (50,7567° N, 2,5204° E); choisissez ce lieu pour l’activer.</p>}
+          <p className="mt-2 text-[9px] leading-relaxed text-amber-100/80">La comparaison chiffrée actuelle couvre température, précipitations et vitesse du vent. La direction DD(10 m) reste non comparée tant que l’identifiant exact de sa couverture WCS n’a pas été confirmé.</p>
+          <p className="mt-2 text-[9px] leading-relaxed text-slate-400">La vérification DD(10 m) ne part qu’au clic administrateur. Elle consulte le catalogue et DescribeCoverage pour découvrir l’identifiant exact et contrôler hauteur, unité et échéances; elle ne télécharge ni raster AROME ni valeurs Single Runs et n’intègre pas automatiquement le champ.</p>
+          {windDirectionVerification.error && <p role="alert" className="mt-2 rounded-xl border border-rose-300/25 bg-rose-300/[0.06] p-2 text-[10px] text-rose-100">Vérification impossible : {windDirectionVerification.error.message}</p>}
+          {windDirectionVerification.data && <div className={`mt-2 rounded-xl border p-2 text-[9px] leading-relaxed ${windDirectionVerification.data.status === "verified" ? "border-emerald-300/25 bg-emerald-300/[0.05] text-emerald-100" : "border-cyan-300/20 bg-cyan-300/[0.04] text-cyan-100"}`} role="status">
+            <p className="font-semibold">{windDirectionVerification.data.status === "verified" ? "Métadonnées direction 10 m confirmées pour ce run" : windDirectionVerification.data.status === "not-confirmed" ? "Identifiant candidat, métadonnées insuffisantes" : windDirectionVerification.data.status === "not-advertised" ? "Aucun nom direction/DD reconnu dans ce run" : windDirectionVerification.data.status === "missing-key" ? "Identifiant OAuth absent" : windDirectionVerification.data.status === "authentication-error" ? "Accès catalogue refusé" : "Vérification impossible"}</p>
+            <p>{windDirectionVerification.data.message}</p>
+            {windDirectionVerification.data.run && <p>Run inspecté (UTC) : <strong>{windDirectionVerification.data.run}</strong></p>}
+            {windDirectionVerification.data.candidates.map((candidate) => <div key={candidate.coverageId} className="mt-1 rounded-lg border border-white/10 bg-black/15 p-1.5">
+              <p className="break-all"><code>{candidate.coverageId}</code></p>
+              <p>Valeurs : {candidate.unit ?? "unité non fournie"} · axe hauteur : {candidate.heightAxisUnit ?? "non fourni"} · niveaux : {candidate.heights.length ? candidate.heights.join(", ") : "non fournis"} · échéances du run : {candidate.validTimeCount}</p>
+              {candidate.issues.length > 0 && <p>{candidate.issues.join(" ")}</p>}
+            </div>)}
+          </div>}
           {aromeShadow.error && <p role="alert" className="mt-3 rounded-xl border border-rose-300/25 bg-rose-300/[0.06] p-2 text-[10px] text-rose-100">Requête impossible : {aromeShadow.error.message}</p>}
           {aromeShadow.data && <div className="mt-3 space-y-3" role="status">
             <div className={`rounded-xl border p-2 text-[10px] leading-relaxed ${aromeShadow.data.status === "ok" ? "border-emerald-300/25 bg-emerald-300/[0.05] text-emerald-100" : aromeShadow.data.status === "missing-key" || aromeShadow.data.status === "authentication-error" ? "border-amber-300/25 bg-amber-300/[0.05] text-amber-100" : "border-sky-300/20 bg-sky-300/[0.04] text-sky-100"}`}>

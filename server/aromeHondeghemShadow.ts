@@ -319,6 +319,142 @@ export interface AromeShadowOptions {
   decodePoint?: typeof getPointFromGeoTiffBytes;
 }
 
+export type AromeWindDirectionVerificationStatus =
+  | "verified"
+  | "not-confirmed"
+  | "not-advertised"
+  | "missing-key"
+  | "authentication-error"
+  | "request-impossible";
+
+export interface AromeWindDirectionCoverageCandidate {
+  coverageId: string;
+  run: string;
+  unit: string | null;
+  heights: number[];
+  heightAxisUnit: string | null;
+  validTimeCount: number;
+  metadataConfirmed: boolean;
+  issues: string[];
+}
+
+export interface AromeWindDirectionVerificationResult {
+  status: AromeWindDirectionVerificationStatus;
+  message: string;
+  checkedAt: string;
+  run: string | null;
+  candidates: AromeWindDirectionCoverageCandidate[];
+}
+
+function looksLikeWindDirectionCoverageId(id: string): boolean {
+  return !/(?:gust|rafale|dd_raf)/i.test(id)
+    && (/(?:wind[_-]?direction|direction)/i.test(id) || /(?:^|[^a-z0-9])dd(?:[^a-z0-9]|$)/i.test(id));
+}
+
+/**
+ * Explicit admin-only metadata check. It discovers candidate identifiers from the live catalogue
+ * when the admin clicks; it never assumes a WCS identifier and never downloads forecast values.
+ */
+export async function verifyHondeghemAromeWindDirectionAvailability(
+  options: Pick<AromeShadowOptions, "oauthApplicationId" | "fetchImpl" | "now"> = {},
+): Promise<AromeWindDirectionVerificationResult> {
+  const checkedAt = (options.now?.() ?? new Date()).toISOString();
+  const base = (status: AromeWindDirectionVerificationStatus, message: string, run: string | null = null, candidates: AromeWindDirectionCoverageCandidate[] = []) => ({ status, message, checkedAt, run, candidates });
+  const oauthApplicationId = options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId;
+  if (!oauthApplicationId?.trim()) {
+    return base("missing-key", "Identifiant d’application OAuth2 METEOFRANCE_API_KEY manquant : aucune requête fournisseur n’a été envoyée.");
+  }
+
+  const fetchImpl = options.fetchImpl ?? fetch;
+  try {
+    const tokenResponse = await fetchImpl(METEOFRANCE_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${oauthApplicationId.trim()}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      body: "grant_type=client_credentials",
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!tokenResponse.ok) {
+      return tokenResponse.status === 401 || tokenResponse.status === 403
+        ? base("authentication-error", `Échange OAuth2 Météo-France refusé (HTTP ${tokenResponse.status}); vérifiez l’accès à l’API AROME.`)
+        : base("request-impossible", `Service de jeton OAuth2 Météo-France indisponible (HTTP ${tokenResponse.status}).`);
+    }
+    const tokenPayload = await tokenResponse.json() as { access_token?: unknown } | null;
+    const accessToken = typeof tokenPayload?.access_token === "string" ? tokenPayload.access_token.trim() : "";
+    if (!accessToken) return base("request-impossible", "Échange OAuth2 réussi mais aucun jeton d’accès n’a été retourné.");
+
+    const headers = { Authorization: `Bearer ${accessToken}`, accept: "application/xml" };
+    const capabilitiesUrl = new URL(`${AROME_WCS_BASE}/GetCapabilities`);
+    capabilitiesUrl.searchParams.set("service", "WCS");
+    capabilitiesUrl.searchParams.set("version", "2.0.1");
+    capabilitiesUrl.searchParams.set("language", "fre");
+    const capabilitiesResponse = await fetchImpl(capabilitiesUrl.toString(), { headers, signal: AbortSignal.timeout(20_000) });
+    if (!capabilitiesResponse.ok) {
+      return capabilitiesResponse.status === 401 || capabilitiesResponse.status === 403
+        ? base("authentication-error", `Catalogue WCS AROME refusé (HTTP ${capabilitiesResponse.status}).`)
+        : base("request-impossible", `Catalogue WCS AROME indisponible (HTTP ${capabilitiesResponse.status}).`);
+    }
+
+    const coverageIds = localTagText(await capabilitiesResponse.text(), "CoverageId").map(decodeXml);
+    const selection = chooseLatestRun(coverageIds);
+    if (!selection) return base("request-impossible", "Aucun run de référence AROME reconnu pour associer les métadonnées de direction.");
+    const candidateIds = Array.from(new Set(coverageIds.filter((id) => looksLikeWindDirectionCoverageId(id)
+      && parseRunFromCoverageId(id)?.run === selection.run))).slice(0, 5);
+    if (!candidateIds.length) {
+      return base("not-advertised", `Aucun identifiant du run ${selection.run} ne mentionne explicitement direction/DD dans le catalogue. Cela ne prouve pas l’absence du champ sous un autre nom; aucun identifiant n’est supposé.`, selection.run);
+    }
+
+    const candidates: AromeWindDirectionCoverageCandidate[] = [];
+    for (const coverageId of candidateIds) {
+      const issues: string[] = [];
+      const describeUrl = new URL(`${AROME_WCS_BASE}/DescribeCoverage`);
+      describeUrl.searchParams.set("service", "WCS");
+      describeUrl.searchParams.set("version", "2.0.1");
+      describeUrl.searchParams.set("coverageID", coverageId);
+      const described = await fetchImpl(describeUrl.toString(), { headers, signal: AbortSignal.timeout(20_000) });
+      if (described.status === 401 || described.status === 403) {
+        return base("authentication-error", `Métadonnées WCS refusées pour ${coverageId} (HTTP ${described.status}).`, selection.run, candidates);
+      }
+      if (!described.ok) {
+        candidates.push({ coverageId, run: selection.run, unit: null, heights: [], heightAxisUnit: null, validTimeCount: 0, metadataConfirmed: false, issues: [`DescribeCoverage indisponible (HTTP ${described.status}).`] });
+        continue;
+      }
+
+      const metadata = parseCoverageMetadata(await described.text(), selection.run);
+      const unit = metadata.unit;
+      const normalizedUnit = (unit ?? "").trim().toLowerCase().replace(/\s+/g, "");
+      const angularUnit = ["°", "deg", "degree", "degrees"].includes(normalizedUnit);
+      const heightAxisUnit = metadata.axisUnits.height ?? null;
+      const normalizedHeightUnit = (heightAxisUnit ?? "").trim().toLowerCase();
+      const metreHeightAxis = ["m", "meter", "metre", "meters", "metres"].includes(normalizedHeightUnit);
+      const hasTenMetreLevel = metadata.heights.some((height) => Math.abs(height - 10) < 0.001);
+      const exactAxes = ["long", "lat", "height", "time"].every((axis) => metadata.axisLabels.includes(axis));
+      const secondsTimeAxis = ["s", "sec", "second", "seconds"].includes((metadata.axisUnits.time ?? "").toLowerCase());
+      const validTimeCount = metadata.validAt.filter((time) => Date.parse(time) >= Date.parse(selection.run)
+        && Date.parse(time) < Date.parse(selection.run) + MAX_HOURS * 60 * 60 * 1000).length;
+      if (!angularUnit) issues.push(`Unité des valeurs absente ou non confirmée en degrés (${unit ?? "non fournie"}).`);
+      if (!metadata.axisLabels.includes("height") || !metreHeightAxis || !hasTenMetreLevel) issues.push("Axe vertical en mètres avec niveau exact 10 m non confirmé.");
+      if (!exactAxes || !secondsTimeAxis || validTimeCount === 0) issues.push("Axes géographiques et échéances UTC du run non confirmés.");
+      candidates.push({ coverageId, run: selection.run, unit, heights: metadata.heights, heightAxisUnit, validTimeCount, metadataConfirmed: issues.length === 0, issues });
+    }
+
+    const verified = candidates.some((candidate) => candidate.metadataConfirmed);
+    return base(
+      verified ? "verified" : "not-confirmed",
+      verified
+        ? `Le catalogue annonce au moins une couverture candidate dont DescribeCoverage confirme les degrés, le niveau 10 m et des échéances du run ${selection.run}. Aucune valeur raster ni réponse Single Runs n’a été demandée; l’intégration reste à activer explicitement.`
+        : `Le catalogue annonce des identifiants candidats pour le run ${selection.run}, mais leurs métadonnées ne confirment pas toutes les conditions 10 m/degrés/temps. Aucune valeur n’est comparée.`,
+      selection.run,
+      candidates,
+    );
+  } catch {
+    return base("request-impossible", "Vérification du catalogue WCS impossible; aucune donnée de prévision n’a été téléchargée.");
+  }
+}
+
 /**
  * Manual, read-only comparison. It uses only the default AROME France HD product at Hondeghem;
  * it never writes to forecasts or lets the AROME result replace the displayed Best Match values.
