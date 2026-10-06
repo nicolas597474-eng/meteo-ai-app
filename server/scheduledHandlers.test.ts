@@ -114,6 +114,7 @@ describe("cadence automatique des prévisions", () => {
     const dailyWrite = handler.indexOf("await insertForecasts(forecastRowsForLoc);");
     const dailyCounter = handler.indexOf("dailyModelsCollected += dailyCoverage.collected.length", dailyWrite);
     const hourlyWrite = handler.indexOf("const writeResult = await insertHourlyForecasts(rows, { refreshProjection: diagnostic.projectionReady });");
+    const hourlyJournalWrite = handler.indexOf("await upsertHourlyForecastCollectionResults([", hourlyWrite);
     const hourlyCounter = handler.indexOf("hourlyModelsCollected++", hourlyWrite);
 
     expect(handler).toContain("getParisForecastSlot(new Date(), activeHours)");
@@ -131,6 +132,9 @@ describe("cadence automatique des prévisions", () => {
     expect(handler.indexOf("collectHourlyForecastAllModelsWithDiagnostics(today")).toBeLessThan(handler.indexOf("if (expertData.length === 0)"));
     expect(dailyCounter).toBeGreaterThan(dailyWrite);
     expect(hourlyCounter).toBeGreaterThan(hourlyWrite);
+    expect(hourlyCounter).toBeGreaterThan(hourlyJournalWrite);
+    expect(handler).toContain("isHourlyForecastArchiveComplete");
+    expect(handler).toContain("isHourlyForecastRunHealthy({");
     expect(handler).toContain("{ refreshComputedAt: true }");
     expect(handler).toContain("await insertForecastRuns(");
     expect(handler).not.toContain("cacheManualHourlyForecast");
