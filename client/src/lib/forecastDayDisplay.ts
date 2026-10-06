@@ -9,6 +9,8 @@ import type {
   DailyOfficialFusionDisplay,
 } from "@shared/dailyForecast";
 
+export const OFFICIAL_FORECAST_TIME_ZONE = "Europe/Paris";
+
 export type DailyForecastPoint = {
   date?: string | null;
   tempMax?: number | null;
@@ -35,6 +37,24 @@ export type DailyForecastPoint = {
   modelAgreement?: DailyModelAgreement | null;
 };
 
+export type DailyForecastMetricSourceKey =
+  | "tempMax"
+  | "tempMin"
+  | "precipitation"
+  | "windSpeed"
+  | "windGust"
+  | "humidity"
+  | "cloudCover";
+
+export type DailyForecastDisplayMetric = {
+  key: string;
+  label: string;
+  value: number | string | null | undefined;
+  unit: string;
+  precision: number;
+  sourceKey?: DailyForecastMetricSourceKey;
+};
+
 export type ForecastDisplayDay<
   THour extends DatedForecastHour,
   TDay extends DailyForecastPoint,
@@ -54,10 +74,73 @@ function isValidDateKey(value: string | null | undefined): value is string {
   );
 }
 
+/** Date keys in the current official forecast contract are civil dates in Europe/Paris. */
+export function getForecastDateKey(
+  now: Date | number = Date.now(),
+  timeZone = OFFICIAL_FORECAST_TIME_ZONE,
+): string {
+  const value = typeof now === "number" ? new Date(now) : now;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (name: Intl.DateTimeFormatPartTypes) =>
+    parts.find(({ type }) => type === name)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function getNextForecastDateKey(date: string): string {
+  if (!isValidDateKey(date)) return date;
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
+
+function isFiniteValue(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function formatTemperature(value: number): string {
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} °C`;
+}
+
+/** Never substitutes an hourly value when a daily extreme is absent. */
+export function getDailyExtremesDisplayLabel(
+  day: DailyForecastPoint | null | undefined,
+): string {
+  const max = isFiniteValue(day?.tempMax) ? formatTemperature(day.tempMax) : null;
+  const min = isFiniteValue(day?.tempMin) ? formatTemperature(day.tempMin) : null;
+  if (!max && !min) return "Extrêmes journaliers indisponibles";
+  return `Tmax ${max ?? "indisponible"} · Tmin ${min ?? "indisponible"}`;
+}
+
+/** Every meteorological field currently exposed by the daily DayForecast payload. */
+export function getDailyForecastDisplayMetrics(
+  day: DailyForecastPoint,
+): DailyForecastDisplayMetric[] {
+  return [
+    { key: "tempMax", label: "Température maximale quotidienne", value: day.tempMax, unit: "°C", precision: 1, sourceKey: "tempMax" },
+    { key: "tempMin", label: "Température minimale quotidienne", value: day.tempMin, unit: "°C", precision: 1, sourceKey: "tempMin" },
+    { key: "precipitation", label: "Précipitations · cumul quotidien", value: day.precipitation, unit: "mm", precision: 1, sourceKey: "precipitation" },
+    { key: "windSpeed", label: "Vent · maximum quotidien", value: day.windSpeed, unit: "km/h", precision: 0, sourceKey: "windSpeed" },
+    { key: "windGust", label: "Rafales · maximum quotidien", value: day.windGust, unit: "km/h", precision: 0, sourceKey: "windGust" },
+    { key: "windDirection", label: "Direction dominante du vent", value: day.windDirection, unit: "°", precision: 0 },
+    { key: "humidity", label: "Humidité moyenne quotidienne", value: day.humidity, unit: "%", precision: 0, sourceKey: "humidity" },
+    { key: "cloudCover", label: "Nébulosité moyenne quotidienne", value: day.cloudCover, unit: "%", precision: 0, sourceKey: "cloudCover" },
+    { key: "condition", label: "Condition quotidienne", value: day.condition, unit: "", precision: 0 },
+    { key: "uvIndex", label: "Indice UV quotidien", value: day.uvIndex, unit: "indice", precision: 1 },
+    { key: "feelsLikeMax", label: "Température ressentie · maximum", value: day.feelsLikeMax, unit: "°C", precision: 1 },
+    { key: "feelsLikeMin", label: "Température ressentie · minimum", value: day.feelsLikeMin, unit: "°C", precision: 1 },
+    { key: "sunrise", label: "Lever du soleil", value: day.sunrise, unit: "", precision: 0 },
+    { key: "sunset", label: "Coucher du soleil", value: day.sunset, unit: "", precision: 0 },
+  ];
+}
+
 /**
- * Keeps the official hourly series authoritative wherever it exists. Daily
- * qualified daily fusions are used only for dates without official hours and
- * retain their own explicit identity. Dates are never inferred from timestamps.
+ * Keeps the official hourly series authoritative for its own values. For explicitly
+ * selected civil dates, daily payload values are attached as a separate source;
+ * no hourly value is aggregated or substituted for a daily field.
  */
 export function buildForecastDisplayDays<
   THour extends DatedForecastHour,
@@ -65,7 +148,8 @@ export function buildForecastDisplayDays<
 >(
   hours: readonly THour[],
   dailyDays: readonly TDay[],
-  maximumDays = 15
+  maximumDays = 15,
+  dailyDatesToShowAlongsideHourly: readonly string[] = [],
 ): ForecastDisplayDay<THour, TDay>[] {
   const byDate = new Map<
     string,
@@ -74,6 +158,9 @@ export function buildForecastDisplayDays<
       daily: TDay | null;
     }
   >();
+  const includeDailyForHourlyDate = new Set(
+    dailyDatesToShowAlongsideHourly.filter(isValidDateKey),
+  );
 
   for (const group of groupOfficialHourlyForecastByDate(hours).days) {
     byDate.set(group.date, { hourlyGroup: group, daily: null });
@@ -81,7 +168,10 @@ export function buildForecastDisplayDays<
   for (const daily of dailyDays) {
     if (!isValidDateKey(daily.date)) continue;
     const current = byDate.get(daily.date);
-    if (current?.hourlyGroup) continue;
+    if (current?.hourlyGroup) {
+      if (includeDailyForHourlyDate.has(daily.date)) current.daily = daily;
+      continue;
+    }
     byDate.set(daily.date, { hourlyGroup: null, daily });
   }
 
@@ -98,7 +188,7 @@ export function buildForecastDisplayDays<
         date,
         kind: "official-hourly",
         hourlyGroup: entry.hourlyGroup,
-        daily: null,
+        daily: entry.daily,
       });
     } else if (entry.daily) {
       result.push({
