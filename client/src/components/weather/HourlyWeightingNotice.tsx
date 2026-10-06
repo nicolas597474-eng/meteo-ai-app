@@ -49,7 +49,7 @@ const REASON_LABELS: Record<string, string> = {
   horizon_not_scored: "horizon sans bucket historique",
   incomparable_horizons: "horizons différents, évalués séparément",
   no_wet_models: "aucun modèle disponible ne prévoit au moins 0,1 mm",
-  no_model_data: "aucune valeur réelle reçue pour cette variable et cette échéance",
+  no_model_data: "aucune prévision admissible pour cette variable et cette échéance",
 };
 
 function formatGroups(
@@ -63,7 +63,7 @@ function formatGroups(
     if (rowStatus !== calibrationStatus) continue;
     const label = VARIABLE_LABELS[row.variable] ?? row.variable;
     const horizons = groups.get(label) ?? new Set<string>();
-    horizons.add(row.horizonBucket ?? "bucket historique non disponible");
+    horizons.add(row.horizonBucket ?? "horizon non déterminé");
     groups.set(label, horizons);
   }
   return Array.from(groups, ([variable, horizons]) => `${variable} (${Array.from(horizons).join(", ")})`).join("; ");
@@ -75,7 +75,7 @@ function formatUnavailableDetails(rows: NonNullable<HourlyWeightingNoticeProps["
     if (row.availabilityStatus !== "UNAVAILABLE" && row.method !== "unavailable") continue;
     const reason = REASON_LABELS[row.unavailableReason ?? ""] ?? "aucune valeur disponible";
     const variable = VARIABLE_LABELS[row.variable] ?? row.variable;
-    const item = `${variable} (${row.horizonBucket ?? "échéance exacte"})`;
+    const item = `${variable} (${row.horizonBucket ?? "horizon non déterminé"})`;
     const variables = groups.get(reason) ?? new Set<string>();
     variables.add(item);
     groups.set(reason, variables);
@@ -87,7 +87,7 @@ function formatCoverageLevelDistribution(rows: NonNullable<HourlyWeightingNotice
   const groups = new Map<string, { variable: string; horizon: string; counts: Record<ModelCountCoverageLevel, number> }>();
   for (const row of rows ?? []) {
     if (!row.coverageLevelCounts) continue;
-    const horizon = row.horizonBucket ?? "échéance exacte";
+    const horizon = row.horizonBucket ?? "horizon non déterminé";
     const key = `${row.variable}|${horizon}`;
     const group = groups.get(key) ?? {
       variable: VARIABLE_LABELS[row.variable] ?? row.variable,
