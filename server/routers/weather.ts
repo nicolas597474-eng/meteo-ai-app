@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "../_core/trpc";
+import { ENV } from "../_core/env";
 import {
   getForecastsByDate,
   getForecastsByDateRange,
@@ -84,6 +85,7 @@ import { buildLocalPrecipitationNowcastingReport } from "../localPrecipitationNo
 import { deriveStationPerformanceProfiles } from "../stationPerformanceService";
 import { getStationRankingContract } from "../stationRankingContract";
 import { runHondeghemAromeShadowComparison, verifyHondeghemAromeWindDirectionAvailability } from "../aromeHondeghemShadow";
+import { compareOpenWeatherForecastWithOfficial } from "../openWeatherShadow";
 import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
 import { buildStationForecastComparison24h } from "../stationForecastComparison";
 import { dailyPhysicalComparisonsRouter } from "./dailyPhysicalComparisons";
@@ -660,6 +662,26 @@ export const weatherRouter = router({
   /** Vérification au clic des candidats DD(10 m) du catalogue WCS; aucun raster ni run Single Runs n’est téléchargé. */
   verifyHondeghemAromeWindDirection: adminProcedure
     .mutation(async () => verifyHondeghemAromeWindDirectionAvailability()),
+  /** OpenWeather est un comparateur shadow manuel; il ne participe pas au moteur et ne persiste rien. */
+  compareOpenWeatherShadow: adminProcedure
+    .input(z.object({
+      lat: latitudeSchema,
+      lon: longitudeSchema,
+      officialHours: z.array(z.object({
+        validAt: z.number().int().positive(),
+        temp: z.number().finite().nullable(),
+        windSpeed: z.number().finite().nullable(),
+        windDirection: z.number().finite().nullable(),
+        humidity: z.number().finite().nullable(),
+        cloudCover: z.number().finite().nullable(),
+      }).strict()).max(96),
+    }).strict())
+    .mutation(async ({ input }) => compareOpenWeatherForecastWithOfficial({
+      apiKey: ENV.openWeatherMapApiKey,
+      lat: input.lat,
+      lon: input.lon,
+      officialHours: input.officialHours,
+    })),
 
   /** Provenance commune : horaires, repli quotidien réel ou indisponibilité explicite. */
   getForecastProvenance: publicProcedure

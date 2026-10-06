@@ -86,4 +86,13 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("elle ne télécharge ni raster AROME ni valeurs Single Runs et n’intègre pas automatiquement le champ");
     expect(pageSource).toContain('{user?.role === "admin" && <MeteoSurface');
   });
+  it("garde OpenWeather comme comparateur manuel shadow et affiche les échéances et champs non couverts", () => {
+    expect(pageSource).toContain("trpc.weather.compareOpenWeatherShadow.useMutation()");
+    expect(pageSource).toContain("validAt,");
+    expect(pageSource).toContain("openWeatherShadow.data.provenance.endpoint");
+    expect(pageSource).toContain("openWeatherShadow.data.coverage.map");
+    expect(pageSource).toContain("openWeatherShadow.data.unsupportedFields.map");
+    expect(pageSource).toContain("aucun changement des prévisions officielles");
+    expect(pageSource).toContain("jamais un modèle ni un vote");
+  });
 });

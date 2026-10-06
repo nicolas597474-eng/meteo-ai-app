@@ -3865,3 +3865,13 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Ajouter des fixtures synthétiques pour le champ confirmé, le champ incomplet, l’absence de nom direction/DD, la hauteur/unité et l’absence de téléchargement de valeurs.
 - [x] Vérifications : `pnpm check` réussi; 20 tests Vitest ciblés réussis; `pnpm build` réussi avec avertissements existants (variables Analytics, asset runtime, gros chunks); `git diff --check` propre.
 - [x] Commit `79bd71b` poussé sur `feat/verification-direction-vent-arome-shadow`; PR [#79](https://github.com/nicolas597474-eng/meteo-ai-app/pull/79) ouverte vers `main`, sans fusion ni déploiement.
+
+## Comparaison OpenWeather en mode shadow — 6 octobre 2026
+- [x] Repartir du `main` frais `074569841b9c1139f24fc7bd44b722b7156c3185`; vérifier `todo.md`, les audits présents et l’état public des PR; constater la fusion de #79 et l’absence de PR ouverte.
+- [x] Confirmer dans la documentation du [Forecast 5 jours / 3 heures](https://openweathermap.org/forecast5) et la [grille tarifaire](https://openweathermap.org/price) l’usage de l’endpoint existant `/data/2.5/forecast`, distinct de One Call 3.0 et listé dans l’offre gratuite; aucun nouvel abonnement ou endpoint payant n’est ajouté.
+- [x] Partager le constructeur d’URL avec l’adaptateur existant sans changer son agrégation journalière; ajouter un diagnostic OpenWeather déclenché manuellement, admin-only, qui compare la série officielle déjà affichée sans collecte officielle supplémentaire, persistance ou migration.
+- [x] Appairer uniquement des timestamps UTC `validTime` exactement égaux; convertir les unités explicites, utiliser une différence circulaire pour la direction et exposer les horaires/champs non couverts. OpenWeather reste comparateur, jamais modèle indépendant ni vote.
+- [x] Ne modifier ni pondérations, archivage officiel, pipeline de prévision, intégration Météo-France/AROME shadow, base ou migrations. La comparaison ne rend aucun champ de secours actif.
+- [x] Valider uniquement avec fixtures synthétiques; aucun appel réel à OpenWeather ou autre API météo pendant la tâche.
+- [x] `pnpm check`, tests ciblés (13/13), suite complète (204 fichiers, 1 014 tests réussis, 2 ignorés), `pnpm build` et `git diff --check`.
+- [ ] Commit et PR dédiée vers `main`, sans fusion ni déploiement.
