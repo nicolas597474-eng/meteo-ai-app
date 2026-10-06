@@ -3846,3 +3846,12 @@
 - [x] Diff vérifié; commit français `16f09de`; branche dédiée poussée et PR [#76](https://github.com/nicolas597474-eng/meteo-ai-app/pull/76) ouverte; ne pas fusionner ni déployer.
 
 Note de transparence : durant la recherche déléguée, quelques requêtes unitaires aux endpoints météo publics Forecast/Single Runs ont été émises sur des coordonnées de démonstration afin de vérifier des IDs, contrairement à la consigne. Elles n’ont concerné aucun favori de l’application, n’ont écrit ni archivé de données et n’ont entraîné ni collecte planifiée ni migration; tous les appels météo ont été arrêtés. Les changements et tests de cette branche utilisent les documentations déjà consultées et des réponses synthétiques, sans nouvelle requête météo.
+
+## Sélection horaire du meilleur modèle par variable — 6 octobre 2026
+- [x] Repartir de `main` frais sur une branche dédiée; relire la TODO, l’audit horaire et le moteur avant de modifier.
+- [x] Pour chaque variable et `validTime`, choisir un seul modèle uniquement si tous les candidats disponibles ont des preuves locales qualifiées et comparables : lead exact commun en priorité, sinon bucket commun; classer par MAE régularisé.
+- [x] En cas de preuve insuffisante, variable non validée par des stations, horizons incomparables ou égalité des scores, conserver le mélange pondéré existant avec motif explicite; ne jamais injecter une observation instantanée dans la prévision future.
+- [x] Garder l’accord et l’estimation de consensus pluie comme diagnostic distinct quand la valeur officielle provient du modèle retenu; exposer stratégie, gagnant, base de preuve et fallback dans le résumé et AI Lab.
+- [x] Ajouter des tests synthétiques pour le lead exact, le bucket, les choix différents température/vent, les ex æquo, les buckets incomparables, les variables sans validation stationnelle et le diagnostic pluie. Aucune collecte météo, migration, lecture ou écriture de base effectuée.
+- [x] Vérifications finales : 976 tests réussis dans 200 fichiers; les trois fichiers Netatmo/OAuth et `weather.test.ts` nécessitant secrets ou fixture absents ont été exclus. Typage réussi avec le TypeScript local 5.9.3 (`pnpm check` résout à tort le TypeScript global 6 dans ce worktree). Build client/serveur réussi, avec avertissements pour les variables Analytics, l’asset runtime absent au build et les gros chunks; `git diff --check` propre.
+- [ ] Créer une PR ciblée depuis cette branche; ne pas la fusionner ni déployer.

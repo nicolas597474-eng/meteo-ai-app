@@ -13,7 +13,13 @@ import { isCompleteHourlyForecastBatch } from "./hourlyForecastCompleteness";
 import { normalizeHourlySourceValue, parseHourlyTimestampSeconds } from "./hourlyValueNormalization";
 import { OFFICIAL_HOURLY_MODELS } from "./officialModels";
 export { OFFICIAL_HOURLY_MODELS } from "./officialModels";
-import type { HourlyHistoricalEvidence, HourlyMultiModelMetrics } from "../shared/hourlyModelMetrics";
+import type {
+  HourlyHistoricalEvidence,
+  HourlyMultiModelMetrics,
+  HourlySelectionEvidenceBasis,
+  HourlyVariableSelectionReason,
+  HourlyVariableSelectionStrategy,
+} from "../shared/hourlyModelMetrics";
 import type { ModelCountCoverageLevel } from "../shared/modelCoverageConfidence";
 import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
@@ -411,6 +417,10 @@ export type HourlyModelWeightDiagnostic = {
 export type HourlyVariableWeighting = {
   variable: string;
   method: "historical_skill" | "mixed" | "robust_fallback" | "single_model" | "unavailable";
+  selectionStrategy: HourlyVariableSelectionStrategy;
+  selectedModelName: string | null;
+  selectionEvidenceBasis: HourlySelectionEvidenceBasis;
+  selectionReason: HourlyVariableSelectionReason;
   /** Null when available model runs fall into different history buckets. */
   horizonBucket: string | null;
   availabilityStatus: HourlyAvailabilityStatus;

@@ -132,4 +132,31 @@ describe("HourlyWeightingNotice", () => {
     expect(html).toContain("PARTIALLY_CALIBRATED");
     expect(html).toContain("UNCALIBRATED_ROBUST");
   });
+
+  it("affiche les meilleurs modèles par variable et les raisons du fallback pondéré", () => {
+    const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
+      status: "mixed",
+      availabilityStatus: "FUSED",
+      calibrationStatus: "PARTIALLY_CALIBRATED",
+      horizons: [{
+        variable: "temperature",
+        horizonBucket: "6_24h",
+        method: "mixed",
+        availabilityStatus: "FUSED",
+        calibrationStatus: "PARTIALLY_CALIBRATED",
+        unavailableReason: null,
+        hourCount: 4,
+        selectionStrategyCounts: { qualified_best_model: 3, weighted_ensemble_fallback: 1 },
+        bestModelHourCounts: [{ modelName: "ICON", hourCount: 3 }],
+        selectionReasonCounts: [{ reason: "incomparable_horizons", hourCount: 1 }],
+        modelNamesWithData: ["AROME", "ICON"],
+      }],
+    } }));
+
+    expect(html).toContain("Meilleur modèle retenu sur preuve historique locale comparable");
+    expect(html).toContain("température (6_24h) : ICON sur 3 échéances");
+    expect(html).toContain("Fallback conservé :");
+    expect(html).toContain("mélange pondéré actuel lorsque la preuve ne permet pas de départager sûrement les modèles");
+    expect(html).toContain("horizons non comparables");
+  });
 });

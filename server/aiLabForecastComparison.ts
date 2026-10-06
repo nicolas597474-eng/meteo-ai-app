@@ -16,6 +16,10 @@ function projectHourlyWeighting(point: OfficialWeatherSnapshot["hourly"][number]
     variableWeightings: weighting.variableWeightings.map((variable) => ({
       variable: variable.variable,
       method: variable.method,
+      selectionStrategy: variable.selectionStrategy,
+      selectedModelName: variable.selectedModelName,
+      selectionEvidenceBasis: variable.selectionEvidenceBasis,
+      selectionReason: variable.selectionReason,
       horizonBucket: variable.horizonBucket,
       availabilityStatus: variable.availabilityStatus,
       calibrationStatus: variable.calibrationStatus,

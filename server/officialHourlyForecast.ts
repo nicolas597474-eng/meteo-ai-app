@@ -24,7 +24,13 @@ import {
 import { calculateRobustFallbackMultipliers, MODEL_FUSION_WEIGHT_CAP, normalizeModelWeightsWithCap, PERFORMANCE_PRIOR_DAYS } from "./fusionPerformance";
 import { PUBLIC_RANKING_EVIDENCE_THRESHOLDS } from "./weatherReliabilityConfig";
 import { summarizeHourlyHistoricalEvidence, type HourlyHistoricalScoreRow } from "./hourlyHistoricalEvidence";
-import type { HourlyHistoricalEvidence, ManualHourlyOverride } from "../shared/hourlyModelMetrics";
+import type {
+  HourlyHistoricalEvidence,
+  HourlySelectionEvidenceBasis,
+  HourlyVariableSelectionReason,
+  HourlyVariableSelectionStrategy,
+  ManualHourlyOverride,
+} from "../shared/hourlyModelMetrics";
 import { filterCurrentHourlyScoringRows } from "../shared/hourlyScoringValidation";
 import { selectEligibleModelsForHorizon, type ForecastModelCandidate, type ForecastModelEligibilityDiagnostic, type SelectedForecastModel } from "./forecastModelSelection";
 
@@ -71,16 +77,20 @@ type SelectedHourlyModel = SelectedForecastModel<HourlyModelValue>;
 type HourlyHistoricalEvidenceSelection = {
   evidence: HourlyHistoricalEvidence | null;
   exactEvidence: HourlyHistoricalEvidence | null;
+  bucketEvidence: HourlyHistoricalEvidence | null;
   calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" | "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" | "UNCALIBRATED_ROBUST";
 };
 type PreparedHourlyModel = {
   selected: SelectedHourlyModel;
   evidence: HourlyHistoricalEvidence | null;
   exactEvidence: HourlyHistoricalEvidence | null;
+  bucketEvidence: HourlyHistoricalEvidence | null;
   calibrationLevel: HourlyHistoricalEvidenceSelection["calibrationLevel"];
   calibrationStatus: HourlyCalibrationStatus;
+  horizonMilliseconds: number | null;
   reliability: number;
   rawWeight: number;
+  ensembleWeight: number;
   robustFallbackWeight: number | null;
   finalWeight: number;
   contributes: boolean;
@@ -233,6 +243,9 @@ export type OfficialHourlyWeightingSummary = {
     variable: string;
     horizonBucket: string | null;
     method: "historical_skill" | "mixed" | "robust_fallback" | "single_model" | "unavailable";
+    selectionStrategyCounts: Record<HourlyVariableSelectionStrategy, number>;
+    bestModelHourCounts: Array<{ modelName: string; hourCount: number }>;
+    selectionReasonCounts: Array<{ reason: HourlyVariableSelectionReason; hourCount: number }>;
     availabilityStatus: HourlyAvailabilityStatus;
     calibrationStatus: HourlyCalibrationStatus;
     unavailableReason: HourlyWeightingUnavailableReason | null;
@@ -355,6 +368,85 @@ function getVariableMethod(
   return "robust_fallback";
 }
 
+type BestModelSelection = {
+  selected: PreparedHourlyModel | null;
+  strategy: HourlyVariableSelectionStrategy;
+  evidenceBasis: HourlySelectionEvidenceBasis;
+  reason: HourlyVariableSelectionReason;
+};
+
+function hasQualifiedMetrics(evidence: HourlyHistoricalEvidence | null): evidence is HourlyHistoricalEvidence & {
+  metrics: NonNullable<HourlyHistoricalEvidence["metrics"]>;
+} {
+  return evidence?.status === "qualified" && evidence.metrics != null;
+}
+
+function selectBestQualifiedModel(
+  prepared: readonly PreparedHourlyModel[],
+  variable: OfficialHourlyVariable,
+): BestModelSelection {
+  if (prepared.length === 0) {
+    return { selected: null, strategy: "unavailable", evidenceBasis: null, reason: "no_admissible_model" };
+  }
+  if (prepared.length === 1) {
+    return { selected: prepared[0]!, strategy: "only_available_model", evidenceBasis: null, reason: "only_model_available" };
+  }
+  if (!HISTORY_VARIABLE_SET.has(variable)) {
+    return { selected: null, strategy: "weighted_ensemble_fallback", evidenceBasis: null, reason: "variable_without_station_validation" };
+  }
+
+  const exactLead = prepared[0]!.horizonMilliseconds;
+  const exactBucket = prepared[0]!.selected.horizonBucket;
+  const exactComparable = exactLead != null
+    && exactBucket != null
+    && prepared.every((item) => hasQualifiedMetrics(item.exactEvidence)
+      && item.horizonMilliseconds === exactLead
+      && item.selected.horizonBucket === exactBucket);
+  const bucket = prepared[0]!.selected.horizonBucket;
+  const bucketComparable = bucket != null
+    && prepared.every((item) => hasQualifiedMetrics(item.bucketEvidence)
+      && item.selected.horizonBucket === bucket);
+
+  const basis: HourlySelectionEvidenceBasis = exactComparable
+    ? "exact_lead"
+    : bucketComparable ? "horizon_bucket" : null;
+  if (!basis) {
+    const hasQualifiedButIncomparableEvidence = prepared.every((item) => hasQualifiedMetrics(item.evidence));
+    const hasUnavailableHistory = prepared.every((item) => item.evidence?.status === "history_unavailable");
+    const reason: HourlyVariableSelectionReason = hasQualifiedButIncomparableEvidence
+      ? "incomparable_horizons"
+      : hasUnavailableHistory ? "historical_scores_unavailable" : "insufficient_qualified_history";
+    return { selected: null, strategy: "weighted_ensemble_fallback", evidenceBasis: null, reason };
+  }
+
+  const evidenceFor = (item: PreparedHourlyModel) => basis === "exact_lead" ? item.exactEvidence! : item.bucketEvidence!;
+  const metrics = prepared.map((item) => evidenceFor(item).metrics!);
+  const baselineMae = median(metrics.map((item) => item.mae));
+  const ranked = prepared.map((item, index) => {
+    const score = metrics[index]!;
+    const comparisonReliability = score.comparisonCount / (score.comparisonCount + PERFORMANCE_PRIOR_DAYS);
+    const dayReliability = score.evaluatedDays / (score.evaluatedDays + PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays);
+    const reliability = comparisonReliability * dayReliability;
+    const regularizedMae = baselineMae > 0
+      ? baselineMae + reliability * (score.mae - baselineMae)
+      : score.mae;
+    return { item, regularizedMae };
+  }).sort((left, right) => left.regularizedMae - right.regularizedMae
+    || left.item.selected.modelName.localeCompare(right.item.selected.modelName));
+  const best = ranked[0]!;
+  const runnerUp = ranked[1]!;
+  const tieTolerance = Math.max(1, Math.abs(best.regularizedMae)) * 1e-9;
+  if (Math.abs(runnerUp.regularizedMae - best.regularizedMae) <= tieTolerance) {
+    return { selected: null, strategy: "weighted_ensemble_fallback", evidenceBasis: null, reason: "tied_qualified_scores" };
+  }
+  return {
+    selected: best.item,
+    strategy: "qualified_best_model",
+    evidenceBasis: basis,
+    reason: "qualified_comparable_history",
+  };
+}
+
 function ineligibilityReasonByModel(diagnostics: readonly ForecastModelEligibilityDiagnostic[]): Array<HourlyVariableWeighting["modelReasons"][number]> {
   return diagnostics.filter((item) => !item.eligible).map((item) => ({
     modelName: item.modelName,
@@ -454,7 +546,7 @@ function computeVariableForecastValue(input: {
       ? selected.validTime - selected.providerRunAt
       : Number.NaN;
     const evidence = selected.horizonBucket == null || !HISTORY_VARIABLE_SET.has(variable) || !Number.isSafeInteger(horizonMilliseconds) || horizonMilliseconds <= 0
-      ? { evidence: null, exactEvidence: null, calibrationLevel: "UNCALIBRATED_ROBUST" as const }
+      ? { evidence: null, exactEvidence: null, bucketEvidence: null, calibrationLevel: "UNCALIBRATED_ROBUST" as const }
       : getHistoricalEvidence(selected.modelName as OfficialHourlyModelName, variable, horizonMilliseconds, selected.horizonBucket);
     return { selected, ...evidence };
   });
@@ -467,7 +559,7 @@ function computeVariableForecastValue(input: {
     metricsByBucket.set(key, list);
   }
   const baselineByBucket = new Map(Array.from(metricsByBucket, ([key, values]) => [key, median(values)] as const));
-  const prepared: PreparedHourlyModel[] = valueHistory.map(({ selected, evidence, exactEvidence, calibrationLevel }) => {
+  const prepared: PreparedHourlyModel[] = valueHistory.map(({ selected, evidence, exactEvidence, bucketEvidence, calibrationLevel }) => {
     const fullyCalibrated = evidence?.status === "qualified" && evidence.metrics != null;
     const partiallyCalibrated = evidence?.metrics != null && ["insufficient_evidence", "incomplete_metrics"].includes(evidence.status);
     const calibrationStatus: HourlyCalibrationStatus = fullyCalibrated
@@ -493,10 +585,15 @@ function computeVariableForecastValue(input: {
       selected,
       evidence,
       exactEvidence,
+      bucketEvidence,
       calibrationLevel,
       calibrationStatus,
+      horizonMilliseconds: Number.isSafeInteger(selected.providerRunAt) && selected.validTime != null
+        ? selected.validTime - selected.providerRunAt!
+        : null,
       reliability,
       rawWeight: historicalMultiplier,
+      ensembleWeight: 0,
       robustFallbackWeight: null,
       finalWeight: 0,
       contributes: true,
@@ -528,23 +625,28 @@ function computeVariableForecastValue(input: {
   });
 
   const availableCount = prepared.length;
+  const bestSelection = selectBestQualifiedModel(prepared, variable);
   const wetModels = variable === "precipitation"
     ? prepared.filter((item) => item.selected.value >= PRECIPITATION_RAIN_THRESHOLD_MM)
     : prepared;
-  const valueContributors = variable === "precipitation" && wetModels.length > 0 ? wetModels : prepared;
-  const rawByModel = new Map(valueContributors.map((item) => [item.selected.modelId ?? item.selected.modelName, item.rawWeight] as const));
+  const ensembleContributors = variable === "precipitation" && wetModels.length > 0 ? wetModels : prepared;
+  const rawByModel = new Map(ensembleContributors.map((item) => [item.selected.modelId ?? item.selected.modelName, item.rawWeight] as const));
   const cappedByModel = normalizeModelWeightsWithCap(
     Array.from(rawByModel, ([modelId, rawWeight]) => ({ modelId, rawWeight })),
     1,
     MODEL_FUSION_WEIGHT_CAP,
   );
-  const finalByModel = cappedByModel
+  const ensembleByModel = cappedByModel
     ? new Map(Array.from(cappedByModel, ([modelId, weight]) => [modelId, weight] as const))
     : normalizeWeights(rawByModel);
+  const useQualifiedWinner = bestSelection.strategy === "qualified_best_model" && bestSelection.selected != null;
+  const valueContributors = useQualifiedWinner ? [bestSelection.selected!] : ensembleContributors;
   for (const item of prepared) {
-    item.contributes = valueContributors.includes(item);
+    const modelId = item.selected.modelId ?? item.selected.modelName;
+    item.ensembleWeight = ensembleContributors.includes(item) ? ensembleByModel?.get(modelId) ?? 0 : 0;
+    item.contributes = useQualifiedWinner ? item === bestSelection.selected : ensembleContributors.includes(item);
     item.finalWeight = item.contributes
-      ? finalByModel?.get(item.selected.modelId ?? item.selected.modelName) ?? 0
+      ? useQualifiedWinner ? 1 : ensembleByModel?.get(modelId) ?? 0
       : 0;
   }
 
@@ -594,6 +696,12 @@ function computeVariableForecastValue(input: {
   const weighting: HourlyVariableWeighting = {
     variable,
     method,
+    selectionStrategy: bestSelection.strategy,
+    selectedModelName: bestSelection.strategy === "qualified_best_model" || bestSelection.strategy === "only_available_model"
+      ? bestSelection.selected?.selected.modelName ?? null
+      : null,
+    selectionEvidenceBasis: bestSelection.evidenceBasis,
+    selectionReason: bestSelection.reason,
     horizonBucket: buckets.length === 1 ? buckets[0]! : null,
     availabilityStatus,
     calibrationStatus,
@@ -634,7 +742,7 @@ function makePoint(
     amountMm: selected.value,
   }));
   const wetPrecipitationModels = precipitationSelection.filter(({ selected }) => selected.value >= PRECIPITATION_RAIN_THRESHOLD_MM);
-  const conditionalMean = weightedMean(wetPrecipitationModels.map((item) => ({ value: item.selected.value, weight: item.finalWeight })));
+  const conditionalMean = weightedMean(wetPrecipitationModels.map((item) => ({ value: item.selected.value, weight: item.ensembleWeight })));
   const precipitationMetrics = summarizePrecipitationModels(
     precipitationModels,
     precipitationSelection.map(({ selected }) => selected.modelName),
@@ -646,7 +754,10 @@ function makePoint(
       } : {}),
     },
   );
-  const precipitation = precipitationMetrics.consensusEstimateMm;
+  const precipitation = precipitationValue.weighting.selectionStrategy === "qualified_best_model"
+    || precipitationValue.weighting.selectionStrategy === "only_available_model"
+    ? precipitationValue.value
+    : precipitationMetrics.consensusEstimateMm;
   const temperature = valueFor("temperature");
   const windSpeed = valueFor("wind_speed");
   const windGust = valueFor("wind_gust");
@@ -840,6 +951,7 @@ export function computeOfficialHourlyForecast(
     const result: HourlyHistoricalEvidenceSelection = {
       evidence: exactQualified ? exactEvidence : bucketEvidence,
       exactEvidence,
+      bucketEvidence,
       calibrationLevel: exactQualified
         ? "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
         : bucketEvidence.metrics != null ? "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" : "UNCALIBRATED_ROBUST",
@@ -852,6 +964,9 @@ export function computeOfficialHourlyForecast(
     variable: string;
     horizonBucket: string | null;
     method: "historical_skill" | "mixed" | "robust_fallback" | "single_model" | "unavailable";
+    selectionStrategyCounts: Record<HourlyVariableSelectionStrategy, number>;
+    bestModelHourCounts: Map<string, number>;
+    selectionReasonCounts: Map<HourlyVariableSelectionReason, number>;
     availabilityStatus: HourlyAvailabilityStatus;
     calibrationStatus: HourlyCalibrationStatus;
     unavailableReason: HourlyWeightingUnavailableReason | null;
@@ -890,6 +1005,14 @@ export function computeOfficialHourlyForecast(
         variable: weighting.variable,
         horizonBucket: weighting.horizonBucket,
         method: weighting.method,
+        selectionStrategyCounts: {
+          qualified_best_model: 0,
+          weighted_ensemble_fallback: 0,
+          only_available_model: 0,
+          unavailable: 0,
+        },
+        bestModelHourCounts: new Map<string, number>(),
+        selectionReasonCounts: new Map<HourlyVariableSelectionReason, number>(),
         availabilityStatus: weighting.availabilityStatus,
         calibrationStatus: weighting.calibrationStatus,
         unavailableReason: weighting.unavailableReason,
@@ -905,6 +1028,13 @@ export function computeOfficialHourlyForecast(
       row.evidenceEligibleModelCount += weighting.evidenceEligibleModelCount;
       row.contributingModelCount += weighting.contributingModelCount;
       row.coverageLevelCounts[weighting.coverageLevel] += 1;
+      row.selectionStrategyCounts[weighting.selectionStrategy] += 1;
+      if (weighting.selectedModelName) {
+        row.bestModelHourCounts.set(weighting.selectedModelName, (row.bestModelHourCounts.get(weighting.selectedModelName) ?? 0) + 1);
+      }
+      if (weighting.selectionStrategy === "weighted_ensemble_fallback") {
+        row.selectionReasonCounts.set(weighting.selectionReason, (row.selectionReasonCounts.get(weighting.selectionReason) ?? 0) + 1);
+      }
       weighting.availableModels.forEach((name) => row.modelNamesWithData.add(name as OfficialHourlyModelName));
       summaryRows.set(key, row);
     }
@@ -937,6 +1067,10 @@ export function computeOfficialHourlyForecast(
       modelsWithData: Array.from(allModelsWithData),
       horizons: Array.from(summaryRows.values()).map((row) => ({
         ...row,
+        bestModelHourCounts: Array.from(row.bestModelHourCounts, ([modelName, hourCount]) => ({ modelName, hourCount }))
+          .sort((left, right) => right.hourCount - left.hourCount || left.modelName.localeCompare(right.modelName)),
+        selectionReasonCounts: Array.from(row.selectionReasonCounts, ([reason, hourCount]) => ({ reason, hourCount }))
+          .sort((left, right) => right.hourCount - left.hourCount || left.reason.localeCompare(right.reason)),
         modelNamesWithData: Array.from(row.modelNamesWithData),
       })),
     },
