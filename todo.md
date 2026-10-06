@@ -3875,3 +3875,15 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Valider uniquement avec fixtures synthétiques; aucun appel réel à OpenWeather ou autre API météo pendant la tâche.
 - [x] `pnpm check`, tests ciblés (13/13), suite complète (204 fichiers, 1 014 tests réussis, 2 ignorés), `pnpm build` et `git diff --check`.
 - [x] Commit et PR dédiée #80 ouverts vers `main`, sans fusion ni déploiement.
+
+
+## Mini-histogrammes horaires par rubrique — PR #82 — 6 octobre 2026
+- [x] Vérifier que la PR #81 était fusionnée; repartir d’un clone propre sur `main` frais `efe4627` et travailler sur une branche dédiée, sans toucher aux autres worktrees.
+- [x] Ajouter aux rubriques horaires numériques des mini-histogrammes colorés par variable : pluie bleu, vent turquoise, humidité/rosée cyan, nuages gris bleuté, pression violet, UV ambre, ressenti rouge doux, visibilité bleu clair et rayonnement orange; couleur décorative uniquement. AQI reste vert si une série apparaît un jour, mais aucun histogramme AQI n’est synthétisé quand sa donnée manque.
+- [x] Compacter les colonnes tout en conservant un intervalle visible, des libellés et valeurs lisibles et un défilement horizontal qui garde toutes les échéances disponibles.
+- [x] Utiliser un départ horaire commun : échéance cliquée si disponible, sinon échéance courante par `validAt`, puis première future; trier et aligner par instant UTC, préserver les instants distincts à l’heure d’hiver et représenter les trous sans interpolation.
+- [x] Garder les catégories (type/intensité), code WMO et AQI sans données en texte. Le resolver détaillé transmet le snapshot horaire filtré aux échéances courantes/futures; aucune prévision archivée antérieure n’est exposée à ce composant, donc aucune barre passée ni observation substitutive.
+- [x] Ne modifier ni valeurs, unités, logique de prévision, API, collecte, base de données ou dépendances.
+- [x] Vérifier les palettes et le rendu SSR ciblé : 19 tests réussis; `pnpm check`, `pnpm build` et `git diff --check` réussis. Le build conserve les avertissements existants Analytics, asset runtime et taille des chunks.
+- [x] Inspecter le composant dans un aperçu local de 390 px CSS avec fixture synthétique : vérification responsive/émulation, pas un téléphone réel; aucun appel météo. Supprimer les fixtures temporaires et arrêter le serveur local.
+- [x] Commit `59596bd` sur `feat/hourly-detail-mini-histograms-20261006`; PR [#82](https://github.com/nicolas597474-eng/meteo-ai-app/pull/82) ouverte vers `main`, sans fusion ni déploiement.
