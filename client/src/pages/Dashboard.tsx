@@ -987,7 +987,7 @@ export default function Dashboard() {
 
             <section aria-label="Observations actuelles" className="rounded-xl border border-cyan-400/20 bg-cyan-950/10 px-2 pb-2">
               <p className="pt-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-200/80">Observations actuelles <span className="font-normal normal-case tracking-normal text-slate-400">· provenance propre à chaque champ</span></p>
-            <div className={`${dashboardTemperatureLayout.compactMetrics} border-t border-cyan-400/20`}>
+            <div className="mt-2 grid grid-cols-2 gap-1 border-t border-cyan-400/20 pt-2 sm:grid-cols-4 sm:gap-2">
               {/* Ressenti */}
               <div className="text-center">
                 <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
@@ -1019,9 +1019,34 @@ export default function Dashboard() {
                 <p className="text-lg font-bold sm:text-2xl">{currentHumidity == null ? "—" : `${formatDashboardNumber(currentHumidity)}%`}</p>
                 <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(humidityField, currentSnapshot?.capturedAt)}</p>
               </div>
-            </div>
+              <div className="text-center" title={currentStateFieldTitle(precipitationField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Droplets className="mr-1 inline h-3 w-3" />Précipitations actuelles</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentPrecipitation == null ? "—" : `${currentPrecipitation.toFixed(1)} mm`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(precipitationField, currentSnapshot?.capturedAt)}</p>
+                <p className="text-[8px] leading-tight text-slate-500">Cumul station non comparable</p>
+              </div>
+              <div className="text-center" title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Vent actuel</p>
+                <p className="text-sm font-semibold sm:text-lg">{windSpeed == null ? "—" : `${windSpeed.toFixed(1)} km/h`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windSpeedField, currentSnapshot?.capturedAt)}</p>
+              </div>
+              <div className="text-center" title={currentStateFieldTitle(windGustField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Rafales actuelles</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentWindGust == null ? "—" : `${currentWindGust.toFixed(1)} km/h`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
+              </div>
+              <div className="text-center" title={currentStateFieldTitle(pressureField)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Thermometer className="mr-1 inline h-3 w-3" />Pression locale</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{currentPressure == null ? "Références source non comparables" : formatCurrentStateProvenance(pressureField)}</p>
+              </div>
+              <div className="text-center" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
+                <p className="text-[10px] text-muted-foreground sm:text-xs"><Eye className="mr-1 inline h-3 w-3" />Nuages actuels</p>
+                <p className="text-sm font-semibold sm:text-lg">{currentCloudCover == null ? "—" : `${formatDashboardNumber(currentCloudCover, 0)}%`}</p>
+                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}</p>
+              </div>
+              </div>
             </section>
-
             <section aria-label="Prévisions du jour" className="mt-2 rounded-xl border border-sky-400/20 bg-sky-950/10 px-2 pb-2">
               <p className="pt-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">Prévisions du jour <span className="font-normal normal-case tracking-normal text-slate-400">· valeurs prévues, distinctes des observations</span></p>
               <div className="mt-2 grid grid-cols-2 gap-1 border-t border-sky-400/20 pt-2 sm:grid-cols-4 sm:gap-2">
@@ -1069,37 +1094,7 @@ export default function Dashboard() {
               </div>
               </div>
             </section>
-            <section className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-950/10 p-2" aria-label="Autres données météorologiques courantes">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-200/80">Autres observations actuelles</p>
-              <div className="mt-1 grid grid-cols-2 gap-1 border-t border-cyan-400/20 pt-2 sm:grid-cols-4 sm:gap-2">
-              <div className="text-center" title={currentStateFieldTitle(precipitationField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Droplets className="mr-1 inline h-3 w-3" />Précipitations actuelles</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentPrecipitation == null ? "—" : `${currentPrecipitation.toFixed(1)} mm`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(precipitationField, currentSnapshot?.capturedAt)}</p>
-                <p className="text-[8px] leading-tight text-slate-500">Cumul station non comparable</p>
-              </div>
-              <div className="text-center" title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Vent actuel</p>
-                <p className="text-sm font-semibold sm:text-lg">{windSpeed == null ? "—" : `${windSpeed.toFixed(1)} km/h`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windSpeedField, currentSnapshot?.capturedAt)}</p>
-              </div>
-              <div className="text-center" title={currentStateFieldTitle(windGustField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Rafales actuelles</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentWindGust == null ? "—" : `${currentWindGust.toFixed(1)} km/h`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
-              </div>
-              <div className="text-center" title={currentStateFieldTitle(pressureField)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Thermometer className="mr-1 inline h-3 w-3" />Pression locale</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{currentPressure == null ? "Références source non comparables" : formatCurrentStateProvenance(pressureField)}</p>
-              </div>
-              <div className="text-center" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Eye className="mr-1 inline h-3 w-3" />Nuages actuels</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentCloudCover == null ? "—" : `${formatDashboardNumber(currentCloudCover, 0)}%`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}</p>
-              </div>
-              </div>
-            </section>
+
             </div>
           </div>
 
