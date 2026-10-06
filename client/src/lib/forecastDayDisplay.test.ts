@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildForecastDisplayDays,
+  getDailyExtremesDisplayLabel,
+  getDailyForecastDisplayMetrics,
+  getForecastDateKey,
+  getNextForecastDateKey,
   getDailyReferenceSourceLabels,
 } from "@/lib/forecastDayDisplay";
 
@@ -39,6 +43,67 @@ describe("forecast display days", () => {
     expect(
       result.every(day => day.kind !== "official-hourly" || day.daily === null)
     ).toBe(true);
+  });
+
+  it("attaches exact daily values alongside an hourly date without changing the hourly series", () => {
+    const date = "2026-10-06";
+    const daily = {
+      date,
+      tempMax: 21.4,
+      tempMin: 8.2,
+      precipitation: 2.3,
+      windSpeed: 18,
+      windGust: 31,
+      humidity: 72,
+      cloudCover: 48,
+      sunrise: "07:42",
+      sunset: "19:03",
+    };
+    const hours = [
+      { date, hour: "10:00", temp: 13.6 },
+      { date, hour: "11:00", temp: 14.1 },
+    ];
+
+    const [result] = buildForecastDisplayDays(hours, [daily], 15, [date]);
+
+    expect(result).toMatchObject({ date, kind: "official-hourly", daily });
+    expect(result.hourlyGroup?.hours.map(({ hour }) => hour.temp)).toEqual([13.6, 14.1]);
+    expect(getDailyExtremesDisplayLabel(result.daily)).toBe("Tmax 21,4 °C · Tmin 8,2 °C");
+    expect(getDailyForecastDisplayMetrics(daily).find(({ key }) => key === "precipitation")).toMatchObject({ value: 2.3, unit: "mm" });
+  });
+
+  it("keeps daily metrics explicitly unavailable when only hourly data exists", () => {
+    const date = "2026-10-06";
+    const [result] = buildForecastDisplayDays(
+      [{ date, hour: "10:00", temp: 19 }],
+      [],
+      15,
+      [date],
+    );
+
+    expect(result).toMatchObject({ kind: "official-hourly", daily: null });
+    expect(getDailyExtremesDisplayLabel(result.daily)).toBe("Extrêmes journaliers indisponibles");
+  });
+
+  it("reports a missing daily extreme without substituting the hourly temperature", () => {
+    const date = "2026-10-06";
+    const daily = { date, tempMax: 20.5, tempMin: null };
+    const [result] = buildForecastDisplayDays(
+      [{ date, hour: "13:00", temp: 30 }],
+      [daily],
+      15,
+      [date],
+    );
+
+    expect(result.hourlyGroup?.hours[0]?.hour.temp).toBe(30);
+    expect(getDailyExtremesDisplayLabel(result.daily)).toBe("Tmax 20,5 °C · Tmin indisponible");
+    expect(getDailyForecastDisplayMetrics(result.daily!).find(({ key }) => key === "tempMin")?.value).toBeNull();
+  });
+
+  it("uses the forecast contract timezone for today/tomorrow and leaves date keys unshifted", () => {
+    expect(getForecastDateKey(Date.parse("2026-10-06T21:59:00.000Z"))).toBe("2026-10-06");
+    expect(getForecastDateKey(Date.parse("2026-10-06T22:00:00.000Z"))).toBe("2026-10-07");
+    expect(getNextForecastDateKey("2026-10-31")).toBe("2026-11-01");
   });
 
   it("does not invent dates when either source is sparse or undated", () => {

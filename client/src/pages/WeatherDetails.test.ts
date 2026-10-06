@@ -18,9 +18,10 @@ describe("page Prévisions détaillées", () => {
   it("limite les dates aux données réelles et protège la séparation officielle/référence", () => {
     expect(displayDaysSource).toContain("Math.min(15, Math.floor(maximumDays))");
     expect(displayDaysSource).toContain("groupOfficialHourlyForecastByDate(hours)");
-    expect(displayDaysSource).toContain("if (current?.hourlyGroup) continue");
+    expect(displayDaysSource).toContain("if (current?.hourlyGroup) {");
+    expect(displayDaysSource).toContain("if (includeDailyForHourlyDate.has(daily.date)) current.daily = daily");
     expect(displayDaysSource).toContain("isValidDateKey(daily.date)");
-    expect(timelineSource).toContain("buildForecastDisplayDays(hours, dailyDays)");
+    expect(timelineSource).toContain("buildForecastDisplayDays(hours, dailyDays, 15, [today, tomorrow])");
     expect(timelineSource).toContain("Fusion officielle · preuves par variable");
     expect(timelineSource).toContain("Sources quotidiennes réellement reçues");
     expect(timelineSource).toContain("Best Match · référence dérivée, non contributeur officiel");
@@ -54,7 +55,7 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("aria-pressed={isSelected}");
     expect(timelineSource).toContain("aria-pressed={isHourSelected}");
     expect(timelineSource).toContain("Aucune série horaire officielle disponible pour cette date");
-    expect(timelineSource).toContain("Extrêmes quotidiens non fournis");
+    expect(timelineSource).toContain("Extrêmes journaliers indisponibles");
   });
   it("n’affiche que les champs fournis, distingue les fréquences brutes et laisse l’AQI indisponible", () => {
     for (const title of ["Précipitations", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité", "Rayonnement solaire"]) {
