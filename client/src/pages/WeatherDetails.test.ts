@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 const pageSource = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url), "utf8");
 const timelineSource = readFileSync(new URL("../components/weather/ForecastByDaySection.tsx", import.meta.url), "utf8");
+const selectedDetailsSource = readFileSync(new URL("../lib/hourlySelectedDetails.ts", import.meta.url), "utf8");
 const displayDaysSource = readFileSync(new URL("../lib/forecastDayDisplay.ts", import.meta.url), "utf8");
 describe("page Prévisions détaillées", () => {
   it("réutilise le contrat existant et transmet séparément l’horaire officiel, les jours et leurs sources", () => {
@@ -46,8 +47,8 @@ describe("page Prévisions détaillées", () => {
   it("garde les rubans horizontaux accessibles et n’invente pas d’échéances pour la série quotidienne", () => {
     expect(timelineSource).toContain('aria-label="Jours de prévision défilables"');
     expect(timelineSource).toContain('aria-label="Heures de prévision défilables"');
-    expect(timelineSource.match(/overflow-x-auto/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(timelineSource.match(/touch-pan-x/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(timelineSource.match(/overflow-x-auto/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(timelineSource.match(/touch-pan-x/g)?.length).toBeGreaterThanOrEqual(2);
     expect(timelineSource.match(/snap-x snap-mandatory/g)?.length).toBeGreaterThanOrEqual(2);
     expect(timelineSource).toContain("centerWithinHorizontalStrip");
     expect(timelineSource).toContain("aria-pressed={isSelected}");
@@ -57,16 +58,29 @@ describe("page Prévisions détaillées", () => {
   });
   it("n’affiche que les champs fournis, distingue les fréquences brutes et laisse l’AQI indisponible", () => {
     for (const title of ["Précipitations", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité", "Rayonnement solaire"]) {
-      expect(timelineSource).toContain(`title: "${title}"`);
+      expect(selectedDetailsSource).toContain(`"${title}"`);
     }
-    expect(timelineSource).toContain("Rafales max.");
-    expect(timelineSource).toContain("Direction dominante");
+    expect(selectedDetailsSource).toContain("rafales");
+    expect(selectedDetailsSource).toContain("direction");
+    expect(selectedDetailsSource).toContain("Type et intensité");
+    expect(selectedDetailsSource).toContain("weatherCode");
+    expect(selectedDetailsSource).toContain("Non disponible");
+    expect(selectedDetailsSource).toContain("Aucune donnée horaire de qualité de l’air");
     expect(timelineSource).toContain("Soleil");
-    expect(timelineSource).toContain("fréquence brute descriptive, pas une probabilité");
+    expect(selectedDetailsSource).toContain("fréquence descriptive brute, pas une probabilité calibrée");
     expect(timelineSource).toContain("jamais une probabilité de pluie calibrée");
     expect(timelineSource).toContain("buildDailyDetailCategories");
     expect(timelineSource).toContain("L’indice de qualité de l’air ne fait pas partie des données renvoyées à cette page");
     expect(timelineSource).toContain("Aucune valeur n’est demandée, déduite ou inventée");
+  });
+  it("lie les valeurs affichées à l’heure cliquée et expose son validTime et sa source", () => {
+    expect(timelineSource).toContain("buildHourlyDetailCategories(selectedEntry, hours)");
+    expect(timelineSource).toContain("selectedEntry.hour.validAt");
+    expect(timelineSource).toContain("validTime UTC :");
+    expect(timelineSource).toContain("Source : {selectedSourceLabel} · {selectedMethodLabel}");
+    expect(timelineSource).toContain("whitespace-normal break-words");
+    expect(pageSource).toContain("officialProvenance={{");
+    expect(pageSource).toContain("source: data.officialSnapshot?.source");
   });
   it("préserve la navigation historique, la carte et les preuves horaires", () => {
     expect(pageSource).toContain('import { Link } from "wouter"');

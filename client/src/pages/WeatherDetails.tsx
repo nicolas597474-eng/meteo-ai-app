@@ -119,6 +119,12 @@ export default function WeatherDetails() {
           dailySources={data.modelsUsed ?? []}
           activeHourIndex={currentHourIdx}
           hourlyWeighting={data.officialSnapshot?.hourlyWeighting}
+          officialProvenance={{
+            source: data.officialSnapshot?.source,
+            sourceKind: data.officialSnapshot?.sourceKind,
+            computedAt: data.officialSnapshot?.computedAt,
+            hourlyComputedAt: data.officialSnapshot?.hourlyComputedAt,
+          }}
         />
 
         {user?.role === "admin" && <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-violet-300/25 bg-violet-300/[0.045] p-3 sm:rounded-[24px] sm:p-4" aria-labelledby="arome-shadow-title">
