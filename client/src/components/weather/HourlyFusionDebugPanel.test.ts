@@ -19,6 +19,10 @@ const weighting: HourlyFusionTrace = {
   variableWeightings: [{
     variable: "temperature",
     method: "mixed",
+    selectionStrategy: "weighted_ensemble_fallback",
+    selectedModelName: null,
+    selectionEvidenceBasis: null,
+    selectionReason: "insufficient_qualified_history",
     horizonBucket: null,
     availabilityStatus: "FUSED",
     calibrationStatus: "PARTIALLY_CALIBRATED",
@@ -153,6 +157,8 @@ describe("HourlyFusionDebugPanel", () => {
     expect(html).toContain("pas la couverture/qualité des stations physiques");
     expect(html).toContain("L’incertitude statistique n’est pas mesurée ici");
     expect(html).toContain("la fiabilité historique est affichée séparément");
+    expect(html).toContain("fallback : mélange pondéré actuel (preuve historique qualifiée insuffisante)");
+    expect(html).toContain("Aucune mesure instantanée n’est injectée dans cette prévision future");
     expect(html).toMatch(/accord brut 80\s?%/i);
     expect(html).toContain("probabilité calibrée : non");
     expect(html).not.toContain("Probabilité de pluie : 80 %");

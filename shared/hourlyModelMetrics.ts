@@ -9,6 +9,24 @@ export type ManualHourlyOverride = {
   officialOriginalPointCount: number;
 };
 
+export type HourlyVariableSelectionStrategy =
+  | "qualified_best_model"
+  | "weighted_ensemble_fallback"
+  | "only_available_model"
+  | "unavailable";
+
+export type HourlySelectionEvidenceBasis = "exact_lead" | "horizon_bucket" | null;
+
+export type HourlyVariableSelectionReason =
+  | "qualified_comparable_history"
+  | "insufficient_qualified_history"
+  | "historical_scores_unavailable"
+  | "incomparable_horizons"
+  | "tied_qualified_scores"
+  | "variable_without_station_validation"
+  | "only_model_available"
+  | "no_admissible_model";
+
 export type HourlyHistoricalEvidenceStatus =
   | "qualified"
   | "insufficient_evidence"
@@ -101,6 +119,10 @@ export type HourlyFusionExcludedModelTrace = {
 export type HourlyFusionVariableTrace = {
   variable: string;
   method: string;
+  selectionStrategy: HourlyVariableSelectionStrategy;
+  selectedModelName: string | null;
+  selectionEvidenceBasis: HourlySelectionEvidenceBasis;
+  selectionReason: HourlyVariableSelectionReason;
   horizonBucket: string | null;
   availabilityStatus: string;
   calibrationStatus: string;

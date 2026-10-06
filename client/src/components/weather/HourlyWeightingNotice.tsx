@@ -1,5 +1,9 @@
 import React from "react";
-import type { ManualHourlyOverride } from "@shared/hourlyModelMetrics";
+import type {
+  HourlyVariableSelectionReason,
+  HourlyVariableSelectionStrategy,
+  ManualHourlyOverride,
+} from "@shared/hourlyModelMetrics";
 import {
   getModelCountCoverageLabel,
   MODEL_COUNT_COVERAGE_LEVELS,
@@ -29,6 +33,9 @@ type HourlyWeightingNoticeProps = {
       evidenceEligibleModelCount?: number;
       contributingModelCount?: number;
       coverageLevelCounts?: Partial<Record<ModelCountCoverageLevel, number>>;
+      selectionStrategyCounts?: Partial<Record<HourlyVariableSelectionStrategy, number>>;
+      bestModelHourCounts?: readonly { modelName: string; hourCount: number }[];
+      selectionReasonCounts?: readonly { reason: HourlyVariableSelectionReason; hourCount: number }[];
       modelNamesWithData: readonly string[];
     }[];
   } | null;
@@ -111,6 +118,38 @@ function formatCoverageLevelDistribution(rows: NonNullable<HourlyWeightingNotice
   }).join("; ");
 }
 
+function formatModelSelectionSummary(rows: NonNullable<HourlyWeightingNoticeProps["weighting"]>["horizons"]) {
+  const best: string[] = [];
+  const fallback: string[] = [];
+  const reasonLabels: Record<HourlyVariableSelectionReason, string> = {
+    qualified_comparable_history: "preuve locale comparable qualifiée",
+    insufficient_qualified_history: "preuves qualifiées insuffisantes",
+    historical_scores_unavailable: "historique local indisponible",
+    incomparable_horizons: "horizons non comparables",
+    tied_qualified_scores: "pas de gagnant unique",
+    variable_without_station_validation: "variable sans validation stationnelle",
+    only_model_available: "un seul modèle disponible",
+    no_admissible_model: "aucun modèle admissible",
+  };
+  for (const row of rows ?? []) {
+    const variable = VARIABLE_LABELS[row.variable] ?? row.variable;
+    const horizon = row.horizonBucket ?? "horizon non déterminé";
+    const context = `${variable} (${horizon})`;
+    const bestHours = row.selectionStrategyCounts?.qualified_best_model ?? 0;
+    if (bestHours > 0) {
+      const winners = (row.bestModelHourCounts ?? [])
+        .map(({ modelName, hourCount }) => `${modelName} sur ${hourCount} échéance${hourCount === 1 ? "" : "s"}`);
+      best.push(`${context} : ${winners.join(", ") || `${bestHours} échéances avec gagnant`}`);
+    }
+    const fallbackHours = row.selectionStrategyCounts?.weighted_ensemble_fallback ?? 0;
+    if (fallbackHours > 0) {
+      const reasons = Array.from(new Set((row.selectionReasonCounts ?? []).map(({ reason }) => reasonLabels[reason])));
+      fallback.push(`${context} : ${fallbackHours} échéance${fallbackHours === 1 ? "" : "s"}${reasons.length > 0 ? ` (${reasons.join(", ")})` : ""}`);
+    }
+  }
+  return { best, fallback };
+}
+
 export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps) {
   if (!weighting) return null;
 
@@ -121,6 +160,7 @@ export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps)
   const robust = formatGroups(weighting.horizons, "UNCALIBRATED_ROBUST");
   const unavailable = formatUnavailableDetails(weighting.horizons);
   const coverageDistribution = formatCoverageLevelDistribution(weighting.horizons);
+  const selectionSummary = formatModelSelectionSummary(weighting.horizons);
   const modelsWithData = Array.from(new Set([
     ...(weighting.modelsWithData ?? []),
     ...(weighting.horizons ?? []).flatMap((row) => row.modelNamesWithData),
@@ -145,6 +185,8 @@ export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps)
         <p><span className="font-semibold text-sky-100">Nombre de modèles contributeurs, par variable et horizon :</span> {coverageDistribution}.</p>
         <p>Ces catégories décrivent uniquement l’effectif des modèles contributeurs, pas la couverture/qualité des stations physiques. L’incertitude statistique n’est pas mesurée ici; la performance historique et son statut de calibration (`CALIBRATED`, `PARTIALLY_CALIBRATED`, `UNCALIBRATED_ROBUST`) restent distincts et sont affichés séparément ci-dessous.</p>
       </div>}
+      {selectionSummary.best.length > 0 && <p className="mb-1 rounded-md border border-emerald-200/15 bg-emerald-200/[0.035] px-2 py-1"><span className="font-semibold text-emerald-100">Meilleur modèle retenu sur preuve historique locale comparable :</span> {selectionSummary.best.join("; ")}.</p>}
+      {selectionSummary.fallback.length > 0 && <p className="mb-1 rounded-md border border-sky-200/10 bg-black/10 px-2 py-1"><span className="font-semibold text-sky-100">Fallback conservé :</span> mélange pondéré actuel lorsque la preuve ne permet pas de départager sûrement les modèles — {selectionSummary.fallback.join("; ")}.</p>}
       {weighting.status === "unavailable" ? (
         <>
           <p><span className="font-semibold text-amber-100">Prévision officielle horaire indisponible : aucun modèle admissible n’a fourni de valeur.</span> {availabilityMessage} {evidenceLabel} Modèles avec données : {modelsLabel}. Best Match est exclu.</p>

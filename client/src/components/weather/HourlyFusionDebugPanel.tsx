@@ -90,6 +90,28 @@ function calibrationLevelLabel(level: string): string {
   return "repli robuste non calibré";
 }
 
+function selectionDescription(variable: HourlyFusionTrace["variableWeightings"][number]): string {
+  if (variable.selectionStrategy === "qualified_best_model") {
+    const basis = variable.selectionEvidenceBasis === "exact_lead" ? "lead exact local" : "bucket local";
+    return `meilleur modèle unique : ${variable.selectedModelName ?? "nom indisponible"} (${basis} qualifié)`;
+  }
+  if (variable.selectionStrategy === "only_available_model") {
+    return `un seul modèle disponible : ${variable.selectedModelName ?? "nom indisponible"}; aucun classement comparatif`;
+  }
+  if (variable.selectionStrategy === "unavailable") return "aucune prévision admissible";
+  const reason: Record<string, string> = {
+    insufficient_qualified_history: "preuve historique qualifiée insuffisante",
+    historical_scores_unavailable: "historique local indisponible",
+    incomparable_horizons: "horizons historiques non comparables",
+    tied_qualified_scores: "aucun gagnant unique dans les scores qualifiés",
+    variable_without_station_validation: "variable sans validation stationnelle suffisante",
+    only_model_available: "un seul modèle disponible",
+    no_admissible_model: "aucune valeur admissible",
+    qualified_comparable_history: "preuve historique qualifiée",
+  };
+  return `fallback : mélange pondéré actuel (${reason[variable.selectionReason] ?? variable.selectionReason})`;
+}
+
 export function HourlyFusionDebugPanel({
   points,
   preferredValidAt,
@@ -106,8 +128,8 @@ export function HourlyFusionDebugPanel({
   return <div className="space-y-2.5" aria-label="Débogage de la fusion horaire">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div>
-        <p className="text-[11px] font-semibold text-slate-100">Poids et disponibilité par modèle</p>
-        <p className="text-[9px] text-slate-400">Chaque variable choisit ses propres runs et buckets pour la même échéance.</p>
+        <p className="text-[11px] font-semibold text-slate-100">Sélection et disponibilité par variable</p>
+        <p className="text-[9px] text-slate-400">Un gagnant n’est utilisé que si les preuves locales comparables sont qualifiées; sinon, le mélange pondéré actuel reste le fallback.</p>
       </div>
       <label className="flex items-center gap-1.5 text-[9px] text-slate-300">
         <span>Cible</span>
@@ -147,7 +169,8 @@ export function HourlyFusionDebugPanel({
           <summary className="cursor-pointer text-[10px] font-semibold text-slate-100">
             {variableLabel(variable.variable)} · {variable.contributingModelCount}/{variable.expectedModelCount} contributeurs · {getModelCountCoverageLabel(variable.coverageLevel as Parameters<typeof getModelCountCoverageLabel>[0])} · {statusLabel(variable.calibrationStatus)}
           </summary>
-          <p className="mt-1 text-[9px] leading-relaxed text-slate-400">Disponibles : {variable.availableModelCount} · preuves qualifiées : {variable.evidenceEligibleModelCount} · résumé bucket : {variable.horizonBucket ?? "mixte ou non classé"}. Les modèles peuvent appartenir à des buckets différents; aucun horizon commun n’est requis. La couverture décrit l’effectif de modèles contributeurs, pas la couverture/qualité des stations physiques. L’incertitude statistique n’est pas mesurée ici; la fiabilité historique est affichée séparément.</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-sky-100">Sélection : {selectionDescription(variable)}. Aucune mesure instantanée n’est injectée dans cette prévision future.</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-slate-400">Disponibles : {variable.availableModelCount} · preuves qualifiées : {variable.evidenceEligibleModelCount} · résumé bucket : {variable.horizonBucket ?? "mixte ou non classé"}. Le gagnant exige une preuve comparable au lead exact ou dans un bucket commun; en cas contraire, le mélange pondéré peut conserver plusieurs buckets. La couverture décrit l’effectif de modèles contributeurs, pas la couverture/qualité des stations physiques. L’incertitude statistique n’est pas mesurée ici; la fiabilité historique est affichée séparément.</p>
           {variable.modelWeights.length > 0 && <ul className="mt-1.5 space-y-1.5">
             {variable.modelWeights.map((model) => <li key={`${variable.variable}-${model.modelName}`} className="rounded-md border border-emerald-300/10 bg-emerald-300/[0.035] px-2 py-1.5 text-[9px] leading-relaxed text-slate-300">
               <p className="font-semibold text-emerald-100">{model.modelName} · disponible · {model.contributedToValue ? "contributeur" : "valeur conservée, non contributrice à la quantité"}</p>
@@ -175,7 +198,7 @@ export function HourlyFusionDebugPanel({
         <p className="font-semibold text-cyan-100">Précipitations · accord des modèles</p>
         <p>{precipitation.rainModelCount}/{precipitation.availableModelCount} modèles disponibles prévoient au moins {formatNumber(precipitation.thresholdMm, 1)} mm · accord brut {formatNumber(precipitation.frequencyPercent, 1)} % · probabilité calibrée : non.</p>
         <p>Estimation de consensus : {formatNumber(precipitation.consensusEstimateMm, 2)} mm · moyenne conditionnelle des modèles pluvieux : {formatNumber(precipitation.conditionalMeanMm, 2)} mm ({precipitation.conditionalMeanMethod}).</p>
-        <p>Cette fréquence décrit un accord de modèles, pas une probabilité météorologique calibrée. Valeurs par modèle : {precipitation.modelValues.map((model) => `${model.modelName} ${formatNumber(model.amountMm, 2)} mm`).join(" · ") || "aucune valeur disponible"}.</p>
+        <p>Cette fréquence décrit un accord de modèles, pas une probabilité météorologique calibrée; l’estimation de consensus reste distincte de la valeur finale affichée plus haut si un modèle unique a été retenu. Valeurs par modèle : {precipitation.modelValues.map((model) => `${model.modelName} ${formatNumber(model.amountMm, 2)} mm`).join(" · ") || "aucune valeur disponible"}.</p>
       </div>}
     </>}
   </div>;
