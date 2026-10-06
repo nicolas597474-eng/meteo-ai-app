@@ -21,7 +21,7 @@ vi.mock("./_core/env", () => ({
     forgeApiUrl: "http://test-forge-api.com",
     forgeApiKey: "test_forge_api_key",
     openWeatherMapApiKey: "",
-    meteoFranceApiKey: "",
+    meteoFranceOAuthApplicationId: "",
     netatmoStateSecret: "test_jwt_secret_key_for_mocking",
     netatmoEncryptionKey: "test_jwt_secret_key_for_mocking",
   },

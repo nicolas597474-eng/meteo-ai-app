@@ -1,8 +1,10 @@
 import { fromArrayBuffer } from "geotiff";
+import { ENV } from "./_core/env";
 import { HONDEGHEM } from "./weatherServices";
 
 export const AROME_WCS_PROFILE = "MF-NWP-HIGHRES-AROME-001-FRANCE-WCS";
 const AROME_WCS_BASE = `https://public-api.meteofrance.fr/public/arome/1.0/wcs/${AROME_WCS_PROFILE}`;
+const METEOFRANCE_TOKEN_URL = "https://portail-api.meteofrance.fr/token";
 const OPEN_METEO_SINGLE_RUNS = "https://single-runs-api.open-meteo.com/v1/forecast";
 const OPEN_METEO_MODEL = "meteofrance_arome_france_hd";
 const MAX_HOURS = 24;
@@ -310,7 +312,7 @@ function forecastValue(series: ForecastSeries | null, metric: AromeShadowMetric,
 }
 
 export interface AromeShadowOptions {
-  apiKey?: string;
+  oauthApplicationId?: string;
   fetchImpl?: FetchLike;
   now?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -323,20 +325,41 @@ export interface AromeShadowOptions {
  */
 export async function runHondeghemAromeShadowComparison(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
   const comparedAt = (options.now?.() ?? new Date()).toISOString();
-  const apiKey = options.apiKey ?? process.env.AROME_API_KEY;
-  if (!apiKey?.trim()) {
-    return baseResult("missing-key", "Clé serveur AROME_API_KEY manquante : aucune requête fournisseur n’a été envoyée.", comparedAt);
+  const oauthApplicationId = options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId;
+  if (!oauthApplicationId?.trim()) {
+    return baseResult("missing-key", "Identifiant d’application OAuth2 METEOFRANCE_API_KEY manquant : aucune requête fournisseur n’a été envoyée.", comparedAt);
   }
   const fetchImpl = options.fetchImpl ?? fetch;
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const decodePoint = options.decodePoint ?? getPointFromGeoTiffBytes;
-  const headers = { apikey: apiKey.trim(), accept: "application/xml, application/octet-stream" };
   const result = baseResult("request-impossible", "La comparaison n’a pas pu être exécutée.", comparedAt);
+  let headers: Record<string, string> = {};
   const getText = async (url: string): Promise<{ ok: boolean; status: number; text: string }> => {
     const response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(20_000) });
     return { ok: response.ok, status: response.status, text: response.ok ? await response.text() : "" };
   };
   try {
+    const tokenResponse = await fetchImpl(METEOFRANCE_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${oauthApplicationId.trim()}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      body: "grant_type=client_credentials",
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!tokenResponse.ok) {
+      if (tokenResponse.status === 401 || tokenResponse.status === 403) {
+        return { ...result, status: "authentication-error", message: `Échange OAuth2 Météo-France refusé (HTTP ${tokenResponse.status}); vérifiez l’abonnement AROME et l’identifiant d’application.` };
+      }
+      return { ...result, message: `Service de jeton OAuth2 Météo-France indisponible (HTTP ${tokenResponse.status}).` };
+    }
+    const tokenPayload = await tokenResponse.json() as { access_token?: unknown } | null;
+    const accessToken = typeof tokenPayload?.access_token === "string" ? tokenPayload.access_token.trim() : "";
+    if (!accessToken) return { ...result, message: "Échange OAuth2 Météo-France réussi mais aucun jeton d’accès n’a été retourné." };
+    headers = { Authorization: `Bearer ${accessToken}`, accept: "application/xml, application/octet-stream" };
+
     const capabilitiesUrl = new URL(`${AROME_WCS_BASE}/GetCapabilities`);
     capabilitiesUrl.searchParams.set("service", "WCS");
     capabilitiesUrl.searchParams.set("version", "2.0.1");
@@ -344,7 +367,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     const capabilities = await getText(capabilitiesUrl.toString());
     if (!capabilities.ok) {
       if (capabilities.status === 401) {
-        return { ...result, status: "authentication-error", message: "Authentification AROME refusée (HTTP 401); vérifiez que la clé serveur est abonnée à l’API AROME." };
+        return { ...result, status: "authentication-error", message: "Authentification AROME refusée (HTTP 401); vérifiez l’identifiant OAuth2 et l’abonnement à l’API AROME." };
       }
       return { ...result, message: `Catalogue WCS AROME indisponible (HTTP ${capabilities.status}).` };
     }
@@ -460,7 +483,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
         let value: number | null = null;
         let issue: string | undefined;
         try {
-          const response = await fetchImpl(coverageUrl.toString(), { headers: { apikey: apiKey.trim(), accept: "application/octet-stream" }, signal: AbortSignal.timeout(20_000) });
+          const response = await fetchImpl(coverageUrl.toString(), { headers: { ...headers, accept: "application/octet-stream" }, signal: AbortSignal.timeout(20_000) });
           if (!response.ok) {
             if (response.status === 401) return { ...result, status: "authentication-error", message: "Authentification AROME refusée pendant GetCoverage (HTTP 401)." };
             issue = response.status === 403
@@ -494,7 +517,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
       : "Comparaison partielle : seules les valeurs présentes dans les deux sources et conformes aux métadonnées sont comparées; les prévisions affichées restent inchangées.";
     return result;
   } catch (error) {
-    const status = error instanceof Error && /401|403|auth/i.test(error.message) ? "authentication-error" : "request-impossible";
-    return { ...result, status, message: status === "authentication-error" ? "Authentification AROME refusée; vérifiez la clé et l’abonnement AROME." : "Requête fournisseur impossible ou métadonnées inattendues; aucune prévision de production n’a été modifiée." };
+    const status = error instanceof Error && /401|403/.test(error.message) ? "authentication-error" : "request-impossible";
+    return { ...result, status, message: status === "authentication-error" ? "Authentification AROME refusée; vérifiez l’identifiant OAuth2 et l’abonnement AROME." : "Requête fournisseur impossible ou métadonnées inattendues; aucune prévision de production n’a été modifiée." };
   }
 }

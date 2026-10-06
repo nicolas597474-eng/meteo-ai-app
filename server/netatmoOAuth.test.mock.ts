@@ -14,7 +14,7 @@ export const mockENV = {
   forgeApiUrl: 'http://test-forge-api.com',
   forgeApiKey: 'test_forge_api_key',
   openWeatherMapApiKey: '',
-  meteoFranceApiKey: '',
+  meteoFranceOAuthApplicationId: '',
 };
 
 // Export as ENV for compatibility
