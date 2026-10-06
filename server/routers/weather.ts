@@ -83,7 +83,7 @@ import { buildLocalTemperatureNowcastingReport } from "../localTemperatureNowcas
 import { buildLocalPrecipitationNowcastingReport } from "../localPrecipitationNowcastingShadow";
 import { deriveStationPerformanceProfiles } from "../stationPerformanceService";
 import { getStationRankingContract } from "../stationRankingContract";
-import { runHondeghemAromeShadowComparison } from "../aromeHondeghemShadow";
+import { runHondeghemAromeShadowComparison, verifyHondeghemAromeWindDirectionAvailability } from "../aromeHondeghemShadow";
 import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
 import { buildStationForecastComparison24h } from "../stationForecastComparison";
 import { dailyPhysicalComparisonsRouter } from "./dailyPhysicalComparisons";
@@ -657,6 +657,9 @@ export const weatherRouter = router({
   /** Comparaison manuelle AROME en lecture seule, limitée à Hondeghem et sans effet sur la production. */
   compareHondeghemAromeShadow: adminProcedure
     .mutation(async () => runHondeghemAromeShadowComparison()),
+  /** Vérification au clic des candidats DD(10 m) du catalogue WCS; aucun raster ni run Single Runs n’est téléchargé. */
+  verifyHondeghemAromeWindDirection: adminProcedure
+    .mutation(async () => verifyHondeghemAromeWindDirectionAvailability()),
 
   /** Provenance commune : horaires, repli quotidien réel ou indisponibilité explicite. */
   getForecastProvenance: publicProcedure
