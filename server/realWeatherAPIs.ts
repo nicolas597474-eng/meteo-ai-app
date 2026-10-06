@@ -12,6 +12,7 @@
 
 import { ENV } from "./_core/env";
 import { fetchWeather } from "./weatherFetch";
+import { buildOpenWeatherForecastUrl } from "./openWeatherApi";
 
 const PUBLIC_API_TIMEOUT_MS = 8000;
 
@@ -43,13 +44,7 @@ export async function fetchOpenWeatherMap(
   if (!apiKey) return null;
 
   try {
-    const url = new URL("https://api.openweathermap.org/data/2.5/forecast");
-    url.searchParams.set("lat", lat.toString());
-    url.searchParams.set("lon", lon.toString());
-    url.searchParams.set("appid", apiKey);
-    url.searchParams.set("units", "metric");
-    url.searchParams.set("lang", "fr");
-    url.searchParams.set("cnt", "40"); // 5 jours × 8 tranches/jour
+    const url = buildOpenWeatherForecastUrl({ apiKey, lat, lon });
 
     const response = await fetchWeather(url.toString(), {}, { timeoutMs: PUBLIC_API_TIMEOUT_MS, attempts: 2 });
     if (!response.ok) {

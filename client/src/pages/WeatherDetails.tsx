@@ -37,6 +37,7 @@ export default function WeatherDetails() {
   const [slowLoad, setSlowLoad] = useState(false);
   const aromeShadow = trpc.weather.compareHondeghemAromeShadow.useMutation();
   const windDirectionVerification = trpc.weather.verifyHondeghemAromeWindDirection.useMutation();
+  const openWeatherShadow = trpc.weather.compareOpenWeatherShadow.useMutation();
 
   const isHondeghem = !activeLocation || (
     Math.abs(activeLocation.lat - 50.7567) < 0.001 && Math.abs(activeLocation.lon - 2.5204) < 0.001
@@ -54,6 +55,25 @@ export default function WeatherDetails() {
   const parisDateAt = (validAt: string) => new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date(validAt));
+  const runOpenWeatherShadowComparison = () => {
+    const officialHours = (data?.hours ?? []).flatMap((hour) => {
+      const validAt = hour.validAt;
+      if (typeof validAt !== "number" || !Number.isSafeInteger(validAt)) return [];
+      return [{
+        validAt,
+        temp: hour.temp ?? null,
+        windSpeed: hour.windSpeed ?? null,
+        windDirection: hour.windDirection ?? null,
+        humidity: hour.humidity ?? null,
+        cloudCover: hour.cloudCover ?? null,
+      }];
+    });
+    openWeatherShadow.mutate({
+      lat: activeLocation?.lat ?? 50.7567,
+      lon: activeLocation?.lon ?? 2.5204,
+      officialHours,
+    });
+  };
 
   useEffect(() => {
     if (!isLoading && !isFetching) {
@@ -184,6 +204,49 @@ export default function WeatherDetails() {
             {aromeShadow.data.missing.length > 0 && <div className="rounded-xl border border-amber-200/20 bg-amber-200/[0.04] p-2 text-[9px] text-amber-100"><p className="font-semibold">Manquants et limites détectés</p><ul className="mt-1 list-inside list-disc">{aromeShadow.data.missing.map((message: string, index: number) => <li key={`${index}-${message}`}>{message}</li>)}</ul></div>}
           </div>}
           <p className="mt-2 text-[9px] text-slate-500">Appel externe authentifié côté serveur uniquement; l’authentification live n’est pas testée dans l’environnement de développement. Open-Meteo Best Match, les fusions journalières et la Vigilance restent inchangés.</p>
+        </MeteoSurface>}
+
+        {user?.role === "admin" && <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-sky-300/25 bg-sky-300/[0.04] p-3 sm:rounded-[24px] sm:p-4" aria-labelledby="openweather-shadow-title">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-200/75">Diagnostic manuel · mode shadow</p>
+              <h2 id="openweather-shadow-title" className="mt-1 text-base font-semibold text-white">OpenWeather ↔ prévision officielle</h2>
+              <p className="mt-1 text-[10px] leading-relaxed text-slate-300">Utilise l’endpoint Forecast existant (5 jours / 3 heures) au clic uniquement. OpenWeather reste un comparateur, jamais un modèle ni un vote.</p>
+            </div>
+            <button type="button" onClick={runOpenWeatherShadowComparison} disabled={openWeatherShadow.isPending || hours.length === 0} className="min-h-10 shrink-0 rounded-xl border border-sky-200/35 bg-sky-300/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:cursor-not-allowed disabled:opacity-50">
+              {openWeatherShadow.isPending ? "Comparaison en cours…" : openWeatherShadow.data ? "Relancer la comparaison" : "Comparer OpenWeather"}
+            </button>
+          </div>
+          <p className="mt-2 text-[9px] leading-relaxed text-amber-100/80">Seuls les validTime UTC exactement communs sont comparés : aucune interpolation, aucun rééchantillonnage, aucune écriture en base et aucun changement des prévisions officielles. Les runs ne sont pas déclarés équivalents.</p>
+          {openWeatherShadow.error && <p role="alert" className="mt-2 rounded-xl border border-rose-300/25 bg-rose-300/[0.06] p-2 text-[10px] text-rose-100">Comparaison impossible : {openWeatherShadow.error.message}</p>}
+          {openWeatherShadow.data && <div className="mt-3 space-y-2" role="status">
+            <div className={`rounded-xl border p-2 text-[10px] leading-relaxed ${openWeatherShadow.data.status === "ok" ? "border-emerald-300/25 bg-emerald-300/[0.05] text-emerald-100" : openWeatherShadow.data.status === "missing-key" || openWeatherShadow.data.status === "request-impossible" ? "border-amber-300/25 bg-amber-300/[0.05] text-amber-100" : "border-sky-300/20 bg-sky-300/[0.04] text-sky-100"}`}>
+              <p className="font-semibold">{openWeatherShadow.data.status === "missing-key" ? "Clé OpenWeather absente" : openWeatherShadow.data.status === "request-impossible" ? "Requête impossible" : openWeatherShadow.data.status === "no-common-times" ? "Aucune échéance commune exacte" : openWeatherShadow.data.status === "partial" ? "Comparaison partielle" : "Comparaison terminée"}</p>
+              <p>{openWeatherShadow.data.message}</p>
+              <p className="mt-1">Provenance externe : {openWeatherShadow.data.provenance.provider} · <code className="break-all">{openWeatherShadow.data.provenance.endpoint}</code> · {openWeatherShadow.data.provenance.product}. Rôle : {openWeatherShadow.data.provenance.role}. Identifiant de run fournisseur : non disponible.</p>
+              <p>Référence : {openWeatherShadow.data.officialReference} · {openWeatherShadow.data.officialHourCount} échéance(s) officielles transmises · {openWeatherShadow.data.openWeatherPointCount} échéance(s) OpenWeather · {openWeatherShadow.data.exactCommonTimeCount} validTime exact(s) en commun · {openWeatherShadow.data.comparisonRows.length} paire(s) de champs comparée(s).</p>
+              <p>Dernière comparaison : {new Date(openWeatherShadow.data.comparedAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (Europe/Paris).</p>
+            </div>
+            {openWeatherShadow.data.warnings.length > 0 && <ul className="list-inside list-disc rounded-xl border border-amber-200/20 bg-amber-200/[0.04] p-2 text-[9px] text-amber-100">{openWeatherShadow.data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
+            <details className="rounded-xl border border-white/10 bg-black/10 p-2">
+              <summary className="cursor-pointer text-[10px] font-semibold text-sky-100">Paires comparées aux échéances exactes ({openWeatherShadow.data.comparisonRows.length})</summary>
+              <div className="mt-2 max-h-80 overflow-auto">
+                <table className="w-full border-collapse text-left text-[9px]">
+                  <thead className="sticky top-0 bg-slate-950 text-slate-300"><tr><th className="p-1">validTime UTC</th><th className="p-1">Champ</th><th className="p-1">OpenWeather</th><th className="p-1">Officiel</th><th className="p-1">Écart OWM−officiel</th></tr></thead>
+                  <tbody>{openWeatherShadow.data.comparisonRows.map((row) => <tr key={`${row.validAt}-${row.field}`} className="border-t border-white/8 text-slate-200"><td className="whitespace-nowrap p-1">{row.validAt.replace("T", " ").replace(".000Z", "Z")}</td><td className="p-1">{row.label}</td><td className="p-1">{row.openWeatherValue.toFixed(1)} {row.unit}</td><td className="p-1">{row.officialValue.toFixed(1)} {row.unit}</td><td className="p-1">{row.difference > 0 ? "+" : ""}{row.difference.toFixed(1)} {row.unit}</td></tr>)}</tbody>
+                </table>
+              </div>
+            </details>
+            <details className="rounded-xl border border-white/10 bg-black/10 p-2">
+              <summary className="cursor-pointer text-[10px] font-semibold text-sky-100">Couverture exacte et horaires non appariés</summary>
+              <ul className="mt-2 space-y-2 text-[9px] text-slate-300">{openWeatherShadow.data.coverage.map((item) => <li key={item.field} className="rounded-lg border border-white/8 p-1.5"><p className="font-semibold text-slate-100">{item.label} · {item.exactPairCount} paire(s) · OWM {item.openWeatherValueCount} valeur(s) · officiel {item.officialValueCount}</p>{item.openWeatherOnlyTimes.length > 0 && <p>OpenWeather sans valeur officielle exacte : {item.openWeatherOnlyTimes.join(", ")}</p>}{item.officialOnlyTimes.length > 0 && <p>Officiel sans valeur OpenWeather exacte : {item.officialOnlyTimes.join(", ")}</p>}{item.openWeatherOnlyTimes.length === 0 && item.officialOnlyTimes.length === 0 && <p>Toutes les valeurs reçues pour ce champ ont une paire exacte.</p>}</li>)}</ul>
+            </details>
+            <details className="rounded-xl border border-amber-200/20 bg-amber-200/[0.03] p-2">
+              <summary className="cursor-pointer text-[10px] font-semibold text-amber-100">Champs non comparés et limites</summary>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-[9px] text-slate-300">{openWeatherShadow.data.unsupportedFields.map((item) => <li key={item.field}><strong>{item.field} :</strong> {item.reason}</li>)}</ul>
+              <p className="mt-2 text-[9px] text-slate-400">{openWeatherShadow.data.provenance.validTimePolicy}</p>
+            </details>
+          </div>}
         </MeteoSurface>}
 
         {/* ═══ SECTION : CARTE MÉTÉO ANIMÉE ═══ */}
