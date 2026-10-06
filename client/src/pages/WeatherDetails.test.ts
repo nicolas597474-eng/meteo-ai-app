@@ -74,7 +74,11 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("Aucune valeur n’est demandée, déduite ou inventée");
   });
   it("lie les valeurs affichées à l’heure cliquée et expose son validTime et sa source", () => {
-    expect(timelineSource).toContain("buildHourlyDetailCategories(selectedEntry, hours)");
+    expect(timelineSource).toContain("buildHourlyDetailCategories(selectedEntry, hours, indexedHours, histogramStartValidAt)");
+    expect(timelineSource).toContain("getHourlyHistogramStartValidAt(");
+    expect(timelineSource).toContain("buildHourlyHistogramSeries(detail.key, indexedHours, startValidAt)");
+    expect(timelineSource).toContain("<HourlyMiniHistogram");
+    expect(timelineSource).toContain("allHours={hours}");
     expect(timelineSource).toContain("selectedEntry.hour.validAt");
     expect(timelineSource).toContain("validTime UTC :");
     expect(timelineSource).toContain("Source : {selectedSourceLabel} · {selectedMethodLabel}");

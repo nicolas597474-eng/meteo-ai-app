@@ -5,6 +5,8 @@ import { getModelCountCoverageLabel, getModelCountCoverageLevel } from "@shared/
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
+import { HourlyMiniHistogram } from "@/components/weather/HourlyMiniHistogram";
+import { buildHourlyHistogramSeries, getHourlyHistogramStartValidAt, type HourlyHistogramSeries, type IndexedHourlyHistogramHour } from "@/lib/hourlyMiniHistogram";
 import {
   buildForecastDisplayDays,
   getDailyReferenceSourceLabels,
@@ -72,6 +74,7 @@ type DetailCategory = {
   cadence: "hourly" | "daily";
   validAt?: number | null;
   rows: DetailRow[];
+  hourlyHistogramSeries?: HourlyHistogramSeries<ForecastHour>[];
 };
 
 function isFiniteValue(value: number | null | undefined): value is number {
@@ -174,6 +177,8 @@ function formatUtcTimestamp(value: string | number | null | undefined): string {
 function buildHourlyDetailCategories(
   entry: IndexedForecastHour<ForecastHour>,
   allHours: readonly ForecastHour[],
+  indexedHours: readonly IndexedHourlyHistogramHour<ForecastHour>[],
+  startValidAt: number | null,
 ): DetailCategory[] {
   return buildHourlySelectedDetails(entry.hour, hourTime(entry, allHours)).map((detail) => ({
     key: detail.key,
@@ -191,6 +196,7 @@ function buildHourlyDetailCategories(
       chartValue: null,
       chartValueLabel: "—",
     }],
+    hourlyHistogramSeries: buildHourlyHistogramSeries(detail.key, indexedHours, startValidAt),
   }));
 }
 
@@ -332,7 +338,7 @@ function buildDailyDetailCategories(day: DailyForecastPoint): DetailCategory[] {
   return categories.filter(({ rows }) => rows.length > 0);
 }
 
-function DayDetailsAccordion({ category }: { category: DetailCategory }) {
+function DayDetailsAccordion({ category, allHours = [] }: { category: DetailCategory; allHours?: readonly ForecastHour[] }) {
   const notes = category.rows.filter(({ note }) => Boolean(note));
   return (
     <details className="group border-t border-sky-100/10 first:border-t-0">
@@ -346,11 +352,21 @@ function DayDetailsAccordion({ category }: { category: DetailCategory }) {
       </summary>
       <div className="pb-4 pl-12 pr-1 sm:pl-14">
         {category.cadence === "hourly" ? (
-          <div className="space-y-1 text-xs leading-relaxed text-slate-300">
-            <p>Valeur de l’échéance sélectionnée · {category.rows[0]?.time ?? "heure indisponible"}.</p>
-            <p className="break-words font-medium text-slate-100">{category.rows[0]?.value ?? "—"}</p>
-            <p>validTime UTC : {formatUtcTimestamp(category.validAt)}</p>
-          </div>
+          <>
+            <div className="space-y-1 text-xs leading-relaxed text-slate-300">
+              <p>Valeur de l’échéance sélectionnée · {category.rows[0]?.time ?? "heure indisponible"}.</p>
+              <p className="break-words font-medium text-slate-100">{category.rows[0]?.value ?? "—"}</p>
+              <p>validTime UTC : {formatUtcTimestamp(category.validAt)}</p>
+            </div>
+            {category.hourlyHistogramSeries?.map((series) => (
+              <HourlyMiniHistogram
+                key={series.field}
+                categoryKey={category.key}
+                series={series}
+                allHours={allHours}
+              />
+            ))}
+          </>
         ) : (
           <dl className="space-y-1 text-sm text-slate-100">
             {category.rows.map((row) => <div key={row.key} className="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt className="text-slate-400">{row.time}</dt><dd className="text-right font-medium tabular-nums">{row.value}</dd></div>)}
@@ -409,6 +425,14 @@ export function ForecastByDaySection({
   const selectedDayRef = useRef<HTMLButtonElement | null>(null);
   const hourStripRef = useRef<HTMLDivElement | null>(null);
   const dayStripRef = useRef<HTMLDivElement | null>(null);
+  const indexedHours = useMemo(() => hours.map((hour, index) => ({ index, hour })), [hours]);
+  const [clickedHistogramStartAt, setClickedHistogramStartAt] = useState<number | null>(null);
+  const histogramStartValidAt = getHourlyHistogramStartValidAt(
+    indexedHours,
+    activeHourIndex,
+    clickedHistogramStartAt,
+    Date.now(),
+  );
   const initialSelection = useMemo(
     () => getInitialForecastTimelineSelection(grouped.days, activeHourIndex),
     [grouped.days, activeHourIndex],
@@ -427,7 +451,7 @@ export function ForecastByDaySection({
     ? selectedDaily ? buildDailyDetailCategories(selectedDaily) : []
     : [];
   const hourlyDetailCategories = selectedDay?.kind === "official-hourly" && selectedEntry
-    ? buildHourlyDetailCategories(selectedEntry, hours)
+    ? buildHourlyDetailCategories(selectedEntry, hours, indexedHours, histogramStartValidAt)
     : [];
   const selectedValidTimeUtc = formatUtcTimestamp(selectedEntry?.hour.validAt);
   const selectedSnapshotTimeUtc = formatUtcTimestamp(officialProvenance?.hourlyComputedAt ?? officialProvenance?.computedAt);
@@ -461,11 +485,14 @@ export function ForecastByDaySection({
   }, [selectedDayDate]);
 
   const onDayPress = (day: ForecastDisplayDay<ForecastHour, DailyForecastPoint>) => {
+    setClickedHistogramStartAt(null);
     const active = day.hourlyGroup?.hours.find(({ index }) => index === activeHourIndex);
     setSelection({ dayDate: day.date, hourIndex: active?.index ?? day.hourlyGroup?.hours[0]?.index ?? null, expanded: true });
   };
   const onHourPress = (index: number) => {
     if (!selectedGroup) return;
+    const clickedHour = selectedGroup.hours.find((entry) => entry.index === index);
+    setClickedHistogramStartAt(clickedHour?.hour.validAt ?? null);
     setSelection((previous) => selectForecastHour({
       dayDate: selectedGroup.date,
       hourIndex: previous.dayDate === selectedGroup.date ? previous.hourIndex : selectedHourIndex,
@@ -604,7 +631,7 @@ export function ForecastByDaySection({
                     <p>Snapshot horaire calculé (UTC) : {selectedSnapshotTimeUtc}.</p>
                   </div>
                 ) : <p className="border-b border-sky-100/10 py-3 text-xs text-slate-300">Aucune échéance horaire sélectionnée.</p>}
-                {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} />)}
+                {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} allHours={hours} />)}
               </>
             ) : (
               <>
