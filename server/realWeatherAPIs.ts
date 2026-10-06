@@ -150,11 +150,11 @@ export async function fetchMeteoFrance(
   lat: number,
   lon: number
 ): Promise<RealForecastResult | null> {
-  const oauthKey = ENV.meteoFranceApiKey;
-  if (!oauthKey) return null;
+  const oauthApplicationId = ENV.meteoFranceOAuthApplicationId;
+  if (!oauthApplicationId) return null;
 
   try {
-    const bearerToken = await getMFBearerToken(oauthKey);
+    const bearerToken = await getMFBearerToken(oauthApplicationId);
     if (!bearerToken) return null;
 
     // Endpoint prévisions journalières Météo-France (API communautaire hacf-fr)
