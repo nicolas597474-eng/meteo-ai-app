@@ -56,6 +56,7 @@ import { computeOfficialDailyForecast } from "../officialForecast";
 import { buildForecastRunArchiveRows } from "../dailyForecastPerformance";
 import { buildDailyForecastVerificationReadModel, buildMeteoAIDailyFusionArchiveRun } from "../dailyForecastVerification";
 import { HOURLY_FORECAST_VARIABLES, MODEL_FORECAST_HORIZONS } from "../forecastVariableCoverage";
+import { PROVIDER_RUN_MODEL_CAPABILITIES } from "../providerRunCapabilities";
 import { compareTraceWeights } from "../weightComparison";
 import { findActiveHourlyForecastIndex } from "../../shared/hourlyForecastTime";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
@@ -821,6 +822,21 @@ export const weatherRouter = router({
           errorCode: result.errorCode,
           attemptedAt: result.attemptedAt,
           completedAt: result.completedAt,
+        })),
+        providerRunSupport: PROVIDER_RUN_MODEL_CAPABILITIES.map((capability) => ({
+          model: capability.modelName,
+          forecastModelId: capability.forecastModelId,
+          openMeteoModelId: capability.openMeteoModelId,
+          appIdMatchesDocumentedId: capability.appIdMatchesDocumentedId,
+          singleRunModelId: capability.singleRunModelId,
+          singleRunEndpointSupportedForDocumentedId: capability.singleRunEndpointSupportedForDocumentedId,
+          metadataMappingVerified: capability.metadataMappingVerified,
+          maximumDocumentedForecastDays: capability.maximumDocumentedForecastDays,
+          horizonDescription: capability.horizonDescription,
+          documentedCalibrationVariables: capability.documentedCalibrationVariables,
+          modelDocumentationUrl: capability.modelDocumentationUrl,
+          singleRunsDocumentationUrl: capability.singleRunsDocumentationUrl,
+          captureUnavailableReason: capability.captureUnavailableReason,
         })),
         providerRunCollectionAvailable: providerRunCollection.available,
         providerRunCollection: providerRunCollection.results.map((result) => ({

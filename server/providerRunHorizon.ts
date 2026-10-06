@@ -1,24 +1,14 @@
 import { getParisDateAndHour, parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 import { HOURLY_FORECAST_VARIABLES } from "./forecastVariableCoverage";
 import { normalizeHourlySourceValue, parseHourlyTimestampSeconds } from "./hourlyValueNormalization";
+import { DIRECT_SINGLE_RUN_METADATA_MODEL_IDS } from "./providerRunCapabilities";
+
+export { DIRECT_SINGLE_RUN_METADATA_MODEL_IDS } from "./providerRunCapabilities";
 
 export const SINGLE_RUN_API_URL = "https://single-runs-api.open-meteo.com/v1/forecast";
 export const OPEN_METEO_MODEL_METADATA_BASE = "https://api.open-meteo.com/data";
 export const SINGLE_RUN_AVAILABILITY_SAFETY_DELAY_MS = 10 * 60_000;
 export const SINGLE_RUN_CAPTURE_FORECAST_DAYS = 2;
-
-/**
- * Direct metadata IDs are deliberately limited to exact official model IDs
- * currently used by the Forecast pipeline. `*_seamless` aliases are not
- * mapped to native datasets because their location-dependent resolution cannot
- * be inferred safely from a different model's metadata file.
- */
-export const DIRECT_SINGLE_RUN_METADATA_MODEL_IDS = {
-  AROME: "meteofrance_arome_france_hd",
-  ARPEGE: "meteofrance_arpege_europe",
-  ICON: "dwd_icon_eu",
-  ECMWF: "ecmwf_ifs025",
-} as const;
 
 const PROVIDER_RUN_VARIABLES = HOURLY_FORECAST_VARIABLES.filter((variable) =>
   ["temperature", "precipitation", "wind_speed", "wind_gust", "humidity", "surface_pressure"].includes(variable.key),

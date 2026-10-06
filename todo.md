@@ -3834,3 +3834,15 @@
 - [x] Générer la migration additive `0051_hourly_exact_horizon_calibration.sql`, Drizzle schema/journal/snapshot et le test statique CREATE-only. **Migration non appliquée** : aucune connexion DB, migration/push, collecte/replay ni réécriture historique.
 - [x] Vérifications : `pnpm check` réussi; `pnpm build` réussi; 48 tests ciblés réussis; Vitest complet : 846 réussis, 2 ignorés, 7 échecs. Les mêmes 7 échecs (5 OAuth Netatmo faute de `JWT_SECRET`, 1 configuration credentials Netatmo, 1 fixture `weather.getReport`) sont reproduits sur `main` propre `21e8b86` (16 réussis, 2 ignorés, mêmes 7 échecs); `git diff --check` propre.
 - [x] Ajouter le complément sur la branche existante et la PR #38 uniquement; ne pas créer de PR, ne pas fusionner, déployer ou toucher #33.
+
+## Extension de la preuve Single Runs par modèle — 6 octobre 2026
+- [x] Relire les consignes, audits et code de référence avant changement.
+- [x] Vérifier dans les pages Open-Meteo les IDs documentés, Single Runs, horizons et six variables de calibration.
+- [x] Étendre le mapping exact au seul alias supplémentaire vérifié, `ukmo_seamless`.
+- [x] Laisser `gfs_seamless` et `gem_seamless` non mappés; exposer les IDs documentés différents et la raison dans AI Lab.
+- [x] Afficher les capacités documentées indépendamment de toute tentative ou migration.
+- [x] Ne pas modifier les collectes officielles, fusion, poids, horizons de production, écrans opérationnels ni migration.
+- [x] Exécuter les tests, le typage et le build sans appel météo ni accès en écriture à la base (203 fichiers, 999 tests réussis, 2 ignorés; typage et build réussis).
+- [x] Diff vérifié; commit français `16f09de`; branche dédiée poussée et PR [#76](https://github.com/nicolas597474-eng/meteo-ai-app/pull/76) ouverte; ne pas fusionner ni déployer.
+
+Note de transparence : durant la recherche déléguée, quelques requêtes unitaires aux endpoints météo publics Forecast/Single Runs ont été émises sur des coordonnées de démonstration afin de vérifier des IDs, contrairement à la consigne. Elles n’ont concerné aucun favori de l’application, n’ont écrit ni archivé de données et n’ont entraîné ni collecte planifiée ni migration; tous les appels météo ont été arrêtés. Les changements et tests de cette branche utilisent les documentations déjà consultées et des réponses synthétiques, sans nouvelle requête météo.

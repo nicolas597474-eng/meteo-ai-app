@@ -21,9 +21,24 @@ Aucun horaire nominal de cycle n’est utilisé pour fabriquer un run. Un run no
 
 ### Compatibilité de métadonnées retenue
 
-Les quatre noms et IDs déjà employés par le pipeline Forecast ont une correspondance directe vers un `meta.json` vérifiable : AROME (`meteofrance_arome_france_hd`), ARPEGE (`meteofrance_arpege_europe`), ICON (`dwd_icon_eu`) et ECMWF (`ecmwf_ifs025`). L’ID ECMWF reste strictement inchangé.
+Les quatre correspondances déjà utilisées restent inchangées : AROME (`meteofrance_arome_france_hd`), ARPEGE (`meteofrance_arpege_europe`), ICON (`dwd_icon_eu`) et ECMWF (`ecmwf_ifs025`). La documentation Open-Meteo confirme aussi l’ID exact `ukmo_seamless`; il est ajouté tel quel, sans le remplacer par un modèle sous-jacent. L’[API Single Runs](https://open-meteo.com/en/docs/single-runs-api) accepte les paramètres Forecast inchangés, dont `models`, avec le paramètre `run` obligatoire. La [documentation des métadonnées et mises à jour](https://open-meteo.com/en/docs/model-updates) distingue initialisation, disponibilité et résolution temporelle.
 
-Les alias Forecast `gfs_seamless`, `gem_seamless` et `ukmo_seamless` ne sont pas mappés à des ensembles de données natifs : plusieurs variantes natives ou des métadonnées obsolètes ne prouvent pas l’identité d’un alias « seamless » pour un lieu donné. Ils restent donc au statut « run exact inconnu » dans AI Lab, même si un run passé de ces IDs a déjà répondu 200 sur Single Runs. La compatibilité passée ne prouve pas la disponibilité de chaque cycle futur.
+Les sélecteurs documentés pour GFS et GEM sont `ncep_gfs_seamless` et `cmc_gem_seamless`, respectivement. Ils ne sont pas identiques aux IDs utilisés par l’application (`gfs_seamless` et `gem_seamless`); aucune équivalence n’est établie ici, donc aucune requête de capture n’est activée pour ces alias. UKMO est différent : l’ID documenté est exactement `ukmo_seamless`, mais son produit combine UKMO Global et UKV selon le lieu; aucune correspondance vers `ukmo_global` ou `ukmo_ukv` n’est supposée.
+
+### Capacités documentées par modèle
+
+| Modèle et ID employé par l’application | ID Open-Meteo documenté | Run individuel et horizon documentés | Variables horaires visées par le sidecar |
+| --- | --- | --- | --- |
+| [AROME](https://open-meteo.com/en/docs/meteofrance-api) · `meteofrance_arome_france_hd` | Identique | Oui, Single Runs · AROME France HD jusqu’à 2 jours | Les six variables de calibration ci-dessous; AROME HD n’a pas de niveaux de pression. |
+| [ARPEGE](https://open-meteo.com/en/docs/meteofrance-api) · `meteofrance_arpege_europe` | Identique | Oui, Single Runs · jusqu’à 4 jours | Les six variables de calibration ci-dessous; certaines (dont surface pressure) sont dérivées. |
+| [ICON](https://open-meteo.com/en/docs/dwd-api) · `dwd_icon_eu` | Identique | Oui, Single Runs · ICON Europe jusqu’à 5 jours; sorties natives horaires puis 3 h après 78 h | Les six variables de calibration ci-dessous. |
+| [ECMWF](https://open-meteo.com/en/docs/ecmwf-api) · `ecmwf_ifs025` | Identique | Oui, Single Runs · IFS Open-Data 0,25° jusqu’à 15 jours; sorties 3 h puis 6 h après 144 h | Les six variables de calibration ci-dessous; humidité relative et pression de surface peuvent être dérivées. |
+| [GFS](https://open-meteo.com/en/docs/gfs-api) · `gfs_seamless` | `ncep_gfs_seamless` | Single Runs documenté pour l’ID Open-Meteo; GFS global jusqu’à 16 jours. L’alias applicatif reste non mappé. | Les six champs sont documentés pour l’ID Open-Meteo cité, pas attribués à l’alias applicatif. |
+| [GEM](https://open-meteo.com/en/docs/gem-api) · `gem_seamless` | `cmc_gem_seamless` | Single Runs documenté pour l’ID Open-Meteo; GEM Global jusqu’à 10 jours, RDPS 3,5 jours, HRDPS 2 jours selon la région. L’alias applicatif reste non mappé. | Les six champs sont documentés pour l’ID Open-Meteo cité, pas attribués à l’alias applicatif. |
+| [UKMET](https://open-meteo.com/en/docs/ukmo-api) · `ukmo_seamless` | Identique | Oui, Single Runs · UKMO Global 7 jours et UKV 2 jours selon le lieu; rayonnement limité à 2 jours | Les six variables de calibration ci-dessous pour le produit documenté. |
+
+Les six champs de calibration de l’archive séparée sont `temperature_2m`, `precipitation`, `wind_speed_10m`, `wind_gusts_10m`, `relative_humidity_2m` et `surface_pressure`. Les pages de chaque modèle indiquent lesquels sont natifs ou dérivés; « documenté » ne garantit pas une valeur non nulle à chaque lieu, échéance ou run. Seule une capture établit la présence effective d’une valeur. Les horizons cités décrivent Open-Meteo et n’agrandissent pas la collecte Single Runs de **2 jours**, ni les horizons ou écrans opérationnels existants.
+
 
 ## Manifeste et valeurs archivés
 
