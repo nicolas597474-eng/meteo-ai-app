@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
-import { HourlySelectedDetailsPanel } from "@/components/weather/HourlySelectedDetailsPanel";
 import { getModelCountCoverageLabel, getModelCountCoverageLevel } from "@shared/modelCoverageConfidence";
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
@@ -174,29 +173,24 @@ function buildHourlyDetailCategories(
   indexedHours: readonly IndexedHourlyHistogramHour<ForecastHour>[],
   startValidAt: number | null,
 ): DetailCategory[] {
-  return buildHourlySelectedDetails(entry.hour, hourTime(entry, allHours)).flatMap((detail) => {
-    if (!detail.histogramCategory) return [];
-    const hourlyHistogramSeries = buildHourlyHistogramSeries(detail.histogramCategory, indexedHours, startValidAt);
-    if (hourlyHistogramSeries.length === 0) return [];
-    return [{
-      key: detail.histogramCategory,
-      title: `Tendance · ${detail.title}`,
-      icon: detail.icon,
-      summary: detail.summary,
-      unit: "",
-      cadence: "hourly" as const,
-      validAt: detail.validAt,
-      rows: [{
-        key: `${detail.key}-${entry.index}`,
-        time: detail.timeLabel,
-        value: detail.value,
-        note: detail.note,
-        chartValue: null,
-        chartValueLabel: "—",
-      }],
-      hourlyHistogramSeries,
-    }];
-  });
+  return buildHourlySelectedDetails(entry.hour, hourTime(entry, allHours)).map((detail) => ({
+    key: detail.key,
+    title: detail.title,
+    icon: detail.icon,
+    summary: detail.summary,
+    unit: "",
+    cadence: "hourly",
+    validAt: detail.validAt,
+    rows: [{
+      key: `${detail.key}-${entry.index}`,
+      time: detail.timeLabel,
+      value: detail.value,
+      note: detail.note,
+      chartValue: null,
+      chartValueLabel: "—",
+    }],
+    hourlyHistogramSeries: buildHourlyHistogramSeries(detail.key, indexedHours, startValidAt),
+  }));
 }
 
 function evidenceStatusLabel(status: DailyForecastEvidenceStatus): string {
@@ -521,9 +515,6 @@ export function ForecastByDaySection({
   const detailCategories = selectedDay?.kind === "official-daily-fusion"
     ? selectedDaily ? buildDailyDetailCategories(selectedDaily) : []
     : [];
-  const selectedHourlyDetails = selectedDay?.kind === "official-hourly" && selectedEntry
-    ? buildHourlySelectedDetails(selectedEntry.hour, hourTime(selectedEntry, hours))
-    : [];
   const hourlyDetailCategories = selectedDay?.kind === "official-hourly" && selectedEntry
     ? buildHourlyDetailCategories(selectedEntry, hours, indexedHours, histogramStartValidAt)
     : [];
@@ -628,16 +619,6 @@ export function ForecastByDaySection({
                 </div>
               </div>
 
-              {selectedDay.kind === "official-hourly" && selectedEntry && (
-                <HourlySelectedDetailsPanel
-                  details={selectedHourlyDetails}
-                  describeCondition={conditionDescription}
-                  variant="summary"
-                  heading={`Données météo de l’échéance sélectionnée · ${hourTime(selectedEntry, hours)}`}
-                  provenance={`validTime UTC : ${selectedValidTimeUtc} · Source : ${selectedSourceLabel} · ${selectedMethodLabel} · Snapshot horaire calculé (UTC) : ${selectedSnapshotTimeUtc}`}
-                />
-              )}
-
               {selectedDay.kind === "official-daily-fusion" && selectedDaily?.officialFusion && (
                 <div className="mt-3 border-t border-sky-100/15 pt-2.5" aria-label="Provenance de la fusion quotidienne">
                   <span className="inline-flex rounded-full border border-cyan-200/40 bg-cyan-300/10 px-2 py-1 text-[10px] font-bold text-cyan-100">Fusion officielle · preuves par variable</span>
@@ -723,17 +704,7 @@ export function ForecastByDaySection({
                     <p>Snapshot horaire calculé (UTC) : {selectedSnapshotTimeUtc}.</p>
                   </div>
                 ) : <p className="border-b border-sky-100/10 py-3 text-xs text-slate-300">Aucune échéance horaire sélectionnée.</p>}
-                <HourlySelectedDetailsPanel details={selectedHourlyDetails} describeCondition={conditionDescription} variant="details" />
-                {hourlyDetailCategories.length > 0 && (
-                  <details className="border-t border-sky-100/10 px-1 py-2">
-                    <summary className="min-h-10 cursor-pointer list-none py-2 text-sm font-semibold text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">
-                      Tendances horaires des mesures
-                    </summary>
-                    <div className="space-y-1 pb-2">
-                      {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} allHours={hours} />)}
-                    </div>
-                  </details>
-                )}
+                {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} allHours={hours} />)}
                 {selectedDateIsTodayOrTomorrow && selectedDaily && <DailyForecastMetricsPanel day={selectedDaily} sourceLabels={sourceLabels} />}
                 {selectedDateIsTodayOrTomorrow && !selectedDaily && (
                   <p className="border-t border-sky-100/10 py-3 text-xs leading-relaxed text-amber-100">Payload quotidien indisponible pour cette date : extrêmes journaliers et autres métriques quotidiennes indisponibles. Aucune valeur n’est déduite des heures.</p>
