@@ -4,6 +4,7 @@ import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotic
 import { getModelCountCoverageLabel, getModelCountCoverageLevel } from "@shared/modelCoverageConfidence";
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
+import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
 import {
   buildForecastDisplayDays,
   getDailyReferenceSourceLabels,
@@ -15,9 +16,7 @@ import {
   getInitialForecastTimelineSelection,
   getSelectedForecastHourIndex,
   groupOfficialHourlyForecastByDate,
-  isOfficialSevenModelSource,
   selectForecastHour,
-  type ForecastDayGroup,
   type ForecastTimelineSelection,
   type IndexedForecastHour,
 } from "@/lib/forecastTimeline";
@@ -36,6 +35,7 @@ type ForecastHour = {
   temp?: number | null;
   apparentTemp?: number | null;
   condition?: string | null;
+  weatherCode?: number | null;
   precipitation?: number | null;
   windSpeed?: number | null;
   windGust?: number | null;
@@ -52,7 +52,7 @@ type ForecastHour = {
   solarRadiation?: number | null;
   precipType?: string | null;
   precipIntensity?: string | null;
-  multiModelMetrics?: { source?: string; bestMatchIncluded?: boolean; precipitation?: PrecipitationMetrics | null } | null;
+  multiModelMetrics?: { source?: string; bestMatchIncluded?: boolean; expectedModelCount?: number; precipitation?: PrecipitationMetrics | null } | null;
 };
 
 type DetailRow = {
@@ -70,17 +70,12 @@ type DetailCategory = {
   summary: string;
   unit: string;
   cadence: "hourly" | "daily";
+  validAt?: number | null;
   rows: DetailRow[];
 };
 
 function isFiniteValue(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function officialPrecipitationMetrics(hour: ForecastHour): PrecipitationMetrics | null {
-  const metrics = hour.multiModelMetrics;
-  if (!metrics || !isOfficialSevenModelSource(metrics)) return null;
-  return metrics.precipitation ?? null;
 }
 
 function dateLabel(date: string, today: string, tomorrow: string): string {
@@ -169,111 +164,34 @@ function hourTime(entry: IndexedForecastHour<ForecastHour>, allHours: readonly F
   return `${display.hourLabel}${display.offsetLabel ? ` · ${display.offsetLabel}` : ""}`;
 }
 
+function formatUtcTimestamp(value: string | number | null | undefined): string {
+  const timestamp = typeof value === "number" ? value : typeof value === "string" ? Date.parse(value) : Number.NaN;
+  if (!Number.isFinite(timestamp)) return "indisponible";
+  const date = new Date(timestamp);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "indisponible";
+}
+
 function buildHourlyDetailCategories(
-  group: ForecastDayGroup<ForecastHour>,
+  entry: IndexedForecastHour<ForecastHour>,
   allHours: readonly ForecastHour[],
 ): DetailCategory[] {
-  const entries = group.hours;
-  const time = (entry: IndexedForecastHour<ForecastHour>) => hourTime(entry, allHours);
-  const precipitationRows: DetailRow[] = entries.flatMap((entry) => {
-    const value = entry.hour.precipitation;
-    const metrics = officialPrecipitationMetrics(entry.hour);
-    const hasModelRainCount = metrics && isFiniteValue(metrics.rainModelCount) && isFiniteValue(metrics.availableModelCount);
-    if (!isFiniteValue(value) && !hasModelRainCount) return [];
-    const notes = hasModelRainCount
-      ? `${metrics.rainModelCount}/${metrics.availableModelCount} modèles au seuil${isFiniteValue(metrics.thresholdMm) ? ` ≥ ${formatOptionalForecastValue(metrics.thresholdMm, 1, " mm")}` : ""} · fréquence brute non calibrée`
-      : undefined;
-    return [{
-      key: `rain-${entry.index}`,
-      time: time(entry),
-      value: formatOptionalForecastValue(value, 1, " mm"),
-      note: notes,
-      chartValue: isFiniteValue(value) ? value : null,
-      chartValueLabel: formatOptionalForecastValue(value, 1, " mm"),
-    }];
-  });
-
-  const windRows: DetailRow[] = entries.flatMap((entry) => {
-    const { windSpeed, windGust, windDirection } = entry.hour;
-    if (![windSpeed, windGust, windDirection].some(isFiniteValue)) return [];
-    const pieces = [
-      isFiniteValue(windSpeed) ? `Vent ${formatOptionalForecastValue(windSpeed, 0, " km/h")}` : null,
-      isFiniteValue(windGust) ? `Rafales ${formatOptionalForecastValue(windGust, 0, " km/h")}` : null,
-      isFiniteValue(windDirection) ? `Direction ${windDirectionLabel(windDirection)}` : null,
-    ].filter((value): value is string => value != null);
-    return [{
-      key: `wind-${entry.index}`,
-      time: time(entry),
-      value: pieces.join(" · "),
-      chartValue: isFiniteValue(windSpeed) ? windSpeed : null,
-      chartValueLabel: formatOptionalForecastValue(windSpeed, 0, " km/h"),
-    }];
-  });
-
-  const humidityRows: DetailRow[] = entries.flatMap((entry) => {
-    const humidity = entry.hour.humidity;
-    const dewPoint = entry.hour.dewPoint;
-    if (!isFiniteValue(humidity) && !isFiniteValue(dewPoint)) return [];
-    const value = [
-      isFiniteValue(humidity) ? formatOptionalForecastValue(humidity, 0, "%") : null,
-      isFiniteValue(dewPoint) ? `Rosée ${formatOptionalForecastValue(dewPoint, 0, "°")}` : null,
-    ].filter((item): item is string => item != null).join(" · ");
-    return [{
-      key: `humidity-${entry.index}`,
-      time: time(entry),
-      value,
-      chartValue: isFiniteValue(humidity) ? humidity : null,
-      chartValueLabel: formatOptionalForecastValue(humidity, 0, "%"),
-    }];
-  });
-
-  const cloudRows: DetailRow[] = entries.flatMap((entry) => {
-    const { cloudCover, cloudLow, cloudMid, cloudHigh } = entry.hour;
-    if (![cloudCover, cloudLow, cloudMid, cloudHigh].some(isFiniteValue)) return [];
-    const value = [
-      isFiniteValue(cloudCover) ? `Total ${formatOptionalForecastValue(cloudCover, 0, " %")}` : null,
-      isFiniteValue(cloudLow) ? `basses ${formatOptionalForecastValue(cloudLow, 0, " %")}` : null,
-      isFiniteValue(cloudMid) ? `moyennes ${formatOptionalForecastValue(cloudMid, 0, " %")}` : null,
-      isFiniteValue(cloudHigh) ? `hautes ${formatOptionalForecastValue(cloudHigh, 0, " %")}` : null,
-    ].filter((item): item is string => item != null).join(" · ");
-    return [{ key: `cloud-${entry.index}`, time: time(entry), value, chartValue: isFiniteValue(cloudCover) ? cloudCover : null, chartValueLabel: formatOptionalForecastValue(cloudCover, 0, "%") }];
-  });
-
-  const numericRows = (
-    key: string,
-    selectValue: (hour: ForecastHour) => number | null | undefined,
-    decimals: number,
-    unit: string,
-  ) => entries.flatMap((entry) => {
-    const value = selectValue(entry.hour);
-    if (!isFiniteValue(value)) return [];
-    return [{ key: `${key}-${entry.index}`, time: time(entry), value: formatOptionalForecastValue(value, decimals, unit), chartValue: value, chartValueLabel: formatOptionalForecastValue(value, decimals, unit) }];
-  });
-
-  const typeRows: DetailRow[] = entries.flatMap((entry) => {
-    const { precipType, precipIntensity } = entry.hour;
-    if (!precipType && !precipIntensity) return [];
-    const labels: Record<string, string> = { rain: "pluie", snow: "neige", freezing_rain: "pluie verglaçante", light: "faible", moderate: "modérée", heavy: "forte" };
-    return [{ key: `precip-type-${entry.index}`, time: time(entry), value: [precipType ? labels[precipType] ?? precipType : null, precipIntensity ? labels[precipIntensity] ?? precipIntensity : null].filter(Boolean).join(" · "), chartValue: null, chartValueLabel: "—" }];
-  });
-
-  const firstAvailable = (rows: DetailRow[]) => {
-    const row = rows.find(({ chartValue }) => chartValue !== null) ?? rows[0];
-    return row ? `${row.value} · ${row.time}` : "—";
-  };
-
-  return [
-    { key: "precipitation", title: "Précipitations", icon: "precipitation", summary: firstAvailable(precipitationRows), unit: "mm", cadence: "hourly" as const, rows: precipitationRows },
-    { key: "precip-type", title: "Type et intensité", icon: "precipitation", summary: firstAvailable(typeRows), unit: "", cadence: "hourly" as const, rows: typeRows },
-    { key: "wind", title: "Vent", icon: "wind_param", summary: firstAvailable(windRows), unit: "km/h", cadence: "hourly" as const, rows: windRows },
-    { key: "humidity", title: "Humidité et rosée", icon: "humidity", summary: firstAvailable(humidityRows), unit: "%", cadence: "hourly" as const, rows: humidityRows },
-    { key: "clouds", title: "Nuages", icon: "cloud_cover", summary: firstAvailable(cloudRows), unit: "%", cadence: "hourly" as const, rows: cloudRows },
-    { key: "pressure", title: "Pression", icon: "pressure", summary: firstAvailable(numericRows("pressure", (hour) => hour.pressure, 0, " hPa")), unit: "hPa", cadence: "hourly" as const, rows: numericRows("pressure", (hour) => hour.pressure, 0, " hPa") },
-    { key: "uv", title: "Indice UV", icon: "sunny", summary: firstAvailable(numericRows("uv", (hour) => hour.uvIndex, 1, "")), unit: "indice", cadence: "hourly" as const, rows: numericRows("uv", (hour) => hour.uvIndex, 1, "") },
-    { key: "apparent", title: "Température ressentie", icon: "thermometer", summary: firstAvailable(numericRows("apparent", (hour) => hour.apparentTemp, 1, "°")), unit: "°C", cadence: "hourly" as const, rows: numericRows("apparent", (hour) => hour.apparentTemp, 1, "°") },
-    { key: "visibility", title: "Visibilité", icon: "eye", summary: firstAvailable(numericRows("visibility", (hour) => hour.visibility, 1, " km")), unit: "km", cadence: "hourly" as const, rows: numericRows("visibility", (hour) => hour.visibility, 1, " km") },
-    { key: "radiation", title: "Rayonnement solaire", icon: "sunny", summary: firstAvailable(numericRows("radiation", (hour) => hour.solarRadiation, 0, " W/m²")), unit: "W/m²", cadence: "hourly" as const, rows: numericRows("radiation", (hour) => hour.solarRadiation, 0, " W/m²") },
-  ].filter(({ rows }) => rows.length > 0);
+  return buildHourlySelectedDetails(entry.hour, hourTime(entry, allHours)).map((detail) => ({
+    key: detail.key,
+    title: detail.title,
+    icon: detail.icon,
+    summary: detail.summary,
+    unit: "",
+    cadence: "hourly",
+    validAt: detail.validAt,
+    rows: [{
+      key: `${detail.key}-${entry.index}`,
+      time: detail.timeLabel,
+      value: detail.value,
+      note: detail.note,
+      chartValue: null,
+      chartValueLabel: "—",
+    }],
+  }));
 }
 
 function evidenceStatusLabel(status: DailyForecastEvidenceStatus): string {
@@ -414,48 +332,26 @@ function buildDailyDetailCategories(day: DailyForecastPoint): DetailCategory[] {
   return categories.filter(({ rows }) => rows.length > 0);
 }
 
-function HourlyMiniChart({ category }: { category: DetailCategory }) {
-  const points = category.rows.filter(({ chartValue }) => chartValue !== null);
-  if (points.length === 0) {
-    return <p className="py-3 text-sm text-[#b8bbc2]">Aucune valeur horaire disponible pour cette mesure.</p>;
-  }
-  const maxValue = Math.max(...points.map(({ chartValue }) => chartValue ?? 0), 0);
-  const barColor = category.key === "precipitation" ? "bg-[#a8c7fa]" : category.key === "wind" ? "bg-[#8ab4f8]" : "bg-[#bdc1c6]";
-
-  return (
-    <div role="group" aria-label={`${category.title}, graphique horaire en ${category.unit || "indice"}`} className="-mx-1 overflow-x-auto overscroll-x-contain px-1 pb-2 scrollbar-hide touch-pan-x">
-      <div className="flex w-max min-w-full items-end gap-2 pt-1">
-        {points.map((point) => {
-          const value = point.chartValue ?? 0;
-          const height = maxValue === 0 ? 5 : Math.max(5, Math.round((value / maxValue) * 100));
-          return (
-            <div key={point.key} aria-label={`${point.time}: ${point.chartValueLabel}`} className="flex w-12 shrink-0 flex-col items-center gap-1 text-center">
-              <span className="whitespace-nowrap text-[11px] tabular-nums text-[#d9dce2]">{point.chartValueLabel}</span>
-              <div aria-hidden="true" className="flex h-12 w-8 items-end justify-center border-b border-white/15">
-                <span className={`block w-5 rounded-t-sm ${barColor}`} style={{ height: `${height}%` }} />
-              </div>
-              <span className="whitespace-nowrap text-[10px] text-[#b8bbc2]">{point.time}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function DayDetailsAccordion({ category }: { category: DetailCategory }) {
   const notes = category.rows.filter(({ note }) => Boolean(note));
   return (
     <details className="group border-t border-sky-100/10 first:border-t-0">
-      <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">
+      <summary className="grid min-h-[4rem] cursor-pointer list-none grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-x-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 sm:flex sm:gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-300/10 text-cyan-100"><MeteoIcon name={category.icon} size={16} /></span>
-        <span className="min-w-0 flex-1 text-[14px] font-semibold text-slate-100">{category.title}</span>
-        <span className="max-w-[42%] truncate text-xs tabular-nums text-slate-300">{category.summary}</span>
-        <span aria-hidden="true" className="ml-1 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
+        <span className="flex min-w-0 items-start justify-between gap-x-2 gap-y-1 sm:flex-1 sm:items-center">
+          <span className="min-w-0 flex-1 text-[14px] font-semibold leading-snug text-slate-100">{category.title}</span>
+          <span className="min-w-0 max-w-[62%] whitespace-normal break-words text-right text-xs leading-relaxed tabular-nums text-slate-300 sm:max-w-[58%]">{category.summary}</span>
+          <span aria-hidden="true" className="shrink-0 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
+        </span>
       </summary>
-      <div className="pb-4 pl-14 pr-1">
-        <p className="mb-2 text-xs text-slate-300">{category.cadence === "hourly" ? "Valeurs horaires réellement fournies · défilez horizontalement pour parcourir les heures." : "Valeur quotidienne issue de la fusion officielle; pondération historique si la preuve est qualifiée, sinon repli robuste non calibré."}</p>
-        {category.cadence === "hourly" ? <HourlyMiniChart category={category} /> : (
+      <div className="pb-4 pl-12 pr-1 sm:pl-14">
+        {category.cadence === "hourly" ? (
+          <div className="space-y-1 text-xs leading-relaxed text-slate-300">
+            <p>Valeur de l’échéance sélectionnée · {category.rows[0]?.time ?? "heure indisponible"}.</p>
+            <p className="break-words font-medium text-slate-100">{category.rows[0]?.value ?? "—"}</p>
+            <p>validTime UTC : {formatUtcTimestamp(category.validAt)}</p>
+          </div>
+        ) : (
           <dl className="space-y-1 text-sm text-slate-100">
             {category.rows.map((row) => <div key={row.key} className="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt className="text-slate-400">{row.time}</dt><dd className="text-right font-medium tabular-nums">{row.value}</dd></div>)}
           </dl>
@@ -491,12 +387,19 @@ export function ForecastByDaySection({
   dailySources,
   activeHourIndex,
   hourlyWeighting,
+  officialProvenance,
 }: {
   hours: ForecastHour[];
   dailyDays: DailyForecastPoint[];
   dailySources: string[];
   activeHourIndex: number;
   hourlyWeighting?: unknown;
+  officialProvenance?: {
+    source?: string | null;
+    sourceKind?: string | null;
+    computedAt?: string | null;
+    hourlyComputedAt?: string | null;
+  } | null;
 }) {
   const grouped = useMemo(() => groupOfficialHourlyForecastByDate(hours), [hours]);
   const displayDays = useMemo(() => buildForecastDisplayDays(hours, dailyDays), [hours, dailyDays]);
@@ -522,7 +425,20 @@ export function ForecastByDaySection({
   const selectedDaily = selectedDay?.daily ?? null;
   const detailCategories = selectedDay?.kind === "official-daily-fusion"
     ? selectedDaily ? buildDailyDetailCategories(selectedDaily) : []
-    : selectedGroup ? buildHourlyDetailCategories(selectedGroup, hours) : [];
+    : [];
+  const hourlyDetailCategories = selectedDay?.kind === "official-hourly" && selectedEntry
+    ? buildHourlyDetailCategories(selectedEntry, hours)
+    : [];
+  const selectedValidTimeUtc = formatUtcTimestamp(selectedEntry?.hour.validAt);
+  const selectedSnapshotTimeUtc = formatUtcTimestamp(officialProvenance?.hourlyComputedAt ?? officialProvenance?.computedAt);
+  const selectedSourceLabel = officialProvenance?.source === "open-meteo"
+    ? "Open-Meteo"
+    : officialProvenance?.source ?? "indisponible";
+  const selectedMetrics = selectedEntry?.hour.multiModelMetrics;
+  const selectedModelCount = selectedMetrics?.expectedModelCount;
+  const selectedMethodLabel = selectedMetrics?.source === "official_seven_models" && selectedMetrics.bestMatchIncluded === false
+    ? `Fusion officielle MeteoAI · ${isFiniteValue(selectedModelCount) ? `${selectedModelCount} modèle(s) disponible(s)` : "effectif indisponible"} · Best Match exclu`
+    : "Prévision horaire officielle · provenance de fusion non détaillée";
   const today = parisDateKey();
   const tomorrow = nextCalendarDate(today);
   const selectedConditionSource = selectedEntry?.hour.condition?.trim() ?? selectedDaily?.condition?.trim() ?? "";
@@ -678,8 +594,24 @@ export function ForecastByDaySection({
           </div>
 
           <section aria-label="Détails météo disponibles" className="rounded-2xl border border-sky-300/20 bg-slate-950/35 px-3">
-            {detailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} />)}
-            <AirQualityAccordion />
+            {selectedDay.kind === "official-hourly" ? (
+              <>
+                {selectedEntry ? (
+                  <div className="space-y-1 border-b border-sky-100/10 py-3 text-[11px] leading-relaxed text-slate-300" aria-label="Validité et provenance de l’heure sélectionnée">
+                    <p className="font-semibold text-sky-100">Valeurs pour l’échéance sélectionnée · {hourTime(selectedEntry, hours)}</p>
+                    <p>validTime UTC : {selectedEntry.hour.validAt != null && selectedValidTimeUtc !== "indisponible" ? <time dateTime={selectedValidTimeUtc}>{selectedValidTimeUtc}</time> : "indisponible"}</p>
+                    <p>Source : {selectedSourceLabel} · {selectedMethodLabel}.</p>
+                    <p>Snapshot horaire calculé (UTC) : {selectedSnapshotTimeUtc}.</p>
+                  </div>
+                ) : <p className="border-b border-sky-100/10 py-3 text-xs text-slate-300">Aucune échéance horaire sélectionnée.</p>}
+                {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} />)}
+              </>
+            ) : (
+              <>
+                {detailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} />)}
+                <AirQualityAccordion />
+              </>
+            )}
           </section>
 
           <details className="group px-1 text-xs text-slate-300">
