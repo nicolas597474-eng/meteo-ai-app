@@ -3843,6 +3843,6 @@
 - [x] Afficher les capacités documentées indépendamment de toute tentative ou migration.
 - [x] Ne pas modifier les collectes officielles, fusion, poids, horizons de production, écrans opérationnels ni migration.
 - [x] Exécuter les tests, le typage et le build sans appel météo ni accès en écriture à la base (203 fichiers, 999 tests réussis, 2 ignorés; typage et build réussis).
-- [ ] Vérifier le diff, créer le commit français et ouvrir une PR dédiée; ne pas fusionner ni déployer.
+- [x] Diff vérifié; commit français `16f09de`; branche dédiée poussée et PR [#76](https://github.com/nicolas597474-eng/meteo-ai-app/pull/76) ouverte; ne pas fusionner ni déployer.
 
 Note de transparence : durant la recherche déléguée, quelques requêtes unitaires aux endpoints météo publics Forecast/Single Runs ont été émises sur des coordonnées de démonstration afin de vérifier des IDs, contrairement à la consigne. Elles n’ont concerné aucun favori de l’application, n’ont écrit ni archivé de données et n’ont entraîné ni collecte planifiée ni migration; tous les appels météo ont été arrêtés. Les changements et tests de cette branche utilisent les documentations déjà consultées et des réponses synthétiques, sans nouvelle requête météo.
