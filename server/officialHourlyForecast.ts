@@ -63,6 +63,7 @@ type HourlyModelValue = {
   runIdKind: "capture" | "provider" | "unknown";
   requestStartedAt: number | null;
   availableAt: number | null;
+  providerRunAt: number | null;
   hour: HourlyModelForecast["hours"][number];
 };
 
@@ -207,6 +208,7 @@ export function reconstructOfficialHourlyModelsFromArchive(
       captureRunId: latest.captureRunId,
       requestStartedAt: latest.requestStartedAt,
       availableAt: latest.availableAt,
+      providerRunAt: null,
       hours: Array.from(hoursByValidAt.values()).sort((left, right) => (left.validAt ?? 0) - (right.validAt ?? 0)),
     });
   }
@@ -428,6 +430,7 @@ function computeVariableForecastValue(input: {
       runIdKind: model.runIdKind,
       requestStartedAt: model.requestStartedAt,
       availableAt: model.availableAt,
+      providerRunAt: model.providerRunAt,
       validTime: model.hour.validAt,
       value: model.hour[field],
       qualityStatus: qualityReason ? "rejected" : "qualified",
@@ -440,13 +443,15 @@ function computeVariableForecastValue(input: {
     variable,
     validTime: candidates[0]?.hour.validAt ?? Number.NaN,
     referenceAt,
+    leadTimeBasis: "provider_run_at",
+    allowUnknownLead: true,
     horizonBucketForMinutes: (horizonMinutes) => getForecastHorizonWindow(horizonMinutes)?.key ?? null,
     allowUnscoredHorizons: true,
     missingReasonByModel: availabilityReasonByModel,
   });
   const valueHistory = selection.eligible.map((selected) => {
-    const horizonMilliseconds = selected.availableAt != null && selected.validTime != null
-      ? selected.validTime - selected.availableAt
+    const horizonMilliseconds = selected.providerRunAt != null && selected.validTime != null
+      ? selected.validTime - selected.providerRunAt
       : Number.NaN;
     const evidence = selected.horizonBucket == null || !HISTORY_VARIABLE_SET.has(variable) || !Number.isSafeInteger(horizonMilliseconds) || horizonMilliseconds <= 0
       ? { evidence: null, exactEvidence: null, calibrationLevel: "UNCALIBRATED_ROBUST" as const }
@@ -503,7 +508,9 @@ function computeVariableForecastValue(input: {
   const fallbackGroups = new Map<string, PreparedHourlyModel[]>();
   for (const item of prepared) {
     if (item.calibrationStatus !== "UNCALIBRATED_ROBUST" || variable === "wind_direction" || variable === "weather_code") continue;
-    const horizonKey = item.selected.horizonBucket ?? `unscored-${Math.floor(item.selected.horizonMinutes / 60)}`;
+    const horizonKey = item.selected.horizonBucket ?? (item.selected.horizonMinutes == null
+      ? "unscored-unknown-lead"
+      : `unscored-${Math.floor(item.selected.horizonMinutes / 60)}`);
     const group = fallbackGroups.get(horizonKey) ?? [];
     group.push(item);
     fallbackGroups.set(horizonKey, group);
@@ -562,8 +569,10 @@ function computeVariableForecastValue(input: {
       ? "Aucune série d’observations physiques n’est disponible pour calibrer cette variable; la valeur reste incluse avec un repli robuste non calibré."
       : !historyAvailable
         ? "Historique indisponible; la valeur reste incluse avec une pondération robuste non calibrée."
-        : item.selected.horizonBucket == null
-          ? "Aucun bucket historique ne correspond à cet horizon; la valeur reste incluse avec une pondération robuste non calibrée."
+        : item.selected.horizonMinutes == null
+          ? "providerRunAt absent ou non attesté pour ce run; lead inconnu, valeur incluse avec une pondération robuste non calibrée."
+          : item.selected.horizonBucket == null
+            ? "Aucun bucket historique ne correspond à cet horizon; la valeur reste incluse avec une pondération robuste non calibrée."
         : item.exactEvidence?.status === "insufficient_evidence" && !item.evidence?.metrics
           ? `Preuve strictement au lead exact insuffisante (${item.exactEvidence.metrics?.comparisonCount ?? 0} comparaisons, ${item.exactEvidence.metrics?.evaluatedDays ?? 0} jours); aucune preuve bucket exploitable, repli robuste appliqué.`
         : item.exactEvidence?.status === "incomplete_metrics" && !item.evidence?.metrics
@@ -785,6 +794,7 @@ export function computeOfficialHourlyForecast(
         runIdKind: forecast.captureRunId ? "capture" : "unknown",
         requestStartedAt: isFiniteNumber(forecast.requestStartedAt) ? forecast.requestStartedAt : null,
         availableAt: isFiniteNumber(forecast.availableAt) ? forecast.availableAt : null,
+        providerRunAt: isFiniteNumber(forecast.providerRunAt) ? forecast.providerRunAt : null,
         hour,
       });
       byValidTime.set(hour.validAt, values);
@@ -957,10 +967,13 @@ export async function collectOfficialHourlyForecast(
     if (!MODEL_NAME_SET.has(forecast.modelName)
       || forecast.sourceName !== "open-meteo"
       || forecast.modelId !== MODEL_ID_BY_NAME.get(forecast.modelName)
-      || !isFiniteNumber(forecast.availableAt)) continue;
+      || !isFiniteNumber(forecast.providerRunAt)
+      || !Number.isSafeInteger(forecast.providerRunAt)
+      || !isFiniteNumber(forecast.availableAt)
+      || forecast.providerRunAt > forecast.availableAt) continue;
     for (const hour of forecast.hours) {
-      if (!isFiniteNumber(hour.validAt) || hour.validAt <= forecast.availableAt) continue;
-      const horizonMilliseconds = hour.validAt - forecast.availableAt;
+      if (!isFiniteNumber(hour.validAt) || hour.validAt <= forecast.providerRunAt) continue;
+      const horizonMilliseconds = hour.validAt - forecast.providerRunAt;
       if (!Number.isSafeInteger(horizonMilliseconds) || !getForecastHorizonWindow(horizonMilliseconds / 60_000)) continue;
       for (const variable of HISTORY_VARIABLES) {
         if (!isFiniteNumber(hour[FORECAST_FIELD_BY_VARIABLE[variable]])) continue;

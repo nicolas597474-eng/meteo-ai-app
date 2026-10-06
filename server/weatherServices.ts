@@ -393,7 +393,7 @@ export type HourlyModelWeightDiagnostic = {
   requestStartedAt: number | null;
   availableAt: number;
   validTime: number;
-  horizonMinutes: number;
+  horizonMinutes: number | null;
   horizonBucket: string | null;
   value: number;
   reliability: number;
@@ -936,6 +936,8 @@ export type HourlyModelForecast = {
   captureRunId?: string;
   requestStartedAt?: number;
   availableAt?: number;
+  /** Exact provider model initialization timestamp, null when the response does not attest it. */
+  providerRunAt?: number | null;
   hours: Array<{
     validAt: number;
     hour: number;
@@ -1177,6 +1179,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
           captureRunId: randomUUID(),
           requestStartedAt,
           availableAt,
+          providerRunAt: null,
           hours,
           sourceMetadata: {
             timezone: typeof (data as { timezone?: unknown }).timezone === "string" ? (data as { timezone: string }).timezone : null,

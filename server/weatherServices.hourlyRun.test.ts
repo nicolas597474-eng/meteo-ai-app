@@ -76,6 +76,7 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
     expect(forecasts[0].hours.map((hour) => hour.validAt)).toEqual(unixTimes.map((value) => value * 1000));
     expect(new Set(forecasts.map((forecast) => forecast.captureRunId)).size).toBe(7);
     expect(forecasts.every((forecast) => forecast.sourceName === "open-meteo" && forecast.availableAt! >= forecast.requestStartedAt!)).toBe(true);
+    expect(forecasts.every((forecast) => forecast.providerRunAt === null)).toBe(true);
 
     const requestUrls = mockedFetchWeather.mock.calls.map(([input]) => new URL(String(input)));
     expect(requestUrls).toHaveLength(7);

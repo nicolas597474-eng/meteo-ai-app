@@ -67,7 +67,7 @@ export type HourlyFusionWeightModelTrace = {
   requestStartedAt: number | null;
   availableAt: number;
   validTime: number;
-  horizonMinutes: number;
+  horizonMinutes: number | null;
   horizonBucket: string | null;
   value: number;
   reliability: number;

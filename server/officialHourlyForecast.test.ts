@@ -17,6 +17,7 @@ function modelForecasts(at = validAt, available = at - 12 * 60 * 60_000): Hourly
     modelId: model.modelId,
     sourceName: "open-meteo",
     availableAt: available,
+    providerRunAt: available,
     hours: [{
       validAt: at,
       hour: new Date(at).getUTCHours(),
@@ -136,10 +137,38 @@ describe("reconstructOfficialHourlyModelsFromArchive", () => {
     expect(forecasts[0]?.hours.map((hour) => hour.hour)).toEqual([2, 2]);
     expect(forecasts[0]?.hours.map((hour) => hour.temperature)).toEqual([8, 12]);
     expect(forecasts[0]?.hours[0]).toMatchObject({ cloudCover: 55, dewPoint: 3, visibility: 6, weatherCode: 2 });
+    expect(forecasts[0]?.providerRunAt).toBeNull();
   });
 });
 
 describe("computeOfficialHourlyForecast", () => {
+  it("utilise providerRunAt plutôt que availableAt pour le lead et la preuve horaire", () => {
+    const providerRunAt = validAt - 8 * 60 * 60_000;
+    const forecasts = modelForecasts(validAt, validAt - 2 * 60 * 60_000)
+      .map((forecast) => ({ ...forecast, providerRunAt }));
+    const result = computeOfficialHourlyForecast(forecasts, historicalScores());
+    const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
+
+    expect(weights).toHaveLength(OFFICIAL_HOURLY_MODELS.length);
+    expect(weights.every((item) => item.horizonMinutes === 8 * 60)).toBe(true);
+    expect(weights.every((item) => item.horizonBucket === "6_24h")).toBe(true);
+    expect(weights[0]?.availableAt).toBe(validAt - 2 * 60 * 60_000);
+    expect(variableWeighting(result, "temperature")?.calibrationStatus).toBe("CALIBRATED");
+  });
+
+  it("conserve les valeurs avec repli robuste quand aucun providerRunAt n’est attesté, sans estimer de lead", () => {
+    const forecasts = modelForecasts().map((forecast) => ({ ...forecast, providerRunAt: null }));
+    const result = computeOfficialHourlyForecast(forecasts, historicalScores());
+    const weighting = variableWeighting(result, "temperature");
+    const weights = weighting?.modelWeights ?? [];
+
+    expect(result.hours[0]?.temp).not.toBeNull();
+    expect(weighting).toMatchObject({ method: "robust_fallback", calibrationStatus: "UNCALIBRATED_ROBUST" });
+    expect(weights).toHaveLength(OFFICIAL_HOURLY_MODELS.length);
+    expect(weights.every((item) => item.horizonMinutes === null && item.horizonBucket === null)).toBe(true);
+    expect(weights.every((item) => item.historicalScore === null)).toBe(true);
+  });
+
   it("exclut les scores legacy nuls des poids, conserve les valeurs robustes et accepte la version stricte courante", () => {
     const legacyRows = historicalScores().map((row) => ({ ...row, scoringValidationVersion: null }));
     const legacyResult = computeOfficialHourlyForecast(modelForecasts(), legacyRows);
@@ -489,7 +518,7 @@ describe("computeOfficialHourlyForecast", () => {
 
   it("pondère les échéances par bucket propre à chaque run au lieu d’exiger un horizon commun", () => {
     const forecasts = modelForecasts().map((model) => model.modelName === "UKMET"
-      ? { ...model, availableAt: validAt - 60 * 60_000 }
+      ? { ...model, availableAt: validAt - 30_000, providerRunAt: validAt - 60 * 60_000 }
       : model);
     const result = computeOfficialHourlyForecast(forecasts, historicalScores());
 
@@ -504,7 +533,8 @@ describe("computeOfficialHourlyForecast", () => {
     const horizons = [30, 119.6, 120, 359.6, 360, 1439.6, 1440];
     const forecasts = modelForecasts().map((model, index) => ({
       ...model,
-      availableAt: validAt - horizons[index]! * 60_000,
+      availableAt: validAt - 30_000,
+      providerRunAt: validAt - horizons[index]! * 60_000,
     }));
     const result = computeOfficialHourlyForecast(forecasts, historicalScores());
     const weights = variableWeighting(result, "temperature")?.modelWeights ?? [];
@@ -526,7 +556,8 @@ describe("computeOfficialHourlyForecast", () => {
     const buckets = ["0_2h", "0_2h", "2_6h", "2_6h", "6_24h", "6_24h", "1_3d"];
     const forecasts = modelForecasts().map((model, index) => ({
       ...model,
-      availableAt: validAt - horizons[index]! * 60_000,
+      availableAt: validAt - 30_000,
+      providerRunAt: validAt - horizons[index]! * 60_000,
     }));
     const scores = OFFICIAL_HOURLY_MODELS.flatMap((model, modelIndex) => Array.from({ length: 7 }, (_, dayIndex) => {
       const mae = 0.25 + modelIndex;
