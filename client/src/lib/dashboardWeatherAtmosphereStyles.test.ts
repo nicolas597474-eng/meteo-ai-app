@@ -16,6 +16,7 @@ describe("styles de l’atmosphère météo du Dashboard", () => {
   it("ne capte pas les interactions et conserve une couche non intrusive", () => {
     expect(atmosphereStyles).toContain("pointer-events: none");
     expect(atmosphereStyles).toContain("position: fixed");
+    expect(atmosphereStyles).not.toContain("dashboard-weather-atmosphere__water-bead");
   });
 
   it("anime les phénomènes uniquement si l’utilisateur accepte les mouvements", () => {
@@ -32,6 +33,11 @@ describe("styles de l’atmosphère météo du Dashboard", () => {
     expect(atmosphereStyles).toContain(
       "@media (prefers-reduced-motion: reduce)"
     );
+    expect(atmosphereStyles).toContain("@media (max-width: 640px)");
+    expect(atmosphereStyles).toContain('data-effects-mode="reduced"');
+    expect(atmosphereStyles).toContain("var(--rain-drift, 2vw)");
+    expect(atmosphereStyles).toContain("dashboard-weather-frost-breathe");
+    expect(atmosphereStyles).toContain(":not(.dashboard-weather-atmosphere__wash)");
     expect(atmosphereStyles).toContain(
       "dashboard-weather-atmosphere__snowflake"
     );
