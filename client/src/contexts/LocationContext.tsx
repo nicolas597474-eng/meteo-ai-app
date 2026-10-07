@@ -33,11 +33,12 @@ const LocationContext = createContext<LocationContextValue>({
 });
 
 const STORAGE_KEY = "meteoai_active_location";
+const LEGACY_DASHBOARD_LOCATION_KEY = "meteoai_last_location";
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [activeLocation, setActiveLocationState] = useState<ActiveLocation | null>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_DASHBOARD_LOCATION_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;

@@ -6,6 +6,7 @@ import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
 import { HourlyMiniHistogram } from "@/components/weather/HourlyMiniHistogram";
+import { OfficialForecastCalculationTimes } from "@/components/weather/OfficialForecastCalculationTimes";
 import { buildHourlyHistogramSeries, getHourlyHistogramStartValidAt, type HourlyHistogramSeries, type IndexedHourlyHistogramHour } from "@/lib/hourlyMiniHistogram";
 import {
   buildForecastDisplayDays,
@@ -490,6 +491,7 @@ function AirQualityAccordion() {
 }
 
 export function ForecastByDaySection({
+  locationName,
   hours,
   dailyDays,
   dailySources,
@@ -497,6 +499,7 @@ export function ForecastByDaySection({
   hourlyWeighting,
   officialProvenance,
 }: {
+  locationName?: string;
   hours: ForecastHour[];
   dailyDays: DailyForecastPoint[];
   dailySources: string[];
@@ -552,7 +555,6 @@ export function ForecastByDaySection({
     ? buildHourlyDetailCategories(selectedEntry, hours, indexedHours, histogramStartValidAt)
     : [];
   const selectedValidTimeUtc = formatUtcTimestamp(selectedEntry?.hour.validAt);
-  const selectedSnapshotTimeUtc = formatUtcTimestamp(officialProvenance?.hourlyComputedAt ?? officialProvenance?.computedAt);
   const selectedSourceLabel = officialProvenance?.source === "open-meteo"
     ? "Open-Meteo"
     : officialProvenance?.source ?? "indisponible";
@@ -612,6 +614,7 @@ export function ForecastByDaySection({
 
   return (
     <section aria-labelledby="forecast-by-day-title" className="min-w-0 w-full space-y-3">
+      {locationName ? <p className="px-1 text-[10px] text-slate-400">Lieu actif : <span className="font-medium text-slate-200">{locationName}</span></p> : null}
       {selectedDay ? (
         <>
           <section
@@ -749,7 +752,11 @@ export function ForecastByDaySection({
                     <p className="font-semibold text-sky-100">Valeurs pour l’échéance sélectionnée · {hourTime(selectedEntry, hours)}</p>
                     <p>validTime UTC : {selectedEntry.hour.validAt != null && selectedValidTimeUtc !== "indisponible" ? <time dateTime={selectedValidTimeUtc}>{selectedValidTimeUtc}</time> : "indisponible"}</p>
                     <p>Source : {selectedSourceLabel} · {selectedMethodWithFallback}.</p>
-                    <p>Snapshot horaire calculé (UTC) : {selectedSnapshotTimeUtc}.</p>
+                    <OfficialForecastCalculationTimes
+                      hourlyComputedAt={officialProvenance?.hourlyComputedAt}
+                      computedAt={officialProvenance?.computedAt}
+                      className="text-slate-300"
+                    />
                   </div>
                 ) : <p className="border-b border-sky-100/10 py-3 text-xs text-slate-300">Aucune échéance horaire sélectionnée.</p>}
                 {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} allHours={hours} />)}

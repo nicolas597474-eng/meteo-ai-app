@@ -29,7 +29,9 @@ import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
+import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour, getOfficialForecastCoordinates } from "@/lib/officialForecast";
+import { useOfficialForecast } from "@/hooks/useOfficialForecast";
+import { OfficialForecastCalculationTimes } from "@/components/weather/OfficialForecastCalculationTimes";
 import type { OfficialRegimeInputDiagnostic, RegimeInputStatus } from "@shared/regimeInputDiagnostics";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
@@ -330,8 +332,7 @@ export default function Dashboard() {
 
   // Use location-aware query when a location is selected
   const queryInput = useMemo(() => ({
-    lat: selectedLocation?.lat ?? 50.76,
-    lon: selectedLocation?.lon ?? 2.52,
+    ...getOfficialForecastCoordinates(selectedLocation),
     radiusKm: activeLocation?.radiusKm ?? 20,
     localMode,
   }), [selectedLocation?.lat, selectedLocation?.lon, activeLocation?.radiusKm, localMode]);
@@ -370,8 +371,7 @@ export default function Dashboard() {
 
   // Coordinates for weather queries — use active location or Hondeghem default
   const coordsInput = useMemo(() => ({
-    lat: selectedLocation?.lat ?? 50.76,
-    lon: selectedLocation?.lon ?? 2.52,
+    ...getOfficialForecastCoordinates(selectedLocation),
   }), [selectedLocation?.lat, selectedLocation?.lon]);
 
   // Dashboard (MeteoAI synthesis) — always location-aware
@@ -383,17 +383,9 @@ export default function Dashboard() {
       refetchOnWindowFocus: false,
     }
   );
-  // Réponse officielle consolidée : la même source alimente Dashboard et Détails.
-  const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast } = trpc.weather.getDetailedForecast.useQuery(
-    { ...coordsInput, includeExtendedPeriods: false },
-    {
-      staleTime: 60 * 1000,
-      refetchInterval: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      retry: 2,
-      retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
-    }
-  );
+  // Réponse officielle consolidée : le hook partagé alimente Dashboard et Détails avec le même lieu et la même politique de rafraîchissement.
+  const { query: officialForecastQuery } = useOfficialForecast(selectedLocation);
+  const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast } = officialForecastQuery;
   const { data: currentDashboardWeather } = trpc.favorites.getCurrentDashboardWeather.useQuery(
     coordsInput,
     { staleTime: 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 },
@@ -653,8 +645,9 @@ export default function Dashboard() {
   const primaryRegimeId: string = multiRegime?.activeRegimes?.[0]?.id ?? (regime as any)?.regime ?? (regime as any)?.id ?? "unknown";
   const regimeScore: number | null = multiRegime?.confidenceScore ?? null;
   // L’accord est affiché en unités physiques et demeure distinct de la fiabilité historique.
-  const currentHourIndex = findActiveHourlyForecastIndex(hours, forecastNowMs);
-  const currentHour = hours[currentHourIndex] ?? null;
+  const activeOfficialHour = getActiveOfficialForecastHour(hours, forecastNowMs);
+  const currentHourIndex = activeOfficialHour?.index ?? -1;
+  const currentHour = activeOfficialHour?.hour ?? null;
   const isDailyFallback = currentHour == null && currentSnapshot == null && !hasPhysicalCurrentState && dailyFallback?.kind === "daily_fusion";
   const fallbackDateLabel = isDailyFallback
     ? new Date(`${dailyFallback.date}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", timeZone: "Europe/Paris" })
@@ -1313,11 +1306,16 @@ export default function Dashboard() {
         {/* Hourly Chart */}
         <div className="overflow-visible rounded-[22px]">
           <HourlyWeightingNotice weighting={officialForecast?.officialSnapshot?.hourlyWeighting} />
+          <OfficialForecastCalculationTimes
+            hourlyComputedAt={officialForecast?.officialSnapshot?.hourlyComputedAt}
+            computedAt={officialForecast?.officialSnapshot?.computedAt}
+            className="mb-2 px-1"
+          />
           {hourlyLoading ? (
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
             <Suspense fallback={<div className="h-56 bg-muted rounded-xl animate-pulse" />}>
-              <HourlyChart hours={hours} locationName={activeLocation?.name} />
+              <HourlyChart hours={hours} locationName={selectedLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name} activeHourIndex={currentHourIndex} />
             </Suspense>
           ) : (
             <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-5 text-center">
@@ -1334,7 +1332,7 @@ export default function Dashboard() {
             <div className="h-72 bg-muted rounded-xl animate-pulse" />
           ) : days.length > 0 ? (
             <Suspense fallback={<div className="h-72 bg-muted rounded-xl animate-pulse" />}>
-              <FifteenDayChart days={days} locationName={activeLocation?.name} />
+              <FifteenDayChart days={days} locationName={selectedLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name} />
             </Suspense>
           ) : null}
         </div>

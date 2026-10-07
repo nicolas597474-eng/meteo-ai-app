@@ -40,6 +40,7 @@ export interface HourData {
 interface Props {
   hours: HourData[];
   locationName?: string;
+  activeHourIndex?: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -279,7 +280,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export default function HourlyChart({ hours, locationName }: Props) {
+export default function HourlyChart({ hours, locationName, activeHourIndex }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -335,8 +336,8 @@ export default function HourlyChart({ hours, locationName }: Props) {
 
   // Active forecast interval index
   const nowHour = useMemo(() => {
-    return findActiveHourlyForecastIndex(hours, Date.now());
-  }, [hours]);
+    return activeHourIndex ?? findActiveHourlyForecastIndex(hours, Date.now());
+  }, [activeHourIndex, hours]);
   const dayBoundaryIndexes = useMemo(
     () => hours.reduce<number[]>((indexes, hour, index) => {
       if (index > 0 && hour.hour === "00:00") indexes.push(index);

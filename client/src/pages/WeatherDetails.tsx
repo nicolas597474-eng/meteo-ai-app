@@ -2,7 +2,7 @@
  * WeatherDetails — Page de prévisions météo ultra-détaillées
  * Sections: prévisions unifiées par jour/heure, carte météo et historique vérifié
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,11 +12,12 @@ import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { ForecastByDaySection } from "@/components/weather/ForecastByDaySection";
 import { HourlyHistoricalEvidencePanel } from "@/components/weather/HourlyHistoricalEvidencePanel";
 import { BackToTopButton } from "@/components/BackToTopButton";
-import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
+import { WEATHER_QUERY_SLOW_MS } from "@/lib/weatherQueryRecovery";
 import { WindyMap } from "@/components/WindyMap";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
+import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour } from "@/lib/officialForecast";
+import { useOfficialForecast } from "@/hooks/useOfficialForecast";
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -24,16 +25,9 @@ export default function WeatherDetails() {
   const { activeLocation } = useLocation();
   const { user } = useAuth();
   const { style: pageSkyStyle } = usePageWeatherSky();
-  const coordsInput = useMemo(() => activeLocation
-    ? { lat: activeLocation.lat, lon: activeLocation.lon }
-    : undefined, [activeLocation?.lat, activeLocation?.lon]);
-
-  const { data, isLoading, isFetching, isError, error, refetch } = trpc.weather.getDetailedForecast.useQuery({ ...coordsInput, includeExtendedPeriods: false }, {
-    retry: shouldRetryWeatherQuery,
-    retryDelay: weatherRetryDelay,
-    refetchOnWindowFocus: false,
-  });
-  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
+  const { query: detailedForecastQuery, coordinates } = useOfficialForecast(activeLocation);
+  const { data, isLoading, isFetching, isError, error, refetch } = detailedForecastQuery;
+  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordinates, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
   const [slowLoad, setSlowLoad] = useState(false);
   const aromeShadow = trpc.weather.compareHondeghemAromeShadow.useMutation();
   const windDirectionVerification = trpc.weather.verifyHondeghemAromeWindDirection.useMutation();
@@ -69,8 +63,8 @@ export default function WeatherDetails() {
       }];
     });
     openWeatherShadow.mutate({
-      lat: activeLocation?.lat ?? 50.7567,
-      lon: activeLocation?.lon ?? 2.5204,
+      lat: coordinates.lat,
+      lon: coordinates.lon,
       officialHours,
     });
   };
@@ -84,10 +78,9 @@ export default function WeatherDetails() {
     return () => window.clearTimeout(timeout);
   }, [isLoading, isFetching]);
 
-  const currentHourIdx = useMemo(() => {
-    if (!data?.hours) return -1;
-    return findActiveHourlyForecastIndex(data.hours, Date.now());
-  }, [data?.hours]);
+  const activeOfficialHour = data?.hours
+    ? getActiveOfficialForecastHour(data.hours, Date.now())
+    : null;
   if (isLoading) {
     return (
       <div className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
@@ -108,12 +101,14 @@ export default function WeatherDetails() {
   }
 
   const hours = data.hours ?? [];
-  const currentHour = hours[currentHourIdx] ?? null;
+  const currentHourIdx = activeOfficialHour?.index ?? -1;
+  const currentHour = activeOfficialHour?.hour ?? null;
 
   return (
     <div className="weather-page-sky forecast-details-page min-h-dvh w-full overflow-x-clip bg-[#061426]" style={pageSkyStyle}>
       <div className="mx-auto w-full min-w-0 max-w-none space-y-3 px-4 pt-[max(env(safe-area-inset-top),0.25rem)] pb-24 sm:max-w-2xl sm:space-y-5 sm:px-3 sm:py-4 sm:pb-28">
         <ForecastByDaySection
+          locationName={activeLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name}
           hours={hours}
           dailyDays={data.days ?? []}
           dailySources={data.modelsUsed ?? []}

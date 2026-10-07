@@ -4,9 +4,10 @@ const pageSource = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url)
 const timelineSource = readFileSync(new URL("../components/weather/ForecastByDaySection.tsx", import.meta.url), "utf8");
 const selectedDetailsSource = readFileSync(new URL("../lib/hourlySelectedDetails.ts", import.meta.url), "utf8");
 const displayDaysSource = readFileSync(new URL("../lib/forecastDayDisplay.ts", import.meta.url), "utf8");
+const calculationTimesSource = readFileSync(new URL("../components/weather/OfficialForecastCalculationTimes.tsx", import.meta.url), "utf8");
 describe("page Prévisions détaillées", () => {
   it("réutilise le contrat existant et transmet séparément l’horaire officiel, les jours et leurs sources", () => {
-    expect(pageSource).toContain('trpc.weather.getDetailedForecast.useQuery({ ...coordsInput, includeExtendedPeriods: false }');
+    expect(pageSource).toContain("useOfficialForecast(activeLocation)");
     expect(pageSource).toContain("dailyDays={data.days ?? []}");
     expect(pageSource).toContain("dailySources={data.modelsUsed ?? []}");
     expect(pageSource).toContain("hours={hours}");
@@ -85,9 +86,14 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("Source : {selectedSourceLabel} · {selectedMethodWithFallback}");
     expect(timelineSource).toContain("repli OpenWeather exact pour");
     expect(timelineSource).toContain("fraîcheur amont inconnue");
+    expect(timelineSource).toContain("<OfficialForecastCalculationTimes");
+    expect(calculationTimesSource).toContain("Calcul horaire :");
+    expect(calculationTimesSource).toContain("Snapshot courant / quotidien :");
     expect(timelineSource).toContain("whitespace-normal break-words");
     expect(pageSource).toContain("officialProvenance={{");
     expect(pageSource).toContain("source: data.officialSnapshot?.source");
+    expect(pageSource).toContain("hourlyComputedAt: data.officialSnapshot?.hourlyComputedAt");
+    expect(pageSource).toContain("computedAt: data.officialSnapshot?.computedAt");
   });
   it("préserve la navigation historique, la carte et les preuves horaires", () => {
     expect(pageSource).toContain('import { Link } from "wouter"');
@@ -95,7 +101,7 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain('href="/history"');
     expect(pageSource).toContain("<WindyMap");
     expect(pageSource).toContain("<HourlyHistoricalEvidencePanel");
-    expect(pageSource).toContain("findActiveHourlyForecastIndex(data.hours, Date.now())");
+    expect(pageSource).toContain("getActiveOfficialForecastHour(data.hours, Date.now())");
     expect(pageSource).toContain("Prévisions temporairement indisponibles");
     expect(pageSource).toContain("forecast-details-page");
     expect(pageSource).toContain("pb-24");

@@ -68,7 +68,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('onClick={() => handleModeChange("standard")}');
     expect(source).toContain('aria-label="Fermer le contexte local et revenir au mode Officiel"');
     expect(source).toContain("Données horaires temporairement indisponibles.");
-    expect(source).toContain("includeExtendedPeriods: false");
+    expect(source).toContain("useOfficialForecast(selectedLocation)");
     expect(source).toContain("const officialHours = officialForecast?.hours ?? []");
     expect(source).toContain("const hours = officialHours");
     expect(source).not.toContain("const officialHours: any[]");
