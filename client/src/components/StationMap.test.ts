@@ -44,6 +44,13 @@ describe("carte des stations OpenStreetMap", () => {
     expect((source.match(/aria-label=\"Fermer la carte agrandie\"/g) ?? []).length).toBe(1);
   });
 
+  it("ajoute des boutons de zoom manuel sur la carte compacte", () => {
+    expect(source).toContain("!isExpanded && mapReady");
+    expect(source).toContain("Zoom manuel de la carte des stations");
+    expect(source).toContain("onZoomIn={() => adjustExpandedZoom(1)}");
+    expect(source).toContain("onZoomOut={() => adjustExpandedZoom(-1)}");
+  });
+
   it("ne conserve pas les contrôles de fond Satellite ni Street View de Google", () => {
     expect(source).not.toContain("MapTypeToggle");
     expect(source).not.toContain("google.maps");

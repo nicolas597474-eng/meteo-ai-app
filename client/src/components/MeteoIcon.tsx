@@ -10,6 +10,7 @@ interface MeteoIconProps {
   name: string;
   size?: number;
   className?: string;
+  ariaLabel?: string;
 }
 
 const PICTORIAL_WEATHER_ICONS: Record<string, string> = {
@@ -97,7 +98,7 @@ function hasExplicitSizeClass(className: string) {
   return /(^|\s)(?:h|w)-[\w/.-]+/.test(className);
 }
 
-export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
+export function MeteoIcon({ name, size = 40, className = "", ariaLabel = `Icône météo : ${name}` }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
   const pictorialIcon = PICTORIAL_WEATHER_ICONS[name.toLowerCase()];
   const animationClass = getPictorialAnimationClass(name);
@@ -110,7 +111,7 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
         className={`meteo-icon-shell meteo-icon-3d ${className}`}
         style={shellSizeStyle}
         role="img"
-        aria-label={`Icône météo : ${name}`}
+        aria-label={ariaLabel}
         data-weather-icon={effectKind}
       >
         <img
@@ -139,7 +140,7 @@ export function MeteoIcon({ name, size = 40, className = "" }: MeteoIconProps) {
       className={`meteo-icon-shell meteo-icon-3d ${className}`}
       style={shellSizeStyle}
       role="img"
-      aria-label={`Icône météo : ${name}`}
+      aria-label={ariaLabel}
       data-weather-icon={effectKind}
     >
     <svg

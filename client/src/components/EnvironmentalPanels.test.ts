@@ -13,6 +13,14 @@ const trajectorySunMoonSource = source.slice(source.indexOf("function SunMoonPan
 const temporalSunMoonSource = source.slice(source.indexOf("function SunMoonPanelTemporal"), source.indexOf("export function EnvironmentalPanels"));
 
 describe("EnvironmentalPanels", () => {
+  it("offre un recentrage accessible à côté des contrôles de zoom des cartes OSM", () => {
+    expect(source).toContain("MapRecenterButton");
+    expect(source).toContain("Recentrer la carte sur le lieu actif");
+    expect(source).toContain("map.setView([center.lat, center.lon], isExpanded ? ECLIPSE_IMMERSIVE_WORLD_ZOOM : 5)");
+    expect(source).toContain("map.setBearing(0)");
+    expect(source).toContain("enableRotation={isExpanded}");
+  });
+
   it("présente la qualité de l’air avec ses mesures réelles et son attribution", () => {
     expect(source).toContain("Qualité de l’air");
     expect(source).toContain("PM2.5");
