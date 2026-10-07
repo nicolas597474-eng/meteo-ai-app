@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { getForecastModelGuide } from "@/lib/forecastModelGuides";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { ForecastFlowStatusBadge, ForecastFlowStatusLegend } from "@/components/weather/ForecastFlowStatusBadge";
+import { HourlyJournalPanel } from "@/components/weather/HourlyJournalPanel";
+import type { HourlyJournalEntry } from "@/lib/hourlyJournalFilter";
 import { LocalTemperatureNowcastingPanel } from "@/components/weather/LocalTemperatureNowcastingPanel";
 import { LocalPrecipitationNowcastingPanel } from "@/components/weather/LocalPrecipitationNowcastingPanel";
 
@@ -893,6 +895,13 @@ export default function WeatherAILab() {
     <FusionSimulation steps={simulationSteps} snapshotLabel={snapshotLabel} />
 
     <StationSimulation steps={stationSteps} />
+
+    <HourlyJournalPanel
+      expectedModels={expectedHourlyModels}
+      entries={(forecastCollectionReport?.hourlyModelCollection ?? []) as HourlyJournalEntry[]}
+      available={forecastCollectionReport?.hourlyModelCollectionAvailable ?? false}
+      onOpenModel={setSelectedCollectionModel}
+    />
 
     <HourlyComparisonDiagnosticsPanel location={activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined} />
 
