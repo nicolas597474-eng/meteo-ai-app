@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildForecastDisplayDays,
+  formatDailyTemperature,
   getDailyExtremesDisplayLabel,
   getDailyForecastDisplayMetrics,
   getForecastDateKey,
@@ -69,6 +70,7 @@ describe("forecast display days", () => {
 
     expect(result).toMatchObject({ date, kind: "official-hourly", daily });
     expect(result.hourlyGroup?.hours.map(({ hour }) => hour.temp)).toEqual([13.6, 14.1]);
+    expect(formatDailyTemperature(21.4)).toBe("21,4 °C");
     expect(getDailyExtremesDisplayLabel(result.daily)).toBe("Tmax 21,4 °C · Tmin 8,2 °C");
     expect(getDailyForecastDisplayMetrics(daily).find(({ key }) => key === "precipitation")).toMatchObject({ value: 2.3, unit: "mm" });
     expect(getDailyForecastDisplayMetrics(daily).find(({ key }) => key === "weatherCode")).toMatchObject({ value: 53, unit: "WMO" });

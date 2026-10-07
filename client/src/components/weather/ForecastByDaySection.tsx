@@ -8,11 +8,14 @@ import { getDailyWeatherCodeIconName } from "@/lib/dailyWeatherIcon";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
 import { filterDailyMetricsForOfficialHourlyCard, filterOfficialHourlyCardDetails, findNextOfficialHourlyConditionChange, getOfficialHourlyCondition } from "@/lib/officialHourlyCard";
+import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
+import { getTemperatureTone } from "@/lib/chartTemperatureTone";
 import { HourlyMiniHistogram } from "@/components/weather/HourlyMiniHistogram";
 import { OfficialForecastCalculationTimes } from "@/components/weather/OfficialForecastCalculationTimes";
 import { buildHourlyHistogramSeries, getHourlyHistogramStartValidAt, HOURLY_HISTOGRAM_PALETTE, type HourlyHistogramCategoryKey, type HourlyHistogramSeries, type IndexedHourlyHistogramHour } from "@/lib/hourlyMiniHistogram";
 import {
   buildForecastDisplayDays,
+  formatDailyTemperature,
   getDailyExtremesDisplayLabel,
   getDailyForecastDisplayMetrics,
   getDailyReferenceSourceLabels,
@@ -102,17 +105,18 @@ function relativeForecastAge(value: string | null | undefined): string {
   return `il y a ${Math.floor(hours / 24)} j`;
 }
 
-function OfficialHourlyFieldCard({ label, icon, value, provenance, provenanceTitle }: {
+function OfficialHourlyFieldCard({ label, icon, value, provenance, provenanceTitle, valueColor }: {
   label: string;
   icon: string;
   value: string;
   provenance: string;
   provenanceTitle: string;
+  valueColor?: string;
 }) {
   return (
     <div className="min-w-0 rounded-lg border border-sky-100/10 bg-slate-950/25 px-1.5 py-1.5 text-center" title={provenanceTitle}>
       <p className="flex min-h-7 items-center justify-center gap-1 text-[9px] leading-tight text-sky-100/80 sm:text-[10px]"><MeteoIcon name={icon} size={14} className="shrink-0" />{label}</p>
-      <p className="mt-0.5 break-words text-sm font-semibold tabular-nums text-slate-50 sm:text-base">{value}</p>
+      <p className="mt-0.5 break-words text-sm font-semibold tabular-nums text-slate-50 sm:text-base" style={valueColor ? { color: valueColor } : undefined}>{value}</p>
       <p className="mt-0.5 break-words text-[8px] leading-tight text-slate-400">{provenance}</p>
     </div>
   );
@@ -701,8 +705,16 @@ export function ForecastByDaySection({
     const origin = fallback ? `réponse reçue ${freshness} · fraîcheur amont inconnue` : `calcul ${freshness}`;
     return `${source} · ${origin}${available ? "" : " · champ indisponible"}`;
   };
+  const selectedHourlyTemperatureTone = selectedEntry && selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.temp)
+    ? getTemperatureTone(selectedEntry.hour.temp, "hourly").label
+    : undefined;
+  const selectedHourlyApparentTemperatureTone = selectedEntry && selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.apparentTemp)
+    ? getTemperatureTone(selectedEntry.hour.apparentTemp, "hourly").label
+    : undefined;
+  const selectedDailyMaximumTone = getExtremeTemperatureTone("max", selectedDaily?.tempMax);
+  const selectedDailyMinimumTone = getExtremeTemperatureTone("min", selectedDaily?.tempMin);
   const hourlyFieldCards = selectedEntry && selectedEntryHasValidTime ? [
-    { key: "apparent", label: "Ressenti prévu", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.apparentTemp, 1, "°"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.apparentTemp)) },
+    { key: "apparent", label: "Ressenti prévu", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.apparentTemp, 1, "°"), valueColor: selectedHourlyApparentTemperatureTone, provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.apparentTemp)) },
     { key: "direction", label: "Direction du vent", icon: "wind_param", value: isFiniteValue(selectedEntry.hour.windDirection) ? `${windDirectionLabel(selectedEntry.hour.windDirection)} · ${formatOptionalForecastValue(selectedEntry.hour.windDirection, 0, "°")}` : "—", provenance: hourlyFieldProvenance("windDirection", isFiniteValue(selectedEntry.hour.windDirection)) },
     { key: "humidity", label: "Humidité prévue", icon: "humidity", value: formatOptionalForecastValue(selectedEntry.hour.humidity, 0, "%"), provenance: hourlyFieldProvenance("humidity", isFiniteValue(selectedEntry.hour.humidity)) },
     { key: "dew-point", label: "Point de rosée", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.dewPoint, 1, "°"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.dewPoint)) },
@@ -763,14 +775,22 @@ export function ForecastByDaySection({
                 {selectedDay.kind === "official-hourly" ? (
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">{selectedEntry ? `Échéance ${hourTime(selectedEntry, hours)}` : "Température horaire"}</p>
-                    <p className="mt-0.5 text-[2.8rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-5xl">{formatOptionalForecastValue(selectedEntryHasValidTime ? selectedEntry?.hour.temp : null, 1, "°")}</p>
+                    <p className="mt-0.5 text-[2.8rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-5xl" style={selectedHourlyTemperatureTone ? { color: selectedHourlyTemperatureTone } : undefined}>{formatOptionalForecastValue(selectedEntryHasValidTime ? selectedEntry?.hour.temp : null, 1, "°")}</p>
                     {selectedEntry && <p className="mt-1 text-[8px] leading-tight text-slate-400" title={`validTime UTC ${selectedValidTimeUtc}`}>{hourlyFieldProvenance("temperature", selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.temp))}</p>}
                     {selectedEntryHasValidTime && selectedEntry?.hour.fallbackProvenance?.temperature && <p className="mt-1 text-[9px] leading-relaxed text-amber-200">OpenWeatherMap · réponse obtenue par l’application {new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }).format(new Date(selectedEntry.hour.fallbackProvenance.temperature.retrievedAt))} · validTime exact · run fournisseur non communiqué, fraîcheur amont inconnue.</p>}
                     {(selectedDaily || selectedDateIsTodayOrTomorrow) && (
                       <>
-                      <p className="mt-1.5 text-[10px] leading-relaxed text-cyan-100">
-                        {selectedDaily ? `Extrêmes quotidiens · ${getDailyExtremesDisplayLabel(selectedDaily)}` : "Extrêmes journaliers indisponibles"}
-                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] leading-relaxed">
+                        {selectedDaily ? <>
+                          <span className="text-cyan-100">Extrêmes quotidiens ·</span>
+                          {isFiniteValue(selectedDaily.tempMax)
+                            ? <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${selectedDailyMaximumTone.container}`}><span className={`text-[8px] font-bold uppercase tracking-wide ${selectedDailyMaximumTone.label}`}>Tmax</span><span className={`font-bold tabular-nums ${selectedDailyMaximumTone.value}`}>{formatDailyTemperature(selectedDaily.tempMax)}</span></span>
+                            : <span className="text-slate-300">Tmax indisponible</span>}
+                          {isFiniteValue(selectedDaily.tempMin)
+                            ? <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${selectedDailyMinimumTone.container}`}><span className={`text-[8px] font-bold uppercase tracking-wide ${selectedDailyMinimumTone.label}`}>Tmin</span><span className={`font-bold tabular-nums ${selectedDailyMinimumTone.value}`}>{formatDailyTemperature(selectedDaily.tempMin)}</span></span>
+                            : <span className="text-slate-300">Tmin indisponible</span>}
+                        </> : <span className="text-cyan-100">Extrêmes journaliers indisponibles</span>}
+                      </div>
                       <p className="text-[8px] leading-tight text-slate-400" title={`Source des extrêmes : ${dailyExtremesSource}`}>{dailyExtremesSource} · {dailyExtremesAge}</p>
                       </>
                     )}
@@ -789,7 +809,7 @@ export function ForecastByDaySection({
                   <p className="text-[13px] font-medium leading-snug text-slate-50">{selectedCondition || "Condition indisponible"}</p>
                   {selectedDay.kind === "official-hourly" && <p className="mt-0.5 text-[8px] leading-tight text-slate-400">{hourlyFieldProvenance(null, Boolean(selectedHourlyCondition))}</p>}
                   <p className="mt-2 text-[10px] text-slate-300">Ressenti</p>
-                  <p className="text-sm font-semibold tabular-nums text-white">
+                  <p className="text-sm font-semibold tabular-nums text-white" style={selectedDay.kind === "official-hourly" && selectedHourlyApparentTemperatureTone ? { color: selectedHourlyApparentTemperatureTone } : undefined}>
                     {selectedDay.kind === "official-hourly"
                       ? formatOptionalForecastValue(selectedEntryHasValidTime ? selectedEntry?.hour.apparentTemp : null, 1, "°")
                       : [
