@@ -757,6 +757,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             const providerRunArchive = await getHourlyProviderRunValues(locKey, yesterday);
             if (providerRunArchive.available && providerRunArchive.values.length > 0) {
               const providerRunEvaluation = evaluateProviderRunForecasts(snapshots, providerRunArchive.values);
+              console.info(`[SingleRunComparisonDiagnostic] ${locName}: ${JSON.stringify(providerRunEvaluation.diagnostics)}`);
               const providerRunComparisons = providerRunEvaluation.comparisons.filter(
                 (row): row is typeof row & { forecastRunValueId: number; observationSnapshotId: number } =>
                   row.forecastRunValueId != null && row.observationSnapshotId != null,
@@ -766,6 +767,9 @@ export async function collectObservationsHandler(req: Request, res: Response) {
                 scores: providerRunEvaluation.scores,
               });
               console.log(`[ProviderRunScore] ${locName}: ${providerRunEvaluation.scores.length} score(s), ${providerRunEvaluation.comparisons.length} comparaison(s) ${providerRunSaved ? "archivée(s)" : "en attente de migration"}`);
+            } else if (providerRunArchive.available) {
+              const emptyProviderRunEvaluation = evaluateProviderRunForecasts(snapshots, []);
+              console.info(`[SingleRunComparisonDiagnostic] ${locName}: ${JSON.stringify(emptyProviderRunEvaluation.diagnostics)}`);
             }
           } catch {
             console.warn(`[ProviderRunScore] ${locName}: évaluation provider-run ignorée; scores de disponibilité historiques inchangés.`);
@@ -773,6 +777,8 @@ export async function collectObservationsHandler(req: Request, res: Response) {
 
           const hourlyForecastRuns = await getHourlyForecastRunValues(locKey, yesterday);
           if (hourlyForecastRuns.length === 0) {
+            const emptyHourlyEvaluation = evaluateHourlyForecastRuns(snapshots, []);
+            console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(emptyHourlyEvaluation.diagnostics)}`);
             locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune capture horaire vérifiable archivée; les anciennes séries mutables ne sont pas réutilisées`);
             continue;
           }
@@ -783,6 +789,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
               return variable ? [{ ...run, variable }] : [];
             }),
           );
+          console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(evaluation.diagnostics)}`);
           const hourlyScores = evaluation.compatibilityScores;
           const validatedBucketScores = evaluation.scores.filter((score) => score.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION);
           if (validatedBucketScores.length > 0) {
