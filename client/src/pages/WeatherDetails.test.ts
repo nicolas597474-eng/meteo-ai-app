@@ -59,6 +59,23 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("Aucune série horaire officielle n’est fournie pour cette date");
     expect(timelineSource).toContain("Extrêmes journaliers indisponibles");
   });
+  it("place les heures puis les jours avant les détails de l’échéance sélectionnée", () => {
+    const hourlyStrip = timelineSource.indexOf('aria-labelledby="forecast-hourly-strip-title"');
+    const dailyStrip = timelineSource.indexOf('aria-labelledby="forecast-daily-strip-title"');
+    const selectedForecast = timelineSource.indexOf("Prévisions de l’échéance sélectionnée");
+    expect(hourlyStrip).toBeGreaterThanOrEqual(0);
+    expect(hourlyStrip).toBeLessThan(dailyStrip);
+    expect(dailyStrip).toBeLessThan(selectedForecast);
+  });
+  it("agrandit les heures, indique la pluie disponible et conserve les palettes thermiques", () => {
+    expect(timelineSource).toContain("w-[4.5rem]");
+    expect(timelineSource).toContain("entry.hour.precipitation > 0");
+    expect(timelineSource).toContain("getTemperatureTone(entry.hour.temp, \"hourly\")");
+    expect(timelineSource).toContain('getExtremeTemperatureTone("max", day.daily?.tempMax)');
+    expect(timelineSource).toContain('getExtremeTemperatureTone("min", day.daily?.tempMin)');
+    expect(timelineSource).toContain("Tmax</span>");
+    expect(timelineSource).toContain("Tmin</span>");
+  });
   it("n’affiche que les champs fournis, distingue les fréquences brutes et laisse l’AQI indisponible", () => {
     for (const title of ["Précipitations", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité", "Rayonnement solaire"]) {
       expect(selectedDetailsSource).toContain(`"${title}"`);
