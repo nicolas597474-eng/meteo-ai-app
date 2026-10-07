@@ -27,6 +27,7 @@ import {
   hourlyForecastProviderRunValues,
   hourlyForecastProviderRunComparisons,
   hourlyForecastProviderRunScores,
+  hourlyComparisonDiagnosticSnapshots,
   leadTimeScores,
   InsertForecast,
   InsertForecastRun,
@@ -72,6 +73,7 @@ import {
   InsertPersonalModelObservationScore,
   InsertPersonalModelCalibration,
 } from "../drizzle/schema";
+import type { HourlyComparisonDiagnostic } from "./hourlyComparisonDiagnostics";
 import { ENV } from "./_core/env";
 import { selectLatestForecasts } from "./forecastSelection";
 import { buildForecastUpdateSet } from "./forecastWrite";
@@ -1818,6 +1820,52 @@ export async function getHourlyForecastRunValues(locationKey: string, date: stri
     eq(hourlyForecastRunValues.locationKey, locationKey),
     eq(hourlyForecastRunValues.targetDate, date),
   )).orderBy(hourlyForecastRunValues.modelName, hourlyForecastRunValues.validTime, hourlyForecastRunValues.variable, hourlyForecastRunValues.availableAt);
+}
+
+let hourlyComparisonDiagnosticsStorageWarningLogged = false;
+function warnHourlyComparisonDiagnosticsStorage(error?: unknown) {
+  if (hourlyComparisonDiagnosticsStorageWarningLogged) return;
+  hourlyComparisonDiagnosticsStorageWarningLogged = true;
+  console.warn("[HourlyComparisonDiagnostics] Snapshot storage is unavailable; verify additive migration 0057.", error ?? "");
+}
+
+/** Replace the one latest diagnostic snapshot for a location after its scheduled evaluation. */
+export async function upsertHourlyComparisonDiagnosticSnapshot(input: {
+  locationKey: string;
+  cycleDate: string;
+  diagnostics: HourlyComparisonDiagnostic[];
+}): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const capturedAt = new Date();
+  try {
+    await db.insert(hourlyComparisonDiagnosticSnapshots).values({ ...input, capturedAt }).onDuplicateKeyUpdate({
+      set: {
+        cycleDate: input.cycleDate,
+        diagnostics: input.diagnostics,
+        capturedAt,
+      },
+    });
+    return true;
+  } catch (error) {
+    warnHourlyComparisonDiagnosticsStorage(error);
+    return false;
+  }
+}
+
+/** Read the latest persisted diagnostic snapshot only; this function never evaluates forecasts. */
+export async function getLatestHourlyComparisonDiagnosticSnapshot(locationKey: string) {
+  const db = await getDb();
+  if (!db) return null;
+  try {
+    const [snapshot] = await db.select().from(hourlyComparisonDiagnosticSnapshots)
+      .where(eq(hourlyComparisonDiagnosticSnapshots.locationKey, locationKey))
+      .limit(1);
+    return snapshot ?? null;
+  } catch (error) {
+    warnHourlyComparisonDiagnosticsStorage(error);
+    return null;
+  }
 }
 
 /** Idempotently records one model result for a scheduled batch attempt. */

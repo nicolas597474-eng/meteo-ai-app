@@ -1,6 +1,7 @@
 import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
@@ -12,6 +13,32 @@ import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 // =============================================================================
 
 const PROJECT_ROOT = import.meta.dirname;
+function resolveBuildCommitSha(): string {
+  const environmentSha = process.env.GITHUB_SHA
+    ?? process.env.VERCEL_GIT_COMMIT_SHA
+    ?? process.env.COMMIT_SHA
+    ?? process.env.BUILD_COMMIT_SHA;
+  if (environmentSha && /^[a-f\d]{7,40}$/i.test(environmentSha.trim())) {
+    return environmentSha.trim();
+  }
+
+  try {
+    const sha = execFileSync("git", ["rev-parse", "--verify", "HEAD"], {
+      cwd: PROJECT_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const workingTree = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+      cwd: PROJECT_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return /^[a-f\d]{40}$/i.test(sha) && !workingTree ? sha : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 const LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
 const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024; // 1MB per log file
 const TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6); // Trim to 60% to avoid constant re-trimming
@@ -153,6 +180,9 @@ function vitePluginManusDebugCollector(): Plugin {
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
 export default defineConfig({
+  define: {
+    __BUILD_COMMIT_SHA__: JSON.stringify(resolveBuildCommitSha()),
+  },
   plugins,
   resolve: {
     alias: {

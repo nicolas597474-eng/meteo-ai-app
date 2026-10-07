@@ -10,6 +10,7 @@ import { BackToTopButton } from "@/components/BackToTopButton";
 import { getValidationModelSource } from "@/lib/validationModelSource";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastAlignmentPanel } from "@/components/weather/ForecastAlignmentPanel";
+import { HourlyComparisonDiagnosticsPanel } from "@/components/weather/HourlyComparisonDiagnosticsPanel";
 import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -892,6 +893,8 @@ export default function WeatherAILab() {
     <FusionSimulation steps={simulationSteps} snapshotLabel={snapshotLabel} />
 
     <StationSimulation steps={stationSteps} />
+
+    <HourlyComparisonDiagnosticsPanel location={activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined} />
 
     <section className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4">
       <Stat label="Étendue Tmax" value={formatAgreementRange(data.modelAgreement.tempMax, data.modelAgreement.expectedModelCount, "°C")} tone="text-orange-200" help={<IndicatorHelp title="Dispersion de température"><p>Étendue brute entre modèles nommés indépendants pour Tmax. Aucun seuil de qualité ni conversion en note n’est appliqué.</p><p>Modèles avec valeur : {data.modelAgreement.tempMax.modelsWithData.join(", ") || "aucun"}. Best Match est exclu.</p><p className="text-slate-400">Cette mesure décrit l’accord, pas la fiabilité historique face aux observations. L’incertitude statistique n’est pas mesurée ici.</p></IndicatorHelp>} />

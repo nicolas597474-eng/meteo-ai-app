@@ -153,6 +153,7 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("LocalPrecipitationNowcastingPanel");
     expect(source).toContain('user?.role === "admin" && localNowcastingReports?.temperature');
     expect(source).toContain('user?.role === "admin" && localNowcastingReports?.precipitation');
+    expect(source).toContain("HourlyComparisonDiagnosticsPanel");
     expect(source).not.toContain("getShadowDataHubReport");
     expect(source).not.toContain("Data Hub canonique shadow");
     expect(source).not.toContain("Observation P1.6");
