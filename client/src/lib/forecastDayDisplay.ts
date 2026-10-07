@@ -104,7 +104,7 @@ function isFiniteValue(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function formatTemperature(value: number): string {
+export function formatDailyTemperature(value: number): string {
   return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} °C`;
 }
 
@@ -112,8 +112,8 @@ function formatTemperature(value: number): string {
 export function getDailyExtremesDisplayLabel(
   day: DailyForecastPoint | null | undefined,
 ): string {
-  const max = isFiniteValue(day?.tempMax) ? formatTemperature(day.tempMax) : null;
-  const min = isFiniteValue(day?.tempMin) ? formatTemperature(day.tempMin) : null;
+  const max = isFiniteValue(day?.tempMax) ? formatDailyTemperature(day.tempMax) : null;
+  const min = isFiniteValue(day?.tempMin) ? formatDailyTemperature(day.tempMin) : null;
   if (!max && !min) return "Extrêmes journaliers indisponibles";
   return `Tmax ${max ?? "indisponible"} · Tmin ${min ?? "indisponible"}`;
 }
