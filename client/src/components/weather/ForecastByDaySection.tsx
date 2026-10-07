@@ -754,6 +754,101 @@ export function ForecastByDaySection({
       {locationName ? <p className="px-1 text-[10px] text-slate-400">Lieu actif : <span className="font-medium text-slate-200">{locationName}</span></p> : null}
       {selectedDay ? (
         <>
+        <section aria-labelledby="forecast-hourly-strip-title" className="min-w-0 overflow-hidden rounded-2xl border border-sky-100/15 bg-slate-950/25">
+          <h3 id="forecast-hourly-strip-title" className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/80">Heure par heure</h3>
+          {selectedGroup ? (
+            <div ref={hourStripRef} role="group" aria-label="Heures de prévision défilables" className="flex snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain px-3 pb-2 pt-1 scrollbar-hide touch-pan-x">
+              {selectedGroup.hours.map((entry) => {
+                const display = formatHourlyDisplay(entry.hour, hours);
+                const isHourSelected = entry.index === selectedHourIndex;
+                const isActiveForecast = entry.index === activeHourIndex;
+                const icon = conditionIconName(entry.hour.condition);
+                const temperatureTone = isFiniteValue(entry.hour.temp)
+                  ? getTemperatureTone(entry.hour.temp, "hourly").label
+                  : undefined;
+                const precipitationLabel = isFiniteValue(entry.hour.precipitation) && entry.hour.precipitation > 0
+                  ? `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(entry.hour.precipitation)} mm`
+                  : null;
+                const precipitationDescription = precipitationLabel
+                  ? `, pluie ${precipitationLabel}`
+                  : entry.hour.precipitation === 0
+                    ? ", aucune pluie prévue"
+                    : ", précipitations indisponibles";
+                return (
+                  <button
+                    key={`${entry.hour.date ?? "date-absente"}-${entry.hour.hour ?? "heure-absente"}-${entry.index}`}
+                    type="button"
+                    ref={isHourSelected ? selectedHourRef : undefined}
+                    aria-pressed={isHourSelected}
+                    aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 1, "°")}${precipitationDescription}${isActiveForecast ? ", prévision active" : ""}`}
+                    onClick={() => onHourPress(entry.index)}
+                    className={`forecast-hour-cell min-h-[5.75rem] w-[4.5rem] shrink-0 snap-start rounded-xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
+                  >
+                    <span className={`block min-h-5 text-sm font-bold tabular-nums ${temperatureTone ? "" : "text-slate-400"}`} style={temperatureTone ? { color: temperatureTone } : undefined}>{formatOptionalForecastValue(entry.hour.temp, 1, "°")}</span>
+                    <MeteoIcon name={icon} size={23} />
+                    <span aria-hidden="true" className={`mt-0.5 block min-h-4 text-[10px] font-semibold tabular-nums ${precipitationLabel ? "text-sky-200" : "text-transparent"}`}>{precipitationLabel ?? "—"}</span>
+                    <span className={`mt-0.5 block text-xs font-semibold tabular-nums ${isHourSelected ? "text-cyan-100" : "text-slate-300"}`}>{display.hourLabel}</span>
+                    {display.offsetLabel && <span className="block text-[9px] text-amber-200">{display.offsetLabel}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p role="status" className="px-4 py-3 text-xs leading-relaxed text-slate-200"><span className="mb-1 block font-semibold text-amber-100">Données horaires indisponibles</span>Aucune série horaire officielle n’est fournie pour cette date. Les valeurs restent quotidiennes et ne sont pas déclinées heure par heure.</p>
+          )}
+        </section>
+
+        <section aria-labelledby="forecast-daily-strip-title" className="min-w-0 overflow-hidden rounded-2xl border border-sky-100/15 bg-slate-950/25">
+          <h3 id="forecast-daily-strip-title" className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/80">Jour par jour</h3>
+          <div ref={dayStripRef} role="group" aria-label="Jours de prévision défilables" className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-3 pb-2 pt-1 scrollbar-hide touch-pan-x">
+            {displayDays.map((day) => {
+              const first = day.hourlyGroup?.hours[0]?.hour;
+              const dailyWeatherCode = day.daily && isFiniteValue(day.daily.weatherCode) ? day.daily.weatherCode : null;
+              const dailyWeatherIconName = dailyWeatherCode == null ? null : getDailyWeatherCodeIconName(dailyWeatherCode);
+              const dailyWeatherCondition = dailyWeatherIconName && dailyWeatherCode != null
+                ? dailyConditionFromWmoWeatherCode(dailyWeatherCode)
+                : null;
+              const condition = dailyWeatherCondition ?? day.daily?.condition ?? first?.condition;
+              const weatherIconName = dailyWeatherIconName ?? conditionIconName(condition);
+              const weatherIconLabel = `État du ciel : ${conditionDescription(condition) || "indisponible"}`;
+              const isSelected = selectedDayDate === day.date;
+              const hasMaximum = isFiniteValue(day.daily?.tempMax);
+              const hasMinimum = isFiniteValue(day.daily?.tempMin);
+              const maximumTone = getExtremeTemperatureTone("max", day.daily?.tempMax);
+              const minimumTone = getExtremeTemperatureTone("min", day.daily?.tempMin);
+              const dailySourceLabel = day.daily?.officialFusion
+                ? "Fusion quotidienne officielle"
+                : day.daily
+                  ? "Données quotidiennes présentes"
+                  : "Données quotidiennes indisponibles";
+              const buttonLabel = `${day.kind === "official-hourly" ? "Prévision horaire officielle" : "Prévision quotidienne"} du ${dateText(day.date)}. ${dailySourceLabel}. ${getDailyExtremesDisplayLabel(day.daily)}. ${conditionDescription(condition) || "Condition indisponible"}.`;
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  ref={isSelected ? selectedDayRef : undefined}
+                  aria-label={buttonLabel}
+                  aria-pressed={isSelected}
+                  onClick={() => onDayPress(day)}
+                  className={`forecast-day-tile w-[5.35rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
+                >
+                  <span className="block truncate text-[11px] font-medium text-slate-200">{shortWeekday(day.date)}</span>
+                  <span className="my-1 flex justify-center"><MeteoIcon name={weatherIconName} size={20} ariaLabel={weatherIconLabel} /></span>
+                  <span className={`flex min-h-5 w-full items-center justify-between gap-1 rounded-md border px-1 py-0.5 ${hasMaximum ? maximumTone.container : "border-white/10 bg-slate-950/30"}`}>
+                    <span className={`text-[7px] font-bold uppercase tracking-wide ${hasMaximum ? maximumTone.label : "text-slate-400"}`}>Tmax</span>
+                    <span className={`text-[9px] font-black tabular-nums ${hasMaximum ? maximumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}</span>
+                  </span>
+                  <span className={`mt-0.5 flex min-h-5 w-full items-center justify-between gap-1 rounded-md border px-1 py-0.5 ${hasMinimum ? minimumTone.container : "border-white/10 bg-slate-950/30"}`}>
+                    <span className={`text-[7px] font-bold uppercase tracking-wide ${hasMinimum ? minimumTone.label : "text-slate-400"}`}>Tmin</span>
+                    <span className={`text-[9px] font-black tabular-nums ${hasMinimum ? minimumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}</span>
+                  </span>
+                  {day.daily && <span className="mt-1 block whitespace-nowrap text-[8px] font-bold text-cyan-100">{day.daily.officialFusion ? "Fusion" : "Quotidien"}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
           <section
             aria-label={`Prévision ${selectedDay.kind === "official-hourly" ? "horaire officielle" : selectedDaily?.officialFusion ? "fusion quotidienne officielle" : "quotidienne"} du ${dateText(selectedDay.date)}`}
             className="relative min-w-0 overflow-hidden rounded-2xl border border-sky-300/30 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 text-slate-50 shadow-[0_10px_32px_rgba(2,8,23,0.38)]"
@@ -838,78 +933,7 @@ export function ForecastByDaySection({
               )}
             </div>
 
-            <div className="relative z-10 border-y border-sky-100/15 bg-slate-950/25 py-2">
-              {selectedGroup ? (
-                <div ref={hourStripRef} role="group" aria-label="Heures de prévision défilables" className="flex snap-x snap-mandatory gap-1 overflow-x-auto overscroll-x-contain px-3 pb-0.5 scrollbar-hide touch-pan-x">
-                  {selectedGroup.hours.map((entry) => {
-                    const display = formatHourlyDisplay(entry.hour, hours);
-                    const isHourSelected = entry.index === selectedHourIndex;
-                    const isActiveForecast = entry.index === activeHourIndex;
-                    const icon = conditionIconName(entry.hour.condition);
-                    return (
-                      <button
-                        key={`${entry.hour.date ?? "date-absente"}-${entry.hour.hour ?? "heure-absente"}-${entry.index}`}
-                        type="button"
-                        ref={isHourSelected ? selectedHourRef : undefined}
-                        aria-pressed={isHourSelected}
-                        aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 0, "°")}${isActiveForecast ? ", prévision active" : ""}`}
-                        onClick={() => onHourPress(entry.index)}
-                        className={`forecast-hour-cell w-[3.45rem] shrink-0 snap-start rounded-xl border px-1 py-1 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
-                      >
-                        <span className="block min-h-4 text-[12px] font-semibold tabular-nums text-white">{formatOptionalForecastValue(entry.hour.temp, 0, "°")}</span>
-                        <MeteoIcon name={icon} size={19} />
-                        <span className={`mt-0.5 block text-[10px] tabular-nums ${isHourSelected ? "text-cyan-100" : "text-slate-300"}`}>{display.hourLabel}</span>
-                        {display.offsetLabel && <span className="block text-[9px] text-amber-200">{display.offsetLabel}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p role="status" className="px-4 py-3 text-xs leading-relaxed text-slate-200"><span className="mb-1 block font-semibold text-amber-100">Données horaires indisponibles</span>Aucune série horaire officielle n’est fournie pour cette date. Les valeurs restent quotidiennes et ne sont pas déclinées heure par heure.</p>
-              )}
-            </div>
           </section>
-
-          <div ref={dayStripRef} role="group" aria-label="Jours de prévision défilables" className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 scrollbar-hide touch-pan-x">
-            {displayDays.map((day) => {
-              const first = day.hourlyGroup?.hours[0]?.hour;
-              const dailyWeatherCode = day.daily && isFiniteValue(day.daily.weatherCode) ? day.daily.weatherCode : null;
-              const dailyWeatherIconName = dailyWeatherCode == null ? null : getDailyWeatherCodeIconName(dailyWeatherCode);
-              const dailyWeatherCondition = dailyWeatherIconName && dailyWeatherCode != null
-                ? dailyConditionFromWmoWeatherCode(dailyWeatherCode)
-                : null;
-              const condition = dailyWeatherCondition ?? day.daily?.condition ?? first?.condition;
-              const weatherIconName = dailyWeatherIconName ?? conditionIconName(condition);
-              const weatherIconLabel = `État du ciel : ${conditionDescription(condition) || "indisponible"}`;
-              const isSelected = selectedDayDate === day.date;
-              const hasDailyExtremes = isFiniteValue(day.daily?.tempMax) && isFiniteValue(day.daily?.tempMin);
-              const temperatures = hasDailyExtremes
-                ? `${formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}/${formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}`
-                : getDailyExtremesDisplayLabel(day.daily);
-              const dailySourceLabel = day.daily?.officialFusion
-                ? "Fusion quotidienne officielle"
-                : day.daily
-                  ? "Données quotidiennes présentes"
-                  : "Données quotidiennes indisponibles";
-              const buttonLabel = `${day.kind === "official-hourly" ? "Prévision horaire officielle" : "Prévision quotidienne"} du ${dateText(day.date)}. ${dailySourceLabel}. ${getDailyExtremesDisplayLabel(day.daily)}. ${conditionDescription(condition) || "Condition indisponible"}.`;
-              return (
-                <button
-                  key={day.date}
-                  type="button"
-                  ref={isSelected ? selectedDayRef : undefined}
-                  aria-label={buttonLabel}
-                  aria-pressed={isSelected}
-                  onClick={() => onDayPress(day)}
-                  className={`forecast-day-tile w-[4.25rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
-                >
-                  <span className="block truncate text-[11px] font-medium text-slate-200">{shortWeekday(day.date)}</span>
-                  <span className="my-1 flex justify-center"><MeteoIcon name={weatherIconName} size={20} ariaLabel={weatherIconLabel} /></span>
-                  <span className="block min-h-7 whitespace-normal break-words text-[8px] font-semibold leading-tight tabular-nums text-slate-100">{temperatures}</span>
-                  {day.daily && <span className="mt-1 block whitespace-nowrap text-[8px] font-bold text-cyan-100">{day.daily.officialFusion ? "Fusion" : "Quotidien"}</span>}
-                </button>
-              );
-            })}
-          </div>
 
           <section aria-label="Détails météo disponibles" className="rounded-2xl border border-sky-300/20 bg-slate-950/35 px-3">
             {selectedDay.kind === "official-hourly" ? (
