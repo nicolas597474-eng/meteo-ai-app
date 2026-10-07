@@ -290,4 +290,52 @@ describe("provider-run horizon provenance", () => {
     expect(evaluation.comparisons).toEqual([]);
     expect(evaluation.scores).toEqual([]);
   });
+
+  it("diagnostique Single Runs selon ses horodatages propres, sans seuil measurementTime des stations", () => {
+    const snapshot = {
+      id: 902,
+      locationKey,
+      date: "2026-10-04",
+      hour: 21,
+      stationCount: 2,
+      temperature: 20,
+      precipitation: 0.2,
+      windSpeed: 14.4,
+      windGust: 17,
+      humidity: 82,
+      pressure: 1013.25,
+      stationsUsed: ["station-a", "station-b"],
+    };
+    const earlierRunAt = runAt - 60 * 60_000;
+    const evaluation = evaluateProviderRunForecasts([snapshot], [
+      value(),
+      value({
+        id: 19,
+        captureRunId: "null-single-run-value",
+        providerRunAt: earlierRunAt,
+        forecastLeadTimeMilliseconds: validTime - earlierRunAt,
+        collectionLatencyMilliseconds: availableAt - earlierRunAt,
+        value: null,
+      }),
+      value({ id: 20, captureRunId: "received-at-valid-time", availableAt: validTime }),
+    ]);
+    const diagnostic = evaluation.diagnostics.find(({ variable }) => variable === "temperature");
+
+    expect(diagnostic).toMatchObject({
+      path: "single_runs",
+      archivedForecasts: 3,
+      opportunitiesAtSameLocationAndValidTime: 2,
+      qualifiedPhysicalObservationsPresent: 2,
+      temporallyAdmissible: 2,
+      admissiblePairs: 1,
+      retainedComparisons: 1,
+      firstRejectionCounts: {
+        FORECAST_AVAILABLE_AT_OR_AFTER_VALID_TIME: 1,
+        FORECAST_VALUE_MISSING_OR_NONFINITE: 1,
+      },
+    });
+    expect(diagnostic?.temporalRule).toContain("station measurementTime is not an input");
+    expect(evaluation.comparisons).toHaveLength(1);
+    expect(evaluation.comparisons[0]).toMatchObject({ leadBasis: "provider_run", providerRunAt: runAt });
+  });
 });

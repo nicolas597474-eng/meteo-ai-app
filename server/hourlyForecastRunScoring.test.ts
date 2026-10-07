@@ -450,4 +450,45 @@ describe("evaluateHourlyForecastRuns", () => {
 
     expect(result.compatibilityScores).toEqual([]);
   });
+
+  it("décompte les étapes ordinaires et attribue un seul premier rejet par prévision archivée", () => {
+    const validTime = observedAt(12);
+    const measurementTime = validTime - 15 * 60_000;
+    const physical = snapshot(12, 10, {
+      stationsUsed: stationEvidence(validTime, {
+        fieldWeights: { temperature: 1 },
+        measurementTimes: { temperature: new Date(measurementTime).toISOString() },
+      }),
+    });
+    const physicalWithoutFieldTime = snapshot(13, 10, { stationsUsed: [] });
+    const result = evaluateHourlyForecastRuns([physical, physicalWithoutFieldTime], [
+      forecast({ captureRunId: "kept-before-measurement", validTime, availableAt: validTime - 30 * 60_000, variable: "temperature", value: 9 }),
+      forecast({ captureRunId: "after-measurement", validTime, availableAt: validTime - 10 * 60_000, variable: "temperature", value: 100 }),
+      forecast({ captureRunId: "equal-measurement", validTime, availableAt: measurementTime, variable: "temperature", value: 100 }),
+      forecast({ captureRunId: "missing-value", validTime, availableAt: validTime - 60 * 60_000, variable: "temperature", value: null }),
+      forecast({ captureRunId: "no-location-match", locationKey: "49.000_1.000", validTime, availableAt: validTime - 30 * 60_000, variable: "temperature", value: 8 }),
+      forecast({ captureRunId: "unqualified-observation", validTime: observedAt(13), availableAt: observedAt(13) - 30 * 60_000, variable: "temperature", value: 8 }),
+    ]);
+    const diagnostic = result.diagnostics.find(({ variable }) => variable === "temperature");
+
+    expect(diagnostic).toMatchObject({
+      path: "ordinary_hourly",
+      archivedForecasts: 6,
+      opportunitiesAtSameLocationAndValidTime: 5,
+      qualifiedPhysicalObservationsPresent: 4,
+      temporallyAdmissible: 2,
+      admissiblePairs: 1,
+      retainedComparisons: 1,
+      firstRejectionCounts: {
+        NO_MATCHING_LOCATION_VALID_TIME_OBSERVATION: 1,
+        NO_QUALIFIED_PHYSICAL_OBSERVATION: 1,
+        FORECAST_AVAILABLE_AT_OR_AFTER_MEASUREMENT_TIME: 2,
+        FORECAST_VALUE_MISSING_OR_NONFINITE: 1,
+      },
+    });
+    expect(diagnostic?.temporalRule).toContain("availableAt < earliest measurementTime");
+    expect(result.exactComparisons).toHaveLength(1);
+    expect(result.exactComparisons[0]).toMatchObject({ captureRunId: "kept-before-measurement", absoluteError: 1 });
+    expect(scoresFor(result).find((score) => score.horizonBucket === "0_2h")).toMatchObject({ sampleSize: 1, mae: 1 });
+  });
 });

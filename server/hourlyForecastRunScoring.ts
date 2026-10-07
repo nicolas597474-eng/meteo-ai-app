@@ -2,6 +2,11 @@ import { FORECAST_HORIZON_WINDOWS, getForecastHorizonWindow } from "../shared/fo
 import { scoreQualifiedHourlyModels, type QualifiedHourlyModelScore } from "./qualifiedHourlyScoring";
 import { parisLocalHourToUniqueEpochMs } from "./parisHourlyTime";
 import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
+import {
+  createHourlyComparisonDiagnostics,
+  recordHourlyComparisonFirstRejection,
+  type HourlyComparisonDiagnostic,
+} from "./hourlyComparisonDiagnostics";
 
 export const HOURLY_FORECAST_VARIABLES = [
   "temperature",
@@ -127,6 +132,7 @@ export type HourlyForecastRunEvaluation = {
   exactComparisons: HourlyExactForecastComparison[];
   exactScores: HourlyExactForecastRunScore[];
   compatibilityScores: QualifiedHourlyModelScore[];
+  diagnostics: HourlyComparisonDiagnostic[];
 };
 
 type ModelDescriptor = Pick<HourlyForecastRunValue, "locationKey" | "targetDate" | "sourceName" | "modelName" | "modelId">;
@@ -622,5 +628,103 @@ export function evaluateHourlyForecastRuns(
     || left.variable.localeCompare(right.variable)
     || left.validTime - right.validTime
     || left.availableAt - right.availableAt);
-  return { scores, exactComparisons, exactScores, compatibilityScores };
+
+  const diagnostics = createHourlyComparisonDiagnostics("ordinary_hourly", HOURLY_FORECAST_VARIABLES);
+  const diagnosticsByVariable = new Map(diagnostics.map((diagnostic) => [diagnostic.variable, diagnostic]));
+  const snapshotsBySlot = new Map<string, HourlyPhysicalSnapshot>();
+  for (const snapshot of snapshots) {
+    const validTime = parisLocalHourToUniqueEpochMs(snapshot.date, snapshot.hour);
+    if (validTime != null) snapshotsBySlot.set([snapshot.locationKey, snapshot.date, validTime].join("|"), snapshot);
+  }
+  const retainedComparisonKeys = new Set(exactComparisons.map((comparison) => [
+    comparison.locationKey,
+    comparison.observationDate,
+    comparison.sourceName,
+    comparison.modelName,
+    comparison.modelId ?? "",
+    comparison.validTime,
+    comparison.variable,
+    comparison.captureRunId,
+  ].join("|")));
+  const deduplicatedForecasts = new Set(forecastValues);
+
+  // This is a place/time aggregate comparison. `stationsUsed` supplies only the
+  // field-contributor weights and measurement timestamps for qualification.
+  for (const forecast of forecastValuesInput) {
+    const diagnostic = diagnosticsByVariable.get(forecast.variable);
+    if (!diagnostic) continue;
+    diagnostic.archivedForecasts += 1;
+    if (!Number.isFinite(forecast.validTime) || !Number.isFinite(forecast.availableAt)
+      || !Number.isFinite(forecast.requestStartedAt)) {
+      recordHourlyComparisonFirstRejection(diagnostic, "FORECAST_METADATA_INVALID");
+      continue;
+    }
+    if (!deduplicatedForecasts.has(forecast)) {
+      recordHourlyComparisonFirstRejection(diagnostic, "FORECAST_REPLAY_OR_CONFLICTING_DUPLICATE");
+      continue;
+    }
+    const snapshot = snapshotsBySlot.get([forecast.locationKey, forecast.targetDate, forecast.validTime].join("|"));
+    if (!snapshot) {
+      recordHourlyComparisonFirstRejection(diagnostic, "NO_MATCHING_LOCATION_VALID_TIME_OBSERVATION");
+      continue;
+    }
+    diagnostic.opportunitiesAtSameLocationAndValidTime += 1;
+    const observed = observationValue(snapshot, forecast.variable);
+    const earliestMeasurementAt = earliestContributorObservedAt(snapshot, forecast.variable);
+    if (observed == null || earliestMeasurementAt == null) {
+      recordHourlyComparisonFirstRejection(diagnostic, "NO_QUALIFIED_PHYSICAL_OBSERVATION");
+      continue;
+    }
+    diagnostic.qualifiedPhysicalObservationsPresent += 1;
+    if (forecast.availableAt >= forecast.validTime) {
+      recordHourlyComparisonFirstRejection(diagnostic, "FORECAST_AVAILABLE_AT_OR_AFTER_VALID_TIME");
+      continue;
+    }
+    if (forecast.availableAt >= earliestMeasurementAt) {
+      recordHourlyComparisonFirstRejection(diagnostic, "FORECAST_AVAILABLE_AT_OR_AFTER_MEASUREMENT_TIME");
+      continue;
+    }
+    diagnostic.temporallyAdmissible += 1;
+    if (forecast.value == null || !Number.isFinite(forecast.value)) {
+      recordHourlyComparisonFirstRejection(diagnostic, "FORECAST_VALUE_MISSING_OR_NONFINITE");
+      continue;
+    }
+    diagnostic.admissiblePairs += 1;
+
+    const selected = latestAdmissibleValue(
+      valuesBySeries.get(forecastSeriesKey(forecast)) ?? [],
+      Math.min(forecast.validTime, earliestMeasurementAt),
+    );
+    if (!selected) {
+      recordHourlyComparisonFirstRejection(diagnostic, "AMBIGUOUS_ADMISSIBLE_FORECAST_TIE");
+      continue;
+    }
+    if (selected !== forecast) {
+      recordHourlyComparisonFirstRejection(diagnostic, "SUPERSEDED_BY_LATER_ADMISSIBLE_FORECAST");
+      continue;
+    }
+    const horizonMilliseconds = forecast.validTime - forecast.availableAt;
+    if (!Number.isSafeInteger(horizonMilliseconds) || horizonMilliseconds <= 0
+      || !getForecastHorizonWindow(horizonMilliseconds / 60_000)) {
+      recordHourlyComparisonFirstRejection(diagnostic, "FORECAST_OUTSIDE_SCORING_HORIZON");
+      continue;
+    }
+    const retainedKey = [
+      forecast.locationKey,
+      forecast.targetDate,
+      forecast.sourceName,
+      forecast.modelName,
+      forecast.modelId ?? "",
+      forecast.validTime,
+      forecast.variable,
+      forecast.captureRunId,
+    ].join("|");
+    if (!retainedComparisonKeys.has(retainedKey)) {
+      recordHourlyComparisonFirstRejection(diagnostic, "NOT_RETAINED_BY_CURRENT_SCORER");
+      continue;
+    }
+    diagnostic.retainedComparisons += 1;
+  }
+
+  return { scores, exactComparisons, exactScores, compatibilityScores, diagnostics };
 }
