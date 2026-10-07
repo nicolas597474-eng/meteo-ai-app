@@ -122,6 +122,8 @@ describe("cadence automatique des prévisions", () => {
     expect(handler).toContain("FAVORITES_FORECAST_SCHEDULER_LOCK_KEY");
     expect(handler).toContain("getLocationForecastRefreshLockKey(locKey)");
     expect(handler).toContain("await upsertHourlyForecastCollectionResults(initialHourlyResults)");
+    expect(handler).toContain("formatHourlyJournalWriteError(error)");
+    expect(handler).toContain("non journalisé — ${errorDetails}");
     expect(handler).toContain("archiveRowsWritten = writeResult.archiveRowsWritten");
     expect(handler).toContain("expectedHourlyValidTimes = getParisHourlyTimestamps(today)");
     expect(handler).toContain("projectionReady: diagnostic.projectionReady");

@@ -29,6 +29,7 @@ import { collectProviderRunBatch } from "./providerRunCollection";
 import { computeOfficialDailyForecast } from "./officialForecast";
 import { runOptionalBackgroundTask } from "./optionalBackgroundTask";
 import { rebuildLocalTemperatureNowcastForSnapshot } from "./localTemperatureNowcastingShadow";
+import { formatHourlyJournalWriteError } from "./hourlyJournalErrors";
 import {
   evaluateLocalPrecipitationNowcastOutcomesForSnapshot,
   rebuildLocalPrecipitationNowcastForSnapshot,
@@ -1347,9 +1348,10 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 completedAt: Date.now(),
               }]);
               resultJournaled = true;
-            } catch {
-              errors.push(`${fav.name}: résultat horaire de ${model.modelName} non journalisé.`);
-              console.warn(`[HourlyAudit] ${fav.name}/${model.modelName}: could not persist final result.`);
+            } catch (error) {
+              const errorDetails = formatHourlyJournalWriteError(error);
+              errors.push(`${fav.name}: résultat horaire de ${model.modelName} non journalisé — ${errorDetails}.`);
+              console.warn(`[HourlyAudit] ${fav.name}/${model.modelName}: could not persist final result — ${errorDetails}.`);
             }
             if (isHourlyForecastRunHealthy({
               isOfficialModel: OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName),
