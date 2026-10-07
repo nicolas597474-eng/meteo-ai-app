@@ -171,7 +171,7 @@ export function StationMap({
           }}
         >
           {!isExpanded && mapReady && (
-            <div className="absolute bottom-3 right-3 z-20" data-swipe-exclude>
+            <div className="absolute bottom-12 right-3 z-20" data-swipe-exclude>
               <MapZoomControl
                 onZoomIn={() => adjustExpandedZoom(1)}
                 onZoomOut={() => adjustExpandedZoom(-1)}

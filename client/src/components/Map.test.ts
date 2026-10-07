@@ -13,6 +13,10 @@ describe("cartographie OpenStreetMap", () => {
     expect(source).toContain("attribution: tileSource.attribution");
   });
 
+  it("isole les couches Leaflet sous les commandes React superposées", () => {
+    expect(source).toContain('"relative z-0 h-full w-full"');
+  });
+
   it("signale l’échec des tuiles et permet de relancer leur chargement", () => {
     expect(source).toContain("Fond cartographique indisponible");
     expect(source).toContain('tileLayerInstance.on("tileerror", onTileError)');

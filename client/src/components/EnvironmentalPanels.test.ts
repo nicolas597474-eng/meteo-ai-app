@@ -131,7 +131,7 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("Réorienter la carte vers le nord");
     expect(source).toContain("onClick={resetExpandedMapBearing}");
     expect(source).toContain("interactive={isExpanded}");
-    expect(source).toContain('absolute bottom-3 right-3 z-20');
+    expect(source).toContain('absolute bottom-12 right-3 z-20');
     expect(source).toContain("MapZoomControl onZoomIn={() => { const map = compactMapRef.current;");
     expect(source).toContain("const compassHeading = deviceHeading == null ? expandedHeading");
     expect(source).toContain("deviceHeading");

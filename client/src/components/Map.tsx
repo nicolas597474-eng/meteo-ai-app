@@ -161,7 +161,7 @@ export function MapView({
         role="region"
         aria-label="Carte OpenStreetMap"
         className={cn(
-          "h-full w-full",
+          "relative z-0 h-full w-full",
           allowPageScroll ? "touch-pan-y" : "touch-none",
         )}
       />
