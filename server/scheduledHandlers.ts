@@ -1296,8 +1296,12 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                   errorCode = "write_failed";
                 }
                 finalStatus = archiveRowsWritten > 0 ? "partial" : "safe_error";
-                errors.push(`${fav.name}: archivage horaire de ${model.modelName} non confirmé (${errorCode}).`);
-                console.warn(`[HourlyArchive] ${fav.name}/${model.modelName}: write not confirmed (${errorCode}).`);
+                const errorDetails = formatHourlyJournalWriteError(writeError);
+                const failureLabel = errorCode === "projection_write_failed"
+                  ? `projection horaire de ${model.modelName} non confirmée (${projectionRowsWritten}/${diagnostic.expectedHoursCount})`
+                  : `archivage horaire de ${model.modelName} non confirmé (${errorCode})`;
+                errors.push(`${fav.name}: ${failureLabel} — ${errorDetails}.`);
+                console.warn(`[HourlyArchive] ${fav.name}/${model.modelName}: ${failureLabel} — ${errorDetails}.`);
               }
             }
 

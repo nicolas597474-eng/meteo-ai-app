@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { HourlyForecastPersistenceError, withHourlyForecastPersistenceStages } from "./hourlyForecastPersistence";
+import { formatHourlyJournalWriteError } from "./hourlyJournalErrors";
 
 describe("hourly forecast persistence confirmations", () => {
   it("returns only row counts reported after successful archive and projection writes", async () => {
@@ -66,6 +67,32 @@ describe("hourly forecast persistence confirmations", () => {
     expect(error).toBeInstanceOf(HourlyForecastPersistenceError);
     expect(error).toMatchObject({ errorCode: "projection_write_failed", archiveRowsWritten: 108, projectionRowsWritten: 12 });
     expect(error.message).not.toContain("secret SQL error");
+  });
+
+  it("retient la cause SQL exacte quand la projection échoue après l’archive", async () => {
+    const driverError = Object.assign(new Error("Unknown column 'validTime' in 'field list'"), {
+      code: "ER_BAD_FIELD_ERROR",
+      errno: 1054,
+      sqlState: "42S22",
+      sqlMessage: "Unknown column 'validTime' in 'field list'",
+    });
+    const drizzleError = new Error("Drizzle query failed", { cause: driverError });
+    const error = await withHourlyForecastPersistenceStages(async confirm => {
+      confirm(480);
+    }, async () => {
+      throw drizzleError;
+    }).catch(caught => caught);
+
+    expect(error).toBeInstanceOf(HourlyForecastPersistenceError);
+    expect(error).toMatchObject({
+      errorCode: "projection_write_failed",
+      archiveRowsWritten: 480,
+      projectionRowsWritten: 0,
+      cause: drizzleError,
+    });
+    expect(formatHourlyJournalWriteError(error)).toContain(
+      'message="Unknown column \'validTime\' in \'field list\'"; code=ER_BAD_FIELD_ERROR'
+    );
   });
 
   it("keeps collection-attempt upserts idempotent by batch, location and source", () => {

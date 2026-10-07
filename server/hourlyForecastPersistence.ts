@@ -6,8 +6,9 @@ export class HourlyForecastPersistenceError extends Error {
     readonly errorCode: HourlyForecastPersistenceErrorCode,
     readonly archiveRowsWritten: number,
     readonly projectionRowsWritten: number,
+    cause?: unknown,
   ) {
-    super(`Hourly forecast persistence failed (${errorCode}).`);
+    super(`Hourly forecast persistence failed (${errorCode}).`, { cause });
     this.name = "HourlyForecastPersistenceError";
   }
 }
@@ -28,16 +29,16 @@ export async function withHourlyForecastPersistenceStages(
     await writeArchive((count) => {
       if (Number.isFinite(count) && count > 0) archiveRowsWritten += Math.floor(count);
     });
-  } catch {
-    throw new HourlyForecastPersistenceError("archive_write_failed", archiveRowsWritten, projectionRowsWritten);
+  } catch (error) {
+    throw new HourlyForecastPersistenceError("archive_write_failed", archiveRowsWritten, projectionRowsWritten, error);
   }
   if (options.skipProjection) return { archiveRowsWritten, projectionRowsWritten };
   try {
     await writeProjection((count) => {
       if (Number.isFinite(count) && count > 0) projectionRowsWritten += Math.floor(count);
     });
-  } catch {
-    throw new HourlyForecastPersistenceError("projection_write_failed", archiveRowsWritten, projectionRowsWritten);
+  } catch (error) {
+    throw new HourlyForecastPersistenceError("projection_write_failed", archiveRowsWritten, projectionRowsWritten, error);
   }
   return { archiveRowsWritten, projectionRowsWritten };
 }
