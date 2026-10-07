@@ -57,24 +57,32 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("aria-pressed={isSelected}");
     expect(timelineSource).toContain("aria-pressed={isHourSelected}");
     expect(timelineSource).toContain("Aucune série horaire officielle n’est fournie pour cette date");
-    expect(timelineSource).toContain("Extrêmes journaliers indisponibles");
+    expect(timelineSource).toContain("Métriques quotidiennes indisponibles pour cette date.");
   });
-  it("place les heures puis les jours avant les détails de l’échéance sélectionnée", () => {
+  it("place les jours puis les heures avant les détails de l’échéance sélectionnée", () => {
     const hourlyStrip = timelineSource.indexOf('aria-labelledby="forecast-hourly-strip-title"');
     const dailyStrip = timelineSource.indexOf('aria-labelledby="forecast-daily-strip-title"');
     const selectedForecast = timelineSource.indexOf("Prévisions de l’échéance sélectionnée");
     expect(hourlyStrip).toBeGreaterThanOrEqual(0);
-    expect(hourlyStrip).toBeLessThan(dailyStrip);
-    expect(dailyStrip).toBeLessThan(selectedForecast);
+    expect(dailyStrip).toBeGreaterThanOrEqual(0);
+    expect(dailyStrip).toBeLessThan(hourlyStrip);
+    expect(hourlyStrip).toBeLessThan(selectedForecast);
   });
-  it("agrandit les heures, indique la pluie disponible et conserve les palettes thermiques", () => {
-    expect(timelineSource).toContain("w-[4.5rem]");
+  it("agrandit les rubans, indique la pluie disponible et conserve les palettes thermiques", () => {
+    expect(timelineSource).toContain("w-[5rem]");
+    expect(timelineSource).toContain("<MeteoIcon name={icon} size={28} />");
+    expect(timelineSource).toContain("w-[7rem]");
+    expect(timelineSource).toContain("<MeteoIcon name={weatherIconName} size={30}");
+    expect(timelineSource).toContain('{day.date === today ? "Aujourd’hui" : shortWeekday(day.date)}');
+    expect(timelineSource).toContain(">Max</span>");
+    expect(timelineSource).toContain(">Min</span>");
+    expect(timelineSource).not.toContain('day.daily.officialFusion ? "Fusion" : "Quotidien"');
+    expect(timelineSource).not.toContain("Extrêmes quotidiens ·");
+    expect(timelineSource).toContain("whitespace-nowrap text-2xl font-bold leading-none tabular-nums text-white sm:text-3xl");
     expect(timelineSource).toContain("entry.hour.precipitation > 0");
     expect(timelineSource).toContain("getTemperatureTone(entry.hour.temp, \"hourly\")");
     expect(timelineSource).toContain('getExtremeTemperatureTone("max", day.daily?.tempMax)');
     expect(timelineSource).toContain('getExtremeTemperatureTone("min", day.daily?.tempMin)');
-    expect(timelineSource).toContain("Tmax</span>");
-    expect(timelineSource).toContain("Tmin</span>");
   });
   it("n’affiche que les champs fournis, distingue les fréquences brutes et laisse l’AQI indisponible", () => {
     for (const title of ["Précipitations", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité", "Rayonnement solaire"]) {
