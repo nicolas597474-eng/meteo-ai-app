@@ -51,9 +51,10 @@ describe("carte de prévision horaire officielle", () => {
     ).toEqual(["precipitation", "wind"]);
   });
 
-  it("n’inclut ni état quotidien ni code WMO brut dans la carte horaire", () => {
+  it("exclut les extrêmes, l’état quotidien et le code WMO brut de la carte horaire", () => {
     const metrics = [
       { key: "tempMax" },
+      { key: "tempMin" },
       { key: "condition" },
       { key: "weatherCode" },
       { key: "precipitation" },
@@ -61,6 +62,6 @@ describe("carte de prévision horaire officielle", () => {
 
     expect(
       filterDailyMetricsForOfficialHourlyCard(metrics).map(({ key }) => key)
-    ).toEqual(["tempMax", "precipitation"]);
+    ).toEqual(["precipitation"]);
   });
 });

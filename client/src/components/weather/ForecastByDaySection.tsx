@@ -689,14 +689,6 @@ export function ForecastByDaySection({
       : selectedHourlyCondition
         ? "aucun changement descriptif disponible après cette échéance"
         : "indisponible · état du ciel non fourni";
-  const dailyExtremesSource = selectedDaily?.officialFusion
-    ? "Fusion quotidienne MeteoAI"
-    : selectedDaily
-      ? sourceLabels.join(" · ") || "provenance quotidienne non précisée"
-      : "données quotidiennes absentes";
-  const dailyExtremesAge = selectedDaily?.officialFusion?.issuedAt
-    ? `émise ${relativeForecastAge(selectedDaily.officialFusion.issuedAt)}`
-    : "fraîcheur indisponible";
   const hourlyFieldProvenance = (fallbackField: OpenWeatherFallbackField | null, available: boolean) => {
     const fallback = fallbackField ? selectedEntry?.hour.fallbackProvenance?.[fallbackField] : undefined;
     const computedAt = fallback?.retrievedAt ?? officialProvenance?.hourlyComputedAt ?? officialProvenance?.computedAt;
@@ -711,8 +703,6 @@ export function ForecastByDaySection({
   const selectedHourlyApparentTemperatureTone = selectedEntry && selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.apparentTemp)
     ? getTemperatureTone(selectedEntry.hour.apparentTemp, "hourly").label
     : undefined;
-  const selectedDailyMaximumTone = getExtremeTemperatureTone("max", selectedDaily?.tempMax);
-  const selectedDailyMinimumTone = getExtremeTemperatureTone("min", selectedDaily?.tempMin);
   const hourlyFieldCards = selectedEntry && selectedEntryHasValidTime ? [
     { key: "apparent", label: "Ressenti prévu", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.apparentTemp, 1, "°"), valueColor: selectedHourlyApparentTemperatureTone, provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.apparentTemp)) },
     { key: "direction", label: "Direction du vent", icon: "wind_param", value: isFiniteValue(selectedEntry.hour.windDirection) ? `${windDirectionLabel(selectedEntry.hour.windDirection)} · ${formatOptionalForecastValue(selectedEntry.hour.windDirection, 0, "°")}` : "—", provenance: hourlyFieldProvenance("windDirection", isFiniteValue(selectedEntry.hour.windDirection)) },
@@ -754,6 +744,62 @@ export function ForecastByDaySection({
       {locationName ? <p className="px-1 text-[10px] text-slate-400">Lieu actif : <span className="font-medium text-slate-200">{locationName}</span></p> : null}
       {selectedDay ? (
         <>
+        <section aria-labelledby="forecast-daily-strip-title" className="min-w-0 overflow-hidden rounded-2xl border border-sky-100/15 bg-slate-950/25">
+          <h3 id="forecast-daily-strip-title" className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/80">Jour par jour</h3>
+          <div ref={dayStripRef} role="group" aria-label="Jours de prévision défilables" className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-3 pb-2 pt-1 scrollbar-hide touch-pan-x">
+            {displayDays.map((day) => {
+              const first = day.hourlyGroup?.hours[0]?.hour;
+              const dailyWeatherCode = day.daily && isFiniteValue(day.daily.weatherCode) ? day.daily.weatherCode : null;
+              const dailyWeatherIconName = dailyWeatherCode == null ? null : getDailyWeatherCodeIconName(dailyWeatherCode);
+              const dailyWeatherCondition = dailyWeatherIconName && dailyWeatherCode != null
+                ? dailyConditionFromWmoWeatherCode(dailyWeatherCode)
+                : null;
+              const condition = dailyWeatherCondition ?? day.daily?.condition ?? first?.condition;
+              const weatherIconName = dailyWeatherIconName ?? conditionIconName(condition);
+              const weatherIconLabel = `État du ciel : ${conditionDescription(condition) || "indisponible"}`;
+              const isSelected = selectedDayDate === day.date;
+              const hasMaximum = isFiniteValue(day.daily?.tempMax);
+              const hasMinimum = isFiniteValue(day.daily?.tempMin);
+              const maximumTone = getExtremeTemperatureTone("max", day.daily?.tempMax);
+              const minimumTone = getExtremeTemperatureTone("min", day.daily?.tempMin);
+              const dailySourceLabel = day.daily?.officialFusion
+                ? "Fusion quotidienne officielle"
+                : day.daily
+                  ? "Données quotidiennes présentes"
+                  : "Données quotidiennes indisponibles";
+              const dailyMaximumLabel = hasMaximum
+                ? `Max ${formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}`
+                : "Max indisponible";
+              const dailyMinimumLabel = hasMinimum
+                ? `Min ${formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}`
+                : "Min indisponible";
+              const buttonLabel = `${day.kind === "official-hourly" ? "Prévision horaire officielle" : "Prévision quotidienne"} du ${dateText(day.date)}. ${dailySourceLabel}. ${dailyMaximumLabel} · ${dailyMinimumLabel}. ${conditionDescription(condition) || "Condition indisponible"}.`;
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  ref={isSelected ? selectedDayRef : undefined}
+                  aria-label={buttonLabel}
+                  aria-pressed={isSelected}
+                  onClick={() => onDayPress(day)}
+                  className={`forecast-day-tile w-[7rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
+                >
+                  <span className="block truncate text-sm font-semibold text-slate-100">{day.date === today ? "Aujourd’hui" : shortWeekday(day.date)}</span>
+                  <span className="my-1 flex justify-center"><MeteoIcon name={weatherIconName} size={30} ariaLabel={weatherIconLabel} /></span>
+                  <span className={`mt-1 flex min-h-8 w-full items-center justify-between gap-1 rounded-lg border px-2 py-1 ${hasMaximum ? maximumTone.container : "border-white/10 bg-slate-950/30"}`}>
+                    <span className={`text-sm font-black tabular-nums ${hasMaximum ? maximumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}</span>
+                    <span className={`text-[10px] font-bold tracking-wide ${hasMaximum ? maximumTone.label : "text-slate-400"}`}>Max</span>
+                  </span>
+                  <span className={`mt-1 flex min-h-8 w-full items-center justify-between gap-1 rounded-lg border px-2 py-1 ${hasMinimum ? minimumTone.container : "border-white/10 bg-slate-950/30"}`}>
+                    <span className={`text-sm font-black tabular-nums ${hasMinimum ? minimumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}</span>
+                    <span className={`text-[10px] font-bold tracking-wide ${hasMinimum ? minimumTone.label : "text-slate-400"}`}>Min</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <section aria-labelledby="forecast-hourly-strip-title" className="min-w-0 overflow-hidden rounded-2xl border border-sky-100/15 bg-slate-950/25">
           <h3 id="forecast-hourly-strip-title" className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/80">Heure par heure</h3>
           {selectedGroup ? (
@@ -782,12 +828,12 @@ export function ForecastByDaySection({
                     aria-pressed={isHourSelected}
                     aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 1, "°")}${precipitationDescription}${isActiveForecast ? ", prévision active" : ""}`}
                     onClick={() => onHourPress(entry.index)}
-                    className={`forecast-hour-cell min-h-[5.75rem] w-[4.5rem] shrink-0 snap-start rounded-xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
+                    className={`forecast-hour-cell min-h-[6.25rem] w-[5rem] shrink-0 snap-start rounded-xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
                   >
                     <span className={`block min-h-5 text-sm font-bold tabular-nums ${temperatureTone ? "" : "text-slate-400"}`} style={temperatureTone ? { color: temperatureTone } : undefined}>{formatOptionalForecastValue(entry.hour.temp, 1, "°")}</span>
-                    <MeteoIcon name={icon} size={23} />
-                    <span aria-hidden="true" className={`mt-0.5 block min-h-4 text-[10px] font-semibold tabular-nums ${precipitationLabel ? "text-sky-200" : "text-transparent"}`}>{precipitationLabel ?? "—"}</span>
-                    <span className={`mt-0.5 block text-xs font-semibold tabular-nums ${isHourSelected ? "text-cyan-100" : "text-slate-300"}`}>{display.hourLabel}</span>
+                    <MeteoIcon name={icon} size={28} />
+                    <span aria-hidden="true" className={`mt-0.5 block min-h-5 text-xs font-bold tabular-nums ${precipitationLabel ? "text-sky-200" : "text-transparent"}`}>{precipitationLabel ?? "—"}</span>
+                    <span className={`mt-0.5 block text-sm font-bold tabular-nums ${isHourSelected ? "text-cyan-100" : "text-slate-300"}`}>{display.hourLabel}</span>
                     {display.offsetLabel && <span className="block text-[9px] text-amber-200">{display.offsetLabel}</span>}
                   </button>
                 );
@@ -796,57 +842,6 @@ export function ForecastByDaySection({
           ) : (
             <p role="status" className="px-4 py-3 text-xs leading-relaxed text-slate-200"><span className="mb-1 block font-semibold text-amber-100">Données horaires indisponibles</span>Aucune série horaire officielle n’est fournie pour cette date. Les valeurs restent quotidiennes et ne sont pas déclinées heure par heure.</p>
           )}
-        </section>
-
-        <section aria-labelledby="forecast-daily-strip-title" className="min-w-0 overflow-hidden rounded-2xl border border-sky-100/15 bg-slate-950/25">
-          <h3 id="forecast-daily-strip-title" className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/80">Jour par jour</h3>
-          <div ref={dayStripRef} role="group" aria-label="Jours de prévision défilables" className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-3 pb-2 pt-1 scrollbar-hide touch-pan-x">
-            {displayDays.map((day) => {
-              const first = day.hourlyGroup?.hours[0]?.hour;
-              const dailyWeatherCode = day.daily && isFiniteValue(day.daily.weatherCode) ? day.daily.weatherCode : null;
-              const dailyWeatherIconName = dailyWeatherCode == null ? null : getDailyWeatherCodeIconName(dailyWeatherCode);
-              const dailyWeatherCondition = dailyWeatherIconName && dailyWeatherCode != null
-                ? dailyConditionFromWmoWeatherCode(dailyWeatherCode)
-                : null;
-              const condition = dailyWeatherCondition ?? day.daily?.condition ?? first?.condition;
-              const weatherIconName = dailyWeatherIconName ?? conditionIconName(condition);
-              const weatherIconLabel = `État du ciel : ${conditionDescription(condition) || "indisponible"}`;
-              const isSelected = selectedDayDate === day.date;
-              const hasMaximum = isFiniteValue(day.daily?.tempMax);
-              const hasMinimum = isFiniteValue(day.daily?.tempMin);
-              const maximumTone = getExtremeTemperatureTone("max", day.daily?.tempMax);
-              const minimumTone = getExtremeTemperatureTone("min", day.daily?.tempMin);
-              const dailySourceLabel = day.daily?.officialFusion
-                ? "Fusion quotidienne officielle"
-                : day.daily
-                  ? "Données quotidiennes présentes"
-                  : "Données quotidiennes indisponibles";
-              const buttonLabel = `${day.kind === "official-hourly" ? "Prévision horaire officielle" : "Prévision quotidienne"} du ${dateText(day.date)}. ${dailySourceLabel}. ${getDailyExtremesDisplayLabel(day.daily)}. ${conditionDescription(condition) || "Condition indisponible"}.`;
-              return (
-                <button
-                  key={day.date}
-                  type="button"
-                  ref={isSelected ? selectedDayRef : undefined}
-                  aria-label={buttonLabel}
-                  aria-pressed={isSelected}
-                  onClick={() => onDayPress(day)}
-                  className={`forecast-day-tile w-[5.35rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
-                >
-                  <span className="block truncate text-[11px] font-medium text-slate-200">{shortWeekday(day.date)}</span>
-                  <span className="my-1 flex justify-center"><MeteoIcon name={weatherIconName} size={20} ariaLabel={weatherIconLabel} /></span>
-                  <span className={`flex min-h-5 w-full items-center justify-between gap-1 rounded-md border px-1 py-0.5 ${hasMaximum ? maximumTone.container : "border-white/10 bg-slate-950/30"}`}>
-                    <span className={`text-[7px] font-bold uppercase tracking-wide ${hasMaximum ? maximumTone.label : "text-slate-400"}`}>Tmax</span>
-                    <span className={`text-[9px] font-black tabular-nums ${hasMaximum ? maximumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}</span>
-                  </span>
-                  <span className={`mt-0.5 flex min-h-5 w-full items-center justify-between gap-1 rounded-md border px-1 py-0.5 ${hasMinimum ? minimumTone.container : "border-white/10 bg-slate-950/30"}`}>
-                    <span className={`text-[7px] font-bold uppercase tracking-wide ${hasMinimum ? minimumTone.label : "text-slate-400"}`}>Tmin</span>
-                    <span className={`text-[9px] font-black tabular-nums ${hasMinimum ? minimumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}</span>
-                  </span>
-                  {day.daily && <span className="mt-1 block whitespace-nowrap text-[8px] font-bold text-cyan-100">{day.daily.officialFusion ? "Fusion" : "Quotidien"}</span>}
-                </button>
-              );
-            })}
-          </div>
         </section>
 
           <section
@@ -865,7 +860,7 @@ export function ForecastByDaySection({
                 <span className="shrink-0 rounded-full border border-sky-200/25 bg-slate-950/45 px-2 py-1 text-[9px] font-semibold tracking-wide text-sky-100">MeteoAI</span>
               </div>
 
-              <div className="mt-3 flex items-center gap-3 sm:gap-5">
+              <div className="mt-3 flex items-center justify-between gap-3 sm:gap-5">
                 {selectedConditionIcon !== "calendar" && <div className="shrink-0 drop-shadow-md"><MeteoIcon name={selectedConditionIcon} size={56} ariaLabel={selectedConditionIconAriaLabel} /></div>}
                 {selectedDay.kind === "official-hourly" ? (
                   <div className="min-w-0 flex-1">
@@ -873,22 +868,6 @@ export function ForecastByDaySection({
                     <p className="mt-0.5 text-[2.8rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-5xl" style={selectedHourlyTemperatureTone ? { color: selectedHourlyTemperatureTone } : undefined}>{formatOptionalForecastValue(selectedEntryHasValidTime ? selectedEntry?.hour.temp : null, 1, "°")}</p>
                     {selectedEntry && <p className="mt-1 text-[8px] leading-tight text-slate-400" title={`validTime UTC ${selectedValidTimeUtc}`}>{hourlyFieldProvenance("temperature", selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.temp))}</p>}
                     {selectedEntryHasValidTime && selectedEntry?.hour.fallbackProvenance?.temperature && <p className="mt-1 text-[9px] leading-relaxed text-amber-200">OpenWeatherMap · réponse obtenue par l’application {new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }).format(new Date(selectedEntry.hour.fallbackProvenance.temperature.retrievedAt))} · validTime exact · run fournisseur non communiqué, fraîcheur amont inconnue.</p>}
-                    {(selectedDaily || selectedDateIsTodayOrTomorrow) && (
-                      <>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] leading-relaxed">
-                        {selectedDaily ? <>
-                          <span className="text-cyan-100">Extrêmes quotidiens ·</span>
-                          {isFiniteValue(selectedDaily.tempMax)
-                            ? <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${selectedDailyMaximumTone.container}`}><span className={`text-[8px] font-bold uppercase tracking-wide ${selectedDailyMaximumTone.label}`}>Tmax</span><span className={`font-bold tabular-nums ${selectedDailyMaximumTone.value}`}>{formatDailyTemperature(selectedDaily.tempMax)}</span></span>
-                            : <span className="text-slate-300">Tmax indisponible</span>}
-                          {isFiniteValue(selectedDaily.tempMin)
-                            ? <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${selectedDailyMinimumTone.container}`}><span className={`text-[8px] font-bold uppercase tracking-wide ${selectedDailyMinimumTone.label}`}>Tmin</span><span className={`font-bold tabular-nums ${selectedDailyMinimumTone.value}`}>{formatDailyTemperature(selectedDaily.tempMin)}</span></span>
-                            : <span className="text-slate-300">Tmin indisponible</span>}
-                        </> : <span className="text-cyan-100">Extrêmes journaliers indisponibles</span>}
-                      </div>
-                      <p className="text-[8px] leading-tight text-slate-400" title={`Source des extrêmes : ${dailyExtremesSource}`}>{dailyExtremesSource} · {dailyExtremesAge}</p>
-                      </>
-                    )}
                   </div>
                 ) : (
                   <div className="min-w-0 flex-1">
@@ -903,8 +882,8 @@ export function ForecastByDaySection({
                 <div className="max-w-[42%] shrink-0 text-right">
                   <p className="text-[13px] font-medium leading-snug text-slate-50">{selectedCondition || "Condition indisponible"}</p>
                   {selectedDay.kind === "official-hourly" && <p className="mt-0.5 text-[8px] leading-tight text-slate-400">{hourlyFieldProvenance(null, Boolean(selectedHourlyCondition))}</p>}
-                  <p className="mt-2 text-[10px] text-slate-300">Ressenti</p>
-                  <p className="text-sm font-semibold tabular-nums text-white" style={selectedDay.kind === "official-hourly" && selectedHourlyApparentTemperatureTone ? { color: selectedHourlyApparentTemperatureTone } : undefined}>
+                  <p className="mt-2 text-[11px] font-medium text-slate-300">Ressenti</p>
+                  <p className={selectedDay.kind === "official-hourly" ? "mt-0.5 whitespace-nowrap text-2xl font-bold leading-none tabular-nums text-white sm:text-3xl" : "text-sm font-semibold tabular-nums text-white"} style={selectedDay.kind === "official-hourly" && selectedHourlyApparentTemperatureTone ? { color: selectedHourlyApparentTemperatureTone } : undefined}>
                     {selectedDay.kind === "official-hourly"
                       ? formatOptionalForecastValue(selectedEntryHasValidTime ? selectedEntry?.hour.apparentTemp : null, 1, "°")
                       : [
@@ -953,7 +932,7 @@ export function ForecastByDaySection({
                 {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} allHours={hours} />)}
                 {selectedDateIsTodayOrTomorrow && selectedDaily && <DailyForecastMetricsPanel day={selectedDaily} sourceLabels={sourceLabels} excludeDailyConditionAndCode />}
                 {selectedDateIsTodayOrTomorrow && !selectedDaily && (
-                  <p className="border-t border-sky-100/10 py-3 text-xs leading-relaxed text-amber-100">Payload quotidien indisponible pour cette date : extrêmes journaliers et autres métriques quotidiennes indisponibles. Aucune valeur n’est déduite des heures.</p>
+                  <p className="border-t border-sky-100/10 py-3 text-xs leading-relaxed text-amber-100">Métriques quotidiennes indisponibles pour cette date. Aucune valeur n’est déduite des heures.</p>
                 )}
               </>
             ) : (

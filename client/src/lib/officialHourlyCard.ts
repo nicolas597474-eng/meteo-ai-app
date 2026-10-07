@@ -87,6 +87,10 @@ export function filterDailyMetricsForOfficialHourlyCard<
   T extends { key: string },
 >(metrics: readonly T[]): T[] {
   return metrics.filter(
-    metric => metric.key !== "condition" && metric.key !== "weatherCode"
+    metric =>
+      metric.key !== "tempMax" &&
+      metric.key !== "tempMin" &&
+      metric.key !== "condition" &&
+      metric.key !== "weatherCode"
   );
 }
