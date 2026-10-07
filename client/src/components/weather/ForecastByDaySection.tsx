@@ -29,6 +29,7 @@ import {
   type IndexedForecastHour,
 } from "@/lib/forecastTimeline";
 import type { DailyForecastEvidenceStatus, DailyOfficialFusionDisplay, DailyForecastSourceDiagnostic, DailyFusionMetricDiagnostic } from "@shared/dailyForecast";
+import type { HourlyFallbackProvenance, OpenWeatherFallbackField } from "@shared/hourlyFallbackProvenance";
 
 type PrecipitationMetrics = {
   thresholdMm?: number | null;
@@ -60,6 +61,7 @@ type ForecastHour = {
   solarRadiation?: number | null;
   precipType?: string | null;
   precipIntensity?: string | null;
+  fallbackProvenance?: HourlyFallbackProvenance;
   multiModelMetrics?: { source?: string; bestMatchIncluded?: boolean; expectedModelCount?: number; precipitation?: PrecipitationMetrics | null } | null;
 };
 
@@ -559,6 +561,20 @@ export function ForecastByDaySection({
   const selectedMethodLabel = selectedMetrics?.source === "official_seven_models" && selectedMetrics.bestMatchIncluded === false
     ? `Fusion officielle MeteoAI · ${isFiniteValue(selectedModelCount) ? `${selectedModelCount} modèle(s) disponible(s)` : "effectif indisponible"} · Best Match exclu`
     : "Prévision horaire officielle · provenance de fusion non détaillée";
+  const selectedFallbackProvenance = selectedEntry?.hour.fallbackProvenance;
+  const selectedFallbackFields = selectedFallbackProvenance
+    ? Object.keys(selectedFallbackProvenance).filter((field): field is OpenWeatherFallbackField => Boolean(selectedFallbackProvenance[field as OpenWeatherFallbackField]))
+    : [];
+  const fallbackFieldLabels: Record<OpenWeatherFallbackField, string> = {
+    temperature: "température",
+    windSpeed: "vitesse du vent",
+    windDirection: "direction du vent",
+    humidity: "humidité",
+    cloudCover: "nébulosité",
+  };
+  const selectedMethodWithFallback = selectedFallbackFields.length > 0
+    ? `${selectedMethodLabel} · repli OpenWeather exact pour ${selectedFallbackFields.map((field) => fallbackFieldLabels[field]).join(", ")}`
+    : selectedMethodLabel;
   const selectedConditionSource = selectedEntry?.hour.condition?.trim() ?? selectedDaily?.condition?.trim() ?? "";
   const selectedCondition = conditionDescription(selectedConditionSource);
   const selectedConditionIcon = conditionIconName(selectedConditionSource);
@@ -620,6 +636,7 @@ export function ForecastByDaySection({
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">{selectedEntry ? `Échéance ${hourTime(selectedEntry, hours)}` : "Température horaire"}</p>
                     <p className="mt-0.5 text-[2.8rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-5xl">{formatOptionalForecastValue(selectedEntry?.hour.temp, 1, "°")}</p>
+                    {selectedEntry?.hour.fallbackProvenance?.temperature && <p className="mt-1 text-[9px] leading-relaxed text-amber-200">OpenWeatherMap · réponse obtenue par l’application {new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }).format(new Date(selectedEntry.hour.fallbackProvenance.temperature.retrievedAt))} · validTime exact · run fournisseur non communiqué, fraîcheur amont inconnue.</p>}
                     {selectedDateIsTodayOrTomorrow && (
                       <p className="mt-1.5 text-[10px] leading-relaxed text-cyan-100">
                         {selectedDaily ? `Extrêmes quotidiens · ${getDailyExtremesDisplayLabel(selectedDaily)}` : "Extrêmes journaliers indisponibles"}
@@ -731,7 +748,7 @@ export function ForecastByDaySection({
                   <div className="space-y-1 border-b border-sky-100/10 py-3 text-[11px] leading-relaxed text-slate-300" aria-label="Validité et provenance de l’heure sélectionnée">
                     <p className="font-semibold text-sky-100">Valeurs pour l’échéance sélectionnée · {hourTime(selectedEntry, hours)}</p>
                     <p>validTime UTC : {selectedEntry.hour.validAt != null && selectedValidTimeUtc !== "indisponible" ? <time dateTime={selectedValidTimeUtc}>{selectedValidTimeUtc}</time> : "indisponible"}</p>
-                    <p>Source : {selectedSourceLabel} · {selectedMethodLabel}.</p>
+                    <p>Source : {selectedSourceLabel} · {selectedMethodWithFallback}.</p>
                     <p>Snapshot horaire calculé (UTC) : {selectedSnapshotTimeUtc}.</p>
                   </div>
                 ) : <p className="border-b border-sky-100/10 py-3 text-xs text-slate-300">Aucune échéance horaire sélectionnée.</p>}
@@ -755,7 +772,7 @@ export function ForecastByDaySection({
             <summary className="min-h-10 cursor-pointer list-none py-2 font-medium text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">Provenance et disponibilité des champs <span aria-hidden="true" className="ml-1 inline-block transition-transform group-open:rotate-180">⌄</span></summary>
             {selectedDay.kind === "official-hourly" && (
               <>
-                <p className="pb-2 leading-relaxed">Cette vue utilise uniquement la série horaire officielle à sept modèles, sans Best Match. Les variables sans valeur qualifiée restent indisponibles; les maxima/minima quotidiens ne sont pas reconstitués à partir d’un échantillon horaire incomplet.</p>
+                <p className="pb-2 leading-relaxed">La série de base reste la fusion horaire officielle à sept modèles Open-Meteo, sans Best Match. OpenWeatherMap ne complète que les cellules absentes aux validTime UTC strictement identiques; il ne devient ni un modèle, ni un vote, ni une preuve de calibration. Toute valeur complétée porte sa provenance et l’heure de récupération; le run et la fraîcheur amont restent inconnus. Les autres absences restent indisponibles.</p>
                 <HourlyWeightingNotice weighting={hourlyWeighting as any} />
               </>
             )}

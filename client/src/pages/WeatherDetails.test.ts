@@ -82,7 +82,9 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("allHours={hours}");
     expect(timelineSource).toContain("selectedEntry.hour.validAt");
     expect(timelineSource).toContain("validTime UTC :");
-    expect(timelineSource).toContain("Source : {selectedSourceLabel} · {selectedMethodLabel}");
+    expect(timelineSource).toContain("Source : {selectedSourceLabel} · {selectedMethodWithFallback}");
+    expect(timelineSource).toContain("repli OpenWeather exact pour");
+    expect(timelineSource).toContain("fraîcheur amont inconnue");
     expect(timelineSource).toContain("whitespace-normal break-words");
     expect(pageSource).toContain("officialProvenance={{");
     expect(pageSource).toContain("source: data.officialSnapshot?.source");

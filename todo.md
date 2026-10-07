@@ -3887,3 +3887,13 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Vérifier les palettes et le rendu SSR ciblé : 19 tests réussis; `pnpm check`, `pnpm build` et `git diff --check` réussis. Le build conserve les avertissements existants Analytics, asset runtime et taille des chunks.
 - [x] Inspecter le composant dans un aperçu local de 390 px CSS avec fixture synthétique : vérification responsive/émulation, pas un téléphone réel; aucun appel météo. Supprimer les fixtures temporaires et arrêter le serveur local.
 - [x] Commit `59596bd` sur `feat/hourly-detail-mini-histograms-20261006`; PR [#82](https://github.com/nicolas597474-eng/meteo-ai-app/pull/82) ouverte vers `main`, sans fusion ni déploiement.
+
+
+## Repli horaire OpenWeather par cellule manquante — 7 octobre 2026
+- [x] Repartir de `main` vérifié au SHA `c97c126` sur une branche dédiée; confirmer que #80 est fusionnée et garder #86 ouverte et intacte.
+- [x] Dans la seule réponse `weather.getDetailedForecast`, compléter au plus température, vitesse/direction du vent, humidité relative et nébulosité totale si une cellule officielle est absente et si la réponse Forecast OpenWeather fournit exactement le même `validTime` UTC.
+- [x] Préserver toute valeur Open-Meteo finie, y compris zéro; écarter timestamps ambigus/dupliqués, valeurs invalides, champs non comparés et échéances non exactement alignées. Aucune interpolation, extrapolation, observation de remplacement, écriture DB, archive, migration, dépendance ou tâche de collecte.
+- [x] Garder la série des sept modèles, Best Match, poids, scores, calibration, régimes, sélection et autres endpoints inchangés; ne jamais compter OpenWeather comme modèle indépendant.
+- [x] Afficher par cellule la provenance, le produit, le `validTime`, l’heure de récupération applicative et l’absence de run/fraîcheur amont certifiés; laisser tous les champs sans paire inconnus. Documentation : `docs/openweather-hourly-fallback.md`.
+- [x] Tests uniquement synthétiques, sans appel météo ni accès DB : tests ciblés 22/22 réussis; `pnpm check` réussi; `pnpm build` réussi (avertissements existants Analytics/asset runtime/taille bundle); `git diff --check` propre.
+- [x] Aucun appel API météo live, collecte ou procédure de production exécuté; aucune fusion ni aucun déploiement.

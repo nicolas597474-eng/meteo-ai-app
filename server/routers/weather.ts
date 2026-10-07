@@ -86,6 +86,7 @@ import { deriveStationPerformanceProfiles } from "../stationPerformanceService";
 import { getStationRankingContract } from "../stationRankingContract";
 import { runHondeghemAromeShadowComparison, verifyHondeghemAromeWindDirectionAvailability } from "../aromeHondeghemShadow";
 import { compareOpenWeatherForecastWithOfficial } from "../openWeatherShadow";
+import { fillOpenWeatherHourlyGaps } from "../openWeatherHourlyFallback";
 import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
 import { buildStationForecastComparison24h } from "../stationForecastComparison";
 import { dailyPhysicalComparisonsRouter } from "./dailyPhysicalComparisons";
@@ -986,9 +987,16 @@ export const weatherRouter = router({
       const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
       const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
-      const hours = snapshot.hourly;
+      const officialHours = snapshot.hourly;
+      const hourlyFallback = await fillOpenWeatherHourlyGaps({
+        apiKey: ENV.openWeatherMapApiKey,
+        lat: (coords ?? HONDEGHEM).lat,
+        lon: (coords ?? HONDEGHEM).lon,
+        hours: officialHours,
+      });
+      const hours = hourlyFallback.hours;
       const includeExtendedPeriods = input?.includeExtendedPeriods !== false;
-      const periodHours = includeExtendedPeriods ? await collectHourlyForecast(today, coords, 16) : hours;
+      const periodHours = includeExtendedPeriods ? await collectHourlyForecast(today, coords, 16) : officialHours;
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
 
@@ -1002,10 +1010,10 @@ export const weatherRouter = router({
       const dailyFallback = hours.length === 0
         ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
         : null;
-      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hours, getParisHour(), new Date(snapshot.computedAt), "Prévision horaire officielle · 7 modèles", snapshot.hourlyComputedAt));
-      const activeForecast = hours[findActiveHourlyForecastIndex(hours, new Date(snapshot.computedAt).getTime())];
+      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(officialHours, getParisHour(), new Date(snapshot.computedAt), "Prévision horaire officielle · 7 modèles", snapshot.hourlyComputedAt));
+      const activeForecast = officialHours[findActiveHourlyForecastIndex(officialHours, new Date(snapshot.computedAt).getTime())];
       const nextRegimeChange = officialRegime.primary
-        ? findNextHourlyRegimeChange(hours, `${getParisHour()}:00`, officialRegime.primary.id, activeForecast?.validAt)
+        ? findNextHourlyRegimeChange(officialHours, `${getParisHour()}:00`, officialRegime.primary.id, activeForecast?.validAt)
         : null;
 
       const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
@@ -1015,6 +1023,7 @@ export const weatherRouter = router({
         currentSnapshot: snapshot.currentSnapshot,
         officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting },
         hours,
+        hourlyFallbackDiagnostics: hourlyFallback.diagnostics,
         periodHours,
         periodHoursSource: includeExtendedPeriods ? "open_meteo_best_match_reference" as const : "official_seven_models" as const,
         days,

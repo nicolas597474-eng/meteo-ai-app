@@ -25,6 +25,7 @@ import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModel
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 import type { BestMatchDailyReference, DailyForecastMetric, DailyOfficialFusionDisplay } from "../shared/dailyForecast";
 import { isValidDailyWmoWeatherCode, summarizeDailyWeatherCodes, type DailyWeatherCodeCandidate, type DailyWeatherCodeSummary } from "../shared/dailyWeatherCode";
+import type { HourlyFallbackProvenance } from "../shared/hourlyFallbackProvenance";
 import type { computeOfficialDailyForecastWithDiagnostics, ForecastTraceSource } from "./officialForecast";
 import {
   buildDailyModelCollectionCoverage,
@@ -490,6 +491,8 @@ export type HourlyPoint = {
   cloudHigh?: number | null;       // %
   precipType?: string | null;      // rain, snow, freezing_rain, etc.
   precipIntensity?: string | null; // light, moderate, heavy
+  /** Per-cell supplemental source, populated only by the detail-page gap fallback. */
+  fallbackProvenance?: HourlyFallbackProvenance;
   /** Only the official seven-model engine populates these source-tagged metrics. */
   multiModelMetrics?: HourlyMultiModelMetrics | null;
 };
