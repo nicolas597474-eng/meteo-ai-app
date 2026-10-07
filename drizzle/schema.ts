@@ -1,5 +1,6 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, double, json, bigint, uniqueIndex, index } from "drizzle-orm/mysql-core";
 import type { StationMeasurementTimes } from "../server/stationMeasurementFreshness";
+import type { HourlyComparisonDiagnostic } from "../server/hourlyComparisonDiagnostics";
 
 /**
  * Core user table backing auth flow.
@@ -865,6 +866,16 @@ export const hourlyForecastProviderRunScores = mysqlTable("hourly_forecast_provi
 ]);
 export type HourlyForecastProviderRunScore = typeof hourlyForecastProviderRunScores.$inferSelect;
 export type InsertHourlyForecastProviderRunScore = typeof hourlyForecastProviderRunScores.$inferInsert;
+
+/** Last scheduled hourly-comparison diagnostic cycle per location; not used by scoring. */
+export const hourlyComparisonDiagnosticSnapshots = mysqlTable("hourly_comparison_diagnostic_snapshots", {
+  locationKey: varchar("locationKey", { length: 32 }).primaryKey(),
+  cycleDate: varchar("cycleDate", { length: 10 }).notNull(),
+  diagnostics: json("diagnostics").$type<HourlyComparisonDiagnostic[]>().notNull(),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
+});
+export type HourlyComparisonDiagnosticSnapshot = typeof hourlyComparisonDiagnosticSnapshots.$inferSelect;
+export type InsertHourlyComparisonDiagnosticSnapshot = typeof hourlyComparisonDiagnosticSnapshots.$inferInsert;
 
 /**
  * Lead-time scoring — per-model, per-location, per-horizon error metrics.

@@ -22,6 +22,7 @@ import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows }
 import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
 import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable } from "./hourlyForecastRunScoring";
+import type { HourlyComparisonDiagnostic } from "./hourlyComparisonDiagnostics";
 import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 import { evaluateProviderRunForecasts } from "./providerRunHorizon";
 import { collectProviderRunBatch } from "./providerRunCollection";
@@ -81,6 +82,7 @@ import {
   getLatestHourlyProviderRunCaptures,
   persistHourlyProviderRunCaptureBatch,
   getHourlyProviderRunValues,
+  upsertHourlyComparisonDiagnosticSnapshot,
   persistHourlyProviderRunEvaluation,
   getStationEvidenceSummary,
 } from "./db";
@@ -718,6 +720,8 @@ export async function collectObservationsHandler(req: Request, res: Response) {
         const locKey = makeLocationKey(loc.lat, loc.lon);
         const locName = loc.customName ?? loc.name;
 
+        const comparisonDiagnostics: HourlyComparisonDiagnostic[] = [];
+
         try {
           console.log(`[MeteoAI] Collecting observations for ${locName} (${loc.lat}, ${loc.lon})`);
 
@@ -757,6 +761,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             const providerRunArchive = await getHourlyProviderRunValues(locKey, yesterday);
             if (providerRunArchive.available && providerRunArchive.values.length > 0) {
               const providerRunEvaluation = evaluateProviderRunForecasts(snapshots, providerRunArchive.values);
+              comparisonDiagnostics.push(...providerRunEvaluation.diagnostics);
               console.info(`[SingleRunComparisonDiagnostic] ${locName}: ${JSON.stringify(providerRunEvaluation.diagnostics)}`);
               const providerRunComparisons = providerRunEvaluation.comparisons.filter(
                 (row): row is typeof row & { forecastRunValueId: number; observationSnapshotId: number } =>
@@ -769,6 +774,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
               console.log(`[ProviderRunScore] ${locName}: ${providerRunEvaluation.scores.length} score(s), ${providerRunEvaluation.comparisons.length} comparaison(s) ${providerRunSaved ? "archivée(s)" : "en attente de migration"}`);
             } else if (providerRunArchive.available) {
               const emptyProviderRunEvaluation = evaluateProviderRunForecasts(snapshots, []);
+              comparisonDiagnostics.push(...emptyProviderRunEvaluation.diagnostics);
               console.info(`[SingleRunComparisonDiagnostic] ${locName}: ${JSON.stringify(emptyProviderRunEvaluation.diagnostics)}`);
             }
           } catch {
@@ -778,7 +784,9 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           const hourlyForecastRuns = await getHourlyForecastRunValues(locKey, yesterday);
           if (hourlyForecastRuns.length === 0) {
             const emptyHourlyEvaluation = evaluateHourlyForecastRuns(snapshots, []);
+            comparisonDiagnostics.push(...emptyHourlyEvaluation.diagnostics);
             console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(emptyHourlyEvaluation.diagnostics)}`);
+            await upsertHourlyComparisonDiagnosticSnapshot({ locationKey: locKey, cycleDate: yesterday, diagnostics: comparisonDiagnostics });
             locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune capture horaire vérifiable archivée; les anciennes séries mutables ne sont pas réutilisées`);
             continue;
           }
@@ -789,7 +797,9 @@ export async function collectObservationsHandler(req: Request, res: Response) {
               return variable ? [{ ...run, variable }] : [];
             }),
           );
+          comparisonDiagnostics.push(...evaluation.diagnostics);
           console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(evaluation.diagnostics)}`);
+          await upsertHourlyComparisonDiagnosticSnapshot({ locationKey: locKey, cycleDate: yesterday, diagnostics: comparisonDiagnostics });
           const hourlyScores = evaluation.compatibilityScores;
           const validatedBucketScores = evaluation.scores.filter((score) => score.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION);
           if (validatedBucketScores.length > 0) {

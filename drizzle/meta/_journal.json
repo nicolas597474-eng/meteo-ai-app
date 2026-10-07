@@ -400,6 +400,13 @@
       "when": 1791216861005,
       "tag": "0056_daily_comparison_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "5",
+      "when": 1791380621015,
+      "tag": "0057_hourly_comparison_diagnostic_snapshots",
+      "breakpoints": true
     }
   ]
 }

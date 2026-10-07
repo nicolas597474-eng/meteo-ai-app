@@ -232,4 +232,23 @@ describe("persistance stricte de la collecte legacy", () => {
     expect(handler).toContain("buildForecastRunArchiveRows(expertData, locKey, today, issuedAt)");
     expect(handler).toContain("computeOfficialDailyForecast(rawLocForecasts");
   });
+
+  it("écrit le snapshot dans le traitement planifié après le calcul des diagnostics horaires", () => {
+    const source = readFileSync(new URL("./scheduledHandlers.ts", import.meta.url), "utf8");
+    const handlerStart = source.indexOf("export async function collectObservationsHandler");
+    const handlerEnd = source.indexOf("export async function collectPhysicalObservationSnapshotsHandler", handlerStart);
+    const scheduledHandler = source.slice(handlerStart, handlerEnd);
+    const loopStart = scheduledHandler.indexOf("for (const loc of uniqueLocations) {");
+    const loopEnd = scheduledHandler.indexOf("} catch (err: any) {", loopStart);
+    const perLocation = scheduledHandler.slice(loopStart, loopEnd);
+    const evaluation = perLocation.indexOf("const evaluation = evaluateHourlyForecastRuns(");
+    const snapshotWrite = perLocation.indexOf("await upsertHourlyComparisonDiagnosticSnapshot(", evaluation);
+    const scorePersistence = perLocation.indexOf("const hourlyScores =", evaluation);
+
+    expect(perLocation).toContain("comparisonDiagnostics.push(...providerRunEvaluation.diagnostics)");
+    expect(perLocation).toContain("comparisonDiagnostics.push(...evaluation.diagnostics)");
+    expect((perLocation.match(/await upsertHourlyComparisonDiagnosticSnapshot\(/g) ?? []).length).toBe(2);
+    expect(snapshotWrite).toBeGreaterThan(evaluation);
+    expect(snapshotWrite).toBeLessThan(scorePersistence);
+  });
 });

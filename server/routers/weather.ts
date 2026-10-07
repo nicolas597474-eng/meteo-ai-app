@@ -20,6 +20,7 @@ import {
   getStoredHourlyForecasts,
   getHourlyForecastEvaluationHistory,
   getHourlyForecastRunValues,
+  getLatestHourlyComparisonDiagnosticSnapshot,
   insertForecasts,
   insertForecastRuns,
   insertMeteoAIDailyFusionRun,
@@ -1241,6 +1242,15 @@ export const weatherRouter = router({
       const favorite = (await getFavoriteLocations(ctx.user.id)).find((entry) => entry.id === input.favoriteId);
       if (!favorite) throw new Error("Ce lieu favori est introuvable ou ne vous appartient pas.");
       return collectPhysicalObservationSnapshotsForFavorites([favorite], "manual");
+    }),
+
+  /** Read-only view of the last scheduled hourly-comparison diagnostic cycle. */
+  getHourlyComparisonDiagnostics: publicProcedure
+    .input(optionalCoordinatesSchema.optional())
+    .query(async ({ input }) => {
+      const lat = input?.lat ?? HONDEGHEM.lat;
+      const lon = input?.lon ?? HONDEGHEM.lon;
+      return getLatestHourlyComparisonDiagnosticSnapshot(makeLocationKey(lat, lon));
     }),
 
   /**
