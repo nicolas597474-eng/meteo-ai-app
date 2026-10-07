@@ -83,13 +83,13 @@ export default function WeatherDetails() {
     : null;
   if (isLoading) {
     return (
-      <div className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
+      <div role="status" aria-live="polite" aria-busy="true" aria-label="Chargement des prévisions" className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
         <div className="mx-auto w-full min-w-0 max-w-none space-y-4 px-1 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:px-3 sm:py-4">
-          <Skeleton className="h-10 w-48" />
+          <h1 className="px-2 text-sm font-semibold text-sky-100">Chargement des prévisions</h1>
           {slowLoad && <div role="status" className="min-w-0 w-full max-w-full rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-100">La source météo met plus de temps que prévu. MeteoAI réessaie uniquement les erreurs temporaires.</div>}
-          <Skeleton className="h-64 w-full rounded-2xl" />
-          <Skeleton className="h-48 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton aria-hidden="true" className="h-64 w-full rounded-2xl" />
+          <Skeleton aria-hidden="true" className="h-48 w-full rounded-2xl" />
+          <Skeleton aria-hidden="true" className="h-64 w-full rounded-2xl" />
         </div>
       </div>
     );

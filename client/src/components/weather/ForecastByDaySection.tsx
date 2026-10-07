@@ -9,7 +9,7 @@ import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
 import { HourlyMiniHistogram } from "@/components/weather/HourlyMiniHistogram";
 import { OfficialForecastCalculationTimes } from "@/components/weather/OfficialForecastCalculationTimes";
-import { buildHourlyHistogramSeries, getHourlyHistogramStartValidAt, type HourlyHistogramSeries, type IndexedHourlyHistogramHour } from "@/lib/hourlyMiniHistogram";
+import { buildHourlyHistogramSeries, getHourlyHistogramStartValidAt, HOURLY_HISTOGRAM_PALETTE, type HourlyHistogramCategoryKey, type HourlyHistogramSeries, type IndexedHourlyHistogramHour } from "@/lib/hourlyMiniHistogram";
 import {
   buildForecastDisplayDays,
   getDailyExtremesDisplayLabel,
@@ -157,7 +157,9 @@ function centerWithinHorizontalStrip(strip: HTMLDivElement | null, item: HTMLBut
   const stripBounds = strip.getBoundingClientRect();
   const itemBounds = item.getBoundingClientRect();
   const left = strip.scrollLeft + itemBounds.left - stripBounds.left - (strip.clientWidth - itemBounds.width) / 2;
-  strip.scrollTo({ left, behavior: "smooth" });
+  const reducedMotion = typeof window !== "undefined"
+    && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  strip.scrollTo({ left, behavior: reducedMotion ? "auto" : "smooth" });
 }
 
 function hourTime(entry: IndexedForecastHour<ForecastHour>, allHours: readonly ForecastHour[]): string {
@@ -170,6 +172,29 @@ function formatUtcTimestamp(value: string | number | null | undefined): string {
   if (!Number.isFinite(timestamp)) return "indisponible";
   const date = new Date(timestamp);
   return Number.isFinite(date.getTime()) ? date.toISOString() : "indisponible";
+}
+
+function formatForecastFreshness(value: string | null | undefined): { iso: string; label: string } | null {
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  if (!Number.isFinite(timestamp)) return null;
+  const date = new Date(timestamp);
+  return {
+    iso: date.toISOString(),
+    label: new Intl.DateTimeFormat("fr-FR", {
+      dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris",
+    }).format(date),
+  };
+}
+
+const CATEGORY_PALETTE_KEYS: Record<string, HourlyHistogramCategoryKey> = {
+  "precip-type": "precipitation",
+  "feels-like": "apparent",
+  sun: "uv",
+};
+
+function getCategoryPalette(categoryKey: string) {
+  const paletteKey = CATEGORY_PALETTE_KEYS[categoryKey] ?? categoryKey as HourlyHistogramCategoryKey;
+  return HOURLY_HISTOGRAM_PALETTE[paletteKey];
 }
 
 function buildHourlyDetailCategories(
@@ -435,10 +460,11 @@ function DailyForecastMetricsPanel({ day, sourceLabels }: { day: DailyForecastPo
 
 function DayDetailsAccordion({ category, allHours = [] }: { category: DetailCategory; allHours?: readonly ForecastHour[] }) {
   const notes = category.rows.filter(({ note }) => Boolean(note));
+  const palette = getCategoryPalette(category.key);
   return (
     <details className="group border-t border-sky-100/10 first:border-t-0">
       <summary className="grid min-h-[4rem] cursor-pointer list-none grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-x-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 sm:flex sm:gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-300/10 text-cyan-100"><MeteoIcon name={category.icon} size={16} /></span>
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${palette?.accentClassName ?? "bg-sky-300/10 text-cyan-100"}`} style={palette ? { backgroundColor: palette.accentBackground, color: palette.accentColor } : undefined}><MeteoIcon name={category.icon} size={16} /></span>
         <span className="flex min-w-0 items-start justify-between gap-x-2 gap-y-1 sm:flex-1 sm:items-center">
           <span className="min-w-0 flex-1 text-[14px] font-semibold leading-snug text-slate-100">{category.title}</span>
           <span className="min-w-0 max-w-[62%] whitespace-normal break-words text-right text-xs leading-relaxed tabular-nums text-slate-300 sm:max-w-[58%]">{category.summary}</span>
@@ -459,6 +485,7 @@ function DayDetailsAccordion({ category, allHours = [] }: { category: DetailCate
                 categoryKey={category.key}
                 series={series}
                 allHours={allHours}
+                selectedValidAt={category.validAt}
               />
             ))}
           </>
@@ -560,6 +587,17 @@ export function ForecastByDaySection({
   const selectedSourceLabel = officialProvenance?.source === "open-meteo"
     ? "Open-Meteo"
     : officialProvenance?.source ?? "indisponible";
+  const selectedContextSource = selectedDay?.kind === "official-hourly"
+    ? selectedSourceLabel
+    : selectedDaily?.officialFusion
+      ? "Fusion quotidienne MeteoAI"
+      : sourceLabels.length
+        ? sourceLabels.join(" · ")
+        : "non précisée";
+  const freshnessValue = selectedDay?.kind === "official-hourly"
+    ? officialProvenance?.hourlyComputedAt ?? officialProvenance?.computedAt
+    : selectedDaily?.officialFusion?.issuedAt ?? officialProvenance?.computedAt;
+  const selectedFreshness = formatForecastFreshness(freshnessValue);
   const selectedMetrics = selectedEntry?.hour.multiModelMetrics;
   const selectedModelCount = selectedMetrics?.expectedModelCount;
   const selectedMethodLabel = selectedMetrics?.source === "official_seven_models" && selectedMetrics.bestMatchIncluded === false
@@ -596,7 +634,7 @@ export function ForecastByDaySection({
     : `Condition météo : ${conditionDescription(selectedConditionSource) || "indisponible"}`;
   const sceneStyle = selectedConditionSource && selectedConditionIcon !== "calendar"
     ? {
-        backgroundImage: `linear-gradient(180deg, rgba(5, 20, 38, 0.54) 0%, rgba(5, 17, 33, 0.76) 52%, rgba(4, 13, 27, 0.92) 100%), url("${getWeatherLandscapeImage(selectedConditionSource)}")`,
+        backgroundImage: `linear-gradient(180deg, rgba(5, 20, 38, 0.66) 0%, rgba(5, 17, 33, 0.84) 52%, rgba(4, 13, 27, 0.96) 100%), url("${getWeatherLandscapeImage(selectedConditionSource)}")`,
         backgroundPosition: "center",
         backgroundSize: "cover",
       }
@@ -636,7 +674,7 @@ export function ForecastByDaySection({
             className="relative min-w-0 overflow-hidden rounded-2xl border border-sky-300/30 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 text-slate-50 shadow-[0_10px_32px_rgba(2,8,23,0.38)]"
             style={sceneStyle}
           >
-            <div className="relative z-10 px-4 pb-3 pt-3 sm:px-5 sm:pt-4">
+            <div key={`${selectedDay.date}:${selectedEntry?.hour.validAt ?? selectedHourIndex ?? "daily"}`} className="forecast-selected-summary relative z-10 px-4 pb-3 pt-3 sm:px-5 sm:pt-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-100/80">
@@ -684,6 +722,12 @@ export function ForecastByDaySection({
                 </div>
               </div>
 
+              <div aria-label="Prévision, source et fraîcheur" className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] leading-relaxed">
+                <span aria-label="Prévu, non observé" className="inline-flex min-h-6 items-center rounded-full border border-cyan-200/35 bg-cyan-300/10 px-2 font-bold uppercase tracking-[0.08em] text-cyan-100">Prévu</span>
+                <span className="min-w-0 rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Source</span> · {selectedContextSource}</span>
+                <span className="rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Calcul</span> · {selectedFreshness ? <time dateTime={selectedFreshness.iso}>{selectedFreshness.label} (Europe/Paris)</time> : "heure indisponible"}</span>
+              </div>
+
               {selectedDay.kind === "official-daily-fusion" && selectedDaily?.officialFusion && (
                 <div className="mt-3 border-t border-sky-100/15 pt-2.5" aria-label="Provenance de la fusion quotidienne">
                   <span className="inline-flex rounded-full border border-cyan-200/40 bg-cyan-300/10 px-2 py-1 text-[10px] font-bold text-cyan-100">Fusion officielle · preuves par variable</span>
@@ -708,7 +752,7 @@ export function ForecastByDaySection({
                         aria-pressed={isHourSelected}
                         aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 0, "°")}${isActiveForecast ? ", prévision active" : ""}`}
                         onClick={() => onHourPress(entry.index)}
-                        className={`forecast-hour-cell w-[3.45rem] shrink-0 snap-start rounded-xl border px-1 py-1 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
+                        className={`forecast-hour-cell w-[3.45rem] shrink-0 snap-start rounded-xl border px-1 py-1 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
                       >
                         <span className="block min-h-4 text-[12px] font-semibold tabular-nums text-white">{formatOptionalForecastValue(entry.hour.temp, 0, "°")}</span>
                         <MeteoIcon name={icon} size={19} />
@@ -719,7 +763,7 @@ export function ForecastByDaySection({
                   })}
                 </div>
               ) : (
-                <p className="px-4 py-3 text-xs leading-relaxed text-slate-200">Aucune série horaire officielle disponible pour cette date. Les valeurs restent quotidiennes et ne sont pas déclinées heure par heure.</p>
+                <p role="status" className="px-4 py-3 text-xs leading-relaxed text-slate-200"><span className="mb-1 block font-semibold text-amber-100">Données horaires indisponibles</span>Aucune série horaire officielle n’est fournie pour cette date. Les valeurs restent quotidiennes et ne sont pas déclinées heure par heure.</p>
               )}
             </div>
           </section>
@@ -756,7 +800,7 @@ export function ForecastByDaySection({
                   aria-label={buttonLabel}
                   aria-pressed={isSelected}
                   onClick={() => onDayPress(day)}
-                  className={`forecast-day-tile w-[4.25rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
+                  className={`forecast-day-tile w-[4.25rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
                 >
                   <span className="block truncate text-[11px] font-medium text-slate-200">{shortWeekday(day.date)}</span>
                   <span className="my-1 flex justify-center"><MeteoIcon name={weatherIconName} size={20} ariaLabel={weatherIconLabel} /></span>
@@ -813,9 +857,9 @@ export function ForecastByDaySection({
           </details>
         </>
       ) : (
-        <div className="rounded-2xl border border-sky-300/25 bg-slate-900/75 px-4 py-5 text-sm leading-relaxed text-slate-200" role="status">
-          <h2 id="forecast-by-day-title" className="font-semibold text-white">Prévisions</h2>
-          <p className="mt-2">Aucune échéance datée n’est disponible dans la série horaire officielle ni dans la fusion quotidienne officielle.</p>
+        <div className="rounded-2xl border border-amber-200/25 bg-slate-900/75 px-4 py-5 text-sm leading-relaxed text-slate-200" role="status" aria-label="Aucune prévision datée disponible">
+          <h2 id="forecast-by-day-title" className="font-semibold text-white">Aucune prévision disponible</h2>
+          <p className="mt-2">Aucune échéance datée n’a été reçue pour la série horaire officielle ou la fusion quotidienne. Les données manquantes ne sont pas déduites ni remplacées.</p>
           {grouped.undatedHours > 0 && <p className="mt-1 text-amber-100">{grouped.undatedHours} échéance(s) sans date locale explicite n’ont pas été regroupées; aucune date n’a été déduite de l’horodatage UTC.</p>}
         </div>
       )}

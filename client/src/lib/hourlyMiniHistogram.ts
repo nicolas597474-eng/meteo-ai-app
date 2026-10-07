@@ -63,16 +63,46 @@ export type HourlyHistogramSeries<T extends HourlyHistogramForecast = HourlyHist
 };
 
 export const HOURLY_HISTOGRAM_PALETTE = {
-  precipitation: { barClassName: "bg-sky-400" },
-  wind: { barClassName: "bg-teal-400" },
-  humidity: { barClassName: "bg-cyan-400" },
-  clouds: { barClassName: "bg-slate-400" },
-  pressure: { barClassName: "bg-violet-400" },
-  uv: { barClassName: "bg-amber-400" },
-  apparent: { barClassName: "bg-rose-400" },
-  visibility: { barClassName: "bg-blue-300" },
-  radiation: { barClassName: "bg-orange-400" },
-  "air-quality": { barClassName: "bg-emerald-400" },
+  precipitation: {
+    barClassName: "bg-sky-400", accentClassName: "bg-sky-300/10 text-sky-100",
+    barColor: "#38bdf8", accentColor: "#e0f2fe", accentBackground: "rgb(56 189 248 / 0.10)",
+  },
+  wind: {
+    barClassName: "bg-teal-400", accentClassName: "bg-teal-300/10 text-teal-100",
+    barColor: "#2dd4bf", accentColor: "#ccfbf1", accentBackground: "rgb(45 212 191 / 0.10)",
+  },
+  humidity: {
+    barClassName: "bg-cyan-400", accentClassName: "bg-cyan-300/10 text-cyan-100",
+    barColor: "#22d3ee", accentColor: "#cffafe", accentBackground: "rgb(34 211 238 / 0.10)",
+  },
+  clouds: {
+    barClassName: "bg-slate-400", accentClassName: "bg-slate-300/10 text-slate-100",
+    barColor: "#94a3b8", accentColor: "#f1f5f9", accentBackground: "rgb(148 163 184 / 0.10)",
+  },
+  pressure: {
+    barClassName: "bg-violet-400", accentClassName: "bg-violet-300/10 text-violet-100",
+    barColor: "#a78bfa", accentColor: "#ede9fe", accentBackground: "rgb(167 139 250 / 0.10)",
+  },
+  uv: {
+    barClassName: "bg-amber-400", accentClassName: "bg-amber-300/10 text-amber-100",
+    barColor: "#fbbf24", accentColor: "#fef3c7", accentBackground: "rgb(251 191 36 / 0.10)",
+  },
+  apparent: {
+    barClassName: "bg-rose-400", accentClassName: "bg-rose-300/10 text-rose-100",
+    barColor: "#fb7185", accentColor: "#ffe4e6", accentBackground: "rgb(251 113 133 / 0.10)",
+  },
+  visibility: {
+    barClassName: "bg-blue-300", accentClassName: "bg-blue-300/10 text-blue-100",
+    barColor: "#93c5fd", accentColor: "#dbeafe", accentBackground: "rgb(147 197 253 / 0.10)",
+  },
+  radiation: {
+    barClassName: "bg-orange-400", accentClassName: "bg-orange-300/10 text-orange-100",
+    barColor: "#fb923c", accentColor: "#ffedd5", accentBackground: "rgb(251 146 60 / 0.10)",
+  },
+  "air-quality": {
+    barClassName: "bg-emerald-400", accentClassName: "bg-emerald-300/10 text-emerald-100",
+    barColor: "#34d399", accentColor: "#d1fae5", accentBackground: "rgb(52 211 153 / 0.10)",
+  },
 } as const;
 
 export type HourlyHistogramCategoryKey = keyof typeof HOURLY_HISTOGRAM_PALETTE;

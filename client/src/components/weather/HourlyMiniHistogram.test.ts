@@ -33,7 +33,7 @@ describe("rendu des mini-histogrammes horaires", () => {
     expect(html).toContain("UTC+02");
     expect(html).toContain("UTC+01");
     expect(html).toContain("bg-sky-400");
-    expect(html).toContain("La couleur ne code ni qualité ni confiance");
+    expect(html).toContain("La couleur identifie la variable, pas la qualité ni la confiance");
   });
 
   it("ne rend aucun histogramme s’il n’y a pas de valeur numérique disponible", () => {
@@ -52,5 +52,28 @@ describe("rendu des mini-histogrammes horaires", () => {
       series: { field: "precipitation", label: "Précipitations", unit: "mm", decimals: 1, points: [] },
       allHours: hours,
     }))).toBe("");
+  });
+
+  it("marque exactement l’échéance sélectionnée, même quand sa valeur est absente", () => {
+    const hours: HourlyHistogramForecast[] = [
+      { date: "2026-10-25", hour: "02:00", validAt: Date.parse("2026-10-25T00:00:00.000Z"), precipitation: 0.2 },
+      { date: "2026-10-25", hour: "02:00", validAt: Date.parse("2026-10-25T01:00:00.000Z"), precipitation: null },
+      { date: "2026-10-25", hour: "03:00", validAt: Date.parse("2026-10-25T02:00:00.000Z"), precipitation: 1.4 },
+    ];
+    const series = buildHourlyHistogramSeries(
+      "precipitation",
+      hours.map((hour, index) => ({ index, hour })),
+      hours[0].validAt!,
+    )[0];
+    const html = renderToStaticMarkup(createElement(HourlyMiniHistogram, {
+      categoryKey: "precipitation",
+      series,
+      allHours: hours,
+      selectedValidAt: hours[1].validAt,
+    }));
+
+    expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+    expect(html).toContain("Échéance sélectionnée");
+    expect(html).toContain("ring-cyan-100/75");
   });
 });
