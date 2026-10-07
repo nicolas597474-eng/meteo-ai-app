@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Crosshair, Minus, Plus } from "lucide-react";
 
 const CONTROL_SURFACE = "border border-white/20 bg-[#0d1117]/90 text-slate-100 shadow-lg shadow-black/25 backdrop-blur-sm";
 const CONTROL_FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300";
@@ -23,6 +23,24 @@ export function MapControlButton({
     >
       {children}
     </button>
+  );
+}
+
+export function MapRecenterButton({
+  onClick,
+  ariaLabel = "Recentrer la carte sur le lieu actif",
+  active = false,
+  className = "",
+}: {
+  onClick: () => void;
+  ariaLabel?: string;
+  active?: boolean;
+  className?: string;
+}) {
+  return (
+    <MapControlButton onClick={onClick} aria-label={ariaLabel} title={ariaLabel} active={active} className={`text-sky-200 ${className}`}>
+      <Crosshair aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />
+    </MapControlButton>
   );
 }
 

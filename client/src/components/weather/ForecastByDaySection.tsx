@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
 import { getModelCountCoverageLabel, getModelCountCoverageLevel } from "@shared/modelCoverageConfidence";
+import { dailyConditionFromWmoWeatherCode } from "@shared/dailyWeatherCode";
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
+import { getDailyWeatherCodeIconName } from "@/lib/dailyWeatherIcon";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
 import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
 import { HourlyMiniHistogram } from "@/components/weather/HourlyMiniHistogram";
@@ -577,9 +579,21 @@ export function ForecastByDaySection({
   const selectedMethodWithFallback = selectedFallbackFields.length > 0
     ? `${selectedMethodLabel} · repli OpenWeather exact pour ${selectedFallbackFields.map((field) => fallbackFieldLabels[field]).join(", ")}`
     : selectedMethodLabel;
-  const selectedConditionSource = selectedEntry?.hour.condition?.trim() ?? selectedDaily?.condition?.trim() ?? "";
+  const selectedDailyWeatherCode = selectedDay?.kind === "official-daily-fusion" && isFiniteValue(selectedDaily?.weatherCode)
+    ? selectedDaily.weatherCode
+    : null;
+  const selectedDailyCodeCondition = selectedDailyWeatherCode == null
+    ? null
+    : dailyConditionFromWmoWeatherCode(selectedDailyWeatherCode);
+  const selectedDailyCodeIconName = selectedDailyWeatherCode == null
+    ? null
+    : getDailyWeatherCodeIconName(selectedDailyWeatherCode);
+  const selectedConditionSource = selectedEntry?.hour.condition?.trim() ?? selectedDailyCodeCondition ?? selectedDaily?.condition?.trim() ?? "";
   const selectedCondition = conditionDescription(selectedConditionSource);
-  const selectedConditionIcon = conditionIconName(selectedConditionSource);
+  const selectedConditionIcon = selectedDailyCodeIconName ?? conditionIconName(selectedConditionSource);
+  const selectedConditionIconAriaLabel = selectedDailyWeatherCode != null && selectedDailyCodeCondition
+    ? `Code météo WMO ${selectedDailyWeatherCode} : ${selectedDailyCodeCondition}`
+    : `Condition météo : ${conditionDescription(selectedConditionSource) || "indisponible"}`;
   const sceneStyle = selectedConditionSource && selectedConditionIcon !== "calendar"
     ? {
         backgroundImage: `linear-gradient(180deg, rgba(5, 20, 38, 0.54) 0%, rgba(5, 17, 33, 0.76) 52%, rgba(4, 13, 27, 0.92) 100%), url("${getWeatherLandscapeImage(selectedConditionSource)}")`,
@@ -634,7 +648,7 @@ export function ForecastByDaySection({
               </div>
 
               <div className="mt-3 flex items-center gap-3 sm:gap-5">
-                {selectedConditionIcon !== "calendar" && <div className="shrink-0 drop-shadow-md"><MeteoIcon name={selectedConditionIcon} size={56} /></div>}
+                {selectedConditionIcon !== "calendar" && <div className="shrink-0 drop-shadow-md"><MeteoIcon name={selectedConditionIcon} size={56} ariaLabel={selectedConditionIconAriaLabel} /></div>}
                 {selectedDay.kind === "official-hourly" ? (
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">{selectedEntry ? `Échéance ${hourTime(selectedEntry, hours)}` : "Température horaire"}</p>
@@ -713,7 +727,16 @@ export function ForecastByDaySection({
           <div ref={dayStripRef} role="group" aria-label="Jours de prévision défilables" className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 scrollbar-hide touch-pan-x">
             {displayDays.map((day) => {
               const first = day.hourlyGroup?.hours[0]?.hour;
-              const condition = day.daily?.condition ?? first?.condition;
+              const dailyWeatherCode = day.daily && isFiniteValue(day.daily.weatherCode) ? day.daily.weatherCode : null;
+              const dailyWeatherIconName = dailyWeatherCode == null ? null : getDailyWeatherCodeIconName(dailyWeatherCode);
+              const dailyWeatherCondition = dailyWeatherIconName && dailyWeatherCode != null
+                ? dailyConditionFromWmoWeatherCode(dailyWeatherCode)
+                : null;
+              const condition = dailyWeatherCondition ?? day.daily?.condition ?? first?.condition;
+              const weatherIconName = dailyWeatherIconName ?? conditionIconName(condition);
+              const weatherIconLabel = dailyWeatherCode != null && dailyWeatherIconName && dailyWeatherCondition
+                ? `Code météo WMO ${dailyWeatherCode} : ${dailyWeatherCondition}`
+                : `Condition météo : ${conditionDescription(condition) || "indisponible"}`;
               const isSelected = selectedDayDate === day.date;
               const hasDailyExtremes = isFiniteValue(day.daily?.tempMax) && isFiniteValue(day.daily?.tempMin);
               const temperatures = hasDailyExtremes
@@ -736,7 +759,7 @@ export function ForecastByDaySection({
                   className={`forecast-day-tile w-[4.25rem] shrink-0 snap-start rounded-2xl border px-1.5 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isSelected ? "border-cyan-200/75 bg-sky-300/15 shadow-[0_0_0_1px_rgba(103,232,249,0.16)]" : "border-sky-100/10 bg-slate-950/35 hover:border-sky-200/25 hover:bg-sky-950/40"}`}
                 >
                   <span className="block truncate text-[11px] font-medium text-slate-200">{shortWeekday(day.date)}</span>
-                  <span className="my-1 flex justify-center"><MeteoIcon name={conditionIconName(condition)} size={20} /></span>
+                  <span className="my-1 flex justify-center"><MeteoIcon name={weatherIconName} size={20} ariaLabel={weatherIconLabel} /></span>
                   <span className="block min-h-7 whitespace-normal break-words text-[8px] font-semibold leading-tight tabular-nums text-slate-100">{temperatures}</span>
                   {day.daily && <span className="mt-1 block whitespace-nowrap text-[8px] font-bold text-cyan-100">{day.daily.officialFusion ? "Fusion" : "Quotidien"}</span>}
                 </button>

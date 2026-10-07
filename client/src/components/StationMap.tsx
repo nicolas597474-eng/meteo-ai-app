@@ -169,7 +169,17 @@ export function StationMap({
             renderMarkers(map);
             setMapReady(true);
           }}
-        />
+        >
+          {!isExpanded && mapReady && (
+            <div className="absolute bottom-3 right-3 z-20" data-swipe-exclude>
+              <MapZoomControl
+                onZoomIn={() => adjustExpandedZoom(1)}
+                onZoomOut={() => adjustExpandedZoom(-1)}
+                ariaLabel="Zoom manuel de la carte des stations"
+              />
+            </div>
+          )}
+        </MapView>
         {isExpanded && mapReady && (
           <>
             <MapControlButton
