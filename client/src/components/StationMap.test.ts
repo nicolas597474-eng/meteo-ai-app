@@ -1,50 +1,35 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("carte des stations", () => {
-  it("démarre en satellite et conserve la vue réelle uniquement sur le marqueur de référence", () => {
-    const source = readFileSync(new URL("./StationMap.tsx", import.meta.url), "utf8");
-    expect(source).toContain('useState<"satellite" | "roadmap">("satellite")');
-    expect(source).toContain("mapTypeId={mapType}");
-    expect(source).toContain("panorama.setPosition(position)");
-    expect(source).toContain("marker.addListener(\"click\"");
-    expect(source).not.toContain("Satellite · touchez un point pour la vue réelle");
-    expect(source).not.toContain("Vue réelle ici");
-    expect(source).toContain('fixed inset-0 z-[200] bg-[#070b13]');
-    expect(source).toContain('import { createPortal } from "react-dom"');
-    expect(source).toContain("createPortal(mapShell, document.body)");
-    expect(source).toContain("isExpanded && typeof document !== \"undefined\"");
-    expect(source).toContain('h-72 rounded-xl border border-slate-800 sm:h-80');
-    expect(source).toContain('mt-2 space-y-2');
-    expect(source).toContain('className="flex justify-center"');
-    expect(source).toContain('MapTypeToggle value={mapType} onChange={changeMapType}');
-    expect(source).toContain("MapControlButton");
-    expect(source).toContain("MapZoomControl");
-    expect(source).toContain("MapTypeToggle");
-    expect(source).toContain("const focusCurrentLocation = useCallback");
-    expect(source).toContain("map.panTo({ lat: center.lat, lng: center.lon })");
-    expect(source).toContain("map.setZoom(14)");
-    expect(source).toContain("Zoom sur le lieu");
-    expect(source).toContain("const restoreNormalView = useCallback");
-    expect(source).toContain("map.setZoom(normalZoom)");
-    expect(source).toContain("Vue normale");
-    expect(source).toContain("Revenir au cadrage normal de la carte");
-    expect(source).toContain("const adjustExpandedZoom = useCallback");
+const source = readFileSync(new URL("./StationMap.tsx", import.meta.url), "utf8");
+
+describe("carte des stations OpenStreetMap", () => {
+  it("affiche le lieu actif et les stations sous forme de marqueurs Leaflet interactifs", () => {
+    expect(source).toContain("L.circleMarker([center.lat, center.lon]");
+    expect(source).toContain("station.ageMinutes !== null && station.ageMinutes <= 90");
+    expect(source).toContain("L.circleMarker([station.lat, station.lon]");
+    expect(source).toContain(".bindPopup(stationInfoHtml(station)");
+    expect(source).toContain(".bindTooltip(`${station.name}");
+    expect(source).toContain("markerLayer.clearLayers()");
+  });
+
+  it("préserve les détails des relevés et leur code de fraîcheur", () => {
+    expect(source).toContain("function stationFreshness");
+    expect(source).toContain("Dernier relevé");
+    expect(source).toContain("#34d399");
+    expect(source).toContain("#fbbf24");
+    expect(source).toContain("#fb7185");
+    expect(source).toContain("function stationInfoHtml");
+    expect(source).toContain("Priorité technique de réseau/source");
+    expect(source).toContain("pas une performance météo individuelle mesurée");
+    expect(source).not.toContain("Fiabilité mesurée");
+  });
+
+  it("conserve le recentrage, le zoom personnalisé, la légende et le plein écran", () => {
+    expect(source).toContain("map.setView([center.lat, center.lon], 14)");
+    expect(source).toContain("mapRef.current?.setView([center.lat, center.lon], normalZoom)");
     expect(source).toContain("map.setZoom(Math.max(2, Math.min(20, currentZoom + delta)))");
     expect(source).toContain('absolute right-3 top-[28%] z-10 flex flex-col items-center gap-4');
-    expect(source).toContain('absolute right-3 top-3 z-10');
-    expect(source).toContain('MapTypeToggle value={mapType} onChange={changeMapType}');
-    expect(source).toContain('MapControlButton onClick={focusCurrentLocation}');
-    expect(source).toContain('MapZoomControl onZoomIn={() => adjustExpandedZoom(1)}');
-    expect(source).not.toContain('absolute bottom-16 right-3 z-10');
-    expect(source).not.toContain('absolute left-3 top-16 z-10');
-    expect((source.match(/aria-label="Fermer la carte agrandie"/g) ?? []).length).toBe(1);
-    expect(source).toContain("MapZoomControl");
-    expect(source).toContain("streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM }");
-    expect(source).toContain("const changeMapType = useCallback");
-    expect(source).toContain("mapRef.current?.setMapTypeId(nextType)");
-    expect(source).toContain("MapTypeToggle value={mapType}");
-    expect(source).toContain("changeMapType");
     expect(source).toContain('aria-label="Centrer la carte sur le lieu actif"');
     expect(source).toContain("Niveau de zoom : {zoomLevel}");
     expect(source).toContain("Légende des marqueurs");
@@ -52,30 +37,17 @@ describe("carte des stations", () => {
     expect(source).toContain("Vert</strong> — station avec relevé de moins de 90 min");
     expect(source).toContain("Ambre</strong> — station avec relevé de plus de 90 min");
     expect(source).toContain("group-open:rotate-180");
-    expect(source).toContain("streetViewControl={false}");
-    expect(source).toContain("rotateControl={false}");
-    expect(source).toContain("mapTypeControl: false");
-    expect(source).toContain("fullscreenControl: false");
-    expect(source).toContain("zoomControl: false");
-    expect(source).toContain("streetViewControl: isExpanded");
-    expect(source).toContain("rotateControl: false");
-    expect(source).toContain("Fermer la carte");
-    expect(source).not.toContain("MapTypeControlStyle.HORIZONTAL_BAR");
-    expect(source).toContain("setIsExpanded(true)");
     expect(source).toContain("const openImmersiveMap = useCallback");
     expect(source).toContain("const closeImmersiveMap = useCallback");
     expect(source).toContain("document.documentElement.requestFullscreen()");
-    expect(source).toContain("background:#071018");
-    expect(source).toContain("border:1px solid #38bdf8");
-    expect(source).toContain("function stationFreshness");
-    expect(source).toContain("Dernier relevé");
-    expect(source).toContain("#34d399");
-    expect(source).toContain("#fbbf24");
-    expect(source).toContain("#fb7185");
-    expect(source).toContain("function stationInfoHtml");
-    expect(source).toContain("new google.maps.InfoWindow()");
-    expect(source).toContain("Priorité technique de réseau/source");
-    expect(source).toContain("pas une performance météo individuelle mesurée");
-    expect(source).not.toContain("Fiabilité mesurée");
+    expect(source).toContain("createPortal(mapShell, document.body)");
+    expect((source.match(/aria-label=\"Fermer la carte agrandie\"/g) ?? []).length).toBe(1);
+  });
+
+  it("ne conserve pas les contrôles de fond Satellite ni Street View de Google", () => {
+    expect(source).not.toContain("MapTypeToggle");
+    expect(source).not.toContain("google.maps");
+    expect(source).not.toContain("Street View");
+    expect(source).not.toContain("streetViewControl");
   });
 });

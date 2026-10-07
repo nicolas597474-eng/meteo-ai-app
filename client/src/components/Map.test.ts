@@ -1,47 +1,53 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { MAP_UNAVAILABLE_MESSAGE } from "./Map";
 
-describe("repli de cartographie", () => {
-  it("informe que la liste de stations reste disponible lorsque la carte échoue", () => {
-    expect(MAP_UNAVAILABLE_MESSAGE).toContain("stations restent accessibles");
+const source = readFileSync(new URL("./Map.tsx", import.meta.url), "utf8");
+
+describe("cartographie OpenStreetMap", () => {
+  it("charge les tuiles standard et affiche l’attribution OSM et le lien de signalement", () => {
+    expect(source).toContain("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
+    expect(source).toContain("OpenStreetMap contributors");
+    expect(source).toContain("https://www.openstreetmap.org/copyright");
+    expect(source).toContain("https://www.openstreetmap.org/fixthemap");
+    expect(source).toContain("L.tileLayer(tileSource.url");
+    expect(source).toContain("attribution: tileSource.attribution");
   });
 
-  it("permet de contrôler Street View et de signaler le passage en plein écran", async () => {
-    const source = await import("node:fs").then(({ readFileSync }) => readFileSync(new URL("./Map.tsx", import.meta.url), "utf8"));
-    expect(source).toContain("streetViewControl?: boolean");
-    expect(source).toContain("rotateControl?: boolean");
-    expect(source).toContain("mapTypeControl?: boolean");
-    expect(source).toContain("fullscreenControl?: boolean");
-    expect(source).toContain("zoomControl?: boolean");
-    expect(source).toContain("cameraControl?: boolean");
-    expect(source).toContain("cameraControl = false");
-    expect(source).toContain("isFractionalZoomEnabled?: boolean");
-    expect(source).toContain("isFractionalZoomEnabled = true");
-    expect(source).toContain("allowPageScroll?: boolean");
-    expect(source).toContain("allowPageScroll = false");
-    expect(source).toContain('allowPageScroll ? "touch-pan-y" : "touch-none"');
-    expect(source).toContain("isFractionalZoomEnabled: isFractionalZoomEnabled && !prefersReducedMotion");
-    expect(source).toContain("prefers-reduced-motion: reduce");
-    expect(source).toContain("touchGestureActive");
-    expect(source).toContain("touch-none");
-    expect(source).toContain("touchGestureActive.current");
-    expect(source).toContain("data-swipe-exclude");
-    expect(source).toContain("resizeFrame");
+  it("signale l’échec des tuiles et permet de relancer leur chargement", () => {
+    expect(source).toContain("Fond cartographique indisponible");
+    expect(source).toContain('tileLayerInstance.on("tileerror", onTileError)');
+    expect(source).toContain("tileLayer.current?.redraw()");
+    expect(source).toContain("Réessayer");
+  });
+
+  it("conserve les interactions, le défilement mobile et le redimensionnement plein écran", () => {
+    expect(source).toContain("interactive?: boolean");
+    expect(source).toContain("scrollWheelZoom: interactive");
+    expect(source).toContain("allowPageScroll ? \"touch-pan-y\" : \"touch-none\"");
+    expect(source).toContain("ResizeObserver");
+    expect(source).toContain("mapInstance.invalidateSize");
     expect(source).toContain("window.requestAnimationFrame");
     expect(source).toContain("window.cancelAnimationFrame");
-    expect(source).toContain("createPortal");
-    expect(source).toContain('className?.includes("eclipse-map-viewport")');
-    expect(source).toContain("createPortal(mapView, document.body)");
     expect(source).toContain("onFullscreenChange?:");
     expect(source).toContain('document.addEventListener("fullscreenchange", reportFullscreen)');
-	    expect(source).toContain("ResizeObserver");
-	    expect(source).toContain('window.google.maps.event.trigger(mapInstance, "resize")');
-	    expect(source).toContain('loading: "async"');
-	    expect(source).toContain("document.getElementById(GOOGLE_MAPS_SCRIPT_ID)");
-    expect(source).toContain("isMapsReady");
-    expect(source).toContain('window.google.maps.importLibrary("maps")');
-    expect(source).toContain("const MapConstructor");
-    expect(source).toContain("script.defer = true");
-	    expect(source).toContain("document.getElementById(GOOGLE_MAPS_SCRIPT_ID)");
-	  });
+    expect(source).toContain('className?.includes("eclipse-map-viewport")');
+    expect(source).toContain("createPortal(mapView, document.body)");
+  });
+
+  it("active les gestes de rotation uniquement sur les cartes qui le demandent", () => {
+    expect(source).toContain('import "@tomickigrzegorz/leaflet-rotate"');
+    expect(source).toContain("enableRotation?: boolean");
+    expect(source).toContain("enableRotation = false");
+    expect(source).toContain("rotate: enableRotation");
+    expect(source).toContain("dragRotate: enableRotation");
+    expect(source).toContain("shiftKeyRotate: enableRotation");
+    expect(source).toContain("touchRotate: enableRotation");
+    expect(source).toContain("rotateControl: false");
+  });
+
+  it("ne charge plus de script de cartographie Google", () => {
+    expect(source).not.toContain("google.maps");
+    expect(source).not.toContain("maps.googleapis.com");
+    expect(source).not.toContain("VITE_FRONTEND_FORGE_API_KEY");
+  });
 });

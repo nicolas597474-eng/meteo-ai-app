@@ -1,291 +1,187 @@
-/**
- * GOOGLE MAPS FRONTEND INTEGRATION - ESSENTIAL GUIDE
- *
- * USAGE FROM PARENT COMPONENT:
- * ======
- *
- * const mapRef = useRef<google.maps.Map | null>(null);
- *
- * <MapView
- *   initialCenter={{ lat: 40.7128, lng: -74.0060 }}
- *   initialZoom={15}
- *   onMapReady={(map) => {
- *     mapRef.current = map; // Store to control map from parent anytime, google map itself is in charge of the re-rendering, not react state.
- * </MapView>
- *
- * ======
- * Available Libraries and Core Features:
- * -------------------------------
- * 📍 MARKER (from `marker` library)
- * - Attaches to map using { map, position }
- * new google.maps.marker.AdvancedMarkerElement({
- *   map,
- *   position: { lat: 37.7749, lng: -122.4194 },
- *   title: "San Francisco",
- * });
- *
- * -------------------------------
- * 🏢 PLACES (from `places` library)
- * - Does not attach directly to map; use data with your map manually.
- * const place = new google.maps.places.Place({ id: PLACE_ID });
- * await place.fetchFields({ fields: ["displayName", "location"] });
- * map.setCenter(place.location);
- * new google.maps.marker.AdvancedMarkerElement({ map, position: place.location });
- *
- * -------------------------------
- * 🧭 GEOCODER (from `geocoding` library)
- * - Standalone service; manually apply results to map.
- * const geocoder = new google.maps.Geocoder();
- * geocoder.geocode({ address: "New York" }, (results, status) => {
- *   if (status === "OK" && results[0]) {
- *     map.setCenter(results[0].geometry.location);
- *     new google.maps.marker.AdvancedMarkerElement({
- *       map,
- *       position: results[0].geometry.location,
- *     });
- *   }
- * });
- *
- * -------------------------------
- * 📐 GEOMETRY (from `geometry` library)
- * - Pure utility functions; not attached to map.
- * const dist = google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
- *
- * -------------------------------
- * 🛣️ ROUTES (from `routes` library)
- * - Combines DirectionsService (standalone) + DirectionsRenderer (map-attached)
- * const directionsService = new google.maps.DirectionsService();
- * const directionsRenderer = new google.maps.DirectionsRenderer({ map });
- * directionsService.route(
- *   { origin, destination, travelMode: "DRIVING" },
- *   (res, status) => status === "OK" && directionsRenderer.setDirections(res)
- * );
- *
- * -------------------------------
- * 🌦️ MAP LAYERS (attach directly to map)
- * - new google.maps.TrafficLayer().setMap(map);
- * - new google.maps.TransitLayer().setMap(map);
- * - new google.maps.BicyclingLayer().setMap(map);
- *
- * -------------------------------
- * ✅ SUMMARY
- * - “map-attached” → AdvancedMarkerElement, DirectionsRenderer, Layers.
- * - “standalone” → Geocoder, DirectionsService, DistanceMatrixService, ElevationService.
- * - “data-only” → Place, Geometry utilities.
- */
-
-/// <reference types="@types/google.maps" />
-
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { usePersistFn } from "@/hooks/usePersistFn";
+import L from "leaflet";
+import "@tomickigrzegorz/leaflet-rotate";
+import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
 
-declare global {
-  interface Window {
-    google?: typeof google;
-    __meteoaiGoogleMapsReady?: () => void;
-  }
-}
+export const OSM_TILE_SOURCE = {
+  url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a> · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">Signaler un problème</a>',
+};
 
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
-const FORGE_BASE_URL =
-  import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
-  "https://forge.butterfly-effect.dev";
-const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
-export const MAP_UNAVAILABLE_MESSAGE = "Carte indisponible. Les stations restent accessibles dans la liste ci-dessous.";
-const GOOGLE_MAPS_SCRIPT_ID = "meteoai-google-maps-proxy-script";
+export const MAP_UNAVAILABLE_MESSAGE =
+  "Fond cartographique indisponible. Les marqueurs, zones et données restent accessibles.";
 
-function buildMapsScriptUrl(): string {
-  const params = new URLSearchParams({
-    key: API_KEY,
-    v: "weekly",
-    libraries: "marker,places,geocoding,geometry",
-    loading: "async",
-    callback: "__meteoaiGoogleMapsReady",
-  });
-  return `${MAPS_PROXY_URL}/maps/api/js?${params.toString()}`;
-}
-
-let mapScriptPromise: Promise<void> | null = null;
-
-function isMapsReady() {
-  const maps = window.google?.maps;
-  return Boolean(maps && (typeof maps.importLibrary === "function" || typeof maps.Map === "function"));
-}
-
-function loadMapScript(): Promise<void> {
-  if (isMapsReady()) return Promise.resolve();
-  if (mapScriptPromise) return mapScriptPromise;
-
-  mapScriptPromise = new Promise<void>((resolve, reject) => {
-    const finishIfReady = () => {
-      if (isMapsReady()) resolve();
-    };
-    window.__meteoaiGoogleMapsReady = finishIfReady;
-    const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
-    if (existing) {
-      if (isMapsReady()) {
-        resolve();
-        return;
-      }
-      existing.remove();
-      existing.addEventListener("load", finishIfReady, { once: true });
-      existing.addEventListener("error", () => {
-        existing.remove();
-        mapScriptPromise = null;
-        reject(new Error("Le service de cartographie est momentanément indisponible."));
-      }, { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = GOOGLE_MAPS_SCRIPT_ID;
-    script.src = buildMapsScriptUrl();
-    script.async = true;
-    script.defer = true;
-    script.crossOrigin = "anonymous";
-    script.onload = finishIfReady;
-    script.onerror = () => {
-      script.remove();
-      window.__meteoaiGoogleMapsReady = undefined;
-      mapScriptPromise = null;
-      reject(new Error("Le service de cartographie est momentanément indisponible."));
-    };
-    document.head.appendChild(script);
-  });
-
-  return mapScriptPromise;
-}
+export type MapTileSource = {
+  url: string;
+  attribution: string;
+};
 
 interface MapViewProps {
   className?: string;
-  initialCenter?: google.maps.LatLngLiteral;
+  initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
-  mapTypeId?: google.maps.MapTypeId | string;
-  mapTypeControl?: boolean;
-  fullscreenControl?: boolean;
-  zoomControl?: boolean;
-  streetViewControl?: boolean;
-  rotateControl?: boolean;
-  cameraControl?: boolean;
-  isFractionalZoomEnabled?: boolean;
+  minZoom?: number;
+  maxZoom?: number;
   allowPageScroll?: boolean;
+  interactive?: boolean;
+  enableRotation?: boolean;
+  tileSource?: MapTileSource;
   children?: ReactNode;
-  onMapReady?: (map: google.maps.Map) => void;
-  onFullscreenChange?: (isFullscreen: boolean, map: google.maps.Map | null) => void;
+  onMapReady?: (map: L.Map) => void;
+  onFullscreenChange?: (isFullscreen: boolean, map: L.Map | null) => void;
 }
 
 export function MapView({
   className,
   initialCenter = { lat: 37.7749, lng: -122.4194 },
   initialZoom = 12,
-  mapTypeId = "roadmap",
-  mapTypeControl = true,
-  fullscreenControl = true,
-  zoomControl = true,
-  streetViewControl = true,
-  rotateControl = true,
-  cameraControl = false,
-  isFractionalZoomEnabled = true,
+  minZoom = 2,
+  maxZoom = 20,
   allowPageScroll = false,
+  interactive = true,
+  enableRotation = false,
+  tileSource = OSM_TILE_SOURCE,
   children,
   onMapReady,
   onFullscreenChange,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<google.maps.Map | null>(null);
-  const touchGestureActive = useRef(false);
-  const touchReleaseTimer = useRef<number | null>(null);
-  const resizeFrame = useRef<number | null>(null);
+  const map = useRef<L.Map | null>(null);
+  const tileLayer = useRef<L.TileLayer | null>(null);
+  const onMapReadyRef = useRef(onMapReady);
+  const onFullscreenChangeRef = useRef(onFullscreenChange);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const init = usePersistFn(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      await loadMapScript();
-      if (!mapContainer.current || !window.google?.maps) {
-        throw new Error("La carte ne peut pas être initialisée.");
-      }
-      const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-      const mapsLibrary = typeof window.google.maps.importLibrary === "function"
-        ? await window.google.maps.importLibrary("maps") as google.maps.MapsLibrary
-        : null;
-      const MapConstructor = mapsLibrary?.Map ?? window.google.maps.Map;
-      if (typeof MapConstructor !== "function") {
-        throw new Error("Le constructeur cartographique Google Maps est indisponible.");
-      }
-      map.current = new MapConstructor(mapContainer.current, {
-        zoom: initialZoom,
-        center: initialCenter,
-        mapTypeId,
-        mapTypeControl,
-        fullscreenControl,
-        zoomControl,
-        streetViewControl,
-        rotateControl,
-        cameraControl,
-        isFractionalZoomEnabled: isFractionalZoomEnabled && !prefersReducedMotion,
-        mapId: "DEMO_MAP_ID",
-      });
-      onMapReady?.(map.current);
-    } catch (error) {
-      console.error("Failed to load Google Maps script", error);
-      setLoadError(MAP_UNAVAILABLE_MESSAGE);
-    } finally {
-      setIsLoading(false);
-    }
-  });
+  onMapReadyRef.current = onMapReady;
+  onFullscreenChangeRef.current = onFullscreenChange;
 
   useEffect(() => {
-    init();
-  }, [init]);
+    const container = mapContainer.current;
+    if (!container) return;
+
+    setIsLoading(true);
+    setLoadError(null);
+    const mapInstance = L.map(container, {
+      attributionControl: true,
+      boxZoom: interactive,
+      doubleClickZoom: interactive,
+      dragging: interactive,
+      keyboard: interactive,
+      maxZoom,
+      minZoom,
+      rotate: enableRotation,
+      dragRotate: enableRotation,
+      shiftKeyRotate: enableRotation,
+      touchRotate: enableRotation,
+      rotateControl: false,
+      scrollWheelZoom: interactive,
+      touchZoom: interactive,
+      zoomControl: false,
+      zoomDelta: 1,
+      zoomSnap: 0,
+    }).setView([initialCenter.lat, initialCenter.lng], initialZoom);
+    const tileLayerInstance = L.tileLayer(tileSource.url, {
+      attribution: tileSource.attribution,
+      maxNativeZoom: Math.min(19, maxZoom),
+      maxZoom,
+      minZoom,
+      updateWhenIdle: true,
+    });
+    const onTileLoad = () => {
+      setIsLoading(false);
+      setLoadError(null);
+    };
+    const onTileError = () => {
+      setIsLoading(false);
+      setLoadError(MAP_UNAVAILABLE_MESSAGE);
+    };
+    tileLayerInstance.on("tileload", onTileLoad);
+    tileLayerInstance.on("tileerror", onTileError);
+    tileLayerInstance.addTo(mapInstance);
+    map.current = mapInstance;
+    tileLayer.current = tileLayerInstance;
+    onMapReadyRef.current?.(mapInstance);
+
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => mapInstance.invalidateSize({ animate: false, pan: false }));
+    resizeObserver?.observe(container);
+    const resizeFrame = window.requestAnimationFrame(() => {
+      mapInstance.invalidateSize({ animate: false, pan: false });
+    });
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.cancelAnimationFrame(resizeFrame);
+      tileLayerInstance.off("tileload", onTileLoad);
+      tileLayerInstance.off("tileerror", onTileError);
+      mapInstance.off();
+      mapInstance.remove();
+      if (map.current === mapInstance) map.current = null;
+      if (tileLayer.current === tileLayerInstance) tileLayer.current = null;
+    };
+  }, [
+    initialCenter.lat,
+    initialCenter.lng,
+    initialZoom,
+    interactive,
+    enableRotation,
+    maxZoom,
+    minZoom,
+    tileSource.attribution,
+    tileSource.url,
+  ]);
 
   useEffect(() => {
     if (!onFullscreenChange) return;
-    const reportFullscreen = () => onFullscreenChange(Boolean(document.fullscreenElement), map.current);
+    const reportFullscreen = () =>
+      onFullscreenChangeRef.current?.(Boolean(document.fullscreenElement), map.current);
     document.addEventListener("fullscreenchange", reportFullscreen);
     return () => document.removeEventListener("fullscreenchange", reportFullscreen);
   }, [onFullscreenChange]);
 
-  useEffect(() => {
-    if (isLoading || !mapContainer.current || !map.current) return;
-    const resizeObserver = new ResizeObserver(() => {
-      if (touchGestureActive.current || resizeFrame.current !== null) return;
-      resizeFrame.current = window.requestAnimationFrame(() => {
-        resizeFrame.current = null;
-        const mapInstance = map.current;
-        if (!mapInstance || !window.google?.maps || touchGestureActive.current) return;
-        window.google.maps.event.trigger(mapInstance, "resize");
-      });
-    });
-    resizeObserver.observe(mapContainer.current);
-    return () => {
-      resizeObserver.disconnect();
-      if (resizeFrame.current !== null) {
-        window.cancelAnimationFrame(resizeFrame.current);
-        resizeFrame.current = null;
-      }
-    };
-  }, [isLoading]);
-
-  if (loadError) {
-    return (
-      <div className={cn("flex h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-border bg-muted/30 p-6 text-center", className)} role="alert">
-        <p className="max-w-sm text-sm text-muted-foreground">{loadError}</p>
-        <button type="button" onClick={() => void init()} className="min-h-11 rounded-md border border-primary/50 px-4 text-sm font-medium text-primary">
-          Réessayer la carte
-        </button>
-      </div>
-    );
-  }
+  const retryTiles = () => {
+    setLoadError(null);
+    setIsLoading(true);
+    tileLayer.current?.redraw();
+  };
 
   const mapView = (
-    <div data-swipe-exclude data-swipe-ignore className={cn("relative h-[500px] w-full", className)}>
-      {isLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Chargement de la carte…</div>}
-      <div ref={mapContainer} className={cn("h-full w-full [will-change:transform]", allowPageScroll ? "touch-pan-y" : "touch-none")} onTouchStart={() => { if (touchReleaseTimer.current != null) window.clearTimeout(touchReleaseTimer.current); touchGestureActive.current = true; }} onTouchEnd={() => { touchReleaseTimer.current = window.setTimeout(() => { touchGestureActive.current = false; }, 160); }} onTouchCancel={() => { touchGestureActive.current = false; }} />
+    <div
+      data-swipe-exclude
+      data-swipe-ignore
+      className={cn("relative h-[500px] w-full", className)}
+    >
+      <div
+        ref={mapContainer}
+        role="region"
+        aria-label="Carte OpenStreetMap"
+        className={cn(
+          "h-full w-full",
+          allowPageScroll ? "touch-pan-y" : "touch-none",
+        )}
+      />
+      {isLoading && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">
+          Chargement de la carte…
+        </div>
+      )}
+      {loadError && (
+        <div className="absolute left-1/2 top-3 z-[1100] flex w-[min(92%,26rem)] -translate-x-1/2 items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-slate-950/95 px-3 py-2 text-xs text-slate-100 shadow-lg">
+          <p role="alert">{loadError}</p>
+          <button
+            type="button"
+            onClick={retryTiles}
+            className="min-h-9 shrink-0 rounded-md border border-sky-400/50 px-3 font-medium text-sky-100"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
       {children}
     </div>
   );

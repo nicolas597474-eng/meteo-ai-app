@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { Compass, LocateFixed, Maximize2, Navigation, SlidersHorizontal, Volume2, VolumeX, X } from "lucide-react";
+import L from "leaflet";
 import { MeteoIcon } from "@/components/MeteoIcon";
-import { MapControlButton, MapTypeToggle, MapZoomControl } from "@/components/MapControls";
+import { MapControlButton, MapZoomControl } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { isNightAtLocalMinutes } from "@/lib/celestialNight";
@@ -295,40 +296,42 @@ function AstronomyDetail({ label, value }: { label: string; value: string }) { r
 function AstronomyVisibilityMap({ astronomy, eventTitle, eventKind }: { astronomy: NonNullable<EnvironmentalData["astronomy"]>; eventTitle: string; eventKind: "eclipse" | "meteor" }) {
   const center = astronomy.coordinates;
   const accent = eventKind === "eclipse" ? "#7dd3fc" : "#c084fc";
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
   const adjustMapZoom = (delta: number) => {
     const map = mapRef.current;
     if (!map) return;
-    const currentZoom = map.getZoom() ?? 9;
+    const currentZoom = map.getZoom();
     map.setZoom(Math.max(3, Math.min(18, currentZoom + delta)));
   };
-  const onMapReady = (map: google.maps.Map) => {
+  const onMapReady = (map: L.Map) => {
     mapRef.current = map;
-    const position = { lat: center.lat, lng: center.lon };
-    new google.maps.marker.AdvancedMarkerElement({ map, position, title: "Lieu actif" });
-    new google.maps.Circle({
-      map,
-      center: position,
+    const position: L.LatLngExpression = [center.lat, center.lon];
+    L.circleMarker(position, {
+      color: "#f8fafc",
+      fillColor: accent,
+      fillOpacity: 1,
+      radius: 7,
+      weight: 2,
+    }).bindTooltip("Lieu actif").addTo(map);
+    L.circle(position, {
       radius: 25_000,
-      strokeColor: accent,
-      strokeOpacity: 0.85,
-      strokeWeight: 2,
+      color: accent,
+      opacity: 0.85,
+      weight: 2,
       fillColor: accent,
       fillOpacity: 0.12,
-      clickable: false,
-    });
+      interactive: false,
+    }).addTo(map);
   };
-  return <div className="mt-3 overflow-hidden rounded-xl border border-slate-600/50 bg-slate-950/40"><div className="flex items-start justify-between gap-3 px-3 py-2.5"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Carte locale d’observation</p><p className="mt-1 text-xs font-semibold text-slate-100">{eventTitle}</p></div><span className="rounded-full border border-slate-500/50 px-2 py-1 text-[9px] text-slate-300">Rayon 25 km</span></div><div data-swipe-exclude><MapView className="h-[190px]" initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={9} mapTypeId="terrain" mapTypeControl={false} fullscreenControl={false} zoomControl={false} streetViewControl={false} rotateControl={false} onMapReady={onMapReady}><div className="absolute right-3 top-3 z-20" data-swipe-exclude><MapZoomControl onZoomIn={() => adjustMapZoom(1)} onZoomOut={() => adjustMapZoom(-1)} /></div></MapView></div><p className="border-t border-slate-700/60 px-3 py-2 text-[9px] leading-relaxed text-slate-400">Le cercle situe le lieu actif et son contexte d’observation. Il ne représente pas la bande géométrique d’une éclipse ; la visibilité dépend aussi de l’horizon, de la météo et de la luminosité locale.</p></div>;
+  return <div className="mt-3 overflow-hidden rounded-xl border border-slate-600/50 bg-slate-950/40"><div className="flex items-start justify-between gap-3 px-3 py-2.5"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">Carte locale d’observation</p><p className="mt-1 text-xs font-semibold text-slate-100">{eventTitle}</p></div><span className="rounded-full border border-slate-500/50 px-2 py-1 text-[9px] text-slate-300">Rayon 25 km</span></div><div data-swipe-exclude><MapView className="h-[190px]" initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={9} onMapReady={onMapReady}><div className="absolute right-3 top-3 z-20" data-swipe-exclude><MapZoomControl onZoomIn={() => adjustMapZoom(1)} onZoomOut={() => adjustMapZoom(-1)} /></div></MapView></div><p className="border-t border-slate-700/60 px-3 py-2 text-[9px] leading-relaxed text-slate-400">Le cercle situe le lieu actif et son contexte d’observation. Il ne représente pas la bande géométrique d’une éclipse ; la visibilité dépend aussi de l’horizon, de la météo et de la luminosité locale.</p></div>;
 }
 
 function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<EnvironmentalData["astronomy"]>; layers: EclipseMapLayer[] }) {
   const [selectedLayerId, setSelectedLayerId] = useState(layers[0]?.eventId ?? "");
   const [isMapExpanded, setIsMapExpanded] = useState(false);
-  const [expandedMapType, setExpandedMapType] = useState<"roadmap" | "satellite">("roadmap");
   const [selectedPoint, setSelectedPoint] = useState<{ lat: number; lon: number; label: string } | null>(null);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
-  const [expandedHeading, setExpandedHeading] = useState(0);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(false);
   const [isSoundHelpOpen, setIsSoundHelpOpen] = useState(false);
@@ -337,6 +340,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   const [isCompassDetailsOpen, setIsCompassDetailsOpen] = useState(false);
   const [isMapOpening, setIsMapOpening] = useState(false);
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
+  const [expandedHeading, setExpandedHeading] = useState(0);
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "waiting" | "tracking" | "no-data" | "denied" | "unsupported">("idle");
   const [headingSource, setHeadingSource] = useState<"none" | "absolute" | "relative">("none");
   const [relativeHeadingOffset, setRelativeHeadingOffset] = useState(0);
@@ -348,16 +352,16 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   }, [firstLayerId]);
   const [displayedArrowRotation, setDisplayedArrowRotation] = useState(0);
   const headingSourceRef = useRef<"none" | "absolute" | "relative">("none");
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const compactMapRef = useRef<google.maps.Map | null>(null);
-  const expandedMapRef = useRef<google.maps.Map | null>(null);
-  const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const compactMapRef = useRef<L.Map | null>(null);
+  const expandedMapRef = useRef<L.Map | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
   const soundContextRef = useRef<AudioContext | null>(null);
   const observationAlertFiredRef = useRef(false);
   const isMapOpeningRef = useRef(false);
   const displayedArrowRotationRef = useRef(0);
   const moonAlignmentHapticRef = useRef(false);
-  const visibilityRectanglesRef = useRef<Array<{ rectangle: google.maps.Rectangle; baseOpacity: number }>>([]);
+  const visibilityRectanglesRef = useRef<Array<{ rectangle: L.Rectangle; baseOpacity: number }>>([]);
   const selectedLayer = layers.find((layer) => layer.eventId === selectedLayerId) ?? layers[0];
   if (!selectedLayer) return null;
   const center = astronomy.coordinates;
@@ -397,7 +401,7 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   }, [isMapExpanded]);
   useEffect(() => {
     const scale = visibilityOpacity / 100;
-    visibilityRectanglesRef.current.forEach(({ rectangle, baseOpacity }) => rectangle.setOptions({ fillOpacity: baseOpacity * scale }));
+    visibilityRectanglesRef.current.forEach(({ rectangle, baseOpacity }) => rectangle.setStyle({ fillOpacity: baseOpacity * scale }));
   }, [visibilityOpacity]);
   useEffect(() => {
     if (!isMapExpanded || (orientationStatus !== "waiting" && orientationStatus !== "tracking") || typeof window === "undefined") return;
@@ -434,62 +438,66 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     return () => window.clearTimeout(timeoutId);
   }, [orientationStatus]);
 
-  const onMapReady = (map: google.maps.Map, isExpanded: boolean) => {
+  const onMapReady = (map: L.Map, isExpanded: boolean) => {
     mapRef.current = map;
     if (isExpanded) expandedMapRef.current = map;
     else compactMapRef.current = map;
-    map.setMapTypeId(isExpanded ? expandedMapType : "terrain");
-    map.setOptions({ fullscreenControl: false, streetViewControl: isExpanded, cameraControl: false, gestureHandling: isExpanded ? "greedy" : "none", draggable: isExpanded, scrollwheel: isExpanded, disableDoubleClickZoom: !isExpanded, keyboardShortcuts: isExpanded, mapTypeControlOptions: isExpanded ? { position: google.maps.ControlPosition.TOP_RIGHT } : undefined, zoomControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_CENTER } : undefined, streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined });
     if (isExpanded) {
-      map.addListener("heading_changed", () => setExpandedHeading(map.getHeading() ?? 0));
-      map.getStreetView().setOptions({ addressControlOptions: { position: google.maps.ControlPosition.TOP_CENTER } });
+      const updateExpandedHeading = () => setExpandedHeading(map.getBearing());
+      map.on("rotate", updateExpandedHeading);
+      updateExpandedHeading();
     }
-    const localPosition = { lat: center.lat, lng: center.lon };
+    visibilityRectanglesRef.current = [];
+    const localPosition: L.LatLngExpression = [center.lat, center.lon];
     const localMarkerContent = document.createElement("div");
     localMarkerContent.className = "eclipse-user-location-marker";
     localMarkerContent.setAttribute("role", "img");
     localMarkerContent.setAttribute("aria-label", "Lieu actif");
     localMarkerContent.innerHTML = '<span class="eclipse-user-location-marker__pulse"></span><span class="eclipse-user-location-marker__core"></span>';
-    new google.maps.marker.AdvancedMarkerElement({ map, position: localPosition, title: "Lieu actif", content: localMarkerContent });
-    new google.maps.Circle({ map, center: localPosition, radius: 25_000, strokeColor: "#f8fafc", strokeOpacity: 0.65, strokeWeight: 1, fillColor: "#e2e8f0", fillOpacity: 0.06, clickable: false });
-    const bounds = new google.maps.LatLngBounds();
+    const localMarker = L.marker(localPosition, {
+      title: "Lieu actif",
+      icon: L.divIcon({ className: "eclipse-map-marker-icon", html: localMarkerContent, iconSize: [34, 34], iconAnchor: [17, 17] }),
+    });
+    L.circle(localPosition, { radius: 25_000, color: "#f8fafc", opacity: 0.65, weight: 1, fillColor: "#e2e8f0", fillOpacity: 0.06, interactive: false }).addTo(map);
+    const bounds = L.latLngBounds(localPosition, localPosition);
     selectedLayer.visibilityCells.forEach((cell) => {
       const isFull = cell.visibility === "full_event";
       const baseOpacity = isFull ? 0.46 : 0.30;
-      const rectangle = new google.maps.Rectangle({ map, bounds: { north: cell.north, south: cell.south, east: cell.east, west: cell.west }, strokeColor: isFull ? "#0284c7" : "#7c3aed", strokeOpacity: isFull ? 0.96 : 0.88, strokeWeight: isFull ? 2.5 : 2, fillColor: isFull ? "#0ea5e9" : "#8b5cf6", fillOpacity: baseOpacity * (visibilityOpacity / 100), clickable: true, zIndex: isFull ? 4 : 3 });
+      const rectangle = L.rectangle([[cell.north, cell.west], [cell.south, cell.east]], { color: isFull ? "#0284c7" : "#7c3aed", opacity: isFull ? 0.96 : 0.88, weight: isFull ? 2.5 : 2, fillColor: isFull ? "#0ea5e9" : "#8b5cf6", fillOpacity: baseOpacity * (visibilityOpacity / 100), interactive: true }).addTo(map);
       visibilityRectanglesRef.current.push({ rectangle, baseOpacity });
-      rectangle.addListener("click", (event: google.maps.MapMouseEvent) => {
-        const lat = event.latLng?.lat() ?? (cell.north + cell.south) / 2;
-        const lon = event.latLng?.lng() ?? (cell.east + cell.west) / 2;
+      rectangle.on("click", (event: L.LeafletMouseEvent) => {
+        const lat = event.latlng.lat;
+        const lon = event.latlng.lng;
         requestCircumstances(lat, lon, selectedLayer.type === "meteor" ? (isFull ? "Nuit astronomique" : "Nuit au crépuscule") : isFull ? "Zone entièrement visible" : "Zone de visibilité partielle");
       });
-      bounds.extend({ lat: cell.north, lng: cell.east });
-      bounds.extend({ lat: cell.south, lng: cell.west });
+      if (isFull) rectangle.bringToFront();
+      bounds.extend(L.latLng(cell.north, cell.east));
+      bounds.extend(L.latLng(cell.south, cell.west));
     });
     if (selectedLayer.centralPath) {
-      const band = [...selectedLayer.centralPath.northLimit, ...selectedLayer.centralPath.southLimit.slice().reverse()];
-      const polygon = new google.maps.Polygon({ map, paths: band, strokeColor: "#fbbf24", strokeOpacity: 0.95, strokeWeight: 2, fillColor: "#fbbf24", fillOpacity: 0.28, clickable: true });
-      polygon.addListener("click", (event: google.maps.MapMouseEvent) => { if (event.latLng) requestCircumstances(event.latLng.lat(), event.latLng.lng(), "Bande centrale NASA"); });
-      new google.maps.Polyline({ map, path: selectedLayer.centralPath.centerLine, strokeColor: "#fff7cc", strokeOpacity: 0.95, strokeWeight: 2, clickable: false });
-      selectedLayer.centralPath.northLimit.forEach((point) => bounds.extend(point));
-      selectedLayer.centralPath.southLimit.forEach((point) => bounds.extend(point));
+      const band = [
+        ...selectedLayer.centralPath.northLimit.map((point) => L.latLng(point.lat, point.lng)),
+        ...selectedLayer.centralPath.southLimit.slice().reverse().map((point) => L.latLng(point.lat, point.lng)),
+      ];
+      const polygon = L.polygon(band, { color: "#fbbf24", opacity: 0.95, weight: 2, fillColor: "#fbbf24", fillOpacity: 0.28, interactive: true }).addTo(map);
+      polygon.on("click", (event: L.LeafletMouseEvent) => requestCircumstances(event.latlng.lat, event.latlng.lng, "Bande centrale NASA"));
+      L.polyline(selectedLayer.centralPath.centerLine.map((point) => L.latLng(point.lat, point.lng)), { color: "#fff7cc", opacity: 0.95, weight: 2, interactive: false }).addTo(map);
+      selectedLayer.centralPath.northLimit.forEach((point) => bounds.extend(L.latLng(point.lat, point.lng)));
+      selectedLayer.centralPath.southLimit.forEach((point) => bounds.extend(L.latLng(point.lat, point.lng)));
     }
-    bounds.extend(localPosition);
-    if (!bounds.isEmpty() && isExpanded) {
+    if (bounds.isValid() && isExpanded) {
       // Le cadrage de toutes les cellules peut tomber trop loin sur mobile et
       // laisser des bandes sans tuile. La vue immersive part donc du lieu actif
       // avec un léger rapprochement qui remplit durablement le viewport.
-      map.setCenter(localPosition);
-      map.setZoom(ECLIPSE_IMMERSIVE_WORLD_ZOOM);
+      map.setView(localPosition, ECLIPSE_IMMERSIVE_WORLD_ZOOM);
     }
     if (!isExpanded) {
-      map.setCenter(localPosition);
-      map.setZoom(5);
+      map.setView(localPosition, 5);
     }
+    localMarker.addTo(map).setZIndexOffset(1000);
     if (isExpanded) requestAnimationFrame(() => {
-      google.maps.event.trigger(map, "resize");
-      map.setCenter(localPosition);
-      map.setZoom(ECLIPSE_IMMERSIVE_WORLD_ZOOM);
+      map.invalidateSize({ animate: false, pan: false });
+      map.setView(localPosition, ECLIPSE_IMMERSIVE_WORLD_ZOOM);
       if (expandedMapRef.current === map) {
         isMapOpeningRef.current = false;
         setIsMapOpening(false);
@@ -505,16 +513,20 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
         const point = { lat: coords.latitude, lng: coords.longitude };
         setIsLocating(false);
         setLocationStatus("Position actuelle utilisée pour le calcul.");
-        const activeMap = expandedMapRef.current ?? mapRef.current;
-        activeMap?.panTo(point);
-        activeMap?.setZoom(Math.max(activeMap.getZoom() ?? 4, 9));
-        if (userMarkerRef.current) userMarkerRef.current.map = null;
+        const activeMap = (isMapExpanded ? expandedMapRef.current : compactMapRef.current) ?? mapRef.current;
+        activeMap?.setView([point.lat, point.lng], Math.max(activeMap.getZoom() ?? 4, 9));
+        userMarkerRef.current?.remove();
         const markerContent = document.createElement("div");
         markerContent.className = "eclipse-user-location-marker";
         markerContent.setAttribute("role", "img");
         markerContent.setAttribute("aria-label", "Votre position actuelle");
         markerContent.innerHTML = '<span class="eclipse-user-location-marker__pulse"></span><span class="eclipse-user-location-marker__core"></span>';
-        userMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({ map: activeMap ?? undefined, position: point, title: "Ma position actuelle", content: markerContent });
+        if (activeMap) {
+          userMarkerRef.current = L.marker([point.lat, point.lng], {
+            title: "Ma position actuelle",
+            icon: L.divIcon({ className: "eclipse-map-marker-icon", html: markerContent, iconSize: [34, 34], iconAnchor: [17, 17] }),
+          }).addTo(activeMap).setZIndexOffset(1100);
+        }
         requestCircumstances(point.lat, point.lng, "Ma position actuelle");
       },
       () => { setIsLocating(false); setLocationStatus("Position non disponible ou autorisation refusée. Le lieu actif reste affiché."); },
@@ -597,13 +609,10 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
     oscillator.stop(context.currentTime + 0.36);
     observationAlertFiredRef.current = true;
   }, [isAstroObservableNow, soundAlertEnabled]);
-  const recenterExpandedMap = () => {
+  const resetExpandedMapBearing = () => {
     const map = expandedMapRef.current;
     if (!map) return;
-    map.setHeading(0);
-    map.setTilt(0);
-    map.setCenter({ lat: center.lat, lng: center.lon });
-    map.setZoom(ECLIPSE_IMMERSIVE_WORLD_ZOOM);
+    map.setBearing(0);
     setExpandedHeading(0);
   };
   const adjustExpandedZoom = (delta: number) => {
@@ -661,16 +670,15 @@ function EclipseVisibilityMap({ astronomy, layers }: { astronomy: NonNullable<En
   };
   const opacityControl = <div className="absolute bottom-16 left-3 z-20 flex flex-col items-start gap-2" data-swipe-exclude>{isOpacityPanelOpen && <div className="map-opacity-control"><label htmlFor="eclipse-opacity-expanded" className="map-opacity-control__label">Opacité <span>{visibilityOpacity}%</span></label><input id="eclipse-opacity-expanded" type="range" min="0" max="100" step="1" value={visibilityOpacity} onChange={(event) => setVisibilityOpacity(Number(event.target.value))} onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); const bounds = event.currentTarget.getBoundingClientRect(); setVisibilityOpacity(Math.round(Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)) * 100)); }} onPointerMove={(event) => { if (!event.currentTarget.hasPointerCapture(event.pointerId)) return; event.stopPropagation(); const bounds = event.currentTarget.getBoundingClientRect(); setVisibilityOpacity(Math.round(Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)) * 100)); }} onPointerUp={(event) => { event.stopPropagation(); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onTouchStart={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} aria-label="Opacité des zones de visibilité" /></div>}<MapControlButton onClick={() => setIsOpacityPanelOpen((open) => !open)} aria-label="Régler l’opacité des zones de visibilité" aria-expanded={isOpacityPanelOpen} title="Opacité des zones" active={isOpacityPanelOpen}><SlidersHorizontal size={21} strokeWidth={2.3} aria-hidden="true" /></MapControlButton></div>;
   const mapContent = (suffix: string, height: string, isExpanded = false) => (
-    <MapView key={`${selectedLayer.eventId}-${suffix}`} className={isExpanded ? "eclipse-map-viewport" : height} initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={3} mapTypeId={isExpanded ? expandedMapType : "terrain"} mapTypeControl={false} fullscreenControl={false} zoomControl={false} streetViewControl={isExpanded} rotateControl={isExpanded} allowPageScroll={!isExpanded} onMapReady={(map) => onMapReady(map, isExpanded)}>
+    <MapView key={`${selectedLayer.eventId}-${suffix}`} className={isExpanded ? "eclipse-map-viewport" : height} initialCenter={{ lat: center.lat, lng: center.lon }} initialZoom={isExpanded ? ECLIPSE_IMMERSIVE_WORLD_ZOOM : 5} interactive={isExpanded} enableRotation={isExpanded} allowPageScroll={!isExpanded} onMapReady={(map) => onMapReady(map, isExpanded)}>
       {!isExpanded && <div className="absolute right-3 top-3 z-20 flex flex-col gap-2" data-swipe-exclude><MapControlButton shape="square" onClick={openExpandedMap} disabled={isMapOpening} aria-label={isMapOpening ? "Ouverture de la carte" : "Agrandir la carte"} title={isMapOpening ? "Ouverture de la carte…" : "Agrandir la carte"} aria-busy={isMapOpening} className="h-11 w-11"><Maximize2 size={21} strokeWidth={2.35} aria-hidden="true" /></MapControlButton><MapControlButton onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Me localiser"} title={isLocating ? "Localisation en cours" : "Me localiser"} aria-busy={isLocating} className="h-11 w-11 text-sky-200"><LocateFixed size={21} strokeWidth={2.25} aria-hidden="true" /></MapControlButton></div>}
       {!isExpanded && <div className="absolute bottom-3 right-3 z-20" data-swipe-exclude><MapZoomControl onZoomIn={() => { const map = compactMapRef.current; if (map) map.setZoom(Math.min(20, (map.getZoom() ?? 3) + 1)); }} onZoomOut={() => { const map = compactMapRef.current; if (map) map.setZoom(Math.max(2, (map.getZoom() ?? 3) - 1)); }} /></div>}
       {isExpanded && opacityControl}
       {isExpanded && selectedLayer.type !== "meteor" && <div className="map-control-cluster absolute left-3 top-3 z-20" data-swipe-exclude><MapControlButton onClick={() => { if (isDeviceCompassActive) setIsCompassDetailsOpen(true); else void enableDeviceCompass(); }} aria-label={compassButtonAriaLabel} aria-haspopup={isDeviceCompassActive ? "dialog" : undefined} aria-expanded={isDeviceCompassActive ? isCompassDetailsOpen : undefined} title={isMoonAligned ? "Lune dans l’axe de visée" : isDeviceCompassActive ? "Boussole orientée par le téléphone" : "Touchez pour orienter la boussole"} shape="circle" active={isDeviceCompassActive} className={compassButtonClassName} data-moon-aligned={isMoonAligned ? "true" : "false"}><span className="eclipse-compass-ring absolute inset-[6px] rounded-full" aria-hidden="true" /><span className="eclipse-compass-orbit absolute inset-[14px] rounded-full" aria-hidden="true" />{isMoonGuidanceActive && <span className="eclipse-moon-alignment-ring absolute left-1/2 top-1/2" aria-hidden="true" style={moonAlignmentStyle} />}{[0, 90, 180, 270].map((angle) => <span key={`cardinal-arrow-${angle}`} className="eclipse-compass-cardinal-arrow absolute left-1/2 top-1/2" aria-hidden="true" style={{ transform: `translate(-50%, -50%) rotate(${angle - compassHeading}deg) translateY(-56px)` }} />)}{COMPASS_ROSE_POINTS.map((point) => { const isAstroDirection = highlightedCompassPoint?.label === point.label; return <span key={point.label} aria-hidden="true" className={`eclipse-compass-label ${point.cardinal ? "eclipse-compass-label--cardinal" : "eclipse-compass-label--intercardinal"} absolute left-1/2 top-1/2 leading-none ${isAstroDirection ? "rounded-full bg-amber-300 px-1 font-black text-amber-950 shadow-sm" : ""} ${point.label === "N" && !isAstroDirection ? "text-rose-300" : ""}`} style={{ transform: `translate(-50%, -50%) rotate(${point.angle - compassHeading}deg) translateY(-50px) rotate(${compassHeading - point.angle}deg)` }}>{point.label}</span>; })}{astronomicalAzimuth != null && <svg className="eclipse-astro-guidance-arrow absolute inset-[6px]" viewBox="0 0 100 100" aria-hidden="true" style={{ transform: `rotate(${displayedArrowRotation}deg)` }}><defs><linearGradient id={`eclipse-guidance-${suffix}`} x1="50" y1="62" x2="50" y2="10" gradientUnits="userSpaceOnUse"><stop stopColor="#1d4ed8" stopOpacity="0.22" /><stop offset="0.6" stopColor="#38bdf8" /><stop offset="1" stopColor="#dbeafe" /></linearGradient></defs><path className="eclipse-astro-guidance-arrow__beam" d="M50 63V28" stroke={`url(#eclipse-guidance-${suffix})`} /><path className="eclipse-astro-guidance-arrow__head" d="M50 9 L62 34 L50 29 L38 34 Z" fill={`url(#eclipse-guidance-${suffix})`} /><circle className="eclipse-astro-guidance-arrow__core" cx="50" cy="62" r="4.3" /></svg>}<span className="eclipse-compass-center-pulse absolute left-1/2 top-1/2" aria-hidden="true" /><span className="eclipse-compass-center absolute left-1/2 top-1/2 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full" aria-hidden="true"><Compass size={20} strokeWidth={2.3} style={{ transform: `rotate(${-compassHeading}deg)` }} /></span>{isMoonAligned && <span className="eclipse-moon-alignment-label absolute left-1/2 top-1/2" aria-hidden="true">Lune alignée</span>}<span className="eclipse-astro-bearing absolute -bottom-4" aria-hidden="true"><small>{astronomicalBodyLabel}</small><strong>{astronomicalAzimuth == null ? "Az. —" : `${astronomicalAzimuth}° ${astronomicalDirection ?? ""}`}</strong></span></MapControlButton></div>}
       {isExpanded && selectedLayer.type !== "meteor" && <div className="map-compass-status absolute left-3 top-[208px] z-20 w-[188px]" data-swipe-exclude><div className="w-full rounded-xl border border-slate-500/60 bg-[#111c2b]/95 px-2.5 py-2 text-left text-[10px] font-semibold leading-snug text-slate-100 shadow-lg"><p>{orientationStatus === "denied" ? "Capteur refusé" : orientationStatus === "unsupported" ? "Capteur indisponible" : orientationStatus === "waiting" ? "Bougez le téléphone" : orientationStatus === "no-data" ? "Aucun cap reçu" : isDeviceCompassActive ? `Cap ${Math.round(compassHeading)}°${headingSource === "relative" ? isRelativeHeadingCalibrated ? " calibré" : " relatif" : ""}` : "Touchez la rose des vents"}</p>{!isDeviceCompassActive && orientationStatus !== "waiting" && orientationStatus !== "unsupported" && <p className="mt-1 border-t border-slate-600/70 pt-1.5 text-[9px] font-medium text-sky-100">Autorisez Mouvement et orientation dans les réglages du navigateur.</p>}</div></div>}
       {isExpanded && selectedLayer.type === "lunar" && <aside className="lunar-live-panel absolute right-3 z-20" style={{ bottom: observationNotice ? "4.7rem" : "0.75rem" }} aria-label="Informations lunaires actuelles" data-swipe-exclude><div className="lunar-live-panel__glow" aria-hidden="true" /><div className="lunar-live-panel__content"><div className="flex items-start justify-between gap-3"><div><p className="lunar-live-panel__eyebrow">Lune actuelle</p><p className="lunar-live-panel__phase"><span aria-hidden="true">{moonObservation?.lunar?.symbol ?? astronomy.moon.symbol}</span>{moonObservation?.lunar?.label ?? astronomy.moon.label}</p></div><span className="lunar-live-panel__illumination">{moonObservation?.lunar?.illuminationPct ?? astronomy.moonIllumination ?? "—"}%</span></div><div className="lunar-live-panel__metric"><span>Distance Terre–Lune</span><strong>{formatLunarDistance(moonObservation?.moon.distanceKm)}</strong></div><p className="lunar-live-panel__updated">Calcul réel · {formatAstronomyTime(moonObservation?.calculatedAt)}</p></div></aside>}
-      {isExpanded && <div className="absolute left-[calc(50%+39px)] top-3 z-20 -translate-x-1/2" data-swipe-exclude><MapTypeToggle value={expandedMapType} onChange={(value) => { setExpandedMapType(value); expandedMapRef.current?.setMapTypeId(value); }} /></div>}
       {isExpanded && <MapControlButton onClick={closeExpandedMap} aria-label="Fermer la carte agrandie" title="Fermer la carte" className="absolute right-3 top-3 z-20"><X aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} /></MapControlButton>}
-      {isExpanded && <div className="absolute right-3 top-[calc(28%+2.5rem)] z-20 flex flex-col items-center gap-4" data-swipe-exclude><MapControlButton onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Centrer la carte sur ma position"} title={isLocating ? "Localisation en cours…" : "Centrer sur ma position"} aria-busy={isLocating} className="text-sky-200"><LocateFixed aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} /></MapControlButton><MapZoomControl onZoomIn={() => adjustExpandedZoom(1)} onZoomOut={() => adjustExpandedZoom(-1)} /></div>}
+      {isExpanded && <div className="absolute right-3 top-[calc(28%+2.5rem)] z-20 flex flex-col items-center gap-4" data-swipe-exclude><MapControlButton onClick={locateMe} disabled={isLocating} aria-label={isLocating ? "Localisation en cours" : "Centrer la carte sur ma position"} title={isLocating ? "Localisation en cours…" : "Centrer sur ma position"} aria-busy={isLocating} className="text-sky-200"><LocateFixed aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} /></MapControlButton>{Math.abs(expandedHeading) > 0.5 && <MapControlButton onClick={resetExpandedMapBearing} aria-label="Réorienter la carte vers le nord" title="Réorienter la carte vers le nord" className="text-sky-200"><Compass aria-hidden="true" className="h-6 w-6" style={{ transform: `rotate(${expandedHeading}deg)` }} /></MapControlButton>}<MapZoomControl onZoomIn={() => adjustExpandedZoom(1)} onZoomOut={() => adjustExpandedZoom(-1)} /></div>}
       {observationNotice && <div className="map-observability-notice absolute inset-x-3 bottom-3 z-20 flex items-start gap-2 rounded-xl border border-emerald-200/80 bg-emerald-950/95 px-3 py-2 text-emerald-50 shadow-lg" role="alert"><Navigation size={16} className="mt-0.5 shrink-0 text-emerald-300" aria-hidden="true" /><p className="text-[10px] font-semibold leading-snug">{observationNotice}<span className="mt-0.5 block text-[9px] font-normal text-emerald-100/80">Calcul astronomique : vérifiez l’horizon, les nuages et, pour le Soleil, utilisez une protection adaptée.</span></p></div>}
     </MapView>
   );
