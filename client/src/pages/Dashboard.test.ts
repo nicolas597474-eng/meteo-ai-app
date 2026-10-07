@@ -163,6 +163,12 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("dashboard-sky-card");
     expect(source).toContain('<div className="dashboard-sky-card relative overflow-hidden');
     expect(source).toContain("dashboard-sky-image");
+    expect(source).toContain("<DashboardWeatherAtmosphere");
+    expect(source).toContain("condition={displayedCondition}");
+    expect(source).toContain("precipitation={currentPrecipitation");
+    expect(source).toContain("regime={regime?.label}");
+    expect(source).toContain("temperature={currentTemp}");
+    expect(source).toContain("visibilityKm={currentHour?.visibility}");
     expect(source).not.toContain("Voir les prévisions détaillées");
     expect(source).not.toContain('href="/details"');
     expect(source).toContain("dashboardSkyImage");
