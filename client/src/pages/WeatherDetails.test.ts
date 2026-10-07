@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 const pageSource = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url), "utf8");
 const timelineSource = readFileSync(new URL("../components/weather/ForecastByDaySection.tsx", import.meta.url), "utf8");
+const styleSource = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const selectedDetailsSource = readFileSync(new URL("../lib/hourlySelectedDetails.ts", import.meta.url), "utf8");
 const displayDaysSource = readFileSync(new URL("../lib/forecastDayDisplay.ts", import.meta.url), "utf8");
 const calculationTimesSource = readFileSync(new URL("../components/weather/OfficialForecastCalculationTimes.tsx", import.meta.url), "utf8");
@@ -55,7 +56,7 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("centerWithinHorizontalStrip");
     expect(timelineSource).toContain("aria-pressed={isSelected}");
     expect(timelineSource).toContain("aria-pressed={isHourSelected}");
-    expect(timelineSource).toContain("Aucune série horaire officielle disponible pour cette date");
+    expect(timelineSource).toContain("Aucune série horaire officielle n’est fournie pour cette date");
     expect(timelineSource).toContain("Extrêmes journaliers indisponibles");
   });
   it("n’affiche que les champs fournis, distingue les fréquences brutes et laisse l’AQI indisponible", () => {
@@ -121,5 +122,14 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("openWeatherShadow.data.unsupportedFields.map");
     expect(pageSource).toContain("aucun changement des prévisions officielles");
     expect(pageSource).toContain("jamais un modèle ni un vote");
+  });
+  it("rend visibles la fraîcheur, l’origine, la sélection et les états accessibles", () => {
+    expect(timelineSource).toContain('aria-label="Prévision, source et fraîcheur"');
+    expect(timelineSource).toContain("selectedValidAt={category.validAt}");
+    expect(timelineSource).toContain("getCategoryPalette(category.key)");
+    expect(pageSource).toContain('aria-label="Chargement des prévisions"');
+    expect(timelineSource).toContain("Aucune prévision disponible");
+    expect(styleSource).toContain("forecast-selected-summary-enter 180ms");
+    expect(styleSource).toContain("@media (prefers-reduced-motion: reduce)");
   });
 });
