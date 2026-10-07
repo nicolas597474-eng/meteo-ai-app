@@ -4,6 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 
+vi.mock("leaflet", () => ({ default: {} }));
+vi.mock("@tomickigrzegorz/leaflet-rotate", () => ({}));
+
 vi.mock("@/lib/trpc", () => {
   const useQuery = () => ({ data: undefined, error: null, isFetching: false, isLoading: false });
   const weather = new Proxy({}, { get: () => ({ useQuery }) });

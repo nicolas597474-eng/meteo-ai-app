@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import L from "leaflet";
 import { LocateFixed, Maximize2, Undo2, X } from "lucide-react";
-import { MapControlButton, MapTypeToggle, MapZoomControl, mapActionButtonClass } from "@/components/MapControls";
+import { MapControlButton, MapZoomControl, mapActionButtonClass } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
 
 type StationMarker = {
@@ -60,47 +61,33 @@ export function StationMap({
   center: { lat: number; lon: number };
   stations: StationMarker[];
 }) {
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
-  const streetViewRef = useRef<google.maps.StreetViewPanorama | null>(null);
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerLayerRef = useRef<L.LayerGroup | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFocusedOnLocation, setIsFocusedOnLocation] = useState(false);
   const normalZoom = stations.length > 0 ? 11 : 10;
   const [zoomLevel, setZoomLevel] = useState(normalZoom);
-  const [mapType, setMapType] = useState<"satellite" | "roadmap">("satellite");
 
   const focusCurrentLocation = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.panTo({ lat: center.lat, lng: center.lon });
-    map.setZoom(14);
+    map.setView([center.lat, center.lon], 14);
     setIsFocusedOnLocation(true);
   }, [center.lat, center.lon]);
 
-const restoreNormalView = useCallback(() => {
-  const map = mapRef.current;
-  if (!map) return;
-  streetViewRef.current?.setVisible(false);
-  map.panTo({ lat: center.lat, lng: center.lon });
-  map.setZoom(normalZoom);
-  setIsFocusedOnLocation(false);
-}, [center.lat, center.lon, normalZoom]);
+  const restoreNormalView = useCallback(() => {
+    mapRef.current?.setView([center.lat, center.lon], normalZoom);
+    setIsFocusedOnLocation(false);
+  }, [center.lat, center.lon, normalZoom]);
 
   const adjustExpandedZoom = useCallback((delta: number) => {
     const map = mapRef.current;
     if (!map) return;
-    streetViewRef.current?.setVisible(false);
     const currentZoom = map.getZoom() ?? normalZoom;
     map.setZoom(Math.max(2, Math.min(20, currentZoom + delta)));
     setIsFocusedOnLocation(false);
   }, [normalZoom]);
-
-  const changeMapType = useCallback((nextType: "satellite" | "roadmap") => {
-    mapRef.current?.setMapTypeId(nextType);
-    setMapType(nextType);
-  }, []);
 
   const openImmersiveMap = useCallback(() => {
     setIsExpanded(true);
@@ -110,56 +97,40 @@ const restoreNormalView = useCallback(() => {
   }, []);
 
   const closeImmersiveMap = useCallback(() => {
-    streetViewRef.current?.setVisible(false);
     if (typeof document !== "undefined" && document.fullscreenElement) void document.exitFullscreen();
     setIsExpanded(false);
   }, []);
 
-const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title: string) => {
-    if (!mapRef.current) return;
-    const panorama = streetViewRef.current ?? mapRef.current.getStreetView();
-    streetViewRef.current = panorama;
-    panorama.setPosition(position);
-    panorama.setPov({ heading: 0, pitch: 0 });
-    panorama.setVisible(true);
-    window.setTimeout(() => panorama.setOptions({ addressControl: true, motionTracking: false }), 0);
-    mapRef.current.setCenter(position);
-    mapRef.current.setZoom(17);
-    document.querySelector<HTMLElement>("[aria-label='Vue réelle du lieu']")?.focus();
-    console.info(`[Stations] Vue réelle demandée pour ${title} (${position.lat.toFixed(5)}, ${position.lng.toFixed(5)})`);
-  }, []);
+  const renderMarkers = useCallback((map: L.Map) => {
+    const markerLayer = markerLayerRef.current ?? L.layerGroup().addTo(map);
+    markerLayerRef.current = markerLayer;
+    markerLayer.clearLayers();
 
-  const renderMarkers = useCallback((map: google.maps.Map) => {
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    markersRef.current = [];
-
-    const reference = new google.maps.Marker({
-      map,
-      position: { lat: center.lat, lng: center.lon },
-      title: "Lieu de référence",
-      label: { text: "●", color: "#60a5fa", fontSize: "28px" },
-      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#2563eb", fillOpacity: 1, strokeColor: "#dbeafe", strokeWeight: 2 },
-    });
-    markersRef.current.push(reference);
-    reference.addListener("click", () => showStreetViewAt({ lat: center.lat, lng: center.lon }, "Lieu de référence"));
+    L.circleMarker([center.lat, center.lon], {
+      color: "#dbeafe",
+      fillColor: "#2563eb",
+      fillOpacity: 1,
+      radius: 8,
+      weight: 2,
+    })
+      .bindPopup("Lieu de référence")
+      .bindTooltip("Lieu de référence")
+      .addTo(markerLayer);
 
     stations.forEach((station) => {
       const freshness = station.ageMinutes !== null && station.ageMinutes <= 90 ? "#34d399" : "#fbbf24";
-      const marker = new google.maps.Marker({
-        map,
-        position: { lat: station.lat, lng: station.lon },
-        title: `${station.name} · ${station.distanceKm.toFixed(1)} km`,
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: freshness, fillOpacity: 1, strokeColor: "#071018", strokeWeight: 2 },
-      });
-      marker.addListener("click", () => {
-        const infoWindow = infoWindowRef.current ?? new google.maps.InfoWindow();
-        infoWindowRef.current = infoWindow;
-        infoWindow.setContent(stationInfoHtml(station));
-        infoWindow.open({ map, anchor: marker, shouldFocus: false });
-      });
-      markersRef.current.push(marker);
+      L.circleMarker([station.lat, station.lon], {
+        color: "#071018",
+        fillColor: freshness,
+        fillOpacity: 1,
+        radius: 7,
+        weight: 2,
+      })
+        .bindPopup(stationInfoHtml(station), { maxWidth: 280, minWidth: 248 })
+        .bindTooltip(`${station.name} · ${station.distanceKm.toFixed(1)} km`)
+        .addTo(markerLayer);
     });
-  }, [center, showStreetViewAt, stations]);
+  }, [center.lat, center.lon, stations]);
 
   useEffect(() => {
     if (mapRef.current) renderMarkers(mapRef.current);
@@ -167,41 +138,19 @@ const showStreetViewAt = useCallback((position: google.maps.LatLngLiteral, title
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    map.setOptions({
-            mapTypeControl: false,
-      fullscreenControl: false,
-
-zoomControl: false,
-streetViewControl: isExpanded,
-      streetViewControlOptions: isExpanded ? { position: google.maps.ControlPosition.RIGHT_BOTTOM } : undefined,
-rotateControl: false,
-    });
-    window.setTimeout(() => google.maps.event.trigger(map, "resize"), 0);
-  }, [isExpanded]);
-
-  useEffect(() => {
-    const map = mapRef.current;
     if (!map || !mapReady) return;
     setZoomLevel(map.getZoom() ?? normalZoom);
-    const zoomListener = map.addListener("zoom_changed", () => setZoomLevel(map.getZoom() ?? normalZoom));
-    const typeListener = map.addListener("maptypeid_changed", () => {
-      const activeType = map.getMapTypeId();
-      if (activeType === "satellite" || activeType === "roadmap") setMapType(activeType);
-    });
+    const updateZoom = () => setZoomLevel(map.getZoom() ?? normalZoom);
+    map.on("zoomend", updateZoom);
     return () => {
-      zoomListener.remove();
-      typeListener.remove();
+      map.off("zoomend", updateZoom);
     };
   }, [mapReady, normalZoom]);
 
   useEffect(() => {
     if (!isExpanded) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        streetViewRef.current?.setVisible(false);
-        setIsExpanded(false);
-      }
+      if (event.key === "Escape") setIsExpanded(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
@@ -214,15 +163,9 @@ rotateControl: false,
           className="h-full w-full"
           initialCenter={{ lat: center.lat, lng: center.lon }}
           initialZoom={normalZoom}
-          mapTypeId={mapType}
-          mapTypeControl={false}
-          fullscreenControl={false}
-          zoomControl={false}
-          streetViewControl={false}
-          rotateControl={false}
           onMapReady={(map) => {
             mapRef.current = map;
-            streetViewRef.current = map.getStreetView();
+            markerLayerRef.current = L.layerGroup().addTo(map);
             renderMarkers(map);
             setMapReady(true);
           }}
@@ -230,17 +173,12 @@ rotateControl: false,
         {isExpanded && mapReady && (
           <>
             <MapControlButton
-              onClick={() => {
-                closeImmersiveMap();
-              }}
+              onClick={closeImmersiveMap}
               aria-label="Fermer la carte agrandie"
               className="absolute right-3 top-3 z-10"
             >
               <X aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />
             </MapControlButton>
-            <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
-              <MapTypeToggle value={mapType} onChange={changeMapType} />
-            </div>
             <div className="absolute right-3 top-[28%] z-10 flex flex-col items-center gap-4" aria-label="Commandes de la carte">
               <MapControlButton onClick={focusCurrentLocation} aria-label="Centrer la carte sur le lieu actif">
                 <LocateFixed aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
@@ -261,9 +199,6 @@ rotateControl: false,
       </div>
       {mapReady && !isExpanded && (
         <div className="mt-2 space-y-2">
-          <div className="flex justify-center">
-            <MapTypeToggle value={mapType} onChange={changeMapType} />
-          </div>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"

@@ -912,6 +912,11 @@
 }
 
 /* Position choisie par l’utilisateur sur la carte d’éclipse : point précis et onde discrète. */
+.leaflet-div-icon.eclipse-map-marker-icon {
+  border: 0;
+  background: transparent;
+}
+
 .eclipse-user-location-marker {
   position: relative;
   display: grid;
