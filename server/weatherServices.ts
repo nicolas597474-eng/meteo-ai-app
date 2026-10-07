@@ -24,6 +24,7 @@ import type { ModelCountCoverageLevel } from "../shared/modelCoverageConfidence"
 import { summarizeDailyModelAgreement, type DailyAgreementInput, type DailyModelAgreement } from "../shared/modelAgreement";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 import type { BestMatchDailyReference, DailyForecastMetric, DailyOfficialFusionDisplay } from "../shared/dailyForecast";
+import { isValidDailyWmoWeatherCode, summarizeDailyWeatherCodes, type DailyWeatherCodeCandidate, type DailyWeatherCodeSummary } from "../shared/dailyWeatherCode";
 import type { computeOfficialDailyForecastWithDiagnostics, ForecastTraceSource } from "./officialForecast";
 import {
   buildDailyModelCollectionCoverage,
@@ -369,6 +370,8 @@ export type DayForecast = {
   humidity: number | null;
   cloudCover: number | null;
   condition: string | null;
+  weatherCode?: number | null;
+  weatherCodeSummary?: DailyWeatherCodeSummary | null;
   modelAgreement: DailyModelAgreement;
   officialFusion: DailyOfficialFusionDisplay;
   bestMatchReference: BestMatchDailyReference | null;
@@ -553,6 +556,7 @@ export async function collect15DayForecast(
     "sunrise",
     "sunset",
   ])).join(",");
+  const officialDailyFields = Array.from(new Set([...dailyFields.split(","), "weather_code"])).join(",");
 
   const modelResults = await Promise.all(models.map(async (model) => {
     const requestStartedAt = Date.now();
@@ -561,21 +565,23 @@ export async function collect15DayForecast(
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
       url.searchParams.set("longitude", location.lon.toString());
-      url.searchParams.set("daily", dailyFields);
+      // Daily WMO codes are requested only for the seven official model runs; Best Match stays excluded.
+      url.searchParams.set("daily", model.modelId ? officialDailyFields : dailyFields);
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", "16");
       if (model.modelId) url.searchParams.set("models", model.modelId);
 
       const response = await fetchWeather(url.toString(), {}, { timeoutMs: 6_000, attempts: 1 });
-      if (!response.ok) return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt: null, runId, errorReason: `HTTP ${response.status}` };
+      const networkAttemptCount = getWeatherResponseAttemptCount(response);
+      if (!response.ok) return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt: null, networkAttemptCount, runId, errorReason: `HTTP ${response.status}` };
       const data = await response.json();
       const availableAt = Date.now();
       const daily = data.daily;
-      if (!Array.isArray(daily?.time)) return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt, runId, errorReason: "Réponse provider sans série daily.time." };
-      return { name: model.name, modelId: model.modelId, daily, requestStartedAt, availableAt, runId, errorReason: null };
+      if (!Array.isArray(daily?.time)) return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt, networkAttemptCount, runId, errorReason: "Réponse provider sans série daily.time." };
+      return { name: model.name, modelId: model.modelId, daily, requestStartedAt, availableAt, networkAttemptCount, runId, errorReason: null };
     } catch (error) {
       console.error(`[15Day] Error fetching ${model.name}:`, error);
-      return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt: null, runId, errorReason: error instanceof Error ? error.message : "Source indisponible." };
+      return { name: model.name, modelId: model.modelId, daily: null, requestStartedAt, availableAt: null, networkAttemptCount: null, runId, errorReason: error instanceof Error ? error.message : "Source indisponible." };
     }
   }));
   const collectionReferenceAt = Date.now();
@@ -603,6 +609,37 @@ export async function collect15DayForecast(
     const parsed = new Date(`${value}T12:00:00.000Z`);
     return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
   };
+  const weatherCodeCandidatesForDate = (date: string): DailyWeatherCodeCandidate[] => OFFICIAL_HOURLY_MODELS.map((model) => {
+    const result = resultByModelName.get(model.name);
+    const base = {
+      modelName: model.name,
+      modelId: model.modelId,
+      sourceName: result ? "open-meteo" : null,
+      runId: result?.runId ?? null,
+      runIdKind: result ? "capture" as const : null,
+      networkAttemptCount: result?.networkAttemptCount ?? null,
+      deliveryMode: result?.networkAttemptCount === 0 ? "cache" as const : result?.networkAttemptCount == null ? "unknown" as const : "network" as const,
+      requestStartedAt: result?.requestStartedAt ?? null,
+      availableAt: result?.availableAt ?? null,
+      validTime: null as number | null,
+      weatherCode: null as number | null,
+    };
+    if (!result?.daily || !Array.isArray(result.daily.time)) return { ...base, valueStatus: "request_failed" as const };
+    const dateIndexes = result.daily.time.flatMap((value: unknown, index: number) => value === date ? [index] : []);
+    if (dateIndexes.length === 0) return { ...base, valueStatus: "date_missing" as const };
+    if (dateIndexes.length !== 1) return { ...base, valueStatus: "duplicate_date" as const };
+    const index = dateIndexes[0]!;
+    const validTime = getDailyForecastValidTime(date);
+    const timeMatchedBase = { ...base, validTime };
+    const codes = result.daily.weather_code;
+    if (!Array.isArray(codes) || index >= codes.length || !Object.prototype.hasOwnProperty.call(codes, index)) {
+      return { ...timeMatchedBase, valueStatus: "field_missing" as const };
+    }
+    const rawCode = codes[index];
+    if (rawCode == null) return { ...timeMatchedBase, valueStatus: "provider_null" as const };
+    if (!isValidDailyWmoWeatherCode(rawCode)) return { ...timeMatchedBase, valueStatus: "invalid_value" as const };
+    return { ...timeMatchedBase, weatherCode: rawCode, valueStatus: "valid" as const };
+  });
 
   for (const result of modelResults) {
     if (!result?.daily) continue;
@@ -765,6 +802,13 @@ export async function collect15DayForecast(
         cloudCover: fusion.parameterDiagnostics.cloud_cover,
       },
     };
+    const dailyWeatherCodeSummary = summarizeDailyWeatherCodes({
+      validDate: date,
+      expectedValidTime: getDailyForecastValidTime(date) ?? Number.NaN,
+      computedAt: collectionReferenceAt,
+      expectedModels: OFFICIAL_HOURLY_MODELS.map(({ name, modelId }) => ({ modelName: name, modelId })),
+      candidates: weatherCodeCandidatesForDate(date),
+    });
     return {
       date,
       tempMax: fusion.tempMax,
@@ -777,7 +821,9 @@ export async function collect15DayForecast(
       windDirection: null,
       humidity: fusion.humidity,
       cloudCover: fusion.cloudCover,
-      condition: null,
+      condition: dailyWeatherCodeSummary.condition,
+      weatherCode: dailyWeatherCodeSummary.weatherCode,
+      weatherCodeSummary: dailyWeatherCodeSummary,
       modelAgreement,
       officialFusion,
       bestMatchReference: bestMatchByDate.get(date) ?? null,

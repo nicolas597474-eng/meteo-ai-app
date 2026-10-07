@@ -56,6 +56,7 @@ describe("forecast display days", () => {
       windGust: 31,
       humidity: 72,
       cloudCover: 48,
+      weatherCode: 53,
       sunrise: "07:42",
       sunset: "19:03",
     };
@@ -70,6 +71,9 @@ describe("forecast display days", () => {
     expect(result.hourlyGroup?.hours.map(({ hour }) => hour.temp)).toEqual([13.6, 14.1]);
     expect(getDailyExtremesDisplayLabel(result.daily)).toBe("Tmax 21,4 °C · Tmin 8,2 °C");
     expect(getDailyForecastDisplayMetrics(daily).find(({ key }) => key === "precipitation")).toMatchObject({ value: 2.3, unit: "mm" });
+    expect(getDailyForecastDisplayMetrics(daily).find(({ key }) => key === "weatherCode")).toMatchObject({ value: 53, unit: "WMO" });
+    expect(result.daily?.weatherCode).toBe(53);
+    expect(result.hourlyGroup?.hours[0]?.hour).not.toHaveProperty("weatherCode");
   });
 
   it("keeps daily metrics explicitly unavailable when only hourly data exists", () => {

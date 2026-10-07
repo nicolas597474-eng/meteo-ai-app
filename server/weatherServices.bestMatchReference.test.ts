@@ -300,4 +300,65 @@ describe("collect15DayForecast fusion officielle", () => {
     });
     expect(longRange!.bestMatchReference).toBeNull();
   });
+
+  it("collecte le code WMO au quotidien des seuls modèles officiels avec provenance et sans départager par Best Match", async () => {
+    const issuedAt = Date.parse("2026-10-03T08:00:00.000Z");
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(issuedAt + 60_000);
+    const codesByModel = [null, 53, 53, 53, 61, 61, null, 0];
+    let callIndex = 0;
+    const requestedDailyFields: Array<{ modelId: string | null; dailyFields: string[]; hasRequestUrl: boolean }> = [];
+    mockedFetchWeather.mockImplementation(async (input: RequestInfo | URL) => {
+      const index = callIndex++;
+      const requestUrl = input == null ? null : typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const url = requestUrl ? new URL(requestUrl, "https://api.open-meteo.com") : null;
+      const modelId = url?.searchParams.get("models") ?? null;
+      const dailyFields = url?.searchParams.get("daily")?.split(",") ?? [];
+      requestedDailyFields.push({ modelId, dailyFields, hasRequestUrl: requestUrl != null });
+      const code = codesByModel[index] ?? null;
+      return response({
+        daily: {
+          time: ["2026-10-03"],
+          temperature_2m_max: [20 + index], temperature_2m_min: [10 + index],
+          precipitation_sum: [0], wind_speed_10m_max: [8], wind_gusts_10m_max: [12],
+          weather_code: dailyFields.includes("weather_code") ? [code] : undefined,
+        },
+      });
+    });
+
+    const result = await collect15DayForecast(undefined, {
+      issuedAt,
+      resolveOfficialFusion: (targetDate, forecasts, collectionReferenceAt) => Promise.resolve(computeOfficialDailyForecastWithDiagnostics(forecasts, {
+        locationKey: "50.7567_2.5204",
+        targetDate,
+        issuedAt,
+        referenceAt: collectionReferenceAt,
+        evidenceStoreAvailable: false,
+        evidence: [],
+      })),
+    });
+    expect(requestedDailyFields).toHaveLength(8);
+    expect(requestedDailyFields.every(({ hasRequestUrl }) => hasRequestUrl)).toBe(true);
+    expect(requestedDailyFields.map(({ modelId }) => modelId)).toEqual([...OFFICIAL_HOURLY_MODELS.map(({ modelId }) => modelId), null]);
+    expect(requestedDailyFields.filter(({ modelId }) => modelId != null).every(({ dailyFields }) => dailyFields.includes("weather_code"))).toBe(true);
+    expect(requestedDailyFields.find(({ modelId }) => modelId == null)?.dailyFields).not.toContain("weather_code");
+    nowSpy.mockRestore();
+
+    const day = result.days[0]!;
+    expect(day).toMatchObject({ condition: "Bruine", weatherCode: 53 });
+    expect(day.weatherCodeSummary).toMatchObject({
+      validDate: "2026-10-03",
+      timeZone: "Europe/Paris",
+      expectedModelCount: 7,
+      validModelCount: 5,
+      supportingModelCount: 3,
+      selectionMethod: "unique_plurality",
+      calibrated: false,
+    });
+    expect(day.weatherCodeSummary!.modelCodes).toHaveLength(7);
+    expect(day.weatherCodeSummary!.modelCodes[0]).toMatchObject({
+      modelName: "AROME", valueStatus: "provider_null", sourceName: "open-meteo",
+      runIdKind: "capture", validTime: expect.any(Number), availableAt: expect.any(Number),
+    });
+    expect(day.weatherCodeSummary!.modelCodes.some((source) => source.modelName === "Open-Meteo")).toBe(false);
+  });
 });

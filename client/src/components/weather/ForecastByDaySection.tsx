@@ -345,6 +345,37 @@ function formatDailyMetricValue(metric: DailyForecastDisplayMetric): string {
 }
 
 function dailyMetricSourceDescription(day: DailyForecastPoint, metric: DailyForecastDisplayMetric): string {
+  if (metric.key === "condition" || metric.key === "weatherCode") {
+    const summary = day.weatherCodeSummary;
+    if (!summary) return "Aucune preuve quotidienne du code WMO n’est jointe à ce champ.";
+    if (metric.key === "condition") {
+      return summary.condition
+        ? `Libellé dérivé du code WMO quotidien ${summary.weatherCode}; détail des modèles et horodatages dans « Code météo WMO quotidien ». ${summary.reason}`
+        : summary.reason;
+    }
+    const statusLabels: Record<string, string> = {
+      valid: "code reçu",
+      provider_null: "valeur nulle fournisseur",
+      field_missing: "variable absente de la réponse",
+      invalid_value: "valeur invalide",
+      request_failed: "requête indisponible",
+      date_missing: "date absente de la réponse",
+      duplicate_date: "date dupliquée, valeur écartée",
+      time_mismatch: "validTime différent, valeur écartée",
+      duplicate_conflict: "doublon contradictoire, valeur écartée",
+    };
+    const modelDetails = summary.modelCodes.map((source) => {
+      const value = source.valueStatus === "valid" ? `WMO ${source.weatherCode}` : statusLabels[source.valueStatus] ?? source.valueStatus;
+      const receivedAt = source.availableAt == null ? "réception inconnue" : `reçu ${new Date(source.availableAt).toISOString()}`;
+      const requestedAt = source.requestStartedAt == null ? "requête inconnue" : `requête ${new Date(source.requestStartedAt).toISOString()}`;
+      const delivery = source.deliveryMode === "cache" ? "cache (0 tentative réseau)" : source.deliveryMode === "network" ? `réseau (${source.networkAttemptCount} tentative(s))` : "transport inconnu";
+      const sourceValidTime = source.validTime == null ? "validTime indisponible" : `validTime UTC ${new Date(source.validTime).toISOString()}`;
+      const run = source.runId ? ` · run ${source.runId}` : "";
+      return `${source.modelName} (${source.modelId}): ${value}, ${requestedAt}, ${receivedAt}, ${delivery}, ${sourceValidTime}${run}`;
+    }).join("; ");
+    const validTime = summary.validTime == null ? "validTime indisponible" : `validTime UTC ${new Date(summary.validTime).toISOString()}`;
+    return `Validité : ${summary.validDate} (${summary.timeZone}; ${validTime}); assemblé ${summary.computedAt}. ${summary.reason} Provenance par modèle : ${modelDetails}. Best Match est exclu; cette fréquence descriptive n’est pas calibrée. Les horodatages décrivent le service de la réponse (réseau/cache), pas l’heure du run amont.`;
+  }
   if (!day.officialFusion) return "Provenance par métrique non fournie.";
   if (!metric.sourceKey) return "Aucune provenance par métrique n’est fournie pour ce champ.";
   const sources = day.officialFusion.sourcesByVariable[metric.sourceKey] ?? [];
@@ -378,7 +409,7 @@ function DailyForecastMetricsPanel({ day, sourceLabels }: { day: DailyForecastPo
         {metrics.map((metric) => (
           <div key={metric.key} className="rounded-lg border border-sky-100/10 bg-black/15 p-2">
             <dt className="text-[10px] text-slate-400">{metric.label}</dt>
-            <dd className="mt-0.5 break-words text-xs font-semibold tabular-nums text-slate-100">{formatDailyMetricValue(metric)}</dd>
+            <dd className="mt-0.5 break-words text-xs font-semibold tabular-nums text-slate-100">{metric.key === "weatherCode" && metric.value == null ? day.weatherCodeSummary?.reason ?? formatDailyMetricValue(metric) : formatDailyMetricValue(metric)}</dd>
             <p className="mt-0.5 break-words text-[9px] leading-relaxed text-slate-500">{dailyMetricSourceDescription(day, metric)}</p>
           </div>
         ))}
@@ -386,7 +417,7 @@ function DailyForecastMetricsPanel({ day, sourceLabels }: { day: DailyForecastPo
       {consensus && hasConsensusCounts && (
         <p className="text-[10px] leading-relaxed text-slate-300">Pluie annoncée par {consensus.rainModelCount}/{consensus.availableModelCount} modèles au seuil {isFiniteValue(consensus.thresholdMm) ? `≥ ${formatOptionalForecastValue(consensus.thresholdMm, 1, " mm")}` : "indisponible"} · fréquence brute descriptive, jamais une probabilité calibrée.</p>
       )}
-      <p className="text-[10px] leading-relaxed text-slate-400">Non exposés dans le contrat quotidien actuel : pression, pluie/averses/neige séparées, probabilité de précipitations, couverture nuageuse par couche, durée d’ensoleillement, rayonnement et code météo quotidien. Le payload renvoie aussi sans valeur la direction du vent, la condition météo, l’indice UV et les ressentis quotidiens; ces champs restent indisponibles et ne sont pas reconstruits depuis l’horaire.</p>
+      <p className="text-[10px] leading-relaxed text-slate-400">Le code WMO présenté ici appartient uniquement au contrat quotidien : il reste inconnu en cas d’absence ou d’égalité, et n’est ni déduit des heures ni remplacé par Best Match. Cette correction n’ajoute aucun code au panneau de prévision horaire officielle. Restent non exposés au quotidien : pression, pluie/averses/neige séparées, probabilité de précipitations, couverture nuageuse par couche, durée d’ensoleillement et rayonnement. La direction du vent, l’indice UV et les ressentis quotidiens restent indisponibles.</p>
       {bestMatch && (
         <div className="rounded-lg border border-sky-100/10 bg-black/15 p-2 text-[10px] leading-relaxed text-slate-300">
           <p className="font-semibold text-sky-100">{bestMatch.source} · référence dérivée distincte, non contributrice officielle</p>

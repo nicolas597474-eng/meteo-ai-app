@@ -8,6 +8,7 @@ import type {
   BestMatchDailyReference,
   DailyOfficialFusionDisplay,
 } from "@shared/dailyForecast";
+import type { DailyWeatherCodeSummary } from "@shared/dailyWeatherCode";
 
 export const OFFICIAL_FORECAST_TIME_ZONE = "Europe/Paris";
 
@@ -27,6 +28,8 @@ export type DailyForecastPoint = {
   humidity?: number | null;
   cloudCover?: number | null;
   condition?: string | null;
+  weatherCode?: number | null;
+  weatherCodeSummary?: DailyWeatherCodeSummary | null;
   uvIndex?: number | null;
   feelsLikeMax?: number | null;
   feelsLikeMin?: number | null;
@@ -129,6 +132,7 @@ export function getDailyForecastDisplayMetrics(
     { key: "humidity", label: "Humidité moyenne quotidienne", value: day.humidity, unit: "%", precision: 0, sourceKey: "humidity" },
     { key: "cloudCover", label: "Nébulosité moyenne quotidienne", value: day.cloudCover, unit: "%", precision: 0, sourceKey: "cloudCover" },
     { key: "condition", label: "Condition quotidienne", value: day.condition, unit: "", precision: 0 },
+    { key: "weatherCode", label: "Code météo WMO quotidien", value: day.weatherCode, unit: "WMO", precision: 0 },
     { key: "uvIndex", label: "Indice UV quotidien", value: day.uvIndex, unit: "indice", precision: 1 },
     { key: "feelsLikeMax", label: "Température ressentie · maximum", value: day.feelsLikeMax, unit: "°C", precision: 1 },
     { key: "feelsLikeMin", label: "Température ressentie · minimum", value: day.feelsLikeMin, unit: "°C", precision: 1 },
