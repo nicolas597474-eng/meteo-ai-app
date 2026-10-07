@@ -1,4 +1,8 @@
 import { formatOptionalForecastValue } from "./forecastTimeline";
+import type {
+  HourlyFallbackProvenance,
+  OpenWeatherFallbackField,
+} from "@shared/hourlyFallbackProvenance";
 
 export type HourlySelectedForecast = {
   validAt?: number | null;
@@ -21,6 +25,7 @@ export type HourlySelectedForecast = {
   weatherCode?: number | null;
   precipType?: string | null;
   precipIntensity?: string | null;
+  fallbackProvenance?: HourlyFallbackProvenance;
   multiModelMetrics?: {
     source?: string | null;
     bestMatchIncluded?: boolean | null;
@@ -104,6 +109,36 @@ function precipitationIntensityLabel(value: string | null | undefined): string {
   return labels[value.toLowerCase()] ?? value;
 }
 
+function fallbackSourceNote(
+  provenance: HourlyFallbackProvenance | undefined,
+  fields: readonly OpenWeatherFallbackField[]
+): string | undefined {
+  const sources = fields.flatMap(field =>
+    provenance?.[field] ? [provenance[field]!] : []
+  );
+  const uniqueSources = Array.from(
+    new Map(
+      sources.map(source => [
+        `${source.provider}|${source.retrievedAt}|${source.validAt}`,
+        source,
+      ])
+    ).values()
+  );
+  if (uniqueSources.length === 0) return undefined;
+  return uniqueSources
+    .map(source => {
+      const retrieved = Number.isFinite(Date.parse(source.retrievedAt))
+        ? new Intl.DateTimeFormat("fr-FR", {
+            dateStyle: "short",
+            timeStyle: "short",
+            timeZone: "Europe/Paris",
+          }).format(new Date(source.retrievedAt))
+        : "heure de réception indisponible";
+      return `${source.provider} · ${source.product} · réponse obtenue par l’application ${retrieved} (Europe/Paris) · validTime UTC ${new Date(source.validAt).toISOString()} · run fournisseur non communiqué, fraîcheur amont inconnue.`;
+    })
+    .join(" ");
+}
+
 /** Build every field shown in the selected-hour panel from one exact official point. */
 export function buildHourlySelectedDetails(
   hour: HourlySelectedForecast,
@@ -164,19 +199,25 @@ export function buildHourlySelectedDetails(
       "wind",
       "Vent",
       "wind_param",
-      `Vent ${formatWithUnit(hour.windSpeed, 0, " km/h")} · direction ${direction} · rafales ${formatWithUnit(hour.windGust, 0, " km/h")}`
+      `Vent ${formatWithUnit(hour.windSpeed, 0, " km/h")} · direction ${direction} · rafales ${formatWithUnit(hour.windGust, 0, " km/h")}`,
+      fallbackSourceNote(hour.fallbackProvenance, [
+        "windSpeed",
+        "windDirection",
+      ])
     ),
     make(
       "humidity",
       "Humidité et rosée",
       "humidity",
-      `Humidité ${formatWithUnit(hour.humidity, 0, " %")} · point de rosée ${formatWithUnit(hour.dewPoint, 1, " °C")}`
+      `Humidité ${formatWithUnit(hour.humidity, 0, " %")} · point de rosée ${formatWithUnit(hour.dewPoint, 1, " °C")}`,
+      fallbackSourceNote(hour.fallbackProvenance, ["humidity"])
     ),
     make(
       "clouds",
       "Nuages",
       "cloud_cover",
-      `Total ${formatWithUnit(hour.cloudCover, 0, " %")} · basses ${formatWithUnit(hour.cloudLow, 0, " %")} · moyennes ${formatWithUnit(hour.cloudMid, 0, " %")} · hautes ${formatWithUnit(hour.cloudHigh, 0, " %")}`
+      `Total ${formatWithUnit(hour.cloudCover, 0, " %")} · basses ${formatWithUnit(hour.cloudLow, 0, " %")} · moyennes ${formatWithUnit(hour.cloudMid, 0, " %")} · hautes ${formatWithUnit(hour.cloudHigh, 0, " %")}`,
+      fallbackSourceNote(hour.fallbackProvenance, ["cloudCover"])
     ),
     make(
       "pressure",

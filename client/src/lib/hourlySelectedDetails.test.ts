@@ -162,4 +162,40 @@ describe("détails météo de l’échéance horaire sélectionnée", () => {
       "— °C · 02:00 · UTC+01"
     );
   });
+
+  it("affiche la provenance et la fraîcheur inconnue du champ horaire complété", () => {
+    const validAt = Date.parse("2026-10-06T12:00:00.000Z");
+    const details = buildHourlySelectedDetails(
+      {
+        validAt,
+        humidity: 55,
+        fallbackProvenance: {
+          humidity: {
+            provider: "OpenWeatherMap",
+            endpoint: "https://api.openweathermap.org/data/2.5/forecast",
+            product: "Forecast 5 jours / 3 heures",
+            validAt,
+            retrievedAt: "2026-10-06T12:05:00.000Z",
+            providerRunAt: null,
+            upstreamFreshness: "unknown",
+          },
+        },
+      },
+      "14:00"
+    );
+
+    expect(details.find(({ key }) => key === "humidity")?.value).toContain(
+      "Humidité 55 %"
+    );
+    expect(details.find(({ key }) => key === "humidity")?.note).toContain(
+      "OpenWeatherMap"
+    );
+    expect(details.find(({ key }) => key === "humidity")?.note).toContain(
+      "validTime UTC 2026-10-06T12:00:00.000Z"
+    );
+    expect(details.find(({ key }) => key === "humidity")?.note).toContain(
+      "fraîcheur amont inconnue"
+    );
+    expect(details.find(({ key }) => key === "wind")?.note).toBeUndefined();
+  });
 });
