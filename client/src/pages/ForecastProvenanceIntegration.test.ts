@@ -25,14 +25,25 @@ describe("provenance unifiée des pages météo", () => {
   it("alimente Dashboard et détails avec le même snapshot et la même pondération horaire", () => {
     const dashboard = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
     const details = readFileSync(new URL("./WeatherDetails.tsx", import.meta.url), "utf8");
+    const sharedHook = readFileSync(new URL("../hooks/useOfficialForecast.ts", import.meta.url), "utf8");
     const router = readFileSync(new URL("../../../server/routers/weather.ts", import.meta.url), "utf8");
 
-    expect(dashboard).toContain("trpc.weather.getDetailedForecast.useQuery");
-    expect(details).toContain("trpc.weather.getDetailedForecast.useQuery");
+    expect(dashboard).toContain("useOfficialForecast(selectedLocation)");
+    expect(details).toContain("useOfficialForecast(activeLocation)");
+    expect(sharedHook).toContain("trpc.weather.getDetailedForecast.useQuery(queryInput");
+    expect(sharedHook).toContain("OFFICIAL_FORECAST_REFETCH_INTERVAL_MS");
+    expect(details).toContain("getForecastProvenance.useQuery(coordinates");
+    expect(dashboard).toContain("getActiveOfficialForecastHour(hours, forecastNowMs)");
+    expect(details).toContain("getActiveOfficialForecastHour(data.hours, Date.now())");
+    expect(dashboard).toContain("activeHourIndex={currentHourIndex}");
     expect(dashboard).toContain("officialSnapshot?.hourlyWeighting");
     expect(details).toContain("officialSnapshot?.hourlyWeighting");
     expect(router).toContain("hours: snapshot.hourly");
     expect(router).toContain("hourlyWeighting: snapshot.hourlyWeighting");
+    expect(dashboard).toContain("hourlyComputedAt={officialForecast?.officialSnapshot?.hourlyComputedAt}");
+    expect(dashboard).toContain("computedAt={officialForecast?.officialSnapshot?.computedAt}");
+    expect(details).toContain("hourlyComputedAt: data.officialSnapshot?.hourlyComputedAt");
+    expect(details).toContain("computedAt: data.officialSnapshot?.computedAt");
   });
 
   it("retire les deux panneaux des pages volontairement simplifiées", () => {
