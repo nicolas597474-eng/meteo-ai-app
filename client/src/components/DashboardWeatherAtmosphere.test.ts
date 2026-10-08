@@ -13,9 +13,35 @@ describe("DashboardWeatherAtmosphere", () => {
     expect(markup).toContain('data-weather-intensity="heavy"');
     expect(markup).toContain("dashboard-weather-atmosphere__rain-drop--far");
     expect(markup).toContain("dashboard-weather-atmosphere__rain-drop--near");
-    expect(markup).toContain("dashboard-weather-atmosphere__water-bead");
+    expect(markup).not.toContain("dashboard-weather-atmosphere__water-bead");
     expect(markup).toContain("dashboard-weather-atmosphere__wet-sheen");
     expect(markup).toContain('aria-hidden="true"');
+  });
+
+  it("réduit la densité des gouttes et permet de désactiver complètement l’atmosphère", () => {
+    const reduced = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, {
+        condition: "Pluie forte",
+        effectsMode: "reduced",
+      })
+    );
+    const disabled = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, {
+        condition: "Pluie forte",
+        effectsMode: "off",
+      })
+    );
+    const reducedSnow = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, {
+        condition: "Neige",
+        effectsMode: "reduced",
+      })
+    );
+
+    expect(reduced).toContain('data-effects-mode="reduced"');
+    expect(reduced.match(/dashboard-weather-atmosphere__rain-drop--/g)).toHaveLength(10);
+    expect(reducedSnow.match(/dashboard-weather-atmosphere__snowflake/g)).toHaveLength(7);
+    expect(disabled).toBe("");
   });
 
   it("rend les nuages, le soleil et le soleil froid avec des lumières distinctes", () => {

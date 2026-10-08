@@ -164,6 +164,9 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('<div className="dashboard-sky-card relative overflow-hidden');
     expect(source).toContain("dashboard-sky-image");
     expect(source).toContain("<DashboardWeatherAtmosphere");
+    expect(source).toContain("effectsMode={weatherEffectsMode}");
+    expect(source).toContain("storeDashboardWeatherEffectsMode(nextWeatherEffectsMode)");
+    expect(source).toContain("Effets 3D · {getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}");
     expect(source).toContain("condition={displayedCondition}");
     expect(source).toContain("precipitation={currentPrecipitation");
     expect(source).toContain("regime={regime?.label}");

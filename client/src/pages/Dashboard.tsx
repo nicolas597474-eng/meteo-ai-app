@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, LogIn, X } from "lucide-react";
+import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, LogIn, Sparkles, X } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
@@ -10,6 +10,13 @@ import { formatDashboardCompactDate } from "@/lib/dashboardDate";
 import { AlertBadge, isDangerousRegime } from "@/components/AlertBadge";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { DashboardWeatherAtmosphere } from "@/components/DashboardWeatherAtmosphere";
+import {
+  getDashboardWeatherEffectsMode,
+  getDashboardWeatherEffectsModeLabel,
+  getNextDashboardWeatherEffectsMode,
+  storeDashboardWeatherEffectsMode,
+  type DashboardWeatherEffectsMode,
+} from "@/lib/dashboardWeatherEffects";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { LocalModelContributionNotice } from "@/components/LocalModelContributionNotice";
@@ -295,6 +302,8 @@ export default function Dashboard() {
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
+  const [weatherEffectsMode, setWeatherEffectsMode] = useState<DashboardWeatherEffectsMode>(getDashboardWeatherEffectsMode);
+  const nextWeatherEffectsMode = getNextDashboardWeatherEffectsMode(weatherEffectsMode);
   const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
   const [showRegimeMenu, setShowRegimeMenu] = useState(false);
   const [expandedRegimeIds, setExpandedRegimeIds] = useState<string[]>([]);
@@ -710,7 +719,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-weather-page min-h-dvh w-full overflow-x-clip bg-background" style={dashboardSkyStyle}>
-      <DashboardWeatherAtmosphere condition={displayedCondition} regime={regime?.label} temperature={currentTemp} visibilityKm={currentHour?.visibility} precipitation={currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : null)} cloudCover={currentCloudCover} windSpeed={windSpeed} />
+      <DashboardWeatherAtmosphere condition={displayedCondition} regime={regime?.label} temperature={currentTemp} visibilityKm={currentHour?.visibility} precipitation={currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : null)} cloudCover={currentCloudCover} windSpeed={windSpeed} effectsMode={weatherEffectsMode} />
       <div className="mx-auto w-full min-w-0 max-w-none space-y-2 px-1 pb-3 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:space-y-6 sm:px-6 sm:py-8">
 
         {!authLoading && !user && (
@@ -727,6 +736,22 @@ export default function Dashboard() {
         )}
 
         {/* ── Favorites Bar ── */}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              storeDashboardWeatherEffectsMode(nextWeatherEffectsMode);
+              setWeatherEffectsMode(nextWeatherEffectsMode);
+            }}
+            aria-label={`Mode actuel des animations météo 3D : ${getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}. Un clic passe au niveau suivant.`}
+            aria-pressed={weatherEffectsMode !== "off"}
+            title="Basculer entre effets 3D complets, réduits et désactivés"
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${weatherEffectsMode === "off" ? "border-slate-600 bg-slate-900/70 text-slate-300" : weatherEffectsMode === "reduced" ? "border-amber-300/30 bg-amber-300/10 text-amber-100" : "border-sky-300/30 bg-sky-300/10 text-sky-100"}`}
+          >
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Effets 3D · {getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}</span>
+          </button>
+        </div>
         <FavoritesBar
           activeLocation={activeLocation}
           onLocationChange={handleLocationChange}

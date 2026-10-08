@@ -4,39 +4,29 @@ import {
   getDashboardWeatherAtmosphere,
   type DashboardWeatherAtmosphereInput,
 } from "@/lib/dashboardWeatherAtmosphere";
+import type { DashboardWeatherEffectsMode } from "@/lib/dashboardWeatherEffects";
 
 const RAIN_DROPS = [
-  { left: 3, delay: -1.3, duration: 1.8, length: 17, depth: "far" },
-  { left: 8, delay: -0.4, duration: 2.2, length: 24, depth: "mid" },
-  { left: 14, delay: -1.9, duration: 1.6, length: 31, depth: "near" },
-  { left: 19, delay: -0.9, duration: 2.4, length: 18, depth: "far" },
-  { left: 24, delay: -1.6, duration: 1.9, length: 27, depth: "mid" },
-  { left: 30, delay: -0.2, duration: 2.1, length: 34, depth: "near" },
-  { left: 36, delay: -1.1, duration: 1.7, length: 20, depth: "far" },
-  { left: 42, delay: -2.2, duration: 2.5, length: 29, depth: "mid" },
-  { left: 47, delay: -0.7, duration: 1.8, length: 35, depth: "near" },
-  { left: 53, delay: -1.7, duration: 2.3, length: 16, depth: "far" },
-  { left: 58, delay: -0.1, duration: 1.6, length: 26, depth: "mid" },
-  { left: 64, delay: -1.4, duration: 2.4, length: 33, depth: "near" },
-  { left: 70, delay: -0.8, duration: 1.9, length: 19, depth: "far" },
-  { left: 76, delay: -2.1, duration: 2.2, length: 30, depth: "mid" },
-  { left: 81, delay: -0.5, duration: 1.7, length: 36, depth: "near" },
-  { left: 87, delay: -1.8, duration: 2.5, length: 18, depth: "far" },
-  { left: 92, delay: -0.3, duration: 2.1, length: 28, depth: "mid" },
-  { left: 97, delay: -1.2, duration: 1.8, length: 32, depth: "near" },
-  { left: 11, delay: -2.4, duration: 2.3, length: 23, depth: "mid" },
-  { left: 67, delay: -0.6, duration: 1.6, length: 34, depth: "near" },
-] as const;
-
-const WATER_BEADS = [
-  { left: 8, top: 16, size: 12 },
-  { left: 21, top: 61, size: 9 },
-  { left: 37, top: 31, size: 15 },
-  { left: 53, top: 77, size: 11 },
-  { left: 68, top: 24, size: 10 },
-  { left: 79, top: 53, size: 16 },
-  { left: 91, top: 36, size: 9 },
-  { left: 44, top: 88, size: 13 },
+  { left: 3, delay: -1.3, duration: 1.8, length: 17, depth: "far", drift: "-1.2vw" },
+  { left: 8, delay: -0.4, duration: 2.2, length: 24, depth: "mid", drift: "1.4vw" },
+  { left: 14, delay: -1.9, duration: 1.6, length: 31, depth: "near", drift: "2.6vw" },
+  { left: 19, delay: -0.9, duration: 2.4, length: 18, depth: "far", drift: "-0.7vw" },
+  { left: 24, delay: -1.6, duration: 1.9, length: 27, depth: "mid", drift: "1.8vw" },
+  { left: 30, delay: -0.2, duration: 2.1, length: 34, depth: "near", drift: "2.9vw" },
+  { left: 36, delay: -1.1, duration: 1.7, length: 20, depth: "far", drift: "-0.9vw" },
+  { left: 42, delay: -2.2, duration: 2.5, length: 29, depth: "mid", drift: "1.1vw" },
+  { left: 47, delay: -0.7, duration: 1.8, length: 35, depth: "near", drift: "3.1vw" },
+  { left: 53, delay: -1.7, duration: 2.3, length: 16, depth: "far", drift: "-0.6vw" },
+  { left: 58, delay: -0.1, duration: 1.6, length: 26, depth: "mid", drift: "1.6vw" },
+  { left: 64, delay: -1.4, duration: 2.4, length: 33, depth: "near", drift: "2.4vw" },
+  { left: 70, delay: -0.8, duration: 1.9, length: 19, depth: "far", drift: "-1vw" },
+  { left: 76, delay: -2.1, duration: 2.2, length: 30, depth: "mid", drift: "1.3vw" },
+  { left: 81, delay: -0.5, duration: 1.7, length: 36, depth: "near", drift: "2.8vw" },
+  { left: 87, delay: -1.8, duration: 2.5, length: 18, depth: "far", drift: "-0.8vw" },
+  { left: 92, delay: -0.3, duration: 2.1, length: 28, depth: "mid", drift: "1.7vw" },
+  { left: 97, delay: -1.2, duration: 1.8, length: 32, depth: "near", drift: "2.2vw" },
+  { left: 11, delay: -2.4, duration: 2.3, length: 23, depth: "mid", drift: "1.2vw" },
+  { left: 67, delay: -0.6, duration: 1.6, length: 34, depth: "near", drift: "2.7vw" },
 ] as const;
 
 const SNOW_PARTICLES = [
@@ -105,30 +95,52 @@ const STARS = [
   { left: 91, top: 47, delay: -0.2 },
 ] as const;
 
-type DashboardWeatherAtmosphereProps = DashboardWeatherAtmosphereInput;
+function sampleEvenly<T>(items: readonly T[], count: number): T[] {
+  if (count >= items.length) return [...items];
+  if (count <= 0) return [];
+  if (count === 1) return [items[Math.floor(items.length / 2)]];
+  return Array.from({ length: count }, (_, index) =>
+    items[Math.round((index * (items.length - 1)) / (count - 1))]
+  );
+}
 
-export function DashboardWeatherAtmosphere(
-  props: DashboardWeatherAtmosphereProps
-) {
-  const { kind, intensity } = getDashboardWeatherAtmosphere(props);
-  if (kind === "none") return null;
+type DashboardWeatherAtmosphereProps = DashboardWeatherAtmosphereInput & {
+  effectsMode?: DashboardWeatherEffectsMode;
+};
 
+export function DashboardWeatherAtmosphere({
+  effectsMode = "full",
+  ...weather
+}: DashboardWeatherAtmosphereProps) {
+  const { kind, intensity } = getDashboardWeatherAtmosphere(weather);
+  if (kind === "none" || effectsMode === "off") return null;
+
+  const reduced = effectsMode === "reduced";
   const rainDropCount =
-    intensity === "heavy" ? RAIN_DROPS.length : intensity === "light" ? 9 : 14;
+    intensity === "heavy"
+      ? reduced ? 10 : RAIN_DROPS.length
+      : intensity === "light"
+        ? reduced ? 5 : 9
+        : reduced ? 7 : 14;
   const isRain = kind === "rain" || kind === "storm";
+  const snowParticles = sampleEvenly(SNOW_PARTICLES, reduced ? 7 : SNOW_PARTICLES.length);
+  const hailParticles = sampleEvenly(HAIL_PARTICLES, reduced ? 4 : HAIL_PARTICLES.length);
+  const dustParticles = sampleEvenly(DUST_PARTICLES, reduced ? 6 : DUST_PARTICLES.length);
+  const rainDrops = sampleEvenly(RAIN_DROPS, rainDropCount);
 
   return (
     <div
       className="dashboard-weather-atmosphere"
       data-weather-atmosphere={kind}
       data-weather-intensity={intensity}
+      data-effects-mode={effectsMode}
       aria-hidden="true"
     >
       <span className="dashboard-weather-atmosphere__wash" />
 
       {isRain ? (
         <>
-          {RAIN_DROPS.slice(0, rainDropCount).map((drop, index) => (
+          {rainDrops.map((drop, index) => (
             <i
               key={`rain-${index}`}
               className={`dashboard-weather-atmosphere__rain-drop dashboard-weather-atmosphere__rain-drop--${drop.depth}`}
@@ -136,20 +148,9 @@ export function DashboardWeatherAtmosphere(
                 left: `${drop.left}%`,
                 height: `${drop.length}px`,
                 animationDelay: `${drop.delay}s`,
-                animationDuration: `${drop.duration}s`,
-              }}
-            />
-          ))}
-          {WATER_BEADS.map((bead, index) => (
-            <i
-              key={`bead-${index}`}
-              className="dashboard-weather-atmosphere__water-bead"
-              style={{
-                left: `${bead.left}%`,
-                top: `${bead.top}%`,
-                width: `${bead.size}px`,
-                height: `${bead.size * 1.35}px`,
-              }}
+                animationDuration: `${drop.duration * (reduced ? 1.45 : 1)}s`,
+                "--rain-drift": drop.drift,
+              } as CSSProperties}
             />
           ))}
           <span className="dashboard-weather-atmosphere__wet-sheen" />
@@ -179,7 +180,7 @@ export function DashboardWeatherAtmosphere(
 
       {kind === "snow" || kind === "hail" ? (
         <>
-          {(kind === "snow" ? SNOW_PARTICLES : HAIL_PARTICLES).map(
+          {(kind === "snow" ? snowParticles : hailParticles).map(
             (particle, index) => (
               <i
                 key={`${kind}-${index}`}
@@ -190,7 +191,7 @@ export function DashboardWeatherAtmosphere(
                   width: `${particle.size}px`,
                   height: `${particle.size}px`,
                   animationDelay: `${particle.delay}s`,
-                  animationDuration: `${particle.duration}s`,
+                  animationDuration: `${particle.duration * (reduced ? 1.5 : 1)}s`,
                 }}
               />
             )
@@ -212,6 +213,7 @@ export function DashboardWeatherAtmosphere(
                 left: `${spike.left}%`,
                 width: `${spike.width}px`,
                 height: `${spike.height}px`,
+                animationDelay: `${index * -1.4}s`,
               }}
             />
           ))}
@@ -224,6 +226,7 @@ export function DashboardWeatherAtmosphere(
                 top: `${crystal.top}%`,
                 width: `${crystal.size}px`,
                 height: `${crystal.size}px`,
+                animationDelay: `${index * -1.1}s`,
               }}
             />
           ))}
@@ -234,7 +237,7 @@ export function DashboardWeatherAtmosphere(
         <>
           <span className="dashboard-weather-atmosphere__dust-haze dashboard-weather-atmosphere__dust-haze--far" />
           <span className="dashboard-weather-atmosphere__dust-haze dashboard-weather-atmosphere__dust-haze--near" />
-          {DUST_PARTICLES.map((particle, index) => (
+          {dustParticles.map((particle, index) => (
             <i
               key={`dust-${index}`}
               className="dashboard-weather-atmosphere__dust-particle"
@@ -244,7 +247,7 @@ export function DashboardWeatherAtmosphere(
                 width: `${particle.size}px`,
                 height: `${particle.size}px`,
                 animationDelay: `${particle.delay}s`,
-                animationDuration: `${particle.duration}s`,
+                animationDuration: `${particle.duration * (reduced ? 1.5 : 1)}s`,
               }}
             />
           ))}
