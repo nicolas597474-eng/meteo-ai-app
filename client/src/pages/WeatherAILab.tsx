@@ -11,6 +11,8 @@ import { getValidationModelSource } from "@/lib/validationModelSource";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastAlignmentPanel } from "@/components/weather/ForecastAlignmentPanel";
 import { HourlyComparisonDiagnosticsPanel } from "@/components/weather/HourlyComparisonDiagnosticsPanel";
+import { ExperimentalForecastConfidencePanel } from "@/components/weather/ExperimentalForecastConfidencePanel";
+import { calculateExperimentalForecastConfidence } from "@shared/experimentalForecastConfidence";
 import { shouldRetryWeatherQuery, WEATHER_QUERY_SLOW_MS, weatherRetryDelay } from "@/lib/weatherQueryRecovery";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -729,6 +731,20 @@ export default function WeatherAILab() {
   const missingModels = Array.from(new Set([...(collection?.dailyMissingModels ?? []), ...(collection?.hourlyMissingModels ?? [])]));
   const physicalStations = (stationData?.stations ?? []).filter((station) => station.sourceKind === "physical");
   const activePhysicalStations = physicalStations.filter((station) => station.isActive);
+  const confidenceForecastTime = Date.parse(data.forecastComparison.hourlyForecast.computedAt);
+  const confidenceTargetPoint = data.forecastComparison.hourlyForecast.points
+    .filter((point) =>
+      typeof point.validAt === "number" && Number.isFinite(point.validAt) && point.validAt >= confidenceForecastTime,
+    )
+    .sort((left, right) => (left.validAt as number) - (right.validAt as number))[0] ?? null;
+  const confidenceStationsMatchLocation = stationData?.lat === data.forecastComparison.coordinates.lat
+    && stationData?.lon === data.forecastComparison.coordinates.lon;
+  const experimentalConfidence = calculateExperimentalForecastConfidence({
+    point: confidenceTargetPoint,
+    forecastComputedAt: data.forecastComparison.hourlyForecast.computedAt,
+    stations: confidenceStationsMatchLocation ? stationData?.stations ?? [] : [],
+    nowMs: Date.now(),
+  });
   const stationContext = stationData?.groundTruth ?? null;
   const simulationSteps: SimulationStep[] = [
     {
@@ -876,6 +892,7 @@ export default function WeatherAILab() {
     </div>}
 
     <ForecastAlignmentPanel comparison={data.forecastComparison} requestedLocation={activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined} />
+    <ExperimentalForecastConfidencePanel result={experimentalConfidence} />
 
     <section className="rounded-2xl border border-sky-400/25 bg-sky-400/[0.055] p-4" aria-labelledby="forecast-collection-title">
       <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10"><Clock className="h-4 w-4 text-sky-200" /></span><div className="min-w-0"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200/75">Prévisions · 7 modèles horaires officiels + 1 agrégateur de référence</p><h2 id="forecast-collection-title" className="text-sm font-semibold text-slate-100">Cadence prévue : {forecastCollectionReport?.scheduledAt ?? "toutes les 4 h"}</h2></div></div>{forecastCollectionSnapshot && <span className="shrink-0 rounded-full bg-sky-300/10 px-2 py-1 text-[9px] font-semibold text-sky-100">Dernier bilan</span>}</div>
