@@ -473,6 +473,8 @@ export type HourlyPoint = {
   temp: number | null;
   apparentTemp: number | null;
   precipitation: number | null;
+  /** Raw rain/showers/snowfall values from the already selected precipitation contributors; never averaged here. */
+  precipitationComponents?: Array<{ modelName: string; rain: number | null; showers: number | null; snowfall: number | null }>;
   windSpeed: number | null;
   windGust: number | null;
   windDirection: number | null;  // degrees 0-360
@@ -662,16 +664,23 @@ export async function collect15DayForecast(
         humidity: at(daily.relative_humidity_2m_mean, index),
         cloudCover: at(daily.cloud_cover_mean, index),
       };
+      const supplementalBestMatchValues = {
+        windDirection: at(daily.wind_direction_10m_dominant, index),
+        uvIndex: at(daily.uv_index_max, index),
+        feelsLikeMax: at(daily.apparent_temperature_max, index),
+        feelsLikeMin: at(daily.apparent_temperature_min, index),
+      };
       const hasMetric = Object.values(values).some((value) => value != null);
       if (hasMetric) usedModels.add(name);
 
       if (bestMatch) {
-        if (hasMetric) {
+        if (hasMetric || Object.values(supplementalBestMatchValues).some((value) => value != null)) {
           bestMatchByDate.set(date, {
             source: "Open-Meteo Best Match",
             role: "derived_reference",
             officialContributor: false,
             ...values,
+            ...supplementalBestMatchValues,
           });
         }
       } else {
@@ -812,6 +821,7 @@ export async function collect15DayForecast(
       expectedModels: OFFICIAL_HOURLY_MODELS.map(({ name, modelId }) => ({ modelName: name, modelId })),
       candidates: weatherCodeCandidatesForDate(date),
     });
+    const bestMatchReference = bestMatchByDate.get(date) ?? null;
     return {
       date,
       tempMax: fusion.tempMax,
@@ -820,8 +830,8 @@ export async function collect15DayForecast(
       precipitationConsensus: fusion.trace.precipitationConsensus,
       windSpeed: fusion.windSpeed,
       windGust: fusion.windGust,
-      // Daily issue-run provenance is absent for these variables, so they remain unavailable.
-      windDirection: null,
+      // Supplemental values are raw Best Match references, not official fusion inputs.
+      windDirection: bestMatchReference?.windDirection ?? null,
       humidity: fusion.humidity,
       cloudCover: fusion.cloudCover,
       condition: dailyWeatherCodeSummary.condition,
@@ -829,10 +839,10 @@ export async function collect15DayForecast(
       weatherCodeSummary: dailyWeatherCodeSummary,
       modelAgreement,
       officialFusion,
-      bestMatchReference: bestMatchByDate.get(date) ?? null,
-      uvIndex: null,
-      feelsLikeMax: null,
-      feelsLikeMin: null,
+      bestMatchReference,
+      uvIndex: bestMatchReference?.uvIndex ?? null,
+      feelsLikeMax: bestMatchReference?.feelsLikeMax ?? null,
+      feelsLikeMin: bestMatchReference?.feelsLikeMin ?? null,
       sunrise: sunDataByDate.get(date)?.sunrise ?? null,
       sunset: sunDataByDate.get(date)?.sunset ?? null,
     };

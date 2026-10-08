@@ -9,6 +9,7 @@ export type HourlySelectedForecast = {
   temp?: number | null;
   apparentTemp?: number | null;
   precipitation?: number | null;
+  precipitationComponents?: Array<{ modelName: string; rain: number | null; showers: number | null; snowfall: number | null }> | null;
   windSpeed?: number | null;
   windGust?: number | null;
   windDirection?: number | null;
@@ -66,6 +67,18 @@ function formatNumber(value: number | null | undefined, decimals = 0): string {
   return finite(value) ? formatOptionalForecastValue(value, decimals) : "—";
 }
 
+/** Formats raw component values by contributor; it never averages or fills missing values. */
+export function formatHourlyPrecipitationComponentValues(
+  components: ReadonlyArray<{ modelName: string; rain: number | null; showers: number | null; snowfall: number | null }> | null | undefined,
+  field: "rain" | "showers" | "snowfall",
+  unit: string,
+): string {
+  if (!components?.length) return `—${unit}`;
+  return components
+    .map(({ modelName, ...values }) => `${modelName} ${formatWithUnit(values[field], 1, unit)}`)
+    .join(" · ");
+}
+
 function windDirectionLabel(degrees: number): string {
   const directions = [
     "N",
@@ -86,27 +99,6 @@ function windDirectionLabel(degrees: number): string {
     "NNO",
   ];
   return directions[Math.round((((degrees % 360) + 360) % 360) / 22.5) % 16];
-}
-
-function precipitationTypeLabel(value: string | null | undefined): string {
-  if (!value?.trim()) return "—";
-  const labels: Record<string, string> = {
-    rain: "Pluie",
-    snow: "Neige",
-    freezing_rain: "Pluie verglaçante",
-    sleet: "Neige fondue",
-  };
-  return labels[value.toLowerCase()] ?? value;
-}
-
-function precipitationIntensityLabel(value: string | null | undefined): string {
-  if (!value?.trim()) return "—";
-  const labels: Record<string, string> = {
-    light: "Faible",
-    moderate: "Modérée",
-    heavy: "Forte",
-  };
-  return labels[value.toLowerCase()] ?? value;
 }
 
 function fallbackSourceNote(
@@ -189,12 +181,9 @@ export function buildHourlySelectedDetails(
       `Quantité ${formatWithUnit(hour.precipitation, 1, " mm")}`,
       precipitationNote
     ),
-    make(
-      "precip-type",
-      "Type et intensité",
-      "precipitation",
-      `Type ${precipitationTypeLabel(hour.precipType)} · intensité ${precipitationIntensityLabel(hour.precipIntensity)}`
-    ),
+    make("rain", "Pluie", "precipitation", formatHourlyPrecipitationComponentValues(hour.precipitationComponents, "rain", " mm"), "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."),
+    make("showers", "Averses", "precipitation", formatHourlyPrecipitationComponentValues(hour.precipitationComponents, "showers", " mm"), "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."),
+    make("snowfall", "Neige", "precipitation", formatHourlyPrecipitationComponentValues(hour.precipitationComponents, "snowfall", " cm"), "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."),
     make(
       "wind",
       "Vent",
@@ -239,23 +228,11 @@ export function buildHourlySelectedDetails(
       formatWithUnit(hour.visibility, 1, " km")
     ),
     make(
-      "radiation",
-      "Rayonnement solaire",
-      "sunny",
-      formatWithUnit(hour.solarRadiation, 0, " W/m²")
-    ),
-    make(
       "air-quality",
       "Qualité de l’air",
       "cloud_cover",
       "Non disponible",
       "Aucune donnée horaire de qualité de l’air n’est fournie par cette prévision officielle."
-    ),
-    make(
-      "weather-code",
-      "Code météo (WMO)",
-      "calendar",
-      `Code ${formatNumber(hour.weatherCode)}`
     ),
   ];
 }

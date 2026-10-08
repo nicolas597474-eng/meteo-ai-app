@@ -24,6 +24,9 @@ function modelForecasts(at = validAt, available = at - 12 * 60 * 60_000): Hourly
       temperature: 8 + index,
       apparentTemperature: 7 + index,
       precipitation: index === 6 ? 0.4 : 0,
+      rain: index === 6 ? 0 : null,
+      showers: index === 6 ? null : null,
+      snowfall: index === 6 ? 0.2 : null,
       windSpeed: 8 + index,
       windGusts: 12 + index,
       windDirection: index === 0 ? 350 : 10,
@@ -127,6 +130,9 @@ describe("reconstructOfficialHourlyModelsFromArchive", () => {
       row({ id: 6, validTime: firstValidAt, variable: "dew_point", value: 3, unit: "°C" }),
       row({ id: 7, validTime: firstValidAt, variable: "visibility", value: 6, unit: "km" }),
       row({ id: 8, validTime: firstValidAt, variable: "weather_code", value: 2, unit: "wmo code" }),
+      row({ id: 9, validTime: firstValidAt, variable: "rain", value: 0, unit: "mm" }),
+      row({ id: 10, validTime: firstValidAt, variable: "showers", value: 0.3, unit: "mm" }),
+      row({ id: 11, validTime: firstValidAt, variable: "snowfall", value: 0.7, unit: "cm" }),
     ];
 
     const forecasts = reconstructOfficialHourlyModelsFromArchive(archives, targetDate);
@@ -137,6 +143,7 @@ describe("reconstructOfficialHourlyModelsFromArchive", () => {
     expect(forecasts[0]?.hours.map((hour) => hour.hour)).toEqual([2, 2]);
     expect(forecasts[0]?.hours.map((hour) => hour.temperature)).toEqual([8, 12]);
     expect(forecasts[0]?.hours[0]).toMatchObject({ cloudCover: 55, dewPoint: 3, visibility: 6, weatherCode: 2 });
+    expect(forecasts[0]?.hours[0]).toMatchObject({ rain: 0, showers: 0.3, snowfall: 0.7 });
     expect(forecasts[0]?.providerRunAt).toBeNull();
   });
 });
@@ -168,6 +175,19 @@ describe("computeOfficialHourlyForecast", () => {
     }));
     const missingCloudResult = computeOfficialHourlyForecast(missingCloudForecasts, historicalScores());
     expect(missingCloudResult.hours[0]).toMatchObject({ cloudCover: null, condition: "Nébulosité indisponible" });
+  });
+
+  it("transmet les composantes brutes des seuls contributeurs officiels, sans moyenne ni remplacement des absences", () => {
+    const forecasts = modelForecasts();
+
+    const result = computeOfficialHourlyForecast(forecasts, historicalScores());
+
+    expect(result.hours[0]?.precipitationComponents).toEqual([{
+      modelName: OFFICIAL_HOURLY_MODELS[6]!.name,
+      rain: 0,
+      showers: null,
+      snowfall: 0.2,
+    }]);
   });
 
   it("utilise providerRunAt plutôt que availableAt pour le lead et la preuve horaire", () => {

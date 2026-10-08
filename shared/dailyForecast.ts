@@ -120,6 +120,11 @@ export type BestMatchDailyReference = {
   role: "derived_reference";
   officialContributor: false;
   tempMax: number | null;
+  /** Supplemental values remain a separately sourced reference, never a fusion input. */
+  windDirection?: number | null;
+  uvIndex?: number | null;
+  feelsLikeMax?: number | null;
+  feelsLikeMin?: number | null;
   tempMin: number | null;
   precipitation: number | null;
   windSpeed: number | null;

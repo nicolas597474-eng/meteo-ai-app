@@ -87,14 +87,18 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain('getExtremeTemperatureTone("max", day.daily?.tempMax)');
     expect(timelineSource).toContain('getExtremeTemperatureTone("min", day.daily?.tempMin)');
   });
-  it("n’affiche que les champs fournis, distingue les fréquences brutes et laisse l’AQI indisponible", () => {
-    for (const title of ["Précipitations", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité", "Rayonnement solaire"]) {
+  it("affiche les composantes horaires fournies et garde hors panneau les catégories exclues", () => {
+    for (const title of ["Précipitations", "Pluie", "Averses", "Neige", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité"]) {
       expect(selectedDetailsSource).toContain(`"${title}"`);
     }
     expect(selectedDetailsSource).toContain("rafales");
     expect(selectedDetailsSource).toContain("direction");
-    expect(selectedDetailsSource).toContain("Type et intensité");
-    expect(selectedDetailsSource).toContain("weatherCode");
+    expect(selectedDetailsSource).not.toContain("Type et intensité");
+    expect(selectedDetailsSource).not.toContain("Rayonnement solaire");
+    expect(selectedDetailsSource).not.toContain("Code météo (WMO)");
+    expect(selectedDetailsSource).not.toContain('"precip-type"');
+    expect(selectedDetailsSource).not.toContain('"weather-code"');
+    expect(selectedDetailsSource).toContain("formatHourlyPrecipitationComponentValues");
     expect(selectedDetailsSource).toContain("Non disponible");
     expect(selectedDetailsSource).toContain("Aucune donnée horaire de qualité de l’air");
     expect(timelineSource).toContain("Soleil");
