@@ -208,6 +208,10 @@ describe("collect15DayForecast fusion officielle", () => {
         precipitation_sum: dates.map(() => modelIndex === 7 ? 999 : 0.2 + modelIndex),
         wind_speed_10m_max: dates.map(() => modelIndex === 7 ? 999 : 8 + modelIndex),
         wind_gusts_10m_max: dates.map(() => modelIndex === 7 ? 999 : 12 + modelIndex),
+        wind_direction_10m_dominant: dates.map(() => modelIndex === 7 ? 225 : 90),
+        uv_index_max: dates.map(() => modelIndex === 7 ? 0 : 9),
+        apparent_temperature_max: dates.map(() => modelIndex === 7 ? 18.5 : 30),
+        apparent_temperature_min: dates.map(() => modelIndex === 7 ? 8.5 : 20),
       },
     });
     datesByModel.forEach((dates, index) => mockedFetchWeather.mockResolvedValueOnce(dailyResponse(index, dates)));
@@ -255,11 +259,19 @@ describe("collect15DayForecast fusion officielle", () => {
       precipitation: expect.any(Number),
       windSpeed: expect.any(Number),
       windGust: expect.any(Number),
+      windDirection: 225,
+      uvIndex: 0,
+      feelsLikeMax: 18.5,
+      feelsLikeMin: 8.5,
       officialFusion: { horizonBucket: "6-24h" },
       bestMatchReference: {
         source: "Open-Meteo Best Match",
         officialContributor: false,
         tempMax: 999,
+        windDirection: 225,
+        uvIndex: 0,
+        feelsLikeMax: 18.5,
+        feelsLikeMin: 8.5,
       },
     });
     expect(today!.tempMax).not.toBe(999);
@@ -284,6 +296,7 @@ describe("collect15DayForecast fusion officielle", () => {
     expect(tomorrow!.tempMax).not.toBeNull();
     expect(tomorrow!.officialFusion.sourcesByVariable.tempMax.every((source) => source.horizonBucket === "1-3d")).toBe(true);
     expect(tomorrow!.bestMatchReference).toBeNull();
+    expect(tomorrow).toMatchObject({ windDirection: null, uvIndex: null, feelsLikeMax: null, feelsLikeMin: null });
 
     expect(longRange!.officialFusion.horizonBucket).toBe("1-3d");
     expect(longRange!.modelAgreement.tempMax.availableModelCount).toBe(2);
@@ -345,6 +358,7 @@ describe("collect15DayForecast fusion officielle", () => {
 
     const day = result.days[0]!;
     expect(day).toMatchObject({ condition: "Bruine", weatherCode: 53 });
+    expect(day).toMatchObject({ windDirection: null, uvIndex: null, feelsLikeMax: null, feelsLikeMin: null });
     expect(day.weatherCodeSummary).toMatchObject({
       validDate: "2026-10-03",
       timeZone: "Europe/Paris",

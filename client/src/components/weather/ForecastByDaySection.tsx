@@ -6,7 +6,7 @@ import { dailyConditionFromWmoWeatherCode } from "@shared/dailyWeatherCode";
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getDailyWeatherCodeIconName } from "@/lib/dailyWeatherIcon";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
-import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
+import { buildHourlySelectedDetails, formatHourlyPrecipitationComponentValues } from "@/lib/hourlySelectedDetails";
 import { filterDailyMetricsForOfficialHourlyCard, filterOfficialHourlyCardDetails, findNextOfficialHourlyConditionChange, getOfficialHourlyCondition } from "@/lib/officialHourlyCard";
 import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { getTemperatureTone } from "@/lib/chartTemperatureTone";
@@ -53,6 +53,7 @@ type ForecastHour = {
   condition?: string | null;
   weatherCode?: number | null;
   precipitation?: number | null;
+  precipitationComponents?: Array<{ modelName: string; rain: number | null; showers: number | null; snowfall: number | null }> | null;
   windSpeed?: number | null;
   windGust?: number | null;
   windDirection?: number | null;
@@ -440,6 +441,11 @@ function dailyMetricSourceDescription(day: DailyForecastPoint, metric: DailyFore
     const validTime = summary.validTime == null ? "validTime indisponible" : `validTime UTC ${new Date(summary.validTime).toISOString()}`;
     return `Validité : ${summary.validDate} (${summary.timeZone}; ${validTime}); assemblé ${summary.computedAt}. ${summary.reason} Provenance par modèle : ${modelDetails}. Best Match est exclu; cette fréquence descriptive n’est pas calibrée. Les horodatages décrivent le service de la réponse (réseau/cache), pas l’heure du run amont.`;
   }
+  if (["windDirection", "uvIndex", "feelsLikeMax", "feelsLikeMin"].includes(metric.key)) {
+    return day.bestMatchReference
+      ? `${day.bestMatchReference.source} · référence dérivée distincte, non contributrice officielle.`
+      : "Référence Best Match absente; aucune valeur n’est déduite ou remplacée.";
+  }
   if (!day.officialFusion) return "Provenance par métrique non fournie.";
   if (!metric.sourceKey) return "Aucune provenance par métrique n’est fournie pour ce champ.";
   const sources = day.officialFusion.sourcesByVariable[metric.sourceKey] ?? [];
@@ -482,11 +488,12 @@ function DailyForecastMetricsPanel({ day, sourceLabels, excludeDailyConditionAnd
       {consensus && hasConsensusCounts && (
         <p className="text-[10px] leading-relaxed text-slate-300">Pluie annoncée par {consensus.rainModelCount}/{consensus.availableModelCount} modèles au seuil {isFiniteValue(consensus.thresholdMm) ? `≥ ${formatOptionalForecastValue(consensus.thresholdMm, 1, " mm")}` : "indisponible"} · fréquence brute descriptive, jamais une probabilité calibrée.</p>
       )}
-      <p className="text-[10px] leading-relaxed text-slate-400">{excludeDailyConditionAndCode ? "Les métriques de ce payload quotidien restent distinctes du validTime horaire sélectionné; l’état affiché en tête de carte correspond à l’échéance. Aucun code météo brut n’est affiché dans cette carte." : "Le code WMO présenté ici appartient uniquement au contrat quotidien : il reste inconnu en cas d’absence ou d’égalité, et n’est ni déduit des heures ni remplacé par Best Match. Cette correction n’ajoute aucun code au panneau de prévision horaire officielle. Restent non exposés au quotidien : pression, pluie/averses/neige séparées, probabilité de précipitations, couverture nuageuse par couche, durée d’ensoleillement et rayonnement. La direction du vent, l’indice UV et les ressentis quotidiens restent indisponibles."}</p>
+      <p className="text-[10px] leading-relaxed text-slate-400">{excludeDailyConditionAndCode ? "Les métriques de ce payload quotidien restent distinctes du validTime horaire sélectionné; l’état affiché en tête de carte correspond à l’échéance. Aucun code météo brut n’est affiché dans cette carte." : "Le code WMO présenté ici appartient uniquement au contrat quotidien : il reste inconnu en cas d’absence ou d’égalité, et n’est ni déduit des heures ni remplacé par Best Match. Cette correction n’ajoute aucun code au panneau de prévision horaire officielle. Restent non exposés au quotidien : pression, pluie/averses/neige séparées, probabilité de précipitations, couverture nuageuse par couche, durée d’ensoleillement et rayonnement. Direction dominante, UV max et ressentis proviennent uniquement de la référence Best Match, non contributrice officielle, et restent indisponibles si absents."}</p>
       {bestMatch && (
         <div className="rounded-lg border border-sky-100/10 bg-black/15 p-2 text-[10px] leading-relaxed text-slate-300">
           <p className="font-semibold text-sky-100">{bestMatch.source} · référence dérivée distincte, non contributrice officielle</p>
           <p>Tmax {formatReference(bestMatch.tempMax, "°C", 1)} · Tmin {formatReference(bestMatch.tempMin, "°C", 1)} · précipitations {formatReference(bestMatch.precipitation, "mm", 1)} · vent max. {formatReference(bestMatch.windSpeed, "km/h", 0)} · rafales max. {formatReference(bestMatch.windGust, "km/h", 0)}.</p>
+          <p>Direction dominante {formatReference(bestMatch.windDirection ?? null, "°", 0)} · UV max {formatReference(bestMatch.uvIndex ?? null, "indice", 1)} · ressenti max/min {formatReference(bestMatch.feelsLikeMax ?? null, "°C", 1)} / {formatReference(bestMatch.feelsLikeMin ?? null, "°C", 1)}.</p>
         </div>
       )}
     </div>
@@ -703,12 +710,21 @@ export function ForecastByDaySection({
   const selectedHourlyApparentTemperatureTone = selectedEntry && selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.apparentTemp)
     ? getTemperatureTone(selectedEntry.hour.apparentTemp, "hourly").label
     : undefined;
+  const precipitationComponentProvenance = (field: "rain" | "showers" | "snowfall") => {
+    const components = selectedEntry?.hour.precipitationComponents ?? [];
+    const sources = Array.from(new Set(components.map(({ modelName }) => modelName)));
+    const available = components.some((component) => isFiniteValue(component[field]));
+    return `${available ? "Valeurs brutes" : "Champ indisponible"} · contributeurs du total : ${sources.join(", ") || "aucun"} · sans moyenne ni zéro de remplacement`;
+  };
   const hourlyFieldCards = selectedEntry && selectedEntryHasValidTime ? [
     { key: "apparent", label: "Ressenti prévu", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.apparentTemp, 1, "°"), valueColor: selectedHourlyApparentTemperatureTone, provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.apparentTemp)) },
     { key: "direction", label: "Direction du vent", icon: "wind_param", value: isFiniteValue(selectedEntry.hour.windDirection) ? `${windDirectionLabel(selectedEntry.hour.windDirection)} · ${formatOptionalForecastValue(selectedEntry.hour.windDirection, 0, "°")}` : "—", provenance: hourlyFieldProvenance("windDirection", isFiniteValue(selectedEntry.hour.windDirection)) },
     { key: "humidity", label: "Humidité prévue", icon: "humidity", value: formatOptionalForecastValue(selectedEntry.hour.humidity, 0, "%"), provenance: hourlyFieldProvenance("humidity", isFiniteValue(selectedEntry.hour.humidity)) },
     { key: "dew-point", label: "Point de rosée", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.dewPoint, 1, "°"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.dewPoint)) },
     { key: "precipitation", label: "Précipitations prévues", icon: "precipitation", value: formatOptionalForecastValue(selectedEntry.hour.precipitation, 1, " mm"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.precipitation)) },
+    { key: "rain", label: "Pluie · par modèle", icon: "precipitation", value: formatHourlyPrecipitationComponentValues(selectedEntry.hour.precipitationComponents, "rain", " mm"), provenance: precipitationComponentProvenance("rain") },
+    { key: "showers", label: "Averses · par modèle", icon: "precipitation", value: formatHourlyPrecipitationComponentValues(selectedEntry.hour.precipitationComponents, "showers", " mm"), provenance: precipitationComponentProvenance("showers") },
+    { key: "snowfall", label: "Neige · par modèle", icon: "precipitation", value: formatHourlyPrecipitationComponentValues(selectedEntry.hour.precipitationComponents, "snowfall", " cm"), provenance: precipitationComponentProvenance("snowfall") },
     { key: "wind", label: "Vent prévu", icon: "wind_param", value: formatOptionalForecastValue(selectedEntry.hour.windSpeed, 0, " km/h"), provenance: hourlyFieldProvenance("windSpeed", isFiniteValue(selectedEntry.hour.windSpeed)) },
     { key: "gust", label: "Rafales prévues", icon: "wind_param", value: formatOptionalForecastValue(selectedEntry.hour.windGust, 0, " km/h"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.windGust)) },
     { key: "pressure", label: "Pression", icon: "pressure", value: formatOptionalForecastValue(selectedEntry.hour.pressure, 0, " hPa"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.pressure)) },

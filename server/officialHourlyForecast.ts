@@ -801,6 +801,17 @@ function makePoint(
     ? null
     : precipitation > 5 ? "heavy" : precipitation > 1 ? "moderate" : "light";
 
+  // Pass through the exact raw component values of existing precipitation contributors.
+  // This adds no component averaging, replacement zeros, or new weighting decision.
+  const precipitationComponents = precipitationSelection
+    .filter(({ contributes, finalWeight }) => contributes && finalWeight > 0)
+    .map(({ selected }) => ({
+      modelName: selected.modelName,
+      rain: isFiniteNumber(selected.metadata.hour.rain) ? selected.metadata.hour.rain : null,
+      showers: isFiniteNumber(selected.metadata.hour.showers) ? selected.metadata.hour.showers : null,
+      snowfall: isFiniteNumber(selected.metadata.hour.snowfall) ? selected.metadata.hour.snowfall : null,
+    }));
+
   const point: HourlyPoint = {
     date: parisTime.date,
     hour: `${String(parisTime.hour).padStart(2, "0")}:00`,
@@ -808,6 +819,7 @@ function makePoint(
     temp: temperature,
     apparentTemp: valueFor("apparent_temperature"),
     precipitation,
+    precipitationComponents,
     windSpeed,
     windGust,
     windDirection,
