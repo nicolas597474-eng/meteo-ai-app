@@ -28,7 +28,6 @@ import { getLoginUrl } from "@/const";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
-import { ForecastMetricDefinitions } from "@/components/weather/ForecastMetricDefinitions";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
 import { PrecipitationConsensusChart } from "@/components/weather/PrecipitationConsensusChart";
 import { countArchivedSnapshotSlots, formatCollectionDuration } from "@/lib/collectionHealth";
@@ -90,32 +89,47 @@ function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalP
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction }: { direction: number | null }) {
-  const dir = direction;
-  const cardinalDir = (deg: number) => {
-    const dirs = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
-    return dirs[Math.round(deg / 45) % 8];
-  };
+  const cardinalDirections = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"] as const;
+  const cardinalNames = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ouest", "ouest", "nord-ouest"] as const;
+  const directionIndex = direction == null ? null : Math.round(direction / 45) % cardinalDirections.length;
+  const directionLabel = directionIndex == null ? null : cardinalDirections[directionIndex];
+  const directionName = directionIndex == null ? "indisponible" : cardinalNames[directionIndex];
+
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className="relative h-8 w-8">
-        <svg viewBox="0 0 40 40" className="w-full h-full">
-          {/* Compass circle */}
-          <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-          {/* Cardinal ticks */}
-          {[0, 90, 180, 270].map(a => {
-            const rad = (a - 90) * Math.PI / 180;
-            return <line key={a} x1={20 + 14*Math.cos(rad)} y1={20 + 14*Math.sin(rad)} x2={20 + 18*Math.cos(rad)} y2={20 + 18*Math.sin(rad)} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />;
+    <div className="flex flex-col items-center gap-0.5" role="img" aria-label={`Boussole du vent : nord en haut, est à droite, sud en bas, ouest à gauche. Direction ${directionName}.`}>
+      <div className="relative isolate grid size-[5.75rem] place-items-center rounded-full border border-cyan-100/35 bg-gradient-to-br from-sky-200/25 via-slate-800 to-slate-950 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_8px_14px_rgba(0,0,0,0.55)] ring-1 ring-black/40 before:absolute before:inset-1 before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.14),transparent_44%)] before:content-[''] sm:size-24">
+        <svg viewBox="0 0 100 100" className="absolute inset-0 z-10 size-full" aria-hidden="true">
+          <defs>
+            <radialGradient id="wind-compass-face" cx="35%" cy="25%" r="80%">
+              <stop offset="0%" stopColor="#1c4564" />
+              <stop offset="58%" stopColor="#10263c" />
+              <stop offset="100%" stopColor="#07111e" />
+            </radialGradient>
+            <linearGradient id="wind-compass-needle" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#b8f3ff" />
+              <stop offset="48%" stopColor="#38bdf8" />
+              <stop offset="100%" stopColor="#2563eb" />
+            </linearGradient>
+          </defs>
+          <circle cx="50" cy="50" r="43" fill="url(#wind-compass-face)" stroke="rgba(186,230,253,0.55)" strokeWidth="1.3" />
+          <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(148,210,236,0.24)" strokeWidth="0.8" />
+          {Array.from({ length: 16 }, (_, index) => {
+            const angle = (index * 22.5 - 90) * Math.PI / 180;
+            const innerRadius = index % 4 === 0 ? 33 : 37;
+            return <line key={index} x1={50 + innerRadius * Math.cos(angle)} y1={50 + innerRadius * Math.sin(angle)} x2={50 + 41 * Math.cos(angle)} y2={50 + 41 * Math.sin(angle)} stroke={index % 4 === 0 ? "rgba(186,230,253,0.7)" : "rgba(148,210,236,0.32)"} strokeWidth={index % 4 === 0 ? 1.5 : 0.8} />;
           })}
-          {/* Arrow pointing in wind direction */}
-          {dir != null ? <g transform={`rotate(${dir}, 20, 20)`}>
-            <polygon points="20,4 23,20 20,17 17,20" fill="#60a5fa" opacity="0.9" />
-            <polygon points="20,36 23,20 20,23 17,20" fill="rgba(255,255,255,0.2)" />
+          {direction != null ? <g transform={`rotate(${direction}, 50, 50)`}>
+            <path d="M50 17 L56 52 L50 46 L44 52 Z" fill="url(#wind-compass-needle)" stroke="rgba(224,242,254,0.8)" strokeWidth="0.8" />
+            <path d="M50 83 L56 48 L50 54 L44 48 Z" fill="#a8c1d3" opacity="0.62" />
           </g> : null}
-          {/* Center dot */}
-          <circle cx="20" cy="20" r="2" fill="#60a5fa" />
+          <circle cx="50" cy="50" r="3.2" fill="#d9f8ff" stroke="#164e72" strokeWidth="1.2" />
         </svg>
+        <span aria-hidden="true" className="absolute top-1 z-20 text-[10px] font-black leading-none text-cyan-100 drop-shadow">N</span>
+        <span aria-hidden="true" className="absolute right-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">E</span>
+        <span aria-hidden="true" className="absolute bottom-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">S</span>
+        <span aria-hidden="true" className="absolute left-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">O</span>
       </div>
-      <p className="text-[10px] font-bold text-blue-300">{dir == null ? "—" : cardinalDir(dir)}</p>
+      <p className="min-h-4 text-[11px] font-bold text-sky-200">{directionLabel ?? "—"}</p>
     </div>
   );
 }
@@ -138,9 +152,20 @@ function currentString(field?: CurrentStateFieldLike | null): string | null {
   return value && !/^(?:conditions? indisponibles|indisponible)$/i.test(value) ? value : null;
 }
 
+function formatHourlyForecastValidAt(validAt?: number | null): string {
+  if (typeof validAt !== "number" || !Number.isFinite(validAt)) return "Échéance indisponible";
+  return new Date(validAt).toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Paris",
+  }) + " · Europe/Paris";
+}
+
 // ─── UV Index indicator ────────────────────────────────────────────────────────
 function UVBadge({ uv }: { uv: number | null }) {
-  if (uv == null) return <span className="text-base font-semibold">—</span>;
+  if (uv == null) return <span className="text-lg font-semibold">—</span>;
   const level = uv <= 2 ? { label: "Faible", color: "text-green-400" }
     : uv <= 5 ? { label: "Modéré", color: "text-yellow-400" }
     : uv <= 7 ? { label: "Élevé", color: "text-orange-400" }
@@ -148,8 +173,8 @@ function UVBadge({ uv }: { uv: number | null }) {
     : { label: "Extrême", color: "text-purple-400" };
   return (
     <div className="flex flex-col items-center">
-      <span className={`text-sm sm:text-lg font-bold ${level.color}`}>{Math.round(uv)}</span>
-      <span className={`text-[10px] sm:text-xs ${level.color} opacity-80`}>{level.label}</span>
+      <span className={`text-lg font-bold sm:text-2xl ${level.color}`}>{Math.round(uv)}</span>
+      <span className={`text-[11px] sm:text-sm ${level.color} opacity-80`}>{level.label}</span>
     </div>
   );
 }
@@ -357,7 +382,6 @@ export default function Dashboard() {
   const [personalCondition, setPersonalCondition] = useState<(typeof PERSONAL_CONDITION_OPTIONS)[number]["id"]>("partly_cloudy");
   const [personalSubmitResult, setPersonalSubmitResult] = useState<{ notice: string } | null>(null);
   const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
-  const [isForecastInfoOpen, setIsForecastInfoOpen] = useState(false);
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
   const [isCollectionHealthOpen, setIsCollectionHealthOpen] = useState(false);
   const [collectionUpdateNotice, setCollectionUpdateNotice] = useState<HourlyCollectionTrace | null>(null);
@@ -722,14 +746,16 @@ export default function Dashboard() {
     temp: officialSnapshotTemp,
     condition: currentSnapshot?.condition ?? (isDailyFallback ? dailyFallback.condition : null),
   };
-  const dailyAgreement = today?.modelAgreement ?? null;
   const maxTemperature = isDailyFallback ? dailyFallback.tempMax : today?.tempMax ?? meteoAI?.tempMax ?? null;
   const minTemperature = isDailyFallback ? dailyFallback.tempMin : today?.tempMin ?? meteoAI?.tempMin ?? null;
   const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
   const minTemperatureTone = getExtremeTemperatureTone("min", minTemperature);
   const apparentTemperatureField = withCurrentSnapshotFallback(currentFields?.apparentTemperature, currentSnapshot?.apparentTemp, snapshotCapturedAt);
   const apparentTemp = currentNumber(apparentTemperatureField);
-  const currentUV = currentHour?.uvIndex ?? hours.find((hour) => typeof hour.validAt === "number" && hour.validAt > forecastNowMs && hour.uvIndex != null)?.uvIndex ?? null;
+  const futureUVHour = hours.find((hour) => typeof hour.validAt === "number" && hour.validAt > forecastNowMs && hour.uvIndex != null) ?? null;
+  const uvForecastHour = currentHour?.uvIndex != null ? currentHour : futureUVHour;
+  const currentUV = currentHour?.uvIndex ?? futureUVHour?.uvIndex ?? null;
+  const currentUVLabel = uvForecastHour && uvForecastHour !== currentHour ? "UV prévu à l’échéance suivante" : "UV prévu pour cette heure";
   const windDirectionField = withCurrentSnapshotFallback(currentFields?.windDirection, currentSnapshot?.windDirection, snapshotCapturedAt);
   const windSpeedField = withCurrentSnapshotFallback(currentFields?.windSpeed, currentSnapshot?.windSpeed, snapshotCapturedAt);
   const windGustField = withCurrentSnapshotFallback(currentFields?.windGust, currentSnapshot?.windGust, snapshotCapturedAt);
@@ -1052,113 +1078,75 @@ export default function Dashboard() {
             </div>
 
             <section aria-label="Observations actuelles" className="rounded-xl border border-cyan-400/20 bg-cyan-950/10 px-2 pb-2">
-              <p className="pt-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-200/80">Observations actuelles <span className="font-normal normal-case tracking-normal text-slate-400">· provenance propre à chaque champ</span></p>
-            <div className="mt-2 grid grid-cols-2 gap-1 border-t border-cyan-400/20 pt-2 sm:grid-cols-4 sm:gap-2">
-              {/* Ressenti */}
-              <div className="text-center">
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
-                  <Thermometer className="h-3 w-3" />Ressenti
-                </p>
-                <p className="text-lg font-bold sm:text-2xl">
-                  {apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : "—"}
-                </p>
-                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(apparentTemperatureField, currentSnapshot?.capturedAt)}>
-                  {formatCurrentStateProvenance(apparentTemperatureField, currentSnapshot?.capturedAt)}
-                </p>
-              </div>
-              {/* Wind Rose */}
-              <div className="text-center">
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
-                  <Wind className="h-3 w-3" />Direction du vent
-                </p>
-                <div className="flex justify-center">
-                  <WindRose direction={windDir} />
+              <p className="pt-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/90 sm:text-sm">Observations actuelles <span className="font-normal normal-case tracking-normal text-slate-400">· provenance propre à chaque champ</span></p>
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_6rem_minmax(0,1fr)] items-center gap-1 border-t border-cyan-400/20 pt-3 sm:grid-cols-[minmax(0,1fr)_7rem_minmax(0,1fr)] sm:gap-3">
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-1.5 text-center sm:p-2" title={currentStateFieldTitle(apparentTemperatureField, currentSnapshot?.capturedAt)}>
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Thermometer className="h-3.5 w-3.5 shrink-0" />Ressenti</p>
+                  <p className="mt-1 text-lg font-bold text-white sm:text-2xl">{apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : "—"}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(apparentTemperatureField, currentSnapshot?.capturedAt)}</p>
                 </div>
-                <p className="text-[8px] leading-tight text-slate-400" title={currentStateFieldTitle(windDirectionField, currentSnapshot?.capturedAt)}>
-                  Direction · {formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)}
-                </p>
+                <div className="min-w-0 text-center">
+                  <p className="mb-1 flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Direction du vent</p>
+                  <WindRose direction={windDir} />
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]" title={currentStateFieldTitle(windDirectionField, currentSnapshot?.capturedAt)}>
+                    {formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)}
+                  </p>
+                </div>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-1.5 text-center sm:p-2" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Eye className="h-3.5 w-3.5 shrink-0" />Nuages actuels</p>
+                  <p className="mt-1 text-lg font-bold text-white sm:text-2xl">{currentCloudCover == null ? "—" : `${formatDashboardNumber(currentCloudCover, 0)}%`}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}</p>
+                </div>
               </div>
-              <div className="text-center" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-1 sm:text-xs">
-                  <MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité actuelle
-                </p>
-                <p className="text-lg font-bold sm:text-2xl">{currentHumidity == null ? "—" : `${formatDashboardNumber(currentHumidity)}%`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(humidityField, currentSnapshot?.capturedAt)}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}>
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Vent actuel</p>
+                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{windSpeed == null ? "—" : `${windSpeed.toFixed(1)} km/h`}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(windSpeedField, currentSnapshot?.capturedAt)}</p>
+                </div>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(windGustField, currentSnapshot?.capturedAt)}>
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Rafales actuelles</p>
+                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentWindGust == null ? "—" : `${currentWindGust.toFixed(1)} km/h`}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
+                </div>
               </div>
-              <div className="text-center" title={currentStateFieldTitle(precipitationField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Droplets className="mr-1 inline h-3 w-3" />Précipitations actuelles</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentPrecipitation == null ? "—" : `${currentPrecipitation.toFixed(1)} mm`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(precipitationField, currentSnapshot?.capturedAt)}</p>
-                <p className="text-[8px] leading-tight text-slate-500">Cumul station non comparable</p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/20 p-2" title={currentStateFieldTitle(pressureField)}>
+                <p className="flex items-center gap-1 text-[12px] font-medium text-slate-200 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression locale</p>
+                <p className="text-lg font-semibold text-white sm:text-xl">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
+                <p className="w-full text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentPressure == null ? "Références source non comparables" : formatCurrentStateProvenance(pressureField)}</p>
               </div>
-              <div className="text-center" title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Vent actuel</p>
-                <p className="text-sm font-semibold sm:text-lg">{windSpeed == null ? "—" : `${windSpeed.toFixed(1)} km/h`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windSpeedField, currentSnapshot?.capturedAt)}</p>
-              </div>
-              <div className="text-center" title={currentStateFieldTitle(windGustField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Wind className="mr-1 inline h-3 w-3" />Rafales actuelles</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentWindGust == null ? "—" : `${currentWindGust.toFixed(1)} km/h`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
-              </div>
-              <div className="text-center" title={currentStateFieldTitle(pressureField)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Thermometer className="mr-1 inline h-3 w-3" />Pression locale</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{currentPressure == null ? "Références source non comparables" : formatCurrentStateProvenance(pressureField)}</p>
-              </div>
-              <div className="text-center" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
-                <p className="text-[10px] text-muted-foreground sm:text-xs"><Eye className="mr-1 inline h-3 w-3" />Nuages actuels</p>
-                <p className="text-sm font-semibold sm:text-lg">{currentCloudCover == null ? "—" : `${formatDashboardNumber(currentCloudCover, 0)}%`}</p>
-                <p className="text-[8px] leading-tight text-slate-400">{formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}</p>
-              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité actuelle</p>
+                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentHumidity == null ? "—" : `${formatDashboardNumber(currentHumidity)}%`}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(humidityField, currentSnapshot?.capturedAt)}</p>
+                </div>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(precipitationField, currentSnapshot?.capturedAt)}>
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Droplets className="h-3.5 w-3.5 shrink-0" />Précipitations actuelles</p>
+                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentPrecipitation == null ? "—" : `${currentPrecipitation.toFixed(1)} mm`}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(precipitationField, currentSnapshot?.capturedAt)}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-500">Cumul station non comparable</p>
+                </div>
               </div>
             </section>
-            <section aria-label="Prévisions du jour" className="mt-2 rounded-xl border border-sky-400/20 bg-sky-950/10 px-2 pb-2">
-              <p className="pt-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">Prévisions du jour <span className="font-normal normal-case tracking-normal text-slate-400">· valeurs prévues, distinctes des observations</span></p>
-              <div className="mt-2 grid grid-cols-2 gap-1 border-t border-sky-400/20 pt-2 sm:grid-cols-4 sm:gap-2">
-              <div className="text-center">
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-sky-200 sm:mb-0.5 sm:text-xs"><Sun className="h-3 w-3" />UV prévu</p>
-                <UVBadge uv={currentUV} />
+            <section aria-label="Prévisions horaires, distinctes des observations actuelles" className="rounded-xl border border-sky-400/25 bg-sky-950/15 px-2 pb-2">
+              <div className="border-b border-sky-400/20 pb-2 pt-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-200 sm:text-sm">Prévisions horaires <span className="font-normal normal-case tracking-normal text-slate-400">· distinctes des observations</span></p>
               </div>
-              <div className="text-center">
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                  <Droplets className="h-3 w-3" />Pluie prévue
-                </p>
-                <p className="text-sm font-semibold sm:text-lg">{isDailyFallback ? dailyFallback.precipitation ?? "—" : today?.precipitation ?? meteoAI?.precipitation ?? "—"} mm</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="min-w-0 rounded-lg border border-sky-300/15 bg-slate-950/35 p-2 text-center">
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-sky-100 sm:text-sm"><Sun className="h-3.5 w-3.5 shrink-0" />{currentUVLabel}</p>
+                  <UVBadge uv={currentUV} />
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(uvForecastHour?.validAt)}</p>
+                </div>
+                <div className="min-w-0 rounded-lg border border-sky-300/15 bg-slate-950/35 p-2 text-center" title="Visibilité météorologique en kilomètres ; le contrat ne fournit pas de mesure distincte de visibilité des nuages.">
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-sky-100 sm:text-sm"><Eye className="h-3.5 w-3.5 shrink-0" />Visibilité horaire</p>
+                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentHour?.visibility == null ? "—" : `${currentHour.visibility.toFixed(1)} km`}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-500">Visibilité météo, pas spécifique aux nuages</p>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-muted-foreground sm:mb-0.5 sm:text-xs">
-                  <Wind className="h-3 w-3" />Rafales prévues
-                </p>
-                <p className="text-sm font-semibold sm:text-lg">{today?.windGust ?? "—"} km/h</p>
-              </div>
-              <div className="text-center">
-                <p className="mb-0 flex items-center justify-center gap-1 text-[10px] text-sky-200 sm:mb-0.5 sm:text-xs">
-                  <MeteoIcon name="wind_param" size={16} className="shrink-0" />Vent max prévu
-                </p>
-                <p className="text-sm font-semibold sm:text-lg">{today?.windSpeed ?? meteoAI?.windSpeed ?? "—"} km/h</p>
-              </div>
-              <div className="text-center">
-                  <p className="mb-0 flex items-center justify-center gap-0.5 text-[10px] text-sky-200 sm:mb-0.5 sm:text-xs">
-                    <Thermometer className="h-3 w-3" />Accord sur Tmax prévue
-                    <button
-                      type="button"
-                      onClick={() => setIsForecastInfoOpen((open) => !open)}
-                      aria-expanded={isForecastInfoOpen}
-                      aria-controls="forecast-information-panel"
-                      aria-label={isForecastInfoOpen ? "Masquer les informations d’accord entre modèles" : "Afficher les informations d’accord entre modèles"}
-                      className="inline-flex size-5 items-center justify-center rounded-full text-sky-200 transition-colors hover:bg-sky-400/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                    >
-                      {isForecastInfoOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-                    </button>
-                  </p>
-                <p className="text-sm font-semibold sm:text-lg">
-                  {dailyAgreement?.tempMax.range == null ? "Étendue indisponible" : `Étendue ${dailyAgreement.tempMax.range.toFixed(1)} °C`}
-                </p>
-                <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement?.tempMax.standardDeviation == null ? "σ population indisponible" : `σ population ${dailyAgreement.tempMax.standardDeviation.toFixed(1)} °C`}</p>
-                <p className="text-[9px] text-muted-foreground sm:text-[10px]">{dailyAgreement ? `${dailyAgreement.tempMax.availableModelCount}/${dailyAgreement.expectedModelCount} modèles · jour demandé ${dailyAgreement.requestDayOffset == null ? "indisponible" : `J+${dailyAgreement.requestDayOffset}`} · heure de run modèle non archivée · accord brut, pas fiabilité · incertitude statistique non mesurée` : "Accord inter-modèles indisponible · incertitude statistique non mesurée"}</p>
-              </div>
-              </div>
+              <ForecastProvenanceBadge data={forecastProvenance} className="mt-2" />
             </section>
 
             </div>
@@ -1189,34 +1177,6 @@ export default function Dashboard() {
               )) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-[10px] text-slate-400">Aucune collecte de prévisions horodatée n’est encore archivée.</p>}
             </div>
             <div className="mt-3 space-y-2" aria-label="Historique des 24 derniers créneaux horaires">{hourlyCollectionHistory.length ? hourlyCollectionHistory.map((trace) => { const presentation = hourlyCollectionPresentation(trace); return <article key={`${trace.date}-${trace.hour}`} className={`rounded-xl border p-3 ${presentation.className}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-semibold">{hourlyCollectionMoment(trace)} · {presentation.label}</p><p className="mt-1 text-[10px] leading-relaxed opacity-85">{trace.status === "stored" ? `${trace.stationCount} station(s) qualifiée(s) archivée(s) après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.` : trace.status === "no_station" ? `Passage terminé après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""} ; aucune station qualifiée.` : trace.status === "missing" ? "Le créneau est arrivé à échéance sans trace archivée ; la reprise automatique devait le rattraper." : `Échec après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.`}{trace.reason ? ` ${trace.reason}` : ""}</p></div><span className="shrink-0 text-[10px] font-semibold">{trace.status === "stored" ? "✓" : trace.status === "no_station" ? "—" : trace.status === "missing" ? "?" : "!"}</span></div></article>; }) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-xs text-slate-400">Aucun passage horaire n’est encore archivé pour ce lieu.</p>}</div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={isForecastInfoOpen} onOpenChange={setIsForecastInfoOpen}>
-          <DialogContent
-            id="forecast-information-panel"
-            showCloseButton={false}
-            aria-label="Informations sur les prévisions et l’accord inter-modèles"
-            className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto border-sky-300/35 bg-[#08131f]/[0.98] p-3 text-slate-100 shadow-2xl sm:max-w-xl"
-          >
-            <div className="flex items-center justify-between gap-3 pr-0">
-              <DialogHeader className="text-left">
-                <DialogTitle className="text-base font-semibold text-slate-50">Accord et fiabilité des prévisions</DialogTitle>
-              </DialogHeader>
-              <button
-                type="button"
-                onClick={() => setIsForecastInfoOpen(false)}
-                aria-label="Fermer les informations de prévision et d’accord inter-modèles"
-                title="Fermer"
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-900/90 text-slate-200 transition-colors hover:border-sky-300/65 hover:bg-sky-400/15 hover:text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <ForecastProvenanceBadge data={forecastProvenance} />
-              <ForecastMetricDefinitions />
-            </div>
           </DialogContent>
         </Dialog>
 
