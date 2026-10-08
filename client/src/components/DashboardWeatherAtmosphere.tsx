@@ -5,6 +5,7 @@ import {
   type DashboardWeatherAtmosphereInput,
 } from "@/lib/dashboardWeatherAtmosphere";
 import type { DashboardWeatherEffectsMode } from "@/lib/dashboardWeatherEffects";
+import { RainWebGLCanvas } from "@/components/weather/RainWebGLCanvas";
 
 const RAIN_DROPS = [
   { left: 3, delay: -1.3, duration: 1.8, length: 17, depth: "far", drift: "-1.2vw" },
@@ -104,12 +105,74 @@ function sampleEvenly<T>(items: readonly T[], count: number): T[] {
   );
 }
 
+type RainRendererMode = "css" | "webgl";
+
+type RainLayerProps = {
+  drops: typeof RAIN_DROPS[number][];
+  effectsMode: DashboardWeatherEffectsMode;
+  reduced: boolean;
+  condition?: string | null;
+  regime?: string | null;
+  windSpeed?: number | null;
+  windDirection?: number | null;
+  windGust?: number | null;
+};
+
+function RainLayer({
+  drops,
+  effectsMode,
+  reduced,
+  condition,
+  regime,
+  windSpeed,
+  windDirection,
+  windGust,
+}: RainLayerProps) {
+  const [rendererMode, setRendererMode] = React.useState<RainRendererMode>("css");
+
+  return (
+    <div
+      className="dashboard-weather-atmosphere__rain-layer"
+      data-rain-renderer={rendererMode}
+    >
+      {rendererMode === "css" ? drops.map((drop, index) => (
+        <i
+          key={`rain-${index}`}
+          className={`dashboard-weather-atmosphere__rain-drop dashboard-weather-atmosphere__rain-drop--${drop.depth}`}
+          style={{
+            left: `${drop.left}%`,
+            height: `${drop.length}px`,
+            animationDelay: `${drop.delay}s`,
+            animationDuration: `${drop.duration * (reduced ? 1.45 : 1)}s`,
+            "--rain-drift": drop.drift,
+          } as CSSProperties}
+        />
+      )) : null}
+      <RainWebGLCanvas
+        effectsMode={effectsMode}
+        isRainCategory
+        condition={condition}
+        regime={regime}
+        windSpeedKmh={windSpeed}
+        windDirectionDegrees={windDirection}
+        windGustKmh={windGust}
+        onRendererChange={setRendererMode}
+      />
+      <span className="dashboard-weather-atmosphere__wet-sheen" />
+    </div>
+  );
+}
+
 type DashboardWeatherAtmosphereProps = DashboardWeatherAtmosphereInput & {
   effectsMode?: DashboardWeatherEffectsMode;
+  windDirection?: number | null;
+  windGust?: number | null;
 };
 
 export function DashboardWeatherAtmosphere({
   effectsMode = "full",
+  windDirection = null,
+  windGust = null,
   ...weather
 }: DashboardWeatherAtmosphereProps) {
   const { kind, intensity } = getDashboardWeatherAtmosphere(weather);
@@ -139,22 +202,16 @@ export function DashboardWeatherAtmosphere({
       <span className="dashboard-weather-atmosphere__wash" />
 
       {isRain ? (
-        <>
-          {rainDrops.map((drop, index) => (
-            <i
-              key={`rain-${index}`}
-              className={`dashboard-weather-atmosphere__rain-drop dashboard-weather-atmosphere__rain-drop--${drop.depth}`}
-              style={{
-                left: `${drop.left}%`,
-                height: `${drop.length}px`,
-                animationDelay: `${drop.delay}s`,
-                animationDuration: `${drop.duration * (reduced ? 1.45 : 1)}s`,
-                "--rain-drift": drop.drift,
-              } as CSSProperties}
-            />
-          ))}
-          <span className="dashboard-weather-atmosphere__wet-sheen" />
-        </>
+        <RainLayer
+          drops={rainDrops}
+          effectsMode={effectsMode}
+          reduced={reduced}
+          condition={weather.condition}
+          regime={weather.regime}
+          windSpeed={weather.windSpeed}
+          windDirection={windDirection}
+          windGust={windGust}
+        />
       ) : null}
 
       {kind === "clouds" ? (
