@@ -146,7 +146,10 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('dir == null ? "—" : cardinalDir(dir)');
     expect(source).toContain("Précipitations actuelles");
     expect(source).toContain("Pression locale");
-    expect(source).toContain("hasCurrentDashboardFields ? currentNumber(temperatureField) : officialSnapshotTemp");
+    expect(source).toContain("const currentTemp = currentNumber(temperatureField)");
+    expect(source).toContain("withCurrentSnapshotFallback(currentFields?.condition, currentSnapshot?.condition, snapshotCapturedAt)");
+    expect(source).toContain("withCurrentSnapshotFallback(currentFields?.temperature, currentSnapshot?.temp, snapshotCapturedAt)");
+    expect(source).toContain('aria-label="Condition météo indisponible"');
     expect(source).toContain("Cumul station non comparable");
     expect(source).toContain("Références source non comparables");
     expect(source).toContain('{panelDate}');
