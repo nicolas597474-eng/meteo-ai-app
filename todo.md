@@ -3974,4 +3974,4 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Auditer le contrat : `visibility` est une prévision horaire en km; l’API n’offre pas de champ « visibilité des nuages ». L’interface présente donc « Visibilité horaire » et le précise, sans inventer une mesure nuageuse.
 - [x] Ne modifier ni API, sources, observations, calculs météo, prévisions, poids, scoring, ni dépendance; aucun test sur téléphone réel. L’aperçu compilé s’ouvre mais ses prévisions restent indisponibles faute de serveur API local; le rendu des cartes n’a donc pas pu être inspecté visuellement.
 - [x] Valider : test Dashboard ciblé 3/3; suite Vitest complète 228 fichiers, 1 151 tests réussis et 2 ignorés; `pnpm check`, `pnpm build`, `git diff --check` réussis. Build : avertissement de taille du bundle initial supérieur à 500 kB.
-- [x] Préparer une PR ciblée vers `main`, à laisser ouverte sans fusion ni déploiement.
+- [x] Ouvrir la PR dédiée [#114](https://github.com/nicolas597474-eng/meteo-ai-app/pull/114) vers `main`; la laisser ouverte, sans fusion ni déploiement.
