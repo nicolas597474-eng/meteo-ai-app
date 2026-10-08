@@ -34,7 +34,7 @@ import { PrecipitationConsensusChart } from "@/components/weather/PrecipitationC
 import { countArchivedSnapshotSlots, formatCollectionDuration } from "@/lib/collectionHealth";
 import { getDashboardObservability } from "@/lib/dashboardObservability";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
-import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
+import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, withCurrentSnapshotFallback, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
 import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour, getOfficialForecastCoordinates } from "@/lib/officialForecast";
@@ -91,7 +91,8 @@ function currentNumber(field?: CurrentStateFieldLike | null): number | null {
 }
 
 function currentString(field?: CurrentStateFieldLike | null): string | null {
-  return typeof field?.value === "string" && field.value.trim() ? field.value : null;
+  const value = typeof field?.value === "string" ? field.value.trim() : "";
+  return value && !/^(?:conditions? indisponibles|indisponible)$/i.test(value) ? value : null;
 }
 
 // ─── UV Index indicator ────────────────────────────────────────────────────────
@@ -596,7 +597,6 @@ export default function Dashboard() {
   const currentSnapshot = officialForecast?.currentSnapshot ?? null;
   const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
   const currentFields = currentDashboardWeather?.fields;
-  const hasCurrentDashboardFields = currentDashboardWeather != null;
   const hasPhysicalCurrentState = Object.values(currentFields ?? {}).some((field) => field.provenance.kind === "physical_stations");
   const hasAvailableCurrentState = Object.values(currentFields ?? {}).some((field) => field.value != null);
   const nowHour = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).slice(0, 2) + ":00";
@@ -669,10 +669,11 @@ export default function Dashboard() {
   const nextConditionChange = isDailyFallback ? null : findNextConditionChange(hours, currentHour?.hour ?? nowHour, currentHour?.validAt);
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
   const officialSnapshotTemp = currentSnapshot?.temp ?? null;
-  const temperatureField = currentFields?.temperature ?? null;
-  const conditionField = currentFields?.condition ?? null;
-  const currentTemp = hasCurrentDashboardFields ? currentNumber(temperatureField) : officialSnapshotTemp;
-  const selectedCondition = hasCurrentDashboardFields ? currentString(conditionField) : currentSnapshot?.condition ?? null;
+  const snapshotCapturedAt = currentSnapshot?.capturedAt ?? null;
+  const temperatureField = withCurrentSnapshotFallback(currentFields?.temperature, currentSnapshot?.temp, snapshotCapturedAt);
+  const conditionField = withCurrentSnapshotFallback(currentFields?.condition, currentSnapshot?.condition, snapshotCapturedAt);
+  const currentTemp = currentNumber(temperatureField);
+  const selectedCondition = currentString(conditionField);
   const displayedCondition = selectedCondition ?? (isDailyFallback ? dailyFallback.condition : null);
   const activeFavoriteWeather = {
     temp: officialSnapshotTemp,
@@ -683,25 +684,25 @@ export default function Dashboard() {
   const minTemperature = isDailyFallback ? dailyFallback.tempMin : today?.tempMin ?? meteoAI?.tempMin ?? null;
   const maxTemperatureTone = getExtremeTemperatureTone("max", maxTemperature);
   const minTemperatureTone = getExtremeTemperatureTone("min", minTemperature);
-  const apparentTemperatureField = currentFields?.apparentTemperature ?? null;
-  const apparentTemp = hasCurrentDashboardFields ? currentNumber(apparentTemperatureField) : currentSnapshot?.apparentTemp ?? null;
+  const apparentTemperatureField = withCurrentSnapshotFallback(currentFields?.apparentTemperature, currentSnapshot?.apparentTemp, snapshotCapturedAt);
+  const apparentTemp = currentNumber(apparentTemperatureField);
   const currentUV = currentHour?.uvIndex ?? hours.find((hour) => typeof hour.validAt === "number" && hour.validAt > forecastNowMs && hour.uvIndex != null)?.uvIndex ?? null;
-  const windDirectionField = currentFields?.windDirection ?? null;
-  const windSpeedField = currentFields?.windSpeed ?? null;
-  const windGustField = currentFields?.windGust ?? null;
-  const precipitationField = currentFields?.precipitation ?? null;
-  const cloudCoverField = currentFields?.cloudCover ?? null;
-  const humidityField = currentFields?.humidity ?? null;
+  const windDirectionField = withCurrentSnapshotFallback(currentFields?.windDirection, currentSnapshot?.windDirection, snapshotCapturedAt);
+  const windSpeedField = withCurrentSnapshotFallback(currentFields?.windSpeed, currentSnapshot?.windSpeed, snapshotCapturedAt);
+  const windGustField = withCurrentSnapshotFallback(currentFields?.windGust, currentSnapshot?.windGust, snapshotCapturedAt);
+  const precipitationField = withCurrentSnapshotFallback(currentFields?.precipitation, currentSnapshot?.precipitation, snapshotCapturedAt);
+  const cloudCoverField = withCurrentSnapshotFallback(currentFields?.cloudCover, currentSnapshot?.cloudCover, snapshotCapturedAt);
+  const humidityField = withCurrentSnapshotFallback(currentFields?.humidity, currentSnapshot?.humidity, snapshotCapturedAt);
   const pressureField = currentFields?.pressure ?? null;
-  const weatherCodeField = currentFields?.weatherCode ?? null;
-  const currentWeatherCode = hasCurrentDashboardFields ? currentNumber(weatherCodeField) : currentSnapshot?.weatherCode ?? null;
-  const windDir = hasCurrentDashboardFields ? currentNumber(windDirectionField) : currentSnapshot?.windDirection ?? null;
-  const windSpeed = hasCurrentDashboardFields ? currentNumber(windSpeedField) : currentSnapshot?.windSpeed ?? null;
-  const currentWindGust = hasCurrentDashboardFields ? currentNumber(windGustField) : currentSnapshot?.windGust ?? null;
-  const currentPrecipitation = hasCurrentDashboardFields ? currentNumber(precipitationField) : currentSnapshot?.precipitation ?? null;
-  const currentPressure = hasCurrentDashboardFields ? currentNumber(pressureField) : null;
-  const currentCloudCover = hasCurrentDashboardFields ? currentNumber(cloudCoverField) : currentSnapshot?.cloudCover ?? null;
-  const currentHumidity = hasCurrentDashboardFields ? currentNumber(humidityField) : currentSnapshot?.humidity ?? null;
+  const weatherCodeField = withCurrentSnapshotFallback(currentFields?.weatherCode, currentSnapshot?.weatherCode, snapshotCapturedAt);
+  const currentWeatherCode = currentNumber(weatherCodeField);
+  const windDir = currentNumber(windDirectionField);
+  const windSpeed = currentNumber(windSpeedField);
+  const currentWindGust = currentNumber(windGustField);
+  const currentPrecipitation = currentNumber(precipitationField);
+  const currentPressure = currentNumber(pressureField);
+  const currentCloudCover = currentNumber(cloudCoverField);
+  const currentHumidity = currentNumber(humidityField);
   const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : undefined) ?? undefined, windSpeed: windSpeed ?? undefined });
   const dashboardSkyStyle = { "--dashboard-sky-image": `url("${dashboardSkyImage}")` } as CSSProperties;
   const nextRegimeChange = officialForecast?.nextRegimeChange ?? null;
@@ -946,7 +947,9 @@ export default function Dashboard() {
             <div className="flex items-start gap-2 sm:gap-6">
               {/* The main temperature is selected from the current-state read model, independently of forecasts. */}
               <div className="w-[4.75rem] shrink-0 pt-0.5 sm:w-[5.25rem] sm:pt-0">
-                <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} />
+                {displayedCondition
+                  ? <MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} />
+                  : <div className="grid h-16 w-16 place-items-center rounded-full border border-slate-500/30 bg-slate-900/45 text-2xl font-medium text-slate-500" role="img" aria-label="Condition météo indisponible">?</div>}
               </div>
 
               <div className={dashboardTemperatureLayout.content}>
