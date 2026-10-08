@@ -3920,4 +3920,4 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Démarrer en parallèle les lectures indépendantes uniquement dans le parcours demandé; tester que le mode court ne lance ni n’attend l’appel étendu et que le mode long conserve son résultat.
 - [x] Ajouter un test de non-régression synthétique de concurrence et de propagation d’erreur, sans requête météo, collecte, recalcul, migration ni nouvelle dépendance.
 - [x] Vérifications : tests ciblés 22/22; `pnpm check`; `pnpm build`; `git diff --check`. Aucun appel de fournisseur météo n’a été exécuté.
-- [ ] Ouvrir une PR dédiée; ne pas fusionner ni déployer.
+- [x] Ouvrir la PR dédiée [#107](https://github.com/nicolas597474-eng/meteo-ai-app/pull/107) vers `main`; elle reste ouverte, sans fusion ni déploiement.
