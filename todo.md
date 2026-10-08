@@ -3952,3 +3952,16 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Validation finale : `pnpm check` réussi; `pnpm test` — 228 fichiers, 1 147 réussis et 2 ignorés; `pnpm build` réussi; `git diff --check` réussi. Avertissement Vite sur le chunk principal > 500 kB.
 - [x] Limite de vérification : aucun aperçu dans un navigateur mobile ni essai sur téléphone physique.
 - [x] Ouvrir la PR [#111](https://github.com/nicolas597474-eng/meteo-ai-app/pull/111) vers `main`; la laisser ouverte, sans fusion ni déploiement.
+
+
+## Prioriser le chargement initial des pages — 8 octobre 2026
+- [x] Repartir d’un clone propre du `main` au SHA `3086b6327dcc97b2731f7313c261dd5ffbe23512`; confirmer que la PR #107 est fusionnée et relire son périmètre ainsi que les notes de performance existantes.
+- [x] Comparer Dashboard et Prévisions : garder la séparation de #107, le chargement court du Dashboard et l’horizon horaire étendu de 16 jours dans Prévisions; ne modifier aucune donnée, logique météo, collecte ou section.
+- [x] Mesurer le build de référence : le préchargement lancé 250 ms après montage charge les graphes de cinq pages secondaires, soit 897 814 octets JS uniques (233 303 octets gzip), hors bundle initial.
+- [x] Attendre qu’aucune requête React Query active ne reste, puis une période de repos et `requestIdleCallback` (repli temporisé si absent) avant le préchargement global; amorcer immédiatement seulement la route visée au survol, au focus ou à l’appui.
+- [x] Conserver le runtime injecté par `vite-plugin-manus-runtime` sans modification : le HTML de build fait 368 190 octets (105 752 gzip), car le plugin inline un runtime; son retrait ou son déplacement risquerait de changer des fonctions de plateforme.
+- [x] Ajouter un test de contrat pour la priorité aux requêtes actives, au repos et à l’intention de navigation; aucune dépendance ajoutée.
+- [x] Validation : `pnpm check` réussi; tests ciblés 10/10; suite complète Vitest 228 fichiers, 1 150 réussis et 2 ignorés; `pnpm build` et `git diff --check` réussis. Avertissements build persistants : variables Analytics absentes, asset runtime non résolu au build et chunk initial supérieur à 500 kB.
+- [x] Mesure de build après changement : JS initial 1 048 960 octets (293 476 gzip), CSS 331 930 octets (52 900 gzip); aucun temps de chargement réel/LCP n’a été mesuré dans un navigateur connecté à l’application.
+- [x] Aucun appel météo live, collecte, migration, changement de prévision, poids, scores, observations, sources ou journaux.
+- [ ] Ouvrir une PR dédiée vers `main`, la laisser non fusionnée et non publiée.

@@ -46,11 +46,16 @@ describe("navigation entre pages par glissement", () => {
     expect(styles).toContain("prefers-reduced-motion: no-preference");
   });
 
-  it("précharge les pages principales après l’affichage initial et allège la durée de transition", () => {
+  it("attend les requêtes et l’inactivité avant le préchargement global, et anticipe la route visée", () => {
     const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const styles = readFileSync(new URL("./index.css", import.meta.url), "utf8");
-    expect(appSource).toContain("function useMainPagePreload");
-    expect(appSource).toContain("window.setTimeout(preload, 250)");
+    expect(appSource).toContain("const isFetching = useIsFetching();");
+    expect(appSource).toContain("if (isFetching > 0) return;");
+    expect(appSource).toContain("window.requestIdleCallback(preload, { timeout: 1500 })");
+    expect(appSource).toContain("onPointerEnter={() => preloadMainPage(item.path)}");
+    expect(appSource).toContain("onFocus={() => preloadMainPage(item.path)}");
+    expect(appSource).toContain("onPointerDown={() => preloadMainPage(item.path)}");
+    expect(appSource).not.toContain("window.setTimeout(preload, 250)");
     expect(appSource).toContain("loadWeatherAILab()");
     expect(appSource).toContain("loadWeatherDetails()");
     expect(appSource).toContain("setTransition(null), 240");
