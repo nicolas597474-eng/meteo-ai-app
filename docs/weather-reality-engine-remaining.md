@@ -12,7 +12,7 @@ Aucune prévision, observation, station, source météo, fusion, pondération, s
 
 - **Grêle** : codes WMO 96/99 ou libellé explicite de grêle/grésil. Le code 95 (orage sans grêle) n’ajoute pas de grêlons. Le code 99 représente le seul niveau WMO explicitement classé fort; le code 96 reste modéré.
 - **Verglas** : codes WMO 56/57 (bruine verglaçante) et 66/67 (pluie verglaçante), ou libellé explicite de précipitation verglaçante. Le gel seul ou une température négative ne crée pas de couche de verglas. Les codes 56/66 sont légers; 57/67 sont classés forts pour le rendu.
-- **Orage** : les codes WMO 95/96/99 et les libellés existants déclenchent l’éclair. L’orage n’ajoute pas automatiquement une pluie ou de la grêle : la pluie exige un libellé explicite pluie/averse/bruine et la grêle son propre signal. Un cumul de précipitations sans période connue ne suffit pas à faire apparaître de la pluie dans un orage.
+- **Orage** : les codes WMO 95/96/99 et les libellés explicitement liés à l’orage (`orage`, `thunderstorm`) déclenchent l’éclair; le terme « tempête » seul ne suffit pas. L’orage n’ajoute pas automatiquement une pluie ou de la grêle : la pluie exige un libellé explicite pluie/averse/bruine et la grêle son propre signal. Une quantité de précipitations sans période connue ne suffit pas à faire apparaître ou intensifier la pluie dans un orage.
 - **Nuages** : une couverture finie comprise entre 0 et 100 % module l’opacité; zéro est une observation valide. Une valeur `null` reste « inconnue » et utilise un rendu neutre conditionné par le libellé nuageux, elle n’est pas convertie en zéro.
 - **Soleil** : la couverture nuageuse valide module l’intensité d’un voile diffus et non localisé. `null` garde un niveau ambiant neutre distinct de la valeur observée 0 %. Aucun azimut, élévation ou disque solaire n’est inventé.
 - **Vent** : la vitesse, les rafales et la direction existantes pilotent une dérive plafonnée. Les vitesses hors plages (vitesse > 250 km/h, rafale > 300 km/h), les directions hors 0–360° et les valeurs non finies sont ignorées. Sans direction, les rubans restent neutres; aucune direction n’est supposée.
@@ -28,6 +28,7 @@ Ces champs servent uniquement à l’habillage décoratif. Ils ne modifient pas 
 - Le rendu solaire est un simple voile uniforme modulé par la nébulosité, sans nouvelle sphère ni localisation de source lumineuse.
 
 ## Validation
+
 - `pnpm check` : réussi.
 - `pnpm test` : 228 fichiers; 1 147 tests réussis et 2 ignorés.
 - `pnpm build` : réussi. Vite avertit qu’un bundle dépasse 500 kB (le bundle principal est d’environ 1,05 MB); le build termine sans erreur.
@@ -35,4 +36,5 @@ Ces champs servent uniquement à l’habillage décoratif. Ils ne modifient pas 
 - Après correction de deux assertions de test hors portée, les 12 tests ciblés concernés passent également.
 
 Aucun aperçu mobile en navigateur ni essai sur téléphone physique n’a été effectué. La validation visuelle reste à faire sur de vrais appareils iOS et Android; les tests actuels valident le comportement automatisé, pas la fluidité WebGL ni le rendu physique.
+
 - **Grêle** : codes WMO 96/99 ou libellé explicite de grêle/grésil. Le code 95 (orage sans grêle) n’ajoute pas de grêlons. Le code 99 représente le seul niveau WMO explicitement classé fort; le code 96 garde une intensité visuelle `steady`.

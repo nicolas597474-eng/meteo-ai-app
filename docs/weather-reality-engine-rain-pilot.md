@@ -4,8 +4,9 @@ Ce pilote relie le choix de condition déjà utilisé par le tableau de bord à 
 
 ## Entrées et limites
 
-- Le déclenchement reprend uniquement le résultat catégoriel du classifieur visuel existant (libellé ou repli de présence déjà en place), pour pluie/orage. Ce signal ne fournit pas de débit; aucun chiffre n’est utilisé pour l’intensité WebGL.
-- Aucun cumul ou nombre de précipitations n’est interprété comme un débit : la période du champ courant n’est pas garantie. `precipitationRateMmPerHour` reste donc `null`.
+- La pluie n’est affichée que si le libellé de condition/régime sélectionné indique explicitement pluie, averse ou bruine. Une quantité numérique sans période documentée ne déclenche pas la pluie et ne l’intensifie pas.
+- L’orage exige un libellé explicite d’orage ou un code WMO correspondant; le seul mot « tempête » n’active pas les éclairs. Un orage ne crée pas automatiquement pluie ou grêle sans signal distinct.
+- Le débit n’est pas disponible sous une forme courante dont la période est documentée : `precipitationRateMmPerHour` reste donc `null`. Aucun chiffre de précipitations n’est utilisé pour l’intensité WebGL.
 - Les qualificatifs textuels explicites (« faible », « forte »…) peuvent moduler le nombre et la vitesse des particules comme choix de rendu, pas comme mesure physique. Sans qualificatif, le moteur conserve une densité modérée.
 - Le vent est transmis en km/h avec sa direction et ses rafales quand ces valeurs existent. Une direction absente donne une pluie verticale neutre; les valeurs invalides sont ignorées.
 

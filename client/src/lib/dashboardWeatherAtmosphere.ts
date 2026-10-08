@@ -22,6 +22,7 @@ export type DashboardWeatherAtmosphereInput = {
   weatherCode?: number | null;
   temperature?: number | null;
   visibilityKm?: number | null;
+  /** Champ numérique sans période garantie : jamais converti en débit ou signal pluie. */
   precipitation?: number | null;
   cloudCover?: number | null;
   windSpeed?: number | null;
@@ -69,7 +70,9 @@ function normalizedSignals(input: DashboardWeatherAtmosphereInput): string {
 }
 
 /** WMO 96/99 and explicit labels are the only additional hail signals. */
-export function hasDashboardHail(input: DashboardWeatherAtmosphereInput): boolean {
+export function hasDashboardHail(
+  input: DashboardWeatherAtmosphereInput
+): boolean {
   const code = finiteWeatherCode(input.weatherCode);
   return (
     code === 96 ||
@@ -233,9 +236,11 @@ export function getDashboardWeatherFogOpacity(
 function classifyCondition(
   condition: string
 ): DashboardWeatherAtmosphereKind | null {
-  if (/(orage|thunder|tempet|storm)/.test(condition)) return "storm";
+  if (/(orage|thunderstorm)/.test(condition)) return "storm";
   if (/(grele|hail|gresil|graupel)/.test(condition)) return "hail";
-  if (/(verglas|vergla|givre|gele|gel|frost|freezing|ice|glace)/.test(condition))
+  if (
+    /(verglas|vergla|givre|gele|gel|frost|freezing|ice|glace)/.test(condition)
+  )
     return "ice";
   if (/(neige|snow|sleet)/.test(condition)) return "snow";
   if (/(brume seche|poussiere|dust|haze)/.test(condition)) return "dust";
@@ -270,11 +275,7 @@ function getIntensity(
   }
 
   if (kind === "rain") {
-    const precipitation = finiteValue(input.precipitation);
-    if (
-      (precipitation != null && precipitation > 10) ||
-      /(fort|intense|heavy|violent)/.test(condition)
-    ) {
+    if (/(fort|intense|heavy|violent)/.test(condition)) {
       return "heavy";
     }
     if (/(bruine|faible|light|fine)/.test(condition)) return "light";
@@ -318,9 +319,9 @@ function getIntensity(
 }
 
 /**
- * Choisit uniquement un habillage décoratif cohérent avec la condition ou le
- * régime déjà affiché, puis avec les seuils météo déjà utilisés par MeteoAI.
- * Aucun phénomène n’est déduit d’une donnée absente.
+ * Choisit un habillage décoratif à partir des signaux catégoriels explicitement
+ * sélectionnés. Un nombre de précipitations sans période garantie ne déclenche
+ * ni pluie ni intensité. Aucun phénomène n’est déduit d’une donnée absente.
  */
 export function getDashboardWeatherAtmosphere(
   input: DashboardWeatherAtmosphereInput
@@ -334,16 +335,14 @@ export function getDashboardWeatherAtmosphere(
     : weatherCode === 95 || weatherCode === 96 || weatherCode === 99
       ? "storm"
       : classifyCondition(displayedWeather);
-  const precipitation = finiteValue(input.precipitation);
   const cloudCover = finitePercent(input.cloudCover);
   const windSpeed = finiteValue(input.windSpeed);
   const temperature = finiteValue(input.temperature);
   const visibilityKm = finiteVisibilityKm(input.visibilityKm);
 
-  // La condition affichée reste prioritaire; les mesures ne servent qu’en repli.
+  // Les mesures restent des replis pour leurs propres effets, jamais pour inférer la pluie.
   const kind =
     explicitKind ??
-    (precipitation != null && precipitation > 0.2 ? "rain" : null) ??
     (windSpeed != null && windSpeed >= 40 ? "wind" : null) ??
     (visibilityKm != null && visibilityKm < 1 ? "fog" : null) ??
     (temperature != null && temperature > 33 ? "heat" : null) ??
