@@ -177,7 +177,34 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+/**
+ * Supprime le script analytics Umami quand VITE_ANALYTICS_ENDPOINT n'est pas défini.
+ * Sans cela, le navigateur demande `%VITE_ANALYTICS_ENDPOINT%/umami` à chaque chargement :
+ * le serveur répond avec index.html (≈370 ko) à la place d'un script, ce qui est
+ * téléchargé pour rien et provoque une erreur de parsing.
+ */
+function vitePluginStripUnsetAnalytics(): Plugin {
+  return {
+    name: "strip-unset-analytics",
+    enforce: "post",
+    transformIndexHtml: {
+      order: "post",
+      handler(html) {
+        if (!html.includes("%VITE_ANALYTICS_ENDPOINT%")) return html;
+        return html.replace(/<script\b[^>]*%VITE_ANALYTICS_ENDPOINT%[^>]*><\/script>\s*/g, "");
+      },
+    },
+  };
+}
+
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+  vitePluginStripUnsetAnalytics(),
+];
 
 export default defineConfig({
   define: {

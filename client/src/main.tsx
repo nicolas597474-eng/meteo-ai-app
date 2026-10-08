@@ -9,7 +9,11 @@ import { getLoginUrl } from "./const";
 import { LocationProvider } from "./contexts/LocationContext";
 import "./index.css";
 
-const queryClient = new QueryClient();
+// Les données restent « fraîches » 30 s : revenir sur une page déjà visitée
+// affiche immédiatement le cache au lieu d'un écran de chargement, puis met à jour en arrière-plan.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000 } },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;

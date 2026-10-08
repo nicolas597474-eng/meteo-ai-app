@@ -1,4 +1,5 @@
 import "dotenv/config";
+import compression from "compression";
 import express from "express";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -27,6 +28,10 @@ async function startServer() {
   
   // 2. Security headers
   app.use(securityHeaders);
+
+  // 2b. Compression gzip/brotli for HTML, JS/CSS bundles and tRPC JSON
+  // (≈1,4 Mo de bundles non compressés → ≈360 ko transférés)
+  app.use(compression());
   
   // 3. Rate limiting (apply to all routes except health checks)
   app.use((req, res, next) => {

@@ -238,18 +238,18 @@ export const weatherRouter = router({
     // Snapshot, observation et prévision horaire actualisée sont comparés par
     // le sélecteur partagé.
     const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
-    const [meteoAI, observation, officialSnapshot] = await Promise.all([
+    // Lectures indépendantes : lancées en parallèle plutôt qu'en séquence (latence DB cumulée).
+    const [meteoAI, observation, officialSnapshot, forecasts, recentForecasts] = await Promise.all([
       getMeteoAIForecastByDate(today, locKey),
       getObservationByDate(today, locKey),
       resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM),
+      // Toutes les prévisions du jour
+      getForecastsByDate(today, locKey),
+      // Prévisions récentes si pas de donnée du jour
+      getLatestMeteoAIForecasts(7, locKey),
     ]);
     const hourly = officialSnapshot.hourly;
 
-    // Get all forecasts for today
-    const forecasts = await getForecastsByDate(today, locKey);
-
-    // Get recent forecasts if no today data
-    const recentForecasts = await getLatestMeteoAIForecasts(7, locKey);
     const dailyFallbackSource = meteoAI ?? recentForecasts[0];
     const dailyFallbackTrace = getPersistedForecastTrace(dailyFallbackSource?.weights, dailyFallbackSource?.computedAt);
     const dailyFallback = officialSnapshot.hourly.length === 0

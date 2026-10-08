@@ -58,10 +58,25 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Les bundles Vite portent un hash de contenu dans leur nom (ex. index-C5S44qwu.js) :
+  // ils peuvent être mis en cache de façon immuable. index.html, lui, doit toujours
+  // être revalidé pour pointer vers les nouveaux bundles après un déploiement.
+  const HASHED_ASSET = /-[A-Za-z0-9_-]{8}\.(js|css|woff2?)$/;
+  app.use(
+    express.static(distPath, {
+      index: false,
+      maxAge: "1h",
+      setHeaders(res, filePath) {
+        if (filePath.includes(`${path.sep}assets${path.sep}`) && HASHED_ASSET.test(filePath)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      },
+    })
+  );
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

@@ -56,11 +56,19 @@ function shouldIgnorePageSwipe(target: EventTarget | null) {
   return Boolean(target.closest(PAGE_SWIPE_IGNORE_SELECTOR));
 }
 
+/** Pas de préchargement massif sur connexion lente ou en mode économie de données : il concurrencerait la page courante. */
+function isConstrainedNetwork() {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (!connection) return false;
+  return connection.saveData === true || connection.effectiveType === "2g" || connection.effectiveType === "slow-2g";
+}
+
 function useMainPagePreload() {
   const isFetching = useIsFetching();
 
   useEffect(() => {
     if (isFetching > 0) return;
+    if (isConstrainedNetwork()) return;
 
     let cancelled = false;
     let idleCallbackId: number | null = null;
