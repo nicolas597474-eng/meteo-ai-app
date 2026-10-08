@@ -986,8 +986,11 @@ export const weatherRouter = router({
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
+      const includeExtendedPeriods = input?.includeExtendedPeriods !== false;
 
-      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, {
+        hourlyForecastDays: includeExtendedPeriods ? 16 : 2,
+      });
       const officialHours = snapshot.hourly;
       const hourlyFallback = await fillOpenWeatherHourlyGaps({
         apiKey: ENV.openWeatherMapApiKey,
@@ -996,7 +999,6 @@ export const weatherRouter = router({
         hours: officialHours,
       });
       const hours = hourlyFallback.hours;
-      const includeExtendedPeriods = input?.includeExtendedPeriods !== false;
       const periodHours = includeExtendedPeriods ? await collectHourlyForecast(today, coords, 16) : officialHours;
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;

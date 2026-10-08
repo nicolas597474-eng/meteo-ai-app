@@ -580,8 +580,8 @@ export function ForecastByDaySection({
   const today = getForecastDateKey();
   const tomorrow = getNextForecastDateKey(today);
   const displayDays = useMemo(
-    () => buildForecastDisplayDays(hours, dailyDays, 15, [today, tomorrow]),
-    [hours, dailyDays, today, tomorrow],
+    () => buildForecastDisplayDays(hours, dailyDays, 15, dailyDays.map(({ date }) => date ?? "")),
+    [hours, dailyDays],
   );
   const sourceLabels = useMemo(() => getDailyReferenceSourceLabels(dailySources), [dailySources]);
   const [selection, setSelection] = useState<ForecastTimelineSelection>({ dayDate: null, hourIndex: null, expanded: true });
@@ -930,8 +930,8 @@ export function ForecastByDaySection({
                   </div>
                 ) : <p className="border-b border-sky-100/10 py-3 text-xs text-slate-300">Aucune échéance horaire sélectionnée.</p>}
                 {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} allHours={hours} />)}
-                {selectedDateIsTodayOrTomorrow && selectedDaily && <DailyForecastMetricsPanel day={selectedDaily} sourceLabels={sourceLabels} excludeDailyConditionAndCode />}
-                {selectedDateIsTodayOrTomorrow && !selectedDaily && (
+                {selectedDaily && <DailyForecastMetricsPanel day={selectedDaily} sourceLabels={sourceLabels} excludeDailyConditionAndCode={selectedDateIsTodayOrTomorrow} />}
+                {!selectedDaily && (
                   <p className="border-t border-sky-100/10 py-3 text-xs leading-relaxed text-amber-100">Métriques quotidiennes indisponibles pour cette date. Aucune valeur n’est déduite des heures.</p>
                 )}
               </>
