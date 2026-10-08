@@ -6,12 +6,11 @@ import { dailyConditionFromWmoWeatherCode } from "@shared/dailyWeatherCode";
 import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getDailyWeatherCodeIconName } from "@/lib/dailyWeatherIcon";
 import { getWeatherLandscapeImage } from "@/lib/weatherImages";
-import { buildHourlySelectedDetails, formatHourlyPrecipitationComponentValues } from "@/lib/hourlySelectedDetails";
+import { buildHourlySelectedDetails } from "@/lib/hourlySelectedDetails";
 import { filterDailyMetricsForOfficialHourlyCard, filterOfficialHourlyCardDetails, findNextOfficialHourlyConditionChange, getOfficialHourlyCondition } from "@/lib/officialHourlyCard";
 import { getExtremeTemperatureTone } from "@/lib/extremeTemperatureTone";
 import { getTemperatureTone } from "@/lib/chartTemperatureTone";
 import { HourlyMiniHistogram } from "@/components/weather/HourlyMiniHistogram";
-import { OfficialForecastCalculationTimes } from "@/components/weather/OfficialForecastCalculationTimes";
 import { buildHourlyHistogramSeries, getHourlyHistogramStartValidAt, HOURLY_HISTOGRAM_PALETTE, type HourlyHistogramCategoryKey, type HourlyHistogramSeries, type IndexedHourlyHistogramHour } from "@/lib/hourlyMiniHistogram";
 import {
   buildForecastDisplayDays,
@@ -19,6 +18,7 @@ import {
   getDailyExtremesDisplayLabel,
   getDailyForecastDisplayMetrics,
   getDailyReferenceSourceLabels,
+  isSnowWmoWeatherCode,
   getForecastDateKey,
   getNextForecastDateKey,
   OFFICIAL_FORECAST_TIME_ZONE,
@@ -75,7 +75,7 @@ type ForecastHour = {
 
 type DetailRow = {
   key: string;
-  time: string;
+  time?: string;
   value: string;
   note?: string;
   chartValue: number | null;
@@ -104,23 +104,6 @@ function relativeForecastAge(value: string | null | undefined): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `il y a ${hours} h`;
   return `il y a ${Math.floor(hours / 24)} j`;
-}
-
-function OfficialHourlyFieldCard({ label, icon, value, provenance, provenanceTitle, valueColor }: {
-  label: string;
-  icon: string;
-  value: string;
-  provenance: string;
-  provenanceTitle: string;
-  valueColor?: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-sky-100/10 bg-slate-950/25 px-1.5 py-1.5 text-center" title={provenanceTitle}>
-      <p className="flex min-h-7 items-center justify-center gap-1 text-[9px] leading-tight text-sky-100/80 sm:text-[10px]"><MeteoIcon name={icon} size={14} className="shrink-0" />{label}</p>
-      <p className="mt-0.5 break-words text-sm font-semibold tabular-nums text-slate-50 sm:text-base" style={valueColor ? { color: valueColor } : undefined}>{value}</p>
-      <p className="mt-0.5 break-words text-[8px] leading-tight text-slate-400">{provenance}</p>
-    </div>
-  );
 }
 
 function isFiniteValue(value: number | null | undefined): value is number {
@@ -238,7 +221,7 @@ function buildHourlyDetailCategories(
   indexedHours: readonly IndexedHourlyHistogramHour<ForecastHour>[],
   startValidAt: number | null,
 ): DetailCategory[] {
-  return buildHourlySelectedDetails(entry.hour, hourTime(entry, allHours)).map((detail) => ({
+  return buildHourlySelectedDetails(entry.hour).map((detail) => ({
     key: detail.key,
     title: detail.title,
     icon: detail.icon,
@@ -248,7 +231,6 @@ function buildHourlyDetailCategories(
     validAt: detail.validAt,
     rows: [{
       key: `${detail.key}-${entry.index}`,
-      time: detail.timeLabel,
       value: detail.value,
       note: detail.note,
       chartValue: null,
@@ -366,6 +348,17 @@ function buildDailyDetailCategories(day: DailyForecastPoint): DetailCategory[] {
     rows: value ? [{ key: `${key}-${day.date ?? "date"}`, time: "Journée", value, note, chartValue, chartValueLabel: chartValue == null ? "—" : `${chartValue}${unit ? ` ${unit}` : ""}` }] : [],
   });
   const categories: DetailCategory[] = [];
+  if (isSnowWmoWeatherCode(day.weatherCode)) {
+    categories.push(makeCategory(
+      "snowfall",
+      "Neige",
+      "snow",
+      "",
+      "Neige prévue",
+      null,
+      "Code WMO quotidien valide indiquant de la neige; aucune quantité quotidienne de neige n’est fournie."
+    ));
+  }
   if (isFiniteValue(day.precipitation)) {
     const consensus = day.precipitationConsensus;
     const hasCounts = isFiniteValue(consensus?.rainModelCount) && isFiniteValue(consensus?.availableModelCount);
@@ -485,6 +478,15 @@ function DailyForecastMetricsPanel({ day, sourceLabels, excludeDailyConditionAnd
           </div>
         ))}
       </dl>
+      {excludeDailyConditionAndCode && isSnowWmoWeatherCode(day.weatherCode) && (
+        <div aria-label="Neige prévue sur la journée" className="flex items-start gap-2 rounded-lg border border-sky-100/10 bg-black/15 p-2">
+          <MeteoIcon name="snow" size={18} />
+          <div>
+            <p className="text-[10px] font-semibold text-sky-100">Neige</p>
+            <p className="mt-0.5 text-[9px] leading-relaxed text-slate-400">Signal WMO valide pour la journée; aucune quantité quotidienne de neige n’est fournie.</p>
+          </div>
+        </div>
+      )}
       {consensus && hasConsensusCounts && (
         <p className="text-[10px] leading-relaxed text-slate-300">Pluie annoncée par {consensus.rainModelCount}/{consensus.availableModelCount} modèles au seuil {isFiniteValue(consensus.thresholdMm) ? `≥ ${formatOptionalForecastValue(consensus.thresholdMm, 1, " mm")}` : "indisponible"} · fréquence brute descriptive, jamais une probabilité calibrée.</p>
       )}
@@ -517,7 +519,6 @@ function DayDetailsAccordion({ category, allHours = [] }: { category: DetailCate
         {category.cadence === "hourly" ? (
           <>
             <div className="space-y-1 text-xs leading-relaxed text-slate-300">
-              <p>Valeur de l’échéance sélectionnée · {category.rows[0]?.time ?? "heure indisponible"}.</p>
               <p className="break-words font-medium text-slate-100">{category.rows[0]?.value ?? "—"}</p>
               <p>validTime UTC : {formatUtcTimestamp(category.validAt)}</p>
             </div>
@@ -538,7 +539,7 @@ function DayDetailsAccordion({ category, allHours = [] }: { category: DetailCate
         )}
         {notes.length > 0 && (
           <div className="mt-2 space-y-1 border-t border-sky-100/10 pt-2 text-xs leading-relaxed text-slate-300">
-            {notes.map((row) => <p key={row.key}>{row.time} · {row.note}</p>)}
+            {notes.map((row) => <p key={row.key}>{row.time ? `${row.time} · ` : ""}{row.note}</p>)}
             {category.key === "precipitation" && <p className="pt-1 text-sky-100">Les comptes de modèles décrivent une fréquence brute, jamais une probabilité de pluie calibrée.</p>}
           </div>
         )}
@@ -641,25 +642,6 @@ export function ForecastByDaySection({
     ? officialProvenance?.hourlyComputedAt ?? officialProvenance?.computedAt
     : selectedDaily?.officialFusion?.issuedAt ?? officialProvenance?.computedAt;
   const selectedFreshness = formatForecastFreshness(freshnessValue);
-  const selectedMetrics = selectedEntry?.hour.multiModelMetrics;
-  const selectedModelCount = selectedMetrics?.expectedModelCount;
-  const selectedMethodLabel = selectedMetrics?.source === "official_seven_models" && selectedMetrics.bestMatchIncluded === false
-    ? `Fusion officielle MeteoAI · ${isFiniteValue(selectedModelCount) ? `${selectedModelCount} modèle(s) disponible(s)` : "effectif indisponible"} · Best Match exclu`
-    : "Prévision horaire officielle · provenance de fusion non détaillée";
-  const selectedFallbackProvenance = selectedEntry?.hour.fallbackProvenance;
-  const selectedFallbackFields = selectedFallbackProvenance
-    ? Object.keys(selectedFallbackProvenance).filter((field): field is OpenWeatherFallbackField => Boolean(selectedFallbackProvenance[field as OpenWeatherFallbackField]))
-    : [];
-  const fallbackFieldLabels: Record<OpenWeatherFallbackField, string> = {
-    temperature: "température",
-    windSpeed: "vitesse du vent",
-    windDirection: "direction du vent",
-    humidity: "humidité",
-    cloudCover: "nébulosité",
-  };
-  const selectedMethodWithFallback = selectedFallbackFields.length > 0
-    ? `${selectedMethodLabel} · repli OpenWeather exact pour ${selectedFallbackFields.map((field) => fallbackFieldLabels[field]).join(", ")}`
-    : selectedMethodLabel;
   const selectedDailyWeatherCode = selectedDay?.kind === "official-daily-fusion" && isFiniteValue(selectedDaily?.weatherCode)
     ? selectedDaily.weatherCode
     : null;
@@ -710,26 +692,6 @@ export function ForecastByDaySection({
   const selectedHourlyApparentTemperatureTone = selectedEntry && selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.apparentTemp)
     ? getTemperatureTone(selectedEntry.hour.apparentTemp, "hourly").label
     : undefined;
-  const precipitationComponentProvenance = (field: "rain" | "showers" | "snowfall") => {
-    const components = selectedEntry?.hour.precipitationComponents ?? [];
-    const sources = Array.from(new Set(components.map(({ modelName }) => modelName)));
-    const available = components.some((component) => isFiniteValue(component[field]));
-    return `${available ? "Valeurs brutes" : "Champ indisponible"} · contributeurs du total : ${sources.join(", ") || "aucun"} · sans moyenne ni zéro de remplacement`;
-  };
-  const hourlyFieldCards = selectedEntry && selectedEntryHasValidTime ? [
-    { key: "apparent", label: "Ressenti prévu", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.apparentTemp, 1, "°"), valueColor: selectedHourlyApparentTemperatureTone, provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.apparentTemp)) },
-    { key: "direction", label: "Direction du vent", icon: "wind_param", value: isFiniteValue(selectedEntry.hour.windDirection) ? `${windDirectionLabel(selectedEntry.hour.windDirection)} · ${formatOptionalForecastValue(selectedEntry.hour.windDirection, 0, "°")}` : "—", provenance: hourlyFieldProvenance("windDirection", isFiniteValue(selectedEntry.hour.windDirection)) },
-    { key: "humidity", label: "Humidité prévue", icon: "humidity", value: formatOptionalForecastValue(selectedEntry.hour.humidity, 0, "%"), provenance: hourlyFieldProvenance("humidity", isFiniteValue(selectedEntry.hour.humidity)) },
-    { key: "dew-point", label: "Point de rosée", icon: "thermometer", value: formatOptionalForecastValue(selectedEntry.hour.dewPoint, 1, "°"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.dewPoint)) },
-    { key: "precipitation", label: "Précipitations prévues", icon: "precipitation", value: formatOptionalForecastValue(selectedEntry.hour.precipitation, 1, " mm"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.precipitation)) },
-    { key: "rain", label: "Pluie · par modèle", icon: "precipitation", value: formatHourlyPrecipitationComponentValues(selectedEntry.hour.precipitationComponents, "rain", " mm"), provenance: precipitationComponentProvenance("rain") },
-    { key: "showers", label: "Averses · par modèle", icon: "precipitation", value: formatHourlyPrecipitationComponentValues(selectedEntry.hour.precipitationComponents, "showers", " mm"), provenance: precipitationComponentProvenance("showers") },
-    { key: "snowfall", label: "Neige · par modèle", icon: "precipitation", value: formatHourlyPrecipitationComponentValues(selectedEntry.hour.precipitationComponents, "snowfall", " cm"), provenance: precipitationComponentProvenance("snowfall") },
-    { key: "wind", label: "Vent prévu", icon: "wind_param", value: formatOptionalForecastValue(selectedEntry.hour.windSpeed, 0, " km/h"), provenance: hourlyFieldProvenance("windSpeed", isFiniteValue(selectedEntry.hour.windSpeed)) },
-    { key: "gust", label: "Rafales prévues", icon: "wind_param", value: formatOptionalForecastValue(selectedEntry.hour.windGust, 0, " km/h"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.windGust)) },
-    { key: "pressure", label: "Pression", icon: "pressure", value: formatOptionalForecastValue(selectedEntry.hour.pressure, 0, " hPa"), provenance: hourlyFieldProvenance(null, isFiniteValue(selectedEntry.hour.pressure)) },
-    { key: "clouds", label: "Nébulosité", icon: "cloud_cover", value: formatOptionalForecastValue(selectedEntry.hour.cloudCover, 0, "%"), provenance: hourlyFieldProvenance("cloudCover", isFiniteValue(selectedEntry.hour.cloudCover)) },
-  ] : [];
 
   useEffect(() => {
     centerWithinHorizontalStrip(hourStripRef.current, selectedHourRef.current);
@@ -802,11 +764,11 @@ export function ForecastByDaySection({
                 >
                   <span className="block truncate text-sm font-semibold text-slate-100">{day.date === today ? "Aujourd’hui" : shortWeekday(day.date)}</span>
                   <span className="my-1 flex justify-center"><MeteoIcon name={weatherIconName} size={30} ariaLabel={weatherIconLabel} /></span>
-                  <span className={`mt-1 flex min-h-8 w-full items-center justify-between gap-1 rounded-lg border px-2 py-1 ${hasMaximum ? maximumTone.container : "border-white/10 bg-slate-950/30"}`}>
+                  <span className={`mx-auto mt-1 flex min-h-8 w-fit min-w-[5.25rem] items-center justify-center gap-2 rounded-lg border px-2 py-1 ${hasMaximum ? maximumTone.container : "border-white/10 bg-slate-950/30"}`}>
                     <span className={`text-sm font-black tabular-nums ${hasMaximum ? maximumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMax, 1, "°")}</span>
                     <span className={`text-[10px] font-bold tracking-wide ${hasMaximum ? maximumTone.label : "text-slate-400"}`}>Max</span>
                   </span>
-                  <span className={`mt-1 flex min-h-8 w-full items-center justify-between gap-1 rounded-lg border px-2 py-1 ${hasMinimum ? minimumTone.container : "border-white/10 bg-slate-950/30"}`}>
+                  <span className={`mx-auto mt-1 flex min-h-8 w-fit min-w-[5.25rem] items-center justify-center gap-2 rounded-lg border px-2 py-1 ${hasMinimum ? minimumTone.container : "border-white/10 bg-slate-950/30"}`}>
                     <span className={`text-sm font-black tabular-nums ${hasMinimum ? minimumTone.value : "text-slate-400"}`}>{formatOptionalForecastValue(day.daily?.tempMin, 1, "°")}</span>
                     <span className={`text-[10px] font-bold tracking-wide ${hasMinimum ? minimumTone.label : "text-slate-400"}`}>Min</span>
                   </span>
@@ -847,8 +809,8 @@ export function ForecastByDaySection({
                     className={`forecast-hour-cell min-h-[6.25rem] w-[5rem] shrink-0 snap-start rounded-xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
                   >
                     <span className={`block min-h-5 text-sm font-bold tabular-nums ${temperatureTone ? "" : "text-slate-400"}`} style={temperatureTone ? { color: temperatureTone } : undefined}>{formatOptionalForecastValue(entry.hour.temp, 1, "°")}</span>
-                    <MeteoIcon name={icon} size={28} />
-                    <span aria-hidden="true" className={`mt-0.5 block min-h-5 text-xs font-bold tabular-nums ${precipitationLabel ? "text-sky-200" : "text-transparent"}`}>{precipitationLabel ?? "—"}</span>
+                    <MeteoIcon name={icon} size={36} />
+                    {precipitationLabel && <span className="mt-0.5 block min-h-5 text-xs font-bold tabular-nums text-sky-200">{precipitationLabel}</span>}
                     <span className={`mt-0.5 block text-sm font-bold tabular-nums ${isHourSelected ? "text-cyan-100" : "text-slate-300"}`}>{display.hourLabel}</span>
                     {display.offsetLabel && <span className="block text-[9px] text-amber-200">{display.offsetLabel}</span>}
                   </button>
@@ -918,8 +880,6 @@ export function ForecastByDaySection({
                 <span className="rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Calcul</span> · {selectedFreshness ? <time dateTime={selectedFreshness.iso}>{selectedFreshness.label} (Europe/Paris)</time> : "heure indisponible"}</span>
               </div>
 
-              {selectedDay.kind === "official-hourly" && <section aria-label="Données météo prévues pour l’échéance sélectionnée" className="mt-3 rounded-xl border border-sky-400/20 bg-sky-950/10 px-2 pb-2"><p className="pt-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">Prévisions de l’échéance sélectionnée <span className="font-normal normal-case tracking-normal text-slate-400">· provenance par champ</span></p><p className="mt-1 border-t border-sky-400/20 pt-1.5 text-[8px] leading-tight text-slate-400">{selectedEntry && selectedEntryHasValidTime && selectedValidTimeUtc !== "indisponible" ? <>Échéance {hourTime(selectedEntry, hours)} · validTime UTC <time dateTime={selectedValidTimeUtc}>{selectedValidTimeUtc}</time></> : "validTime indisponible · aucune valeur horaire future n’est substituée"}</p>{selectedEntry && selectedEntryHasValidTime ? <div className="mt-1.5 grid grid-cols-2 gap-1 sm:grid-cols-3 sm:gap-1.5 lg:grid-cols-4">{hourlyFieldCards.map(({ key, ...field }) => <OfficialHourlyFieldCard key={key} {...field} provenanceTitle={`${field.provenance} · validTime UTC ${selectedValidTimeUtc}`} />)}</div> : <p role="status" className="mt-1.5 rounded-lg border border-amber-200/20 bg-amber-200/[0.04] px-2 py-2 text-[10px] text-amber-100">{selectedEntry ? "validTime UTC absent ou invalide : mesures horaires indisponibles." : "Aucune échéance horaire sélectionnée : valeurs météo indisponibles."}</p>}</section>}
-
               {selectedDay.kind === "official-daily-fusion" && selectedDaily?.officialFusion && (
                 <div className="mt-3 border-t border-sky-100/15 pt-2.5" aria-label="Provenance de la fusion quotidienne">
                   <span className="inline-flex rounded-full border border-cyan-200/40 bg-cyan-300/10 px-2 py-1 text-[10px] font-bold text-cyan-100">Fusion officielle · preuves par variable</span>
@@ -934,15 +894,8 @@ export function ForecastByDaySection({
             {selectedDay.kind === "official-hourly" ? (
               <>
                 {selectedEntry ? (
-                  <div className="space-y-1 border-b border-sky-100/10 py-3 text-[11px] leading-relaxed text-slate-300" aria-label="Validité et provenance de l’heure sélectionnée">
-                    <p className="font-semibold text-sky-100">Valeurs pour l’échéance sélectionnée · {hourTime(selectedEntry, hours)}</p>
-                    <p>validTime UTC : {selectedEntry.hour.validAt != null && selectedValidTimeUtc !== "indisponible" ? <time dateTime={selectedValidTimeUtc}>{selectedValidTimeUtc}</time> : "indisponible"}</p>
-                    <p>Source : {selectedSourceLabel} · {selectedMethodWithFallback}.</p>
-                    <OfficialForecastCalculationTimes
-                      hourlyComputedAt={officialProvenance?.hourlyComputedAt}
-                      computedAt={officialProvenance?.computedAt}
-                      className="text-slate-300"
-                    />
+                  <div className="border-b border-sky-100/10 py-3" aria-label="Valeurs pour l’échéance sélectionnée">
+                    <h3 className="text-base font-semibold leading-snug text-sky-100">Valeurs pour l’échéance sélectionnée · {hourTime(selectedEntry, hours)}</h3>
                   </div>
                 ) : <p className="border-b border-sky-100/10 py-3 text-xs text-slate-300">Aucune échéance horaire sélectionnée.</p>}
                 {hourlyDetailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} allHours={hours} />)}

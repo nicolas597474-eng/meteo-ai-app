@@ -7,6 +7,7 @@ import {
   getForecastDateKey,
   getNextForecastDateKey,
   getDailyReferenceSourceLabels,
+  isSnowWmoWeatherCode,
 } from "@/lib/forecastDayDisplay";
 
 describe("forecast display days", () => {
@@ -143,5 +144,14 @@ describe("forecast display days", () => {
       "Best Match · référence dérivée, non contributeur officiel",
     ]);
     expect(getDailyReferenceSourceLabels([])).toEqual([]);
+  });
+
+  it("recognizes only valid WMO snow and snow-shower codes", () => {
+    for (const code of [71, 73, 75, 77, 85, 86]) {
+      expect(isSnowWmoWeatherCode(code)).toBe(true);
+    }
+    for (const code of [0, 61, 82, 95, null, undefined, 999, 71.5]) {
+      expect(isSnowWmoWeatherCode(code)).toBe(false);
+    }
   });
 });

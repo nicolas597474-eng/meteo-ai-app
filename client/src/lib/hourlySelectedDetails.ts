@@ -1,4 +1,5 @@
 import { formatOptionalForecastValue } from "./forecastTimeline";
+import { isSnowWmoWeatherCode } from "./forecastDayDisplay";
 import type {
   HourlyFallbackProvenance,
   OpenWeatherFallbackField,
@@ -44,7 +45,6 @@ export type HourlySelectedDetail = {
   icon: string;
   value: string;
   summary: string;
-  timeLabel: string;
   validAt: number | null;
   note?: string;
 };
@@ -133,8 +133,7 @@ function fallbackSourceNote(
 
 /** Build every field shown in the selected-hour panel from one exact official point. */
 export function buildHourlySelectedDetails(
-  hour: HourlySelectedForecast,
-  timeLabel: string
+  hour: HourlySelectedForecast
 ): HourlySelectedDetail[] {
   const validAt =
     typeof hour.validAt === "number" &&
@@ -153,8 +152,7 @@ export function buildHourlySelectedDetails(
     title,
     icon,
     value,
-    summary: `${value} · ${timeLabel}`,
-    timeLabel,
+    summary: value,
     validAt,
     ...(note ? { note } : {}),
   });
@@ -172,18 +170,39 @@ export function buildHourlySelectedDetails(
   const direction = finite(hour.windDirection)
     ? `${windDirectionLabel(hour.windDirection)} (${formatWithUnit(hour.windDirection, 1, "°")})`
     : "—";
-
-  return [
-    make(
+  const details: HourlySelectedDetail[] = [];
+  if (finite(hour.precipitation)) {
+    details.push(make(
       "precipitation",
       "Précipitations",
       "precipitation",
       `Quantité ${formatWithUnit(hour.precipitation, 1, " mm")}`,
       precipitationNote
-    ),
-    make("rain", "Pluie", "precipitation", formatHourlyPrecipitationComponentValues(hour.precipitationComponents, "rain", " mm"), "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."),
-    make("showers", "Averses", "precipitation", formatHourlyPrecipitationComponentValues(hour.precipitationComponents, "showers", " mm"), "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."),
-    make("snowfall", "Neige", "precipitation", formatHourlyPrecipitationComponentValues(hour.precipitationComponents, "snowfall", " cm"), "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."),
+    ));
+  }
+  const precipitationComponents = hour.precipitationComponents ?? [];
+  if (precipitationComponents.some(({ showers }) => finite(showers))) {
+    details.push(make(
+      "showers",
+      "Averses",
+      "precipitation",
+      formatHourlyPrecipitationComponentValues(precipitationComponents, "showers", " mm"),
+      "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."
+    ));
+  }
+  const hasPositiveSnowfall = precipitationComponents.some(
+    ({ snowfall }) => finite(snowfall) && snowfall > 0
+  );
+  if (hasPositiveSnowfall || isSnowWmoWeatherCode(hour.weatherCode)) {
+    const snowValue = hasPositiveSnowfall
+      ? formatHourlyPrecipitationComponentValues(precipitationComponents, "snowfall", " cm")
+      : "Neige prévue";
+    const snowNote = hasPositiveSnowfall
+      ? "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."
+      : "Code météo WMO valide indiquant de la neige; aucune quantité positive de neige n’est fournie pour cette échéance.";
+    details.push(make("snowfall", "Neige", "snow", snowValue, snowNote));
+  }
+  details.push(
     make(
       "wind",
       "Vent",
@@ -233,6 +252,7 @@ export function buildHourlySelectedDetails(
       "cloud_cover",
       "Non disponible",
       "Aucune donnée horaire de qualité de l’air n’est fournie par cette prévision officielle."
-    ),
-  ];
+    )
+  );
+  return details;
 }

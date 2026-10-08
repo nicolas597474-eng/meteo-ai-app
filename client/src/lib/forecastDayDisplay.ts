@@ -9,8 +9,16 @@ import type {
   DailyOfficialFusionDisplay,
 } from "@shared/dailyForecast";
 import type { DailyWeatherCodeSummary } from "@shared/dailyWeatherCode";
+import { dailyConditionFromWmoWeatherCode } from "@shared/dailyWeatherCode";
 
 export const OFFICIAL_FORECAST_TIME_ZONE = "Europe/Paris";
+
+/** True only for a valid WMO code explicitly describing snow or snow showers. */
+export function isSnowWmoWeatherCode(value: unknown): value is number {
+  if (typeof value !== "number") return false;
+  const condition = dailyConditionFromWmoWeatherCode(value);
+  return condition === "Neige" || condition === "Averses de neige";
+}
 
 export type DailyForecastPoint = {
   date?: string | null;
