@@ -3909,3 +3909,4 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Ne modifier ni prévisions, sélection/calibration, valeurs officielles, moteurs/poids de fusion, collecte, API, schéma, migrations ou déploiement; aucun appel météo réel pendant cette tâche.
 - [x] Tests ciblés : 13/13 réussis; `pnpm check` réussi; suite complète `pnpm test` : 224 fichiers, 1 119 tests réussis, 2 ignorés; `pnpm build` réussi; `git diff --check` propre. Le build conserve les avertissements préexistants Analytics, asset runtime et taille de bundles.
 - [x] Documentation du barème et des limites : `docs/experimental-forecast-confidence-index.md`. Aucun merge ni déploiement effectué.
+- [x] Commit `eddf308` poussé sur la branche dédiée; PR [#106](https://github.com/nicolas597474-eng/meteo-ai-app/pull/106) ouverte vers `main`, sans merge ni déploiement.
