@@ -159,4 +159,34 @@ describe("HourlyWeightingNotice", () => {
     expect(html).toContain("mélange pondéré actuel lorsque la preuve ne permet pas de départager sûrement les modèles");
     expect(html).toContain("horizons non comparables");
   });
+
+  it("permet au Dashboard de masquer la couverture et le détail de fallback sans retirer la notice générale", () => {
+    const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, {
+      showCoverageDistribution: false,
+      showFallbackDetails: false,
+      weighting: {
+        status: "mixed",
+        availabilityStatus: "FUSED",
+        calibrationStatus: "PARTIALLY_CALIBRATED",
+        historyStatus: "available",
+        horizons: [{
+          variable: "temperature",
+          horizonBucket: "6_24h",
+          method: "mixed",
+          availabilityStatus: "FUSED",
+          calibrationStatus: "PARTIALLY_CALIBRATED",
+          unavailableReason: null,
+          hourCount: 1,
+          coverageLevelCounts: { BROAD: 1 },
+          selectionStrategyCounts: { weighted_ensemble_fallback: 1 },
+          selectionReasonCounts: [{ reason: "incomparable_horizons", hourCount: 1 }],
+          modelNamesWithData: ["AROME"],
+        }],
+      },
+    }));
+
+    expect(html).not.toContain("Nombre de modèles contributeurs, par variable et horizon");
+    expect(html).not.toContain("Fallback conservé :");
+    expect(html).toContain("Fusion disponible, calibration partielle selon le modèle");
+  });
 });

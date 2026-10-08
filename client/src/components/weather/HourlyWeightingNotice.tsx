@@ -39,6 +39,8 @@ type HourlyWeightingNoticeProps = {
       modelNamesWithData: readonly string[];
     }[];
   } | null;
+  showCoverageDistribution?: boolean;
+  showFallbackDetails?: boolean;
 };
 
 const VARIABLE_LABELS: Record<string, string> = {
@@ -150,7 +152,11 @@ function formatModelSelectionSummary(rows: NonNullable<HourlyWeightingNoticeProp
   return { best, fallback };
 }
 
-export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps) {
+export function HourlyWeightingNotice({
+  weighting,
+  showCoverageDistribution = true,
+  showFallbackDetails = true,
+}: HourlyWeightingNoticeProps) {
   if (!weighting) return null;
 
   const minimumComparisons = weighting.minimumComparisons ?? 30;
@@ -181,12 +187,12 @@ export function HourlyWeightingNotice({ weighting }: HourlyWeightingNoticeProps)
   return (
     <div role="note" className="rounded-lg border border-sky-200/10 bg-sky-200/[0.035] px-2.5 py-2 text-[10px] leading-relaxed text-slate-400">
       {weighting.manualOverride && <p className="mb-1 rounded-md border border-amber-200/20 bg-amber-200/[0.05] px-2 py-1 text-amber-100"><span className="font-semibold">Override horaire manuel explicite appliqué.</span> {weighting.manualOverride.reason} Série officielle d’origine conservée ({weighting.manualOverride.officialOriginalPointCount} échéances; calcul officiel du {weighting.manualOverride.officialOriginalComputedAt}).</p>}
-      {coverageDistribution && <div className="mb-1 rounded-md border border-sky-200/10 bg-black/10 px-2 py-1">
+      {showCoverageDistribution && coverageDistribution && <div className="mb-1 rounded-md border border-sky-200/10 bg-black/10 px-2 py-1">
         <p><span className="font-semibold text-sky-100">Nombre de modèles contributeurs, par variable et horizon :</span> {coverageDistribution}.</p>
         <p>Ces catégories décrivent uniquement l’effectif des modèles contributeurs, pas la couverture/qualité des stations physiques. L’incertitude statistique n’est pas mesurée ici; la performance historique et son statut de calibration (`CALIBRATED`, `PARTIALLY_CALIBRATED`, `UNCALIBRATED_ROBUST`) restent distincts et sont affichés séparément ci-dessous.</p>
       </div>}
       {selectionSummary.best.length > 0 && <p className="mb-1 rounded-md border border-emerald-200/15 bg-emerald-200/[0.035] px-2 py-1"><span className="font-semibold text-emerald-100">Meilleur modèle retenu sur preuve historique locale comparable :</span> {selectionSummary.best.join("; ")}.</p>}
-      {selectionSummary.fallback.length > 0 && <p className="mb-1 rounded-md border border-sky-200/10 bg-black/10 px-2 py-1"><span className="font-semibold text-sky-100">Fallback conservé :</span> mélange pondéré actuel lorsque la preuve ne permet pas de départager sûrement les modèles — {selectionSummary.fallback.join("; ")}.</p>}
+      {showFallbackDetails && selectionSummary.fallback.length > 0 && <p className="mb-1 rounded-md border border-sky-200/10 bg-black/10 px-2 py-1"><span className="font-semibold text-sky-100">Fallback conservé :</span> mélange pondéré actuel lorsque la preuve ne permet pas de départager sûrement les modèles — {selectionSummary.fallback.join("; ")}.</p>}
       {weighting.status === "unavailable" ? (
         <>
           <p><span className="font-semibold text-amber-100">Prévision officielle horaire indisponible : aucun modèle admissible n’a fourni de valeur.</span> {availabilityMessage} {evidenceLabel} Modèles avec données : {modelsLabel}. Best Match est exclu.</p>

@@ -27,9 +27,7 @@ import { DASHBOARD_LOAD_TIMEOUT_MS, DASHBOARD_PREVIEW_MESSAGE } from "@/lib/dash
 import { getLoginUrl } from "@/const";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
-import { ForecastProvenanceBadge } from "@/components/weather/ForecastProvenanceBadge";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
-import { PrecipitationConsensusChart } from "@/components/weather/PrecipitationConsensusChart";
 import { countArchivedSnapshotSlots, formatCollectionDuration } from "@/lib/collectionHealth";
 import { getDashboardObservability } from "@/lib/dashboardObservability";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
@@ -91,13 +89,26 @@ function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalP
 function WindRose({ direction }: { direction: number | null }) {
   const cardinalDirections = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"] as const;
   const cardinalNames = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ouest", "ouest", "nord-ouest"] as const;
-  const directionIndex = direction == null ? null : Math.round(direction / 45) % cardinalDirections.length;
-  const directionLabel = directionIndex == null ? null : cardinalDirections[directionIndex];
-  const directionName = directionIndex == null ? "indisponible" : cardinalNames[directionIndex];
+  const cardinalLabelPositions = [
+    "left-1/2 top-[4px] -translate-x-1/2",
+    "right-[8px] top-[9px]",
+    "right-[3px] top-1/2 -translate-y-1/2",
+    "bottom-[9px] right-[8px]",
+    "bottom-[4px] left-1/2 -translate-x-1/2",
+    "bottom-[9px] left-[8px]",
+    "left-[3px] top-1/2 -translate-y-1/2",
+    "left-[8px] top-[9px]",
+  ] as const;
+  const hasDirection = typeof direction === "number" && Number.isFinite(direction) && direction >= 0 && direction <= 360;
+  const directionIndex = hasDirection ? Math.round((direction % 360) / 45) % cardinalDirections.length : null;
+  const directionName = directionIndex == null ? null : cardinalNames[directionIndex];
+  const readableDirection = directionName ? `${directionName[0].toLocaleUpperCase("fr-FR")}${directionName.slice(1)}` : null;
+  const bearingLabel = hasDirection ? `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(direction)}°` : null;
+  const directionDescription = readableDirection && bearingLabel ? `${readableDirection} · ${bearingLabel}` : "Direction indisponible";
 
   return (
-    <div className="flex flex-col items-center gap-0.5" role="img" aria-label={`Boussole du vent : nord en haut, est à droite, sud en bas, ouest à gauche. Direction ${directionName}.`}>
-      <div className="relative isolate grid size-[5.75rem] place-items-center rounded-full border border-cyan-100/35 bg-gradient-to-br from-sky-200/25 via-slate-800 to-slate-950 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_8px_14px_rgba(0,0,0,0.55)] ring-1 ring-black/40 before:absolute before:inset-1 before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.14),transparent_44%)] before:content-[''] sm:size-24">
+    <div className="flex flex-col items-center gap-0.5" role="img" aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.`}>
+      <div className="relative isolate grid size-[4.5rem] place-items-center rounded-full border border-cyan-100/35 bg-gradient-to-br from-sky-200/25 via-slate-800 to-slate-950 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_8px_14px_rgba(0,0,0,0.55)] ring-1 ring-black/40 before:absolute before:inset-1 before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.14),transparent_44%)] before:content-[''] sm:size-20">
         <svg viewBox="0 0 100 100" className="absolute inset-0 z-10 size-full" aria-hidden="true">
           <defs>
             <radialGradient id="wind-compass-face" cx="35%" cy="25%" r="80%">
@@ -118,18 +129,19 @@ function WindRose({ direction }: { direction: number | null }) {
             const innerRadius = index % 4 === 0 ? 33 : 37;
             return <line key={index} x1={50 + innerRadius * Math.cos(angle)} y1={50 + innerRadius * Math.sin(angle)} x2={50 + 41 * Math.cos(angle)} y2={50 + 41 * Math.sin(angle)} stroke={index % 4 === 0 ? "rgba(186,230,253,0.7)" : "rgba(148,210,236,0.32)"} strokeWidth={index % 4 === 0 ? 1.5 : 0.8} />;
           })}
-          {direction != null ? <g transform={`rotate(${direction}, 50, 50)`}>
-            <path d="M50 17 L56 52 L50 46 L44 52 Z" fill="url(#wind-compass-needle)" stroke="rgba(224,242,254,0.8)" strokeWidth="0.8" />
-            <path d="M50 83 L56 48 L50 54 L44 48 Z" fill="#a8c1d3" opacity="0.62" />
+          {hasDirection ? <g transform={`rotate(${direction}, 50, 50)`}>
+            <path d="M50 23 L56 52 L50 46 L44 52 Z" fill="url(#wind-compass-needle)" stroke="rgba(224,242,254,0.8)" strokeWidth="0.8" />
+            <path d="M50 77 L56 48 L50 54 L44 48 Z" fill="#a8c1d3" opacity="0.62" />
           </g> : null}
           <circle cx="50" cy="50" r="3.2" fill="#d9f8ff" stroke="#164e72" strokeWidth="1.2" />
         </svg>
-        <span aria-hidden="true" className="absolute top-1 z-20 text-[10px] font-black leading-none text-cyan-100 drop-shadow">N</span>
-        <span aria-hidden="true" className="absolute right-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">E</span>
-        <span aria-hidden="true" className="absolute bottom-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">S</span>
-        <span aria-hidden="true" className="absolute left-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">O</span>
+        {cardinalDirections.map((label, index) => (
+          <span key={label} aria-hidden="true" className={`absolute z-20 text-[8px] font-black leading-none text-cyan-100 drop-shadow ${cardinalLabelPositions[index]}`}>
+            {label}
+          </span>
+        ))}
       </div>
-      <p className="min-h-4 text-[11px] font-bold text-sky-200">{directionLabel ?? "—"}</p>
+      <p className="min-h-4 text-center text-[10px] font-bold leading-tight text-sky-200">{directionDescription}</p>
     </div>
   );
 }
@@ -161,6 +173,25 @@ function formatHourlyForecastValidAt(validAt?: number | null): string {
     minute: "2-digit",
     timeZone: "Europe/Paris",
   }) + " · Europe/Paris";
+}
+
+function formatHourlyForecastSource(source?: string | null): string {
+  const normalized = source?.trim();
+  if (!normalized) return "Source non documentée";
+  return normalized.toLowerCase() === "open-meteo" ? "Open-Meteo" : normalized;
+}
+
+function formatHourlyForecastComputedAt(computedAt?: string | null): string {
+  if (!computedAt) return "Calcul indisponible";
+  const date = new Date(computedAt);
+  if (!Number.isFinite(date.getTime())) return "Calcul indisponible";
+  return `Calcul ${date.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Paris",
+  })} · Europe/Paris`;
 }
 
 // ─── UV Index indicator ────────────────────────────────────────────────────────
@@ -770,6 +801,8 @@ export default function Dashboard() {
   const currentWindGust = currentNumber(windGustField);
   const currentPrecipitation = currentNumber(precipitationField);
   const currentPressure = currentNumber(pressureField);
+  const hourlyForecastSource = forecastProvenance?.source ?? officialForecast?.officialSnapshot?.source ?? null;
+  const hourlyForecastComputedAt = forecastProvenance?.updatedAt ?? officialForecast?.officialSnapshot?.computedAt ?? null;
   const currentCloudCover = currentNumber(cloudCoverField);
   const currentHumidity = currentNumber(humidityField);
   const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : undefined) ?? undefined, windSpeed: windSpeed ?? undefined });
@@ -1077,9 +1110,9 @@ export default function Dashboard() {
               )}
             </div>
 
-            <section aria-label="Observations actuelles" className="rounded-xl border border-cyan-400/20 bg-cyan-950/10 px-2 pb-2">
-              <p className="pt-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/90 sm:text-sm">Observations actuelles <span className="font-normal normal-case tracking-normal text-slate-400">· provenance propre à chaque champ</span></p>
-              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_6rem_minmax(0,1fr)] items-center gap-1 border-t border-cyan-400/20 pt-3 sm:grid-cols-[minmax(0,1fr)_7rem_minmax(0,1fr)] sm:gap-3">
+            <section aria-label="Observations actuelles et valeurs prévisionnelles" className="rounded-xl border border-cyan-400/20 bg-cyan-950/10 px-2 pb-2">
+              <p className="pt-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/90 sm:text-sm">Observations actuelles <span className="font-normal normal-case tracking-normal text-slate-400">· nature, source et échéance indiquées par valeur</span></p>
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)] items-center gap-1 border-t border-cyan-400/20 pt-3 sm:grid-cols-[minmax(0,1fr)_6rem_minmax(0,1fr)] sm:gap-3">
                 <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-1.5 text-center sm:p-2" title={currentStateFieldTitle(apparentTemperatureField, currentSnapshot?.capturedAt)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Thermometer className="h-3.5 w-3.5 shrink-0" />Ressenti</p>
                   <p className="mt-1 text-lg font-bold text-white sm:text-2xl">{apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : "—"}</p>
@@ -1111,9 +1144,17 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/20 p-2" title={currentStateFieldTitle(pressureField)}>
-                <p className="flex items-center gap-1 text-[12px] font-medium text-slate-200 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression locale</p>
+                <p className="flex items-center gap-1 text-[12px] font-medium text-slate-200 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression mesurée localement</p>
                 <p className="text-lg font-semibold text-white sm:text-xl">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
-                <p className="w-full text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentPressure == null ? "Références source non comparables" : formatCurrentStateProvenance(pressureField)}</p>
+                <p className="w-full text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentPressure == null ? "Indisponible : références barométriques des stations non comparables." : formatCurrentStateProvenance(pressureField)}</p>
+                <div className="w-full border-t border-white/5 pt-2">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                    <p className="flex items-center gap-1 text-[12px] font-medium text-sky-100 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression de surface estimée (modèle)</p>
+                    <p className="text-lg font-semibold text-white sm:text-xl">{typeof currentHour?.pressure === "number" && Number.isFinite(currentHour.pressure) ? `${formatDashboardNumber(currentHour.pressure, 0)} hPa` : "—"}</p>
+                  </div>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)} · {formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-500"><code className="font-mono">surface_pressure</code> en hPa · pression de surface du lieu, non ramenée au niveau de la mer; estimation de modèle, pas une mesure de station.</p>
+                </div>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
@@ -1128,33 +1169,27 @@ export default function Dashboard() {
                   <p className="mt-1 text-[9px] leading-tight text-slate-500">Cumul station non comparable</p>
                 </div>
               </div>
-            </section>
-            <section aria-label="Prévisions horaires, distinctes des observations actuelles" className="rounded-xl border border-sky-400/25 bg-sky-950/15 px-2 pb-2">
-              <div className="border-b border-sky-400/20 pb-2 pt-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-200 sm:text-sm">Prévisions horaires <span className="font-normal normal-case tracking-normal text-slate-400">· distinctes des observations</span></p>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 border-t border-sky-400/20 pt-2">
+                <div className="grid grid-cols-2 gap-2">
                 <div className="min-w-0 rounded-lg border border-sky-300/15 bg-slate-950/35 p-2 text-center">
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-sky-100 sm:text-sm"><Sun className="h-3.5 w-3.5 shrink-0" />{currentUVLabel}</p>
                   <UVBadge uv={currentUV} />
                   <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(uvForecastHour?.validAt)}</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-500 sm:text-[10px]">{formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
                 </div>
                 <div className="min-w-0 rounded-lg border border-sky-300/15 bg-slate-950/35 p-2 text-center" title="Visibilité météorologique en kilomètres ; le contrat ne fournit pas de mesure distincte de visibilité des nuages.">
-                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-sky-100 sm:text-sm"><Eye className="h-3.5 w-3.5 shrink-0" />Visibilité horaire</p>
+                  <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-sky-100 sm:text-sm"><Eye className="h-3.5 w-3.5 shrink-0" />Visibilité prévue</p>
                   <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentHour?.visibility == null ? "—" : `${currentHour.visibility.toFixed(1)} km`}</p>
                   <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)}</p>
                   <p className="mt-1 text-[9px] leading-tight text-slate-500">Visibilité météo, pas spécifique aux nuages</p>
+                  <p className="mt-1 text-[9px] leading-tight text-slate-500 sm:text-[10px]">{formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
+                </div>
                 </div>
               </div>
-              <ForecastProvenanceBadge data={forecastProvenance} className="mt-2" />
             </section>
 
             </div>
           </div>
-
-        <PrecipitationConsensusChart
-          summary={isDailyFallback ? dailyFallback.precipitationConsensus : today?.precipitationConsensus}
-        />
 
         <Dialog open={isCollectionHealthOpen} onOpenChange={setIsCollectionHealthOpen}>
           <DialogContent id="collection-health-panel" showCloseButton={false} className="max-h-[calc(100dvh-1rem)] overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:max-w-xl" aria-label="Santé des collectes automatiques">
@@ -1338,7 +1373,11 @@ export default function Dashboard() {
 
         {/* Hourly Chart */}
         <div className="overflow-visible rounded-[22px]">
-          <HourlyWeightingNotice weighting={officialForecast?.officialSnapshot?.hourlyWeighting} />
+          <HourlyWeightingNotice
+            weighting={officialForecast?.officialSnapshot?.hourlyWeighting}
+            showCoverageDistribution={false}
+            showFallbackDetails={false}
+          />
           <OfficialForecastCalculationTimes
             hourlyComputedAt={officialForecast?.officialSnapshot?.hourlyComputedAt}
             computedAt={officialForecast?.officialSnapshot?.computedAt}
