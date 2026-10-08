@@ -3941,3 +3941,14 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Valider TypeScript (`pnpm check`), la suite complète (227 fichiers; 1 138 réussis, 2 ignorés) et le build de production (`pnpm build`).
 - [x] Inspecter en fenêtre mobile responsive de 390 × 844 pixels CSS; téléphone physique non testé.
 - [x] Préparer un commit explicite et une PR vers `main`, laissée ouverte pour revue; ne pas fusionner ni déployer.
+
+
+## Extension atmosphérique — phénomènes restants — 2026-10-08
+
+- [x] Reconfirmer `main` au commit `a482b23008126f9f4d28481ac5bc612a2c41e97b` après la fusion des PR #109 (pluie WebGL) et #110 (neige WebGL/brouillard); créer une branche dédiée depuis ce point.
+- [x] Compléter les phénomènes restants sans dupliquer les couches déjà livrées : codes WMO du verglas/orage/grêle, pluie d’orage seulement si le libellé la signale, lumière solaire diffuse, nuages et vent pilotés par les mesures disponibles.
+- [x] Garder `null` distinct de zéro; ne pas déduire le verglas du froid, ne pas faire apparaître pluie/grêle à partir d’un signal non probant; préserver prévisions, scoring, observations, stations, fusion et pondérations; aucune dépendance ajoutée.
+- [x] Préserver les modes complet/réduit/désactivé, `prefers-reduced-motion`, fallback CSS/WebGL, limites mobile et globes solaire/lunaire dédiés; documenter les choix dans `docs/weather-reality-engine-remaining.md`.
+- [x] Validation finale : `pnpm check` réussi; `pnpm test` — 228 fichiers, 1 147 réussis et 2 ignorés; `pnpm build` réussi; `git diff --check` réussi. Avertissement Vite sur le chunk principal > 500 kB.
+- [x] Limite de vérification : aucun aperçu dans un navigateur mobile ni essai sur téléphone physique.
+- [ ] Créer la PR vers `main`, la laisser ouverte sans fusion ni déploiement.

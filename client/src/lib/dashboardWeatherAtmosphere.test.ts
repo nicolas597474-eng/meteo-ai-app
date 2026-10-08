@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   getDashboardWeatherAtmosphere,
+  getDashboardWeatherCloudOpacity,
   getDashboardWeatherFogOpacity,
+  getDashboardWeatherHailIntensity,
+  getDashboardWeatherSunlightOpacity,
+  getDashboardWeatherWindMotion,
+  hasDashboardHail,
+  isDashboardFreezingPrecipitation,
 } from "./dashboardWeatherAtmosphere";
 
 describe("getDashboardWeatherAtmosphere", () => {
@@ -46,7 +52,7 @@ describe("getDashboardWeatherAtmosphere", () => {
     });
   });
 
-  it("sépare le verglas et le givre de la neige", () => {
+  it("sépare le verglas et le givre de la neige sans l’inférer du froid seul", () => {
     expect(getDashboardWeatherAtmosphere({ condition: "Verglas" }).kind).toBe(
       "ice"
     );
@@ -59,7 +65,39 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(getDashboardWeatherAtmosphere({ condition: "Neige" }).kind).toBe(
       "snow"
     );
-    expect(getDashboardWeatherAtmosphere({ temperature: -2 }).kind).toBe("ice");
+    expect(getDashboardWeatherAtmosphere({ temperature: -2 }).kind).toBe("none");
+    expect(getDashboardWeatherAtmosphere({ condition: "Froid" }).kind).toBe(
+      "none"
+    );
+  });
+
+  it("reconnaît les codes WMO de bruine/pluie verglaçante et de grêle", () => {
+    expect(
+      getDashboardWeatherAtmosphere({ condition: "Bruine", weatherCode: 56 })
+    ).toEqual({ kind: "ice", intensity: "light" });
+    expect(
+      getDashboardWeatherAtmosphere({ condition: "Bruine", weatherCode: 57 })
+    ).toEqual({ kind: "ice", intensity: "heavy" });
+    expect(
+      getDashboardWeatherAtmosphere({ condition: "Pluie", weatherCode: 66 })
+    ).toEqual({ kind: "ice", intensity: "light" });
+    expect(
+      getDashboardWeatherAtmosphere({ condition: "Pluie", weatherCode: 67 })
+    ).toEqual({ kind: "ice", intensity: "heavy" });
+    expect(isDashboardFreezingPrecipitation({ weatherCode: 67 })).toBe(true);
+    expect(isDashboardFreezingPrecipitation({ weatherCode: 65 })).toBe(false);
+    expect(
+      getDashboardWeatherAtmosphere({
+        condition: "Orage violent",
+        weatherCode: 96,
+      }).kind
+    ).toBe("storm");
+    expect(hasDashboardHail({ weatherCode: 96 })).toBe(true);
+    expect(hasDashboardHail({ weatherCode: 99 })).toBe(true);
+    expect(hasDashboardHail({ condition: "Grésil" })).toBe(true);
+    expect(getDashboardWeatherHailIntensity({ weatherCode: 96 })).toBe("steady");
+    expect(getDashboardWeatherHailIntensity({ weatherCode: 99 })).toBe("heavy");
+    expect(hasDashboardHail({ weatherCode: 95 })).toBe(false);
   });
 
   it("n’utilise pas un cumul de précipitations sans période pour intensifier la neige", () => {
@@ -131,6 +169,30 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(getDashboardWeatherFogOpacity(0)).toEqual({ far: 0.32, near: 0.23 });
     expect(getDashboardWeatherFogOpacity(1)).toEqual({ far: 0.14, near: 0.1 });
     expect(getDashboardWeatherFogOpacity(24)).toEqual({ far: 0.14, near: 0.1 });
+  });
+
+  it("module les nuages et la lumière sans transformer null en zéro", () => {
+    expect(getDashboardWeatherCloudOpacity(null)).toBeNull();
+    expect(getDashboardWeatherCloudOpacity(-1)).toBeNull();
+    expect(getDashboardWeatherCloudOpacity(0)).toEqual({ far: 0, near: 0 });
+    expect(getDashboardWeatherCloudOpacity(50)).toEqual({ far: 0.12, near: 0.085 });
+    expect(getDashboardWeatherCloudOpacity(100)).toEqual({ far: 0.24, near: 0.17 });
+    expect(getDashboardWeatherSunlightOpacity(null)).toBe(0.14);
+    expect(getDashboardWeatherSunlightOpacity(0)).toBe(0.2);
+    expect(getDashboardWeatherSunlightOpacity(100)).toBe(0.05);
+  });
+
+  it("oriente le vent depuis la direction fournie et reste neutre si elle manque", () => {
+    const reported = getDashboardWeatherWindMotion(80, 0, 100);
+    expect(reported.directionAngleDeg).toBe(90);
+    expect(reported.driftX).toBe("0vw");
+    expect(reported.driftY).toBe("4.33vh");
+
+    const unknown = getDashboardWeatherWindMotion(null, null, null);
+    expect(unknown.directionAngleDeg).toBeNull();
+    expect(unknown.driftX).toBe("0vw");
+    expect(unknown.driftY).toBe("0vh");
+    expect(getDashboardWeatherWindMotion(999, 361, -1).directionAngleDeg).toBeNull();
   });
 
   it("n’invente aucun phénomène quand les conditions et les mesures sont absentes", () => {
