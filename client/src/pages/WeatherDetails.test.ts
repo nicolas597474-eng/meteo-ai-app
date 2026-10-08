@@ -7,13 +7,14 @@ const selectedDetailsSource = readFileSync(new URL("../lib/hourlySelectedDetails
 const displayDaysSource = readFileSync(new URL("../lib/forecastDayDisplay.ts", import.meta.url), "utf8");
 const calculationTimesSource = readFileSync(new URL("../components/weather/OfficialForecastCalculationTimes.tsx", import.meta.url), "utf8");
 describe("page Prévisions détaillées", () => {
-  it("réutilise le contrat existant et transmet séparément l’horaire officiel, les jours et leurs sources", () => {
-    expect(pageSource).toContain("useOfficialForecast(activeLocation)");
+  it("consomme les heures officielles étendues de la PR #103 et garde periodHours comme référence API séparée", () => {
+    expect(pageSource).toContain("useOfficialForecast(activeLocation, { includeExtendedPeriods: true })");
+    expect(pageSource).toContain("usePageWeatherSky({ includeExtendedPeriods: true })");
     expect(pageSource).toContain("dailyDays={data.days ?? []}");
     expect(pageSource).toContain("dailySources={data.modelsUsed ?? []}");
     expect(pageSource).toContain("hours={hours}");
     expect(pageSource).not.toContain("periodHours");
-    expect(pageSource).not.toContain("includeExtendedPeriods: true");
+    expect(pageSource).not.toContain("includeExtendedPeriods: false");
     expect(displayDaysSource).toContain("kind: \"official-daily-fusion\"");
     expect(displayDaysSource).toContain("kind: \"official-hourly\"");
   });

@@ -25,9 +25,9 @@ export function selectPageWeatherSky(input: SkyInput): string {
   });
 }
 
-export function usePageWeatherSky() {
+export function usePageWeatherSky(options: { includeExtendedPeriods?: boolean } = {}) {
   const { activeLocation } = useLocation();
-  const { query: { data } } = useOfficialForecast(activeLocation);
+  const { query: { data } } = useOfficialForecast(activeLocation, options);
   const forecastNowMs = Date.now();
   const image = useMemo(() => {
     const hours = (data?.hours ?? []) as Array<any>;

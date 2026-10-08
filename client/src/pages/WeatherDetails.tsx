@@ -24,8 +24,8 @@ import { useOfficialForecast } from "@/hooks/useOfficialForecast";
 export default function WeatherDetails() {
   const { activeLocation } = useLocation();
   const { user } = useAuth();
-  const { style: pageSkyStyle } = usePageWeatherSky();
-  const { query: detailedForecastQuery, coordinates } = useOfficialForecast(activeLocation);
+  const { style: pageSkyStyle } = usePageWeatherSky({ includeExtendedPeriods: true });
+  const { query: detailedForecastQuery, coordinates } = useOfficialForecast(activeLocation, { includeExtendedPeriods: true });
   const { data, isLoading, isFetching, isError, error, refetch } = detailedForecastQuery;
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordinates, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
   const [slowLoad, setSlowLoad] = useState(false);
