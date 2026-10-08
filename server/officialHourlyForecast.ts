@@ -766,6 +766,7 @@ function makePoint(
   const windDirectionValue = variableValues.get("wind_direction")!;
   const cloudCoverValue = variableValues.get("cloud_cover")!;
   const windDirection = valueFor("wind_direction");
+  const cloudCover = valueFor("cloud_cover");
   const weatherCode = valueFor("weather_code");
   const rawTemperatures = temperatureValue.selected.map(({ selected }) => ({ name: selected.modelName, temperature: selected.value }));
   const temperatureSummary = summarizeModelValues(rawTemperatures.map(({ temperature: value }) => value));
@@ -793,7 +794,9 @@ function makePoint(
   const counts = variableWeightings.filter((item) => item.availabilityStatus !== "UNAVAILABLE");
   const minimumComparisons = counts.flatMap((item) => item.minimumComparisons == null ? [] : [item.minimumComparisons]);
   const minimumComparableDays = counts.flatMap((item) => item.minimumComparableDays == null ? [] : [item.minimumComparableDays]);
-  const condition = precipitation == null ? null : conditionFromWeatherValues(precipitation, null);
+  const condition = precipitation == null && cloudCover == null
+    ? null
+    : conditionFromWeatherValues(precipitation, cloudCover);
   const precipIntensity = precipitation == null || precipitation <= 0
     ? null
     : precipitation > 5 ? "heavy" : precipitation > 1 ? "moderate" : "light";
@@ -808,7 +811,7 @@ function makePoint(
     windSpeed,
     windGust,
     windDirection,
-    cloudCover: valueFor("cloud_cover"),
+    cloudCover,
     humidity,
     uvIndex: valueFor("uv_index"),
     condition,

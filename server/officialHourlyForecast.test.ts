@@ -142,6 +142,34 @@ describe("reconstructOfficialHourlyModelsFromArchive", () => {
 });
 
 describe("computeOfficialHourlyForecast", () => {
+  it("décrit le ciel depuis la nébulosité fusionnée à la même échéance sans code météo", () => {
+    const forecasts = modelForecasts().map((forecast) => ({
+      ...forecast,
+      hours: forecast.hours.map((hour) => ({
+        ...hour,
+        precipitation: 0,
+        cloudCover: 65,
+        weatherCode: null,
+      })),
+    }));
+
+    const result = computeOfficialHourlyForecast(forecasts, historicalScores());
+
+    expect(result.hours[0]?.cloudCover).toBeCloseTo(65, 8);
+    expect(result.hours[0]).toMatchObject({
+      precipitation: 0,
+      weatherCode: null,
+      condition: "Partiellement nuageux",
+    });
+
+    const missingCloudForecasts = forecasts.map((forecast) => ({
+      ...forecast,
+      hours: forecast.hours.map((hour) => ({ ...hour, cloudCover: null })),
+    }));
+    const missingCloudResult = computeOfficialHourlyForecast(missingCloudForecasts, historicalScores());
+    expect(missingCloudResult.hours[0]).toMatchObject({ cloudCover: null, condition: "Nébulosité indisponible" });
+  });
+
   it("utilise providerRunAt plutôt que availableAt pour le lead et la preuve horaire", () => {
     const providerRunAt = validAt - 8 * 60 * 60_000;
     const forecasts = modelForecasts(validAt, validAt - 2 * 60 * 60_000)
