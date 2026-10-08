@@ -3921,3 +3921,12 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Ajouter un test de non-régression synthétique de concurrence et de propagation d’erreur, sans requête météo, collecte, recalcul, migration ni nouvelle dépendance.
 - [x] Vérifications : tests ciblés 22/22; `pnpm check`; `pnpm build`; `git diff --check`. Aucun appel de fournisseur météo n’a été exécuté.
 - [x] Ouvrir la PR dédiée [#107](https://github.com/nicolas597474-eng/meteo-ai-app/pull/107) vers `main`; elle reste ouverte, sans fusion ni déploiement.
+
+
+## Champs météo quotidiens et composantes horaires — 8 octobre 2026
+- [x] Repartir du `main` rafraîchi au SHA `ecf784bc976d60073f673caa7fb1121cb008a0c4`, confirmer la fusion de #107 et l’absence de PR concurrente, puis créer une branche dédiée.
+- [x] Remapper direction dominante, UV max et ressentis min/max quotidiens depuis Open-Meteo Best Match, comme référence distincte non contributrice à la fusion officielle; préserver `null` quand la source est absente.
+- [x] Transmettre pluie/averses/neige horaires comme valeurs brutes étiquetées par modèle, provenant uniquement des contributeurs déjà retenus pour le total officiel et liées au même `validTime`; ne pas moyenner ni remplacer les absences par zéro.
+- [x] Exclure toujours du détail horaire type/intensité des précipitations, rayonnement solaire et code WMO brut. Ne pas modifier les poids/fusions, le schéma, les migrations, les dépendances ou les collectes météo; laisser l’écart de nébulosité des captures non diagnostiqué faute de cause runtime confirmée.
+- [x] Tests ciblés : 46 réussis; test WeatherDetails : 12 réussis. Suite complète : 225 fichiers, 1 123 réussis et 2 ignorés. `pnpm check`, `pnpm build` et `git diff --check` réussis; avertissements de build existants (variables Analytics, asset runtime, taille des bundles).
+- [x] Ouvrir la PR [#108](https://github.com/nicolas597474-eng/meteo-ai-app/pull/108) depuis `fix/weather-forecast-missing-fields-20261008`; laisser la PR ouverte, sans fusion ni déploiement.
