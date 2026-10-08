@@ -5,7 +5,6 @@ const timelineSource = readFileSync(new URL("../components/weather/ForecastByDay
 const styleSource = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const selectedDetailsSource = readFileSync(new URL("../lib/hourlySelectedDetails.ts", import.meta.url), "utf8");
 const displayDaysSource = readFileSync(new URL("../lib/forecastDayDisplay.ts", import.meta.url), "utf8");
-const calculationTimesSource = readFileSync(new URL("../components/weather/OfficialForecastCalculationTimes.tsx", import.meta.url), "utf8");
 describe("page Prévisions détaillées", () => {
   it("consomme les heures officielles étendues de la PR #103 et garde periodHours comme référence API séparée", () => {
     expect(pageSource).toContain("useOfficialForecast(activeLocation, { includeExtendedPeriods: true })");
@@ -65,15 +64,18 @@ describe("page Prévisions détaillées", () => {
   it("place les jours puis les heures avant les détails de l’échéance sélectionnée", () => {
     const hourlyStrip = timelineSource.indexOf('aria-labelledby="forecast-hourly-strip-title"');
     const dailyStrip = timelineSource.indexOf('aria-labelledby="forecast-daily-strip-title"');
-    const selectedForecast = timelineSource.indexOf("Prévisions de l’échéance sélectionnée");
+    const selectedValues = timelineSource.indexOf("Valeurs pour l’échéance sélectionnée");
     expect(hourlyStrip).toBeGreaterThanOrEqual(0);
     expect(dailyStrip).toBeGreaterThanOrEqual(0);
     expect(dailyStrip).toBeLessThan(hourlyStrip);
-    expect(hourlyStrip).toBeLessThan(selectedForecast);
+    expect(hourlyStrip).toBeLessThan(selectedValues);
+    expect(timelineSource).not.toContain("Prévisions de l’échéance sélectionnée");
+    expect(timelineSource).not.toContain("OfficialHourlyFieldCard");
   });
   it("agrandit les rubans, indique la pluie disponible et conserve les palettes thermiques", () => {
     expect(timelineSource).toContain("w-[5rem]");
-    expect(timelineSource).toContain("<MeteoIcon name={icon} size={28} />");
+    expect(timelineSource).toContain("<MeteoIcon name={icon} size={36} />");
+    expect(timelineSource).toContain("w-fit min-w-[5.25rem]");
     expect(timelineSource).toContain("w-[7rem]");
     expect(timelineSource).toContain("<MeteoIcon name={weatherIconName} size={30}");
     expect(timelineSource).toContain('{day.date === today ? "Aujourd’hui" : shortWeekday(day.date)}');
@@ -88,9 +90,10 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain('getExtremeTemperatureTone("min", day.daily?.tempMin)');
   });
   it("affiche les composantes horaires fournies et garde hors panneau les catégories exclues", () => {
-    for (const title of ["Précipitations", "Pluie", "Averses", "Neige", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité"]) {
+    for (const title of ["Précipitations", "Averses", "Neige", "Vent", "Humidité et rosée", "Nuages", "Pression", "Indice UV", "Température ressentie", "Visibilité"]) {
       expect(selectedDetailsSource).toContain(`"${title}"`);
     }
+    expect(selectedDetailsSource).not.toContain('"Pluie"');
     expect(selectedDetailsSource).toContain("rafales");
     expect(selectedDetailsSource).toContain("direction");
     expect(selectedDetailsSource).not.toContain("Type et intensité");
@@ -99,6 +102,8 @@ describe("page Prévisions détaillées", () => {
     expect(selectedDetailsSource).not.toContain('"precip-type"');
     expect(selectedDetailsSource).not.toContain('"weather-code"');
     expect(selectedDetailsSource).toContain("formatHourlyPrecipitationComponentValues");
+    expect(selectedDetailsSource).toContain("hasPositiveSnowfall");
+    expect(selectedDetailsSource).toContain("isSnowWmoWeatherCode(hour.weatherCode)");
     expect(selectedDetailsSource).toContain("Non disponible");
     expect(selectedDetailsSource).toContain("Aucune donnée horaire de qualité de l’air");
     expect(timelineSource).toContain("Soleil");
@@ -108,20 +113,22 @@ describe("page Prévisions détaillées", () => {
     expect(timelineSource).toContain("L’indice de qualité de l’air ne fait pas partie des données renvoyées à cette page");
     expect(timelineSource).toContain("Aucune valeur n’est demandée, déduite ou inventée");
   });
-  it("lie les valeurs affichées à l’heure cliquée et expose son validTime et sa source", () => {
+  it("garde les valeurs sur l’heure cliquée, supprime les métadonnées sous le titre et conserve la provenance ailleurs", () => {
     expect(timelineSource).toContain("buildHourlyDetailCategories(selectedEntry, hours, indexedHours, histogramStartValidAt)");
     expect(timelineSource).toContain("getHourlyHistogramStartValidAt(");
     expect(timelineSource).toContain("buildHourlyHistogramSeries(detail.key, indexedHours, startValidAt)");
     expect(timelineSource).toContain("<HourlyMiniHistogram");
     expect(timelineSource).toContain("allHours={hours}");
-    expect(timelineSource).toContain("selectedEntry.hour.validAt");
+    expect(timelineSource).toContain("selectedEntry?.hour.validAt");
     expect(timelineSource).toContain("validTime UTC :");
-    expect(timelineSource).toContain("Source : {selectedSourceLabel} · {selectedMethodWithFallback}");
-    expect(timelineSource).toContain("repli OpenWeather exact pour");
+    expect(timelineSource).not.toContain("Source : {selectedSourceLabel}");
+    expect(timelineSource).not.toContain("<OfficialForecastCalculationTimes");
+    expect(timelineSource).toContain('aria-label="Prévision, source et fraîcheur"');
+    expect(timelineSource).toContain('hourlyFieldProvenance("temperature"');
+    expect(timelineSource).not.toContain("Valeur de l’échéance sélectionnée · {category.rows[0]?.time");
+    expect(timelineSource).toContain("fallback?.provider");
+    expect(timelineSource).toContain("réponse reçue ${freshness} · fraîcheur amont inconnue");
     expect(timelineSource).toContain("fraîcheur amont inconnue");
-    expect(timelineSource).toContain("<OfficialForecastCalculationTimes");
-    expect(calculationTimesSource).toContain("Calcul horaire :");
-    expect(calculationTimesSource).toContain("Snapshot courant / quotidien :");
     expect(timelineSource).toContain("whitespace-normal break-words");
     expect(pageSource).toContain("officialProvenance={{");
     expect(pageSource).toContain("source: data.officialSnapshot?.source");
