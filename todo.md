@@ -3899,3 +3899,14 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Aucun appel API météo live, collecte ou procédure de production exécuté; aucune fusion ni aucun déploiement.
 - [x] PR #87 ouverte vers `main` depuis `fix/openweather-hourly-gap-fallback-20261007`; laissée ouverte, sans fusion ni déploiement.
 - [x] Mise à jour après fusion distante : #86 a été fusionnée dans `main` au commit `29001dd` pendant le chantier par une action externe; ce travail ne l’a ni modifiée ni fusionnée. Branche #87 rebasée sur `29001dd`, changements préservés et revalidés; #87 reste ouverte.
+
+
+## Indice expérimental de confiance — 8 octobre 2026
+- [x] Repartir du `main` rafraîchi `46ae4a964f42faaa57d7dc2025b7f3239fd9d0c3`; relire les consignes et audits; confirmer l’absence de PR ouverte au moment du contrôle; créer la branche dédiée `feat/experimental-forecast-confidence-index-20261008`.
+- [x] Ajouter dans AI Lab un diagnostic distinct, limité à la température du prochain point horaire officiel et à son `validAt` UTC exact. Ne pas créer d’indice journalier faute de preuve d’émission et d’alignement suffisantes.
+- [x] Respecter les coefficients fixes proposés : accord inter-sources 20 %, qualité des observations 20 %, performance historique 20 %, fraîcheur/couverture 15 %, cohérence spatiale 10 %, horizon 10 %, taille d’échantillon 5 %; conserver la couverture calculable et chaque manque sans redistribution de poids.
+- [x] Exiger l’alignement de toutes les valeurs comparées; utiliser seulement des preuves historiques locales qualifiées et des horizons comparables; ne pas confondre les `modelId` distincts avec une indépendance statistique entre fournisseurs; plafonner la fraîcheur à zéro dès 180 min; afficher les pénalités extrêmes séparément et masquer tout score incomplet.
+- [x] Ne modifier ni prévisions, sélection/calibration, valeurs officielles, moteurs/poids de fusion, collecte, API, schéma, migrations ou déploiement; aucun appel météo réel pendant cette tâche.
+- [x] Tests ciblés : 13/13 réussis; `pnpm check` réussi; suite complète `pnpm test` : 224 fichiers, 1 119 tests réussis, 2 ignorés; `pnpm build` réussi; `git diff --check` propre. Le build conserve les avertissements préexistants Analytics, asset runtime et taille de bundles.
+- [x] Documentation du barème et des limites : `docs/experimental-forecast-confidence-index.md`. Aucun merge ni déploiement effectué.
+- [x] Commit `eddf308` poussé sur la branche dédiée; PR [#106](https://github.com/nicolas597474-eng/meteo-ai-app/pull/106) ouverte vers `main`, sans merge ni déploiement.
