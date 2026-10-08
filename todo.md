@@ -3964,4 +3964,4 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Validation : `pnpm check` réussi; tests ciblés 10/10; suite complète Vitest 228 fichiers, 1 150 réussis et 2 ignorés; `pnpm build` et `git diff --check` réussis. Avertissements build persistants : variables Analytics absentes, asset runtime non résolu au build et chunk initial supérieur à 500 kB.
 - [x] Mesure de build après changement : JS initial 1 048 960 octets (293 476 gzip), CSS 331 930 octets (52 900 gzip); aucun temps de chargement réel/LCP n’a été mesuré dans un navigateur connecté à l’application.
 - [x] Aucun appel météo live, collecte, migration, changement de prévision, poids, scores, observations, sources ou journaux.
-- [ ] Ouvrir une PR dédiée vers `main`, la laisser non fusionnée et non publiée.
+- [x] Ouvrir la PR dédiée [#113](https://github.com/nicolas597474-eng/meteo-ai-app/pull/113) vers `main`; la laisser ouverte, sans fusion ni déploiement.
