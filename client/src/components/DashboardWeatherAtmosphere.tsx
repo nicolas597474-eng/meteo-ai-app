@@ -2,10 +2,12 @@ import * as React from "react";
 import type { CSSProperties } from "react";
 import {
   getDashboardWeatherAtmosphere,
+  getDashboardWeatherFogOpacity,
   type DashboardWeatherAtmosphereInput,
 } from "@/lib/dashboardWeatherAtmosphere";
 import type { DashboardWeatherEffectsMode } from "@/lib/dashboardWeatherEffects";
 import { RainWebGLCanvas } from "@/components/weather/RainWebGLCanvas";
+import { SnowWebGLCanvas } from "@/components/weather/SnowWebGLCanvas";
 
 const RAIN_DROPS = [
   { left: 3, delay: -1.3, duration: 1.8, length: 17, depth: "far", drift: "-1.2vw" },
@@ -163,6 +165,59 @@ function RainLayer({
   );
 }
 
+type SnowRendererMode = "css" | "webgl";
+
+type SnowLayerProps = {
+  flakes: (typeof SNOW_PARTICLES)[number][];
+  effectsMode: DashboardWeatherEffectsMode;
+  reduced: boolean;
+  category: "light" | "steady" | "heavy";
+  windSpeed?: number | null;
+  windDirection?: number | null;
+};
+
+function SnowLayer({
+  flakes,
+  effectsMode,
+  reduced,
+  category,
+  windSpeed,
+  windDirection,
+}: SnowLayerProps) {
+  const [rendererMode, setRendererMode] = React.useState<SnowRendererMode>("css");
+
+  return (
+    <div
+      className="dashboard-weather-atmosphere__snow-layer"
+      data-snow-renderer={rendererMode}
+    >
+      {rendererMode === "css"
+        ? flakes.map((particle, index) => (
+            <i
+              key={`snow-${index}`}
+              className="dashboard-weather-atmosphere__snowflake"
+              style={{
+                left: `${particle.left}%`,
+                top: "-6%",
+                width: `${particle.size}px`,
+                height: `${particle.size}px`,
+                animationDelay: `${particle.delay}s`,
+                animationDuration: `${particle.duration * (reduced ? 1.5 : 1)}s`,
+              }}
+            />
+          ))
+        : null}
+      <SnowWebGLCanvas
+        effectsMode={effectsMode}
+        category={category}
+        windSpeedKmh={windSpeed}
+        windDirectionDegrees={windDirection}
+        onRendererChange={setRendererMode}
+      />
+    </div>
+  );
+}
+
 type DashboardWeatherAtmosphereProps = DashboardWeatherAtmosphereInput & {
   effectsMode?: DashboardWeatherEffectsMode;
   windDirection?: number | null;
@@ -179,6 +234,10 @@ export function DashboardWeatherAtmosphere({
   if (kind === "none" || effectsMode === "off") return null;
 
   const reduced = effectsMode === "reduced";
+  const fogOpacity =
+    kind === "fog"
+      ? getDashboardWeatherFogOpacity(weather.visibilityKm)
+      : null;
   const rainDropCount =
     intensity === "heavy"
       ? reduced ? 10 : RAIN_DROPS.length
@@ -197,6 +256,21 @@ export function DashboardWeatherAtmosphere({
       data-weather-atmosphere={kind}
       data-weather-intensity={intensity}
       data-effects-mode={effectsMode}
+      data-fog-visibility={
+        kind === "fog"
+          ? fogOpacity == null
+            ? "unknown"
+            : "reported"
+          : undefined
+      }
+      style={
+        fogOpacity == null
+          ? undefined
+          : ({
+              "--fog-mist-far-opacity": String(fogOpacity.far),
+              "--fog-mist-near-opacity": String(fogOpacity.near),
+            } as CSSProperties)
+      }
       aria-hidden="true"
     >
       <span className="dashboard-weather-atmosphere__wash" />
@@ -235,29 +309,36 @@ export function DashboardWeatherAtmosphere({
         <span className="dashboard-weather-atmosphere__lightning" />
       ) : null}
 
-      {kind === "snow" || kind === "hail" ? (
+      {kind === "snow" ? (
         <>
-          {(kind === "snow" ? snowParticles : hailParticles).map(
-            (particle, index) => (
-              <i
-                key={`${kind}-${index}`}
-                className={`dashboard-weather-atmosphere__${kind === "snow" ? "snowflake" : "hailstone"}`}
-                style={{
-                  left: `${particle.left}%`,
-                  top: "-6%",
-                  width: `${particle.size}px`,
-                  height: `${particle.size}px`,
-                  animationDelay: `${particle.delay}s`,
-                  animationDuration: `${particle.duration * (reduced ? 1.5 : 1)}s`,
-                }}
-              />
-            )
-          )}
-          {kind === "snow" ? (
-            <span className="dashboard-weather-atmosphere__frost-wash" />
-          ) : null}
+          <SnowLayer
+            flakes={snowParticles}
+            effectsMode={effectsMode}
+            reduced={reduced}
+            category={intensity}
+            windSpeed={weather.windSpeed}
+            windDirection={windDirection}
+          />
+          <span className="dashboard-weather-atmosphere__frost-wash" />
         </>
       ) : null}
+
+      {kind === "hail"
+        ? hailParticles.map((particle, index) => (
+            <i
+              key={`hail-${index}`}
+              className="dashboard-weather-atmosphere__hailstone"
+              style={{
+                left: `${particle.left}%`,
+                top: "-6%",
+                width: `${particle.size}px`,
+                height: `${particle.size}px`,
+                animationDelay: `${particle.delay}s`,
+                animationDuration: `${particle.duration * (reduced ? 1.5 : 1)}s`,
+              }}
+            />
+          ))
+        : null}
 
       {kind === "ice" ? (
         <>

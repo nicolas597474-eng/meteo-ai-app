@@ -44,6 +44,55 @@ function finiteValue(value?: number | null): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function finiteVisibilityKm(value?: number | null): number | null {
+  const visibilityKm = finiteValue(value);
+  return visibilityKm != null && visibilityKm >= 0 && visibilityKm <= 100
+    ? visibilityKm
+    : null;
+}
+
+const FOG_VISUAL_CONFIG = Object.freeze({
+  opacityRangeKm: 1,
+  farOpacityMin: 0.14,
+  farOpacityMax: 0.32,
+  nearOpacityMin: 0.1,
+  nearOpacityMax: 0.23,
+});
+
+export type DashboardWeatherFogOpacity = Readonly<{
+  far: number;
+  near: number;
+}>;
+
+/** Visibility is a reported distance in km; null stays unknown, not zero. */
+export function getDashboardWeatherFogOpacity(
+  visibilityKm?: number | null
+): DashboardWeatherFogOpacity | null {
+  const visibility = finiteVisibilityKm(visibilityKm);
+  if (visibility == null) return null;
+
+  const density = Math.max(
+    0,
+    Math.min(1, 1 - visibility / FOG_VISUAL_CONFIG.opacityRangeKm)
+  );
+  return {
+    far: Number(
+      (
+        FOG_VISUAL_CONFIG.farOpacityMin +
+        density *
+          (FOG_VISUAL_CONFIG.farOpacityMax - FOG_VISUAL_CONFIG.farOpacityMin)
+      ).toFixed(3)
+    ),
+    near: Number(
+      (
+        FOG_VISUAL_CONFIG.nearOpacityMin +
+        density *
+          (FOG_VISUAL_CONFIG.nearOpacityMax - FOG_VISUAL_CONFIG.nearOpacityMin)
+      ).toFixed(3)
+    ),
+  };
+}
+
 function classifyCondition(
   condition: string
 ): DashboardWeatherAtmosphereKind | null {
@@ -73,7 +122,13 @@ function getIntensity(
 ): DashboardWeatherAtmosphereIntensity {
   if (kind === "storm" || kind === "heat") return "heavy";
 
-  if (kind === "rain" || kind === "snow" || kind === "hail") {
+  if (kind === "snow") {
+    if (/(fort|intense|heavy|violent)/.test(condition)) return "heavy";
+    if (/(faible|leger|light|fine)/.test(condition)) return "light";
+    return "steady";
+  }
+
+  if (kind === "rain" || kind === "hail") {
     const precipitation = finiteValue(input.precipitation);
     if (
       (precipitation != null && precipitation > 10) ||
@@ -98,7 +153,7 @@ function getIntensity(
   }
 
   if (kind === "fog") {
-    const visibilityKm = finiteValue(input.visibilityKm);
+    const visibilityKm = finiteVisibilityKm(input.visibilityKm);
     return visibilityKm != null && visibilityKm < 0.2 ? "heavy" : "steady";
   }
 
@@ -134,7 +189,7 @@ export function getDashboardWeatherAtmosphere(
   const cloudCover = finiteValue(input.cloudCover);
   const windSpeed = finiteValue(input.windSpeed);
   const temperature = finiteValue(input.temperature);
-  const visibilityKm = finiteValue(input.visibilityKm);
+  const visibilityKm = finiteVisibilityKm(input.visibilityKm);
 
   // La condition affichée reste prioritaire; les mesures ne servent qu’en repli.
   const kind =

@@ -332,7 +332,26 @@
   display: none;
 }
 
+.dashboard-weather-atmosphere__snow-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dashboard-weather-atmosphere__snow-layer[data-snow-renderer="webgl"] .dashboard-weather-atmosphere__snowflake {
+  display: none;
+}
+
 .dashboard-weather-atmosphere__rain-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.dashboard-weather-atmosphere__snow-canvas {
   position: absolute;
   inset: 0;
   display: block;
@@ -579,6 +598,12 @@
 
 .dashboard-weather-atmosphere__mist--far { top: 24%; }
 .dashboard-weather-atmosphere__mist--near { top: 58%; opacity: 0.23; transform: scaleX(0.85); }
+.dashboard-weather-atmosphere[data-weather-atmosphere="fog"] .dashboard-weather-atmosphere__mist--far {
+  opacity: var(--fog-mist-far-opacity, 0.32);
+}
+.dashboard-weather-atmosphere[data-weather-atmosphere="fog"] .dashboard-weather-atmosphere__mist--near {
+  opacity: var(--fog-mist-near-opacity, 0.23);
+}
 
 .dashboard-weather-atmosphere__dust-haze {
   left: -28%;
@@ -661,7 +686,31 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dashboard-weather-atmosphere > :not(.dashboard-weather-atmosphere__wash) { display: none !important; }
+  .dashboard-weather-atmosphere > :not(.dashboard-weather-atmosphere__wash):not(.dashboard-weather-atmosphere__snow-layer):not(.dashboard-weather-atmosphere__mist) { display: none !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake {
+    display: block !important;
+    animation: none !important;
+    opacity: 0.55;
+    filter: drop-shadow(0 0 2px rgba(220, 240, 255, 0.55));
+    transform: scale(1.35) !important;
+  }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(1) { top: 18% !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(2) { top: 31% !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(3) { top: 45% !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(4) { top: 61% !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(5) { top: 77% !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(6) { top: 27% !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(7) { top: 85% !important; }
+  .dashboard-weather-atmosphere__snow-layer .dashboard-weather-atmosphere__snowflake:nth-of-type(n + 8) {
+    display: none !important;
+  }
+  .dashboard-weather-atmosphere__snow-canvas { display: none !important; }
+  .dashboard-weather-atmosphere__mist {
+    display: block !important;
+    animation: none !important;
+    filter: blur(5px);
+    opacity: 0.12 !important;
+  }
 }
 
 @keyframes dashboard-weather-rain-fall {

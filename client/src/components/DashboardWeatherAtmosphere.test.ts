@@ -39,8 +39,12 @@ describe("DashboardWeatherAtmosphere", () => {
     );
 
     expect(reduced).toContain('data-effects-mode="reduced"');
-    expect(reduced.match(/dashboard-weather-atmosphere__rain-drop--/g)).toHaveLength(10);
-    expect(reducedSnow.match(/dashboard-weather-atmosphere__snowflake/g)).toHaveLength(7);
+    expect(
+      reduced.match(/dashboard-weather-atmosphere__rain-drop--/g)
+    ).toHaveLength(10);
+    expect(
+      reducedSnow.match(/dashboard-weather-atmosphere__snowflake/g)
+    ).toHaveLength(7);
     expect(disabled).toBe("");
   });
 
@@ -86,6 +90,36 @@ describe("DashboardWeatherAtmosphere", () => {
     expect(dust).toContain('data-weather-atmosphere="dust"');
     expect(dust).toContain("dashboard-weather-atmosphere__dust-haze--far");
     expect(dust).toContain("dashboard-weather-atmosphere__dust-particle");
+  });
+
+  it("propose le canvas neige avec le fallback CSS et adapte le brouillard à la visibilité connue", () => {
+    const snow = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, {
+        condition: "Neige",
+        windSpeed: 24,
+        windDirection: 90,
+      })
+    );
+    const unknownFog = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, {
+        condition: "Brouillard",
+        visibilityKm: null,
+      })
+    );
+    const measuredFog = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, {
+        condition: "Brouillard",
+        visibilityKm: 0,
+      })
+    );
+
+    expect(snow).toContain('data-snow-renderer="css"');
+    expect(snow).toContain('data-snow-canvas="webgl"');
+    expect(snow).toContain("dashboard-weather-atmosphere__snowflake");
+    expect(unknownFog).toContain('data-fog-visibility="unknown"');
+    expect(unknownFog).not.toContain("--fog-mist-far-opacity");
+    expect(measuredFog).toContain('data-fog-visibility="reported"');
+    expect(measuredFog).toContain("--fog-mist-far-opacity:0.32");
   });
 
   it("ne rend pas de phénomène décoratif sans condition ni mesure exploitable", () => {
