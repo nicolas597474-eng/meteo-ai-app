@@ -1,6 +1,7 @@
 import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
 import {
   getLaboratoryHorizon,
+  LABORATORY_HORIZONS,
   PUBLIC_RANKING_EVIDENCE_THRESHOLDS,
   type LaboratoryHorizonId,
 } from "./weatherReliabilityConfig";
@@ -58,6 +59,70 @@ export async function buildReliabilityLaboratory(input: {
   const history = await getHourlyForecastEvaluationHistory(locationKey, trendStartDate, throughDate, [], { includeLegacy: true });
   const minimumComparisons = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons;
   const minimumComparableDays = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays;
+  const expectedEvidenceCellCount = OFFICIAL_HOURLY_MODELS.length * HOURLY_FORECAST_VARIABLES.length;
+  const horizonEvidence = LABORATORY_HORIZONS.map((horizon) => {
+    const base = {
+      id: horizon.id,
+      label: horizon.label,
+      storageBucket: horizon.storageBucket,
+      expectedCellCount: expectedEvidenceCellCount,
+    };
+    if (!history.available) {
+      return {
+        ...base,
+        status: "history_unavailable" as const,
+        rawEvidenceCellCount: null,
+        qualifiedCellCount: null,
+        insufficientEvidenceCellCount: null,
+        incompleteMetricCellCount: null,
+        noEvidenceCellCount: null,
+      };
+    }
+    if (!horizon.storageBucket) {
+      return {
+        ...base,
+        status: "horizon_not_stored" as const,
+        rawEvidenceCellCount: null,
+        qualifiedCellCount: null,
+        insufficientEvidenceCellCount: null,
+        incompleteMetricCellCount: null,
+        noEvidenceCellCount: null,
+      };
+    }
+
+    let rawEvidenceCellCount = 0;
+    let qualifiedCellCount = 0;
+    let insufficientEvidenceCellCount = 0;
+    let incompleteMetricCellCount = 0;
+    let noEvidenceCellCount = 0;
+    for (const model of OFFICIAL_HOURLY_MODELS) {
+      for (const variable of HOURLY_FORECAST_VARIABLES) {
+        const summary = summarizeHourlyHistoricalEvidence(history.rows as HourlyHistoricalScoreRow[], {
+          modelName: model.name,
+          modelId: model.modelId,
+          variable,
+          horizonBucket: horizon.storageBucket,
+          beforeDate,
+          periodStartDate: startDate,
+          historyAvailable: history.available,
+        });
+        if (summary.metrics) rawEvidenceCellCount += 1;
+        if (summary.status === "qualified") qualifiedCellCount += 1;
+        else if (summary.status === "insufficient_evidence") insufficientEvidenceCellCount += 1;
+        else if (summary.status === "incomplete_metrics") incompleteMetricCellCount += 1;
+        else if (summary.status === "no_evidence") noEvidenceCellCount += 1;
+      }
+    }
+    return {
+      ...base,
+      status: "available" as const,
+      rawEvidenceCellCount,
+      qualifiedCellCount,
+      insufficientEvidenceCellCount,
+      incompleteMetricCellCount,
+      noEvidenceCellCount,
+    };
+  });
 
   const evidence = OFFICIAL_HOURLY_MODELS.flatMap((model) => HOURLY_FORECAST_VARIABLES.map((variable) => {
     const base = {
@@ -134,6 +199,7 @@ export async function buildReliabilityLaboratory(input: {
     period: { id: input.period, ...period, startDate, endDate: throughDate },
     trendWindowStartDate: trendStartDate,
     selectedHorizon,
+    horizonEvidence,
     evidence: {
       status: history.available ? "available" as const : "history_unavailable" as const,
       source: "hourly_forecast_evaluation_scores" as const,
