@@ -3966,3 +3966,12 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Mesure de build après changement : JS initial 741 392 octets (213 605 gzip), contre 1 048 960 (293 476 gzip) avant découpage, soit 307 568 octets bruts / 79 871 gzip de moins; EnvironmentalPanels devient un chunk de 121 385 octets (27 410 gzip) et Map de 181 050 (51 710 gzip). CSS : 331 930 (52 900 gzip); HTML runtime : 368 190 (105 754 gzip). Aucun temps d’ouverture réel/LCP mesuré.
 - [x] Aucun appel météo live, collecte, migration, changement de prévision, poids, scores, observations, sources ou journaux.
 - [x] Ouvrir la PR dédiée [#113](https://github.com/nicolas597474-eng/meteo-ai-app/pull/113) vers `main`; la laisser ouverte, sans fusion ni déploiement.
+
+## Lisibilité des observations du Dashboard — 8 octobre 2026
+- [x] Repartir du `main` distant vérifié (`fc7b676bf400c3f62e4943643121f97c3992b8db`), travailler sur `feat/dashboard-current-observations-layout-20261008`, sans modifier `main` ni les PR préexistantes.
+- [x] Recentrer et agrandir la boussole avec relief CSS sobre et points N/E/S/O accessibles; placer ressenti et nuages autour, vent/rafales en paire, pression à part, humidité/précipitations en paire; agrandir les intitulés sans changer valeurs, unités, provenance ni états manquants.
+- [x] Retirer la carte « Prévisions du jour » uniquement; garder le graphe indépendant de consensus des précipitations et les données/composants métier. Déplacer UV et visibilité horaire dans un bloc bleu distinct des observations; afficher l’échéance et la provenance/fraîcheur disponibles, préciser le libellé si l’UV n’existe qu’à l’échéance suivante.
+- [x] Auditer le contrat : `visibility` est une prévision horaire en km; l’API n’offre pas de champ « visibilité des nuages ». L’interface présente donc « Visibilité horaire » et le précise, sans inventer une mesure nuageuse.
+- [x] Ne modifier ni API, sources, observations, calculs météo, prévisions, poids, scoring, ni dépendance; aucun test sur téléphone réel. L’aperçu compilé s’ouvre mais ses prévisions restent indisponibles faute de serveur API local; le rendu des cartes n’a donc pas pu être inspecté visuellement.
+- [x] Valider : test Dashboard ciblé 3/3; suite Vitest complète 228 fichiers, 1 151 tests réussis et 2 ignorés; `pnpm check`, `pnpm build`, `git diff --check` réussis. Build : avertissement de taille du bundle initial supérieur à 500 kB.
+- [x] Préparer une PR ciblée vers `main`, à laisser ouverte sans fusion ni déploiement.

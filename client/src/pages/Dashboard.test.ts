@@ -15,7 +15,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("modelWeight={locationWeather.ultraLocal.modelWeight}");
     expect(source).toContain("usesModelFallback={locationWeather.ultraLocal.usesModelFallback}");
     expect(source).toContain("Mes observations");
-    expect(source).toContain('MeteoIcon name="wind_param" size={16}');
+    expect(source).toContain('<Wind className="h-3.5 w-3.5 shrink-0" />Vent actuel');
     expect(source).toContain('MeteoIcon name="humidity" size={16}');
     expect(source).toContain('status: "stored" | "no_station" | "failed" | "missing"');
     expect(source).toContain('label: "Créneau sans trace"');
@@ -96,9 +96,20 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("{regimeSourceLabel} · {regimeFreshnessLabel}");
     expect(source).not.toContain("Synthèse horaire");
     expect(source).toContain("Observations actuelles");
-    expect(source).toContain("Prévisions du jour");
-    expect(source).toContain("Direction · {formatCurrentStateProvenance(windDirectionField");
+    expect(source).not.toContain("Prévisions du jour");
+    expect(source).toContain('aria-label="Prévisions horaires, distinctes des observations actuelles"');
+    expect(source).toContain("UV prévu pour cette heure");
+    expect(source).toContain("Visibilité horaire");
+    expect(source).toContain("Visibilité météo, pas spécifique aux nuages");
+    expect(source).toContain("formatHourlyForecastValidAt(uvForecastHour?.validAt)");
+    expect(source).toContain('uvForecastHour && uvForecastHour !== currentHour ? "UV prévu à l’échéance suivante" : "UV prévu pour cette heure"');
+    expect(source).toContain("formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)");
     expect(source).toContain("WindRose direction={windDir} />");
+    expect(source).toContain("nord en haut, est à droite, sud en bas, ouest à gauche");
+    expect(source).toContain('className="absolute top-1 z-20 text-[10px] font-black leading-none text-cyan-100 drop-shadow">N</span>');
+    expect(source).toContain('className="absolute right-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">E</span>');
+    expect(source).toContain('className="absolute bottom-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">S</span>');
+    expect(source).toContain('className="absolute left-1 z-20 text-[10px] font-black leading-none text-sky-100 drop-shadow">O</span>');
     expect(source).not.toContain("speed={windSpeed}");
     expect(source).toContain("title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}");
     expect(source).toContain("formatDashboardNumber(currentHumidity)");
@@ -110,22 +121,10 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('text-white">{displayedCondition');
     expect(source).toContain('text-white">{nextRegimeChange ? nextRegimeChange.label');
     expect(source).not.toContain("Confiance prévision");
-    expect(source).toContain("Accord inter-modèles");
-    expect(source).toContain("accord brut, pas fiabilité");
-    expect(source).toContain("σ population");
-    expect(source).toContain("incertitude statistique non mesurée");
     expect(metricDefinitions).toContain("Couverture et qualité physiques");
     expect(metricDefinitions).toContain("Incertitude statistique</strong> : non mesurée dans cette vue");
     expect(metricDefinitions).toContain("Fiabilité historique");
-    expect(source).toContain("jour demandé");
-    expect(source).toContain("heure de run modèle non archivée");
-    expect(source).toContain("isForecastInfoOpen");
-    expect(source).toContain('aria-controls="forecast-information-panel"');
-    expect(source).toContain('id="forecast-information-panel"');
-    expect(source).toContain('Dialog open={isForecastInfoOpen} onOpenChange={setIsForecastInfoOpen}');
-    expect(source).toContain('showCloseButton={false}');
-    expect(source).toContain('max-h-[calc(100dvh-1rem)]');
-    expect(source).toContain("Fermer les informations de prévision et d’accord inter-modèles");
+    expect(source).not.toContain('id="forecast-information-panel"');
     expect(source).toContain("Créneaux horaires indisponibles");
     expect(source).toContain("Dernière fusion quotidienne réelle");
     expect(source).toContain('isDailyFallback ? "Tendance quotidienne · " : currentSnapshot || hasAvailableCurrentState ? "État actuel · " : "État courant indisponible · "');
@@ -143,7 +142,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('mb-1 flex justify-center sm:mb-1.5');
     expect(source).toContain("État du ciel</p>");
     expect(source).toContain("Open-Meteo");
-    expect(source).toContain('dir == null ? "—" : cardinalDir(dir)');
+    expect(source).toContain('const directionLabel = directionIndex == null ? null : cardinalDirections[directionIndex];');
     expect(source).toContain("Précipitations actuelles");
     expect(source).toContain("Pression locale");
     expect(source).toContain("const currentTemp = currentNumber(temperatureField)");
@@ -224,16 +223,15 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("Trace horaire mise à jour");
     expect(source).toContain("latestHourlyCollection.status !== \"missing\"");
     expect(source).not.toContain("forecast-collection-title");
-    const ventMaxIndex = source.indexOf("Vent max");
-    const agreementIndex = source.indexOf("Accord inter-modèles");
-    expect(ventMaxIndex).toBeGreaterThan(-1);
-    expect(agreementIndex).toBeGreaterThan(ventMaxIndex);
+    expect(source).toContain("UV prévu pour cette heure");
+    expect(source).toContain("Visibilité horaire");
+    expect(source).not.toContain("Prévisions du jour");
   });
 
-  it("regroupe toutes les observations actuelles avant les prévisions du jour", () => {
+  it("regroupe les observations actuelles et distingue les prévisions horaires", () => {
     const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
     const observationsStart = source.indexOf('<section aria-label="Observations actuelles"');
-    const forecastStart = source.indexOf('<section aria-label="Prévisions du jour"');
+    const forecastStart = source.indexOf('<section aria-label="Prévisions horaires, distinctes des observations actuelles"');
     expect(observationsStart).toBeGreaterThanOrEqual(0);
     expect(forecastStart).toBeGreaterThan(observationsStart);
 
@@ -251,6 +249,12 @@ describe("Dashboard avec état courant sourcé par variable", () => {
       expect(observationsSection).toContain(metric);
     }
     expect(observationsSection).not.toContain("Autres observations actuelles");
+    expect(observationsSection).not.toContain("UV prévu pour cette heure");
+    expect(observationsSection).not.toContain("Visibilité horaire");
+    expect(observationsSection.indexOf("Vent actuel")).toBeLessThan(observationsSection.indexOf("Rafales actuelles"));
+    expect(observationsSection.indexOf("Humidité actuelle")).toBeLessThan(observationsSection.indexOf("Précipitations actuelles"));
+    expect(source.slice(forecastStart)).toContain("{currentUVLabel}");
+    expect(source.slice(forecastStart)).toContain("Visibilité horaire");
     expect(source.match(/<section aria-label="Observations actuelles"/g)).toHaveLength(1);
   });
 
