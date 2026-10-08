@@ -3910,3 +3910,14 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Tests ciblés : 13/13 réussis; `pnpm check` réussi; suite complète `pnpm test` : 224 fichiers, 1 119 tests réussis, 2 ignorés; `pnpm build` réussi; `git diff --check` propre. Le build conserve les avertissements préexistants Analytics, asset runtime et taille de bundles.
 - [x] Documentation du barème et des limites : `docs/experimental-forecast-confidence-index.md`. Aucun merge ni déploiement effectué.
 - [x] Commit `eddf308` poussé sur la branche dédiée; PR [#106](https://github.com/nicolas597474-eng/meteo-ai-app/pull/106) ouverte vers `main`, sans merge ni déploiement.
+
+
+## Chargement rapide du Dashboard et des Prévisions — 8 octobre 2026
+- [x] Repartir du `main` propre après la fusion de la PR #106 (`60e4ab8`) et vérifier l’absence de PR ouverte.
+- [x] Vérifier que la PR [#103](https://github.com/nicolas597474-eng/meteo-ai-app/pull/103), fusionnée le 8 octobre (`d321c87`), conserve 16 jours d’heures officielles pour Prévisions via `includeExtendedPeriods`.
+- [x] Confirmer que Dashboard utilise l’entrée courte (`false` par défaut) et n’appelle pas la série Open-Meteo 16 jours; Prévisions active explicitement l’horizon étendu et garde la série officielle affichée ainsi que `periodHours` dans la réponse.
+- [x] Aligner le hook de fond de Prévisions sur la même clé étendue afin d’éviter une deuxième requête courte; conserver les valeurs et la propagation des erreurs, sans fallback caché.
+- [x] Démarrer en parallèle les lectures indépendantes uniquement dans le parcours demandé; tester que le mode court ne lance ni n’attend l’appel étendu et que le mode long conserve son résultat.
+- [x] Ajouter un test de non-régression synthétique de concurrence et de propagation d’erreur, sans requête météo, collecte, recalcul, migration ni nouvelle dépendance.
+- [x] Vérifications : tests ciblés 22/22; `pnpm check`; `pnpm build`; `git diff --check`. Aucun appel de fournisseur météo n’a été exécuté.
+- [ ] Ouvrir une PR dédiée; ne pas fusionner ni déployer.

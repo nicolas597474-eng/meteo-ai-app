@@ -29,7 +29,8 @@ describe("provenance unifiée des pages météo", () => {
     const router = readFileSync(new URL("../../../server/routers/weather.ts", import.meta.url), "utf8");
 
     expect(dashboard).toContain("useOfficialForecast(selectedLocation)");
-    expect(details).toContain("useOfficialForecast(activeLocation)");
+    expect(details).toContain("useOfficialForecast(activeLocation, { includeExtendedPeriods: true })");
+    expect(details).toContain("usePageWeatherSky({ includeExtendedPeriods: true })");
     expect(sharedHook).toContain("trpc.weather.getDetailedForecast.useQuery(queryInput");
     expect(sharedHook).toContain("OFFICIAL_FORECAST_REFETCH_INTERVAL_MS");
     expect(details).toContain("getForecastProvenance.useQuery(coordinates");
@@ -39,6 +40,9 @@ describe("provenance unifiée des pages météo", () => {
     expect(dashboard).toContain("officialSnapshot?.hourlyWeighting");
     expect(details).toContain("officialSnapshot?.hourlyWeighting");
     expect(router).toContain("hours: snapshot.hourly");
+    expect(router).toContain("periodHours,");
+    expect(router).toContain("periodHoursSource: includeExtendedPeriods ? \"open_meteo_best_match_reference\"");
+    expect(router).toContain("loadExtendedPeriods: () => collectHourlyForecast(today, coords, 16)");
     expect(router).toContain("hourlyWeighting: snapshot.hourlyWeighting");
     expect(dashboard).toContain("hourlyComputedAt={officialForecast?.officialSnapshot?.hourlyComputedAt}");
     expect(dashboard).toContain("computedAt={officialForecast?.officialSnapshot?.computedAt}");

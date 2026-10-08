@@ -91,6 +91,7 @@ import { fillOpenWeatherHourlyGaps } from "../openWeatherHourlyFallback";
 import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
 import { buildStationForecastComparison24h } from "../stationForecastComparison";
 import { dailyPhysicalComparisonsRouter } from "./dailyPhysicalComparisons";
+import { loadDetailedForecastSources } from "../detailedForecastLoading";
 
 function getTodayParis(): string {
   return getParisDate();
@@ -988,26 +989,28 @@ export const weatherRouter = router({
       const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
       const includeExtendedPeriods = input?.includeExtendedPeriods !== false;
 
-      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, {
-        hourlyForecastDays: includeExtendedPeriods ? 16 : 2,
+      const { snapshot, periodHours, metadata: [meteoAI, observation, recentForecasts], hourlyFallback } = await loadDetailedForecastSources({
+        loadSnapshot: () => resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, {
+          hourlyForecastDays: includeExtendedPeriods ? 16 : 2,
+        }),
+        includeExtendedPeriods,
+        loadExtendedPeriods: () => collectHourlyForecast(today, coords, 16),
+        loadMetadata: () => Promise.all([
+          getMeteoAIForecastByDate(today, locKey),
+          getObservationByDate(today, locKey),
+          getLatestMeteoAIForecasts(1, locKey),
+        ]),
+        loadHourlyFallback: (officialHours) => fillOpenWeatherHourlyGaps({
+          apiKey: ENV.openWeatherMapApiKey,
+          lat: (coords ?? HONDEGHEM).lat,
+          lon: (coords ?? HONDEGHEM).lon,
+          hours: officialHours,
+        }),
       });
       const officialHours = snapshot.hourly;
-      const hourlyFallback = await fillOpenWeatherHourlyGaps({
-        apiKey: ENV.openWeatherMapApiKey,
-        lat: (coords ?? HONDEGHEM).lat,
-        lon: (coords ?? HONDEGHEM).lon,
-        hours: officialHours,
-      });
       const hours = hourlyFallback.hours;
-      const periodHours = includeExtendedPeriods ? await collectHourlyForecast(today, coords, 16) : officialHours;
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
-
-      const [meteoAI, observation, recentForecasts] = await Promise.all([
-        getMeteoAIForecastByDate(today, locKey),
-        getObservationByDate(today, locKey),
-        getLatestMeteoAIForecasts(1, locKey),
-      ]);
       const dailyFallbackSource = meteoAI ?? recentForecasts[0];
       const dailyFallbackTrace = getPersistedForecastTrace(dailyFallbackSource?.weights, dailyFallbackSource?.computedAt);
       const dailyFallback = hours.length === 0

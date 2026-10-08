@@ -18,10 +18,10 @@ export function getOfficialForecastCoordinates(location: OfficialForecastLocatio
   };
 }
 
-export function getOfficialForecastQueryInput(location: OfficialForecastLocation) {
+export function getOfficialForecastQueryInput(location: OfficialForecastLocation, includeExtendedPeriods = false) {
   return {
     ...getOfficialForecastCoordinates(location),
-    includeExtendedPeriods: false as const,
+    includeExtendedPeriods,
   };
 }
 
