@@ -3951,4 +3951,4 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Préserver les modes complet/réduit/désactivé, `prefers-reduced-motion`, fallback CSS/WebGL, limites mobile et globes solaire/lunaire dédiés; documenter les choix dans `docs/weather-reality-engine-remaining.md`.
 - [x] Validation finale : `pnpm check` réussi; `pnpm test` — 228 fichiers, 1 147 réussis et 2 ignorés; `pnpm build` réussi; `git diff --check` réussi. Avertissement Vite sur le chunk principal > 500 kB.
 - [x] Limite de vérification : aucun aperçu dans un navigateur mobile ni essai sur téléphone physique.
-- [ ] Créer la PR vers `main`, la laisser ouverte sans fusion ni déploiement.
+- [x] Ouvrir la PR [#111](https://github.com/nicolas597474-eng/meteo-ai-app/pull/111) vers `main`; la laisser ouverte, sans fusion ni déploiement.
