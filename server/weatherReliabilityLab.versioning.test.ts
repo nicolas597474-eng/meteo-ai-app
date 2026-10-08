@@ -51,6 +51,8 @@ describe("Weather AI Lab — agrégats horaires legacy non versionnés", () => {
       row.modelName === OFFICIAL_HOURLY_MODELS[0]!.name && row.variable === "temperature");
     const noScore = result.metrics.find((row) =>
       row.modelName === OFFICIAL_HOURLY_MODELS[1]!.name && row.variable === "temperature");
+    const selectedHorizonSummary = result.horizonEvidence.find((horizon) => horizon.id === "6-24h");
+    const unarchivedHorizonSummary = result.horizonEvidence.find((horizon) => horizon.id === "24-48h");
 
     expect(mocks.getHourlyForecastEvaluationHistory).toHaveBeenCalledWith(
       "50.700_2.500",
@@ -69,6 +71,17 @@ describe("Weather AI Lab — agrégats horaires legacy non versionnés", () => {
       status: "no_evidence",
       metrics: null,
       legacyUnversionedRowCount: 0,
+    });
+    expect(selectedHorizonSummary).toMatchObject({
+      status: "available",
+      rawEvidenceCellCount: 0,
+      qualifiedCellCount: 0,
+      expectedCellCount: OFFICIAL_HOURLY_MODELS.length * 6,
+    });
+    expect(unarchivedHorizonSummary).toMatchObject({
+      status: "horizon_not_stored",
+      rawEvidenceCellCount: null,
+      qualifiedCellCount: null,
     });
   });
 });
