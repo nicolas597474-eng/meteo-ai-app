@@ -720,7 +720,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-weather-page min-h-dvh w-full overflow-x-clip bg-background" style={dashboardSkyStyle}>
-      <DashboardWeatherAtmosphere condition={displayedCondition} regime={regime?.label} temperature={currentTemp} visibilityKm={currentHour?.visibility} precipitation={currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : null)} cloudCover={currentCloudCover} windSpeed={windSpeed} windDirection={windDir} windGust={currentWindGust} effectsMode={weatherEffectsMode} />
+      <DashboardWeatherAtmosphere condition={displayedCondition} regime={regime?.label} weatherCode={currentWeatherCode} temperature={currentTemp} visibilityKm={currentHour?.visibility} precipitation={currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : null)} cloudCover={currentCloudCover} windSpeed={windSpeed} windDirection={windDir} windGust={currentWindGust} effectsMode={weatherEffectsMode} />
       <div className="mx-auto w-full min-w-0 max-w-none space-y-2 px-1 pb-3 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:space-y-6 sm:px-6 sm:py-8">
 
         {!authLoading && !user && (

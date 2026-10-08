@@ -2,10 +2,18 @@ import * as React from "react";
 import type { CSSProperties } from "react";
 import {
   getDashboardWeatherAtmosphere,
+  getDashboardWeatherCloudOpacity,
   getDashboardWeatherFogOpacity,
+  getDashboardWeatherHailIntensity,
+  getDashboardWeatherSunlightOpacity,
+  getDashboardWeatherWindMotion,
+  hasDashboardHail,
+  isDashboardFreezingPrecipitation,
   type DashboardWeatherAtmosphereInput,
 } from "@/lib/dashboardWeatherAtmosphere";
 import type { DashboardWeatherEffectsMode } from "@/lib/dashboardWeatherEffects";
+import { HailWebGLCanvas } from "@/components/weather/HailWebGLCanvas";
+import type { HailVisualCategory } from "@/lib/weatherReality/hailVisualEngine";
 import { RainWebGLCanvas } from "@/components/weather/RainWebGLCanvas";
 import { SnowWebGLCanvas } from "@/components/weather/SnowWebGLCanvas";
 
@@ -218,6 +226,62 @@ function SnowLayer({
   );
 }
 
+type HailRendererMode = "css" | "webgl";
+
+type HailLayerProps = {
+  particles: (typeof HAIL_PARTICLES)[number][];
+  effectsMode: DashboardWeatherEffectsMode;
+  reduced: boolean;
+  category: HailVisualCategory;
+  windSpeed?: number | null;
+  windDirection?: number | null;
+  windGust?: number | null;
+};
+
+function HailLayer({
+  particles,
+  effectsMode,
+  reduced,
+  category,
+  windSpeed,
+  windDirection,
+  windGust,
+}: HailLayerProps) {
+  const [rendererMode, setRendererMode] = React.useState<HailRendererMode>("css");
+
+  return (
+    <div
+      className="dashboard-weather-atmosphere__hail-layer"
+      data-hail-renderer={rendererMode}
+    >
+      {rendererMode === "css"
+        ? particles.map((particle, index) => (
+            <i
+              key={`hail-${index}`}
+              className="dashboard-weather-atmosphere__hailstone"
+              style={{
+                left: `${particle.left}%`,
+                top: "-6%",
+                width: `${particle.size}px`,
+                height: `${particle.size}px`,
+                animationDelay: `${particle.delay}s`,
+                animationDuration: `${particle.duration * (reduced ? 1.5 : 1)}s`,
+              }}
+            />
+          ))
+        : null}
+      <HailWebGLCanvas
+        effectsMode={effectsMode}
+        category={category}
+        windSpeedKmh={windSpeed}
+        windDirectionDegrees={windDirection}
+        windGustKmh={windGust}
+        onRendererChange={setRendererMode}
+      />
+    </div>
+  );
+}
+
 type DashboardWeatherAtmosphereProps = DashboardWeatherAtmosphereInput & {
   effectsMode?: DashboardWeatherEffectsMode;
   windDirection?: number | null;
@@ -238,17 +302,89 @@ export function DashboardWeatherAtmosphere({
     kind === "fog"
       ? getDashboardWeatherFogOpacity(weather.visibilityKm)
       : null;
+  const cloudOpacity =
+    kind === "clouds"
+      ? getDashboardWeatherCloudOpacity(weather.cloudCover)
+      : null;
+  const windMotion = getDashboardWeatherWindMotion(
+    weather.windSpeed,
+    windDirection,
+    windGust
+  );
+  const sunlightOpacity =
+    kind === "sun" || kind === "cold-sun"
+      ? getDashboardWeatherSunlightOpacity(weather.cloudCover)
+      : null;
+  const freezingPrecipitation = isDashboardFreezingPrecipitation(weather);
+  const hasHail = hasDashboardHail(weather);
+  const hailIntensity = hasHail
+    ? getDashboardWeatherHailIntensity(weather)
+    : "steady";
+  const stormRainSignal =
+    kind === "storm" &&
+    /pluie|rain|averse|bruine/i.test(
+      `${weather.condition ?? ""} ${weather.regime ?? ""}`
+    );
   const rainDropCount =
     intensity === "heavy"
       ? reduced ? 10 : RAIN_DROPS.length
       : intensity === "light"
         ? reduced ? 5 : 9
         : reduced ? 7 : 14;
-  const isRain = kind === "rain" || kind === "storm";
+  const isRain = kind === "rain" || stormRainSignal || freezingPrecipitation;
   const snowParticles = sampleEvenly(SNOW_PARTICLES, reduced ? 7 : SNOW_PARTICLES.length);
-  const hailParticles = sampleEvenly(HAIL_PARTICLES, reduced ? 4 : HAIL_PARTICLES.length);
+  const hailParticles = sampleEvenly(
+    HAIL_PARTICLES,
+    reduced
+      ? hailIntensity === "heavy" ? 4 : 3
+      : hailIntensity === "light" ? 5 : HAIL_PARTICLES.length
+  );
   const dustParticles = sampleEvenly(DUST_PARTICLES, reduced ? 6 : DUST_PARTICLES.length);
   const rainDrops = sampleEvenly(RAIN_DROPS, rainDropCount);
+  const cloudOpacityScale = reduced ? 0.72 : 1;
+  const cloudFarOpacity = cloudOpacity?.far ?? (reduced ? 0.12 : 0.18);
+  const cloudNearOpacity = cloudOpacity?.near ?? (reduced ? 0.09 : 0.14);
+  const effectiveWindOpacity = windMotion.opacity * (reduced ? 0.72 : 1);
+  const effectiveWindDuration = windMotion.durationSeconds * (reduced ? 1.8 : 1);
+  const cloudDriftDuration = Math.max(
+    reduced ? 54 : 28,
+    windMotion.durationSeconds + (reduced ? 28 : 12)
+  );
+  const atmosphereStyle = {
+    ...(fogOpacity == null
+      ? {}
+      : {
+          "--fog-mist-far-opacity": String(fogOpacity.far),
+          "--fog-mist-near-opacity": String(fogOpacity.near),
+        }),
+    ...(kind === "clouds"
+      ? {
+          "--cloud-far-opacity": String(cloudFarOpacity * cloudOpacityScale),
+          "--cloud-near-opacity": String(cloudNearOpacity * cloudOpacityScale),
+          "--cloud-drift-x": windMotion.driftX,
+          "--cloud-drift-y": windMotion.driftY,
+          "--cloud-animation-duration": `${cloudDriftDuration}s`,
+        }
+      : {}),
+    ...(kind === "wind"
+      ? {
+          "--wind-direction-angle": `${windMotion.directionAngleDeg ?? 0}deg`,
+          "--wind-drift-x": windMotion.driftX,
+          "--wind-drift-y": windMotion.driftY,
+          "--wind-animation-duration": `${effectiveWindDuration}s`,
+          "--wind-opacity": String(effectiveWindOpacity),
+        }
+      : {}),
+    ...(hasHail
+      ? {
+          "--hail-drift-x": windMotion.driftX,
+          "--hail-drift-y": windMotion.driftY,
+        }
+      : {}),
+    ...(sunlightOpacity == null
+      ? {}
+      : { "--sunlight-opacity": String(sunlightOpacity * (reduced ? 0.72 : 1)) }),
+  } as CSSProperties;
 
   return (
     <div
@@ -256,6 +392,24 @@ export function DashboardWeatherAtmosphere({
       data-weather-atmosphere={kind}
       data-weather-intensity={intensity}
       data-effects-mode={effectsMode}
+      data-hail-signal={hasHail ? "reported" : undefined}
+      data-freezing-precipitation={
+        freezingPrecipitation ? "reported" : undefined
+      }
+      data-cloud-cover={
+        kind === "clouds"
+          ? cloudOpacity == null
+            ? "unknown"
+            : "reported"
+          : undefined
+      }
+      data-wind-direction={
+        kind === "wind"
+          ? windMotion.directionAngleDeg == null
+            ? "unknown"
+            : "reported"
+          : undefined
+      }
       data-fog-visibility={
         kind === "fog"
           ? fogOpacity == null
@@ -263,14 +417,7 @@ export function DashboardWeatherAtmosphere({
             : "reported"
           : undefined
       }
-      style={
-        fogOpacity == null
-          ? undefined
-          : ({
-              "--fog-mist-far-opacity": String(fogOpacity.far),
-              "--fog-mist-near-opacity": String(fogOpacity.near),
-            } as CSSProperties)
-      }
+      style={atmosphereStyle}
       aria-hidden="true"
     >
       <span className="dashboard-weather-atmosphere__wash" />
@@ -297,11 +444,11 @@ export function DashboardWeatherAtmosphere({
 
       {kind === "sun" || kind === "cold-sun" ? (
         <>
-          <span className="dashboard-weather-atmosphere__sun-glow" />
-          <span className="dashboard-weather-atmosphere__sun-shaft" />
-          {kind === "cold-sun" ? (
+          {kind === "sun" ? (
+            <span className="dashboard-weather-atmosphere__sun-glow" />
+          ) : (
             <span className="dashboard-weather-atmosphere__cold-sun-glow" />
-          ) : null}
+          )}
         </>
       ) : null}
 
@@ -323,22 +470,17 @@ export function DashboardWeatherAtmosphere({
         </>
       ) : null}
 
-      {kind === "hail"
-        ? hailParticles.map((particle, index) => (
-            <i
-              key={`hail-${index}`}
-              className="dashboard-weather-atmosphere__hailstone"
-              style={{
-                left: `${particle.left}%`,
-                top: "-6%",
-                width: `${particle.size}px`,
-                height: `${particle.size}px`,
-                animationDelay: `${particle.delay}s`,
-                animationDuration: `${particle.duration * (reduced ? 1.5 : 1)}s`,
-              }}
-            />
-          ))
-        : null}
+      {hasHail ? (
+        <HailLayer
+          particles={hailParticles}
+          effectsMode={effectsMode}
+          reduced={reduced}
+          category={hailIntensity}
+          windSpeed={weather.windSpeed}
+          windDirection={windDirection}
+          windGust={windGust}
+        />
+      ) : null}
 
       {kind === "ice" ? (
         <>
