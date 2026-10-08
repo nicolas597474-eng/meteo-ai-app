@@ -3930,3 +3930,14 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Exclure toujours du détail horaire type/intensité des précipitations, rayonnement solaire et code WMO brut. Ne pas modifier les poids/fusions, le schéma, les migrations, les dépendances ou les collectes météo; laisser l’écart de nébulosité des captures non diagnostiqué faute de cause runtime confirmée.
 - [x] Tests ciblés : 46 réussis; test WeatherDetails : 12 réussis. Suite complète : 225 fichiers, 1 123 réussis et 2 ignorés. `pnpm check`, `pnpm build` et `git diff --check` réussis; avertissements de build existants (variables Analytics, asset runtime, taille des bundles).
 - [x] Ouvrir la PR [#108](https://github.com/nicolas597474-eng/meteo-ai-app/pull/108) depuis `fix/weather-forecast-missing-fields-20261008`; laisser la PR ouverte, sans fusion ni déploiement.
+
+
+## Extension atmosphérique neige et brouillard — 2026-10-08
+
+- [x] Confirmer l’état de `main` après la fusion utilisateur de la PR #109 (`319f7311f5c4c6d7a11802f658525be89243c3ed`) et créer une branche dédiée depuis ce `main`.
+- [x] Étendre seulement le rendu neige et brouillard du Dashboard; conserver les signaux affichés, distinguer une visibilité `null` de zéro, réutiliser les contrôles existants et garder les fallbacks CSS.
+- [x] Ne pas modifier prévisions, scoring, observations, stations ou fusion; ne pas ajouter de dépendance ni charger de données météo pour la vérification.
+- [x] Documenter les entrées fiables, les limites et le comportement d’accessibilité dans `docs/weather-reality-engine-snow-fog.md`.
+- [x] Valider TypeScript (`pnpm check`), la suite complète (227 fichiers; 1 138 réussis, 2 ignorés) et le build de production (`pnpm build`).
+- [x] Inspecter en fenêtre mobile responsive de 390 × 844 pixels CSS; téléphone physique non testé.
+- [x] Préparer un commit explicite et une PR vers `main`, laissée ouverte pour revue; ne pas fusionner ni déployer.

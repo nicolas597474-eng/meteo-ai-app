@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getDashboardWeatherAtmosphere } from "./dashboardWeatherAtmosphere";
+import {
+  getDashboardWeatherAtmosphere,
+  getDashboardWeatherFogOpacity,
+} from "./dashboardWeatherAtmosphere";
 
 describe("getDashboardWeatherAtmosphere", () => {
   it("choisit la pluie et son intensité à partir du libellé ou des précipitations", () => {
@@ -59,6 +62,18 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(getDashboardWeatherAtmosphere({ temperature: -2 }).kind).toBe("ice");
   });
 
+  it("n’utilise pas un cumul de précipitations sans période pour intensifier la neige", () => {
+    expect(
+      getDashboardWeatherAtmosphere({ condition: "Neige", precipitation: 18 })
+    ).toEqual({ kind: "snow", intensity: "steady" });
+    expect(
+      getDashboardWeatherAtmosphere({
+        condition: "Neige forte",
+        precipitation: null,
+      })
+    ).toEqual({ kind: "snow", intensity: "heavy" });
+  });
+
   it("rend la brume sèche et le soleil froid distincts", () => {
     expect(
       getDashboardWeatherAtmosphere({ condition: "Brume sèche" }).kind
@@ -107,6 +122,15 @@ describe("getDashboardWeatherAtmosphere", () => {
       kind: "snow",
       intensity: "heavy",
     });
+  });
+
+  it("garde la visibilité inconnue distincte de zéro et module seulement l’opacité visuelle", () => {
+    expect(getDashboardWeatherFogOpacity(null)).toBeNull();
+    expect(getDashboardWeatherFogOpacity(Number.NaN)).toBeNull();
+    expect(getDashboardWeatherFogOpacity(-1)).toBeNull();
+    expect(getDashboardWeatherFogOpacity(0)).toEqual({ far: 0.32, near: 0.23 });
+    expect(getDashboardWeatherFogOpacity(1)).toEqual({ far: 0.14, near: 0.1 });
+    expect(getDashboardWeatherFogOpacity(24)).toEqual({ far: 0.14, near: 0.1 });
   });
 
   it("n’invente aucun phénomène quand les conditions et les mesures sont absentes", () => {
