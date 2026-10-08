@@ -16,8 +16,10 @@ describe("provenance unifiée des pages météo", () => {
   it("conserve le contrat et les panneaux repliables sur le Dashboard", () => {
     for (const filename of dashboardPageFiles) {
       const source = readFileSync(new URL(`./${filename}`, import.meta.url), "utf8");
-      expect(source).toContain("ForecastProvenanceBadge");
+      expect(source).not.toContain("<ForecastProvenanceBadge");
       expect(source).toContain("weather.getForecastProvenance.useQuery");
+      expect(source).toContain("formatHourlyForecastSource(hourlyForecastSource)");
+      expect(source).toContain("formatHourlyForecastComputedAt(hourlyForecastComputedAt)");
       expect(source).toContain("HourlyWeightingNotice");
     }
   });

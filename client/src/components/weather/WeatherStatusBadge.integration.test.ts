@@ -14,7 +14,9 @@ describe("harmonisation des badges météo", () => {
     expect(ranking).toContain("WeatherStatusBadge");
     expect(ranking).toContain("sans note 0–100");
     expect(dashboard).toContain("WeatherStatusBadge");
-    expect(dashboard).toContain("Prévisions horaires");
+    expect(dashboard).toContain("Observations actuelles et valeurs prévisionnelles");
+    expect(dashboard).toContain("Visibilité prévue");
+    expect(dashboard).not.toContain(">Prévisions horaires");
     expect(reliability).toContain("Fiabilité historique, sans note globale");
     expect(aiLab).toContain("Hors fusion");
     expect(report).toContain("cette dispersion décrit l’accord brut, pas la fiabilité historique. Incertitude statistique : non mesurée ici.");
