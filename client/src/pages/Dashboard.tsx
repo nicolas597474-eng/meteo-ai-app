@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Droplets, Wind, Activity, Clock, CalendarDays, Eye, Thermometer, Sun, Radio, ChevronDown, ChevronUp, LogIn, Sparkles, X } from "lucide-react";
 import { FavoritesBar } from "@/components/FavoritesBar";
@@ -35,7 +35,6 @@ import { countArchivedSnapshotSlots, formatCollectionDuration } from "@/lib/coll
 import { getDashboardObservability } from "@/lib/dashboardObservability";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, withCurrentSnapshotFallback, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
-import { EnvironmentalPanels } from "@/components/EnvironmentalPanels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour, getOfficialForecastCoordinates } from "@/lib/officialForecast";
 import { useOfficialForecast } from "@/hooks/useOfficialForecast";
@@ -44,6 +43,50 @@ import type { OfficialRegimeInputDiagnostic, RegimeInputStatus } from "@shared/r
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
+const EnvironmentalPanels = lazy(() =>
+  import("@/components/EnvironmentalPanels").then(({ EnvironmentalPanels: Component }) => ({ default: Component })),
+);
+
+function EnvironmentalPanelsPlaceholder() {
+  return (
+    <div className="grid min-w-0 w-full grid-cols-1 gap-3 sm:grid-cols-2" aria-hidden="true">
+      <div className="h-64 animate-pulse rounded-[22px] bg-slate-800/40" />
+      <div className="h-64 animate-pulse rounded-[22px] bg-slate-800/40" />
+    </div>
+  );
+}
+
+function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalPanels>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const target = containerRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setShouldLoad(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "800px 0px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef}>
+      {shouldLoad ? (
+        <Suspense fallback={<EnvironmentalPanelsPlaceholder />}>
+          <EnvironmentalPanels {...props} />
+        </Suspense>
+      ) : <EnvironmentalPanelsPlaceholder />}
+    </div>
+  );
+}
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction }: { direction: number | null }) {
@@ -1367,7 +1410,7 @@ export default function Dashboard() {
           ) : null}
         </div>
 
-        <EnvironmentalPanels data={environmentalData} isLoading={environmentalFetching} />
+        <DeferredEnvironmentalPanels data={environmentalData} isLoading={environmentalFetching} />
 
       </div>
       <BackToTopButton />

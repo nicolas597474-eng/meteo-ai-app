@@ -253,4 +253,14 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(observationsSection).not.toContain("Autres observations actuelles");
     expect(source.match(/<section aria-label="Observations actuelles"/g)).toHaveLength(1);
   });
+
+  it("diffère le panneau environnemental lourd jusqu’à l’approche du viewport sans le retirer", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+    expect(source).toContain('import("@/components/EnvironmentalPanels")');
+    expect(source).toContain('rootMargin: "800px 0px"');
+    expect(source).toContain('typeof IntersectionObserver === "undefined"');
+    expect(source).toContain("<EnvironmentalPanels {...props} />");
+    expect(source).toContain("<DeferredEnvironmentalPanels data={environmentalData} isLoading={environmentalFetching} />");
+    expect(source).not.toContain('import { EnvironmentalPanels } from "@/components/EnvironmentalPanels"');
+  });
 });
