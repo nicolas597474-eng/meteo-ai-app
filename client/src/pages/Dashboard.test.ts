@@ -175,6 +175,8 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("regime={regime?.label}");
     expect(source).toContain("temperature={currentTemp}");
     expect(source).toContain("visibilityKm={currentHour?.visibility}");
+    expect(source).toContain("windDirection={windDir}");
+    expect(source).toContain("windGust={currentWindGust}");
     expect(source).not.toContain("Voir les prévisions détaillées");
     expect(source).not.toContain('href="/details"');
     expect(source).toContain("dashboardSkyImage");
