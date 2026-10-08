@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useIsFetching } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -30,6 +31,18 @@ const WeightComparison = lazy(() => import("./pages/WeightComparison"));
 const ReliabilityLaboratory = lazy(loadReliabilityLaboratory);
 const NotFound = lazy(() => import("./pages/NotFound"));
 
+const mainPagePreloaders: Record<string, () => Promise<unknown>> = {
+  "/details": loadWeatherDetails,
+  "/laboratoire": loadReliabilityLaboratory,
+  "/ranking": loadRanking,
+  "/ai-lab": loadWeatherAILab,
+};
+
+function preloadMainPage(path: string) {
+  const preload = mainPagePreloaders[path];
+  if (preload) void preload().catch(() => undefined);
+}
+
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/details", label: "Prévisions", icon: FileText },
@@ -44,8 +57,14 @@ function shouldIgnorePageSwipe(target: EventTarget | null) {
 }
 
 function useMainPagePreload() {
+  const isFetching = useIsFetching();
+
   useEffect(() => {
+    if (isFetching > 0) return;
+
     let cancelled = false;
+    let idleCallbackId: number | null = null;
+    let idleTimeoutId: number | null = null;
     const preload = () => {
       if (cancelled) return;
       void Promise.all([
@@ -57,12 +76,23 @@ function useMainPagePreload() {
       ]).catch(() => undefined);
     };
 
-    const timeoutId = window.setTimeout(preload, 250);
+    const schedulePreload = () => {
+      if (cancelled) return;
+      if (typeof window.requestIdleCallback === "function") {
+        idleCallbackId = window.requestIdleCallback(preload, { timeout: 1500 });
+      } else {
+        idleTimeoutId = window.setTimeout(preload, 1000);
+      }
+    };
+
+    const settleTimeout = window.setTimeout(schedulePreload, 500);
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      window.clearTimeout(settleTimeout);
+      if (idleCallbackId !== null) window.cancelIdleCallback(idleCallbackId);
+      if (idleTimeoutId !== null) window.clearTimeout(idleTimeoutId);
     };
-  }, []);
+  }, [isFetching]);
 }
 
 function PageSwipeNavigator({ children }: { children: ReactNode }) {
@@ -159,6 +189,9 @@ function TopNav() {
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
+                  onPointerEnter={() => preloadMainPage(item.path)}
+                  onFocus={() => preloadMainPage(item.path)}
+                  onPointerDown={() => preloadMainPage(item.path)}
                 >
                   <item.icon className="h-4 w-4" />
                   <span>{item.label}</span>
@@ -186,6 +219,9 @@ function BottomNav() {
               className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors min-w-0 flex-1 ${
                 isActive ? "text-primary" : "text-muted-foreground"
               }`}
+              onPointerEnter={() => preloadMainPage(item.path)}
+              onFocus={() => preloadMainPage(item.path)}
+              onPointerDown={() => preloadMainPage(item.path)}
             >
               <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
               <span className={`text-xs font-medium truncate ${isActive ? "text-primary" : ""}`}>

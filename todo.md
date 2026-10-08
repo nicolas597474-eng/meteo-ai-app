@@ -3952,3 +3952,17 @@ Note de transparence : durant la recherche déléguée, quelques requêtes unita
 - [x] Validation finale : `pnpm check` réussi; `pnpm test` — 228 fichiers, 1 147 réussis et 2 ignorés; `pnpm build` réussi; `git diff --check` réussi. Avertissement Vite sur le chunk principal > 500 kB.
 - [x] Limite de vérification : aucun aperçu dans un navigateur mobile ni essai sur téléphone physique.
 - [x] Ouvrir la PR [#111](https://github.com/nicolas597474-eng/meteo-ai-app/pull/111) vers `main`; la laisser ouverte, sans fusion ni déploiement.
+
+
+## Prioriser le chargement initial des pages — 8 octobre 2026
+- [x] Repartir d’un clone propre du `main` au SHA `3086b6327dcc97b2731f7313c261dd5ffbe23512`; confirmer que la PR #107 est fusionnée et relire son périmètre ainsi que les notes de performance existantes.
+- [x] Comparer Dashboard et Prévisions : garder la séparation de #107, le chargement court du Dashboard et l’horizon horaire étendu de 16 jours dans Prévisions; ne modifier aucune donnée, logique météo, collecte ou section.
+- [x] Mesurer le build de référence : le préchargement lancé 250 ms après montage charge les graphes de cinq pages secondaires, soit 897 814 octets JS uniques (233 303 octets gzip), hors bundle initial.
+- [x] Attendre qu’aucune requête React Query active ne reste, puis une période de repos et `requestIdleCallback` (repli temporisé si absent) avant le préchargement global; amorcer immédiatement seulement la route visée au survol, au focus ou à l’appui.
+- [x] Différer aussi le module EnvironmentalPanels (Leaflet, cartes, composants Soleil/Lune et requêtes propres) jusqu’à 800 px du viewport; conserver le squelette, toute la section, et charger immédiatement si `IntersectionObserver` n’existe pas.
+- [x] Conserver le runtime injecté par `vite-plugin-manus-runtime` sans modification : le HTML de build fait 368 190 octets (105 754 gzip), car le plugin inline un runtime; son retrait ou son déplacement risquerait de changer des fonctions de plateforme.
+- [x] Ajouter des tests de contrat pour le préchargement des routes et le panneau environnemental différé; aucune dépendance ajoutée.
+- [x] Validation finale : `pnpm check` réussi; tests ciblés 29/29; suite complète Vitest 228 fichiers, 1 151 réussis et 2 ignorés; `pnpm build` et `git diff --check` réussis. Avertissements build persistants : variables Analytics absentes, asset runtime non résolu au build et chunk initial supérieur à 500 kB.
+- [x] Mesure de build après changement : JS initial 741 392 octets (213 605 gzip), contre 1 048 960 (293 476 gzip) avant découpage, soit 307 568 octets bruts / 79 871 gzip de moins; EnvironmentalPanels devient un chunk de 121 385 octets (27 410 gzip) et Map de 181 050 (51 710 gzip). CSS : 331 930 (52 900 gzip); HTML runtime : 368 190 (105 754 gzip). Aucun temps d’ouverture réel/LCP mesuré.
+- [x] Aucun appel météo live, collecte, migration, changement de prévision, poids, scores, observations, sources ou journaux.
+- [x] Ouvrir la PR dédiée [#113](https://github.com/nicolas597474-eng/meteo-ai-app/pull/113) vers `main`; la laisser ouverte, sans fusion ni déploiement.
