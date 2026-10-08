@@ -11,7 +11,7 @@ import {
 } from "./dashboardWeatherAtmosphere";
 
 describe("getDashboardWeatherAtmosphere", () => {
-  it("choisit la pluie et son intensité à partir du libellé ou des précipitations", () => {
+  it("choisit la pluie et son intensité uniquement à partir de libellés explicites", () => {
     expect(getDashboardWeatherAtmosphere({ condition: "Pluie forte" })).toEqual(
       {
         kind: "rain",
@@ -25,15 +25,19 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(getDashboardWeatherAtmosphere({ condition: "Averses" }).kind).toBe(
       "rain"
     );
-    expect(getDashboardWeatherAtmosphere({ precipitation: 12 }).intensity).toBe(
-      "heavy"
-    );
+    expect(
+      getDashboardWeatherAtmosphere({ condition: "Pluie", precipitation: 12 })
+    ).toEqual({ kind: "rain", intensity: "steady" });
   });
 
   it("distingue orage, neige, grêle, brouillard, chaleur et vent", () => {
     expect(
       getDashboardWeatherAtmosphere({ condition: "Orage violent" }).kind
     ).toBe("storm");
+    expect(getDashboardWeatherAtmosphere({ condition: "Tempête" })).toEqual({
+      kind: "none",
+      intensity: "steady",
+    });
     expect(
       getDashboardWeatherAtmosphere({ condition: "Neige forte" }).kind
     ).toBe("snow");
@@ -65,7 +69,9 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(getDashboardWeatherAtmosphere({ condition: "Neige" }).kind).toBe(
       "snow"
     );
-    expect(getDashboardWeatherAtmosphere({ temperature: -2 }).kind).toBe("none");
+    expect(getDashboardWeatherAtmosphere({ temperature: -2 }).kind).toBe(
+      "none"
+    );
     expect(getDashboardWeatherAtmosphere({ condition: "Froid" }).kind).toBe(
       "none"
     );
@@ -95,7 +101,9 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(hasDashboardHail({ weatherCode: 96 })).toBe(true);
     expect(hasDashboardHail({ weatherCode: 99 })).toBe(true);
     expect(hasDashboardHail({ condition: "Grésil" })).toBe(true);
-    expect(getDashboardWeatherHailIntensity({ weatherCode: 96 })).toBe("steady");
+    expect(getDashboardWeatherHailIntensity({ weatherCode: 96 })).toBe(
+      "steady"
+    );
     expect(getDashboardWeatherHailIntensity({ weatherCode: 99 })).toBe("heavy");
     expect(hasDashboardHail({ weatherCode: 95 })).toBe(false);
   });
@@ -142,10 +150,21 @@ describe("getDashboardWeatherAtmosphere", () => {
     ).toEqual({ kind: "clouds", intensity: "heavy" });
   });
 
-  it("réutilise les mesures météo réelles en l’absence de libellé de condition", () => {
-    expect(getDashboardWeatherAtmosphere({ precipitation: 0.3 }).kind).toBe(
-      "rain"
-    );
+  it("n’infère pas la pluie depuis une quantité sans période documentée", () => {
+    expect(getDashboardWeatherAtmosphere({ precipitation: 0.3 })).toEqual({
+      kind: "none",
+      intensity: "steady",
+    });
+    expect(getDashboardWeatherAtmosphere({ precipitation: 12 })).toEqual({
+      kind: "none",
+      intensity: "steady",
+    });
+    expect(
+      getDashboardWeatherAtmosphere({ condition: "Pluie", precipitation: 12 })
+    ).toEqual({ kind: "rain", intensity: "steady" });
+  });
+
+  it("réutilise les autres mesures météo en l’absence de libellé", () => {
     expect(getDashboardWeatherAtmosphere({ windSpeed: 45 }).kind).toBe("wind");
     expect(getDashboardWeatherAtmosphere({ visibilityKm: 0.8 }).kind).toBe(
       "fog"
@@ -175,8 +194,14 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(getDashboardWeatherCloudOpacity(null)).toBeNull();
     expect(getDashboardWeatherCloudOpacity(-1)).toBeNull();
     expect(getDashboardWeatherCloudOpacity(0)).toEqual({ far: 0, near: 0 });
-    expect(getDashboardWeatherCloudOpacity(50)).toEqual({ far: 0.12, near: 0.085 });
-    expect(getDashboardWeatherCloudOpacity(100)).toEqual({ far: 0.24, near: 0.17 });
+    expect(getDashboardWeatherCloudOpacity(50)).toEqual({
+      far: 0.12,
+      near: 0.085,
+    });
+    expect(getDashboardWeatherCloudOpacity(100)).toEqual({
+      far: 0.24,
+      near: 0.17,
+    });
     expect(getDashboardWeatherSunlightOpacity(null)).toBe(0.14);
     expect(getDashboardWeatherSunlightOpacity(0)).toBe(0.2);
     expect(getDashboardWeatherSunlightOpacity(100)).toBe(0.05);
@@ -192,7 +217,9 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(unknown.directionAngleDeg).toBeNull();
     expect(unknown.driftX).toBe("0vw");
     expect(unknown.driftY).toBe("0vh");
-    expect(getDashboardWeatherWindMotion(999, 361, -1).directionAngleDeg).toBeNull();
+    expect(
+      getDashboardWeatherWindMotion(999, 361, -1).directionAngleDeg
+    ).toBeNull();
   });
 
   it("n’invente aucun phénomène quand les conditions et les mesures sont absentes", () => {
@@ -202,6 +229,24 @@ describe("getDashboardWeatherAtmosphere", () => {
     expect(getDashboardWeatherAtmosphere({})).toEqual({
       kind: "none",
       intensity: "steady",
+    });
+  });
+
+  it("ne modifie jamais l’objet météo source", () => {
+    const source = Object.freeze({
+      condition: "Pluie forte",
+      precipitation: 12,
+      windSpeed: 18,
+    });
+
+    expect(getDashboardWeatherAtmosphere(source)).toEqual({
+      kind: "rain",
+      intensity: "heavy",
+    });
+    expect(source).toEqual({
+      condition: "Pluie forte",
+      precipitation: 12,
+      windSpeed: 18,
     });
   });
 

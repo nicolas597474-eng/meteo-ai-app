@@ -39,8 +39,12 @@ describe("DashboardWeatherAtmosphere", () => {
     );
 
     expect(reduced).toContain('data-effects-mode="reduced"');
-    expect(reduced.match(/dashboard-weather-atmosphere__rain-drop--/g)).toHaveLength(10);
-    expect(reducedSnow.match(/dashboard-weather-atmosphere__snowflake/g)).toHaveLength(7);
+    expect(
+      reduced.match(/dashboard-weather-atmosphere__rain-drop--/g)
+    ).toHaveLength(10);
+    expect(
+      reducedSnow.match(/dashboard-weather-atmosphere__snowflake/g)
+    ).toHaveLength(7);
     expect(disabled).toBe("");
   });
 
@@ -167,8 +171,26 @@ describe("DashboardWeatherAtmosphere", () => {
     expect(hailstorm).not.toContain('data-rain-renderer="css"');
     expect(ordinaryStorm).not.toContain('data-hail-signal="reported"');
     expect(ordinaryStorm).not.toContain('data-rain-renderer="css"');
-    expect(stormWithOnlyPrecipitation).not.toContain('data-rain-renderer="css"');
+    expect(stormWithOnlyPrecipitation).not.toContain(
+      'data-rain-renderer="css"'
+    );
     expect(rainyStorm).toContain('data-rain-renderer="css"');
+  });
+
+  it("ne fabrique pas de pluie depuis un cumul inconnu ni d’orage depuis une tempête seule", () => {
+    const smallAmount = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, { precipitation: 0.3 })
+    );
+    const largeAmount = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, { precipitation: 12 })
+    );
+    const tempest = renderToStaticMarkup(
+      createElement(DashboardWeatherAtmosphere, { condition: "Tempête" })
+    );
+
+    expect(smallAmount).toBe("");
+    expect(largeAmount).toBe("");
+    expect(tempest).toBe("");
   });
 
   it("module les nuages et le vent selon les valeurs disponibles, sans inventer de direction", () => {
