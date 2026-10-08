@@ -39,6 +39,9 @@ describe("buildOfficialWeatherSnapshot", () => {
     expect(getOfficialWeatherSnapshotCacheKey(first, "2026-08-12", 492)).not.toBe(
       getOfficialWeatherSnapshotCacheKey(second, "2026-08-12", 492),
     );
+    expect(getOfficialWeatherSnapshotCacheKey(first, "2026-08-12", 492, 2)).not.toBe(
+      getOfficialWeatherSnapshotCacheKey(first, "2026-08-12", 492, 16),
+    );
   });
 
   it("conserve séparément le snapshot du modèle et la prévision horaire active", () => {

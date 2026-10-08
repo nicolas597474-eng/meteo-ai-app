@@ -23,7 +23,9 @@ describe("page Prévisions détaillées", () => {
     expect(displayDaysSource).toContain("if (current?.hourlyGroup) {");
     expect(displayDaysSource).toContain("if (includeDailyForHourlyDate.has(daily.date)) current.daily = daily");
     expect(displayDaysSource).toContain("isValidDateKey(daily.date)");
-    expect(timelineSource).toContain("buildForecastDisplayDays(hours, dailyDays, 15, [today, tomorrow])");
+    expect(timelineSource).toContain('buildForecastDisplayDays(hours, dailyDays, 15, dailyDays.map(({ date }) => date ?? ""))');
+    expect(timelineSource).toContain("{selectedDaily && <DailyForecastMetricsPanel");
+    expect(timelineSource).toContain("Métriques quotidiennes indisponibles pour cette date.");
     expect(timelineSource).toContain("Fusion officielle · preuves par variable");
     expect(timelineSource).toContain("Sources quotidiennes réellement reçues");
     expect(timelineSource).toContain("Best Match · référence dérivée, non contributeur officiel");

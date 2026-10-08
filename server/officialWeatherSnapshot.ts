@@ -208,8 +208,9 @@ export function getOfficialWeatherSnapshotCacheKey(
   coords: { lat: number; lon: number },
   weatherDate: string,
   hourBucket: number,
+  hourlyForecastDays = 2,
 ): string {
-  return `${preciseCacheLocationKey(coords)}:${weatherDate}:${hourBucket}`;
+  return `${preciseCacheLocationKey(coords)}:${weatherDate}:${hourBucket}:${hourlyForecastDays}`;
 }
 
 function manualForecastCacheKey(cacheLocationKey: string, weatherDate: string) {
@@ -264,9 +265,14 @@ export function cacheManualHourlyForecast(
  * Returns the authoritative live forecast snapshot for a location. Calls made
  * within one minute share one payload, preventing presentation-level drift.
  */
-export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: number }): Promise<OfficialWeatherSnapshot> {
+export function resolveOfficialWeatherSnapshot(
+  coords: { lat: number; lon: number },
+  options: { hourlyForecastDays?: number } = {},
+): Promise<OfficialWeatherSnapshot> {
   const weatherDate = getParisDate();
-  const cacheKey = getOfficialWeatherSnapshotCacheKey(coords, weatherDate, Math.floor(Date.now() / (60 * 60_000)));
+  const requestedDays = Number.isFinite(options.hourlyForecastDays) ? Math.floor(options.hourlyForecastDays!) : 2;
+  const hourlyForecastDays = Math.min(16, Math.max(2, requestedDays));
+  const cacheKey = getOfficialWeatherSnapshotCacheKey(coords, weatherDate, Math.floor(Date.now() / (60 * 60_000)), hourlyForecastDays);
   const cached = snapshotCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
@@ -276,7 +282,7 @@ export function resolveOfficialWeatherSnapshot(coords: { lat: number; lon: numbe
     const dailyIssuedAt = Date.now();
     const dailyLocationKey = makeLocationKey(coords.lat, coords.lon);
     const [hourlyResult, currentSnapshot, dailyResult] = await Promise.all([
-      collectOfficialHourlyForecast(weatherDate, coords),
+      collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays }),
       collectCurrentWeatherSnapshot(coords),
       collect15DayForecast(coords, {
         issuedAt: dailyIssuedAt,

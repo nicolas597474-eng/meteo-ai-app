@@ -1077,15 +1077,17 @@ export function computeOfficialHourlyForecast(
   };
 }
 
-/** Collects one shared 48-hour forecast and its read-only historical score window. */
+/** Collects one shared official hourly forecast and its read-only historical score window. */
 export async function collectOfficialHourlyForecast(
   targetDate: string,
   coords?: { lat: number; lon: number },
+  options: { forecastDays?: number } = {},
 ): Promise<CollectedOfficialHourlyForecast> {
   const location = coords ?? HONDEGHEM;
   const collection = await collectHourlyForecastAllModelsWithDiagnostics(targetDate, location, {
     includeBestMatch: false,
     includeNextDay: true,
+    forecastDays: options.forecastDays ?? 2,
   });
   const modelForecasts = collection.forecasts;
   const availabilityReasonByModel = Object.fromEntries(collection.diagnostics

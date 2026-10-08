@@ -1146,13 +1146,17 @@ function classifyHourlyProviderError(error: unknown): string {
 export async function collectHourlyForecastAllModelsWithDiagnostics(
   targetDate: string,
   coords?: { lat: number; lon: number },
-  options: { includeBestMatch?: boolean; includeNextDay?: boolean } = {},
+  options: { includeBestMatch?: boolean; includeNextDay?: boolean; forecastDays?: number } = {},
 ): Promise<CollectedHourlyForecastModels> {
   const location = coords ?? HONDEGHEM;
   const nextDate = options.includeNextDay ? shiftParisCivilDate(targetDate, 1) : null;
-  const lastDate = nextDate ?? targetDate;
+  const hasExplicitForecastDays = Number.isFinite(options.forecastDays);
+  const requestedForecastDays = hasExplicitForecastDays ? Math.floor(options.forecastDays!) : 2;
+  const forecastDays = Math.min(16, Math.max(options.includeNextDay ? 2 : 1, requestedForecastDays));
+  const lastDate = (hasExplicitForecastDays ? shiftParisCivilDate(targetDate, forecastDays - 1) : nextDate ?? targetDate) ?? targetDate;
   const expectedDates = nextDate ? [targetDate, nextDate] : [targetDate];
   const expectedValidTimes = expectedDates.flatMap((date) => getParisHourlyTimestamps(date));
+  const expectedValidTimeSet = new Set(expectedValidTimes);
   const expectedHoursCount = expectedValidTimes.length;
   const expectedValueCount = expectedHoursCount * HOURLY_FORECAST_VARIABLES.length;
   const modelsToCollect = [
@@ -1171,7 +1175,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
       url.searchParams.set("hourly", HOURLY_FORECAST_VARIABLES.map((definition) => definition.apiKey).join(","));
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("timeformat", "unixtime");
-      url.searchParams.set("forecast_days", "2");
+      url.searchParams.set("forecast_days", String(forecastDays));
       if (model.modelId) {
         url.searchParams.set("models", model.modelId);
       }
@@ -1211,6 +1215,8 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
       const canonicalUnits = Object.fromEntries(HOURLY_FORECAST_VARIABLES.map((definition) => [definition.unitField, definition.defaultUnit || ""])) as NonNullable<HourlyModelForecast["sourceMetadata"]>["units"];
       const hours: HourlyModelForecast["hours"] = [];
       let valuesReceived = 0;
+      let diagnosticValuesReceived = 0;
+      let diagnosticHoursReceived = 0;
 
       for (let i = 0; i < rawTimes.length; i++) {
         const unixSeconds = parseHourlyTimestampSeconds(rawTimes[i]);
@@ -1225,7 +1231,12 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
           return [definition.valueField, normalized.value];
         }));
         const parsedHour = { validAt, hour: parisTime.hour, ...parsedValues } as HourlyModelForecast["hours"][number];
-        valuesReceived += HOURLY_ARCHIVE_VARIABLES.filter((key) => parsedHour[key as keyof typeof parsedHour] != null).length;
+        const hourValuesReceived = HOURLY_ARCHIVE_VARIABLES.filter((key) => parsedHour[key as keyof typeof parsedHour] != null).length;
+        valuesReceived += hourValuesReceived;
+        if (expectedValidTimeSet.has(validAt)) {
+          diagnosticHoursReceived += 1;
+          diagnosticValuesReceived += hourValuesReceived;
+        }
         hours.push(parsedHour);
       }
 
@@ -1246,20 +1257,21 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
             units: canonicalUnits,
           },
         };
+        const diagnosticHours = hours.filter((hour) => expectedValidTimeSet.has(hour.validAt));
         const projectionReady = isCompleteHourlyForecastBatch({
-          rows: hours,
+          rows: diagnosticHours,
           expectedValidTimes,
           requiredValueFields: HOURLY_PROJECTION_VARIABLES,
         });
         const archiveBatchComplete = isCompleteHourlyForecastBatch({
-          rows: hours,
+          rows: diagnosticHours,
           expectedValidTimes,
           requiredValueFields: HOURLY_ARCHIVE_VARIABLES,
         });
         if (valuesReceived === 0) {
           return { forecast, diagnostic: {
             modelName: model.name, modelId: model.modelId, status: "failed", attemptCount,
-            hoursReceived: hours.length, valuesReceived: 0, expectedValueCount, expectedHoursCount, projectionReady: false, errorCode: "no_usable_data", variableDiagnostics,
+            hoursReceived: diagnosticHoursReceived, valuesReceived: diagnosticValuesReceived, expectedValueCount, expectedHoursCount, projectionReady: false, errorCode: "no_usable_data", variableDiagnostics,
           } };
         }
         return { forecast, diagnostic: {
@@ -1267,8 +1279,8 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
           modelId: model.modelId,
           status: archiveBatchComplete ? "succeeded" : "partial",
           attemptCount,
-          hoursReceived: hours.length,
-          valuesReceived,
+          hoursReceived: diagnosticHoursReceived,
+          valuesReceived: diagnosticValuesReceived,
           expectedValueCount,
           expectedHoursCount,
           projectionReady,
@@ -1333,7 +1345,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
 export async function collectHourlyForecastAllModels(
   targetDate: string,
   coords?: { lat: number; lon: number },
-  options: { includeBestMatch?: boolean; includeNextDay?: boolean } = {},
+  options: { includeBestMatch?: boolean; includeNextDay?: boolean; forecastDays?: number } = {},
 ): Promise<HourlyModelForecast[]> {
   return (await collectHourlyForecastAllModelsWithDiagnostics(targetDate, coords, options)).forecasts;
 }

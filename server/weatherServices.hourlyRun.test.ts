@@ -273,4 +273,37 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
     expect(forecasts[0].hours.map((hour) => hour.hour)).toEqual([0, 0]);
     expect(mockedFetchWeather.mock.calls.map(([input]) => new URL(String(input))).every((url) => url.searchParams.get("hourly")?.includes("uv_index"))).toBe(true);
   });
+
+  it("collects real official hours across an extended horizon without widening 48-hour completeness diagnostics", async () => {
+    const coreUnixTimes = [
+      ...getParisHourlyTimestamps("2026-10-02"),
+      ...getParisHourlyTimestamps("2026-10-03"),
+    ].map((validAt) => validAt / 1000);
+    const laterValidAt = Date.parse("2026-10-04T10:00:00.000Z");
+    const allUnixTimes = [...coreUnixTimes, laterValidAt / 1000];
+    const extendedResponse = completeResponse();
+    const hourly = extendedResponse.hourly as unknown as Record<string, unknown[]>;
+    hourly.time = allUnixTimes;
+    for (const [key, values] of Object.entries(completeHourly)) {
+      if (key === "time") continue;
+      hourly[key] = allUnixTimes.map((_, index) => values[index % values.length]);
+    }
+    mockedFetchWeather.mockResolvedValue(response(extendedResponse));
+
+    const result = await collectHourlyForecastAllModelsWithDiagnostics(
+      "2026-10-02",
+      { lat: 50.7567, lon: 2.5204 },
+      { includeBestMatch: false, includeNextDay: true, forecastDays: 16 },
+    );
+
+    expect(result.forecasts).toHaveLength(7);
+    expect(result.forecasts[0]?.hours.map(({ validAt }) => validAt)).toContain(laterValidAt);
+    expect(mockedFetchWeather.mock.calls.map(([input]) => new URL(String(input))).every((url) => url.searchParams.get("forecast_days") === "16")).toBe(true);
+    expect(result.diagnostics.every((diagnostic) => diagnostic.status === "succeeded"
+      && diagnostic.hoursReceived === 48
+      && diagnostic.valuesReceived === 960
+      && diagnostic.expectedValueCount === 960
+      && diagnostic.expectedHoursCount === 48
+      && diagnostic.projectionReady)).toBe(true);
+  });
 });
