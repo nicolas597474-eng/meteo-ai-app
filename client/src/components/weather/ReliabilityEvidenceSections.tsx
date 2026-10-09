@@ -190,177 +190,155 @@ export function formatTimestamp(value: string | null | undefined) {
     : "horodatage indisponible";
 }
 
-function EvidenceDial({
-  qualified,
-  total,
-  available,
-  unavailableLabel,
-}: {
-  qualified: number;
-  total: number;
-  available: boolean;
-  unavailableLabel: string;
-}) {
-  const radius = 57;
-  const circumference = 2 * Math.PI * radius;
-  const progress = available && total > 0 ? Math.min(1, qualified / total) : 0;
-  return (
-    <div className="flex flex-col items-center justify-center">
-      <div
-        className="relative h-44 w-44"
-        role="img"
-        aria-label={
-          available
-            ? `${qualified} cellule${qualified === 1 ? "" : "s"} qualifiée${qualified === 1 ? "" : "s"} sur ${total}`
-            : unavailableLabel
-        }
-      >
-        <svg
-          viewBox="0 0 160 160"
-          className="h-full w-full -rotate-90"
-          aria-hidden="true"
-        >
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="#202b39"
-            strokeWidth="10"
-          />
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="url(#reliability-evidence-ring)"
-            strokeWidth="10"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - progress)}
-            className="transition-[stroke-dashoffset] duration-700"
-          />
-          <defs>
-            <linearGradient
-              id="reliability-evidence-ring"
-              x1="0"
-              x2="1"
-              y1="0"
-              y2="1"
-            >
-              <stop offset="0%" stopColor="#38bdf8" />
-              <stop offset="100%" stopColor="#818cf8" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center pt-1 text-center">
-          <span className="font-mono text-4xl font-semibold tracking-tight text-white">
-            {available ? qualified : "—"}
-          </span>
-          <span className="mt-0.5 text-xs text-slate-400">
-            {available ? `/ ${total} cellules` : unavailableLabel}
-          </span>
-        </div>
-      </div>
-      <p className="mt-1 text-sm font-semibold text-slate-100">
-        Qualification des archives
-      </p>
-      <p className="mt-1 text-center text-[10px] leading-relaxed text-slate-500">
-        Couverture de preuve · pas une note de performance
-      </p>
-    </div>
-  );
+type NoteComparisonPoint = {
+  stationTemperature: number | null;
+  officialTemperature: number | null;
+};
+
+function meanAbsoluteDeltaC(points: NoteComparisonPoint[]): number | null {
+  const deltas = points
+    .filter((point) => typeof point.stationTemperature === "number" && typeof point.officialTemperature === "number")
+    .map((point) => Math.abs(point.stationTemperature - point.officialTemperature));
+  if (deltas.length === 0) return null;
+  return deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length;
 }
 
-export function EvidenceSummary({ data }: { data: any }) {
-  const rows = data.metrics as ReliabilityMetricRow[];
-  const total = rows.length;
-  const available = data.evidence.status === "available";
-  const horizonArchived = data.selectedHorizon?.storageBucket != null;
-  const evidenceAvailable = available && horizonArchived;
-  const qualified = rows.filter(row => row.status === "qualified");
-  const raw = rows.filter(row => row.metrics != null);
-  const dateRange = `${formatDate(data.period.startDate)} – ${formatDate(data.period.endDate)}`;
-  const narrative = !available
-    ? "L’archive horaire est indisponible. Aucune métrique n’est estimée ni remplacée par une valeur par défaut."
-    : !horizonArchived
-      ? `L’horizon ${data.selectedHorizon?.label ?? "choisi"} n’est pas archivé séparément. Aucune échéance voisine n’est utilisée comme substitut.`
-      : qualified.length === 0
-        ? "Aucune combinaison modèle × variable × horizon n’atteint actuellement le seuil de qualification. Les valeurs brutes disponibles restent consultables plus bas."
-        : `${qualified.length} combinaison${qualified.length === 1 ? "" : "s"} modèle × variable × horizon atteint le seuil d’évidence pour la fenêtre choisie.`;
+function noteFromMeanAbsoluteError(mae: number | null): number | null {
+  if (mae == null || !Number.isFinite(mae)) return null;
+  return Math.max(0, Math.min(10, Math.round((10 - 2 * mae) * 10) / 10));
+}
+
+function noteLabel(note: number | null): string {
+  if (note == null) return "Non disponible";
+  if (note >= 7.5) return "Fiable";
+  if (note >= 5) return "Correct";
+  if (note >= 3) return "Moyen";
+  return "Peu fiable";
+}
+
+function noteToneClass(note: number | null): string {
+  if (note == null) return "text-slate-400";
+  if (note >= 7.5) return "text-emerald-300";
+  if (note >= 5) return "text-sky-300";
+  if (note >= 3) return "text-amber-300";
+  return "text-rose-300";
+}
+
+function formatNote(note: number | null): string {
+  if (note == null) return "—";
+  return note.toFixed(1).replace(".", ",");
+}
+
+export function ReliabilityNotesSummary({
+  data,
+  hourlyPoints,
+  dailyPoints,
+}: {
+  data: any;
+  hourlyPoints: NoteComparisonPoint[];
+  dailyPoints: NoteComparisonPoint[];
+}) {
+  const available = data.evidence?.status === "available";
+  const evidenceAvailable = available && data.selectedHorizon?.storageBucket != null;
+  const dateRange =
+    formatDate(data.period?.startDate) + " – " + formatDate(data.period?.endDate);
+  const horizonLabel = data.selectedHorizon?.label ?? "non disponible";
+
+  const isComplete = (point: NoteComparisonPoint) =>
+    typeof point.stationTemperature === "number" && typeof point.officialTemperature === "number";
+  const comparedHours = hourlyPoints.filter(isComplete).length;
+  const comparedDays = dailyPoints.filter(isComplete).length;
+  const hourlyMae = meanAbsoluteDeltaC(hourlyPoints);
+  const dailyMae = meanAbsoluteDeltaC(dailyPoints);
+  const hourlyNote = noteFromMeanAbsoluteError(hourlyMae);
+  const dailyNote = noteFromMeanAbsoluteError(dailyMae);
+  const knownNotes = [hourlyNote, dailyNote].filter((note): note is number => note != null);
+  const globalNote =
+    knownNotes.length > 0
+      ? Math.round((knownNotes.reduce((sum, note) => sum + note, 0) / knownNotes.length) * 10) / 10
+      : null;
+
+  const headline =
+    globalNote == null
+      ? null
+      : globalNote >= 7.5
+        ? "Les prévisions restent fiables (" + formatNote(globalNote) + "/10) sur la fenêtre choisie."
+        : globalNote >= 5
+          ? "Les prévisions restent utilisables (" + formatNote(globalNote) + "/10), avec des ratés assez fréquents."
+          : globalNote >= 3
+            ? "Les prévisions sont moyennes (" + formatNote(globalNote) + "/10) : à considérer avec prudence."
+            : "Les prévisions sont peu fiables (" + formatNote(globalNote) + "/10) actuellement.";
+  const hourlySentence =
+    hourlyMae == null
+      ? null
+      : "La température horaire s’écarte en moyenne de " + formatNote(hourlyMae) + " °C.";
+  const comparisonSentence =
+    hourlyNote == null || dailyNote == null
+      ? null
+      : dailyNote > hourlyNote
+        ? "Le bulletin quotidien (min/max, cumul) est plus fiable que le détail heure par heure."
+        : dailyNote < hourlyNote
+          ? "Le détail heure par heure est plus fiable que le bulletin quotidien."
+          : "Le bulletin quotidien et le détail heure par heure affichent la même fiabilité.";
+  const narrative =
+    globalNote == null
+      ? "Aucune comparaison complète n’est encore disponible pour cette fenêtre. Aucune note n’est inventée : les notes apparaîtront avec les premières comparaisons station / prévision officielle archivées."
+      : [headline, hourlySentence, comparisonSentence].filter(Boolean).join(" ");
 
   return (
     <MeteoSurface
       tone="lab"
       as="section"
       className="overflow-hidden rounded-[1.7rem] p-4 sm:p-5"
-      aria-labelledby="reliability-summary-title"
+      aria-labelledby="reliability-notes-title"
     >
-      <div className="grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_14rem] md:gap-8">
-        <div className="order-2 min-w-0 md:order-1">
+      <div className="grid items-center gap-5 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-8">
+        <div className="order-1 flex justify-center">
+          <div className="flex flex-col items-center rounded-2xl border border-sky-400/20 bg-slate-950/30 px-6 py-5 text-center">
+            <p className="font-mono text-5xl font-semibold tracking-tight text-white">
+              {formatNote(globalNote)}
+              <span className="text-xl text-slate-400"> / 10</span>
+            </p>
+            <p className={"mt-2 text-sm font-semibold " + noteToneClass(globalNote)}>{noteLabel(globalNote)}</p>
+            <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+              Note globale · {horizonLabel} · Synthèse
+            </p>
+          </div>
+        </div>
+        <div className="order-2 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-sky-400/25 bg-sky-400/8 px-2.5 py-1 text-[10px] font-semibold text-sky-100">
               <Database className="mr-1 inline h-3 w-3" />
-              {evidenceAvailable
-                ? "Analyse archivée"
-                : !available
-                  ? "Archive non lisible"
-                  : "Horizon non archivé"}
+              {evidenceAvailable ? "Analyse archivée" : !available ? "Archive non lisible" : "Horizon non archivé"}
             </span>
             <span className="rounded-full border border-slate-700/80 bg-slate-950/30 px-2.5 py-1 text-[10px] text-slate-400">
-              {dateRange}
+              {dateRange} · Synthèse
             </span>
             <span className="rounded-full border border-slate-700/80 bg-slate-950/30 px-2.5 py-1 text-[10px] text-slate-400">
-              Horizon · {data.selectedHorizon?.label ?? "non disponible"}
+              {comparedHours} heure{comparedHours === 1 ? "" : "s"} · {comparedDays} jour{comparedDays === 1 ? "" : "s"}
             </span>
           </div>
-          <h2
-            id="reliability-summary-title"
-            className="mt-3 text-xl font-semibold tracking-tight text-white"
-          >
-            Une lecture claire, sans score inventé
+          <h2 id="reliability-notes-title" className="mt-3 text-xl font-semibold tracking-tight text-white">
+            Notes de fiabilité
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300">
-            {narrative}
-          </p>
-          <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-slate-400">
-            MAE, RMSE, biais, effectifs, dates et évolution par modèle ×
-            variable × horizon exact. Le biais signé est descriptif et n’est
-            jamais appliqué aux prévisions officielles futures.
-          </p>
-          <p className="mt-2 max-w-3xl text-[10px] leading-relaxed text-slate-500">
-            Best Match et les agrégateurs sont exclus. L’accord inter-modèles
-            décrit une dispersion de prévisions et n’est pas une mesure de
-            fiabilité.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-700/65 bg-slate-950/30 px-3 py-2.5">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                Cellules avec métriques
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300">{narrative}</p>
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <article className="rounded-xl border border-slate-700/65 bg-slate-950/30 px-3.5 py-3" aria-label="Note horaire">
+              <p className="font-mono text-2xl font-semibold tabular-nums text-slate-100">
+                {formatNote(hourlyNote)}
+                <span className="text-xs text-slate-500"> / 10</span>
               </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">
-                {evidenceAvailable ? `${raw.length} / ${total}` : "—"}
+              <p className={"mt-0.5 text-[11px] font-semibold " + noteToneClass(hourlyNote)}>{noteLabel(hourlyNote)}</p>
+              <p className="mt-1 text-[10px] text-slate-500">Horaire · heure par heure</p>
+            </article>
+            <article className="rounded-xl border border-slate-700/65 bg-slate-950/30 px-3.5 py-3" aria-label="Note quotidienne">
+              <p className="font-mono text-2xl font-semibold tabular-nums text-slate-100">
+                {formatNote(dailyNote)}
+                <span className="text-xs text-slate-500"> / 10</span>
               </p>
-            </div>
-            <div className="rounded-xl border border-slate-700/65 bg-slate-950/30 px-3 py-2.5">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                Seuil d’évidence
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-100">
-                {data.evidence.minimumComparisons}+ comparaisons ·{" "}
-                {data.evidence.minimumComparableDays}+ jours
-              </p>
-            </div>
-            <div className="col-span-2 rounded-xl border border-slate-700/65 bg-slate-950/30 px-3 py-2.5 sm:col-span-1">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                Brutes non qualifiées
-              </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-amber-100">
-                {evidenceAvailable
-                  ? Math.max(0, raw.length - qualified.length)
-                  : "—"}
-              </p>
-            </div>
+              <p className={"mt-0.5 text-[11px] font-semibold " + noteToneClass(dailyNote)}>{noteLabel(dailyNote)}</p>
+              <p className="mt-1 text-[10px] text-slate-500">Quotidien · min/max, cumul</p>
+            </article>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <WeatherStatusBadge
@@ -368,35 +346,22 @@ export function EvidenceSummary({ data }: { data: any }) {
               tone={available ? "success" : "danger"}
               label="Archive horaire"
               value={available ? "Lisible" : "Indisponible"}
-              description={
-                available
-                  ? "Les scores horaires versionnés sont consultables pour cette fenêtre."
-                  : "La lecture de l’archive a échoué. Ce statut ne signifie pas zéro comparaison."
-              }
             />
             <span className="text-[10px] text-slate-500">
-              {data.evidence.expectedModelCount} modèles officiels · unité
-              propre à chaque variable
+              {data.evidence?.expectedModelCount} modèles officiels · unité propre à chaque variable
             </span>
           </div>
-        </div>
-        <div className="order-1 flex justify-center md:order-2">
-          <EvidenceDial
-            qualified={qualified.length}
-            total={total}
-            available={evidenceAvailable}
-            unavailableLabel={
-              !available
-                ? "Archive historique indisponible"
-                : "Horizon non archivé séparément"
-            }
-          />
+          <p className="mt-3 max-w-3xl text-[10px] leading-relaxed text-slate-500">
+            Notes indicatives sur 10, déduites de l’écart moyen (°C) entre les stations physiques validées et la prévision officielle disponibles dans la fenêtre choisie. MAE, RMSE, biais, effectifs, dates et évolution par modèle × variable × horizon exact. Le biais signé est descriptif et n’est jamais appliqué aux prévisions officielles futures.
+          </p>
+          <p className="mt-2 max-w-3xl text-[10px] leading-relaxed text-slate-500">
+            Best Match et les agrégateurs sont exclus. L’accord inter-modèles décrit une dispersion de prévisions et n’est pas une mesure de fiabilité.
+          </p>
         </div>
       </div>
     </MeteoSurface>
   );
 }
-
 function VariableEvidenceCard({
   config,
   rows,
@@ -533,7 +498,7 @@ export function VariableEvidenceSection({
           Détail par variable
         </h2>
         <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-          Aucune note globale : chaque unité et chaque seuil restent distincts.
+          Chaque unité et chaque seuil restent distincts : les notes de synthèse ne les remplacent pas.
         </p>
       </div>
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">

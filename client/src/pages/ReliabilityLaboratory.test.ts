@@ -30,8 +30,8 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
     );
   });
 
-  it("sépare les métriques historiques par modèle, variable et horizon sans score global", () => {
-    expect(source).toContain("Fiabilité historique, sans note globale");
+  it("sépare les métriques historiques par modèle, variable et horizon exact", () => {
+    expect(source).toContain("Fiabilité historique, vérifiée sur observations");
     expect(source).toContain(
       "MAE, RMSE, biais, effectifs, dates et évolution par modèle × variable × horizon exact"
     );
@@ -64,12 +64,10 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
   });
 
   it("distingue un horizon non archivé d’une absence de qualification", () => {
-    expect(source).toContain(
-      'L’horizon ${data.selectedHorizon?.label ?? "choisi"} n’est pas archivé séparément.'
-    );
-    expect(source).toContain(
-      'evidenceAvailable ? `${raw.length} / ${total}` : "—"'
-    );
+    expect(source).toContain("Note globale ·");
+    expect(source).toContain("Note horaire");
+    expect(source).toContain("Note quotidienne");
+    expect(source).toContain("Aucune note n’est inventée");
     expect(source).toContain(
       "Horizon non archivé séparément : les taux de couverture sont indisponibles"
     );

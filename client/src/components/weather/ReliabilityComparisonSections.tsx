@@ -540,8 +540,7 @@ export function MethodologySection({ data }: { data?: any }) {
           </li>
           <li>
             L’accord inter-modèles, la qualité des stations et l’incertitude
-            statistique sont distincts. Cette page ne fusionne pas les métriques
-            en une note sur 10.
+            statistique sont distincts. Les notes de synthèse affichées en haut de page restent indicatives et ne remplacent pas ces métriques détaillées.
           </li>
         </ul>
         {data?.evidence?.note ? (
