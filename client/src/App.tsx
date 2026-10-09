@@ -4,6 +4,7 @@ import { useIsFetching } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { FavoriteWeatherPreloader } from "./components/FavoriteWeatherPreloader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, MAIN_PAGE_PATHS, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import Dashboard from "./pages/Dashboard";
@@ -296,6 +297,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
+          <FavoriteWeatherPreloader />
           <TopNav />
           <ScrollToTopOnRouteChange />
           <PageSwipeNavigator>
