@@ -5,7 +5,7 @@ const readPage = (path: string) =>
   readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("harmonisation des badges météo", () => {
-  it("réutilise les statuts visuels sans note globale de prévision", () => {
+  it("réutilise les statuts visuels avec des notes de fiabilité distinctes d’un score 0–100", () => {
     const ranking = readPage("../../pages/Ranking.tsx");
     const dashboard = readPage("../../pages/Dashboard.tsx");
     const reliability = [
@@ -24,7 +24,10 @@ describe("harmonisation des badges météo", () => {
     );
     expect(dashboard).toContain("Visibilité prévue");
     expect(dashboard).not.toContain(">Prévisions horaires");
-    expect(reliability).toContain("Fiabilité historique, sans note globale");
+    expect(reliability).toContain("Notes de fiabilité");
+    expect(reliability).toContain("Note globale ·");
+    expect(reliability).toContain("Notes indicatives sur 10");
+    expect(reliability).not.toContain("normalizedScore");
     expect(aiLab).toContain("Hors fusion");
     expect(report).toContain(
       "cette dispersion décrit l’accord brut, pas la fiabilité historique. Incertitude statistique : non mesurée ici."

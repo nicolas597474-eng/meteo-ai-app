@@ -191,15 +191,19 @@ export function formatTimestamp(value: string | null | undefined) {
     : "horodatage indisponible";
 }
 
-type NoteComparisonPoint = {
+export type NoteComparisonPoint = {
   stationTemperature: number | null;
   officialTemperature: number | null;
 };
 
-function meanAbsoluteDeltaC(points: NoteComparisonPoint[]): number | null {
-  const deltas = points
-    .filter((point) => typeof point.stationTemperature === "number" && typeof point.officialTemperature === "number")
-    .map((point) => Math.abs(point.stationTemperature - point.officialTemperature));
+export function meanAbsoluteDeltaC(points: readonly NoteComparisonPoint[]): number | null {
+  const deltas = points.flatMap((point) => {
+    const stationTemperature = point.stationTemperature;
+    const officialTemperature = point.officialTemperature;
+    if (typeof stationTemperature !== "number" || !Number.isFinite(stationTemperature)
+      || typeof officialTemperature !== "number" || !Number.isFinite(officialTemperature)) return [];
+    return [Math.abs(stationTemperature - officialTemperature)];
+  });
   if (deltas.length === 0) return null;
   return deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length;
 }
