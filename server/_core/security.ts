@@ -85,7 +85,8 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: https:; " +
     "font-src 'self'; " +
-    "connect-src 'self' https://*.manus.space https://*.manus.computer; " +
+    "connect-src 'self' https://geocoding-api.open-meteo.com " +
+    "https://*.manus.space https://*.manus.computer; " +
     "frame-ancestors 'none'; " +
     "form-action 'self'; " +
     "base-uri 'self'"
