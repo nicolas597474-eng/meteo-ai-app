@@ -117,7 +117,6 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("maximumFractionDigits: 1");
     expect(source).toContain("wind-compass-bezel");
     expect(source).toContain("wind-compass-neon");
-    expect(source).toContain("rotateX(10deg)");
     expect(source).not.toContain("speed={windSpeed}");
     expect(source).toContain("title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}");
     expect(source).toContain("formatDashboardNumber(currentHumidity)");

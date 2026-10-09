@@ -110,7 +110,6 @@ function WindRose({ direction }: { direction: number | null }) {
     <div className="flex flex-col items-center gap-0.5" role="img" aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.`}>
       <div
         className="relative isolate grid size-[4.5rem] place-items-center rounded-full border border-[#31355e] bg-[radial-gradient(circle_at_32%_26%,#2c3157_0%,#12132a_55%,#07070f_100%)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.22),inset_0_-3px_6px_rgba(0,0,0,0.65),0_10px_18px_rgba(0,0,0,0.65),0_0_18px_rgba(0,245,255,0.22)] ring-1 ring-black/50 before:absolute before:inset-[3px] before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(140,200,255,0.1),transparent_46%)] before:content-[''] sm:size-20"
-        style={{ transform: "perspective(320px) rotateX(10deg)" }}
       >
         <svg viewBox="0 0 100 100" className="absolute inset-0 z-10 size-full" aria-hidden="true">
           <defs>
