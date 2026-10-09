@@ -24,7 +24,7 @@ describe("Weather AI Lab — agrégats horaires legacy non versionnés", () => {
         modelName: OFFICIAL_HOURLY_MODELS[0]!.name,
         modelId: OFFICIAL_HOURLY_MODELS[0]!.modelId,
         variable: "temperature",
-        horizonBucket: "6-24h",
+        horizonBucket: "6_24h",
         sampleSize: 35,
         mae: 0.4,
         rmse: 0.6,

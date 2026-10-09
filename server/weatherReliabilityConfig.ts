@@ -138,16 +138,18 @@ export function getStatisticalConfidence(input: {
 }
 
 /**
- * Only the first two horizons are stored distinctly today. The other choices
- * remain visible to document the target model, but cannot be extrapolated from
- * a broader storage bucket without inventing a result.
+ * storageBucket doit être une clé exacte de FORECAST_HORIZON_WINDOWS
+ * (shared/forecastHorizon.ts), celle écrite par le scoring horaire. Un horizon
+ * qui recouvre plusieurs buckets, ou dont les bornes ne coïncident avec aucun
+ * bucket, reste non archivé séparément : il n’est ni agrégé ni remplacé par un
+ * bucket voisin.
  */
 export const LABORATORY_HORIZONS = [
-  { id: "0-6h", label: "0–6 h", storageBucket: "0-6h" },
-  { id: "6-24h", label: "6–24 h", storageBucket: "6-24h" },
+  { id: "0-6h", label: "0–6 h", storageBucket: null }, // recouvre les buckets 0_2h et 2_6h
+  { id: "6-24h", label: "6–24 h", storageBucket: "6_24h" },
   { id: "24-48h", label: "24–48 h", storageBucket: null },
   { id: "2-3d", label: "2–3 jours", storageBucket: null },
-  { id: "4-7d", label: "4–7 jours", storageBucket: "4-7d" },
+  { id: "4-7d", label: "4–7 jours", storageBucket: null }, // 4 à 7 jours ne correspond pas au bucket 3_7d
   { id: "8-10d", label: "8–10 jours", storageBucket: null },
   { id: "11-15d", label: "11–15 jours", storageBucket: null },
 ] as const;
