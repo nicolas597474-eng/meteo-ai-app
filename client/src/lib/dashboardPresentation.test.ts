@@ -99,6 +99,33 @@ describe("présentation des champs météo du Dashboard", () => {
     expect(withCurrentSnapshotFallback(null, null, null)).toBeNull();
   });
 
+  it("présente une valeur prévue avec sa nature, sa source, son échéance et son heure de calcul", () => {
+    const forecastField = {
+      value: 33,
+      provenance: {
+        kind: "official_hourly_forecast" as const,
+        label: "Prévision horaire officielle",
+        stationCount: 0,
+        stationSources: ["Open-Meteo"],
+        observedAt: "2026-10-09T16:00:00.000Z",
+        computedAt: "2026-10-09T16:06:00.000Z",
+        ageMinutes: null,
+        reason: null,
+        measurements: [],
+      },
+    };
+
+    expect(formatCurrentStateProvenance(forecastField)).toBe(
+      "Prévu · Open-Meteo · 18:00 · calcul 18:06"
+    );
+    expect(
+      formatCurrentStateProvenance({
+        ...forecastField,
+        provenance: { ...forecastField.provenance, computedAt: null },
+      })
+    ).toBe("Prévu · Open-Meteo · 18:00");
+  });
+
   it("attribue au régime le libellé et l’horodatage de sa source réellement retenue", () => {
     const nowMs = Date.parse("2026-10-04T18:00:00.000Z");
     expect(

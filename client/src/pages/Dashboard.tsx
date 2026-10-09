@@ -32,6 +32,8 @@ import { countArchivedSnapshotSlots, formatCollectionDuration } from "@/lib/coll
 import { getDashboardObservability } from "@/lib/dashboardObservability";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, withCurrentSnapshotFallback, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
+import { getDashboardWind } from "@/lib/dashboardWind";
+import { formatOptionalForecastValue } from "@/lib/forecastTimeline";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour, getOfficialForecastCoordinates } from "@/lib/officialForecast";
 import { useOfficialForecast } from "@/hooks/useOfficialForecast";
@@ -839,22 +841,30 @@ export default function Dashboard() {
   const uvForecastHour = currentHour?.uvIndex != null ? currentHour : futureUVHour;
   const currentUV = currentHour?.uvIndex ?? futureUVHour?.uvIndex ?? null;
   const currentUVLabel = uvForecastHour && uvForecastHour !== currentHour ? "UV prévu à l’échéance suivante" : "UV prévu pour cette heure";
-  const windDirectionField = withCurrentSnapshotFallback(currentFields?.windDirection, currentSnapshot?.windDirection, snapshotCapturedAt);
-  const windSpeedField = withCurrentSnapshotFallback(currentFields?.windSpeed, currentSnapshot?.windSpeed, snapshotCapturedAt);
-  const windGustField = withCurrentSnapshotFallback(currentFields?.windGust, currentSnapshot?.windGust, snapshotCapturedAt);
+  const hourlyForecastSource = forecastProvenance?.source ?? officialForecast?.officialSnapshot?.source ?? null;
+  const hourlyForecastComputedAt = forecastProvenance?.updatedAt ?? officialForecast?.officialSnapshot?.computedAt ?? null;
+  // Vent : mêmes valeurs que la page Prévisions (prévision horaire officielle de l’heure active); jamais les stations.
+  const dashboardWind = getDashboardWind({
+    hour: currentHour,
+    forecastSource: formatHourlyForecastSource(hourlyForecastSource),
+    forecastComputedAt: hourlyForecastComputedAt,
+    snapshot: currentSnapshot,
+    snapshotCapturedAt,
+  });
+  const windDirectionField = dashboardWind.directionField;
+  const windSpeedField = dashboardWind.speedField;
+  const windGustField = dashboardWind.gustField;
   const precipitationField = withCurrentSnapshotFallback(currentFields?.precipitation, currentSnapshot?.precipitation, snapshotCapturedAt);
   const cloudCoverField = withCurrentSnapshotFallback(currentFields?.cloudCover, currentSnapshot?.cloudCover, snapshotCapturedAt);
   const humidityField = withCurrentSnapshotFallback(currentFields?.humidity, currentSnapshot?.humidity, snapshotCapturedAt);
   const pressureField = currentFields?.pressure ?? null;
   const weatherCodeField = withCurrentSnapshotFallback(currentFields?.weatherCode, currentSnapshot?.weatherCode, snapshotCapturedAt);
   const currentWeatherCode = currentNumber(weatherCodeField);
-  const windDir = currentNumber(windDirectionField);
-  const windSpeed = currentNumber(windSpeedField);
-  const currentWindGust = currentNumber(windGustField);
+  const windDir = dashboardWind.direction;
+  const windSpeed = dashboardWind.speed;
+  const currentWindGust = dashboardWind.gust;
   const currentPrecipitation = currentNumber(precipitationField);
   const currentPressure = currentNumber(pressureField);
-  const hourlyForecastSource = forecastProvenance?.source ?? officialForecast?.officialSnapshot?.source ?? null;
-  const hourlyForecastComputedAt = forecastProvenance?.updatedAt ?? officialForecast?.officialSnapshot?.computedAt ?? null;
   const currentCloudCover = currentNumber(cloudCoverField);
   const currentHumidity = currentNumber(humidityField);
   const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : undefined) ?? undefined, windSpeed: windSpeed ?? undefined });
@@ -1186,12 +1196,12 @@ export default function Dashboard() {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Vent actuel</p>
-                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{windSpeed == null ? "—" : `${windSpeed.toFixed(1)} km/h`}</p>
+                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{formatOptionalForecastValue(windSpeed, 0, " km/h")}</p>
                   <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(windSpeedField, currentSnapshot?.capturedAt)}</p>
                 </div>
                 <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(windGustField, currentSnapshot?.capturedAt)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Rafales actuelles</p>
-                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentWindGust == null ? "—" : `${currentWindGust.toFixed(1)} km/h`}</p>
+                  <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{formatOptionalForecastValue(currentWindGust, 0, " km/h")}</p>
                   <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
                 </div>
               </div>
