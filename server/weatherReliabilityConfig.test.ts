@@ -3,12 +3,14 @@ import {
   getLaboratoryHorizon,
   getProvisionalEvidenceScore,
   getStatisticalConfidence,
+  LABORATORY_HORIZONS,
   LABORATORY_SCORE_WEIGHT_TOTAL,
   LABORATORY_SCORE_WEIGHTS,
   MINIMUM_RELIABILITY_COMPARISONS,
   PUBLIC_RANKING_EVIDENCE_THRESHOLDS,
   isPublicModelRankingEligible,
 } from "./weatherReliabilityConfig";
+import { FORECAST_HORIZON_WINDOWS, getForecastHorizonWindow } from "../shared/forecastHorizon";
 
 describe("weatherReliabilityConfig", () => {
   it("conserve exactement 100 % de pondération pour le score normalisé", () => {
@@ -58,8 +60,28 @@ describe("weatherReliabilityConfig", () => {
   });
 
   it("n’assimile pas les horizons non archivés séparément à un horizon voisin", () => {
-    expect(getLaboratoryHorizon("6-24h")?.storageBucket).toBe("6-24h");
+    expect(getLaboratoryHorizon("6-24h")?.storageBucket).toBe("6_24h");
+    expect(getLaboratoryHorizon("0-6h")?.storageBucket).toBeNull();
+    expect(getLaboratoryHorizon("4-7d")?.storageBucket).toBeNull();
     expect(getLaboratoryHorizon("24-48h")?.storageBucket).toBeNull();
     expect(getLaboratoryHorizon("8-10d")?.storageBucket).toBeNull();
+  });
+
+  it("n’archive séparément que les buckets qui existent dans le découpage partagé", () => {
+    const writtenBuckets = new Set<string>(FORECAST_HORIZON_WINDOWS.map((window) => window.key));
+    for (const horizon of LABORATORY_HORIZONS) {
+      if (horizon.storageBucket !== null) {
+        expect(writtenBuckets.has(horizon.storageBucket)).toBe(true);
+      }
+    }
+  });
+
+  it("fait correspondre 6–24 h au bucket 6_24h et ne fait pas coïncider 0–6 h ni 4–7 j avec un bucket", () => {
+    expect(getForecastHorizonWindow(6 * 60)?.key).toBe("6_24h");
+    expect(getForecastHorizonWindow(0)?.key).toBe("0_2h");
+    expect(getForecastHorizonWindow(5 * 60)?.key).toBe("2_6h");
+    expect(getForecastHorizonWindow(4 * 24 * 60)?.key).toBe("3_7d");
+    expect(getLaboratoryHorizon("0-6h")?.storageBucket).toBeNull();
+    expect(getLaboratoryHorizon("4-7d")?.storageBucket).toBeNull();
   });
 });
