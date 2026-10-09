@@ -5,7 +5,7 @@ import { ReliabilityLocationPicker } from "@/components/weather/ReliabilityLocat
 import { ReliabilityTrendChart } from "@/components/weather/ReliabilityTrendChart";
 import { YesterdayVerificationPanel } from "@/components/weather/YesterdayVerificationPanel";
 import {
-  EvidenceSummary,
+  ReliabilityNotesSummary,
   HorizonEvidenceSection,
   VariableEvidenceSection,
   type ReliabilityMetricRow,
@@ -153,7 +153,7 @@ export default function ReliabilityLaboratory() {
                 Bulletin d’audit · observations physiques
               </p>
               <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                Fiabilité historique, sans note globale
+                Fiabilité historique, vérifiée sur observations
               </h1>
               <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-400 sm:text-sm">
                 Compare les prévisions archivées au temps réellement observé,
@@ -238,7 +238,11 @@ export default function ReliabilityLaboratory() {
 
         {data ? (
           <>
-            <EvidenceSummary data={data} />
+            <ReliabilityNotesSummary
+              data={data}
+              hourlyPoints={overviewData?.comparison24h ?? []}
+              dailyPoints={overviewData?.comparison7d ?? []}
+            />
             <VariableEvidenceSection
               rows={data.metrics as ReliabilityMetricRow[]}
               expectedModelCount={data.evidence.expectedModelCount}
