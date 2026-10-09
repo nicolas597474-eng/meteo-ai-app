@@ -1283,8 +1283,10 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                     ? "succeeded"
                     : "partial";
                 if (finalStatus === "partial" && !errorCode) {
+                  // La colonne `errorCode` du journal horaire est un varchar(32) : un code plus
+                  // long ferait échouer l'écriture du journal (ER_DATA_TOO_LONG).
                   errorCode = diagnostic.projectionReady
-                    ? "partial_archive_projection_published"
+                    ? "partial_projection_published"
                     : "partial_projection_retained";
                 }
               } catch (writeError) {

@@ -137,6 +137,9 @@ describe("cadence automatique des prévisions", () => {
     expect(hourlyCounter).toBeGreaterThan(hourlyJournalWrite);
     expect(handler).toContain("isHourlyForecastArchiveComplete");
     expect(handler).toContain("isHourlyForecastRunHealthy({");
+    expect(handler).not.toContain("partial_archive_projection_published");
+    expect(handler).toContain("partial_projection_published");
+    expect(handler).toContain("partial_projection_retained");
     expect(handler).toContain("{ refreshComputedAt: true }");
     expect(handler).toContain("await insertForecastRuns(");
     expect(handler).not.toContain("cacheManualHourlyForecast");
