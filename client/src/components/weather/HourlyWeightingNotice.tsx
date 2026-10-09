@@ -158,6 +158,8 @@ export function HourlyWeightingNotice({
   showFallbackDetails = true,
 }: HourlyWeightingNoticeProps) {
   if (!weighting) return null;
+  // Bloc retiré de l'interface : le statut robust_fallback n'affiche plus de notice utilisateur.
+  if (weighting.status === "robust_fallback") return null;
 
   const minimumComparisons = weighting.minimumComparisons ?? 30;
   const minimumDays = weighting.minimumComparableDays ?? 7;
@@ -203,11 +205,6 @@ export function HourlyWeightingNotice({
           <p><span className="font-semibold text-sky-100">Prévision d’un modèle unique, pas une fusion multimodèle.</span> {modelsLabel}. Disponibilité et calibration sont distinctes; {evidenceLabel} {availabilityMessage} Best Match est exclu.</p>
           {calibrated && <p className="mt-1">Calibration qualifiée : {calibrated}.</p>}
           {robust && <p className="mt-1">Valeur conservée avec repli robuste non calibré : {robust}.</p>}
-        </>
-      ) : weighting.status === "robust_fallback" ? (
-        <>
-          <p><span className="font-semibold text-amber-100">Fusion des seuls modèles réellement disponibles, pondération robuste non calibrée.</span> Les valeurs restent visibles même sans historique suffisant; ce statut ne prétend pas être une confiance probabiliste. {evidenceLabel} {availabilityMessage} Modèles contributeurs potentiels : {modelsLabel}. Best Match est exclu.</p>
-          {robust && <p className="mt-1">Repli robuste : {robust}.</p>}
         </>
       ) : weighting.status === "mixed" ? (
         <>

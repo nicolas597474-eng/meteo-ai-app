@@ -189,4 +189,30 @@ describe("HourlyWeightingNotice", () => {
     expect(html).not.toContain("Fallback conservé :");
     expect(html).toContain("Fusion disponible, calibration partielle selon le modèle");
   });
+
+  it("ne rend plus le bloc de fusion robuste non calibrée", () => {
+    const html = renderToStaticMarkup(createElement(HourlyWeightingNotice, { weighting: {
+      status: "robust_fallback",
+      availabilityStatus: "FUSED",
+      calibrationStatus: "UNCALIBRATED_ROBUST",
+      historyStatus: "available",
+      minimumComparisons: 30,
+      minimumComparableDays: 7,
+      modelsWithData: sevenModels,
+      horizons: [{
+        variable: "temperature",
+        horizonBucket: "6_24h",
+        method: "robust_fallback",
+        availabilityStatus: "FUSED",
+        calibrationStatus: "UNCALIBRATED_ROBUST",
+        unavailableReason: null,
+        hourCount: 3,
+        modelNamesWithData: sevenModels,
+      }],
+    } }));
+
+    expect(html).not.toContain("Fusion des seuls modèles réellement disponibles");
+    expect(html).not.toContain("pondération robuste non calibrée");
+    expect(html).not.toContain("Best Match est exclu");
+  });
 });
