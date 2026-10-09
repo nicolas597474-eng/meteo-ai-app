@@ -171,6 +171,16 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Aucune trace disponible.");
     expect(source).toContain("poids cumulé");
     expect(source).toContain("Paramètres de la fusion");
+    // Le bloc reste en haut de la page : avant la grille de statistiques.
+    expect(source).toContain(
+      'className="order-[-1] rounded-2xl border border-violet-400/20 bg-violet-400/[0.045] p-4" aria-labelledby="lab-parameters-title"',
+    );
+    const parametersIndex = source.indexOf('aria-labelledby="lab-parameters-title"');
+    const statisticsIndex = source.indexOf(
+      'className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4"',
+    );
+    expect(parametersIndex).toBeGreaterThan(-1);
+    expect(parametersIndex).toBeLessThan(statisticsIndex);
   });
 
   it("sépare la disponibilité réelle de la calibration et des scores historiques", () => {
