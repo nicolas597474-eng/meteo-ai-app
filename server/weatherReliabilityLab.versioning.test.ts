@@ -10,7 +10,7 @@ vi.mock("./db", () => mocks);
 import { OFFICIAL_HOURLY_MODELS } from "./weatherServices";
 import { buildReliabilityLaboratory } from "./weatherReliabilityLab";
 
-describe("Weather AI Lab — agrégats horaires legacy non versionnés", () => {
+describe("Weather AI Lab — agrégats horaires bruts non validés", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-05T12:00:00.000Z"));
@@ -26,9 +26,9 @@ describe("Weather AI Lab — agrégats horaires legacy non versionnés", () => {
         variable: "temperature",
         horizonBucket: "6_24h",
         sampleSize: 35,
-        mae: 0.4,
-        rmse: 0.6,
-        bias: 0.1,
+        mae: 0.5,
+        rmse: 0.75,
+        bias: 0.25,
         scoringValidationVersion: null,
       }],
       exactAvailable: false,
@@ -40,7 +40,7 @@ describe("Weather AI Lab — agrégats horaires legacy non versionnés", () => {
     vi.useRealTimers();
   });
 
-  it("distingue les lignes historiques non versionnées d’une archive sans score sans leur attribuer de métriques", async () => {
+  it("expose les métriques brutes non validées sans jamais les compter comme preuves", async () => {
     const result = await buildReliabilityLaboratory({
       lat: 50.7,
       lon: 2.5,
@@ -64,17 +64,26 @@ describe("Weather AI Lab — agrégats horaires legacy non versionnés", () => {
     expect(legacyOnly).toMatchObject({
       status: "legacy_unversioned_only",
       metrics: null,
+      rawMetrics: {
+        mae: 0.5,
+        rmse: 0.75,
+        bias: 0.25,
+        comparisonCount: 35,
+        evaluatedDays: 1,
+      },
       legacyUnversionedRowCount: 1,
     });
-    expect(legacyOnly?.reason).toContain("exclue(s) des preuves actuelles et des poids officiels");
+    expect(legacyOnly?.reason).toContain("Données brutes non validées");
+    expect(legacyOnly?.reason).toContain("exclues des preuves actuelles et des poids officiels");
     expect(noScore).toMatchObject({
       status: "no_evidence",
       metrics: null,
+      rawMetrics: null,
       legacyUnversionedRowCount: 0,
     });
     expect(selectedHorizonSummary).toMatchObject({
       status: "available",
-      rawEvidenceCellCount: 0,
+      rawEvidenceCellCount: 1,
       qualifiedCellCount: 0,
       expectedCellCount: OFFICIAL_HOURLY_MODELS.length * 6,
     });

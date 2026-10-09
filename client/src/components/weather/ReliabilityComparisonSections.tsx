@@ -208,13 +208,19 @@ export function ModelComparisonSection({
     .filter(row => row.variable === config.id)
     .slice()
     .sort((a, b) => {
-      const rank = (status: string) =>
-        status === "qualified" ? 0 : status === "insufficient_evidence" ? 1 : 2;
-      const difference = rank(a.status) - rank(b.status);
+      const metricsOf = (row: ReliabilityMetricRow) => row.metrics ?? row.rawMetrics;
+      const rank = (row: ReliabilityMetricRow) =>
+        row.status === "qualified" ? 0
+          : row.status === "insufficient_evidence" ? 1
+            : metricsOf(row) != null ? 2
+              : 3;
+      const difference = rank(a) - rank(b);
       if (difference) return difference;
-      if (a.metrics && b.metrics) return a.metrics.mae - b.metrics.mae;
-      if (a.metrics) return -1;
-      if (b.metrics) return 1;
+      const aValues = metricsOf(a);
+      const bValues = metricsOf(b);
+      if (aValues && bValues) return aValues.mae - bValues.mae;
+      if (aValues) return -1;
+      if (bValues) return 1;
       return a.modelName.localeCompare(b.modelName);
     });
 
@@ -303,25 +309,25 @@ export function ModelComparisonSection({
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-1.5">
                   <MetricCell
-                    label="MAE"
-                    value={metric(row.metrics?.mae, row.unit, 2)}
+                    label={row.metrics == null && row.rawMetrics != null ? "MAE · brut non validé" : "MAE"}
+                    value={metric((row.metrics ?? row.rawMetrics)?.mae, row.unit, 2)}
                     color="text-orange-100"
                   />
                   <MetricCell
                     label="RMSE"
-                    value={metric(row.metrics?.rmse, row.unit, 2)}
+                    value={metric((row.metrics ?? row.rawMetrics)?.rmse, row.unit, 2)}
                     color="text-amber-100"
                   />
                   <MetricCell
                     label="Biais"
-                    value={signedMetric(row.metrics?.bias, row.unit, 2)}
+                    value={signedMetric((row.metrics ?? row.rawMetrics)?.bias, row.unit, 2)}
                     color="text-sky-100"
                   />
                 </div>
                 <div className="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 text-[9px] text-slate-400">
                   <span>
-                    n = {row.metrics?.comparisonCount ?? "—"} ·{" "}
-                    {row.metrics?.evaluatedDays ?? "—"} jours
+                    n = {(row.metrics ?? row.rawMetrics)?.comparisonCount ?? "—"} ·{" "}
+                    {(row.metrics ?? row.rawMetrics)?.evaluatedDays ?? "—"} jours
                   </span>
                   <span>
                     {formatDate(row.firstScoreDate)} →{" "}
@@ -347,7 +353,7 @@ export function ModelComparisonSection({
                       ? " · "
                       : ""}
                     {row.legacyUnversionedRowCount > 0
-                      ? `${row.legacyUnversionedRowCount} score(s) historique(s) sans version ignoré(s)`
+                      ? `${row.legacyUnversionedRowCount} ligne(s) brute(s) non validée(s), hors preuves`
                       : ""}
                   </p>
                 ) : null}
@@ -386,18 +392,25 @@ export function ModelComparisonSection({
                       </p>
                     </td>
                     <td className="p-3 text-right font-mono tabular-nums text-orange-100">
-                      {metric(row.metrics?.mae, row.unit, 2)}
+                      {metric((row.metrics ?? row.rawMetrics)?.mae, row.unit, 2)}
+                      {row.metrics == null && row.rawMetrics != null ? (
+                        <span className="mt-1 block font-sans text-[9px] font-semibold text-amber-300">
+                          brut non validé
+                        </span>
+                      ) : null}
                     </td>
                     <td className="p-3 text-right font-mono tabular-nums text-amber-100">
-                      {metric(row.metrics?.rmse, row.unit, 2)}
+                      {metric((row.metrics ?? row.rawMetrics)?.rmse, row.unit, 2)}
                     </td>
                     <td className="p-3 text-right font-mono tabular-nums text-sky-100">
-                      {signedMetric(row.metrics?.bias, row.unit, 2)}
+                      {signedMetric((row.metrics ?? row.rawMetrics)?.bias, row.unit, 2)}
                     </td>
                     <td className="p-3 text-right font-mono tabular-nums text-slate-300">
                       {row.metrics
                         ? `${row.metrics.comparisonCount} · ${row.metrics.evaluatedDays}`
-                        : "—"}
+                        : row.rawMetrics
+                          ? `${row.rawMetrics.comparisonCount} · ${row.rawMetrics.evaluatedDays}`
+                          : "—"}
                       <span className="mt-1 block text-[9px] text-slate-500">
                         seuil {row.minimumComparisons} ·{" "}
                         {row.minimumComparableDays} j
@@ -436,8 +449,8 @@ export function ModelComparisonSection({
                       ) : null}
                       {row.legacyUnversionedRowCount > 0 ? (
                         <p className="mt-1 text-[9px] text-amber-200">
-                          {row.legacyUnversionedRowCount} historique(s) non
-                          versionné(s) exclu(s)
+                          {row.legacyUnversionedRowCount} ligne(s) brute(s) non
+                          validée(s), hors preuves
                         </p>
                       ) : null}
                     </td>
@@ -451,8 +464,10 @@ export function ModelComparisonSection({
       <p className="border-t border-slate-800/80 px-4 py-3 text-[10px] leading-relaxed text-slate-500">
         Les lignes qualifiées sont affichées d’abord, puis triées par MAE
         croissante pour la variable sélectionnée; les autres restent visibles
-        avec leur statut. Une comparaison n’est valable que dans sa maille
-        exacte modèle × variable × horizon.
+        avec leur statut. Les cellules marquées « brut non validé » proviennent
+        de lignes archivées sans version de validation stricte : elles restent
+        indicatives, hors preuves et hors poids officiels. Une comparaison n’est
+        valable que dans sa maille exacte modèle × variable × horizon.
       </p>
     </MeteoSurface>
   );
@@ -534,9 +549,10 @@ export function MethodologySection({ data }: { data?: any }) {
             une probabilité.
           </li>
           <li>
-            Lignes incomplètes, agrégats non versionnés, Best Match et autres
-            horizons exclus; aucune échéance voisine ou période extérieure n’est
-            utilisée en repli.
+            Lignes incomplètes exclues; les données brutes « non validées »
+            restent affichées mais hors preuves et hors poids officiels. Best
+            Match et autres horizons exclus; aucune échéance voisine ou période
+            extérieure n’est utilisée en repli.
           </li>
           <li>
             L’accord inter-modèles, la qualité des stations et l’incertitude

@@ -57,6 +57,20 @@ export async function buildReliabilityLaboratory(input: {
   const selectedHorizon = getLaboratoryHorizon(input.horizon);
   const trendStartDate = getParisDateDaysAgo(Math.max(period.days, 60));
   const history = await getHourlyForecastEvaluationHistory(locationKey, trendStartDate, throughDate, [], { includeLegacy: true });
+  const summarizeCell = (
+    rows: readonly unknown[],
+    model: { name: string; modelId: string },
+    variable: (typeof HOURLY_FORECAST_VARIABLES)[number],
+    storageBucket: string,
+  ) => summarizeHourlyHistoricalEvidence([...rows] as HourlyHistoricalScoreRow[], {
+    modelName: model.name,
+    modelId: model.modelId,
+    variable,
+    horizonBucket: storageBucket,
+    beforeDate,
+    periodStartDate: startDate,
+    historyAvailable: history.available,
+  });
   const minimumComparisons = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons;
   const minimumComparableDays = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays;
   const expectedEvidenceCellCount = OFFICIAL_HOURLY_MODELS.length * HOURLY_FORECAST_VARIABLES.length;
@@ -97,16 +111,10 @@ export async function buildReliabilityLaboratory(input: {
     let noEvidenceCellCount = 0;
     for (const model of OFFICIAL_HOURLY_MODELS) {
       for (const variable of HOURLY_FORECAST_VARIABLES) {
-        const summary = summarizeHourlyHistoricalEvidence(history.rows as HourlyHistoricalScoreRow[], {
-          modelName: model.name,
-          modelId: model.modelId,
-          variable,
-          horizonBucket: horizon.storageBucket,
-          beforeDate,
-          periodStartDate: startDate,
-          historyAvailable: history.available,
-        });
-        if (summary.metrics) rawEvidenceCellCount += 1;
+        const summary = summarizeCell(history.rows, model, variable, horizon.storageBucket);
+        const rawCellMetrics = summary.metrics
+          ?? summarizeCell(history.legacyRows, model, variable, horizon.storageBucket).metrics;
+        if (rawCellMetrics) rawEvidenceCellCount += 1;
         if (summary.status === "qualified") qualifiedCellCount += 1;
         else if (summary.status === "insufficient_evidence") insufficientEvidenceCellCount += 1;
         else if (summary.status === "incomplete_metrics") incompleteMetricCellCount += 1;
@@ -144,6 +152,7 @@ export async function buildReliabilityLaboratory(input: {
         reason: "Cet horizon n’est pas archivé séparément; aucune échéance voisine n’est utilisée en repli.",
         legacyUnversionedRowCount: 0,
         metrics: null,
+        rawMetrics: null,
         minimumComparisons,
         minimumComparableDays,
         firstScoreDate: null,
@@ -153,15 +162,10 @@ export async function buildReliabilityLaboratory(input: {
         trend: null,
       };
     }
-    const summary = summarizeHourlyHistoricalEvidence(history.rows as HourlyHistoricalScoreRow[], {
-      modelName: model.name,
-      modelId: model.modelId,
-      variable,
-      horizonBucket: selectedHorizon.storageBucket,
-      beforeDate,
-      periodStartDate: startDate,
-      historyAvailable: history.available,
-    });
+    const summary = summarizeCell(history.rows, model, variable, selectedHorizon.storageBucket);
+    const unvalidatedSummary = summary.metrics == null
+      ? summarizeCell(history.legacyRows, model, variable, selectedHorizon.storageBucket)
+      : null;
     const legacyUnversionedRows = (history.legacyRows as HourlyHistoricalScoreRow[]).filter((row) =>
       row.sourceName === "open-meteo"
       && row.modelName === model.name
@@ -172,13 +176,17 @@ export async function buildReliabilityLaboratory(input: {
       && row.date <= throughDate,
     );
     const legacyUnversionedRowCount = legacyUnversionedRows.length;
+    const rawMetrics = summary.metrics ?? unvalidatedSummary?.metrics ?? null;
+    const rawNote = summary.metrics == null && rawMetrics != null
+      ? `Données brutes non validées consultables (${rawMetrics.comparisonCount} comparaisons sur ${rawMetrics.evaluatedDays} jour(s)); sans version de validation stricte, elles restent exclues des preuves actuelles et des poids officiels.`
+      : null;
     const legacyNote = legacyUnversionedRowCount > 0
-      ? `${legacyUnversionedRowCount} ligne(s) horaire(s) historique(s) sans version de validation, exclue(s) des preuves actuelles et des poids officiels.`
+      ? `${legacyUnversionedRowCount} ligne(s) brute(s) non validée(s) archivée(s) sur cette maille, exclue(s) des preuves actuelles et des poids officiels.`
       : null;
     const reason = summary.status === "history_unavailable"
       ? "Historique illisible ou indisponible; aucune preuve actuelle n’est qualifiée."
       : summary.status === "no_evidence"
-        ? legacyNote ?? "Aucune ligne complète modèle × variable × horizon n’est archivée sur cette période."
+        ? rawNote ?? legacyNote ?? "Aucune ligne complète modèle × variable × horizon n’est archivée sur cette période."
         : summary.status === "incomplete_metrics"
           ? `Des lignes versionnées existent, mais au moins une métrique requise est absente ou invalide.${legacyNote ? ` ${legacyNote}` : ""}`
           : summary.status === "insufficient_evidence"
@@ -187,6 +195,7 @@ export async function buildReliabilityLaboratory(input: {
     return {
       ...base,
       ...summary,
+      rawMetrics,
       status: summary.status === "no_evidence" && legacyUnversionedRowCount > 0 ? "legacy_unversioned_only" as const : summary.status,
       legacyUnversionedRowCount,
       horizonLabel: selectedHorizon.label,
@@ -209,7 +218,7 @@ export async function buildReliabilityLaboratory(input: {
       variables: HOURLY_FORECAST_VARIABLES.map((variable) => ({ key: variable, label: VARIABLE_LABELS[variable], unit: VARIABLE_UNITS[variable] })),
       minimumComparisons,
       minimumComparableDays,
-      note: "Seuls les scores horaires portant la version de validation stricte courante alimentent les preuves et les poids officiels. Les agrégats historiques non versionnés restent consultables séparément dans le diagnostic, mais ne sont jamais traités comme preuve actuelle. MAE/RMSE/biais ne sont pas fusionnés en note; Best Match et agrégateurs sont exclus.",
+      note: "Seuls les scores horaires portant la version de validation stricte courante alimentent les preuves et les poids officiels. Les données brutes « non validées » restent consultables séparément dans le diagnostic, mais ne sont jamais traitées comme preuve actuelle. MAE/RMSE/biais ne sont pas fusionnés en note; Best Match et agrégateurs sont exclus.",
     },
     metrics: evidence,
     availability: {
