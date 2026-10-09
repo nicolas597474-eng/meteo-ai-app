@@ -93,7 +93,7 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  `connect-src 'self' ${MANUS_ORIGINS} ${GEOCODING_API_ORIGIN}`,
+  `connect-src 'self' ${GEOCODING_API_ORIGIN} ${MANUS_ORIGINS}`,
   `frame-src 'self' ${WINDY_EMBED_ORIGIN}`,
   "frame-ancestors 'none'",
   "form-action 'self'",

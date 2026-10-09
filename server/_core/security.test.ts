@@ -119,3 +119,25 @@ describe("middleware securityHeaders", () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 });
+
+// Test ajouté par la PR #126 (correctif minimal du géocodage), conservé tel quel :
+// il fixe aussi l'ordre de l'origine dans connect-src.
+describe("securityHeaders", () => {
+  it("autorise l’API de géocodage utilisée par la recherche de villes", () => {
+    const headers = new Map<string, string>();
+    const response = {
+      setHeader: vi.fn((name: string, value: string) => {
+        headers.set(name, value);
+      }),
+      removeHeader: vi.fn(),
+    } as unknown as Response;
+    const next = vi.fn();
+
+    securityHeaders({} as Request, response, next);
+
+    expect(headers.get("Content-Security-Policy")).toContain(
+      "connect-src 'self' https://geocoding-api.open-meteo.com"
+    );
+    expect(next).toHaveBeenCalledOnce();
+  });
+});
