@@ -159,6 +159,30 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).not.toContain("Observation P1.6");
   });
 
+  it("expose un bloc Paramètres qui lit la trace de fusion sans inventer de valeur", () => {
+    const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
+    expect(source).toContain('aria-labelledby="lab-parameters-title"');
+    expect(source).toContain(">Paramètres<");
+    expect(source).toContain("parameterOfficialValues");
+    expect(source).toContain("Poids réellement appliqués par paramètre");
+    expect(source).toContain("Valeur officielle fusionnée :");
+    expect(source).toContain("Valeur officielle non exposée pour ce paramètre.");
+    expect(source).toContain("Aucune source appliquée dans la trace.");
+    expect(source).toContain("Aucune trace disponible.");
+    expect(source).toContain("poids cumulé");
+    expect(source).toContain("Paramètres de la fusion");
+    // Le bloc reste en haut de la page : avant la grille de statistiques.
+    expect(source).toContain(
+      'className="order-[-1] rounded-2xl border border-violet-400/20 bg-violet-400/[0.045] p-4" aria-labelledby="lab-parameters-title"',
+    );
+    const parametersIndex = source.indexOf('aria-labelledby="lab-parameters-title"');
+    const statisticsIndex = source.indexOf(
+      'className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4"',
+    );
+    expect(parametersIndex).toBeGreaterThan(-1);
+    expect(parametersIndex).toBeLessThan(statisticsIndex);
+  });
+
   it("sépare la disponibilité réelle de la calibration et des scores historiques", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
     expect(source).toContain("Une absence hors portée n’est pas un échec de performance");
