@@ -40,7 +40,7 @@ import {
   getStationQualityProfiles,
   getFavoriteLocations,
 } from "../db";
-import { collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
+import { collectCurrentWeatherSnapshot, collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
 import { summarizePrecipitationModels } from "../../shared/precipitationConsensus";
 import { legacyStabilityLabelForStorage } from "../legacyStabilityStorage";
@@ -211,6 +211,13 @@ const detailedForecastInputSchema = z.object({
 );
 
 export const weatherRouter = router({
+  /** Fast model-current read used to make the Dashboard useful before the seven-model horizon finishes. */
+  getCurrentModelSnapshot: publicProcedure
+    .input(optionalCoordinatesSchema.optional())
+    .query(({ input }) => collectCurrentWeatherSnapshot(
+      input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : HONDEGHEM,
+    )),
+
   /** Catalogue descriptif des régimes : il n’altère jamais le régime détecté. */
   getRegimeCatalogue: publicProcedure.query(() => (
     Object.entries(EXTENDED_REGIME_INFO).map(([id, info]) => ({

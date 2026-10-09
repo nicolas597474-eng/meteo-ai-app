@@ -509,6 +509,10 @@ export default function Dashboard() {
     coordsInput,
     { staleTime: 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 },
   );
+  const { data: fastCurrentSnapshot } = trpc.weather.getCurrentModelSnapshot.useQuery(
+    coordsInput,
+    { staleTime: 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 },
+  );
   const hourlyLoading = officialLoading;
   const hourlyError = officialError;
   const hourlyFetching = officialFetching;
@@ -616,8 +620,11 @@ export default function Dashboard() {
     updatePersonalObservation.mutate({ id: editingPersonalObservation.id, observation: { temperature, condition: editingPersonalObservation.condition, windSpeed, precipitation } });
   };
 
-  const isLoading = officialLoading && hourlyLoading;
-  const isError = officialError && hourlyError;
+  // The current model snapshot is explicitly distinct from the official
+  // seven-model horizon, but lets the page render instead of holding a full
+  // screen skeleton while that horizon refreshes after a cold start.
+  const isLoading = officialLoading && hourlyLoading && !fastCurrentSnapshot;
+  const isError = officialError && hourlyError && !fastCurrentSnapshot;
   const refreshCurrentWeather = async () => {
     setHasWaitTimedOut(false);
     await Promise.all([refetchDashboard(), refetchOfficialForecast()]);
@@ -702,7 +709,7 @@ export default function Dashboard() {
   const today = days[0] ?? null;
   const officialHours = officialForecast?.hours ?? [];
   const hours = officialHours;
-  const currentSnapshot = officialForecast?.currentSnapshot ?? null;
+  const currentSnapshot = officialForecast?.currentSnapshot ?? fastCurrentSnapshot ?? null;
   const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
   const currentFields = currentDashboardWeather?.fields;
   const hasPhysicalCurrentState = Object.values(currentFields ?? {}).some((field) => field.provenance.kind === "physical_stations");

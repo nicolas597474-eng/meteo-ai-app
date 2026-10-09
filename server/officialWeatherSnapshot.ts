@@ -1,8 +1,8 @@
-import { getDailyFusionPerformanceEvidence, makeLocationKey } from "./db";
-import { getParisDate, getParisHour } from "./weatherTime";
+import { getDailyFusionPerformanceEvidence, getHourlyForecastEvaluationHistory, getHourlyForecastRunValues, makeLocationKey } from "./db";
+import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { collect15DayForecast, collectCurrentWeatherSnapshot, type CurrentWeatherSnapshot, type DayForecast, type HourlyPoint } from "./weatherServices";
 import { findActiveHourlyForecastIndex, keepCurrentAndFutureHourlyForecasts } from "../shared/hourlyForecastTime";
-import { collectOfficialHourlyForecast, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
+import { collectOfficialHourlyForecast, computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
 import { computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 import type { ManualHourlyOverride } from "../shared/hourlyModelMetrics";
@@ -271,6 +271,53 @@ export function resolveOfficialDailyForecastSnapshot(coords: { lat: number; lon:
   return value;
 }
 
+/**
+ * Reads the latest real scheduled projection before a cold live refresh. This
+ * is limited to the short Dashboard path: the archived receipt time remains
+ * visible, no value is invented, and a new live collection is started after it.
+ */
+async function readArchivedOfficialHourlySnapshot(
+  coords: { lat: number; lon: number },
+  weatherDate: string,
+): Promise<OfficialWeatherSnapshot | null> {
+  const locationKey = makeLocationKey(coords.lat, coords.lon);
+  const [rows, history, currentSnapshot] = await Promise.all([
+    getHourlyForecastRunValues(locationKey, weatherDate),
+    getHourlyForecastEvaluationHistory(
+      locationKey,
+      getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
+      getParisDateDaysAgo(1),
+    ),
+    collectCurrentWeatherSnapshot(coords),
+  ]);
+  const modelForecasts = reconstructOfficialHourlyModelsFromArchive(rows, weatherDate);
+  if (modelForecasts.length === 0) return null;
+  const computed = computeOfficialHourlyForecast(modelForecasts, history.rows, {
+    historyAvailable: history.available,
+    exactHistoryAvailable: history.exactAvailable,
+    exactHistoryScores: history.exactRows,
+  });
+  if (computed.hours.length === 0) return null;
+
+  const receiptTimes = modelForecasts
+    .map((forecast) => forecast.availableAt)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (receiptTimes.length === 0) return null;
+  const receivedAt = Math.max(...receiptTimes);
+  return buildOfficialWeatherSnapshot({
+    lat: coords.lat,
+    lon: coords.lon,
+    weatherDate,
+    computedAt: new Date(receivedAt),
+    hourly: computed.hours,
+    currentSnapshot,
+    hourlyWeighting: computed.weighting,
+    daily: [],
+    modelsUsed: modelForecasts.map((forecast) => forecast.modelName),
+    parisHour: String(getParisHour()).padStart(2, "0"),
+  });
+}
+
 function applyManualHourlyForecast(snapshot: OfficialWeatherSnapshot, coords: { lat: number; lon: number }): OfficialWeatherSnapshot {
   const key = manualForecastCacheKey(preciseCacheLocationKey(coords), snapshot.weatherDate);
   const cached = manualHourlyForecastCache.get(key);
@@ -373,8 +420,26 @@ export function resolveOfficialWeatherSnapshot(
     return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
   }
 
-  const value = createSnapshot();
-  const entry: CacheEntry = { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value };
+  let entry: CacheEntry;
+  const value = includeDaily
+    ? createSnapshot()
+    : readArchivedOfficialHourlySnapshot(coords, weatherDate).then((archivedSnapshot) => {
+      if (!archivedSnapshot) return createSnapshot();
+
+      const refresh = createSnapshot();
+      entry.refreshing = refresh;
+      void refresh.then((snapshot) => {
+        if (snapshotCache.get(cacheKey) !== entry) return;
+        snapshotCache.set(cacheKey, {
+          expiresAt: Date.now() + getOfficialSnapshotTtlMs(snapshot.hourly),
+          value: Promise.resolve(snapshot),
+        });
+      }).catch(() => {
+        if (snapshotCache.get(cacheKey) === entry) entry.refreshing = undefined;
+      });
+      return archivedSnapshot;
+    });
+  entry = { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value };
   snapshotCache.set(cacheKey, entry);
   void value.then((snapshot) => {
     const current = snapshotCache.get(cacheKey);

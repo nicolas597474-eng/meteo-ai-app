@@ -287,4 +287,12 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('lazy(() => import("@/components/HourlyChart"))');
     expect(source).toContain('lazy(() => import("@/components/FifteenDayChart"))');
   });
+
+  it("affiche l’état actuel sans attendre le recalcul de l’horizon multi-modèles", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("trpc.weather.getCurrentModelSnapshot.useQuery");
+    expect(source).toContain("!fastCurrentSnapshot");
+    expect(source).toContain("officialForecast?.currentSnapshot ?? fastCurrentSnapshot ?? null");
+  });
 });
