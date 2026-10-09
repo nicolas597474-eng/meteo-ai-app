@@ -2037,12 +2037,14 @@ export async function persistHourlyProviderRunEvaluation(input: {
 /** Insert or deterministically refresh detailed scores for one observation day. */
 export async function persistHourlyForecastEvaluationScores(rows: InsertHourlyForecastEvaluationScore[]): Promise<void> {
   const db = await getDb();
-  const validatedRows = rows.filter((row) => row.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION
-    && typeof row.sampleSize === "number" && row.sampleSize > 0
+  const completeRows = rows.filter((row) =>
+    typeof row.sampleSize === "number" && row.sampleSize > 0
     && row.mae != null && Number.isFinite(row.mae)
     && row.rmse != null && Number.isFinite(row.rmse)
     && row.bias != null && Number.isFinite(row.bias));
-  if (!db || validatedRows.length === 0) return;
+  const validatedRows = completeRows.filter((row) => row.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION);
+  const unvalidatedRows = completeRows.filter((row) => row.scoringValidationVersion !== HOURLY_SCORING_VALIDATION_VERSION);
+  if (!db || completeRows.length === 0) return;
   try {
     for (const row of validatedRows) {
       await db.insert(hourlyForecastEvaluationScores).values(row).onDuplicateKeyUpdate({
@@ -2058,6 +2060,15 @@ export async function persistHourlyForecastEvaluationScores(rows: InsertHourlyFo
           scoringValidationVersion: HOURLY_SCORING_VALIDATION_VERSION,
           computedAt: new Date(),
         },
+      });
+    }
+    // Les lignes complètes non validées sont archivées avec une version de
+    // validation NULL : elles restent consultables comme données brutes
+    // dans le labo, sans jamais remplacer une ligne validée (la mise à
+    // jour de conflit est sans effet sur les valeurs existantes).
+    for (const row of unvalidatedRows) {
+      await db.insert(hourlyForecastEvaluationScores).values(row).onDuplicateKeyUpdate({
+        set: { modelId: row.modelId },
       });
     }
   } catch (error) {

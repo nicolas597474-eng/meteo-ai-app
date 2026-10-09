@@ -55,12 +55,14 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
     expect(source).toContain("Données insuffisantes");
     expect(source).toContain("Horizon non archivé séparément");
     expect(source).toContain("Historique indisponible");
-    expect(source).toContain("Historique non versionné · exclu");
+    expect(source).toContain("Brut non validé · hors preuves");
     expect(source).toContain(
       "Une cellule « — » signifie non disponible, pas zéro."
     );
     expect(source).toContain("Aucune métrique n’est estimée");
-    expect(source).toContain("score(s) historique(s) sans version ignoré(s)");
+    expect(source).toContain("ligne(s) brute(s) non validée(s)");
+    expect(source).toContain("row.rawMetrics");
+    expect(source).toContain("Plage des MAE brutes");
   });
 
   it("distingue un horizon non archivé d’une absence de qualification", () => {

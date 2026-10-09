@@ -802,26 +802,26 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(evaluation.diagnostics)}`);
           await upsertHourlyComparisonDiagnosticSnapshot({ locationKey: locKey, cycleDate: yesterday, diagnostics: comparisonDiagnostics });
           const hourlyScores = evaluation.compatibilityScores;
-          const validatedBucketScores = evaluation.scores.filter((score) => score.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION);
-          if (validatedBucketScores.length > 0) {
-            await persistHourlyForecastEvaluationScores(validatedBucketScores.map((score) => ({
-              locationKey: score.locationKey,
-              date: score.date,
-              sourceName: score.sourceName,
-              modelName: score.modelName,
-              modelId: score.modelId,
-              variable: score.variable,
-              horizonBucket: score.horizonBucket,
-              observationCount: score.observationCount,
-              evaluableObservationCount: score.evaluableObservationCount,
-              sampleSize: score.sampleSize,
-              coverageRatio: score.coverageRatio,
-              mae: score.mae,
-              rmse: score.rmse,
-              bias: score.bias,
-              scoringValidationVersion: score.scoringValidationVersion,
-            })));
-          }
+          // Archive tous les agrégats complets du jour : les lignes non validées
+          // sont écrites avec une version de validation NULL et restent
+          // consultables comme données brutes, sans jamais remplacer une ligne validée.
+          await persistHourlyForecastEvaluationScores(evaluation.scores.map((score) => ({
+            locationKey: score.locationKey,
+            date: score.date,
+            sourceName: score.sourceName,
+            modelName: score.modelName,
+            modelId: score.modelId,
+            variable: score.variable,
+            horizonBucket: score.horizonBucket,
+            observationCount: score.observationCount,
+            evaluableObservationCount: score.evaluableObservationCount,
+            sampleSize: score.sampleSize,
+            coverageRatio: score.coverageRatio,
+            mae: score.mae,
+            rmse: score.rmse,
+            bias: score.bias,
+            scoringValidationVersion: score.scoringValidationVersion,
+          })));
           const exactComparisonsStored = await persistHourlyForecastExactComparisons(evaluation.exactComparisons.flatMap((comparison) => {
             if (comparison.forecastRunValueId == null || comparison.observationSnapshotId == null) return [];
             return [{ ...comparison, forecastRunValueId: comparison.forecastRunValueId, observationSnapshotId: comparison.observationSnapshotId }];

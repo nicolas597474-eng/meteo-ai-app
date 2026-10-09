@@ -32,6 +32,7 @@ export type ReliabilityMetricRow = {
   status: string;
   reason: string | null;
   metrics: ReliabilityMetricValues | null;
+  rawMetrics: ReliabilityMetricValues | null;
   minimumComparisons: number;
   minimumComparableDays: number;
   firstScoreDate: string | null;
@@ -142,7 +143,7 @@ export function statusLabel(status: string) {
     case "incomplete_metrics":
       return "Métriques incomplètes";
     case "legacy_unversioned_only":
-      return "Historique non versionné · exclu";
+      return "Brut non validé · hors preuves";
     case "history_unavailable":
       return "Historique indisponible";
     case "horizon_not_stored":
@@ -378,12 +379,27 @@ function VariableEvidenceCard({
   const qualified = rows.filter(
     row => row.status === "qualified" && row.metrics != null
   );
-  const raw = rows.filter(row => row.metrics != null);
+  const rawValues = rows
+    .map(row => row.metrics ?? row.rawMetrics)
+    .filter((value): value is ReliabilityMetricValues => value != null);
+  const unvalidatedValues = rows
+    .map(row => (row.metrics == null && row.rawMetrics != null ? row.rawMetrics : null))
+    .filter((value): value is ReliabilityMetricValues => value != null);
+  const hasRawUnvalidated = unvalidatedValues.length > 0;
   const maeValues = qualified.flatMap(row =>
     row.metrics ? [row.metrics.mae] : []
   );
+  const rawMaeValues = rawValues.map(value => value.mae);
   const minimum = maeValues.length ? Math.min(...maeValues) : null;
   const maximum = maeValues.length ? Math.max(...maeValues) : null;
+  const rawMinimum = rawMaeValues.length ? Math.min(...rawMaeValues) : null;
+  const rawMaximum = rawMaeValues.length ? Math.max(...rawMaeValues) : null;
+  const rawMaeRange =
+    rawMinimum == null || rawMaximum == null
+      ? "—"
+      : Math.abs(rawMaximum - rawMinimum) < 0.05
+        ? metric(rawMinimum, config.unit, 1)
+        : `${metric(rawMinimum, config.unit, 1)} – ${metric(rawMaximum, config.unit, 1)}`;
   const progress =
     expectedModelCount > 0
       ? Math.min(100, (qualified.length / expectedModelCount) * 100)
@@ -422,18 +438,22 @@ function VariableEvidenceCard({
       <div className="mt-4 flex items-end justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-            Plage des MAE qualifiées
+            {qualified.length
+              ? "Plage des MAE qualifiées"
+              : hasRawUnvalidated
+                ? "Plage des MAE brutes · non validées"
+                : "Plage des MAE qualifiées"}
           </p>
           <p
-            className={`mt-1 truncate text-lg font-semibold tabular-nums ${minimum == null ? "text-slate-500" : config.accent}`}
+            className={`mt-1 truncate text-lg font-semibold tabular-nums ${minimum == null && !hasRawUnvalidated ? "text-slate-500" : config.accent}`}
           >
-            {maeRange}
+            {hasRawUnvalidated && minimum == null ? rawMaeRange : maeRange}
           </p>
         </div>
         <p className="shrink-0 pb-0.5 text-right text-[9px] leading-relaxed text-slate-500">
           {evidenceAvailable ? (
             <>
-              {raw.length} avec
+              {rawValues.length} avec
               <br />
               donnée brute
             </>
@@ -468,7 +488,9 @@ function VariableEvidenceCard({
             ? "Archive historique indisponible; aucune métrique n’est estimée."
             : qualified.length
               ? "Étendue brute entre modèles qualifiés; ce n’est pas une moyenne."
-              : "Aucune mesure ne franchit le seuil pour cette variable et cet horizon."}
+              : hasRawUnvalidated
+                ? "Aucune mesure ne franchit le seuil; les MAE brutes non validées restent affichées hors preuves et hors poids officiels."
+                : "Aucune mesure ne franchit le seuil pour cette variable et cet horizon."}
       </p>
     </article>
   );

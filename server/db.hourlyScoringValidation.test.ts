@@ -87,18 +87,23 @@ describe("hourly scoring validation persistence and reads", () => {
     delete process.env.DATABASE_URL;
   });
 
-  it("ignore les lignes legacy et vides et promeut au marqueur courant un conflit recalculé", async () => {
+  it("archive les lignes brutes non validées sans jamais remplacer une ligne validée", async () => {
     const currentBucket = bucketScore(HOURLY_SCORING_VALIDATION_VERSION);
     const emptyBucket = bucketScore(HOURLY_SCORING_VALIDATION_VERSION, 0);
+    const rawBucket = bucketScore(null);
     await persistHourlyForecastEvaluationScores([
-      bucketScore(null),
+      rawBucket,
       emptyBucket,
       currentBucket,
     ]);
 
-    expect(fakeDatabase.insertedRows).toEqual([currentBucket]);
-    expect(fakeDatabase.onDuplicateKeyUpdate).toHaveBeenCalledWith(expect.objectContaining({
+    expect(fakeDatabase.insertedRows).toEqual([currentBucket, rawBucket]);
+    expect(fakeDatabase.onDuplicateKeyUpdate).toHaveBeenCalledTimes(2);
+    expect(fakeDatabase.onDuplicateKeyUpdate.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       set: expect.objectContaining({ scoringValidationVersion: HOURLY_SCORING_VALIDATION_VERSION }),
+    }));
+    expect(fakeDatabase.onDuplicateKeyUpdate.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+      set: { modelId: "ecmwf_ifs025" },
     }));
 
     vi.clearAllMocks();
