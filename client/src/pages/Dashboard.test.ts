@@ -297,4 +297,22 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("!fastCurrentSnapshot");
     expect(source).toContain("officialForecast?.currentSnapshot ?? fastCurrentSnapshot ?? null");
   });
+
+  it("alimente vent, rafales et direction avec la prévision horaire de la page Prévisions, sans les stations", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("getDashboardWind({");
+    expect(source).toContain("hour: currentHour,");
+    expect(source).toContain("const windSpeed = dashboardWind.speed;");
+    expect(source).toContain("const currentWindGust = dashboardWind.gust;");
+    expect(source).toContain("const windDir = dashboardWind.direction;");
+    expect(source).not.toContain("currentFields?.windSpeed");
+    expect(source).not.toContain("currentFields?.windGust");
+    expect(source).not.toContain("currentFields?.windDirection");
+    // Même fonction et même arrondi que la page Prévisions : « 33 km/h », pas « 33.0 km/h ».
+    expect(source).toContain('formatOptionalForecastValue(windSpeed, 0, " km/h")');
+    expect(source).toContain('formatOptionalForecastValue(currentWindGust, 0, " km/h")');
+    expect(source).not.toContain("windSpeed.toFixed(1)");
+    expect(source).not.toContain("currentWindGust.toFixed(1)");
+  });
 });

@@ -73,31 +73,54 @@ export function clearAllRateLimits() {
 // =============================================================================
 
 /**
+ * Origines tierces que le NAVIGATEUR contacte directement (voir client/src).
+ *
+ * Une origine absente de la CSP n'est pas jointe : le fetch est refusé avant
+ * toute requête réseau et l'utilisateur voit une « Erreur réseau » générique
+ * alors que sa connexion est saine. Toute nouvelle dépendance navigateur
+ * (fetch, iframe) doit donc être déclarée ici ; security.test.ts le vérifie.
+ */
+/** Recherche de ville Open-Meteo (FavoritesBar, ReliabilityLocationPicker). */
+export const GEOCODING_API_ORIGIN = "https://geocoding-api.open-meteo.com";
+/** Carte météo Windy intégrée en iframe (WindyMap). */
+export const WINDY_EMBED_ORIGIN = "https://embed.windy.com";
+
+const MANUS_ORIGINS = "https://*.manus.space https://*.manus.computer";
+
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${MANUS_ORIGINS}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "font-src 'self'",
+  `connect-src 'self' ${GEOCODING_API_ORIGIN} ${MANUS_ORIGINS}`,
+  `frame-src 'self' ${WINDY_EMBED_ORIGIN}`,
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "base-uri 'self'",
+].join("; ");
+
+/**
+ * La géolocalisation reste réservée à l'application (« Utiliser ma position
+ * actuelle », barre de favoris) et à l'embed Windy, qui la demande via
+ * allow="geolocation". Micro et caméra restent désactivés.
+ */
+export const PERMISSIONS_POLICY = `geolocation=(self "${WINDY_EMBED_ORIGIN}"), microphone=(), camera=()`;
+
+/**
  * Security headers middleware
  * Adds common security headers to all responses
  */
 export function securityHeaders(req: Request, res: Response, next: NextFunction) {
   // Content Security Policy
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.manus.space https://*.manus.computer; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: https:; " +
-    "font-src 'self'; " +
-    "connect-src 'self' https://geocoding-api.open-meteo.com " +
-    "https://*.manus.space https://*.manus.computer; " +
-    "frame-ancestors 'none'; " +
-    "form-action 'self'; " +
-    "base-uri 'self'"
-  );
+  res.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
   
   // Other security headers
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  res.setHeader("Permissions-Policy", PERMISSIONS_POLICY);
   
   // Remove server information
   res.removeHeader("X-Powered-By");

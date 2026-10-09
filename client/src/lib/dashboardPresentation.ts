@@ -1,12 +1,19 @@
 export type CurrentStateFieldLike = {
   value: number | string | null;
   provenance: {
-    kind: "physical_stations" | "open_meteo_snapshot" | "unavailable";
+    kind:
+      | "physical_stations"
+      | "open_meteo_snapshot"
+      | "official_hourly_forecast"
+      | "unavailable";
     label: string;
     stationCount: number;
     stationSources: string[];
+    /** Pour une prévision horaire, c’est l’échéance (validTime) affichée. */
     observedAt: string | null;
     ageMinutes: number | null;
+    /** Prévision horaire officielle : instant de calcul du run affiché. */
+    computedAt?: string | null;
     reason: string | null;
     measurements: Array<{
       stationName: string;
@@ -131,6 +138,11 @@ export function formatCurrentStateProvenance(
   }
   if (provenance.kind === "open_meteo_snapshot") {
     return `Open-Meteo · ${timeLabel ?? "heure inconnue"} · ${ageLabel}`;
+  }
+  if (provenance.kind === "official_hourly_forecast") {
+    const source = provenance.stationSources.join(" + ") || "Source non documentée";
+    const computedLabel = parisTimeLabel(parsedTimestamp(provenance.computedAt));
+    return `Prévu · ${source} · ${timeLabel ?? "échéance inconnue"}${computedLabel ? ` · calcul ${computedLabel}` : ""}`;
   }
   return "Indisponible";
 }
