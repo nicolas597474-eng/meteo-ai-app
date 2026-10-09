@@ -108,43 +108,79 @@ function WindRose({ direction }: { direction: number | null }) {
 
   return (
     <div className="flex flex-col items-center gap-0.5" role="img" aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.`}>
-      <div className="relative isolate grid size-[4.5rem] place-items-center rounded-full border border-cyan-100/35 bg-gradient-to-br from-sky-200/25 via-slate-800 to-slate-950 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_8px_14px_rgba(0,0,0,0.55)] ring-1 ring-black/40 before:absolute before:inset-1 before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.14),transparent_44%)] before:content-[''] sm:size-20">
+      <div
+        className="relative isolate grid size-[4.5rem] place-items-center rounded-full border border-[#31355e] bg-[radial-gradient(circle_at_32%_26%,#2c3157_0%,#12132a_55%,#07070f_100%)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.22),inset_0_-3px_6px_rgba(0,0,0,0.65),0_10px_18px_rgba(0,0,0,0.65),0_0_18px_rgba(0,245,255,0.22)] ring-1 ring-black/50 before:absolute before:inset-[3px] before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(140,200,255,0.1),transparent_46%)] before:content-[''] sm:size-20"
+        style={{ transform: "perspective(320px) rotateX(10deg)" }}
+      >
         <svg viewBox="0 0 100 100" className="absolute inset-0 z-10 size-full" aria-hidden="true">
           <defs>
-            <radialGradient id="wind-compass-face" cx="35%" cy="25%" r="80%">
-              <stop offset="0%" stopColor="#1c4564" />
-              <stop offset="58%" stopColor="#10263c" />
-              <stop offset="100%" stopColor="#07111e" />
+            <radialGradient id="wind-compass-dial" cx="38%" cy="28%" r="82%">
+              <stop offset="0%" stopColor="#182452" />
+              <stop offset="42%" stopColor="#0A0E2A" />
+              <stop offset="100%" stopColor="#05081c" />
             </radialGradient>
-            <linearGradient id="wind-compass-needle" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#b8f3ff" />
-              <stop offset="48%" stopColor="#38bdf8" />
-              <stop offset="100%" stopColor="#2563eb" />
+            <linearGradient id="wind-compass-bezel" x1="0.15" y1="0" x2="0.85" y2="1">
+              <stop offset="0%" stopColor="#4c527e" />
+              <stop offset="30%" stopColor="#262a4c" />
+              <stop offset="55%" stopColor="#12131f" />
+              <stop offset="80%" stopColor="#1c2038" />
+              <stop offset="100%" stopColor="#3a3f68" />
             </linearGradient>
+            <linearGradient id="wind-compass-needle" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#e6feff" />
+              <stop offset="42%" stopColor="#00F5FF" />
+              <stop offset="100%" stopColor="#0077a8" />
+            </linearGradient>
+            <linearGradient id="wind-compass-needle-tail" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#4a5474" />
+              <stop offset="55%" stopColor="#232a42" />
+              <stop offset="100%" stopColor="#0d1020" />
+            </linearGradient>
+            <radialGradient id="wind-compass-hub" cx="34%" cy="30%" r="80%">
+              <stop offset="0%" stopColor="#f4f8ff" />
+              <stop offset="32%" stopColor="#aeb9d4" />
+              <stop offset="68%" stopColor="#3d4460" />
+              <stop offset="100%" stopColor="#171b2e" />
+            </radialGradient>
+            <filter id="wind-compass-neon" x="-70%" y="-70%" width="240%" height="240%">
+              <feGaussianBlur stdDeviation="1.9" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
-          <circle cx="50" cy="50" r="43" fill="url(#wind-compass-face)" stroke="rgba(186,230,253,0.55)" strokeWidth="1.3" />
-          <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(148,210,236,0.24)" strokeWidth="0.8" />
-          {Array.from({ length: 16 }, (_, index) => {
-            const angle = (index * 22.5 - 90) * Math.PI / 180;
-            const innerRadius = index % 4 === 0 ? 33 : 37;
-            return <line key={index} x1={50 + innerRadius * Math.cos(angle)} y1={50 + innerRadius * Math.sin(angle)} x2={50 + 41 * Math.cos(angle)} y2={50 + 41 * Math.sin(angle)} stroke={index % 4 === 0 ? "rgba(186,230,253,0.7)" : "rgba(148,210,236,0.32)"} strokeWidth={index % 4 === 0 ? 1.5 : 0.8} />;
+          <circle cx="50" cy="50" r="46.4" fill="none" stroke="url(#wind-compass-bezel)" strokeWidth="4.4" />
+          <circle cx="50" cy="50" r="48.4" fill="none" stroke="rgba(0,245,255,0.5)" strokeWidth="0.55" filter="url(#wind-compass-neon)" />
+          <path d="M17.2 17.2 A46.4 46.4 0 0 1 50 3.6" fill="none" stroke="rgba(170,220,255,0.5)" strokeWidth="1.1" strokeLinecap="round" />
+          <path d="M82.8 82.8 A46.4 46.4 0 0 1 50 96.4" fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth="1.1" strokeLinecap="round" />
+          <circle cx="50" cy="50" r="43" fill="url(#wind-compass-dial)" stroke="rgba(0,245,255,0.32)" strokeWidth="0.9" />
+          <circle cx="50" cy="50" r="39.5" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="0.5" />
+          {Array.from({ length: 32 }, (_, index) => {
+            const angle = (index * 11.25 - 90) * Math.PI / 180;
+            const isMajor = index % 4 === 0;
+            const innerRadius = isMajor ? 33 : 36;
+            return <line key={index} x1={50 + innerRadius * Math.cos(angle)} y1={50 + innerRadius * Math.sin(angle)} x2={50 + 41.2 * Math.cos(angle)} y2={50 + 41.2 * Math.sin(angle)} stroke={isMajor ? "rgba(0,245,255,0.92)" : "rgba(150,225,245,0.38)"} strokeWidth={isMajor ? 1.4 : 0.55} filter={isMajor ? "url(#wind-compass-neon)" : undefined} />;
           })}
           {hasDirection ? <g transform={`rotate(${direction}, 50, 50)`}>
-            <path d="M50 23 L56 52 L50 46 L44 52 Z" fill="url(#wind-compass-needle)" stroke="rgba(224,242,254,0.8)" strokeWidth="0.8" />
-            <path d="M50 77 L56 48 L50 54 L44 48 Z" fill="#a8c1d3" opacity="0.62" />
+            <path d="M50 17.5 L54.6 49 L50 44.6 L45.4 49 Z" fill="url(#wind-compass-needle)" stroke="rgba(235,255,255,0.9)" strokeWidth="0.6" filter="url(#wind-compass-neon)" />
+            <path d="M50 82.5 L54.6 51 L50 55.4 L45.4 51 Z" fill="url(#wind-compass-needle-tail)" stroke="rgba(130,140,170,0.55)" strokeWidth="0.5" />
           </g> : null}
-          <circle cx="50" cy="50" r="3.2" fill="#d9f8ff" stroke="#164e72" strokeWidth="1.2" />
+          <circle cx="50" cy="50" r="5.6" fill="url(#wind-compass-hub)" stroke="rgba(255,255,255,0.28)" strokeWidth="0.7" />
+          <circle cx="50" cy="50" r="1.9" fill="#00F5FF" filter="url(#wind-compass-neon)" />
+          <circle cx="48.1" cy="47.9" r="0.9" fill="rgba(255,255,255,0.9)" />
         </svg>
         {cardinalDirections.map((label, index) => (
-          <span key={label} aria-hidden="true" className={`absolute z-20 text-[8px] font-black leading-none text-cyan-100 drop-shadow ${cardinalLabelPositions[index]}`}>
+          <span key={label} aria-hidden="true" className={`absolute z-20 text-[8px] font-black leading-none text-white drop-shadow-[0_0_4px_rgba(0,245,255,0.95)] ${cardinalLabelPositions[index]}`}>
             {label}
           </span>
         ))}
       </div>
-      <p className="min-h-4 text-center text-[10px] font-bold leading-tight text-sky-200">{directionDescription}</p>
+      <p className="min-h-4 text-center text-[10px] font-bold leading-tight text-cyan-100">{directionDescription}</p>
     </div>
   );
 }
+
 
 function currentStateFieldTitle(field?: CurrentStateFieldLike | null, snapshotAt?: string | null): string {
   const provenance = field?.provenance;
