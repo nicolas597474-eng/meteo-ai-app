@@ -1868,13 +1868,21 @@ export async function getLatestHourlyComparisonDiagnosticSnapshot(locationKey: s
   }
 }
 
-/** Idempotently records one model result for a scheduled batch attempt. */
+/** Limite physique de la colonne `errorCode` du journal horaire (varchar(32)). */
+export const HOURLY_COLLECTION_ERROR_CODE_MAX_LENGTH = 32;
+
+/**
+ * Idempotently records one model result for a scheduled batch attempt.
+ * `errorCode` est tronqué à la limite de la colonne : un code trop long ne doit
+ * jamais faire échouer l'écriture du journal de collecte (ER_DATA_TOO_LONG).
+ */
 export async function upsertHourlyForecastCollectionResults(rows: InsertHourlyForecastCollectionResult[]): Promise<void> {
   if (rows.length === 0) return;
   const db = await getDb();
   if (!db) throw new Error("Database unavailable while recording hourly collection evidence.");
   for (const row of rows) {
-    await db.insert(hourlyForecastCollectionResults).values(row).onDuplicateKeyUpdate({
+    const errorCode = row.errorCode ? row.errorCode.slice(0, HOURLY_COLLECTION_ERROR_CODE_MAX_LENGTH) : null;
+    await db.insert(hourlyForecastCollectionResults).values({ ...row, errorCode }).onDuplicateKeyUpdate({
       set: {
         status: row.status,
         requestAttempts: row.requestAttempts,
@@ -1884,7 +1892,7 @@ export async function upsertHourlyForecastCollectionResults(rows: InsertHourlyFo
         archiveRowsWritten: row.archiveRowsWritten,
         projectionRowsWritten: row.projectionRowsWritten,
         variableCoverage: row.variableCoverage ?? null,
-        errorCode: row.errorCode,
+        errorCode,
         completedAt: row.completedAt,
       },
     });
