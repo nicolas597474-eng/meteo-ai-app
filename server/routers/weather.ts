@@ -66,7 +66,8 @@ import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
 import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights, filterForecastTraceToModelNames } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
-import { buildDatedDailyFusionFallback, resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
+import { buildDatedDailyFusionFallback, resolveOfficialDailyForecastSnapshot, resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
+import { projectHourlyForecastForDashboard } from "../forecastResponseProjection";
 import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
 import { buildAILabForecastComparisonReadModel, formatAILabLocationLabel } from "../aiLabForecastComparison";
 import { getCollectedModelNames, getMissingModelNames } from "../stationCollectionModels";
@@ -241,7 +242,7 @@ export const weatherRouter = router({
     const [meteoAI, observation, officialSnapshot] = await Promise.all([
       getMeteoAIForecastByDate(today, locKey),
       getObservationByDate(today, locKey),
-      resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM),
+      resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, { includeDaily: false }),
     ]);
     const hourly = officialSnapshot.hourly;
 
@@ -648,6 +649,15 @@ export const weatherRouter = router({
       return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, days: snapshot.daily, modelsUsed: snapshot.modelsUsed, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
 
+  /** Daily horizon loaded after the Dashboard's critical current-weather response. */
+  getDashboardDailyForecast: publicProcedure
+    .input(optionalCoordinatesSchema.optional())
+    .query(async ({ input }) => {
+      const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : HONDEGHEM;
+      const daily = await resolveOfficialDailyForecastSnapshot(coords);
+      return { days: daily.daily, modelsUsed: daily.modelsUsed };
+    }),
+
   /**
    * Hourly forecast for today
    */
@@ -655,7 +665,7 @@ export const weatherRouter = router({
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
-      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, { includeDaily: false });
       return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting } };
     }),
 
@@ -692,7 +702,7 @@ export const weatherRouter = router({
     .query(async ({ input }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const locationKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
-      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
+      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, { includeDaily: false });
       const currentFusion = snapshot.hourly.length === 0
         ? await getMeteoAIForecastByDate(snapshot.weatherDate, locationKey)
         : null;
@@ -992,6 +1002,7 @@ export const weatherRouter = router({
       const { snapshot, periodHours, metadata: [meteoAI, observation, recentForecasts], hourlyFallback } = await loadDetailedForecastSources({
         loadSnapshot: () => resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, {
           hourlyForecastDays: includeExtendedPeriods ? 16 : 2,
+          includeDaily: includeExtendedPeriods,
         }),
         includeExtendedPeriods,
         loadExtendedPeriods: () => collectHourlyForecast(today, coords, 16),
@@ -1008,7 +1019,12 @@ export const weatherRouter = router({
         }),
       });
       const officialHours = snapshot.hourly;
-      const hours = hourlyFallback.hours;
+      // Historical weighting traces remain available in Prévisions. They are
+      // not rendered in Dashboard, where omitting them removes several MB from
+      // the mobile response without changing forecasts or model agreement.
+      const hours = includeExtendedPeriods
+        ? hourlyFallback.hours
+        : projectHourlyForecastForDashboard(hourlyFallback.hours);
       const days = snapshot.daily;
       const modelsUsed = snapshot.modelsUsed;
       const dailyFallbackSource = meteoAI ?? recentForecasts[0];
@@ -1029,9 +1045,11 @@ export const weatherRouter = router({
         currentSnapshot: snapshot.currentSnapshot,
         officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting },
         hours,
-        hourlyFallbackDiagnostics: hourlyFallback.diagnostics,
-        periodHours,
-        periodHoursSource: includeExtendedPeriods ? "open_meteo_best_match_reference" as const : "official_seven_models" as const,
+        ...(includeExtendedPeriods ? {
+          hourlyFallbackDiagnostics: hourlyFallback.diagnostics,
+          periodHours,
+          periodHoursSource: "open_meteo_best_match_reference" as const,
+        } : {}),
         days,
         modelsUsed,
         dailyFallback,

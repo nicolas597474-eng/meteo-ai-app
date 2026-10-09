@@ -495,6 +495,16 @@ export default function Dashboard() {
   // Réponse officielle consolidée : le hook partagé alimente Dashboard et Détails avec le même lieu et la même politique de rafraîchissement.
   const { query: officialForecastQuery } = useOfficialForecast(selectedLocation);
   const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast } = officialForecastQuery;
+  const { data: dashboardDailyForecast, isLoading: dashboardDailyLoading } = trpc.weather.getDashboardDailyForecast.useQuery(
+    coordsInput,
+    {
+      // The daily horizon is visually below the current conditions. Waiting for
+      // the critical hourly forecast prevents competing cold-start requests.
+      enabled: !!officialForecast,
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
   const { data: currentDashboardWeather } = trpc.favorites.getCurrentDashboardWeather.useQuery(
     coordsInput,
     { staleTime: 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 },
@@ -688,7 +698,7 @@ export default function Dashboard() {
   const meteoAI = dash?.meteoAI;
   const officialRegime = officialForecast?.regime ?? (dash as any)?.officialRegime ?? null;
   const officialPrimaryRegime = officialRegime?.primary as any;
-  const days: any[] = officialForecast?.days ?? (lw ? lw.forecast15d : []);
+  const days: any[] = dashboardDailyForecast?.days ?? officialForecast?.days ?? (lw ? lw.forecast15d : []);
   const today = days[0] ?? null;
   const officialHours = officialForecast?.hours ?? [];
   const hours = officialHours;
@@ -1400,7 +1410,7 @@ export default function Dashboard() {
 
         {/* ── 15-day chart enriched ── */}
         <div className="overflow-visible rounded-[22px]">
-          {officialLoading ? (
+          {officialLoading || dashboardDailyLoading ? (
             <div className="h-72 bg-muted rounded-xl animate-pulse" />
           ) : days.length > 0 ? (
             <Suspense fallback={<div className="h-72 bg-muted rounded-xl animate-pulse" />}>

@@ -54,7 +54,7 @@ describe("chargement des sources des prévisions détaillées", () => {
     });
   });
 
-  it("réutilise les heures officielles lorsque les périodes étendues sont désactivées", async () => {
+  it("n’ajoute pas un second tableau d’heures lorsque les périodes étendues sont désactivées", async () => {
     const officialHours = [{ validAt: 1, temp: 12 }];
     let extendedCalled = false;
 
@@ -67,7 +67,7 @@ describe("chargement des sources des prévisions détaillées", () => {
     });
 
     expect(extendedCalled).toBe(false);
-    expect(result.periodHours).toBe(officialHours);
+    expect(result).not.toHaveProperty("periodHours");
     expect(result.hourlyFallback).toEqual({ hours: officialHours });
   });
 

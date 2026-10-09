@@ -84,7 +84,7 @@ function uvLabel(uv: number | null): { text: string; color: string } {
 
 // ─── Weather Icon (MeteoAI pack) ─────────────────────────────────────────────────────────
 function WeatherIconSVG({ condition, size = 22 }: { condition: string; size?: number }) {
-  return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} />;
+  return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} presentation="compact" />;
 }
 
 function ForecastScaleLabels({

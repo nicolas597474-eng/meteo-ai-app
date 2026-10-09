@@ -22,6 +22,8 @@ describe("prévision horaire officielle partagée", () => {
       includeExtendedPeriods: true,
     });
     expect(dashboardSource).toContain("useOfficialForecast(selectedLocation)");
+    expect(dashboardSource).toContain("trpc.weather.getDashboardDailyForecast.useQuery");
+    expect(dashboardSource).toContain("enabled: !!officialForecast");
     expect(dashboardSource).not.toContain("periodHours");
     expect(dashboardSource).not.toContain("includeExtendedPeriods: true");
     expect(detailsSource).toContain("useOfficialForecast(activeLocation, { includeExtendedPeriods: true })");

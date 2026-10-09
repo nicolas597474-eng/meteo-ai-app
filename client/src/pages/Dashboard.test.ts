@@ -280,4 +280,11 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("<DeferredEnvironmentalPanels data={environmentalData} isLoading={environmentalFetching} />");
     expect(source).not.toContain('import { EnvironmentalPanels } from "@/components/EnvironmentalPanels"');
   });
+
+  it("garde les graphiques en rendu différé via leurs imports dynamiques", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('lazy(() => import("@/components/HourlyChart"))');
+    expect(source).toContain('lazy(() => import("@/components/FifteenDayChart"))');
+  });
 });

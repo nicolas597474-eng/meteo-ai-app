@@ -250,7 +250,7 @@ export const favoritesRouter = router({
     .query(async ({ ctx, input }) => {
       const localRadiusKm = Math.max(...getUltraLocalConfig("local").config.radiusBands.map((band) => band.maxKm));
       const [officialSnapshot, stations] = await Promise.all([
-        resolveOfficialWeatherSnapshot({ lat: input.lat, lon: input.lon }),
+        resolveOfficialWeatherSnapshot({ lat: input.lat, lon: input.lon }, { includeDaily: false }),
         collectNearbyStations(
           input.lat,
           input.lon,

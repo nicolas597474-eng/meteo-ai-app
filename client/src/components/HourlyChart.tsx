@@ -65,7 +65,7 @@ function degToCompass(deg: number | null): string {
 
 // ─── Weather Icon (MeteoAI pack) ─────────────────────────────────────────────
 function WeatherIconSVG({ condition, size = 20 }: { condition: string; size?: number }) {
-  return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} />;
+  return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} presentation="compact" />;
 }
 
 function visibilityLabel(value: number | null | undefined): string {

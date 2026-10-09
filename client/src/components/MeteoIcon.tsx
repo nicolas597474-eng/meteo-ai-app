@@ -11,6 +11,8 @@ interface MeteoIconProps {
   size?: number;
   className?: string;
   ariaLabel?: string;
+  /** Compact inline SVG avoids downloading large raster artwork in dense charts. */
+  presentation?: "full" | "compact";
 }
 
 const PICTORIAL_WEATHER_ICONS: Record<string, string> = {
@@ -98,14 +100,14 @@ function hasExplicitSizeClass(className: string) {
   return /(^|\s)(?:h|w)-[\w/.-]+/.test(className);
 }
 
-export function MeteoIcon({ name, size = 40, className = "", ariaLabel = `Icône météo : ${name}` }: MeteoIconProps) {
+export function MeteoIcon({ name, size = 40, className = "", ariaLabel = `Icône météo : ${name}`, presentation = "full" }: MeteoIconProps) {
   const uniqueId = useId().replace(/:/g, "");
   const pictorialIcon = PICTORIAL_WEATHER_ICONS[name.toLowerCase()];
   const animationClass = getPictorialAnimationClass(name);
   const inlineAnimationClass = getInlineAnimationClass(name);
   const shellSizeStyle = hasExplicitSizeClass(className) ? undefined : { width: size, height: size };
   const effectKind = getWeatherEffectKind(name);
-  if (pictorialIcon) {
+  if (pictorialIcon && presentation === "full") {
     return (
       <span
         className={`meteo-icon-shell meteo-icon-3d ${className}`}
@@ -202,7 +204,7 @@ export function MeteoIcon({ name, size = 40, className = "", ariaLabel = `Icône
       <g filter={`url(#${depthFilterId})`}><FuturisticGlyph name={name} ids={{ cloud: cloudGradientId, sun: sunGradientId, rain: rainGradientId, cyan: cyanGradientId, violet: violetGradientId }} /></g>
       {showGlass ? <path d="M21 11c6-3 16-3.5 23-.7" stroke="#f8fafc" strokeOpacity="0.24" strokeWidth="1.25" strokeLinecap="round" /> : null}
     </svg>
-    <WeatherEffects name={name} />
+    {presentation === "full" ? <WeatherEffects name={name} /> : null}
     </span>
   );
 }

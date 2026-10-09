@@ -70,11 +70,23 @@ export function buildDatedDailyFusionFallback(
   };
 }
 
-type CacheEntry = { expiresAt: number; value: Promise<OfficialWeatherSnapshot> };
+type CacheEntry = {
+  expiresAt: number;
+  value: Promise<OfficialWeatherSnapshot>;
+  /** A stale entry is returned immediately while this one refreshes in background. */
+  refreshing?: Promise<OfficialWeatherSnapshot>;
+};
+export type OfficialDailyForecastSnapshot = {
+  daily: DayForecast[];
+  modelsUsed: string[];
+};
+type DailyCacheEntry = { expiresAt: number; value: Promise<OfficialDailyForecastSnapshot> };
 type ManualHourlyForecast = { expiresAt: number; hours: HourlyPoint[]; computedAt: string; weighting?: OfficialHourlyWeightingSummary; reason: string };
 const snapshotCache = new Map<string, CacheEntry>();
+const dailySnapshotCache = new Map<string, DailyCacheEntry>();
 const manualHourlyForecastCache = new Map<string, ManualHourlyForecast>();
 const SNAPSHOT_TTL_MS = 2 * 60_000;
+const DAILY_SNAPSHOT_TTL_MS = 5 * 60_000;
 const EMPTY_HOURLY_SNAPSHOT_TTL_MS = 12_000;
 const HOURLY_NUMERIC_COVERAGE_FIELDS = [
   "temp", "apparentTemp", "precipitation", "windSpeed", "windGust", "windDirection",
@@ -207,14 +219,56 @@ function preciseCacheLocationKey(coords: { lat: number; lon: number }) {
 export function getOfficialWeatherSnapshotCacheKey(
   coords: { lat: number; lon: number },
   weatherDate: string,
-  hourBucket: number,
+  _hourBucket: number,
   hourlyForecastDays = 2,
 ): string {
-  return `${preciseCacheLocationKey(coords)}:${weatherDate}:${hourBucket}:${hourlyForecastDays}`;
+  // Current/future-window filtering happens on every read. Tying the cache to
+  // the current hour forced an unnecessary cold multi-model collection at each
+  // hour boundary, even when an otherwise valid snapshot was already present.
+  return `${preciseCacheLocationKey(coords)}:${weatherDate}:${hourlyForecastDays}`;
 }
 
 function manualForecastCacheKey(cacheLocationKey: string, weatherDate: string) {
   return `${cacheLocationKey}:${weatherDate}`;
+}
+
+async function collectOfficialDailyForecastSnapshot(coords: { lat: number; lon: number }): Promise<OfficialDailyForecastSnapshot> {
+  const issuedAt = Date.now();
+  const locationKey = makeLocationKey(coords.lat, coords.lon);
+  const dailyResult = await collect15DayForecast(coords, {
+    issuedAt,
+    resolveOfficialFusion: async (targetDate, forecasts, referenceAt, availabilityReasonByModel) => {
+      const fusionEvidence = await getDailyFusionPerformanceEvidence(
+        locationKey,
+        targetDate,
+        forecasts.flatMap((forecast) => forecast.availableAt == null ? [] : [forecast.availableAt]),
+      );
+      return computeOfficialDailyForecastWithDiagnostics(forecasts, {
+        locationKey,
+        targetDate,
+        issuedAt: referenceAt,
+        referenceAt,
+        evidenceStoreAvailable: fusionEvidence.available,
+        evidence: fusionEvidence.evidence,
+        availabilityReasonByModel,
+      });
+    },
+  });
+  return { daily: dailyResult.days, modelsUsed: dailyResult.modelsUsed };
+}
+
+/** The daily horizon is independent from the current-hour response and caches separately. */
+export function resolveOfficialDailyForecastSnapshot(coords: { lat: number; lon: number }): Promise<OfficialDailyForecastSnapshot> {
+  const cacheKey = `${preciseCacheLocationKey(coords)}:${getParisDate()}`;
+  const cached = dailySnapshotCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const value = collectOfficialDailyForecastSnapshot(coords);
+  dailySnapshotCache.set(cacheKey, { expiresAt: Date.now() + DAILY_SNAPSHOT_TTL_MS, value });
+  void value.catch(() => {
+    if (dailySnapshotCache.get(cacheKey)?.value === value) dailySnapshotCache.delete(cacheKey);
+  });
+  return value;
 }
 
 function applyManualHourlyForecast(snapshot: OfficialWeatherSnapshot, coords: { lat: number; lon: number }): OfficialWeatherSnapshot {
@@ -267,42 +321,23 @@ export function cacheManualHourlyForecast(
  */
 export function resolveOfficialWeatherSnapshot(
   coords: { lat: number; lon: number },
-  options: { hourlyForecastDays?: number } = {},
+  options: { hourlyForecastDays?: number; includeDaily?: boolean } = {},
 ): Promise<OfficialWeatherSnapshot> {
   const weatherDate = getParisDate();
   const requestedDays = Number.isFinite(options.hourlyForecastDays) ? Math.floor(options.hourlyForecastDays!) : 2;
   const hourlyForecastDays = Math.min(16, Math.max(2, requestedDays));
-  const cacheKey = getOfficialWeatherSnapshotCacheKey(coords, weatherDate, Math.floor(Date.now() / (60 * 60_000)), hourlyForecastDays);
+  const includeDaily = options.includeDaily !== false;
+  const cacheKey = `${getOfficialWeatherSnapshotCacheKey(coords, weatherDate, Math.floor(Date.now() / (60 * 60_000)), hourlyForecastDays)}:${includeDaily ? "full" : "hourly"}`;
   const cached = snapshotCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
   }
 
-  const value = (async () => {
-    const dailyIssuedAt = Date.now();
-    const dailyLocationKey = makeLocationKey(coords.lat, coords.lon);
-    const [hourlyResult, currentSnapshot, dailyResult] = await Promise.all([
+  const createSnapshot = () => (async () => {
+    const [hourlyResult, currentSnapshot, dailySnapshot] = await Promise.all([
       collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays }),
       collectCurrentWeatherSnapshot(coords),
-      collect15DayForecast(coords, {
-        issuedAt: dailyIssuedAt,
-        resolveOfficialFusion: async (targetDate, forecasts, referenceAt, availabilityReasonByModel) => {
-          const fusionEvidence = await getDailyFusionPerformanceEvidence(
-            dailyLocationKey,
-            targetDate,
-            forecasts.flatMap((forecast) => forecast.availableAt == null ? [] : [forecast.availableAt]),
-          );
-          return computeOfficialDailyForecastWithDiagnostics(forecasts, {
-            locationKey: dailyLocationKey,
-            targetDate,
-            issuedAt: referenceAt,
-            referenceAt,
-            evidenceStoreAvailable: fusionEvidence.available,
-            evidence: fusionEvidence.evidence,
-            availabilityReasonByModel,
-          });
-        },
-      }),
+      includeDaily ? resolveOfficialDailyForecastSnapshot(coords) : Promise.resolve({ daily: [], modelsUsed: [] }),
     ]);
     return applyManualHourlyForecast(buildOfficialWeatherSnapshot({
       lat: coords.lat,
@@ -312,12 +347,35 @@ export function resolveOfficialWeatherSnapshot(
       hourly: hourlyResult.hours,
       currentSnapshot,
       hourlyWeighting: hourlyResult.weighting,
-      daily: dailyResult.days,
-      modelsUsed: dailyResult.modelsUsed,
+      daily: dailySnapshot.daily,
+      modelsUsed: dailySnapshot.modelsUsed,
       parisHour: String(getParisHour()).padStart(2, "0"),
     }), coords);
   })().then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
-  snapshotCache.set(cacheKey, { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value });
+
+  // Keep the last qualified result visible rather than making visitors wait on
+  // a new seven-model request. The refresh never alters a response already
+  // sent, and a failed refresh retains the proven previous snapshot.
+  if (cached) {
+    if (!cached.refreshing) {
+      const refresh = createSnapshot();
+      cached.refreshing = refresh;
+      void refresh.then((snapshot) => {
+        if (snapshotCache.get(cacheKey) !== cached) return;
+        snapshotCache.set(cacheKey, {
+          expiresAt: Date.now() + getOfficialSnapshotTtlMs(snapshot.hourly),
+          value: Promise.resolve(snapshot),
+        });
+      }).catch(() => {
+        if (snapshotCache.get(cacheKey) === cached) cached.refreshing = undefined;
+      });
+    }
+    return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
+  }
+
+  const value = createSnapshot();
+  const entry: CacheEntry = { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value };
+  snapshotCache.set(cacheKey, entry);
   void value.then((snapshot) => {
     const current = snapshotCache.get(cacheKey);
     if (current?.value === value) {

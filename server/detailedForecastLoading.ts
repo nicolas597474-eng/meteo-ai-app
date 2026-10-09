@@ -24,7 +24,7 @@ export async function loadDetailedForecastSources<
   const snapshotPromise = options.loadSnapshot();
   const periodHoursPromise = options.includeExtendedPeriods
     ? options.loadExtendedPeriods()
-    : snapshotPromise.then((snapshot) => snapshot.hourly);
+    : null;
   const metadataPromise = options.loadMetadata();
   const hourlyFallbackPromise = snapshotPromise.then((snapshot) => options.loadHourlyFallback(snapshot.hourly));
 
@@ -35,5 +35,12 @@ export async function loadDetailedForecastSources<
     hourlyFallbackPromise,
   ]);
 
-  return { snapshot, periodHours, metadata, hourlyFallback };
+  // The short Dashboard response already exposes `hours`. Returning the same
+  // array a second time under `periodHours` previously doubled its payload.
+  return {
+    snapshot,
+    metadata,
+    hourlyFallback,
+    ...(periodHours ? { periodHours } : {}),
+  };
 }
