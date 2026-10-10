@@ -83,8 +83,11 @@ function uvLabel(uv: number | null): { text: string; color: string } {
 }
 
 // ─── Weather Icon (MeteoAI pack) ─────────────────────────────────────────────────────────
+// Presentation « full » : les graphiques du Dashboard utilisent les mêmes
+// icônes météo 3D illustrées que l'en-tête et la page Prévisions (PNG du pack
+// MeteoAI, partagés et mis en cache par le navigateur).
 function WeatherIconSVG({ condition, size = 22 }: { condition: string; size?: number }) {
-  return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} presentation="compact" />;
+  return <MeteoIcon name={getIconNameFromCondition(condition)} size={size} />;
 }
 
 function ForecastScaleLabels({
