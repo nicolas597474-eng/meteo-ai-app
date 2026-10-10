@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { FavoriteWeatherPreloader } from "./components/FavoriteWeatherPreloader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, MAIN_PAGE_PATHS, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
+import { useDetailedForecastPrefetch } from "./hooks/useDetailedForecastPrefetch";
 import Dashboard from "./pages/Dashboard";
 import {
   LayoutDashboard,
@@ -59,6 +60,7 @@ function shouldIgnorePageSwipe(target: EventTarget | null) {
 
 function useMainPagePreload() {
   const isFetching = useIsFetching();
+  const prefetchDetailedForecast = useDetailedForecastPrefetch();
 
   useEffect(() => {
     if (isFetching > 0) return;
@@ -68,6 +70,11 @@ function useMainPagePreload() {
     let idleTimeoutId: number | null = null;
     const preload = () => {
       if (cancelled) return;
+      // Le chunk seul ne suffit pas : sans données en cache, la page Prévisions
+      // remonte son squelette « Chargement des prévisions ». La même requête
+      // tRPC (même clé) est donc préchauffée ici, une fois la charge initiale
+      // terminée, pour que la navigation vers /details serve le cache.
+      prefetchDetailedForecast();
       void Promise.all([
         loadReliabilityLaboratory(),
         loadRanking(),
@@ -93,7 +100,7 @@ function useMainPagePreload() {
       if (idleCallbackId !== null) window.cancelIdleCallback(idleCallbackId);
       if (idleTimeoutId !== null) window.clearTimeout(idleTimeoutId);
     };
-  }, [isFetching]);
+  }, [isFetching, prefetchDetailedForecast]);
 }
 
 function PageSwipeNavigator({ children }: { children: ReactNode }) {
@@ -144,7 +151,7 @@ function PageSwipeNavigator({ children }: { children: ReactNode }) {
 
     const deltaX = event.clientX - gesture.x;
     const deltaY = event.clientY - gesture.y;
-    const elapsed = event.timeStamp - gesture.time;
+    const elapsed = event.timeStamp - gesture.timeStamp;
     if (!isQualifiedPageSwipe(deltaX, deltaY, elapsed)) return;
 
     const target = getSwipeNavigationTarget(location, deltaX);
@@ -167,6 +174,11 @@ function PageSwipeNavigator({ children }: { children: ReactNode }) {
 
 function TopNav() {
   const [location] = useLocation();
+  const prefetchDetailedForecast = useDetailedForecastPrefetch();
+  const activateNavItem = (path: string) => {
+    preloadMainPage(path);
+    if (path === "/details") prefetchDetailedForecast();
+  };
   return (
     <nav className="sticky top-0 z-50 hidden border-b border-border bg-background sm:block">
       <div className="max-w-2xl mx-auto px-3 sm:px-6">
@@ -190,9 +202,9 @@ function TopNav() {
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
-                  onPointerEnter={() => preloadMainPage(item.path)}
-                  onFocus={() => preloadMainPage(item.path)}
-                  onPointerDown={() => preloadMainPage(item.path)}
+                  onPointerEnter={() => activateNavItem(item.path)}
+                  onFocus={() => activateNavItem(item.path)}
+                  onPointerDown={() => activateNavItem(item.path)}
                 >
                   <item.icon className="h-4 w-4" />
                   <span>{item.label}</span>
@@ -208,6 +220,11 @@ function TopNav() {
 
 function BottomNav() {
   const [location] = useLocation();
+  const prefetchDetailedForecast = useDetailedForecastPrefetch();
+  const activateNavItem = (path: string) => {
+    preloadMainPage(path);
+    if (path === "/details") prefetchDetailedForecast();
+  };
   return (
     <nav aria-label="Navigation principale" className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background text-foreground sm:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="flex h-16 items-center justify-around px-2">
@@ -220,9 +237,9 @@ function BottomNav() {
               className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors min-w-0 flex-1 ${
                 isActive ? "text-primary" : "text-muted-foreground"
               }`}
-              onPointerEnter={() => preloadMainPage(item.path)}
-              onFocus={() => preloadMainPage(item.path)}
-              onPointerDown={() => preloadMainPage(item.path)}
+              onPointerEnter={() => activateNavItem(item.path)}
+              onFocus={() => activateNavItem(item.path)}
+              onPointerDown={() => activateNavItem(item.path)}
             >
               <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
               <span className={`text-xs font-medium truncate ${isActive ? "text-primary" : ""}`}>
