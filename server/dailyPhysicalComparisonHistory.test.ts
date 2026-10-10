@@ -37,9 +37,9 @@ function row(overrides: Partial<DailyForecastObservationComparison> = {}): Daily
     observationWindowStartAt: Date.parse("2026-10-02T07:00:00.000Z"),
     observationWindowEndAt: Date.parse("2026-10-02T07:00:00.000Z"),
     stationEvidence: [{
-      stationId: "metar-LFAC",
+      stationId: "mf-59000",
       stationName: "Station physique",
-      source: "metar",
+      source: "meteofrance",
       snapshotHour: 9,
       observedAt: Date.parse("2026-10-02T07:00:00.000Z"),
       value: 18,
@@ -64,7 +64,7 @@ describe("historique des comparaisons physiques quotidiennes", () => {
       row({ id: 10, forecastAvailableAt: null, observationWindowStartAt: null, observationWindowEndAt: null, stationEvidence: null }),
       row({ id: 11, forecastAvailableAt: Date.parse("2026-10-02T08:00:00.000Z") }),
       row({ id: 12, stationEvidence: [{ stationId: "openmeteo-grid", source: "openmeteo", observedAt: Date.parse("2026-10-02T07:00:00.000Z") }] }),
-      row({ id: 13, stationEvidence: [{ stationId: "metar-LFAC", source: "metar", observedAt: Date.parse("2026-10-01T20:00:00.000Z") }] }),
+      row({ id: 13, stationEvidence: [{ stationId: "mf-59000", source: "meteofrance", observedAt: Date.parse("2026-10-01T20:00:00.000Z") }] }),
     ];
 
     const result = buildDailyPhysicalComparisonHistoryPage(rows, {
@@ -118,7 +118,7 @@ describe("historique des comparaisons physiques quotidiennes", () => {
         forecastAvailableAt: Date.parse("2026-09-30T08:00:00.000Z"),
         observationWindowStartAt: Date.parse("2026-10-01T07:00:00.000Z"),
         observationWindowEndAt: Date.parse("2026-10-01T07:00:00.000Z"),
-        stationEvidence: [{ stationId: "metar-LFAC", stationName: "Station physique", source: "metar", snapshotHour: 9, observedAt: Date.parse("2026-10-01T07:00:00.000Z"), value: 18, weight: 1 }],
+        stationEvidence: [{ stationId: "mf-59000", stationName: "Station physique", source: "meteofrance", snapshotHour: 9, observedAt: Date.parse("2026-10-01T07:00:00.000Z"), value: 18, weight: 1 }],
       }),
     ];
     const result = buildDailyPhysicalComparisonHistoryPage(rows, { locationKey, pageSize: 2 });

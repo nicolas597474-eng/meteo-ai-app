@@ -33,9 +33,9 @@ function physicalSnapshots(overrides: {
       windGust,
       precipitation,
       stationsUsed: [{
-        stationId: overrides.stationId ?? "metar-LFAC",
+        stationId: overrides.stationId ?? "mf-59000",
         name: "Station physique de test",
-        source: overrides.source ?? "metar",
+        source: overrides.source ?? "meteofrance",
         observedAt: measurementTime,
         measurementTimes: {
           temperature: measurementTime,

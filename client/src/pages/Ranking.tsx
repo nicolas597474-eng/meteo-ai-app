@@ -56,7 +56,6 @@ const PERFORMANCE_VARIABLE_LABELS: Record<string, string> = {
 
 const PERFORMANCE_SOURCE_NAMES: Record<string, string> = {
   meteofrance: "Météo-France",
-  metar: "METAR",
   netatmo: "Netatmo",
 };
 
@@ -409,7 +408,6 @@ export default function Ranking() {
 
 const SOURCE_LABELS: Record<string, string> = {
   meteofrance: "Météo-France",
-  metar: "METAR officiel",
   synop: "SYNOP/WMO",
   noaa: "NOAA",
   openmeteo: "Open-Meteo",

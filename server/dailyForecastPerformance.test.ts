@@ -53,9 +53,9 @@ function snapshots(): PhysicalSnapshot[] {
       windGust,
       precipitation,
       stationsUsed: [{
-        stationId: "metar-LFAC",
-        name: "Station METAR test",
-        source: "metar",
+        stationId: "mf-59000",
+        name: "Station physique test",
+        source: "meteofrance",
         observedAt: timestamp,
         measurementTimes: { temperature: timestamp, windSpeed: timestamp, windGust: timestamp, precipitation: timestamp },
         temperature,

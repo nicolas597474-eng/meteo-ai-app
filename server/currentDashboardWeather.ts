@@ -61,7 +61,6 @@ const MAX_LOCAL_DISTANCE_KM = Math.max(...LOCAL_CONFIG.radiusBands.map((band) =>
 const MIN_LOCAL_SOURCE_RELIABILITY = LOCAL_CONFIG.minReliability;
 const SOURCE_LABELS: Record<StationSource, string> = {
   meteofrance: "Météo-France",
-  metar: "METAR",
   netatmo: "Netatmo",
   wunderground: "Weather Underground",
   cwop: "CWOP",

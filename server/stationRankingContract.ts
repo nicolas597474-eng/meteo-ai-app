@@ -8,7 +8,6 @@ import {
 
 const PHYSICAL_SOURCE_NAMES: Record<StationSource, string> = {
   meteofrance: "Météo-France StatIC",
-  metar: "METAR / observations aéroportuaires",
   netatmo: "Netatmo",
   synop: "Référence ECMWF de grille (non station)",
   noaa: "NOAA / référence non station",

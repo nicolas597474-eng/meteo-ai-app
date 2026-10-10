@@ -8,7 +8,6 @@ import {
   getStationSourceKind,
   mapSynopRecord,
   revalidateStationFreshness,
-  mapMetarObservation,
   type StationData,
 } from "./stationService";
 
@@ -80,48 +79,12 @@ describe("haversineKm", () => {
 describe("getStationSourceKind", () => {
   it("distingue les observations physiques des références de modèle", () => {
     expect(getStationSourceKind("meteofrance")).toBe("physical");
-    expect(getStationSourceKind("metar")).toBe("physical");
     expect(getStationSourceKind("openmeteo")).toBe("reference");
     expect(getStationSourceKind("netatmo")).toBe("physical");
     expect(getStationSourceKind("synop")).toBe("reference");
     expect(getStationSourceKind("cwop")).toBe("reference");
     expect(getStationSourceKind("wunderground")).toBe("reference");
     expect(getStationSourceKind("opensensemap")).toBe("reference");
-  });
-});
-
-describe("mapMetarObservation", () => {
-  it("convertit une observation aéroportuaire officielle en station physique et convertit le vent en km/h", () => {
-    const station = mapMetarObservation({
-      icaoId: "LFAC",
-      reportTime: "2026-08-12T06:30:00.000Z",
-      temp: 20,
-      dewp: 12,
-      wdir: 70,
-      wspd: 10,
-      wgst: 15,
-      altim: 1022,
-      lat: 50.962,
-      lon: 1.954,
-      elev: 12,
-      name: "Calais-Dunkerque Arpt, FR",
-    }, 50.95, 1.96, 30);
-
-    expect(station).toMatchObject({ source: "metar", stationId: "metar-LFAC", windSpeed: 18.5, windGust: 27.8, pressure: 1022, isActive: true });
-    expect(station?.measurementTimes?.windDirection).toBe("2026-08-12T06:30:00.000Z");
-    expect(station?.distanceKm).toBeLessThan(30);
-  });
-
-  it("écarte une observation officielle au-delà du rayon choisi", () => {
-    expect(mapMetarObservation({ icaoId: "LFAC", lat: 50.962, lon: 1.954 }, 50.7567, 2.5204, 10)).toBeNull();
-  });
-
-  it("ne remplace pas un reportTime absent par l’heure de collecte", () => {
-    const station = mapMetarObservation({ icaoId: "LFAC", temp: 20, lat: 50.962, lon: 1.954 }, 50.95, 1.96, 30);
-    expect(station?.updatedAt).toBeNull();
-    expect(station?.measurementTimes?.temperature).toBeNull();
-    expect(station?.measurementTimes?.windSpeed).toBeNull();
-    expect(station?.measurementTimes?.windDirection).toBeNull();
   });
 });
 
@@ -192,7 +155,7 @@ describe("getCandidateStations", () => {
   it("conserve les capteurs citoyens candidats sans les transformer en station physique", () => {
     const candidates = getCandidateStations([
       makeStation({ stationId: "opensensemap-box-1", source: "opensensemap", isActive: false, qualificationStatus: "candidate", sourceTier: 3 }),
-      makeStation({ stationId: "metar-LFAC", source: "metar", qualificationStatus: "validated", sourceTier: 1 }),
+      makeStation({ stationId: "mf-59000", source: "meteofrance", qualificationStatus: "validated", sourceTier: 1 }),
     ]);
 
     expect(candidates).toHaveLength(1);

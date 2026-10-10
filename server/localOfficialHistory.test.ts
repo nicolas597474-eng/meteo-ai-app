@@ -4,7 +4,7 @@ import { buildLocalOfficialDeltaHistory } from "./localOfficialHistory";
 describe("buildLocalOfficialDeltaHistory", () => {
   it("compare les observations physiques à la température déjà calculée par le moteur horaire officiel", () => {
     const points = buildLocalOfficialDeltaHistory([
-      { stationId: "metar-LFAC", observedAt: Date.parse("2026-08-12T06:31:00.000Z"), temperature: 17, distanceKm: 4, reliabilityScore: 90 },
+      { stationId: "mf-59000", observedAt: Date.parse("2026-08-12T06:31:00.000Z"), temperature: 17, distanceKm: 4, reliabilityScore: 92 },
       { stationId: "mf-123", observedAt: Date.parse("2026-08-12T06:45:00.000Z"), temperature: 16, distanceKm: 8, reliabilityScore: 92 },
     ], [
       { validAt: Date.parse("2026-08-12T06:00:00.000Z"), temperature: 14.4 },
