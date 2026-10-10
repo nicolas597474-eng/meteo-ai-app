@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ShieldCheck } from "lucide-react";
+import { ChevronDown, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { ReliabilityTrendChart } from "@/components/weather/ReliabilityTrendChart";
 import { YesterdayVerificationPanel } from "@/components/weather/YesterdayVerificationPanel";
@@ -110,9 +111,10 @@ export default function ReliabilityLaboratory() {
     [activeLocation?.lat, activeLocation?.lon]
   );
 
-  const { data, isLoading, isError } =
+  const { data, isLoading, isError, isFetching } =
     trpc.weather.getReliabilityLaboratory.useQuery(input, {
       staleTime: 2 * 60 * 1000,
+      placeholderData: keepPreviousData,
     });
   const {
     data: overviewData,
@@ -120,6 +122,7 @@ export default function ReliabilityLaboratory() {
     isError: overviewError,
   } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput, {
     staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
   const {
     data: yesterdayData,
@@ -127,6 +130,7 @@ export default function ReliabilityLaboratory() {
     isError: yesterdayError,
   } = trpc.weather.getYesterdayForecastObservation.useQuery(yesterdayInput, {
     staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
   const verificationPairs = useMemo(
     () => (yesterdayData?.pairs ?? []) as VerificationPair[],
@@ -186,6 +190,24 @@ export default function ReliabilityLaboratory() {
               <span className="hidden shrink-0 rounded-full border border-slate-700/70 bg-slate-950/30 px-2.5 py-1 text-[9px] text-slate-500 sm:inline-flex">
                 {locationName} · Europe/Paris
               </span>
+              {data && isFetching ? (
+                <span
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-[9px] font-medium text-sky-200"
+                  role="status"
+                >
+                  <LoaderCircle className="h-3 w-3 animate-spin" aria-hidden="true" />
+                  Actualisation…
+                </span>
+              ) : null}
+              {data && !isFetching && isError ? (
+                <span
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-[9px] font-medium text-amber-100"
+                  role="status"
+                >
+                  <TriangleAlert className="h-3 w-3" aria-hidden="true" />
+                  Actualisation échouée · dernières preuves affichées
+                </span>
+              ) : null}
             </div>
             <div>
               <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
