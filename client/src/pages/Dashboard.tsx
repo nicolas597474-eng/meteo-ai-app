@@ -310,19 +310,18 @@ function WindRose({ direction }: { direction: number | null }) {
                 />
               );
             })}
+            {/* Rose des vents à huit branches */}
+            {starPoints.map(({ index, path }) => (
+              <path
+                key={`compass-star-${index}`}
+                d={path}
+                fill={index % 2 === 0 ? "url(#wind-compass-star-blue)" : "url(#wind-compass-star-steel)"}
+                stroke="rgba(150,220,255,0.5)"
+                strokeWidth="0.45"
+                opacity="0.85"
+              />
+            ))}
           </g>
-
-          {/* Rose des vents à huit branches */}
-          {starPoints.map(({ index, path }) => (
-            <path
-              key={`compass-star-${index}`}
-              d={path}
-              fill={index % 2 === 0 ? "url(#wind-compass-star-blue)" : "url(#wind-compass-star-steel)"}
-              stroke="rgba(150,220,255,0.5)"
-              strokeWidth="0.45"
-              opacity="0.85"
-            />
-          ))}
 
           {/* Aiguille de direction du vent : pointe triangulaire fine bleu lumineux, presque jusqu'au bord */}
           {hasDirection ? (
@@ -348,28 +347,31 @@ function WindRose({ direction }: { direction: number | null }) {
           ) : null}
 
           {/* Libellés cardinaux et intercardinaux blancs, agrandis et lumineux (vue de face) */}
-          {labelPositions.map(({ label, x, y, size }) => {
-            const isCardinal = label.length === 1;
-            return (
-              <text
-                key={label}
-                x={x}
-                y={y}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={size}
-                fontWeight="900"
-                fill="#ffffff"
-                stroke="rgba(1,8,18,0.9)"
-                strokeWidth={isCardinal ? 1 : 0.7}
-                paintOrder="stroke"
-                filter={isCardinal ? "url(#wind-compass-neon)" : "url(#wind-compass-neon-soft)"}
-                style={{ userSelect: "none", pointerEvents: "none" }}
-              >
-                {label}
-              </text>
-            );
-          })}
+<g transform={`rotate(${-compassHeading}, 80, 80)`}>
+            {labelPositions.map(({ label, x, y, size }) => {
+              const isCardinal = label.length === 1;
+              return (
+                <text
+                  key={label}
+                  x={x}
+                  y={y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={size}
+                  fontWeight="900"
+                  fill="#ffffff"
+                  stroke="rgba(1,8,18,0.9)"
+                  strokeWidth={isCardinal ? 1 : 0.7}
+                  paintOrder="stroke"
+                  filter={isCardinal ? "url(#wind-compass-neon)" : "url(#wind-compass-neon-soft)"}
+                  style={{ userSelect: "none", pointerEvents: "none" }}
+                >
+                  {label}
+                </text>
+              );
+            })}
+          </g>
+
 
           {/* Moyeu métallique avec point bleu lumineux */}
           <circle cx="80" cy="80" r="11" fill="url(#wind-compass-hub)" stroke="#c6d4e0" strokeWidth="0.7" />
