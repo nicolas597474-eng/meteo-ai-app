@@ -1080,9 +1080,15 @@ export type CollectedHourlyForecastModels = {
 };
 
 const HOURLY_ARCHIVE_VARIABLES = HOURLY_FORECAST_VARIABLES.map((definition) => definition.valueField);
-const HOURLY_PROJECTION_VARIABLES = HOURLY_FORECAST_VARIABLES
+const HOURLY_PROJECTION_VARIABLES: readonly string[] = HOURLY_FORECAST_VARIABLES
   .filter((definition) => definition.consumerProjected)
   .map((definition) => definition.valueField);
+// Champs d'archive secondaires (non consommés par la projection) : archivés tels
+// quels, null admis (UV/rayonnement la nuit, averses/neige sans phénomène,
+// visibilité selon le produit). Ils ne doivent plus bloquer la complétude du lot.
+export const HOURLY_OPTIONAL_ARCHIVE_VARIABLES = HOURLY_ARCHIVE_VARIABLES.filter(
+  (field) => !HOURLY_PROJECTION_VARIABLES.includes(field),
+);
 
 function finiteHourlyValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -1273,10 +1279,14 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
           expectedValidTimes,
           requiredValueFields: HOURLY_PROJECTION_VARIABLES,
         });
+        // La complétude du lot exige les créneaux attendus complets et les champs
+        // projetés finis. Les champs secondaires (HOURLY_OPTIONAL_ARCHIVE_VARIABLES)
+        // restent archivés en l'état (null compris) mais un null physiquement
+        // attendu ne déclasse plus le lot en « partial ».
         const archiveBatchComplete = isCompleteHourlyForecastBatch({
           rows: diagnosticHours,
           expectedValidTimes,
-          requiredValueFields: HOURLY_ARCHIVE_VARIABLES,
+          requiredValueFields: HOURLY_PROJECTION_VARIABLES,
         });
         if (valuesReceived === 0) {
           return { forecast, diagnostic: {

@@ -334,6 +334,7 @@ function ForecastModelGuideDialog({
     write_failed: "Écriture non confirmée",
     collection_failed: "Collecte interrompue avant le résultat par modèle",
     partial_archive_projection_published: "Champs d’archive secondaires incomplets; projection complète actualisée",
+    partial_projection_published: "Champs d’archive secondaires incomplets; projection complète actualisée",
     partial_projection_retained: "Un créneau ou champ consommé par la projection manque; la série publiée précédente est conservée",
   };
   const attemptedAt = collectionAttempt ? new Date(collectionAttempt.attemptedAt) : null;
