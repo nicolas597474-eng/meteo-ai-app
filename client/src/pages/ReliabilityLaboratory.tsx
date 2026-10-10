@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ShieldCheck } from "lucide-react";
 import { BackToTopButton } from "@/components/BackToTopButton";
-import { ReliabilityLocationPicker } from "@/components/weather/ReliabilityLocationPicker";
 import { ReliabilityTrendChart } from "@/components/weather/ReliabilityTrendChart";
 import { YesterdayVerificationPanel } from "@/components/weather/YesterdayVerificationPanel";
 import {
@@ -162,7 +161,6 @@ export default function ReliabilityLaboratory() {
               </p>
             </div>
           </div>
-          <ReliabilityLocationPicker locationName={locationName} />
         </header>
 
         <MeteoSurface
