@@ -230,7 +230,7 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
     expect(diagnostic).toMatchObject({ status: "partial", valuesReceived: 498, expectedValueCount: 500, projectionReady: false });
   });
 
-  it("distingue les champs d’archive secondaires manquants d’une projection complète", async () => {
+  it("ne bloque plus la complétude du lot sur les champs d’archive secondaires nuls d’une projection complète", async () => {
     const partialArchive = completeResponse();
     for (const key of ["rain", "showers", "snowfall", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "uv_index", "dew_point_2m", "visibility", "shortwave_radiation"]) {
       partialArchive.hourly[key as keyof typeof partialArchive.hourly] = unixTimes.map(() => null) as never;
@@ -240,7 +240,10 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
     const result = await collectHourlyForecastAllModelsWithDiagnostics("2026-10-25", { lat: 50.7567, lon: 2.5204 }, { includeBestMatch: false });
 
     expect(result.forecasts).toHaveLength(7);
-    expect(result.diagnostics.every((item) => item.status === "partial" && item.projectionReady && item.valuesReceived === 250 && item.expectedValueCount === 500)).toBe(true);
+    expect(result.diagnostics.every((item) => item.status === "succeeded" && item.projectionReady && item.valuesReceived === 250 && item.expectedValueCount === 500)).toBe(true);
+    // Les nulls secondaires restent tracés dans les diagnostics par variable.
+    const uv = result.diagnostics[0].variableDiagnostics?.find((variable) => variable.key === "uv_index")!;
+    expect(uv.slots.every((slot) => slot.status === "provider_null")).toBe(true);
     expect(mockedFetchWeather).toHaveBeenCalledTimes(7);
   });
 
