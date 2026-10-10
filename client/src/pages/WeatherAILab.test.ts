@@ -145,8 +145,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("variableCoverage");
     expect(source).toContain('import { BackToTopButton } from "@/components/BackToTopButton"');
     expect(source).toContain("<BackToTopButton />");
-    expect(source).toContain('className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4"');
-    expect(source).toContain('className="order-[-2] flex items-center justify-between gap-2"');
+    expect(source).toContain('className="order-[-2] grid grid-cols-2 gap-2 sm:grid-cols-4"');
+    expect(source).toContain('className="order-[-4] flex items-center justify-between gap-2"');
     expect(source).toContain("getLocalNowcastingReports");
     expect(source).toContain('enabled: user?.role === "admin"');
     expect(source).toContain("LocalTemperatureNowcastingPanel");
@@ -173,14 +173,30 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain("Paramètres de la fusion");
     // Le bloc reste en haut de la page : avant la grille de statistiques.
     expect(source).toContain(
-      'className="order-[-1] rounded-2xl border border-violet-400/20 bg-violet-400/[0.045] p-4" aria-labelledby="lab-parameters-title"',
+      'className="order-[-2] rounded-2xl border border-violet-400/20 bg-violet-400/[0.045] p-4" aria-labelledby="lab-parameters-title"',
     );
     const parametersIndex = source.indexOf('aria-labelledby="lab-parameters-title"');
     const statisticsIndex = source.indexOf(
-      'className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4"',
+      'className="order-[-2] grid grid-cols-2 gap-2 sm:grid-cols-4"',
     );
     expect(parametersIndex).toBeGreaterThan(-1);
     expect(parametersIndex).toBeLessThan(statisticsIndex);
+  });
+
+  it("propose un bloc Paramètres Application tout en haut avec effets 3D et boussole / capteurs", () => {
+    const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
+    expect(source).toContain('aria-labelledby="app-settings-title"');
+    expect(source).toContain("Paramètres Application");
+    expect(source).toContain("Effets 3D de l’application");
+    expect(source).toContain("Mouvement et orientation");
+    expect(source).toContain("storeDashboardWeatherEffectsMode");
+    expect(source).toContain("getDashboardWeatherEffectsModeLabel");
+    expect(source).toContain("useDeviceOrientation");
+    expect(source).toContain("Autoriser l’orientation");
+    expect(source).toContain("Brave, Safari, Chrome");
+
+    // Vérifie que le bloc est tout en haut de la page (ordre -3, avant la fusion et les statistiques)
+    expect(source).toContain('className="order-[-3] rounded-2xl border border-sky-400/25');
   });
 
   it("sépare la disponibilité réelle de la calibration et des scores historiques", () => {
