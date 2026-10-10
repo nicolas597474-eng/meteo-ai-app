@@ -114,8 +114,8 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("currentProvenanceLabel(windDirectionField)");
     expect(source).toContain("WindRose direction={windDir} />");
     expect(source).toContain("nord en haut. ${directionDescription}");
-    expect(source).toContain('size-[4.5rem]');
-    expect(source).toContain('sm:size-20');
+    expect(source).toContain('size-[5.5rem]');
+    expect(source).toContain('sm:size-[6.5rem]');
     expect(source).toContain("labelPositions.map(({ label, x, y, size })");
     expect(source).toContain('"N", "NE", "E", "SE", "S", "SO", "O", "NO"');
     expect(source).toContain("const directionDescription =");
