@@ -49,3 +49,26 @@ export function conditionFromWmoWeatherCode(
   if (weatherCode <= 94) return "Orages";
   return "Orage violent";
 }
+
+/**
+ * Condition harmonisée entre l'instantané courant et les créneaux horaires :
+ * pour les codes WMO de ciel clair (0 à 3), la nébulosité réelle du point prime
+ * sur la classification du fournisseur afin que deux sources décrivant le même
+ * ciel produisent la même étiquette (mêmes seuils que le moteur de régimes).
+ * Les brouillards et précipitations conservent leur traduction WMO, et le code
+ * WMO reste le repli lorsque la nébulosité est absente.
+ */
+export function conditionFromWmoWeatherCodePreferingCloudCover(
+  weatherCode: number | null | undefined,
+  precipitation: number | null | undefined,
+  cloudCover: number | null | undefined,
+): string {
+  const cloudValue = finiteValue(cloudCover);
+  if (
+    cloudValue != null &&
+    (weatherCode === null || weatherCode === undefined || !Number.isFinite(weatherCode) || weatherCode <= 3)
+  ) {
+    return conditionFromWeatherValues(precipitation, cloudValue);
+  }
+  return conditionFromWmoWeatherCode(weatherCode, precipitation, cloudCover);
+}
