@@ -314,4 +314,12 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).not.toContain("windSpeed.toFixed(1)");
     expect(source).not.toContain("currentWindGust.toFixed(1)");
   });
+
+  it("ancre la température du point actuel du graphique horaire sur la mesure des stations physiques", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+    expect(source).toContain("getCurrentStationTemperature(temperatureField");
+    expect(source).toContain("const chartHours = withCurrentStationTemperature(hours, currentHourIndex, stationTemperature)");
+    expect(source).toContain("hours={chartHours}");
+    expect(source).toContain("activeHourMeasurementLabel={stationTemperature?.provenanceLabel ?? null}");
+  });
 });

@@ -11,11 +11,20 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("usePageWeatherSky({ includeExtendedPeriods: true })");
     expect(pageSource).toContain("dailyDays={data.days ?? []}");
     expect(pageSource).toContain("dailySources={data.modelsUsed ?? []}");
-    expect(pageSource).toContain("hours={hours}");
+    expect(pageSource).toContain("hours={displayHours}");
     expect(pageSource).not.toContain("periodHours");
     expect(pageSource).not.toContain("includeExtendedPeriods: false");
     expect(displayDaysSource).toContain("kind: \"official-daily-fusion\"");
     expect(displayDaysSource).toContain("kind: \"official-hourly\"");
+  });
+  it("ancre la température de l'échéance active sur la mesure des stations physiques Netatmo", () => {
+    expect(pageSource).toContain("useCurrentStationTemperature(coordinates)");
+    expect(pageSource).toContain("withCurrentStationTemperature(hours, currentHourIdx, stationTemperature)");
+    expect(pageSource).toContain("activeHourMeasurementLabel={stationTemperature?.provenanceLabel ?? null}");
+    expect(timelineSource).toContain("activeHourMeasurementLabel");
+    expect(timelineSource).toContain("Mesure stations physiques");
+    expect(timelineSource).toContain(">Mesuré</span>");
+    expect(timelineSource).toContain("température mesurée par les stations physiques");
   });
   it("limite les dates aux données réelles et protège la séparation officielle/référence", () => {
     expect(displayDaysSource).toContain("Math.min(15, Math.floor(maximumDays))");

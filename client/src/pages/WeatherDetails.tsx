@@ -18,6 +18,8 @@ import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour } from "@/lib/officialForecast";
 import { useOfficialForecast } from "@/hooks/useOfficialForecast";
+import { useCurrentStationTemperature } from "@/hooks/useCurrentStationTemperature";
+import { withCurrentStationTemperature } from "@/lib/currentStationTemperature";
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -26,6 +28,7 @@ export default function WeatherDetails() {
   const { user } = useAuth();
   const { style: pageSkyStyle } = usePageWeatherSky({ includeExtendedPeriods: true });
   const { query: detailedForecastQuery, coordinates } = useOfficialForecast(activeLocation, { includeExtendedPeriods: true });
+  const stationTemperature = useCurrentStationTemperature(coordinates);
   const { data, isLoading, isFetching, isError, error, refetch } = detailedForecastQuery;
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordinates, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
   const [slowLoad, setSlowLoad] = useState(false);
@@ -103,13 +106,15 @@ export default function WeatherDetails() {
   const hours = data.hours ?? [];
   const currentHourIdx = activeOfficialHour?.index ?? -1;
   const currentHour = activeOfficialHour?.hour ?? null;
+  const displayHours = withCurrentStationTemperature(hours, currentHourIdx, stationTemperature);
 
   return (
     <div className="weather-page-sky forecast-details-page min-h-dvh w-full overflow-x-clip bg-[#061426]" style={pageSkyStyle}>
       <div className="mx-auto w-full min-w-0 max-w-none space-y-3 px-4 pt-[max(env(safe-area-inset-top),0.25rem)] pb-24 sm:max-w-2xl sm:space-y-5 sm:px-3 sm:py-4 sm:pb-28">
         <ForecastByDaySection
           locationName={activeLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name}
-          hours={hours}
+          hours={displayHours}
+          activeHourMeasurementLabel={stationTemperature?.provenanceLabel ?? null}
           dailyDays={data.days ?? []}
           dailySources={data.modelsUsed ?? []}
           activeHourIndex={currentHourIdx}

@@ -150,4 +150,9 @@ describe("HourlyChart", () => {
     expect(source).not.toContain("Tendance de pression");
     expect(source).not.toContain("Écart temp. / rosée");
   });
+
+  it("signale quand le point actuel du graphique est une mesure des stations physiques", () => {
+    expect(source).toContain("activeHourMeasurementLabel");
+    expect(source).toContain("Point actuel : mesure des stations physiques Netatmo");
+  });
 });

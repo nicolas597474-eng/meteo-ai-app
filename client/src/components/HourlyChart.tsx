@@ -41,6 +41,8 @@ interface Props {
   hours: HourData[];
   locationName?: string;
   activeHourIndex?: number;
+  /** Provenance de la mesure des stations physiques quand le point actuel est une observation. */
+  activeHourMeasurementLabel?: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -283,7 +285,7 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export default function HourlyChart({ hours, locationName, activeHourIndex }: Props) {
+export default function HourlyChart({ hours, locationName, activeHourIndex, activeHourMeasurementLabel }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -608,6 +610,12 @@ export default function HourlyChart({ hours, locationName, activeHourIndex }: Pr
           <span className="flex items-center gap-1.5 text-slate-300"><span className="w-2 h-4 rounded-full bg-orange-400 inline-block" /> Temp °C</span>
           <span className="flex items-center gap-1.5 text-green-400"><span className="w-4 h-0 border-t-2 border-dashed border-green-400 inline-block" /> Vent km/h</span>
           <span className="flex items-center gap-1.5 text-blue-400"><span className="w-3 h-3.5 bg-blue-500/80 inline-block rounded-sm" /> Pluie mm</span>
+          {activeHourMeasurementLabel && (
+            <span className="flex items-center gap-1.5 text-amber-200/90" title={activeHourMeasurementLabel}>
+              <Thermometer className="h-3 w-3" />
+              Point actuel : mesure des stations physiques Netatmo
+            </span>
+          )}
         </div>
       </div>
 
