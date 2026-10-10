@@ -352,6 +352,27 @@ function looksLikeWindDirectionCoverageId(id: string): boolean {
 }
 
 /**
+ * Sanitized technical cause for the generic failure paths: it names the real network or parsing error
+ * without ever echoing credentials (the OAuth2 identifier only travels in request headers).
+ */
+function describeAromeShadowError(error: unknown): string {
+  if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+    return "d’lai de 20 s dépassé (timeout)";
+  }
+  const parts: string[] = [];
+  if (error instanceof Error) {
+    if (error.message) parts.push(error.message);
+    const cause = (error as Error & { cause?: unknown }).cause;
+    if (cause instanceof Error && cause.message && !error.message.includes(cause.message)) parts.push(cause.message);
+    if (!parts.length) parts.push(error.name);
+  } else if (error != null) {
+    parts.push(String(error));
+  }
+  const text = (parts.join(" — ") || "erreur inconnue").replace(/\s+/g, " ").trim().slice(0, 200);
+  return `erreur réseau ou parsing : ${text}`;
+}
+
+/**
  * Explicit admin-only metadata check. It discovers candidate identifiers from the live catalogue
  * when the admin clicks; it never assumes a WCS identifier and never downloads forecast values.
  */
@@ -366,6 +387,7 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
   }
 
   const fetchImpl = options.fetchImpl ?? fetch;
+  let step = "l’échange OAuth2 Météo-France";
   try {
     const tokenResponse = await fetchImpl(METEOFRANCE_TOKEN_URL, {
       method: "POST",
@@ -387,6 +409,7 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
     if (!accessToken) return base("request-impossible", "Échange OAuth2 réussi mais aucun jeton d’accès n’a été retourné.");
 
     const headers = { Authorization: `Bearer ${accessToken}`, accept: "application/xml" };
+    step = "la lecture du catalogue WCS AROME";
     const capabilitiesUrl = new URL(`${AROME_WCS_BASE}/GetCapabilities`);
     capabilitiesUrl.searchParams.set("service", "WCS");
     capabilitiesUrl.searchParams.set("version", "2.0.1");
@@ -407,6 +430,7 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
       return base("not-advertised", `Aucun identifiant du run ${selection.run} ne mentionne explicitement direction/DD dans le catalogue. Cela ne prouve pas l’absence du champ sous un autre nom; aucun identifiant n’est supposé.`, selection.run);
     }
 
+    step = "les métadonnées WCS DescribeCoverage";
     const candidates: AromeWindDirectionCoverageCandidate[] = [];
     for (const coverageId of candidateIds) {
       const issues: string[] = [];
@@ -450,9 +474,9 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
       selection.run,
       candidates,
     );
-  } catch {
-    return base("request-impossible", "Vérification du catalogue WCS impossible; aucune donnée de prévision n’a été téléchargée.");
-  }
+  } catch (error) {
+    console.error(`[arome-shadow] vérification de la direction du vent échouée pendant ${step}`, error);
+    return base("request-impossible", `Vérification du catalogue WCS impossible pendant ${step} (${describeAromeShadowError(error)}); aucune donnée de prévision n’a été téléchargée.`);
 }
 
 /**
@@ -470,6 +494,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
   const decodePoint = options.decodePoint ?? getPointFromGeoTiffBytes;
   const result = baseResult("request-impossible", "La comparaison n’a pas pu être exécutée.", comparedAt);
   let headers: Record<string, string> = {};
+  let step = "l’échange OAuth2 Météo-France";
   const getText = async (url: string): Promise<{ ok: boolean; status: number; text: string }> => {
     const response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(20_000) });
     return { ok: response.ok, status: response.status, text: response.ok ? await response.text() : "" };
@@ -495,6 +520,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     const accessToken = typeof tokenPayload?.access_token === "string" ? tokenPayload.access_token.trim() : "";
     if (!accessToken) return { ...result, message: "Échange OAuth2 Météo-France réussi mais aucun jeton d’accès n’a été retourné." };
     headers = { Authorization: `Bearer ${accessToken}`, accept: "application/xml, application/octet-stream" };
+    step = "la lecture du catalogue WCS AROME";
 
     const capabilitiesUrl = new URL(`${AROME_WCS_BASE}/GetCapabilities`);
     capabilitiesUrl.searchParams.set("service", "WCS");
@@ -516,6 +542,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     const geotiffFormat = advertisedGeoTiffFormat(capabilities.text);
     if (!geotiffFormat) return { ...result, message: "Le catalogue WCS n’annonce aucun format GeoTIFF reconnu; aucun fichier raster n’a été demandé." };
 
+    step = "la série Open-Meteo Single Runs du même run";
     const openMeteoResponse = await fetchImpl(buildSingleRunsUrl(run), { signal: AbortSignal.timeout(20_000), headers: { accept: "application/json" } });
     if (!openMeteoResponse.ok) {
       return { ...result, message: `Open-Meteo Single Runs n’a pas fourni le run AROME ${toSingleRunTime(run)} (HTTP ${openMeteoResponse.status}); aucun autre run n’a été substitué.` };
@@ -523,6 +550,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     const openMeteoSeries = parseOpenMeteoSeries(await openMeteoResponse.json());
     if (!openMeteoSeries) return { ...result, message: "La réponse Open-Meteo Single Runs ne contient pas de série horaire exploitable." };
 
+    step = "les métadonnées WCS DescribeCoverage";
     const metadata: Partial<Record<AromeShadowMetric, CoverageMetadata>> = {};
     for (const metric of METRICS) {
       const choice = selection.choices[metric];
@@ -582,6 +610,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
       .slice(0, MAX_HOURS);
     if (!validTimes.length) return { ...result, message: "Aucune échéance valide n’est commune au run AROME WCS et au même run Open-Meteo; aucun autre run n’a été mélangé." };
 
+    step = "le téléchargement des GeoTIFF AROME";
     const spacingMs = 650;
     let lastCoverageStartedAt = 0;
     for (const validAt of validTimes) {
@@ -653,7 +682,10 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
       : "Comparaison partielle : seules les valeurs présentes dans les deux sources et conformes aux métadonnées sont comparées; les prévisions affichées restent inchangées.";
     return result;
   } catch (error) {
+    console.error(`[arome-shadow] comparaison shadow échouée pendant ${step}`, error);
     const status = error instanceof Error && /401|403/.test(error.message) ? "authentication-error" : "request-impossible";
-    return { ...result, status, message: status === "authentication-error" ? "Authentification AROME refusée; vérifiez l’identifiant OAuth2 et l’abonnement AROME." : "Requête fournisseur impossible ou métadonnées inattendues; aucune prévision de production n’a été modifiée." };
+    return { ...result, status, message: status === "authentication-error"
+      ? "Authentification AROME refusée; vérifiez l’identifiant OAuth2 et l’abonnement AROME."
+      : `Requête fournisseur impossible ou métadonnées inattendues pendant ${step} (${describeAromeShadowError(error)}); aucune prévision de production n’a été modifiée.` };
   }
 }

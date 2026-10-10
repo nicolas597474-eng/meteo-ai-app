@@ -273,4 +273,43 @@ describe("AROME Hondeghem shadow comparison", () => {
     const nodataTiff = vi.fn(async () => ({ getImage: async () => ({ ...image, readRasters: async () => [new Float32Array([-9999])] }) }) as any);
     expect(await getPointFromGeoTiffBytes(new ArrayBuffer(8), 50.7567, 2.5204, undefined, nodataTiff as any)).toBeNull();
   });
+
+  it("identifie l’étape et la cause technique quand une requête fournisseur lève une exception", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchImpl = vi.fn(async (): Promise<Response> => {
+      throw new Error("connection reset by peer");
+    });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(result.status).toBe("request-impossible");
+    expect(result.message).toContain("pendant l’échange OAuth2 Météo-France");
+    expect(result.message).toContain("connection reset by peer");
+    expect(result.message).toContain("aucune prévision de production n’a été modifiée");
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("signale explicitement un délai de 20 s dépassé plutôt qu’une cause générique", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchImpl = vi.fn(async (): Promise<Response> => {
+      throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(result.status).toBe("request-impossible");
+    expect(result.message).toContain("délai de 20 s dépassé");
+    errorSpy.mockRestore();
+  });
+
+  it("identifie aussi l’étape et la cause pour la vérification de la direction du vent", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(input.toString());
+      if (url.pathname === "/token") return response(JSON.stringify({ access_token: "synthetic-access-token" }));
+      throw new Error("catalogue WCS illisible");
+    });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch });
+    expect(result.status).toBe("request-impossible");
+    expect(result.message).toContain("pendant la lecture du catalogue WCS AROME");
+    expect(result.message).toContain("catalogue WCS illisible");
+    errorSpy.mockRestore();
+  });
 });
