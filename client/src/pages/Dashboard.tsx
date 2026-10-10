@@ -857,14 +857,12 @@ export default function Dashboard() {
   const precipitationField = withCurrentSnapshotFallback(currentFields?.precipitation, currentSnapshot?.precipitation, snapshotCapturedAt);
   const cloudCoverField = withCurrentSnapshotFallback(currentFields?.cloudCover, currentSnapshot?.cloudCover, snapshotCapturedAt);
   const humidityField = withCurrentSnapshotFallback(currentFields?.humidity, currentSnapshot?.humidity, snapshotCapturedAt);
-  const pressureField = currentFields?.pressure ?? null;
   const weatherCodeField = withCurrentSnapshotFallback(currentFields?.weatherCode, currentSnapshot?.weatherCode, snapshotCapturedAt);
   const currentWeatherCode = currentNumber(weatherCodeField);
   const windDir = dashboardWind.direction;
   const windSpeed = dashboardWind.speed;
   const currentWindGust = dashboardWind.gust;
   const currentPrecipitation = currentNumber(precipitationField);
-  const currentPressure = currentNumber(pressureField);
   const currentCloudCover = currentNumber(cloudCoverField);
   const currentHumidity = currentNumber(humidityField);
   const dashboardSkyImage = getDashboardWeatherImage({ condition: displayedCondition, regime: regime?.label, temperature: currentTemp ?? undefined, cloudCover: currentCloudCover ?? undefined, precipitation: currentPrecipitation ?? (isDailyFallback ? dailyFallback.precipitation : undefined) ?? undefined, windSpeed: windSpeed ?? undefined });
@@ -1205,18 +1203,11 @@ export default function Dashboard() {
                   <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
                 </div>
               </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/20 p-2" title={currentStateFieldTitle(pressureField)}>
-                <p className="flex items-center gap-1 text-[12px] font-medium text-slate-200 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression mesurée localement</p>
-                <p className="text-lg font-semibold text-white sm:text-xl">{currentPressure == null ? "—" : `${currentPressure.toFixed(0)} hPa`}</p>
-                <p className="w-full text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentPressure == null ? "Indisponible : références barométriques des stations non comparables." : formatCurrentStateProvenance(pressureField)}</p>
-                <div className="w-full border-t border-white/5 pt-2">
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                    <p className="flex items-center gap-1 text-[12px] font-medium text-sky-100 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression de surface estimée (modèle)</p>
-                    <p className="text-lg font-semibold text-white sm:text-xl">{typeof currentHour?.pressure === "number" && Number.isFinite(currentHour.pressure) ? `${formatDashboardNumber(currentHour.pressure, 0)} hPa` : "—"}</p>
-                  </div>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)} · {formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-500"><code className="font-mono">surface_pressure</code> en hPa · pression de surface du lieu, non ramenée au niveau de la mer; estimation de modèle, pas une mesure de station.</p>
-                </div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/20 p-2">
+                <p className="flex items-center gap-1 text-[12px] font-medium text-sky-100 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression de surface estimée (modèle)</p>
+                <p className="text-lg font-semibold text-white sm:text-xl">{typeof currentHour?.pressure === "number" && Number.isFinite(currentHour.pressure) ? `${formatDashboardNumber(currentHour.pressure, 0)} hPa` : "—"}</p>
+                <p className="mt-1 w-full text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)} · {formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
+                <p className="mt-1 w-full text-[9px] leading-tight text-slate-500"><code className="font-mono">surface_pressure</code> en hPa · pression de surface du lieu, non ramenée au niveau de la mer; estimation de modèle, pas une mesure de station.</p>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
