@@ -1,3 +1,4 @@
+import { usePageReady } from "@/contexts/PageReadinessContext";
 import * as React from "react";
 import type { CSSProperties } from "react";
 import {
@@ -294,8 +295,10 @@ export function DashboardWeatherAtmosphere({
   windGust = null,
   ...weather
 }: DashboardWeatherAtmosphereProps) {
+  const pageReady = usePageReady();
+  if (!pageReady || effectsMode === "off") return null;
   const { kind, intensity } = getDashboardWeatherAtmosphere(weather);
-  if (kind === "none" || effectsMode === "off") return null;
+  if (kind === "none") return null;
 
   const reduced = effectsMode === "reduced";
   const fogOpacity =

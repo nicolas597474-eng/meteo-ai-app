@@ -1,9 +1,20 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { usePageReady } from "@/contexts/PageReadinessContext";
+
+vi.mock("@/contexts/PageReadinessContext", () => ({ usePageReady: vi.fn() }));
+beforeEach(() => vi.mocked(usePageReady).mockReturnValue(true));
 import { DashboardWeatherAtmosphere } from "./DashboardWeatherAtmosphere";
 
 describe("DashboardWeatherAtmosphere", () => {
+  it("ne monte ni particules ni canvas pendant le chargement de la page", () => {
+    vi.mocked(usePageReady).mockReturnValue(false);
+    for (const condition of ["Pluie forte", "Neige", "Orage"]) {
+      expect(renderToStaticMarkup(createElement(DashboardWeatherAtmosphere, { condition }))).toBe("");
+    }
+  });
+
   it("rend la pluie en plusieurs plans avec des reflets sur la surface", () => {
     const markup = renderToStaticMarkup(
       createElement(DashboardWeatherAtmosphere, { condition: "Pluie forte" })

@@ -2281,3 +2281,15 @@
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
 }
+
+/* Paint data immediately while a route loads. Keep functional spinners alive,
+   but stop decorative icons, skeleton pulses and page entrance transitions. */
+[data-page-loading="true"] .animate-pulse,
+[data-page-loading="true"] [class*="meteo-icon-motion-"],
+[data-page-loading="true"] [class*="meteo-icon-effect-"],
+[data-page-loading="true"] [class*="meteo-icon-effect-"] *,
+[data-page-loading="true"] .page-swipe-transition {
+  animation: none !important;
+  transition: none !important;
+  will-change: auto !important;
+}

@@ -1,16 +1,14 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useIsFetching } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { FavoriteWeatherPreloader } from "./components/FavoriteWeatherPreloader";
-import { ReliabilityLabPreloader } from "./components/weather/ReliabilityLabPreloader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProvenanceDisplayProvider } from "./contexts/ProvenanceDisplayContext";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, MAIN_PAGE_PATHS, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import { useDetailedForecastPrefetch } from "./hooks/useDetailedForecastPrefetch";
-import Dashboard from "./pages/Dashboard";
+import { PageReadinessProvider, usePageReady, useRouteLoading } from "./contexts/PageReadinessContext";
 import {
   LayoutDashboard,
   Trophy,
@@ -20,6 +18,8 @@ import {
   ChartNoAxesCombined,
 } from "lucide-react";
 
+const loadDashboard = () => import("./pages/Dashboard");
+const Dashboard = lazy(loadDashboard);
 const loadRanking = () => import("./pages/Ranking");
 const loadHistory = () => import("./pages/History");
 const loadWeatherAILab = () => import("./pages/WeatherAILab");
@@ -36,6 +36,7 @@ const ReliabilityLaboratory = lazy(loadReliabilityLaboratory);
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const mainPagePreloaders: Record<string, () => Promise<unknown>> = {
+  "/": loadDashboard,
   "/details": loadWeatherDetails,
   "/laboratoire": loadReliabilityLaboratory,
   "/ranking": loadRanking,
@@ -60,49 +61,20 @@ function shouldIgnorePageSwipe(target: EventTarget | null) {
   return Boolean(target.closest(PAGE_SWIPE_IGNORE_SELECTOR));
 }
 
-function useMainPagePreload() {
-  const isFetching = useIsFetching();
-  const prefetchDetailedForecast = useDetailedForecastPrefetch();
-
+// Keep favorite-cache warming, but only after the initial page is ready.
+// Once mounted, leave it mounted so its own requests cannot create a restart loop.
+function DeferredFavoritePreloader() {
+  const ready = usePageReady();
+  const [enabled, setEnabled] = useState(false);
   useEffect(() => {
-    if (isFetching > 0) return;
-
-    let cancelled = false;
-    let idleCallbackId: number | null = null;
-    let idleTimeoutId: number | null = null;
-    const preload = () => {
-      if (cancelled) return;
-      // Le chunk seul ne suffit pas : sans données en cache, la page Prévisions
-      // remonte son squelette « Chargement des prévisions ». La même requête
-      // tRPC (même clé) est donc préchauffée ici, une fois la charge initiale
-      // terminée, pour que la navigation vers /details serve le cache.
-      prefetchDetailedForecast();
-      void Promise.all([
-        loadReliabilityLaboratory(),
-        loadRanking(),
-        loadHistory(),
-        loadWeatherAILab(),
-        loadWeatherDetails(),
-      ]).catch(() => undefined);
-    };
-
-    const schedulePreload = () => {
-      if (cancelled) return;
-      if (typeof window.requestIdleCallback === "function") {
-        idleCallbackId = window.requestIdleCallback(preload, { timeout: 1500 });
-      } else {
-        idleTimeoutId = window.setTimeout(preload, 1000);
-      }
-    };
-
-    const settleTimeout = window.setTimeout(schedulePreload, 500);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(settleTimeout);
-      if (idleCallbackId !== null) window.cancelIdleCallback(idleCallbackId);
-      if (idleTimeoutId !== null) window.clearTimeout(idleTimeoutId);
-    };
-  }, [isFetching, prefetchDetailedForecast]);
+    const connection = (navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }).connection;
+    if (ready && !connection?.saveData && !["slow-2g", "2g"].includes(connection?.effectiveType ?? "")) {
+      setEnabled(true);
+    }
+  }, [ready]);
+  return enabled ? <FavoriteWeatherPreloader /> : null;
 }
 
 function PageSwipeNavigator({ children }: { children: ReactNode }) {
@@ -275,13 +247,14 @@ function ScrollToTopOnRouteChange() {
 }
 
 function RouteLoadingFallback() {
+  useRouteLoading();
   return (
     <div className="mx-auto min-h-[60vh] max-w-2xl space-y-4 px-3 py-5" role="status" aria-live="polite" aria-label="Chargement de la page">
       <span className="sr-only">Chargement de la page…</span>
-      <div className="h-12 w-44 animate-pulse rounded-xl bg-slate-800/80" />
-      <div className="h-48 animate-pulse rounded-[22px] border border-slate-800 bg-slate-900/65" />
+      <div className="h-12 w-44 rounded-xl bg-slate-800/80" />
+      <div className="h-48 rounded-[22px] border border-slate-800 bg-slate-900/65" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl border border-slate-800 bg-slate-900/65" />)}
+        {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-28 rounded-2xl border border-slate-800 bg-slate-900/65" />)}
       </div>
     </div>
   );
@@ -309,26 +282,25 @@ function Router() {
 }
 
 function App() {
-  useMainPagePreload();
-
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <ProvenanceDisplayProvider>
           <TooltipProvider>
             <Toaster />
-            <FavoriteWeatherPreloader />
-            <ReliabilityLabPreloader />
-            <TopNav />
-            <ScrollToTopOnRouteChange />
-            <PageSwipeNavigator>
-              <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
-                <Suspense fallback={<RouteLoadingFallback />}>
-                  <Router />
-                </Suspense>
-              </div>
-            </PageSwipeNavigator>
-            <BottomNav />
+            <PageReadinessProvider>
+              <DeferredFavoritePreloader />
+              <TopNav />
+              <ScrollToTopOnRouteChange />
+              <PageSwipeNavigator>
+                <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <Router />
+                  </Suspense>
+                </div>
+              </PageSwipeNavigator>
+              <BottomNav />
+            </PageReadinessProvider>
           </TooltipProvider>
         </ProvenanceDisplayProvider>
       </ThemeProvider>
