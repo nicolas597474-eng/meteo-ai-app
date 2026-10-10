@@ -116,7 +116,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("nord en haut. ${directionDescription}");
     expect(source).toContain('size-[4.5rem]');
     expect(source).toContain('sm:size-20');
-    expect(source).toContain("cardinalDirections.map((label, index)");
+    expect(source).toContain("labelPositions.map(({ label, x, y, size })");
     expect(source).toContain('"N", "NE", "E", "SE", "S", "SO", "O", "NO"');
     expect(source).toContain("const directionDescription =");
     expect(source).toContain("maximumFractionDigits: 1");
