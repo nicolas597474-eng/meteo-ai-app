@@ -4,7 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { Link } from "wouter";
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDashed, CircleHelp, ClipboardCheck, Clock, Database, FlaskConical, Lightbulb, ListTree, MapPinned, MapPin, RefreshCw, SlidersHorizontal, X, Zap } from "lucide-react";
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDashed, CircleHelp, ClipboardCheck, Clock, Compass, Database, FlaskConical, Lightbulb, ListTree, MapPinned, MapPin, RefreshCw, SlidersHorizontal, Sparkles, X, Zap } from "lucide-react";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { getValidationModelSource } from "@/lib/validationModelSource";
@@ -23,6 +23,14 @@ import { HourlyJournalPanel } from "@/components/weather/HourlyJournalPanel";
 import type { HourlyJournalEntry } from "@/lib/hourlyJournalFilter";
 import { LocalTemperatureNowcastingPanel } from "@/components/weather/LocalTemperatureNowcastingPanel";
 import { LocalPrecipitationNowcastingPanel } from "@/components/weather/LocalPrecipitationNowcastingPanel";
+import {
+  getDashboardWeatherEffectsMode,
+  getDashboardWeatherEffectsModeLabel,
+  getNextDashboardWeatherEffectsMode,
+  storeDashboardWeatherEffectsMode,
+  type DashboardWeatherEffectsMode,
+} from "@/lib/dashboardWeatherEffects";
+import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 
 function IndicatorHelp({ title, children }: { title: string; children: ReactNode }) {
   return <Popover><PopoverTrigger asChild><button type="button" aria-label={`Comprendre le calcul : ${title}`} className="grid h-6 w-6 place-items-center rounded-full border border-slate-700/70 bg-slate-950/30 text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><CircleHelp className="h-3.5 w-3.5" /></button></PopoverTrigger><PopoverContent side="bottom" align="center" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-slate-600 bg-[#101622] px-3 py-3 text-left text-[11px] leading-relaxed text-slate-100 shadow-xl"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/75">Définition de la mesure</p><p className="mt-1 text-sm font-semibold text-white">{title}</p></div><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-700/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><div className="mt-2.5 space-y-2 text-slate-200">{children}</div></PopoverContent></Popover>;
@@ -73,6 +81,152 @@ function StationSimulation({ steps }: { steps: SimulationStep[] }) {
   if (!current) return null;
   const goTo = (index: number) => setActiveStep(Math.max(0, Math.min(steps.length - 1, index)));
   return <section className="rounded-2xl border border-emerald-400/25 bg-[linear-gradient(135deg,rgba(5,150,105,0.10),rgba(13,19,29,0.98)_42%)] p-4" aria-labelledby="station-simulation-title"><div className="flex items-start gap-2"><MapPinned className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" /><div><h2 id="station-simulation-title" className="text-sm font-semibold text-slate-100">Branche complémentaire · Stations locales</h2><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Parcours des observations physiques : recherche, filtrage, synthèse locale et niveau de preuve. Cette branche ne modifie pas la prévision fusionnée.</p></div></div><div className="mt-4 grid grid-cols-[minmax(90px,0.72fr)_minmax(0,1.5fr)] gap-3 sm:grid-cols-[126px_minmax(0,1fr)]"><div className="relative space-y-1.5 before:absolute before:bottom-4 before:left-3 before:top-4 before:w-px before:bg-emerald-300/20" aria-label="Étapes des stations locales">{steps.map((step, index) => <button key={step.id} type="button" onClick={() => goTo(index)} aria-current={index === activeStep ? "step" : undefined} className={`relative z-10 flex min-h-9 w-full items-center gap-1.5 rounded-lg border px-1.5 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${index === activeStep ? "border-emerald-300/55 bg-emerald-400/15" : "border-transparent bg-slate-950/20 hover:border-slate-700"}`}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[9px] font-bold ${index === activeStep ? "border-emerald-200 bg-emerald-300 text-slate-950" : "border-slate-600 bg-[#101722] text-slate-200"}`}>{index + 1}</span><span className="min-w-0"><span className="block truncate text-[9px] font-semibold leading-tight text-slate-200">{step.title}</span><span className="mt-0.5 flex items-center gap-1 text-[8px] text-slate-500"><SimulationStatusIcon status={step.status} /><span>{step.status === "complete" ? "Trace" : step.status === "partial" ? "Partiel" : "Attente"}</span></span></span></button>)}</div><div className="min-w-0"><article className="min-h-[222px] rounded-xl border border-slate-700/80 bg-[#080d14]/80 p-3" aria-live="polite"><div className="flex items-start gap-2"><SimulationStatusIcon status={current.status} /><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-200/75">Étape {activeStep + 1} sur {steps.length}</p><h3 className="mt-1 text-sm font-semibold text-slate-100">{current.title}</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{current.summary}</p></div></div><div className="mt-3 border-t border-slate-700/70 pt-3 text-[11px] leading-relaxed text-slate-400">{current.detail}</div></article><div className="mt-3 flex items-center justify-between gap-2"><button type="button" onClick={() => goTo(activeStep - 1)} disabled={activeStep === 0} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-700 px-2 text-[10px] font-medium text-slate-300 disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />Précédent</button><button type="button" onClick={() => goTo(activeStep + 1)} disabled={activeStep === steps.length - 1} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-emerald-400/35 bg-emerald-400/10 px-2 text-[10px] font-semibold text-emerald-100 disabled:opacity-40">Suivant<ChevronRight className="h-3.5 w-3.5" /></button></div></div></div></section>;
+}
+
+function ApplicationSettingsSection() {
+  const [weatherEffectsMode, setWeatherEffectsMode] = useState<DashboardWeatherEffectsMode>(getDashboardWeatherEffectsMode);
+  const nextWeatherEffectsMode = getNextDashboardWeatherEffectsMode(weatherEffectsMode);
+  const { deviceHeading, status: orientationStatus, requestPermission } = useDeviceOrientation({ autoStart: true });
+
+  const handleToggleEffects = () => {
+    storeDashboardWeatherEffectsMode(nextWeatherEffectsMode);
+    setWeatherEffectsMode(nextWeatherEffectsMode);
+  };
+
+  const handleRequestOrientation = async () => {
+    await requestPermission();
+  };
+
+  const orientationStatusLabel =
+    orientationStatus === "tracking" && deviceHeading != null
+      ? `Capteur actif · Cap ${Math.round(deviceHeading)}°`
+      : orientationStatus === "waiting"
+        ? "En attente de mouvement…"
+        : orientationStatus === "denied"
+          ? "Autorisation refusée"
+          : orientationStatus === "unsupported"
+            ? "Non pris en charge sur cet appareil"
+            : orientationStatus === "no-data"
+              ? "Aucune donnée de cap reçue"
+              : "Prêt à activer";
+
+  const orientationStatusTone =
+    orientationStatus === "tracking"
+      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100"
+      : orientationStatus === "waiting" || orientationStatus === "no-data"
+        ? "border-amber-400/40 bg-amber-400/10 text-amber-100"
+        : orientationStatus === "denied"
+          ? "border-rose-400/40 bg-rose-400/10 text-rose-100"
+          : "border-slate-600 bg-slate-900/70 text-slate-300";
+
+  return (
+    <section
+      className="order-[-3] rounded-2xl border border-sky-400/25 bg-[linear-gradient(135deg,rgba(14,116,144,0.12),rgba(13,19,29,0.98)_45%)] p-4 shadow-lg"
+      aria-labelledby="app-settings-title"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <SlidersHorizontal className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
+          <div className="min-w-0">
+            <h2 id="app-settings-title" className="text-sm font-semibold text-slate-100">
+              Paramètres Application
+            </h2>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+              Personnalisation de l’affichage et accès aux capteurs de l’appareil.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {/* ── Réglage 1 : Effets 3D ── */}
+        <article className="rounded-xl border border-white/10 bg-[#080d14]/80 p-3 flex flex-col justify-between gap-2.5">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-sky-300" />
+                Effets 3D de l’application
+              </span>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold ${
+                weatherEffectsMode === "off"
+                  ? "border-slate-600 bg-slate-900/70 text-slate-300"
+                  : weatherEffectsMode === "reduced"
+                    ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
+                    : "border-sky-300/30 bg-sky-300/10 text-sky-100"
+              }`}>
+                {getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}
+              </span>
+            </div>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
+              Animations atmosphériques du Dashboard (pluie, neige, particules et reflets 3D).
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={handleToggleEffects}
+              aria-label={`Mode actuel des animations météo 3D : ${getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}. Un clic passe au niveau suivant.`}
+              aria-pressed={weatherEffectsMode !== "off"}
+              title="Basculer entre effets 3D complets, réduits et désactivés"
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${
+                weatherEffectsMode === "off"
+                  ? "border-slate-600 bg-slate-900/70 text-slate-300 hover:bg-slate-800"
+                  : weatherEffectsMode === "reduced"
+                    ? "border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"
+                    : "border-sky-300/30 bg-sky-300/10 text-sky-100 hover:bg-sky-300/20"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Effets 3D · {getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}</span>
+            </button>
+            <span className="text-[9px] text-slate-500">
+              {weatherEffectsMode === "full" ? "Complet" : weatherEffectsMode === "reduced" ? "Économie GPU" : "Désactivé"}
+            </span>
+          </div>
+        </article>
+
+        {/* ── Réglage 2 : Mouvement et orientation (Boussole) ── */}
+        <article className="rounded-xl border border-white/10 bg-[#080d14]/80 p-3 flex flex-col justify-between gap-2.5">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                <Compass className="h-4 w-4 text-sky-300" />
+                Mouvement et orientation
+              </span>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold ${orientationStatusTone}`}>
+                {orientationStatus === "tracking" ? "Actif" : orientationStatus === "denied" ? "Refusé" : orientationStatus === "waiting" ? "Attente" : "Inactif"}
+              </span>
+            </div>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
+              Permet à la boussole du Dashboard et à la carte d’éclipse de s’orienter selon la direction réelle de votre téléphone.
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-slate-700/60 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleRequestOrientation}
+                disabled={orientationStatus === "unsupported"}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sky-400/40 bg-sky-400/15 px-3 text-[11px] font-semibold text-sky-100 transition-colors hover:bg-sky-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 disabled:opacity-40"
+              >
+                <Compass className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{orientationStatus === "tracking" ? "Réorienter / Calibrer" : "Autoriser l’orientation"}</span>
+              </button>
+              <span className="text-[10px] font-medium text-slate-300">
+                {orientationStatusLabel}
+              </span>
+            </div>
+
+            <p className="text-[9px] leading-tight text-slate-500">
+              Autorisez « Mouvement et orientation » dans les réglages du navigateur (Brave, Safari, Chrome) si la boussole reste immobile.
+            </p>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
 }
 
 function stationFreshnessLabel(updatedAt: Date | string | null | undefined) {
@@ -883,10 +1037,12 @@ export default function WeatherAILab() {
   ];
 
   return <main className="weather-page-sky mx-auto flex min-h-screen max-w-2xl flex-col gap-3 px-3 py-3 pb-24 sm:px-6 sm:py-6" style={pageSkyStyle}>
-    <header className="order-[-2] flex items-center justify-between gap-2">
+    <header className="order-[-4] flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15"><FlaskConical className="h-5 w-5 text-blue-300" /></div><div className="min-w-0"><h1 className="text-base font-bold text-slate-100">AI Lab · traçabilité</h1><p className="truncate text-xs text-slate-500">{activeLocation?.name ?? "Lieu actif"}{updatedAt ? isArchivedSnapshot ? ` · dernière fusion du ${snapshotDateLabel} à ${updatedAt}` : ` · calcul à ${updatedAt}` : " · snapshot indisponible"}</p></div></div>
       <div className="flex shrink-0 gap-1">{activeLocation?.favoriteId ? <button onClick={() => refreshFusion.mutate({ favoriteId: activeLocation.favoriteId! })} disabled={refreshFusion.isPending || isFetching} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 text-xs font-semibold text-emerald-100 disabled:opacity-60"><RefreshCw className={`h-3.5 w-3.5 ${refreshFusion.isPending ? "animate-spin" : ""}`} />{refreshFusion.isPending ? "Fusion…" : "Relancer"}</button> : null}</div>
     </header>
+
+    <ApplicationSettingsSection />
 
     {refreshFusion.isError && <p className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-100">La relance n’a pas abouti : {refreshFusion.error.message}</p>}
     {refreshFusion.data?.status === "cooldown" && <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">Une fusion récente existe déjà. Réessayez dans environ {refreshFusion.data.retryAfterSeconds} s.</p>}
@@ -930,9 +1086,9 @@ export default function WeatherAILab() {
 
     <HourlyComparisonDiagnosticsPanel location={activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined} />
 
-    <section className="order-[-1] rounded-2xl border border-violet-400/20 bg-violet-400/[0.045] p-4" aria-labelledby="lab-parameters-title"><div className="flex items-start justify-between gap-2"><div className="flex min-w-0 items-start gap-2"><SlidersHorizontal className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" /><div className="min-w-0"><h2 id="lab-parameters-title" className="text-sm font-semibold text-slate-100">Paramètres</h2><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Poids réellement appliqués par paramètre : lecture directe de la trace de fusion. Une colonne vide signifie qu’aucune contribution traçable n’est disponible pour ce paramètre.</p></div></div><IndicatorHelp title="Paramètres de la fusion"><p>Quatre paramètres sont suivis séparément : température, précipitations, vent et humidité. Chacun reçoit ses propres sources et ses propres poids dans la trace de fusion.</p><p>Un poids est une part de calcul, pas une probabilité ni une note. Un paramètre sans contribution traçable reste affiché comme tel, sans valeur de remplacement.</p><HelpDetail label="Valeur officielle">La valeur fusionnée vient du résultat officiel du snapshot consulté ; ce n’est pas une observation de station.</HelpDetail></IndicatorHelp></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{fusionParameters.map((parameter) => { const appliedWeight = parameter.sources.reduce((total, source) => total + (Number.isFinite(source.finalWeight) ? source.finalWeight : 0), 0); const officialValue = parameterOfficialValues[parameter.key] ?? null; return <article key={parameter.key} className={`rounded-xl border border-white/10 p-3 ${parameter.background}`}><p className={`text-[11px] font-semibold ${parameter.tone}`}>{parameter.label}</p><p className="mt-1 text-[10px] text-slate-300">{parameter.sources.length ? `${parameter.sources.length} source(s) appliquée(s) · poids cumulé ${(appliedWeight * 100).toFixed(1)} %` : "Aucune source appliquée dans la trace."}</p><p className="mt-0.5 text-[10px] text-slate-400">{officialValue ? `Valeur officielle fusionnée : ${officialValue}` : "Valeur officielle non exposée pour ce paramètre."}</p>{parameter.sources.length ? <div className="mt-2 space-y-2">{parameter.sources.map((source, index) => <div key={`${parameter.key}-${source.name}-${index}`}><div className="flex items-center justify-between gap-2 text-[10px]"><span className="min-w-0 truncate text-slate-200">{source.name}</span><span className="shrink-0 font-semibold text-slate-100">{(source.finalWeight * 100).toFixed(1)}%</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-950/60"><div className="h-full rounded-full bg-white/70" style={{ width: `${Math.min(100, Math.max(0, source.finalWeight * 100))}%` }} /></div></div>)}</div> : <p className="mt-2 text-[10px] text-slate-500">Aucune trace disponible.</p>}</article>; })}</div></section>
+    <section className="order-[-2] rounded-2xl border border-violet-400/20 bg-violet-400/[0.045] p-4" aria-labelledby="lab-parameters-title"><div className="flex items-start justify-between gap-2"><div className="flex min-w-0 items-start gap-2"><SlidersHorizontal className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" /><div className="min-w-0"><h2 id="lab-parameters-title" className="text-sm font-semibold text-slate-100">Paramètres</h2><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Poids réellement appliqués par paramètre : lecture directe de la trace de fusion. Une colonne vide signifie qu’aucune contribution traçable n’est disponible pour ce paramètre.</p></div></div><IndicatorHelp title="Paramètres de la fusion"><p>Quatre paramètres sont suivis séparément : température, précipitations, vent et humidité. Chacun reçoit ses propres sources et ses propres poids dans la trace de fusion.</p><p>Un poids est une part de calcul, pas une probabilité ni une note. Un paramètre sans contribution traçable reste affiché comme tel, sans valeur de remplacement.</p><HelpDetail label="Valeur officielle">La valeur fusionnée vient du résultat officiel du snapshot consulté ; ce n’est pas une observation de station.</HelpDetail></IndicatorHelp></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{fusionParameters.map((parameter) => { const appliedWeight = parameter.sources.reduce((total, source) => total + (Number.isFinite(source.finalWeight) ? source.finalWeight : 0), 0); const officialValue = parameterOfficialValues[parameter.key] ?? null; return <article key={parameter.key} className={`rounded-xl border border-white/10 p-3 ${parameter.background}`}><p className={`text-[11px] font-semibold ${parameter.tone}`}>{parameter.label}</p><p className="mt-1 text-[10px] text-slate-300">{parameter.sources.length ? `${parameter.sources.length} source(s) appliquée(s) · poids cumulé ${(appliedWeight * 100).toFixed(1)} %` : "Aucune source appliquée dans la trace."}</p><p className="mt-0.5 text-[10px] text-slate-400">{officialValue ? `Valeur officielle fusionnée : ${officialValue}` : "Valeur officielle non exposée pour ce paramètre."}</p>{parameter.sources.length ? <div className="mt-2 space-y-2">{parameter.sources.map((source, index) => <div key={`${parameter.key}-${source.name}-${index}`}><div className="flex items-center justify-between gap-2 text-[10px]"><span className="min-w-0 truncate text-slate-200">{source.name}</span><span className="shrink-0 font-semibold text-slate-100">{(source.finalWeight * 100).toFixed(1)}%</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-950/60"><div className="h-full rounded-full bg-white/70" style={{ width: `${Math.min(100, Math.max(0, source.finalWeight * 100))}%` }} /></div></div>)}</div> : <p className="mt-2 text-[10px] text-slate-500">Aucune trace disponible.</p>}</article>; })}</div></section>
 
-    <section className="order-[-1] grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <section className="order-[-2] grid grid-cols-2 gap-2 sm:grid-cols-4">
       <Stat label="Étendue Tmax" value={formatAgreementRange(data.modelAgreement.tempMax, data.modelAgreement.expectedModelCount, "°C")} tone="text-orange-200" help={<IndicatorHelp title="Dispersion de température"><p>Étendue brute entre modèles nommés indépendants pour Tmax. Aucun seuil de qualité ni conversion en note n’est appliqué.</p><p>Modèles avec valeur : {data.modelAgreement.tempMax.modelsWithData.join(", ") || "aucun"}. Best Match est exclu.</p><p className="text-slate-400">Cette mesure décrit l’accord, pas la fiabilité historique face aux observations. L’incertitude statistique n’est pas mesurée ici.</p></IndicatorHelp>} />
       <Stat label="Étendue pluie · toutes valeurs" value={formatAgreementRange(data.modelAgreement.precipitation, data.modelAgreement.expectedModelCount, "mm")} tone="text-blue-200" help={<IndicatorHelp title="Dispersion des précipitations"><p>Étendue et σ population brutes en mm; l’effectif affiché est propre à la pluie. La dispersion est indisponible avec moins de deux valeurs. L’incertitude statistique n’est pas mesurée ici.</p><p>Seuil ≥{data.modelAgreement.precipitationOccurrence.thresholdMm.toFixed(1)} mm : {data.modelAgreement.precipitationOccurrence.rainModelCount}/{data.modelAgreement.precipitationOccurrence.availableModelCount} modèles disponibles; cette fréquence n’est pas une probabilité calibrée.</p><p>Étendue des quantités parmi les seuls modèles pluvieux : {formatAgreementRange(data.modelAgreement.precipitationWetAmounts, data.modelAgreement.expectedModelCount, "mm")}.</p><p>Modèles avec valeur : {data.modelAgreement.precipitation.modelsWithData.join(", ") || "aucun"}. Best Match est exclu.</p></IndicatorHelp>} />
       <Stat label="Étendue vent max. quotidien" value={formatAgreementRange(data.modelAgreement.windSpeed, data.modelAgreement.expectedModelCount, "km/h")} tone="text-cyan-200" help={<IndicatorHelp title="Dispersion du vent"><p>Étendue brute de vent maximal journalier en km/h, avec son effectif exact. L’incertitude statistique n’est pas mesurée ici.</p><p>Modèles avec valeur : {data.modelAgreement.windSpeed.modelsWithData.join(", ") || "aucun"}. Best Match est exclu.</p></IndicatorHelp>} />

@@ -12,11 +12,9 @@ import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
 import { DashboardWeatherAtmosphere } from "@/components/DashboardWeatherAtmosphere";
 import {
   getDashboardWeatherEffectsMode,
-  getDashboardWeatherEffectsModeLabel,
-  getNextDashboardWeatherEffectsMode,
-  storeDashboardWeatherEffectsMode,
   type DashboardWeatherEffectsMode,
 } from "@/lib/dashboardWeatherEffects";
+import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { LocalModelContributionNotice } from "@/components/LocalModelContributionNotice";
@@ -90,18 +88,14 @@ function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalP
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
 function WindRose({ direction }: { direction: number | null }) {
+  const { deviceHeading, status: orientationStatus, requestPermission } = useDeviceOrientation({ autoStart: true });
+  const compassHeading = deviceHeading ?? 0;
+  const isOrientationActive = orientationStatus === "tracking" && deviceHeading != null;
+
   const cardinalDirections = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"] as const;
+  const cardinalAngles = [0, 45, 90, 135, 180, 225, 270, 315] as const;
   const cardinalNames = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ouest", "ouest", "nord-ouest"] as const;
-  const cardinalLabelPositions = [
-    "left-1/2 top-[4px] -translate-x-1/2",
-    "right-[8px] top-[9px]",
-    "right-[3px] top-1/2 -translate-y-1/2",
-    "bottom-[9px] right-[8px]",
-    "bottom-[4px] left-1/2 -translate-x-1/2",
-    "bottom-[9px] left-[8px]",
-    "left-[3px] top-1/2 -translate-y-1/2",
-    "left-[8px] top-[9px]",
-  ] as const;
+
   const hasDirection = typeof direction === "number" && Number.isFinite(direction) && direction >= 0 && direction <= 360;
   const directionIndex = hasDirection ? Math.round((direction % 360) / 45) % cardinalDirections.length : null;
   const directionName = directionIndex == null ? null : cardinalNames[directionIndex];
@@ -110,7 +104,18 @@ function WindRose({ direction }: { direction: number | null }) {
   const directionDescription = readableDirection && bearingLabel ? `${readableDirection} · ${bearingLabel}` : "Direction indisponible";
 
   return (
-    <div className="flex flex-col items-center gap-0.5" role="img" aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.`}>
+    <button
+      type="button"
+      onClick={() => {
+        if (!isOrientationActive) {
+          void requestPermission();
+        }
+      }}
+      className="flex flex-col items-center gap-0.5 outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded-xl cursor-pointer"
+      role="img"
+      aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.${isOrientationActive ? ` Cap téléphone : ${Math.round(compassHeading)}°.` : " Touchez pour orienter la boussole."}`}
+      title={isOrientationActive ? `Boussole orientée · Cap ${Math.round(compassHeading)}°` : "Touchez pour activer l’orientation par le téléphone"}
+    >
       <div
         className="relative isolate grid size-[4.5rem] place-items-center rounded-full border border-[#31355e] bg-[radial-gradient(circle_at_32%_26%,#2c3157_0%,#12132a_55%,#07070f_100%)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.22),inset_0_-3px_6px_rgba(0,0,0,0.65),0_10px_18px_rgba(0,0,0,0.65),0_0_18px_rgba(0,245,255,0.22)] ring-1 ring-black/50 before:absolute before:inset-[3px] before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(140,200,255,0.1),transparent_46%)] before:content-[''] sm:size-20"
       >
@@ -158,31 +163,56 @@ function WindRose({ direction }: { direction: number | null }) {
           <path d="M82.8 82.8 A46.4 46.4 0 0 1 50 96.4" fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth="1.1" strokeLinecap="round" />
           <circle cx="50" cy="50" r="43" fill="url(#wind-compass-dial)" stroke="rgba(0,245,255,0.32)" strokeWidth="0.9" />
           <circle cx="50" cy="50" r="39.5" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="0.5" />
-          {Array.from({ length: 32 }, (_, index) => {
-            const angle = (index * 11.25 - 90) * Math.PI / 180;
-            const isMajor = index % 4 === 0;
-            const innerRadius = isMajor ? 33 : 36;
-            return <line key={index} x1={50 + innerRadius * Math.cos(angle)} y1={50 + innerRadius * Math.sin(angle)} x2={50 + 41.2 * Math.cos(angle)} y2={50 + 41.2 * Math.sin(angle)} stroke={isMajor ? "rgba(0,245,255,0.92)" : "rgba(150,225,245,0.38)"} strokeWidth={isMajor ? 1.4 : 0.55} filter={isMajor ? "url(#wind-compass-neon)" : undefined} />;
-          })}
-          {hasDirection ? <g transform={`rotate(${direction}, 50, 50)`}>
+          <g transform={`rotate(${-compassHeading}, 50, 50)`}>
+            {Array.from({ length: 32 }, (_, index) => {
+              const angle = (index * 11.25 - 90) * Math.PI / 180;
+              const isMajor = index % 4 === 0;
+              const innerRadius = isMajor ? 33 : 36;
+              return <line key={index} x1={50 + innerRadius * Math.cos(angle)} y1={50 + innerRadius * Math.sin(angle)} x2={50 + 41.2 * Math.cos(angle)} y2={50 + 41.2 * Math.sin(angle)} stroke={isMajor ? "rgba(0,245,255,0.92)" : "rgba(150,225,245,0.38)"} strokeWidth={isMajor ? 1.4 : 0.55} filter={isMajor ? "url(#wind-compass-neon)" : undefined} />;
+            })}
+          </g>
+          {hasDirection ? <g transform={`rotate(${direction - compassHeading}, 50, 50)`}>
             <path d="M50 17.5 L54.6 49 L50 44.6 L45.4 49 Z" fill="url(#wind-compass-needle)" stroke="rgba(235,255,255,0.9)" strokeWidth="0.6" filter="url(#wind-compass-neon)" />
             <path d="M50 82.5 L54.6 51 L50 55.4 L45.4 51 Z" fill="url(#wind-compass-needle-tail)" stroke="rgba(130,140,170,0.55)" strokeWidth="0.5" />
           </g> : null}
           <circle cx="50" cy="50" r="5.6" fill="url(#wind-compass-hub)" stroke="rgba(255,255,255,0.28)" strokeWidth="0.7" />
           <circle cx="50" cy="50" r="1.9" fill="#00F5FF" filter="url(#wind-compass-neon)" />
           <circle cx="48.1" cy="47.9" r="0.9" fill="rgba(255,255,255,0.9)" />
+          {cardinalDirections.map((label, index) => {
+            const angleDeg = cardinalAngles[index] - compassHeading;
+            const angleRad = (angleDeg - 90) * (Math.PI / 180);
+            const radius = 33.8;
+            const x = 50 + radius * Math.cos(angleRad);
+            const y = 50 + radius * Math.sin(angleRad);
+            const isNorth = label === "N";
+            return (
+              <text
+                key={label}
+                x={x}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize="7.5"
+                fontWeight="900"
+                fill={isNorth ? "#fda4af" : "#ffffff"}
+                filter="url(#wind-compass-neon)"
+                style={{ userSelect: "none", pointerEvents: "none" }}
+              >
+                {label}
+              </text>
+            );
+          })}
         </svg>
-        {cardinalDirections.map((label, index) => (
-          <span key={label} aria-hidden="true" className={`absolute z-20 text-[8px] font-black leading-none text-white drop-shadow-[0_0_4px_rgba(0,245,255,0.95)] ${cardinalLabelPositions[index]}`}>
-            {label}
-          </span>
-        ))}
       </div>
       <p className="min-h-4 text-center text-[10px] font-bold leading-tight text-cyan-100">{directionDescription}</p>
-    </div>
+      {isOrientationActive && (
+        <span className="text-[9px] font-medium text-cyan-200/90 leading-none">
+          Cap {Math.round(compassHeading)}°
+        </span>
+      )}
+    </button>
   );
 }
-
 
 function currentStateFieldTitle(field?: CurrentStateFieldLike | null, snapshotAt?: string | null): string {
   const provenance = field?.provenance;
@@ -440,8 +470,7 @@ export default function Dashboard() {
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
-  const [weatherEffectsMode, setWeatherEffectsMode] = useState<DashboardWeatherEffectsMode>(getDashboardWeatherEffectsMode);
-  const nextWeatherEffectsMode = getNextDashboardWeatherEffectsMode(weatherEffectsMode);
+  const [weatherEffectsMode] = useState<DashboardWeatherEffectsMode>(getDashboardWeatherEffectsMode);
   const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
   const [showRegimeMenu, setShowRegimeMenu] = useState(false);
   const [expandedRegimeIds, setExpandedRegimeIds] = useState<string[]>([]);
@@ -902,22 +931,6 @@ export default function Dashboard() {
         )}
 
         {/* ── Favorites Bar ── */}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              storeDashboardWeatherEffectsMode(nextWeatherEffectsMode);
-              setWeatherEffectsMode(nextWeatherEffectsMode);
-            }}
-            aria-label={`Mode actuel des animations météo 3D : ${getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}. Un clic passe au niveau suivant.`}
-            aria-pressed={weatherEffectsMode !== "off"}
-            title="Basculer entre effets 3D complets, réduits et désactivés"
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${weatherEffectsMode === "off" ? "border-slate-600 bg-slate-900/70 text-slate-300" : weatherEffectsMode === "reduced" ? "border-amber-300/30 bg-amber-300/10 text-amber-100" : "border-sky-300/30 bg-sky-300/10 text-sky-100"}`}
-          >
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Effets 3D · {getDashboardWeatherEffectsModeLabel(weatherEffectsMode)}</span>
-          </button>
-        </div>
         <FavoritesBar
           activeLocation={activeLocation}
           onLocationChange={handleLocationChange}
