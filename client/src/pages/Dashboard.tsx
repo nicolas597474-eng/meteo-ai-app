@@ -32,6 +32,7 @@ import { getDashboardObservability } from "@/lib/dashboardObservability";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, withCurrentSnapshotFallback, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
 import { getDashboardWind } from "@/lib/dashboardWind";
+import { getDashboardSky } from "@/lib/dashboardSky";
 import { getCurrentStationTemperature, withCurrentStationTemperature } from "@/lib/currentStationTemperature";
 import { formatOptionalForecastValue } from "@/lib/forecastTimeline";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1037,8 +1038,25 @@ export default function Dashboard() {
   const nextWeatherAlert = getNextWeatherAlert(nextConditionChange);
   const officialSnapshotTemp = currentSnapshot?.temp ?? null;
   const snapshotCapturedAt = currentSnapshot?.capturedAt ?? null;
+  const hourlyForecastSource = forecastProvenance?.source ?? officialForecast?.officialSnapshot?.source ?? null;
+  const hourlyForecastComputedAt = forecastProvenance?.updatedAt ?? officialForecast?.officialSnapshot?.computedAt ?? null;
   const temperatureField = withCurrentSnapshotFallback(currentFields?.temperature, currentSnapshot?.temp, snapshotCapturedAt);
-  const conditionField = withCurrentSnapshotFallback(currentFields?.condition, currentSnapshot?.condition, snapshotCapturedAt);
+  // État du ciel : mêmes valeurs que la page Prévisions (prévision horaire officielle
+  // de l’heure active, consolidation multi-modèles). Le snapshot best_match seul
+  // affichait « Ensoleillé » là où les autres pages indiquaient « Partiellement
+  // nuageux »; il ne reste que le repli affiché tant qu’aucune échéance active n’est
+  // disponible, et n’est jamais mélangé aux valeurs de la prévision consolidée.
+  const dashboardSky = getDashboardSky({
+    hour: currentHour,
+    forecastSource: formatHourlyForecastSource(hourlyForecastSource),
+    forecastComputedAt: hourlyForecastComputedAt,
+    fallbackFields: {
+      condition: withCurrentSnapshotFallback(currentFields?.condition, currentSnapshot?.condition, snapshotCapturedAt),
+      cloudCover: withCurrentSnapshotFallback(currentFields?.cloudCover, currentSnapshot?.cloudCover, snapshotCapturedAt),
+      weatherCode: withCurrentSnapshotFallback(currentFields?.weatherCode, currentSnapshot?.weatherCode, snapshotCapturedAt),
+    },
+  });
+  const conditionField = dashboardSky.conditionField;
   const currentTemp = currentNumber(temperatureField);
   const stationTemperature = getCurrentStationTemperature(temperatureField, formatCurrentStateProvenance(temperatureField, currentSnapshot?.capturedAt));
   const chartHours = withCurrentStationTemperature(hours, currentHourIndex, stationTemperature);
@@ -1050,7 +1068,9 @@ export default function Dashboard() {
     : currentProvenanceLabel(conditionField);
   const activeFavoriteWeather = {
     temp: officialSnapshotTemp,
-    condition: currentSnapshot?.condition ?? (isDailyFallback ? dailyFallback.condition : null),
+    // La pastille du lieu actif reprend le ciel affiché sous la température : même
+    // icône que l’état courant, donc même source que la page Prévisions.
+    condition: displayedCondition,
   };
   const maxTemperature = isDailyFallback ? dailyFallback.tempMax : today?.tempMax ?? meteoAI?.tempMax ?? null;
   const minTemperature = isDailyFallback ? dailyFallback.tempMin : today?.tempMin ?? meteoAI?.tempMin ?? null;
@@ -1062,8 +1082,6 @@ export default function Dashboard() {
   const uvForecastHour = currentHour?.uvIndex != null ? currentHour : futureUVHour;
   const currentUV = currentHour?.uvIndex ?? futureUVHour?.uvIndex ?? null;
   const currentUVLabel = uvForecastHour && uvForecastHour !== currentHour ? "UV prévu à l’échéance suivante" : "UV prévu pour cette heure";
-  const hourlyForecastSource = forecastProvenance?.source ?? officialForecast?.officialSnapshot?.source ?? null;
-  const hourlyForecastComputedAt = forecastProvenance?.updatedAt ?? officialForecast?.officialSnapshot?.computedAt ?? null;
   // Vent : mêmes valeurs que la page Prévisions (prévision horaire officielle de l’heure active); jamais les stations.
   const dashboardWind = getDashboardWind({
     hour: currentHour,
@@ -1076,9 +1094,9 @@ export default function Dashboard() {
   const windSpeedField = dashboardWind.speedField;
   const windGustField = dashboardWind.gustField;
   const precipitationField = withCurrentSnapshotFallback(currentFields?.precipitation, currentSnapshot?.precipitation, snapshotCapturedAt);
-  const cloudCoverField = withCurrentSnapshotFallback(currentFields?.cloudCover, currentSnapshot?.cloudCover, snapshotCapturedAt);
+  const cloudCoverField = dashboardSky.cloudCoverField;
   const humidityField = withCurrentSnapshotFallback(currentFields?.humidity, currentSnapshot?.humidity, snapshotCapturedAt);
-  const weatherCodeField = withCurrentSnapshotFallback(currentFields?.weatherCode, currentSnapshot?.weatherCode, snapshotCapturedAt);
+  const weatherCodeField = dashboardSky.weatherCodeField;
   const currentWeatherCode = currentNumber(weatherCodeField);
   const windDir = dashboardWind.direction;
   const windSpeed = dashboardWind.speed;

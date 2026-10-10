@@ -320,6 +320,27 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).not.toContain("currentWindGust.toFixed(1)");
   });
 
+  it("alimente l’état actuel et les nuages avec la prévision horaire de la page Prévisions", () => {
+    const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("getDashboardSky({");
+    expect(source).toContain("const conditionField = dashboardSky.conditionField;");
+    expect(source).toContain("const cloudCoverField = dashboardSky.cloudCoverField;");
+    expect(source).toContain("const weatherCodeField = dashboardSky.weatherCodeField;");
+    // Le snapshot best_match ne reste que le repli hors échéance active, jamais une
+    // source mélangée : le hero affichait « Ensoleillé » contre « Partiellement nuageux ».
+    expect(source).toContain("condition: withCurrentSnapshotFallback(currentFields?.condition, currentSnapshot?.condition, snapshotCapturedAt)");
+    expect(source).toContain("cloudCover: withCurrentSnapshotFallback(currentFields?.cloudCover, currentSnapshot?.cloudCover, snapshotCapturedAt)");
+    expect(source).not.toContain("const cloudCoverField = withCurrentSnapshotFallback(");
+    expect(source).not.toContain("const weatherCodeField = withCurrentSnapshotFallback(");
+    // L’icône du hero et la pastille du lieu actif suivent le même libellé.
+    expect(source).toContain("<MeteoIcon name={getIconNameFromCondition(displayedCondition)} size={64} />");
+    expect(source).toContain("condition: displayedCondition,");
+    expect(source).not.toContain("condition: currentSnapshot?.condition ?? (isDailyFallback");
+    // Température et humidité gardent leur lecture propre (stations, puis snapshot).
+    expect(source).toContain("const humidityField = withCurrentSnapshotFallback(currentFields?.humidity, currentSnapshot?.humidity, snapshotCapturedAt)");
+  });
+
   it("ancre la température du point actuel du graphique horaire sur la mesure des stations physiques", () => {
     const source = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
     expect(source).toContain("getCurrentStationTemperature(temperatureField");
