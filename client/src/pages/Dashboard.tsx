@@ -88,6 +88,11 @@ function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalP
 }
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
+// Boussole reproduisant fidèlement l'image de référence : vue de face (aucune
+// inclinaison 3D), fond bleu nuit #0A1A2F, cerclage noir à reflets métalliques,
+// lunette argentée segmentée, cadran bleu nuit, graduations lumineuses #00BFFF,
+// libellés cardinaux blancs agrandis et très lisibles, aiguille fine bleu
+// lumineux avec queue bleue, moyeu métallique à point bleu brillant.
 function WindRose({ direction }: { direction: number | null }) {
   const { deviceHeading, status: orientationStatus, requestPermission } = useDeviceOrientation({ autoStart: true });
   const compassHeading = deviceHeading ?? 0;
@@ -120,16 +125,17 @@ function WindRose({ direction }: { direction: number | null }) {
     };
   });
 
-  // Front-facing label positions - horizontal text at fixed positions
+  // Front-facing label positions - horizontal text at fixed positions (vue de face).
+  // Libellés agrandis (17/11) et lueur renforcée pour des directions bien visibles.
   const labelPositions: { label: string; x: number; y: number; size: number }[] = [
-    { label: "N", x: 80, y: 30, size: 14 },
-    { label: "NE", x: 116, y: 44, size: 9 },
-    { label: "E", x: 130, y: 80, size: 14 },
-    { label: "SE", x: 116, y: 116, size: 9 },
-    { label: "S", x: 80, y: 130, size: 14 },
-    { label: "SO", x: 44, y: 116, size: 9 },
-    { label: "O", x: 30, y: 80, size: 14 },
-    { label: "NO", x: 44, y: 44, size: 9 },
+    { label: "N", x: 80, y: 28, size: 20 },
+    { label: "NE", x: 118, y: 42, size: 12 },
+    { label: "E", x: 132, y: 80, size: 20 },
+    { label: "SE", x: 118, y: 118, size: 12 },
+    { label: "S", x: 80, y: 132, size: 20 },
+    { label: "SO", x: 42, y: 118, size: 12 },
+    { label: "O", x: 28, y: 80, size: 20 },
+    { label: "NO", x: 42, y: 42, size: 12 },
   ];
 
   return (
@@ -140,31 +146,37 @@ function WindRose({ direction }: { direction: number | null }) {
           void requestPermission();
         }
       }}
-      className="flex flex-col items-center gap-0.5 outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded-xl cursor-pointer"
+      className="mx-auto flex flex-col items-center gap-0.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sky-300 cursor-pointer"
       role="img"
       aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.${isOrientationActive ? ` Cap téléphone : ${Math.round(compassHeading)}°.` : " Touchez pour orienter la boussole."}`}
       title={isOrientationActive ? `Boussole orientée · Cap ${Math.round(compassHeading)}°` : "Touchez pour activer l'orientation par le téléphone"}
     >
-      <div className="relative isolate grid size-[4.5rem] place-items-center rounded-full bg-[#061426] shadow-[0_8px_18px_rgba(0,10,24,0.7),0_0_16px_rgba(0,176,255,0.2)] ring-1 ring-sky-100/20 sm:size-20">
+      <div className="relative isolate grid size-[5.5rem] place-items-center rounded-full bg-[#0A1A2F] shadow-[0_8px_18px_rgba(0,8,20,0.75),0_0_16px_rgba(0,191,255,0.28)] ring-1 ring-sky-100/20 sm:size-[6.5rem]">
         <svg viewBox="0 0 160 160" className="absolute inset-0 z-10 size-full overflow-visible" aria-hidden="true">
           <defs>
             <linearGradient id="wind-compass-bezel" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#b0c4d8" />
-              <stop offset="20%" stopColor="#647d96" />
-              <stop offset="50%" stopColor="#1a2d42" />
-              <stop offset="80%" stopColor="#3d5a73" />
-              <stop offset="100%" stopColor="#8aa0b4" />
+              <stop offset="0%" stopColor="#f2f7fb" />
+              <stop offset="20%" stopColor="#b9c9d8" />
+              <stop offset="50%" stopColor="#6a8096" />
+              <stop offset="80%" stopColor="#3a4f64" />
+              <stop offset="100%" stopColor="#a7bac9" />
+            </linearGradient>
+            <linearGradient id="wind-compass-outer-reflection" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3d5268" stopOpacity="0.9" />
+              <stop offset="18%" stopColor="#101a26" stopOpacity="0.4" />
+              <stop offset="50%" stopColor="#000000" stopOpacity="0" />
+              <stop offset="82%" stopColor="#101a26" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#3d5268" stopOpacity="0.9" />
             </linearGradient>
             <radialGradient id="wind-compass-case" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#1e3a52" />
-              <stop offset="50%" stopColor="#0f1f30" />
-              <stop offset="100%" stopColor="#060d16" />
+              <stop offset="0%" stopColor="#14304c" />
+              <stop offset="50%" stopColor="#0A1A2F" />
+              <stop offset="100%" stopColor="#04101f" />
             </radialGradient>
             <radialGradient id="wind-compass-dial" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#0e2a45" />
-              <stop offset="40%" stopColor="#081a2e" />
-              <stop offset="75%" stopColor="#051020" />
-              <stop offset="100%" stopColor="#020a14" />
+              <stop offset="0%" stopColor="#0d2440" />
+              <stop offset="55%" stopColor="#0A1A2F" />
+              <stop offset="100%" stopColor="#081527" />
             </radialGradient>
             <radialGradient id="wind-compass-glass" cx="50%" cy="20%" r="60%">
               <stop offset="0%" stopColor="#c0f0ff" stopOpacity="0.08" />
@@ -172,37 +184,37 @@ function WindRose({ direction }: { direction: number | null }) {
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </radialGradient>
             <linearGradient id="wind-compass-light" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#e8fdff" />
-              <stop offset="35%" stopColor="#39d9ff" />
-              <stop offset="100%" stopColor="#006fc0" />
+              <stop offset="0%" stopColor="#e6f9ff" />
+              <stop offset="35%" stopColor="#00cfff" />
+              <stop offset="100%" stopColor="#0077c8" />
             </linearGradient>
             <linearGradient id="wind-compass-star-blue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#d0f4ff" />
-              <stop offset="30%" stopColor="#2090ee" />
-              <stop offset="70%" stopColor="#0858a0" />
-              <stop offset="100%" stopColor="#052848" />
+              <stop offset="0%" stopColor="#d6f4ff" />
+              <stop offset="30%" stopColor="#00bfff" />
+              <stop offset="70%" stopColor="#0068b8" />
+              <stop offset="100%" stopColor="#003a68" />
             </linearGradient>
             <linearGradient id="wind-compass-star-steel" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f0f8ff" />
-              <stop offset="40%" stopColor="#8098b0" />
-              <stop offset="100%" stopColor="#183050" />
+              <stop offset="0%" stopColor="#f4f8fc" />
+              <stop offset="40%" stopColor="#93a7bb" />
+              <stop offset="100%" stopColor="#22384e" />
             </linearGradient>
             <linearGradient id="wind-compass-needle" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f8ffff" />
-              <stop offset="18%" stopColor="#70eaff" />
-              <stop offset="50%" stopColor="#08c0ff" />
-              <stop offset="100%" stopColor="#0758c0" />
+              <stop offset="0%" stopColor="#f4fcff" />
+              <stop offset="18%" stopColor="#3fe4ff" />
+              <stop offset="50%" stopColor="#00bfff" />
+              <stop offset="100%" stopColor="#0072b8" />
             </linearGradient>
             <linearGradient id="wind-compass-needle-tail" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#203850" />
-              <stop offset="50%" stopColor="#a8c0d4" />
-              <stop offset="100%" stopColor="#e4f0ff" />
+              <stop offset="0%" stopColor="#072a4c" />
+              <stop offset="50%" stopColor="#1d5d9a" />
+              <stop offset="100%" stopColor="#6ec8f2" />
             </linearGradient>
             <radialGradient id="wind-compass-hub" cx="50%" cy="40%" r="55%">
-              <stop offset="0%" stopColor="#e0f4ff" />
-              <stop offset="25%" stopColor="#90a8bc" />
-              <stop offset="55%" stopColor="#284060" />
-              <stop offset="100%" stopColor="#081020" />
+              <stop offset="0%" stopColor="#f0f6fa" />
+              <stop offset="25%" stopColor="#b9c9d8" />
+              <stop offset="55%" stopColor="#5c7488" />
+              <stop offset="100%" stopColor="#14263a" />
             </radialGradient>
             <filter id="wind-compass-neon" x="-60%" y="-60%" width="220%" height="220%">
               <feGaussianBlur stdDeviation="1.8" result="blur" />
@@ -220,16 +232,14 @@ function WindRose({ direction }: { direction: number | null }) {
             </filter>
           </defs>
 
-          {/* Outer dark ring */}
-          <circle cx="80" cy="80" r="78" fill="#020811" stroke="#01050b" strokeWidth="1" />
+          {/* Anneau extérieur noir avec reflets métalliques (vue de face) */}
+          <circle cx="80" cy="80" r="78" fill="#000000" stroke="#02060b" strokeWidth="1" />
+          <circle cx="80" cy="80" r="78" fill="url(#wind-compass-outer-reflection)" opacity="0.55" />
 
-          {/* Metallic bezel ring */}
-          <circle cx="80" cy="80" r="75" fill="url(#wind-compass-bezel)" stroke="#8aa0b4" strokeWidth="0.8" />
+          {/* Lunette métallique argentée */}
+          <circle cx="80" cy="80" r="75" fill="url(#wind-compass-bezel)" stroke="#aabfce" strokeWidth="0.8" />
 
-          {/* Inner case ring */}
-          <circle cx="80" cy="80" r="70" fill="url(#wind-compass-case)" stroke="#07111c" strokeWidth="2" />
-
-          {/* Bezel segment separators (8 lines) */}
+          {/* Séparateurs fins de la lunette (8 segments) */}
           {Array.from({ length: 8 }, (_, i) => {
             const angle = i * 45;
             const inner = pointAt(70, angle);
@@ -241,63 +251,29 @@ function WindRose({ direction }: { direction: number | null }) {
                 y1={inner.y}
                 x2={outer.x}
                 y2={outer.y}
-                stroke="rgba(140,165,190,0.5)"
+                stroke="rgba(180,200,220,0.55)"
                 strokeWidth="1.2"
               />
             );
           })}
 
-          {/* Glowing cardinal triangle markers at N, E, S, O */}
-          {[0, 90, 180, 270].map((angle) => {
-            const outer = pointAt(75.5, angle);
-            const mid = pointAt(67, angle);
-            const left = pointAt(71, angle - 10);
-            const right = pointAt(71, angle + 10);
-            return (
-              <path
-                key={`cardinal-arrow-${angle}`}
-                d={`M${outer.x.toFixed(1)} ${outer.y.toFixed(1)} L${left.x.toFixed(1)} ${left.y.toFixed(1)} L${mid.x.toFixed(1)} ${mid.y.toFixed(1)} L${right.x.toFixed(1)} ${right.y.toFixed(1)} Z`}
-                fill="url(#wind-compass-light)"
-                stroke="#d0f8ff"
-                strokeWidth="0.5"
-                filter="url(#wind-compass-neon)"
-              />
-            );
-          })}
+          {/* Cerclage intérieur bleu nuit */}
+          <circle cx="80" cy="80" r="70" fill="url(#wind-compass-case)" stroke="#04121f" strokeWidth="2" />
 
-          {/* Smaller diamond markers at NE, SE, SO, NO */}
-          {[45, 135, 225, 315].map((angle) => {
-            const outer = pointAt(74, angle);
-            const mid = pointAt(69, angle);
-            const left = pointAt(71.5, angle - 6);
-            const right = pointAt(71.5, angle + 6);
-            return (
-              <path
-                key={`intercardinal-marker-${angle}`}
-                d={`M${outer.x.toFixed(1)} ${outer.y.toFixed(1)} L${left.x.toFixed(1)} ${left.y.toFixed(1)} L${mid.x.toFixed(1)} ${mid.y.toFixed(1)} L${right.x.toFixed(1)} ${right.y.toFixed(1)} Z`}
-                fill="url(#wind-compass-light)"
-                stroke="#b0e8ff"
-                strokeWidth="0.35"
-                filter="url(#wind-compass-neon-soft)"
-                opacity="0.8"
-              />
-            );
-          })}
+          {/* Cadran bleu nuit #0A1A2F */}
+          <circle cx="80" cy="80" r="64" fill="url(#wind-compass-dial)" stroke="rgba(0,191,255,0.9)" strokeWidth="1.2" />
 
-          {/* Dial face (deep blue) */}
-          <circle cx="80" cy="80" r="64" fill="url(#wind-compass-dial)" stroke="rgba(42,190,245,0.9)" strokeWidth="1.2" />
+          {/* Anneaux gradués subtils */}
+          <circle cx="80" cy="80" r="60" fill="none" stroke="rgba(0,191,255,0.45)" strokeWidth="0.5" />
+          <circle cx="80" cy="80" r="56" fill="none" stroke="rgba(0,191,255,0.4)" strokeWidth="0.5" />
+          <circle cx="80" cy="80" r="50" fill="none" stroke="rgba(0,191,255,0.35)" strokeWidth="0.5" />
+          <circle cx="80" cy="80" r="40" fill="rgba(2,16,31,0.4)" stroke="rgba(0,191,255,0.55)" strokeWidth="0.5" />
+          <circle cx="80" cy="80" r="36" fill="none" stroke="rgba(0,191,255,0.3)" strokeWidth="0.4" strokeDasharray="0.8 2" />
 
-          {/* Concentric graduated rings */}
-          <circle cx="80" cy="80" r="60" fill="none" stroke="rgba(160,220,250,0.45)" strokeWidth="0.5" />
-          <circle cx="80" cy="80" r="56" fill="none" stroke="rgba(40,170,225,0.4)" strokeWidth="0.5" />
-          <circle cx="80" cy="80" r="50" fill="none" stroke="rgba(60,190,240,0.35)" strokeWidth="0.5" />
-          <circle cx="80" cy="80" r="40" fill="rgba(3,18,32,0.4)" stroke="rgba(50,170,220,0.55)" strokeWidth="0.5" />
-          <circle cx="80" cy="80" r="36" fill="none" stroke="rgba(80,190,240,0.3)" strokeWidth="0.4" strokeDasharray="0.8 2" />
-
-          {/* Glass reflection overlay */}
+          {/* Reflet de verre */}
           <circle cx="80" cy="80" r="63" fill="url(#wind-compass-glass)" />
 
-          {/* Dot ring (rotates with compass heading) */}
+          {/* Anneau de points lumineux #00BFFF (tourne avec le cap) */}
           <g transform={`rotate(${-compassHeading}, 80, 80)`}>
             {Array.from({ length: 72 }, (_, i) => {
               const p = pointAt(57, i * 5);
@@ -308,12 +284,12 @@ function WindRose({ direction }: { direction: number | null }) {
                   cx={p.x}
                   cy={p.y}
                   r={isEmphasized ? 0.8 : 0.4}
-                  fill={isEmphasized ? "#80e0ff" : "#38a8d0"}
+                  fill={isEmphasized ? "#00e0ff" : "#0d9cd8"}
                   opacity={isEmphasized ? 0.9 : 0.6}
                 />
               );
             })}
-            {/* Tick marks */}
+            {/* Graduations fines lumineuses alternées longues/courtes */}
             {Array.from({ length: 36 }, (_, i) => {
               const angle = i * 10;
               const isMajor = i % 9 === 0;
@@ -327,78 +303,80 @@ function WindRose({ direction }: { direction: number | null }) {
                   y1={inner.y}
                   x2={outer.x}
                   y2={outer.y}
-                  stroke={isMajor ? "#70d8ff" : "rgba(100,195,235,0.55)"}
+                  stroke={isMajor ? "#00d8ff" : "rgba(0,191,255,0.55)"}
                   strokeWidth={isMajor ? 1.3 : 0.55}
                   strokeLinecap="round"
                   filter={isMajor ? "url(#wind-compass-neon)" : undefined}
                 />
               );
             })}
+            {/* Rose des vents à huit branches */}
+            {starPoints.map(({ index, path }) => (
+              <path
+                key={`compass-star-${index}`}
+                d={path}
+                fill={index % 2 === 0 ? "url(#wind-compass-star-blue)" : "url(#wind-compass-star-steel)"}
+                stroke="rgba(150,220,255,0.5)"
+                strokeWidth="0.45"
+                opacity="0.85"
+              />
+            ))}
           </g>
 
-          {/* 8-point compass star (rose des vents) */}
-          {starPoints.map(({ index, path }) => (
-            <path
-              key={`compass-star-${index}`}
-              d={path}
-              fill={index % 2 === 0 ? "url(#wind-compass-star-blue)" : "url(#wind-compass-star-steel)"}
-              stroke="rgba(150,220,255,0.5)"
-              strokeWidth="0.45"
-              opacity="0.85"
-            />
-          ))}
-
-          {/* Wind direction needle */}
+          {/* Aiguille de direction du vent : pointe triangulaire fine bleu lumineux, presque jusqu'au bord */}
           {hasDirection ? (
             <g transform={`rotate(${direction - compassHeading}, 80, 80)`}>
-              {/* Leading half - bright cyan-blue diamond */}
+              {/* Moitié avant - flèche bleu lumineux */}
               <path
-                d="M80 38 L88 78 L80 73 L72 78 Z"
+                d="M80 23 L88 79 L80 74 L72 79 Z"
                 fill="url(#wind-compass-needle)"
                 stroke="#d0f8ff"
                 strokeWidth="0.7"
                 filter="url(#wind-compass-neon)"
               />
-              {/* Center highlight line */}
-              <line x1="80" y1="42" x2="80" y2="70" stroke="rgba(255,255,255,0.7)" strokeWidth="0.6" strokeLinecap="round" />
-              {/* Trailing half - darker steel */}
+              {/* Ligne centrale de surbrillance */}
+              <line x1="80" y1="27" x2="80" y2="70" stroke="rgba(255,255,255,0.7)" strokeWidth="0.6" strokeLinecap="round" />
+              {/* Moitié arrière - queue bleue */}
               <path
-                d="M80 122 L88 82 L80 87 L72 82 Z"
+                d="M80 137 L88 81 L80 86 L72 81 Z"
                 fill="url(#wind-compass-needle-tail)"
-                stroke="rgba(195,218,238,0.8)"
+                stroke="rgba(110,200,242,0.8)"
                 strokeWidth="0.5"
               />
             </g>
           ) : null}
 
-          {/* Cardinal & intercardinal labels (fixed positions, horizontal) */}
-          {labelPositions.map(({ label, x, y, size }) => {
-            const isCardinal = label.length === 1;
-            return (
-              <text
-                key={label}
-                x={x}
-                y={y}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={size}
-                fontWeight="900"
-                fill="#eef8ff"
-                stroke="rgba(1,8,18,0.85)"
-                strokeWidth={isCardinal ? 0.9 : 0.6}
-                paintOrder="stroke"
-                filter={isCardinal ? "url(#wind-compass-neon-soft)" : undefined}
-                style={{ userSelect: "none", pointerEvents: "none" }}
-              >
-                {label}
-              </text>
-            );
-          })}
+          {/* Libellés cardinaux et intercardinaux blancs, agrandis et lumineux (vue de face) */}
+<g transform={`rotate(${-compassHeading}, 80, 80)`}>
+            {labelPositions.map(({ label, x, y, size }) => {
+              const isCardinal = label.length === 1;
+              return (
+                <text
+                  key={label}
+                  x={x}
+                  y={y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={size}
+                  fontWeight="900"
+                  fill="#ffffff"
+                  stroke="rgba(1,8,18,0.9)"
+                  strokeWidth={isCardinal ? 1.2 : 0.8}
+                  paintOrder="stroke"
+                  filter={isCardinal ? "url(#wind-compass-neon)" : "url(#wind-compass-neon-soft)"}
+                  style={{ userSelect: "none", pointerEvents: "none" }}
+                >
+                  {label}
+                </text>
+              );
+            })}
+          </g>
 
-          {/* Central hub */}
-          <circle cx="80" cy="80" r="11" fill="url(#wind-compass-hub)" stroke="#90a8bc" strokeWidth="0.7" />
-          <circle cx="80" cy="80" r="8" fill="#061522" stroke="rgba(120,165,200,0.7)" strokeWidth="0.5" />
-          <circle cx="80" cy="80" r="5.5" fill="url(#wind-compass-light)" stroke="#c0f8ff" strokeWidth="0.65" filter="url(#wind-compass-neon)" />
+
+          {/* Moyeu métallique avec point bleu lumineux */}
+          <circle cx="80" cy="80" r="11" fill="url(#wind-compass-hub)" stroke="#c6d4e0" strokeWidth="0.7" />
+          <circle cx="80" cy="80" r="8" fill="#0A1A2F" stroke="rgba(0,191,255,0.7)" strokeWidth="0.5" />
+          <circle cx="80" cy="80" r="5.5" fill="url(#wind-compass-light)" stroke="#dffaff" strokeWidth="0.65" filter="url(#wind-compass-neon)" />
           <circle cx="78.5" cy="78.2" r="1.4" fill="rgba(255,255,255,0.9)" />
         </svg>
       </div>
@@ -1406,7 +1384,7 @@ export default function Dashboard() {
                   {currentProvenanceLabel(apparentTemperatureField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(apparentTemperatureField)}</p>}
                 </div>
                 <div className="min-w-0 text-center">
-                  <p className="mb-1 flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Direction du vent</p>
+                  <p className="mb-1 flex items-center justify-center gap-1 whitespace-nowrap text-[12px] font-medium leading-tight text-white sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Direction du vent</p>
                   <WindRose direction={windDir} />
                   {currentProvenanceLabel(windDirectionField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]" title={currentProvenanceTitle(windDirectionField)}>
                     {currentProvenanceLabel(windDirectionField)}
