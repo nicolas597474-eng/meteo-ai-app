@@ -4,7 +4,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { conditionFromWmoWeatherCode } from "./weatherConditionLabels";
+import { conditionFromWmoWeatherCodePreferingCloudCover } from "./weatherConditionLabels";
 import { fetchWeather, getWeatherResponseAttemptCount } from "./weatherFetch";
 import { getParisDateAndHour } from "./parisHourlyTime";
 import { getParisHourlyTimestamps, shiftParisCivilDate } from "./weatherTime";
@@ -927,7 +927,7 @@ export async function collectHourlyForecast(
         cloudCover: cloud,
         humidity,
         uvIndex: hourly.uv_index?.[i] ?? null,
-        condition: conditionFromWmoWeatherCode(weatherCode, precip, cloud),
+        condition: conditionFromWmoWeatherCodePreferingCloudCover(weatherCode, precip, cloud),
         weatherCode,
         // Extended fields
         pressure: hourly.surface_pressure?.[i] ?? null,
@@ -985,7 +985,7 @@ export async function collectCurrentWeatherSnapshot(
       cloudCover,
       humidity: current.relative_humidity_2m ?? null,
       weatherCode,
-      condition: conditionFromWmoWeatherCode(weatherCode, precipitation, cloudCover),
+      condition: conditionFromWmoWeatherCodePreferingCloudCover(weatherCode, precipitation, cloudCover),
     };
   } catch (error) {
     console.error("[CurrentSnapshot] Error fetching Open-Meteo current model snapshot:", error);
