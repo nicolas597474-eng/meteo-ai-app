@@ -150,11 +150,11 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("État du ciel</p>");
     expect(source).toContain("Open-Meteo");
     expect(source).toContain("Précipitations actuelles");
-    expect(source).toContain("Pression mesurée localement");
+    expect(source).not.toContain("Pression mesurée localement");
     expect(source).toContain("Pression de surface estimée (modèle)");
     expect(source).toContain("surface_pressure");
     expect(source).toContain("non ramenée au niveau de la mer");
-    expect(source).toContain("références barométriques des stations non comparables.");
+    expect(source).not.toContain("références barométriques des stations non comparables.");
     expect(source).toContain("const currentTemp = currentNumber(temperatureField)");
     expect(source).toContain("withCurrentSnapshotFallback(currentFields?.condition, currentSnapshot?.condition, snapshotCapturedAt)");
     expect(source).toContain("withCurrentSnapshotFallback(currentFields?.temperature, currentSnapshot?.temp, snapshotCapturedAt)");
@@ -251,7 +251,6 @@ describe("Dashboard avec état courant sourcé par variable", () => {
       "Précipitations actuelles",
       "Vent actuel",
       "Rafales actuelles",
-      "Pression mesurée localement",
       "Pression de surface estimée (modèle)",
       "Nuages actuels",
       "{currentUVLabel}",
