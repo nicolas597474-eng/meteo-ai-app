@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { FavoriteWeatherPreloader } from "./components/FavoriteWeatherPreloader";
 import { ReliabilityLabPreloader } from "./components/weather/ReliabilityLabPreloader";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { ProvenanceDisplayProvider } from "./contexts/ProvenanceDisplayContext";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, MAIN_PAGE_PATHS, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import { useDetailedForecastPrefetch } from "./hooks/useDetailedForecastPrefetch";
 import Dashboard from "./pages/Dashboard";
@@ -313,21 +314,23 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
-        <TooltipProvider>
-          <Toaster />
-          <FavoriteWeatherPreloader />
-          <ReliabilityLabPreloader />
-          <TopNav />
-          <ScrollToTopOnRouteChange />
-          <PageSwipeNavigator>
-            <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
-              <Suspense fallback={<RouteLoadingFallback />}>
-                <Router />
-              </Suspense>
-            </div>
-          </PageSwipeNavigator>
-          <BottomNav />
-        </TooltipProvider>
+        <ProvenanceDisplayProvider>
+          <TooltipProvider>
+            <Toaster />
+            <FavoriteWeatherPreloader />
+            <ReliabilityLabPreloader />
+            <TopNav />
+            <ScrollToTopOnRouteChange />
+            <PageSwipeNavigator>
+              <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
+                <Suspense fallback={<RouteLoadingFallback />}>
+                  <Router />
+                </Suspense>
+              </div>
+            </PageSwipeNavigator>
+            <BottomNav />
+          </TooltipProvider>
+        </ProvenanceDisplayProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

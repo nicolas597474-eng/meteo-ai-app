@@ -199,6 +199,46 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain('className="order-[-3] rounded-2xl border border-sky-400/25');
   });
 
+  it("permet de masquer la provenance des données météo sur toutes les pages", () => {
+    const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
+
+    // Le réglage est branché sur la préférence partagée, pas sur un état local au bloc.
+    expect(source).toContain('import { useProvenanceDisplay } from "@/contexts/ProvenanceDisplayContext"');
+    expect(source).toContain("const { showProvenance, toggleShowProvenance } = useProvenanceDisplay();");
+    expect(source).toContain("Provenance des données météo");
+    expect(source).toContain("onClick={toggleShowProvenance}");
+    expect(source).toContain("Masque sur toutes les pages météo les mentions de source et de fraîcheur");
+    expect(source).toContain("Open-Meteo · 09:00 · il y a 11 min");
+    expect(source).toContain("Provenance · {showProvenance ? \"affichée\" : \"masquée\"}");
+    expect(source).toContain("aria-pressed={!showProvenance}");
+    // Le réglage est un masque d’affichage : aucune donnée n’est modifiée.
+    expect(source).toContain("Les données, sources et traces restent identiques");
+  });
+
+  it("applique le réglage de provenance aux pages météo et au graphe horaire", () => {
+    const dashboard = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf8");
+    const hourlyChart = readFileSync(new URL("../components/HourlyChart.tsx", import.meta.url), "utf8");
+    const byDay = readFileSync(new URL("../components/weather/ForecastByDaySection.tsx", import.meta.url), "utf8");
+    const calculationTimes = readFileSync(
+      new URL("../components/weather/OfficialForecastCalculationTimes.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(dashboard).toContain('import { useProvenanceDisplay } from "@/contexts/ProvenanceDisplayContext"');
+    expect(dashboard).toContain("const currentProvenanceLabel = (field?: CurrentStateFieldLike | null) =>");
+    expect(dashboard).toContain("const regimeSourceLabel = showProvenance ? regimeProvenance.sourceLabel : \"\";");
+
+    expect(hourlyChart).toContain("const { showProvenance } = useProvenanceDisplay();");
+    expect(hourlyChart).toContain("{showProvenance && activeHourMeasurementLabel && (");
+
+    expect(byDay).toContain("const { showProvenance } = useProvenanceDisplay();");
+    expect(byDay).toContain("{showProvenance && <span className=\"min-w-0 rounded-full border border-sky-100/15");
+    expect(byDay).toContain("{showProvenance && <details className=\"group px-1 text-xs text-slate-300\">");
+
+    expect(calculationTimes).toContain("const { showProvenance } = useProvenanceDisplay();");
+    expect(calculationTimes).toContain("if (!showProvenance) return null;");
+  });
+
   it("sépare la disponibilité réelle de la calibration et des scores historiques", () => {
     const source = readFileSync(new URL("./WeatherAILab.tsx", import.meta.url), "utf8");
     expect(source).toContain("Une absence hors portée n’est pas un échec de performance");

@@ -1,3 +1,5 @@
+import { useProvenanceDisplay } from "@/contexts/ProvenanceDisplayContext";
+
 function formatCalculationTime(value: string | null | undefined): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -21,8 +23,13 @@ export function OfficialForecastCalculationTimes({
   computedAt?: string | null;
   className?: string;
 }) {
+  const { showProvenance } = useProvenanceDisplay();
   const hourlyTime = formatCalculationTime(hourlyComputedAt);
   const snapshotTime = formatCalculationTime(computedAt);
+
+  // Réglage « Paramètres Application » de l’AI Lab : les horodatages de calcul
+  // sont une indication de provenance et peuvent être masqués.
+  if (!showProvenance) return null;
 
   return (
     <p aria-label="Horodatages des prévisions officielles" className={`text-[10px] leading-relaxed text-slate-400 ${className}`}>

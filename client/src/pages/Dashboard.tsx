@@ -15,6 +15,7 @@ import {
   type DashboardWeatherEffectsMode,
 } from "@/lib/dashboardWeatherEffects";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
+import { useProvenanceDisplay } from "@/contexts/ProvenanceDisplayContext";
 import { findNextConditionChange, getNextWeatherAlert } from "@/lib/weatherCondition";
 import { LocalOfficialDeltaChart } from "@/components/LocalOfficialDeltaChart";
 import { LocalModelContributionNotice } from "@/components/LocalModelContributionNotice";
@@ -525,7 +526,7 @@ function DominantRegimePanel({
             <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">État du ciel</p>
             <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
             <p className="hidden text-xs leading-tight text-muted-foreground sm:block">{regime.description}</p>
-            <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">{regimeSourceLabel} · {regimeFreshnessLabel}</p>
+            {regimeSourceLabel && regimeFreshnessLabel ? <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">{regimeSourceLabel} · {regimeFreshnessLabel}</p> : null}
             <span className="sr-only">Voir les 20 régimes</span>
           </div>
         </button>
@@ -580,7 +581,7 @@ function DominantRegimePanel({
           </div>
         </div>
       )}
-      <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
+      {(regimeFreshnessLabel || regimeSourceUpdatedAt) ? <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p> : null}
     </section>
   );
 }
@@ -591,6 +592,7 @@ export default function Dashboard() {
   const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
   const [weatherEffectsMode] = useState<DashboardWeatherEffectsMode>(getDashboardWeatherEffectsMode);
+  const { showProvenance } = useProvenanceDisplay();
   const [hasWaitTimedOut, setHasWaitTimedOut] = useState(false);
   const [showRegimeMenu, setShowRegimeMenu] = useState(false);
   const [expandedRegimeIds, setExpandedRegimeIds] = useState<string[]>([]);
@@ -897,6 +899,12 @@ export default function Dashboard() {
   const officialHours = officialForecast?.hours ?? [];
   const hours = officialHours;
   const currentSnapshot = officialForecast?.currentSnapshot ?? fastCurrentSnapshot ?? null;
+  // Réglage « Paramètres Application » de l’AI Lab : la provenance (source, horodatage et
+  // fraîcheur) peut être masquée. Seul l’affichage change : les valeurs restent identiques.
+  const currentProvenanceLabel = (field?: CurrentStateFieldLike | null) =>
+    showProvenance ? formatCurrentStateProvenance(field, currentSnapshot?.capturedAt) : null;
+  const currentProvenanceTitle = (field?: CurrentStateFieldLike | null) =>
+    showProvenance ? currentStateFieldTitle(field, currentSnapshot?.capturedAt) : undefined;
   const dailyFallback = officialForecast?.dailyFallback ?? dash?.dailyFallback ?? null;
   const currentFields = currentDashboardWeather?.fields;
   const hasPhysicalCurrentState = Object.values(currentFields ?? {}).some((field) => field.provenance.kind === "physical_stations");
@@ -926,9 +934,10 @@ export default function Dashboard() {
     sourceUpdatedAt: officialRegime?.sourceUpdatedAt,
     hasRegime: !!officialPrimaryRegime,
   });
-  const regimeSourceLabel = regimeProvenance.sourceLabel;
-  const regimeSourceUpdatedAt = regimeProvenance.sourceTimeLabel;
-  const liveRegimeFreshnessLabel = regimeProvenance.freshnessLabel;
+  // Réglage « Paramètres Application » de l’AI Lab : masque les mentions de provenance.
+  const regimeSourceLabel = showProvenance ? regimeProvenance.sourceLabel : "";
+  const regimeSourceUpdatedAt = showProvenance ? regimeProvenance.sourceTimeLabel : null;
+  const liveRegimeFreshnessLabel = showProvenance ? regimeProvenance.freshnessLabel : "";
   const regimeInputDiagnostics = Array.isArray(officialRegime?.inputDiagnostics)
     ? officialRegime.inputDiagnostics as OfficialRegimeInputDiagnostic[]
     : null;
@@ -979,6 +988,10 @@ export default function Dashboard() {
   const chartHours = withCurrentStationTemperature(hours, currentHourIndex, stationTemperature);
   const selectedCondition = currentString(conditionField);
   const displayedCondition = selectedCondition ?? (isDailyFallback ? dailyFallback.condition : null);
+  // « Tendance quotidienne » décrit la nature de la valeur, pas sa provenance : il reste affiché.
+  const conditionProvenanceLabel = isDailyFallback && !conditionField
+    ? "Tendance quotidienne · pas une observation instantanée"
+    : currentProvenanceLabel(conditionField);
   const activeFavoriteWeather = {
     temp: officialSnapshotTemp,
     condition: currentSnapshot?.condition ?? (isDailyFallback ? dailyFallback.condition : null),
@@ -1083,7 +1096,7 @@ export default function Dashboard() {
                       <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-sky-200/75 sm:text-[9px] sm:tracking-[0.14em]">État du ciel</p>
                       <p className="flex items-center gap-1 text-[11px] font-semibold text-white sm:text-xs">{regime?.label} {showRegimeMenu ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-300" />}</p>
                       <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{regime?.description}</p>
-                      <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">{regimeSourceLabel} · {regimeFreshnessLabel}</p>
+                      {regimeSourceLabel && regimeFreshnessLabel ? <p className="text-[9px] leading-tight text-sky-200/80 sm:mt-0.5 sm:text-[10px]">{regimeSourceLabel} · {regimeFreshnessLabel}</p> : null}
                       <span className="sr-only">Voir les 20 régimes</span>
                     </div>
                   </button>
@@ -1195,7 +1208,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{regimeSourceLabel} · {regimeFreshnessLabel}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p>
+                {(regimeSourceLabel || regimeFreshnessLabel || regimeSourceUpdatedAt) ? <p className="mt-0.5 hidden text-[10px] font-medium text-slate-300 sm:block">{[regimeSourceLabel, regimeFreshnessLabel].filter(Boolean).join(" · ")}{regimeSourceUpdatedAt ? ` · source à ${regimeSourceUpdatedAt} (Europe/Paris)` : ""}</p> : null}
               </div>
             )}
 
@@ -1256,9 +1269,9 @@ export default function Dashboard() {
                   <p className={dashboardTemperatureLayout.currentValue}>
                     {currentTemp != null ? currentTemp.toFixed(1) : "—"}°
                   </p>
-                  <p className="mt-0.5 text-[9px] leading-tight text-slate-400" title={currentStateFieldTitle(temperatureField, currentSnapshot?.capturedAt)}>
-                    {formatCurrentStateProvenance(temperatureField, currentSnapshot?.capturedAt)}
-                  </p>
+                  {currentProvenanceLabel(temperatureField) && <p className="mt-0.5 text-[9px] leading-tight text-slate-400" title={currentProvenanceTitle(temperatureField)}>
+                    {currentProvenanceLabel(temperatureField)}
+                  </p>}
                 </div>
 
                 {/* Max / Min */}
@@ -1284,10 +1297,10 @@ export default function Dashboard() {
                 <span className="font-semibold text-sky-200/90">{isDailyFallback ? "Tendance quotidienne · " : currentSnapshot || hasAvailableCurrentState ? "État actuel · " : "État courant indisponible · "}</span>
                 <span className="text-white">{displayedCondition ?? "Condition indisponible"}</span>
               </p>
-              <p className="text-[9px] leading-tight text-slate-400" title={currentStateFieldTitle(conditionField, currentSnapshot?.capturedAt)}>
-                {isDailyFallback && !conditionField ? "Tendance quotidienne · pas une observation instantanée" : formatCurrentStateProvenance(conditionField, currentSnapshot?.capturedAt)}
-                {currentWeatherCode == null ? "" : ` · code WMO ${currentWeatherCode}`}
-              </p>
+              {conditionProvenanceLabel && <p className="text-[9px] leading-tight text-slate-400" title={currentProvenanceTitle(conditionField)}>
+                {conditionProvenanceLabel}
+                {showProvenance && currentWeatherCode != null ? ` · code WMO ${currentWeatherCode}` : ""}
+              </p>}
               {(nextRegimeChange ?? nextConditionChange) && (
                 <>
                   <p className="whitespace-nowrap text-[15px] font-medium leading-tight sm:hidden">
@@ -1307,54 +1320,54 @@ export default function Dashboard() {
             </div>
 
             <section aria-label="Observations actuelles et valeurs prévisionnelles" className="rounded-xl border border-cyan-400/20 bg-cyan-950/10 px-2 pb-2">
-              <p className="pt-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/90 sm:text-sm">Observations actuelles <span className="font-normal normal-case tracking-normal text-slate-400">· nature, source et échéance indiquées par valeur</span></p>
+              <p className="pt-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/90 sm:text-sm">Observations actuelles {showProvenance && <span className="font-normal normal-case tracking-normal text-slate-400">· nature, source et échéance indiquées par valeur</span>}</p>
               <div className="mt-2 grid grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)] items-center gap-1 border-t border-cyan-400/20 pt-3 sm:grid-cols-[minmax(0,1fr)_6rem_minmax(0,1fr)] sm:gap-3">
-                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-1.5 text-center sm:p-2" title={currentStateFieldTitle(apparentTemperatureField, currentSnapshot?.capturedAt)}>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-1.5 text-center sm:p-2" title={currentProvenanceTitle(apparentTemperatureField)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Thermometer className="h-3.5 w-3.5 shrink-0" />Ressenti</p>
                   <p className="mt-1 text-lg font-bold text-white sm:text-2xl">{apparentTemp != null ? `${apparentTemp.toFixed(1)}°` : "—"}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(apparentTemperatureField, currentSnapshot?.capturedAt)}</p>
+                  {currentProvenanceLabel(apparentTemperatureField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(apparentTemperatureField)}</p>}
                 </div>
                 <div className="min-w-0 text-center">
                   <p className="mb-1 flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Direction du vent</p>
                   <WindRose direction={windDir} />
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]" title={currentStateFieldTitle(windDirectionField, currentSnapshot?.capturedAt)}>
-                    {formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)}
-                  </p>
+                  {currentProvenanceLabel(windDirectionField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]" title={currentProvenanceTitle(windDirectionField)}>
+                    {currentProvenanceLabel(windDirectionField)}
+                  </p>}
                 </div>
-                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-1.5 text-center sm:p-2" title={currentStateFieldTitle(cloudCoverField, currentSnapshot?.capturedAt)}>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-1.5 text-center sm:p-2" title={currentProvenanceTitle(cloudCoverField)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Eye className="h-3.5 w-3.5 shrink-0" />Nuages actuels</p>
                   <p className="mt-1 text-lg font-bold text-white sm:text-2xl">{currentCloudCover == null ? "—" : `${formatDashboardNumber(currentCloudCover, 0)}%`}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(cloudCoverField, currentSnapshot?.capturedAt)}</p>
+                  {currentProvenanceLabel(cloudCoverField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(cloudCoverField)}</p>}
                 </div>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentProvenanceTitle(windSpeedField)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Vent actuel</p>
                   <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{formatOptionalForecastValue(windSpeed, 0, " km/h")}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(windSpeedField, currentSnapshot?.capturedAt)}</p>
+                  {currentProvenanceLabel(windSpeedField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(windSpeedField)}</p>}
                 </div>
-                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(windGustField, currentSnapshot?.capturedAt)}>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentProvenanceTitle(windGustField)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Rafales actuelles</p>
                   <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{formatOptionalForecastValue(currentWindGust, 0, " km/h")}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(windGustField, currentSnapshot?.capturedAt)}</p>
+                  {currentProvenanceLabel(windGustField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(windGustField)}</p>}
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/20 p-2">
                 <p className="flex items-center gap-1 text-[12px] font-medium text-sky-100 sm:text-sm"><Thermometer className="h-3.5 w-3.5" />Pression de surface estimée (modèle)</p>
                 <p className="text-lg font-semibold text-white sm:text-xl">{typeof currentHour?.pressure === "number" && Number.isFinite(currentHour.pressure) ? `${formatDashboardNumber(currentHour.pressure, 0)} hPa` : "—"}</p>
-                <p className="mt-1 w-full text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)} · {formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
+                {showProvenance && <p className="mt-1 w-full text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)} · {formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>}
                 <p className="mt-1 w-full text-[9px] leading-tight text-slate-500"><code className="font-mono">surface_pressure</code> en hPa · pression de surface du lieu, non ramenée au niveau de la mer; estimation de modèle, pas une mesure de station.</p>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(humidityField, currentSnapshot?.capturedAt)}>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentProvenanceTitle(humidityField)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><MeteoIcon name="humidity" size={16} className="shrink-0" />Humidité actuelle</p>
                   <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentHumidity == null ? "—" : `${formatDashboardNumber(currentHumidity)}%`}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(humidityField, currentSnapshot?.capturedAt)}</p>
+                  {currentProvenanceLabel(humidityField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(humidityField)}</p>}
                 </div>
-                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentStateFieldTitle(precipitationField, currentSnapshot?.capturedAt)}>
+                <div className="min-w-0 rounded-lg border border-white/5 bg-black/20 p-2 text-center" title={currentProvenanceTitle(precipitationField)}>
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-slate-200 sm:text-sm"><Droplets className="h-3.5 w-3.5 shrink-0" />Précipitations actuelles</p>
                   <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentPrecipitation == null ? "—" : `${currentPrecipitation.toFixed(1)} mm`}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatCurrentStateProvenance(precipitationField, currentSnapshot?.capturedAt)}</p>
+                  {currentProvenanceLabel(precipitationField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(precipitationField)}</p>}
                   <p className="mt-1 text-[9px] leading-tight text-slate-500">Cumul station non comparable</p>
                 </div>
               </div>
@@ -1363,15 +1376,15 @@ export default function Dashboard() {
                 <div className="min-w-0 rounded-lg border border-sky-300/15 bg-slate-950/35 p-2 text-center">
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-sky-100 sm:text-sm"><Sun className="h-3.5 w-3.5 shrink-0" />{currentUVLabel}</p>
                   <UVBadge uv={currentUV} />
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(uvForecastHour?.validAt)}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-500 sm:text-[10px]">{formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
+                  {showProvenance && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(uvForecastHour?.validAt)}</p>}
+                  {showProvenance && <p className="mt-1 text-[9px] leading-tight text-slate-500 sm:text-[10px]">{formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>}
                 </div>
                 <div className="min-w-0 rounded-lg border border-sky-300/15 bg-slate-950/35 p-2 text-center" title="Visibilité météorologique en kilomètres ; le contrat ne fournit pas de mesure distincte de visibilité des nuages.">
                   <p className="flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-sky-100 sm:text-sm"><Eye className="h-3.5 w-3.5 shrink-0" />Visibilité prévue</p>
                   <p className="mt-1 text-lg font-semibold text-white sm:text-xl">{currentHour?.visibility == null ? "—" : `${currentHour.visibility.toFixed(1)} km`}</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)}</p>
+                  {showProvenance && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{formatHourlyForecastValidAt(currentHour?.validAt)}</p>}
                   <p className="mt-1 text-[9px] leading-tight text-slate-500">Visibilité météo, pas spécifique aux nuages</p>
-                  <p className="mt-1 text-[9px] leading-tight text-slate-500 sm:text-[10px]">{formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>
+                  {showProvenance && <p className="mt-1 text-[9px] leading-tight text-slate-500 sm:text-[10px]">{formatHourlyForecastSource(hourlyForecastSource)} · {formatHourlyForecastComputedAt(hourlyForecastComputedAt)}</p>}
                 </div>
                 </div>
               </div>
