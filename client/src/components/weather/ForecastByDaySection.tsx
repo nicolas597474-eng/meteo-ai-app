@@ -37,6 +37,7 @@ import {
 } from "@/lib/forecastTimeline";
 import type { DailyForecastEvidenceStatus, DailyOfficialFusionDisplay, DailyForecastSourceDiagnostic, DailyFusionMetricDiagnostic } from "@shared/dailyForecast";
 import type { HourlyFallbackProvenance, OpenWeatherFallbackField } from "@shared/hourlyFallbackProvenance";
+import { useProvenanceDisplay } from "@/contexts/ProvenanceDisplayContext";
 
 type PrecipitationMetrics = {
   thresholdMm?: number | null;
@@ -587,6 +588,7 @@ export function ForecastByDaySection({
   /** Provenance de la mesure des stations physiques quand l'échéance active est une observation. */
   activeHourMeasurementLabel?: string | null;
 }) {
+  const { showProvenance } = useProvenanceDisplay();
   const grouped = useMemo(() => groupOfficialHourlyForecastByDate(hours), [hours]);
   const today = getForecastDateKey();
   const tomorrow = getNextForecastDateKey(today);
@@ -849,8 +851,8 @@ export function ForecastByDaySection({
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">{selectedEntry ? `Échéance ${hourTime(selectedEntry, hours)}` : "Température horaire"}</p>
                     <p className="mt-0.5 text-[2.8rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-5xl" style={selectedHourlyTemperatureTone ? { color: selectedHourlyTemperatureTone } : undefined}>{formatOptionalForecastValue(selectedEntryHasValidTime ? selectedEntry?.hour.temp : null, 1, "°")}</p>
-                    {selectedEntry && <p className={activeHourIsMeasured ? "mt-1 text-[8px] leading-tight text-amber-200" : "mt-1 text-[8px] leading-tight text-slate-400"} title={`validTime UTC ${selectedValidTimeUtc}`}>{activeHourIsMeasured ? `Mesure stations physiques · ${activeHourMeasurementLabel}` : hourlyFieldProvenance("temperature", selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.temp))}</p>}
-                    {selectedEntryHasValidTime && selectedEntry?.hour.fallbackProvenance?.temperature && <p className="mt-1 text-[9px] leading-relaxed text-amber-200">OpenWeatherMap · réponse obtenue par l’application {new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }).format(new Date(selectedEntry.hour.fallbackProvenance.temperature.retrievedAt))} · validTime exact · run fournisseur non communiqué, fraîcheur amont inconnue.</p>}
+                    {selectedEntry && showProvenance && <p className={activeHourIsMeasured ? "mt-1 text-[8px] leading-tight text-amber-200" : "mt-1 text-[8px] leading-tight text-slate-400"} title={`validTime UTC ${selectedValidTimeUtc}`}>{activeHourIsMeasured ? `Mesure stations physiques · ${activeHourMeasurementLabel}` : hourlyFieldProvenance("temperature", selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.temp))}</p>}
+                    {showProvenance && selectedEntryHasValidTime && selectedEntry?.hour.fallbackProvenance?.temperature && <p className="mt-1 text-[9px] leading-relaxed text-amber-200">OpenWeatherMap · réponse obtenue par l’application {new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }).format(new Date(selectedEntry.hour.fallbackProvenance.temperature.retrievedAt))} · validTime exact · run fournisseur non communiqué, fraîcheur amont inconnue.</p>}
                   </div>
                 ) : (
                   <div className="min-w-0 flex-1">
@@ -864,7 +866,7 @@ export function ForecastByDaySection({
                 )}
                 <div className="max-w-[42%] shrink-0 text-right">
                   <p className="text-[13px] font-medium leading-snug text-slate-50">{selectedCondition || "Condition indisponible"}</p>
-                  {selectedDay.kind === "official-hourly" && <p className="mt-0.5 text-[8px] leading-tight text-slate-400">{hourlyFieldProvenance(null, Boolean(selectedHourlyCondition))}</p>}
+                  {showProvenance && selectedDay.kind === "official-hourly" && <p className="mt-0.5 text-[8px] leading-tight text-slate-400">{hourlyFieldProvenance(null, Boolean(selectedHourlyCondition))}</p>}
                   <p className="mt-2 text-[11px] font-medium text-slate-300">Ressenti</p>
                   <p className={selectedDay.kind === "official-hourly" ? "mt-0.5 whitespace-nowrap text-2xl font-bold leading-none tabular-nums text-white sm:text-3xl" : "text-sm font-semibold tabular-nums text-white"} style={selectedDay.kind === "official-hourly" && selectedHourlyApparentTemperatureTone ? { color: selectedHourlyApparentTemperatureTone } : undefined}>
                     {selectedDay.kind === "official-hourly"
@@ -877,7 +879,7 @@ export function ForecastByDaySection({
                 </div>
               </div>
 
-              {selectedDay.kind === "official-hourly" && <div className="mt-2 rounded-lg border border-cyan-300/15 bg-slate-950/25 px-2 py-1.5" aria-label="Évolution prévue après l’échéance sélectionnée"><p className="text-[9px] font-semibold text-cyan-100">Évolution prévue · {selectedEvolutionLabel}</p>{selectedEvolutionEntry && <p className="mt-0.5 text-[8px] text-slate-400">{hourlyFieldProvenance(null, true)} · échéance suivante distincte</p>}</div>}
+              {selectedDay.kind === "official-hourly" && <div className="mt-2 rounded-lg border border-cyan-300/15 bg-slate-950/25 px-2 py-1.5" aria-label="Évolution prévue après l’échéance sélectionnée"><p className="text-[9px] font-semibold text-cyan-100">Évolution prévue · {selectedEvolutionLabel}</p>{showProvenance && selectedEvolutionEntry && <p className="mt-0.5 text-[8px] text-slate-400">{hourlyFieldProvenance(null, true)} · échéance suivante distincte</p>}</div>}
 
               <div aria-label="Prévision, source et fraîcheur" className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] leading-relaxed">
                 {activeHourIsMeasured ? (
@@ -885,11 +887,11 @@ export function ForecastByDaySection({
                 ) : (
                   <span aria-label="Prévu, non observé" className="inline-flex min-h-6 items-center rounded-full border border-cyan-200/35 bg-cyan-300/10 px-2 font-bold uppercase tracking-[0.08em] text-cyan-100">Prévu</span>
                 )}
-                <span className="min-w-0 rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Source</span> · {selectedContextSource}</span>
-                <span className="rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Calcul</span> · {selectedFreshness ? <time dateTime={selectedFreshness.iso}>{selectedFreshness.label} (Europe/Paris)</time> : "heure indisponible"}</span>
+                {showProvenance && <span className="min-w-0 rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Source</span> · {selectedContextSource}</span>}
+                {showProvenance && <span className="rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Calcul</span> · {selectedFreshness ? <time dateTime={selectedFreshness.iso}>{selectedFreshness.label} (Europe/Paris)</time> : "heure indisponible"}</span>}
               </div>
 
-              {selectedDay.kind === "official-daily-fusion" && selectedDaily?.officialFusion && (
+              {showProvenance && selectedDay.kind === "official-daily-fusion" && selectedDaily?.officialFusion && (
                 <div className="mt-3 border-t border-sky-100/15 pt-2.5" aria-label="Provenance de la fusion quotidienne">
                   <span className="inline-flex rounded-full border border-cyan-200/40 bg-cyan-300/10 px-2 py-1 text-[10px] font-bold text-cyan-100">Fusion officielle · preuves par variable</span>
                   <p className="mt-1.5 text-[10px] leading-relaxed text-slate-100">Les valeurs sans preuves qualifiées restent indisponibles. Les détails des poids, biais diagnostiques et limites de comparabilité sont ci-dessous.</p>
@@ -923,7 +925,7 @@ export function ForecastByDaySection({
             )}
           </section>
 
-          <details className="group px-1 text-xs text-slate-300">
+          {showProvenance && <details className="group px-1 text-xs text-slate-300">
             <summary className="min-h-10 cursor-pointer list-none py-2 font-medium text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">Provenance et disponibilité des champs <span aria-hidden="true" className="ml-1 inline-block transition-transform group-open:rotate-180">⌄</span></summary>
             {selectedDay.kind === "official-hourly" && (
               <>
@@ -935,7 +937,7 @@ export function ForecastByDaySection({
               ? <DailyFusionDiagnostics day={selectedDaily} sourceLabels={sourceLabels} />
               : <p className="pb-2 leading-relaxed">Les métadonnées de provenance par variable ne sont pas fournies dans ce payload quotidien; aucune calibration ni fusion n’est affirmée.{sourceLabels.length ? ` Sources signalées sans attribution par métrique : ${sourceLabels.join(" · ")}.` : ""}</p>)}
             {selectedDay.kind === "official-daily-fusion" && !selectedDaily && <p className="pb-2 leading-relaxed">Payload quotidien indisponible pour cette date.</p>}
-          </details>
+          </details>}
         </>
       ) : (
         <div className="rounded-2xl border border-amber-200/25 bg-slate-900/75 px-4 py-5 text-sm leading-relaxed text-slate-200" role="status" aria-label="Aucune prévision datée disponible">

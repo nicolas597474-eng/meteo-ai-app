@@ -94,6 +94,11 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).not.toContain("{regime && (\n          <DominantRegimePanel");
     expect(source).toContain("currentSnapshot?.condition");
     expect(source).toContain("{regimeSourceLabel} · {regimeFreshnessLabel}");
+    // La provenance est conditionnée au réglage « Paramètres Application » de l’AI Lab.
+    expect(source).toContain("useProvenanceDisplay");
+    expect(source).toContain("const { showProvenance } = useProvenanceDisplay();");
+    expect(source).toContain("const regimeSourceLabel = showProvenance ? regimeProvenance.sourceLabel : \"\";");
+    expect(source).toContain("const currentProvenanceLabel = (field?: CurrentStateFieldLike | null) =>");
     expect(source).not.toContain("Synthèse horaire");
     expect(source).toContain("Observations actuelles");
     expect(source).not.toContain("Prévisions du jour");
@@ -106,7 +111,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('uvForecastHour && uvForecastHour !== currentHour ? "UV prévu à l’échéance suivante" : "UV prévu pour cette heure"');
     expect(source).toContain("formatHourlyForecastSource(hourlyForecastSource)");
     expect(source).toContain("formatHourlyForecastComputedAt(hourlyForecastComputedAt)");
-    expect(source).toContain("formatCurrentStateProvenance(windDirectionField, currentSnapshot?.capturedAt)");
+    expect(source).toContain("currentProvenanceLabel(windDirectionField)");
     expect(source).toContain("WindRose direction={windDir} />");
     expect(source).toContain("nord en haut. ${directionDescription}");
     expect(source).toContain('size-[4.5rem]');
@@ -118,7 +123,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("wind-compass-bezel");
     expect(source).toContain("wind-compass-neon");
     expect(source).not.toContain("speed={windSpeed}");
-    expect(source).toContain("title={currentStateFieldTitle(windSpeedField, currentSnapshot?.capturedAt)}");
+    expect(source).toContain("title={currentProvenanceTitle(windSpeedField)}");
     expect(source).toContain("formatDashboardNumber(currentHumidity)");
     expect(source).toContain("getRegimeProvenancePresentation({");
     expect(source).not.toContain("officialDataUpdatedAt");
