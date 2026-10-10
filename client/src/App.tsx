@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as React
 import { Route, Switch, Link, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { FavoriteWeatherPreloader } from "./components/FavoriteWeatherPreloader";
+import { ReliabilityLabPreloader } from "./components/weather/ReliabilityLabPreloader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, MAIN_PAGE_PATHS, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import { useDetailedForecastPrefetch } from "./hooks/useDetailedForecastPrefetch";
@@ -315,6 +316,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <FavoriteWeatherPreloader />
+          <ReliabilityLabPreloader />
           <TopNav />
           <ScrollToTopOnRouteChange />
           <PageSwipeNavigator>
