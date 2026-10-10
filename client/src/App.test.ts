@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 describe("navigation MeteoAI", () => {
+  it("charge les pages à la demande sans lancer tous les préchargements au démarrage", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    expect(source).toContain('const Dashboard = lazy(loadDashboard)');
+    expect(source).not.toContain('import Dashboard from');
+    expect(source).not.toContain('useMainPagePreload');
+    expect(source).not.toContain('<ReliabilityLabPreloader');
+    expect(source).toContain('<DeferredFavoritePreloader />');
+    expect(source).toContain('onPointerEnter={() => activateNavItem(item.path)}');
+    expect(source).toContain('<PageReadinessProvider>');
+  });
+
   it("masque l’en-tête de marque sur mobile sans que la barre basse masque le contenu", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     expect(source).toContain('hidden border-b border-border bg-background sm:block');

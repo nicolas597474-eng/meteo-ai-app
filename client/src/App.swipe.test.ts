@@ -46,18 +46,20 @@ describe("navigation entre pages par glissement", () => {
     expect(styles).toContain("prefers-reduced-motion: no-preference");
   });
 
-  it("attend les requêtes et l’inactivité avant le préchargement global, et anticipe la route visée", () => {
+  it("diffère les décorations et ne précharge que la route visée", () => {
     const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const styles = readFileSync(new URL("./index.css", import.meta.url), "utf8");
-    expect(appSource).toContain("const isFetching = useIsFetching();");
-    expect(appSource).toContain("if (isFetching > 0) return;");
-    expect(appSource).toContain("window.requestIdleCallback(preload, { timeout: 1500 })");
+    const readiness = readFileSync(new URL("./contexts/PageReadinessContext.tsx", import.meta.url), "utf8");
+    expect(readiness).toContain("const isFetching = useIsFetching();");
+    expect(readiness).toContain("if (ready || routeLoading || isFetching > 0) return;");
+    expect(readiness).toContain("window.requestIdleCallback");
+    expect(appSource).toContain("useRouteLoading();");
     expect(appSource).toContain("onPointerEnter={() => activateNavItem(item.path)}");
     expect(appSource).toContain("onFocus={() => activateNavItem(item.path)}");
     expect(appSource).toContain("onPointerDown={() => activateNavItem(item.path)}");
     expect(appSource).not.toContain("window.setTimeout(preload, 250)");
-    expect(appSource).toContain("loadWeatherAILab()");
-    expect(appSource).toContain("loadWeatherDetails()");
+    expect(appSource).not.toContain("loadWeatherAILab(),");
+    expect(appSource).not.toContain("loadWeatherDetails(),");
     expect(appSource).toContain("setTransition(null), 240");
     expect(styles).toContain("150ms cubic-bezier(0.23, 1, 0.32, 1)");
   });
