@@ -357,7 +357,7 @@ function looksLikeWindDirectionCoverageId(id: string): boolean {
  */
 function describeAromeShadowError(error: unknown): string {
   if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-    return "d’lai de 20 s dépassé (timeout)";
+    return "délai de 20 s dépassé (timeout)";
   }
   const parts: string[] = [];
   if (error instanceof Error) {
@@ -477,6 +477,7 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
   } catch (error) {
     console.error(`[arome-shadow] vérification de la direction du vent échouée pendant ${step}`, error);
     return base("request-impossible", `Vérification du catalogue WCS impossible pendant ${step} (${describeAromeShadowError(error)}); aucune donnée de prévision n’a été téléchargée.`);
+  }
 }
 
 /**

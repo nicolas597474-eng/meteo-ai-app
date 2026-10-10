@@ -52,9 +52,9 @@ describe("navigation entre pages par glissement", () => {
     expect(appSource).toContain("const isFetching = useIsFetching();");
     expect(appSource).toContain("if (isFetching > 0) return;");
     expect(appSource).toContain("window.requestIdleCallback(preload, { timeout: 1500 })");
-    expect(appSource).toContain("onPointerEnter={() => preloadMainPage(item.path)}");
-    expect(appSource).toContain("onFocus={() => preloadMainPage(item.path)}");
-    expect(appSource).toContain("onPointerDown={() => preloadMainPage(item.path)}");
+    expect(appSource).toContain("onPointerEnter={() => activateNavItem(item.path)}");
+    expect(appSource).toContain("onFocus={() => activateNavItem(item.path)}");
+    expect(appSource).toContain("onPointerDown={() => activateNavItem(item.path)}");
     expect(appSource).not.toContain("window.setTimeout(preload, 250)");
     expect(appSource).toContain("loadWeatherAILab()");
     expect(appSource).toContain("loadWeatherDetails()");

@@ -152,7 +152,7 @@ function PageSwipeNavigator({ children }: { children: ReactNode }) {
 
     const deltaX = event.clientX - gesture.x;
     const deltaY = event.clientY - gesture.y;
-    const elapsed = event.timeStamp - gesture.timeStamp;
+    const elapsed = event.timeStamp - gesture.time;
     if (!isQualifiedPageSwipe(deltaX, deltaY, elapsed)) return;
 
     const target = getSwipeNavigationTarget(location, deltaX);
