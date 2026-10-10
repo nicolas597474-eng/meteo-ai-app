@@ -128,14 +128,14 @@ function WindRose({ direction }: { direction: number | null }) {
   // Front-facing label positions - horizontal text at fixed positions (vue de face).
   // Libellés agrandis (17/11) et lueur renforcée pour des directions bien visibles.
   const labelPositions: { label: string; x: number; y: number; size: number }[] = [
-    { label: "N", x: 80, y: 28, size: 17 },
-    { label: "NE", x: 118, y: 42, size: 11 },
-    { label: "E", x: 132, y: 80, size: 17 },
-    { label: "SE", x: 118, y: 118, size: 11 },
-    { label: "S", x: 80, y: 132, size: 17 },
-    { label: "SO", x: 42, y: 118, size: 11 },
-    { label: "O", x: 28, y: 80, size: 17 },
-    { label: "NO", x: 42, y: 42, size: 11 },
+    { label: "N", x: 80, y: 28, size: 20 },
+    { label: "NE", x: 118, y: 42, size: 12 },
+    { label: "E", x: 132, y: 80, size: 20 },
+    { label: "SE", x: 118, y: 118, size: 12 },
+    { label: "S", x: 80, y: 132, size: 20 },
+    { label: "SO", x: 42, y: 118, size: 12 },
+    { label: "O", x: 28, y: 80, size: 20 },
+    { label: "NO", x: 42, y: 42, size: 12 },
   ];
 
   return (
@@ -151,7 +151,7 @@ function WindRose({ direction }: { direction: number | null }) {
       aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.${isOrientationActive ? ` Cap téléphone : ${Math.round(compassHeading)}°.` : " Touchez pour orienter la boussole."}`}
       title={isOrientationActive ? `Boussole orientée · Cap ${Math.round(compassHeading)}°` : "Touchez pour activer l'orientation par le téléphone"}
     >
-      <div className="relative isolate grid size-20 place-items-center rounded-full bg-[#0A1A2F] shadow-[0_8px_18px_rgba(0,8,20,0.75),0_0_16px_rgba(0,191,255,0.28)] ring-1 ring-sky-100/20 sm:size-[5.5rem]">
+      <div className="relative isolate grid size-[5.5rem] place-items-center rounded-full bg-[#0A1A2F] shadow-[0_8px_18px_rgba(0,8,20,0.75),0_0_16px_rgba(0,191,255,0.28)] ring-1 ring-sky-100/20 sm:size-[6.5rem]">
         <svg viewBox="0 0 160 160" className="absolute inset-0 z-10 size-full overflow-visible" aria-hidden="true">
           <defs>
             <linearGradient id="wind-compass-bezel" x1="0" y1="0" x2="0" y2="1">
@@ -361,7 +361,7 @@ function WindRose({ direction }: { direction: number | null }) {
                   fontWeight="900"
                   fill="#ffffff"
                   stroke="rgba(1,8,18,0.9)"
-                  strokeWidth={isCardinal ? 1 : 0.7}
+                  strokeWidth={isCardinal ? 1.2 : 0.8}
                   paintOrder="stroke"
                   filter={isCardinal ? "url(#wind-compass-neon)" : "url(#wind-compass-neon-soft)"}
                   style={{ userSelect: "none", pointerEvents: "none" }}
@@ -1384,7 +1384,7 @@ export default function Dashboard() {
                   {currentProvenanceLabel(apparentTemperatureField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]">{currentProvenanceLabel(apparentTemperatureField)}</p>}
                 </div>
                 <div className="min-w-0 text-center">
-                  <p className="mb-1 flex items-center justify-center gap-1 text-[12px] font-medium leading-tight text-white sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Direction du vent</p>
+                  <p className="mb-1 flex items-center justify-center gap-1 whitespace-nowrap text-[12px] font-medium leading-tight text-white sm:text-sm"><Wind className="h-3.5 w-3.5 shrink-0" />Direction du vent</p>
                   <WindRose direction={windDir} />
                   {currentProvenanceLabel(windDirectionField) && <p className="mt-1 text-[9px] leading-tight text-slate-400 sm:text-[10px]" title={currentProvenanceTitle(windDirectionField)}>
                     {currentProvenanceLabel(windDirectionField)}
