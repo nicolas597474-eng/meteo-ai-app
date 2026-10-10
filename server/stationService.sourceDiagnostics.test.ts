@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetWeatherFetchCache } from "./weatherFetch";
-import { collectNearbyStationsWithDiagnostics, type StationData } from "./stationService";
+import { collectNearbyStationsWithDiagnostics } from "./stationService";
 
 type SyntheticReply = unknown | Error;
-type SyntheticSource = "meteofrance" | "metar" | "opensensemap";
+// METAR a été retiré de la collecte : seuls Météo-France et openSenseMap restent synthétisés ici.
+type SyntheticSource = "meteofrance" | "opensensemap";
 
 function getInputUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -14,13 +15,14 @@ function getInputUrl(input: RequestInfo | URL): string {
 function installSyntheticSources(replies: Record<SyntheticSource, SyntheticReply>): void {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = getInputUrl(input);
+    if (url.includes("aviationweather.gov")) {
+      throw new Error("Le collecteur METAR ne doit plus émettre aucune requête.");
+    }
     const source: SyntheticSource | null = url.includes("public.opendatasoft.com")
       ? "meteofrance"
-      : url.includes("aviationweather.gov")
-        ? "metar"
-        : url.includes("api.opensensemap.org")
-          ? "opensensemap"
-          : null;
+      : url.includes("api.opensensemap.org")
+        ? "opensensemap"
+        : null;
     if (!source) throw new Error("Unexpected synthetic test request.");
     const reply = replies[source];
     if (reply instanceof Error) throw reply;
@@ -50,23 +52,6 @@ function synopRecord(lat: number, lon: number) {
   };
 }
 
-function metarRecord(lat: number, lon: number) {
-  return {
-    icaoId: "LFAC",
-    reportTime: currentIso(),
-    temp: 18,
-    dewp: 12,
-    wdir: 180,
-    wspd: 5,
-    wgst: 8,
-    altim: 1018,
-    lat,
-    lon,
-    elev: 10,
-    name: "Aéroport synthétique",
-  };
-}
-
 async function collectAt(lat: number) {
   return collectNearbyStationsWithDiagnostics(lat, 2.52, 20, "test synthétique");
 }
@@ -81,7 +66,6 @@ describe("diagnostics des collecteurs de stations", () => {
     const lat = 50.7511;
     installSyntheticSources({
       meteofrance: { results: [synopRecord(lat, 2.52)] },
-      metar: [metarRecord(lat, 2.52)],
       opensensemap: [],
     });
 
@@ -89,11 +73,11 @@ describe("diagnostics des collecteurs de stations", () => {
 
     expect(result.sourceDiagnostics).toEqual([
       { source: "meteofrance", status: "success_with_data", stationCount: 1 },
-      { source: "metar", status: "success_with_data", stationCount: 1 },
       { source: "netatmo", status: "not_configured", stationCount: 0 },
       { source: "opensensemap", status: "success_empty", stationCount: 0 },
     ]);
-    expect(result.stations.map((station) => station.stationId)).toEqual(["mf-59000", "metar-LFAC"]);
+    expect(result.stations.map((station) => station.stationId)).toEqual(["mf-59000"]);
+    expect(result.stations.every((station) => station.source !== "metar")).toBe(true);
     expect(result.cacheHit).toBe(false);
   });
 
@@ -101,7 +85,6 @@ describe("diagnostics des collecteurs de stations", () => {
     const lat = 50.7512;
     installSyntheticSources({
       meteofrance: { results: [] },
-      metar: [],
       opensensemap: [],
     });
 
@@ -110,17 +93,15 @@ describe("diagnostics des collecteurs de stations", () => {
     expect(result.stations).toEqual([]);
     expect(result.sourceDiagnostics).toEqual([
       { source: "meteofrance", status: "success_empty", stationCount: 0 },
-      { source: "metar", status: "success_empty", stationCount: 0 },
       { source: "netatmo", status: "not_configured", stationCount: 0 },
       { source: "opensensemap", status: "success_empty", stationCount: 0 },
     ]);
   });
 
-  it("capture une panne réseau Météo-France sans message brut et conserve les stations METAR", async () => {
+  it("capture une panne réseau Météo-France sans message brut et ne remonte aucune station METAR", async () => {
     const lat = 50.7513;
     installSyntheticSources({
       meteofrance: new TypeError("fetch failed https://provider.invalid/path?token=synthetic-secret"),
-      metar: [metarRecord(lat, 2.52)],
       opensensemap: [],
     });
 
@@ -132,16 +113,16 @@ describe("diagnostics des collecteurs de stations", () => {
       stationCount: 0,
       reason: "network_error",
     });
-    expect(result.stations.map((station) => station.stationId)).toContain("metar-LFAC");
+    expect(result.stations).toEqual([]);
     expect(JSON.stringify(result)).not.toContain("synthetic-secret");
     expect(JSON.stringify(result)).not.toContain("provider.invalid");
+    expect(JSON.stringify(result)).not.toContain("metar");
   });
 
   it("isole un rejet de promesse openSenseMap sans écraser les stations Météo-France déjà réussies", async () => {
     const lat = 50.7514;
     installSyntheticSources({
       meteofrance: { results: [synopRecord(lat, 2.52)] },
-      metar: [],
       opensensemap: new TypeError("network rejection with private provider details"),
     });
 
@@ -164,7 +145,7 @@ describe("diagnostics des collecteurs de stations", () => {
       if (url.includes("public.opendatasoft.com")) {
         return new Response("private provider response", { status: 503 });
       }
-      if (url.includes("aviationweather.gov") || url.includes("api.opensensemap.org")) {
+      if (url.includes("api.opensensemap.org")) {
         return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
       }
       throw new Error("Unexpected synthetic test request.");

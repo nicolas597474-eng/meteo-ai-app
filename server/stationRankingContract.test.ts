@@ -8,14 +8,13 @@ describe("contrat de classement et de performance station", () => {
   it("décrit les mêmes priorités fixes que les mappers physiques actifs, sans inclure les grilles comme stations", () => {
     expect(contract.sources.map(({ id, sourcePriorityScore }) => [id, sourcePriorityScore])).toEqual([
       ["meteofrance", 92],
-      ["metar", 90],
       ["netatmo", 65],
     ]);
     expect(contract.sources.map((source) => source.name)).toEqual([
       "Météo-France StatIC",
-      "METAR / observations aéroportuaires",
       "Netatmo",
     ]);
+    expect(contract.sources.map((source) => source.id)).not.toContain("metar");
     expect(contract.sources.map((source) => source.id)).not.toContain("synop");
     expect(contract.sources.map((source) => source.id)).not.toContain("openmeteo");
     expect(contract.sources.every((source) => source.interpretation.includes("ce n’est ni une précision météo"))).toBe(true);

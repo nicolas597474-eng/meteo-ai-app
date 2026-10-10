@@ -76,14 +76,14 @@ describe("buildCurrentDashboardWeatherState", () => {
   it("préfère l’agrégation physique fraîche sans poids modèle et expose compte, source et âge", () => {
     const state = build([
       station({ stationId: "mf-1", name: "Lille", temperature: 20 }),
-      station({ stationId: "metar-1", source: "metar", name: "Aéroport", temperature: 20.2, distanceKm: 2 }),
+      station({ stationId: "mf-2", name: "Aéroport", temperature: 20.2, distanceKm: 2 }),
     ]);
 
     expect(state.fields.temperature.value).toBeCloseTo(20.1, 1);
     expect(state.fields.temperature.provenance).toMatchObject({
       kind: "physical_stations",
       stationCount: 2,
-      stationSources: expect.arrayContaining(["Météo-France", "METAR"]),
+      stationSources: expect.arrayContaining(["Météo-France"]),
       ageMinutes: 5,
     });
     expect(state.fields.temperature.provenance).not.toHaveProperty("confidence");
@@ -167,7 +167,7 @@ describe("buildCurrentDashboardWeatherState", () => {
   it("calcule la direction du vent comme moyenne circulaire autour de 0°, pas comme moyenne arithmétique", () => {
     const state = build([
       station({ stationId: "d1", windDirection: 359 }),
-      station({ stationId: "d2", source: "metar", windDirection: 1, distanceKm: 2 }),
+      station({ stationId: "d2", windDirection: 1, distanceKm: 2 }),
     ]);
     const direction = state.fields.windDirection.value as number;
 

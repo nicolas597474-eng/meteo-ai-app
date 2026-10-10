@@ -38,7 +38,6 @@ export type StationSource =
   | "wunderground"
   | "cwop"
   | "noaa"
-  | "metar"
   | "openmeteo"
   | "synop"
   | "davis"
@@ -72,7 +71,7 @@ export type StationData = {
   sourceTier?: 1 | 2 | 3;
 };
 
-export type StationCollectionSource = "meteofrance" | "metar" | "netatmo" | "opensensemap";
+export type StationCollectionSource = "meteofrance" | "netatmo" | "opensensemap";
 export type StationSourceDiagnosticStatus = "success_with_data" | "success_empty" | "error" | "not_configured";
 export type StationSourceDiagnostic = {
   source: StationCollectionSource;
@@ -94,7 +93,9 @@ type CachedNearbyStationsCollection = Pick<NearbyStationsCollection, "stations" 
  * Les réseaux personnels simulés et points de grille restent des références de
  * modèle : ils ne doivent jamais être persistés comme observations de station.
  */
-export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance", "metar", "netatmo"]);
+// METAR retiré définitivement : la source aéroportuaire en échec n'entre plus
+// dans aucune méthode de calcul (fusion, vérité terrain, vérification, ranking).
+export const PHYSICAL_STATION_SOURCES: ReadonlySet<StationSource> = new Set<StationSource>(["meteofrance", "netatmo"]);
 
 export type StationSourceKind = "physical" | "reference";
 
@@ -195,7 +196,6 @@ export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: numb
 
 const SOURCE_DEFAULTS: Record<StationSource, { reliability: number; updateFreqMin: number; availability: number }> = {
   meteofrance:  { reliability: 92, updateFreqMin: 60, availability: 0.98 },
-  metar:        { reliability: 90, updateFreqMin: 60, availability: 0.97 },
   synop:        { reliability: 88, updateFreqMin: 60, availability: 0.95 },
   noaa:         { reliability: 85, updateFreqMin: 60, availability: 0.93 },
   infoclimat:   { reliability: 82, updateFreqMin: 30, availability: 0.88 },
@@ -474,83 +474,6 @@ async function fetchMeteoFranceStations(
   return results;
 }
 
-// ─── 3. METAR — official worldwide airport observations (no key required) ─────
-
-export type MetarObservation = {
-  icaoId?: string;
-  reportTime?: string;
-  temp?: number;
-  dewp?: number;
-  wdir?: number;
-  wspd?: number;
-  wgst?: number;
-  altim?: number;
-  lat?: number;
-  lon?: number;
-  elev?: number;
-  name?: string;
-};
-
-export function mapMetarObservation(observation: MetarObservation, lat: number, lon: number, radiusKm: number): StationData | null {
-  if (!observation.icaoId || typeof observation.lat !== "number" || typeof observation.lon !== "number") return null;
-  const distanceKm = haversineKm(lat, lon, observation.lat, observation.lon);
-  if (distanceKm > radiusKm) return null;
-  const knotsToKmh = (knots: number | undefined) => knots === undefined ? null : Math.round(knots * 1.852 * 10) / 10;
-  return {
-    stationId: `metar-${observation.icaoId}`,
-    source: "metar",
-    name: observation.name ? `METAR · ${observation.name}` : `METAR · ${observation.icaoId}`,
-    lat: observation.lat,
-    lon: observation.lon,
-    altitude: observation.elev ?? null,
-    distanceKm: Math.round(distanceKm * 10) / 10,
-    temperature: observation.temp ?? null,
-    humidity: observation.temp !== undefined && observation.dewp !== undefined
-      ? Math.max(0, Math.min(100, Math.round(100 - 5 * (observation.temp - observation.dewp))))
-      : null,
-    pressure: observation.altim ?? null,
-    windSpeed: knotsToKmh(observation.wspd),
-    windGust: knotsToKmh(observation.wgst),
-    windDirection: observation.wdir ?? null,
-    precipitation: null,
-    updatedAt: observation.reportTime ?? null,
-    measurementTimes: {
-      temperature: observation.reportTime ?? null,
-      humidity: observation.reportTime ?? null,
-      pressure: observation.reportTime ?? null,
-      windSpeed: observation.reportTime ?? null,
-      windGust: observation.reportTime ?? null,
-      windDirection: observation.reportTime ?? null,
-      precipitation: observation.reportTime ?? null,
-    },
-    reliabilityScore: SOURCE_DEFAULTS.metar.reliability,
-    updateFrequencyMin: SOURCE_DEFAULTS.metar.updateFreqMin,
-    dataAvailability: SOURCE_DEFAULTS.metar.availability,
-    isActive: true,
-  };
-}
-
-async function fetchMetarStations(lat: number, lon: number, radiusKm: number): Promise<StationData[]> {
-  const latitudePadding = Math.max(radiusKm / 111, 0.25);
-  const longitudePadding = Math.max(radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2)), 0.25);
-  const bbox = [lat - latitudePadding, lon - longitudePadding, lat + latitudePadding, lon + longitudePadding]
-    .map((coordinate) => coordinate.toFixed(4))
-    .join(",");
-  const params = new URLSearchParams({ format: "json", bbox });
-  const response = await fetch(`https://aviationweather.gov/api/data/metar?${params}`, {
-    headers: { "User-Agent": "MeteoAI/1.0 official-station-collector" },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) throw new StationSourceCollectionError("provider_http_error");
-  const observations = await response.json() as unknown;
-  if (!Array.isArray(observations) || observations.some((observation: unknown) => !observation || typeof observation !== "object" || Array.isArray(observation))) {
-    throw new StationSourceCollectionError("invalid_response");
-  }
-  return (observations as MetarObservation[])
-    .map((observation) => mapMetarObservation(observation, lat, lon, radiusKm))
-    .filter((station): station is StationData => station !== null);
-}
-
 // ─── 4. Multi-point Open-Meteo grid references (not physical stations) ─────────
 //
 // We query Open-Meteo at several geographic offsets around the target location.
@@ -620,9 +543,8 @@ async function collectNearbyStationsUncached(
   // Seules les observations de station et les candidats sont assemblés ici.
   // Les modèles sont exposés séparément par fetchCurrentModelReferences().
   let netatmoStatus: import("./netatmoService").NetatmoAvailability | undefined;
-  const [meteoFrance, metar, netatmo, openSenseMap] = await Promise.allSettled([
+  const [meteoFrance, netatmo, openSenseMap] = await Promise.allSettled([
     fetchMeteoFranceStations(lat, lon, radiusKm),
-    fetchMetarStations(lat, lon, radiusKm),
     fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm, {
       onStatus: (status) => {
         netatmoStatus = status;
@@ -634,14 +556,12 @@ async function collectNearbyStationsUncached(
 
   const sourceDiagnostics = [
     makeSourceDiagnostic("meteofrance", meteoFrance),
-    makeSourceDiagnostic("metar", metar),
     makeSourceDiagnostic("netatmo", netatmo, netatmoStatus),
     makeSourceDiagnostic("opensensemap", openSenseMap),
   ];
 
   const all: StationData[] = [
     ...(meteoFrance.status === "fulfilled" ? meteoFrance.value : []),
-    ...(metar.status === "fulfilled" ? metar.value : []),
     ...(netatmo.status === "fulfilled" ? netatmo.value : []),
     ...(openSenseMap.status === "fulfilled" ? openSenseMap.value.map((candidate): StationData => ({
       stationId: `opensensemap-${candidate.providerStationId}`,

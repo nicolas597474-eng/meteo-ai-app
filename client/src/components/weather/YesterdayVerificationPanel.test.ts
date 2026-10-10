@@ -42,9 +42,9 @@ const availableData = {
     observationWindowStartAt: Date.parse("2026-10-02T07:50:00.000Z"),
     observationWindowEndAt: Date.parse("2026-10-02T08:00:00.000Z"),
     stationEvidence: [{
-      stationId: "metar-LFAC",
-      stationName: "METAR · Calais",
-      source: "metar",
+      stationId: "mf-59000",
+      stationName: "Météo-France · Calais",
+      source: "meteofrance",
       snapshotHour: 10,
       observedAt: Date.parse("2026-10-02T07:50:00.000Z"),
       value: 20,
@@ -102,7 +102,7 @@ describe("YesterdayVerificationPanel — rendu mobile-first", () => {
     expect(html).toContain("disponible :");
     expect(html).toContain("Valide : 2026-10-02");
     expect(html).toContain("erreur");
-    expect(html).toContain("METAR · Calais");
+    expect(html).toContain("Météo-France · Calais");
     expect(html).toContain("MAE 1.50 °C");
     expect(html).toContain("aucun score de station calculé");
   });

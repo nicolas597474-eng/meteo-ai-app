@@ -25,9 +25,9 @@ function createPublicContext(): TrpcContext {
 function stationFixture(): StationData {
   const now = new Date().toISOString();
   return {
-    stationId: "metar-LFAC",
-    source: "metar",
-    name: "METAR · Aéroport synthétique",
+    stationId: "netatmo-public-42",
+    source: "netatmo",
+    name: "Netatmo · Station synthétique",
     lat: 50.76,
     lon: 2.52,
     altitude: 10,
@@ -49,9 +49,9 @@ function stationFixture(): StationData {
       windDirection: now,
       precipitation: now,
     },
-    reliabilityScore: 90,
-    updateFrequencyMin: 60,
-    dataAvailability: 0.97,
+    reliabilityScore: 65,
+    updateFrequencyMin: 10,
+    dataAvailability: 0.75,
     isActive: true,
   };
 }
@@ -63,13 +63,12 @@ beforeEach(() => {
 });
 
 describe("weather.searchStations · diagnostics des sources", () => {
-  it("distingue la panne Météo-France des sources vides et conserve la station METAR", async () => {
+  it("distingue la panne Météo-France des sources vides et conserve la station physique Netatmo", async () => {
     const collection: NearbyStationsCollection = {
       stations: [stationFixture()],
       sourceDiagnostics: [
         { source: "meteofrance", status: "error", stationCount: 0, reason: "network_error" },
-        { source: "metar", status: "success_with_data", stationCount: 1 },
-        { source: "netatmo", status: "not_configured", stationCount: 0 },
+        { source: "netatmo", status: "success_with_data", stationCount: 1 },
         { source: "opensensemap", status: "success_empty", stationCount: 0 },
       ],
       cacheHit: false,
@@ -86,7 +85,7 @@ describe("weather.searchStations · diagnostics des sources", () => {
     expect(result.sourceDiagnosticsFromCache).toBe(false);
     expect(result.totalFound).toBe(1);
     expect(result.physicalStationCount).toBe(1);
-    expect(result.stations.map((station) => station.stationId)).toEqual(["metar-LFAC"]);
+    expect(result.stations.map((station) => station.stationId)).toEqual(["netatmo-public-42"]);
     expect(JSON.stringify(result)).not.toContain("provider.invalid");
     expect(JSON.stringify(result)).not.toContain("synthetic-secret");
   });
