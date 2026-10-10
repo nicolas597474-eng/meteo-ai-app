@@ -87,6 +87,36 @@ function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalP
 }
 
 // ─── Wind Rose ───────────────────────────────────────────────────────────────
+// Rendu calé sur la maquette de référence : lunette gunmetal avec 4 arcs néon,
+// repères N/E/S/O sur la lunette, cadran bleu nuit, rose à 8 pointes à deux
+// facettes, aiguille cyan/chrome et moyeu lumineux.
+function windRosePoint(radius: number, degrees: number) {
+  const radians = (degrees * Math.PI) / 180;
+  return { x: 50 + radius * Math.sin(radians), y: 50 - radius * Math.cos(radians) };
+}
+
+function windRoseBezelArc(radius: number, startDeg: number, endDeg: number) {
+  const start = windRosePoint(radius, startDeg);
+  const end = windRosePoint(radius, endDeg);
+  return `M${start.x.toFixed(2)} ${start.y.toFixed(2)} A${radius} ${radius} 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
+const WIND_ROSE_NEON_BAR_CENTERS = [45, 135, 225, 315] as const;
+
+// Huit pointes : cardinales longues (N, E, S, O), intercardinales plus courtes.
+const WIND_ROSE_POINTS = Array.from({ length: 8 }, (_, index) => {
+  const isCardinal = index % 2 === 0;
+  const radius = isCardinal ? 30 : 20;
+  const halfWidth = isCardinal ? 4.2 : 3;
+  const backLength = isCardinal ? 6 : 4;
+  return {
+    angle: index * 45,
+    isCardinal,
+    litPath: `M50 ${50 - radius} L${50 + halfWidth} 50 L50 ${50 + backLength} Z`,
+    shadowPath: `M50 ${50 - radius} L${50 - halfWidth} 50 L50 ${50 + backLength} Z`,
+  };
+});
+
 function WindRose({ direction }: { direction: number | null }) {
   const { deviceHeading, status: orientationStatus, requestPermission } = useDeviceOrientation({ autoStart: true });
   const compassHeading = deviceHeading ?? 0;
@@ -117,21 +147,30 @@ function WindRose({ direction }: { direction: number | null }) {
       title={isOrientationActive ? `Boussole orientée · Cap ${Math.round(compassHeading)}°` : "Touchez pour activer l’orientation par le téléphone"}
     >
       <div
-        className="relative isolate grid size-[4.5rem] place-items-center rounded-full border border-[#31355e] bg-[radial-gradient(circle_at_32%_26%,#2c3157_0%,#12132a_55%,#07070f_100%)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.22),inset_0_-3px_6px_rgba(0,0,0,0.65),0_10px_18px_rgba(0,0,0,0.65),0_0_18px_rgba(0,245,255,0.22)] ring-1 ring-black/50 before:absolute before:inset-[3px] before:rounded-full before:border before:border-white/10 before:bg-[radial-gradient(circle_at_35%_28%,rgba(140,200,255,0.1),transparent_46%)] before:content-[''] sm:size-20"
+        className="relative isolate grid size-[4.5rem] place-items-center rounded-full border border-[#1f2a44] bg-[radial-gradient(circle_at_32%_26%,#1b2740_0%,#080d1a_60%,#03050b_100%)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.18),inset_0_-3px_6px_rgba(0,0,0,0.7),0_10px_18px_rgba(0,0,0,0.65),0_0_18px_rgba(0,245,255,0.22)] ring-1 ring-black/50 sm:size-20"
       >
         <svg viewBox="0 0 100 100" className="absolute inset-0 z-10 size-full" aria-hidden="true">
           <defs>
             <radialGradient id="wind-compass-dial" cx="38%" cy="28%" r="82%">
-              <stop offset="0%" stopColor="#182452" />
-              <stop offset="42%" stopColor="#0A0E2A" />
-              <stop offset="100%" stopColor="#05081c" />
+              <stop offset="0%" stopColor="#0c254c" />
+              <stop offset="100%" stopColor="#030814" />
             </radialGradient>
             <linearGradient id="wind-compass-bezel" x1="0.15" y1="0" x2="0.85" y2="1">
-              <stop offset="0%" stopColor="#4c527e" />
-              <stop offset="30%" stopColor="#262a4c" />
-              <stop offset="55%" stopColor="#12131f" />
-              <stop offset="80%" stopColor="#1c2038" />
-              <stop offset="100%" stopColor="#3a3f68" />
+              <stop offset="0%" stopColor="#6a7189" />
+              <stop offset="30%" stopColor="#2c3140" />
+              <stop offset="55%" stopColor="#14171f" />
+              <stop offset="80%" stopColor="#2a2f40" />
+              <stop offset="100%" stopColor="#5b6278" />
+            </linearGradient>
+            <linearGradient id="wind-rose-lit" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#d9fdff" />
+              <stop offset="35%" stopColor="#00F5FF" />
+              <stop offset="100%" stopColor="#1e5fd6" />
+            </linearGradient>
+            <linearGradient id="wind-rose-shadow" x1="1" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1b3f7a" />
+              <stop offset="55%" stopColor="#0a1d44" />
+              <stop offset="100%" stopColor="#03081c" />
             </linearGradient>
             <linearGradient id="wind-compass-needle" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#e6feff" />
@@ -139,15 +178,21 @@ function WindRose({ direction }: { direction: number | null }) {
               <stop offset="100%" stopColor="#0077a8" />
             </linearGradient>
             <linearGradient id="wind-compass-needle-tail" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#4a5474" />
-              <stop offset="55%" stopColor="#232a42" />
-              <stop offset="100%" stopColor="#0d1020" />
+              <stop offset="0%" stopColor="#f5f7fb" />
+              <stop offset="45%" stopColor="#9aa6bd" />
+              <stop offset="75%" stopColor="#3c4660" />
+              <stop offset="100%" stopColor="#d9e1f0" />
             </linearGradient>
             <radialGradient id="wind-compass-hub" cx="34%" cy="30%" r="80%">
               <stop offset="0%" stopColor="#f4f8ff" />
               <stop offset="32%" stopColor="#aeb9d4" />
               <stop offset="68%" stopColor="#3d4460" />
               <stop offset="100%" stopColor="#171b2e" />
+            </radialGradient>
+            <radialGradient id="wind-compass-sapphire" cx="40%" cy="35%" r="70%">
+              <stop offset="0%" stopColor="#c9fbff" />
+              <stop offset="40%" stopColor="#00F5FF" />
+              <stop offset="100%" stopColor="#0b3a86" />
             </radialGradient>
             <filter id="wind-compass-neon" x="-70%" y="-70%" width="240%" height="240%">
               <feGaussianBlur stdDeviation="1.9" result="blur" />
@@ -157,51 +202,115 @@ function WindRose({ direction }: { direction: number | null }) {
               </feMerge>
             </filter>
           </defs>
+
+          {/* Lunette métallique gunmetal avec reflets */}
           <circle cx="50" cy="50" r="46.4" fill="none" stroke="url(#wind-compass-bezel)" strokeWidth="4.4" />
           <circle cx="50" cy="50" r="48.4" fill="none" stroke="rgba(0,245,255,0.5)" strokeWidth="0.55" filter="url(#wind-compass-neon)" />
           <path d="M17.2 17.2 A46.4 46.4 0 0 1 50 3.6" fill="none" stroke="rgba(170,220,255,0.5)" strokeWidth="1.1" strokeLinecap="round" />
           <path d="M82.8 82.8 A46.4 46.4 0 0 1 50 96.4" fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth="1.1" strokeLinecap="round" />
+
+          {/* 4 arcs lumineux néon sur les quadrants */}
+          {WIND_ROSE_NEON_BAR_CENTERS.map((center) => (
+            <path
+              key={`neon-bar-${center}`}
+              d={windRoseBezelArc(46.4, center - 18, center + 18)}
+              fill="none"
+              stroke="rgba(0,245,255,0.95)"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              filter="url(#wind-compass-neon)"
+            />
+          ))}
+
+          {/* Repère Nord : losange néon avec centre spéculaire */}
+          <path d="M50 1.4 L52.2 3.5 L50 5.6 L47.8 3.5 Z" fill="#00F5FF" stroke="rgba(235,255,255,0.9)" strokeWidth="0.4" filter="url(#wind-compass-neon)" />
+          <circle cx="50" cy="3.5" r="0.7" fill="#ffffff" />
+          {/* Repères E, S, O : pointes néon sur la lunette */}
+          {[90, 180, 270].map((angle) => (
+            <path
+              key={`bezel-marker-${angle}`}
+              transform={`rotate(${angle} 50 50)`}
+              d="M47.6 3.9 L50 6.3 L52.4 3.9 Z"
+              fill="#00F5FF"
+              stroke="rgba(235,255,255,0.8)"
+              strokeWidth="0.35"
+              strokeLinejoin="round"
+              filter="url(#wind-compass-neon)"
+            />
+          ))}
+
+          {/* Cadran intérieur */}
           <circle cx="50" cy="50" r="43" fill="url(#wind-compass-dial)" stroke="rgba(0,245,255,0.32)" strokeWidth="0.9" />
-          <circle cx="50" cy="50" r="39.5" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="0.5" />
+          <circle cx="50" cy="50" r="42.2" fill="none" stroke="rgba(0,245,255,0.6)" strokeWidth="0.6" strokeDasharray="0.8 1.6" />
+          <circle cx="50" cy="50" r="24" fill="none" stroke="rgba(0,245,255,0.18)" strokeWidth="0.5" />
+
+          {/* Graduations et rose : tournent avec le cap */}
           <g transform={`rotate(${-compassHeading}, 50, 50)`}>
             {Array.from({ length: 32 }, (_, index) => {
               const angle = (index * 11.25 - 90) * Math.PI / 180;
               const isMajor = index % 4 === 0;
-              const innerRadius = isMajor ? 33 : 36;
-              return <line key={index} x1={50 + innerRadius * Math.cos(angle)} y1={50 + innerRadius * Math.sin(angle)} x2={50 + 41.2 * Math.cos(angle)} y2={50 + 41.2 * Math.sin(angle)} stroke={isMajor ? "rgba(0,245,255,0.92)" : "rgba(150,225,245,0.38)"} strokeWidth={isMajor ? 1.4 : 0.55} filter={isMajor ? "url(#wind-compass-neon)" : undefined} />;
+              const innerRadius = isMajor ? 36.6 : 38.4;
+              return (
+                <line
+                  key={`tick-${index}`}
+                  x1={50 + innerRadius * Math.cos(angle)}
+                  y1={50 + innerRadius * Math.sin(angle)}
+                  x2={50 + 40.6 * Math.cos(angle)}
+                  y2={50 + 40.6 * Math.sin(angle)}
+                  stroke={isMajor ? "rgba(0,245,255,0.95)" : "rgba(150,225,245,0.45)"}
+                  strokeWidth={isMajor ? 1.1 : 0.5}
+                />
+              );
             })}
+            {WIND_ROSE_POINTS.map((point) => (
+              <g key={`rose-point-${point.angle}`} transform={`rotate(${point.angle} 50 50)`}>
+                <path d={point.litPath} fill="url(#wind-rose-lit)" stroke="rgba(235,255,255,0.4)" strokeWidth="0.3" />
+                <path d={point.shadowPath} fill="url(#wind-rose-shadow)" stroke="rgba(0,245,255,0.25)" strokeWidth="0.3" />
+              </g>
+            ))}
           </g>
-          {hasDirection ? <g transform={`rotate(${direction - compassHeading}, 50, 50)`}>
-            <path d="M50 17.5 L54.6 49 L50 44.6 L45.4 49 Z" fill="url(#wind-compass-needle)" stroke="rgba(235,255,255,0.9)" strokeWidth="0.6" filter="url(#wind-compass-neon)" />
-            <path d="M50 82.5 L54.6 51 L50 55.4 L45.4 51 Z" fill="url(#wind-compass-needle-tail)" stroke="rgba(130,140,170,0.55)" strokeWidth="0.5" />
-          </g> : null}
-          <circle cx="50" cy="50" r="5.6" fill="url(#wind-compass-hub)" stroke="rgba(255,255,255,0.28)" strokeWidth="0.7" />
-          <circle cx="50" cy="50" r="1.9" fill="#00F5FF" filter="url(#wind-compass-neon)" />
-          <circle cx="48.1" cy="47.9" r="0.9" fill="rgba(255,255,255,0.9)" />
+
+          {/* Points lumineux sous les lettres cardinales */}
+          {cardinalAngles.map((angle) => {
+            const dot = windRosePoint(29.5, angle - compassHeading);
+            return <circle key={`dot-${angle}`} cx={dot.x} cy={dot.y} r="0.9" fill="#00F5FF" filter="url(#wind-compass-neon)" />;
+          })}
+
+          {/* Lettres des 8 directions */}
           {cardinalDirections.map((label, index) => {
-            const angleDeg = cardinalAngles[index] - compassHeading;
-            const angleRad = (angleDeg - 90) * (Math.PI / 180);
-            const radius = 33.8;
-            const x = 50 + radius * Math.cos(angleRad);
-            const y = 50 + radius * Math.sin(angleRad);
-            const isNorth = label === "N";
+            const isCardinal = index % 2 === 0;
+            const position = windRosePoint(35.2, cardinalAngles[index] - compassHeading);
             return (
               <text
                 key={label}
-                x={x}
-                y={y}
+                x={position.x}
+                y={position.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize="7.5"
-                fontWeight="900"
-                fill={isNorth ? "#fda4af" : "#ffffff"}
-                filter="url(#wind-compass-neon)"
+                fontSize={isCardinal ? "7.2" : "4.6"}
+                fontWeight="800"
+                fontFamily="Inter, system-ui, sans-serif"
+                fill="#ffffff"
                 style={{ userSelect: "none", pointerEvents: "none" }}
               >
                 {label}
               </text>
             );
           })}
+
+          {/* Aiguille du vent : pointe cyan néon et queue chrome */}
+          {hasDirection ? (
+            <g transform={`rotate(${direction - compassHeading}, 50, 50)`}>
+              <path d="M50 17.5 L54.6 49 L50 44.6 L45.4 49 Z" fill="url(#wind-compass-needle)" stroke="rgba(235,255,255,0.9)" strokeWidth="0.6" filter="url(#wind-compass-neon)" />
+              <path d="M50 82.5 L54.6 51 L50 55.4 L45.4 51 Z" fill="url(#wind-compass-needle-tail)" stroke="rgba(200,210,230,0.6)" strokeWidth="0.5" />
+            </g>
+          ) : null}
+
+          {/* Moyeu : anneau métallique et cœur LED cyan */}
+          <circle cx="50" cy="50" r="5.6" fill="url(#wind-compass-hub)" stroke="rgba(255,255,255,0.28)" strokeWidth="0.7" />
+          <circle cx="50" cy="50" r="4.2" fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth="0.6" />
+          <circle cx="50" cy="50" r="3" fill="url(#wind-compass-sapphire)" filter="url(#wind-compass-neon)" />
+          <circle cx="48.9" cy="48.9" r="0.7" fill="rgba(255,255,255,0.9)" />
         </svg>
       </div>
       <p className="min-h-4 text-center text-[10px] font-bold leading-tight text-cyan-100">{directionDescription}</p>
