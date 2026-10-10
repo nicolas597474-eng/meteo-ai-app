@@ -33,6 +33,7 @@ import { getDashboardObservability } from "@/lib/dashboardObservability";
 import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, withCurrentSnapshotFallback, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
 import { getDashboardWind } from "@/lib/dashboardWind";
+import { getCurrentStationTemperature, withCurrentStationTemperature } from "@/lib/currentStationTemperature";
 import { formatOptionalForecastValue } from "@/lib/forecastTimeline";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour, getOfficialForecastCoordinates } from "@/lib/officialForecast";
@@ -825,6 +826,8 @@ export default function Dashboard() {
   const temperatureField = withCurrentSnapshotFallback(currentFields?.temperature, currentSnapshot?.temp, snapshotCapturedAt);
   const conditionField = withCurrentSnapshotFallback(currentFields?.condition, currentSnapshot?.condition, snapshotCapturedAt);
   const currentTemp = currentNumber(temperatureField);
+  const stationTemperature = getCurrentStationTemperature(temperatureField, formatCurrentStateProvenance(temperatureField, currentSnapshot?.capturedAt));
+  const chartHours = withCurrentStationTemperature(hours, currentHourIndex, stationTemperature);
   const selectedCondition = currentString(conditionField);
   const displayedCondition = selectedCondition ?? (isDailyFallback ? dailyFallback.condition : null);
   const activeFavoriteWeather = {
@@ -1440,7 +1443,7 @@ export default function Dashboard() {
             <div className="h-56 bg-muted rounded-xl animate-pulse" />
           ) : hours.length > 0 ? (
             <Suspense fallback={<div className="h-56 bg-muted rounded-xl animate-pulse" />}>
-              <HourlyChart hours={hours} locationName={selectedLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name} activeHourIndex={currentHourIndex} />
+              <HourlyChart hours={chartHours} locationName={selectedLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name} activeHourIndex={currentHourIndex} activeHourMeasurementLabel={stationTemperature?.provenanceLabel ?? null} />
             </Suspense>
           ) : (
             <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-5 text-center">

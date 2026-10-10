@@ -570,6 +570,7 @@ export function ForecastByDaySection({
   activeHourIndex,
   hourlyWeighting,
   officialProvenance,
+  activeHourMeasurementLabel,
 }: {
   locationName?: string;
   hours: ForecastHour[];
@@ -583,6 +584,8 @@ export function ForecastByDaySection({
     computedAt?: string | null;
     hourlyComputedAt?: string | null;
   } | null;
+  /** Provenance de la mesure des stations physiques quand l'échéance active est une observation. */
+  activeHourMeasurementLabel?: string | null;
 }) {
   const grouped = useMemo(() => groupOfficialHourlyForecastByDate(hours), [hours]);
   const today = getForecastDateKey();
@@ -618,6 +621,8 @@ export function ForecastByDaySection({
     ? getSelectedForecastHourIndex(selection, selectedGroup, activeHourIndex)
     : null;
   const selectedEntry = selectedGroup?.hours.find(({ index }) => index === selectedHourIndex);
+  const selectedEntryIsActiveHour = selectedEntry != null && selectedEntry.index === activeHourIndex;
+  const activeHourIsMeasured = Boolean(activeHourMeasurementLabel) && selectedEntryIsActiveHour;
   const selectedEntryHasValidTime = isFiniteValue(selectedEntry?.hour.validAt);
   const selectedDaily = selectedDay?.daily ?? null;
   const selectedDateIsTodayOrTomorrow = selectedDay?.date === today || selectedDay?.date === tomorrow;
@@ -804,7 +809,7 @@ export function ForecastByDaySection({
                     type="button"
                     ref={isHourSelected ? selectedHourRef : undefined}
                     aria-pressed={isHourSelected}
-                    aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 1, "°")}${precipitationDescription}${isActiveForecast ? ", prévision active" : ""}`}
+                    aria-label={`${display.dateLabel}, ${display.hourLabel}${display.offsetLabel ? `, ${display.offsetLabel}` : ""}, température ${formatOptionalForecastValue(entry.hour.temp, 1, "°")}${precipitationDescription}${isActiveForecast ? (activeHourMeasurementLabel ? ", prévision active · température mesurée par les stations physiques" : ", prévision active") : ""}`}
                     onClick={() => onHourPress(entry.index)}
                     className={`forecast-hour-cell min-h-[6.25rem] w-[5rem] shrink-0 snap-start rounded-xl border px-1.5 py-2 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 ${isHourSelected ? "border-cyan-200/75 bg-sky-300/15" : "border-transparent hover:bg-sky-200/[0.06]"}`}
                   >
@@ -844,7 +849,7 @@ export function ForecastByDaySection({
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/75">{selectedEntry ? `Échéance ${hourTime(selectedEntry, hours)}` : "Température horaire"}</p>
                     <p className="mt-0.5 text-[2.8rem] font-semibold leading-none tracking-[-0.055em] text-white sm:text-5xl" style={selectedHourlyTemperatureTone ? { color: selectedHourlyTemperatureTone } : undefined}>{formatOptionalForecastValue(selectedEntryHasValidTime ? selectedEntry?.hour.temp : null, 1, "°")}</p>
-                    {selectedEntry && <p className="mt-1 text-[8px] leading-tight text-slate-400" title={`validTime UTC ${selectedValidTimeUtc}`}>{hourlyFieldProvenance("temperature", selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.temp))}</p>}
+                    {selectedEntry && <p className={activeHourIsMeasured ? "mt-1 text-[8px] leading-tight text-amber-200" : "mt-1 text-[8px] leading-tight text-slate-400"} title={`validTime UTC ${selectedValidTimeUtc}`}>{activeHourIsMeasured ? `Mesure stations physiques · ${activeHourMeasurementLabel}` : hourlyFieldProvenance("temperature", selectedEntryHasValidTime && isFiniteValue(selectedEntry.hour.temp))}</p>}
                     {selectedEntryHasValidTime && selectedEntry?.hour.fallbackProvenance?.temperature && <p className="mt-1 text-[9px] leading-relaxed text-amber-200">OpenWeatherMap · réponse obtenue par l’application {new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }).format(new Date(selectedEntry.hour.fallbackProvenance.temperature.retrievedAt))} · validTime exact · run fournisseur non communiqué, fraîcheur amont inconnue.</p>}
                   </div>
                 ) : (
@@ -875,7 +880,11 @@ export function ForecastByDaySection({
               {selectedDay.kind === "official-hourly" && <div className="mt-2 rounded-lg border border-cyan-300/15 bg-slate-950/25 px-2 py-1.5" aria-label="Évolution prévue après l’échéance sélectionnée"><p className="text-[9px] font-semibold text-cyan-100">Évolution prévue · {selectedEvolutionLabel}</p>{selectedEvolutionEntry && <p className="mt-0.5 text-[8px] text-slate-400">{hourlyFieldProvenance(null, true)} · échéance suivante distincte</p>}</div>}
 
               <div aria-label="Prévision, source et fraîcheur" className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] leading-relaxed">
-                <span aria-label="Prévu, non observé" className="inline-flex min-h-6 items-center rounded-full border border-cyan-200/35 bg-cyan-300/10 px-2 font-bold uppercase tracking-[0.08em] text-cyan-100">Prévu</span>
+                {activeHourIsMeasured ? (
+                  <span aria-label="Mesuré, observation des stations physiques" className="inline-flex min-h-6 items-center rounded-full border border-amber-200/35 bg-amber-300/10 px-2 font-bold uppercase tracking-[0.08em] text-amber-100">Mesuré</span>
+                ) : (
+                  <span aria-label="Prévu, non observé" className="inline-flex min-h-6 items-center rounded-full border border-cyan-200/35 bg-cyan-300/10 px-2 font-bold uppercase tracking-[0.08em] text-cyan-100">Prévu</span>
+                )}
                 <span className="min-w-0 rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Source</span> · {selectedContextSource}</span>
                 <span className="rounded-full border border-sky-100/15 bg-slate-950/35 px-2 py-1 text-slate-200"><span className="font-semibold text-sky-100">Calcul</span> · {selectedFreshness ? <time dateTime={selectedFreshness.iso}>{selectedFreshness.label} (Europe/Paris)</time> : "heure indisponible"}</span>
               </div>
