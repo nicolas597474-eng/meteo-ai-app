@@ -1,6 +1,7 @@
 import { fromArrayBuffer } from "geotiff";
 import { ENV } from "./_core/env";
 import { inspectMeteoFranceCredential } from "./meteoFranceCredentials";
+import { singleRunMetadataUrl } from "./providerRunHorizon";
 import { HONDEGHEM } from "./weatherServices";
 
 export const AROME_WCS_PROFILE = "MF-NWP-HIGHRES-AROME-001-FRANCE-WCS";
@@ -11,6 +12,10 @@ const OPEN_METEO_MODEL = "meteofrance_arome_france_hd";
 const MAX_HOURS = 24;
 /** Fenêtre Single Runs : le run + le lendemain suffisent pour couvrir MAX_HOURS échéances. */
 export const SINGLE_RUN_FORECAST_DAYS = Math.max(1, Math.ceil(MAX_HOURS / 24) + 1);
+/** Runs candidats essayés au maximum pour l’alignement : un par cycle récent, jamais davantage. */
+export const MAX_ALIGNED_RUN_ATTEMPTS = 3;
+/** Lecture des métadonnées de run Open-Meteo : une panne ne doit jamais bloquer la comparaison. */
+const OPEN_METEO_RUN_METADATA_TIMEOUT_MS = 10_000;
 const METRICS = ["temperature", "precipitation", "windSpeed"] as const;
 export type AromeShadowMetric = typeof METRICS[number];
 export type AromeShadowStatus = "ok" | "partial" | "missing-key" | "invalid-key" | "authentication-error" | "request-impossible";
@@ -126,7 +131,16 @@ function parseRunFromCoverageId(id: string): { run: string; period: string | nul
   const run = match[1].replace(/(\d{2})\.(\d{2})\.(\d{2})Z$/, "$1:$2:$3Z");
   return Number.isFinite(Date.parse(run)) ? { run, period: match[2] ?? null } : null;
 }
-function chooseLatestRun(coverageIds: string[]): { run: string; choices: Partial<Record<AromeShadowMetric, CoverageChoice>> } | null {
+interface CatalogueRun {
+  run: string;
+  choices: Partial<Record<AromeShadowMetric, CoverageChoice>>;
+}
+
+function chooseLatestRun(coverageIds: string[]): CatalogueRun | null {
+  return rankCatalogueRuns(coverageIds)[0] ?? null;
+}
+/** Tous les runs du catalogue, du plus récent au plus ancien, avec leurs couvertures reconnues. */
+function rankCatalogueRuns(coverageIds: string[]): CatalogueRun[] {
   const byRun = new Map<string, Partial<Record<AromeShadowMetric, CoverageChoice>>>();
   for (const id of coverageIds) {
     const parsedRun = parseRunFromCoverageId(id);
@@ -138,10 +152,10 @@ function chooseLatestRun(coverageIds: string[]): { run: string; choices: Partial
     if (!choices[metric]) choices[metric] = { metric, id: decodeXml(id), run: parsedRun.run, period: parsedRun.period };
     byRun.set(parsedRun.run, choices);
   }
-  const candidates = Array.from(byRun.entries())
+  return Array.from(byRun.entries())
     .filter(([, choices]) => choices.temperature || choices.windSpeed || choices.precipitation)
-    .sort(([a], [b]) => Date.parse(b) - Date.parse(a));
-  return candidates.length ? { run: candidates[0][0], choices: candidates[0][1] } : null;
+    .sort(([a], [b]) => Date.parse(b) - Date.parse(a))
+    .map(([run, choices]) => ({ run, choices }));
 }
 function advertisedGeoTiffFormat(xml: string): string | null {
   const supported: string[] = [...localTagText(xml, "formatSupported")];
@@ -301,6 +315,59 @@ async function readOpenMeteoReason(response: Response): Promise<string | null> {
   } catch {
     return null;
   }
+}
+/**
+ * Dernier run publié par Open-Meteo pour AROME France HD, lu dans `static/meta.json` du modèle.
+ * `null` quand les métadonnées sont indisponibles ou illisibles : la comparaison conserve alors
+ * le run le plus récent du catalogue WCS, comme avant, et laisse Single Runs répondre.
+ */
+async function readOpenMeteoLastRunAt(fetchImpl: FetchLike): Promise<number | null> {
+  try {
+    const response = await fetchImpl(singleRunMetadataUrl(OPEN_METEO_MODEL), {
+      signal: AbortSignal.timeout(OPEN_METEO_RUN_METADATA_TIMEOUT_MS),
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return null;
+    const payload = await response.json() as { last_run_initialisation_time?: unknown } | null;
+    const seconds = typeof payload?.last_run_initialisation_time === "number"
+      ? payload.last_run_initialisation_time
+      : Number(payload?.last_run_initialisation_time);
+    if (!Number.isFinite(seconds) || seconds <= 0 || !Number.isSafeInteger(seconds)) return null;
+    return seconds * 1000;
+  } catch {
+    return null;
+  }
+}
+interface RunCandidates {
+  /** Runs du catalogue candidats à la comparaison, du plus récent au plus ancien. */
+  candidates: CatalogueRun[];
+  /** Runs du catalogue écartés d’emblée parce qu’Open-Meteo ne les a pas encore publiés. */
+  skipped: string[];
+}
+/**
+ * L’alignement du run : seule une échéance de run publiée par les deux sources est comparable.
+ * Le dernier run connu d’Open-Meteo borne donc le choix dans le catalogue WCS ; s’il est inconnu,
+ * tous les runs récents restent candidats et la sonde Single Runs tranche, run par run.
+ */
+function selectRunCandidates(rankedRuns: CatalogueRun[], openMeteoLastRunAt: number | null): RunCandidates {
+  const fallback: RunCandidates = { candidates: rankedRuns.slice(0, MAX_ALIGNED_RUN_ATTEMPTS), skipped: [] };
+  if (openMeteoLastRunAt == null) return fallback;
+  const published = rankedRuns.filter(({ run }) => Date.parse(run) <= openMeteoLastRunAt);
+  if (!published.length) return fallback;
+  return {
+    candidates: published.slice(0, MAX_ALIGNED_RUN_ATTEMPTS),
+    skipped: rankedRuns.filter(({ run }) => Date.parse(run) > openMeteoLastRunAt).map(({ run }) => run),
+  };
+}
+/** Explique le décalage quand le run comparé n’est pas le plus récent annoncé par le WCS. */
+function describeRunAlignment(input: { advertisedRun: string; comparedRun: string; openMeteoLastRunAt: number | null; skipped: string[] }): string {
+  if (input.advertisedRun === input.comparedRun) return "";
+  const openMeteoLastRun = input.openMeteoLastRunAt == null
+    ? ""
+    : ` (dernier run publié par Open-Meteo : ${toSingleRunTime(new Date(input.openMeteoLastRunAt).toISOString())} UTC)`;
+  const skipped = input.skipped.length ? input.skipped : [input.advertisedRun];
+  const skippedText = skipped.map(toSingleRunTime).join(", ");
+  return ` Run comparé ${toSingleRunTime(input.comparedRun)} UTC : c’est le plus récent publié à la fois par le catalogue WCS et par Open-Meteo Single Runs${openMeteoLastRun}; le catalogue annonçait déjà ${skippedText} UTC, qu’Open-Meteo n’avait pas encore publié.`;
 }
 function parseOpenMeteoSeries(payload: any): ForecastSeries | null {
   const hourly = payload?.hourly;
@@ -496,6 +563,8 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
 /**
  * Manual, read-only comparison. It uses only the default AROME France HD product at Hondeghem;
  * it never writes to forecasts or lets the AROME result replace the displayed Best Match values.
+ * Le cycle comparé est le plus récent publié à la fois par le catalogue WCS et par Open-Meteo
+ * Single Runs : l’alignement du run évite de demander un cycle que Single Runs n’a pas encore.
  */
 export async function runHondeghemAromeShadowComparison(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
   const comparedAt = (options.now?.() ?? new Date()).toISOString();
@@ -548,24 +617,57 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
       return { ...result, message: `Catalogue WCS AROME indisponible (HTTP ${capabilities.status}).` };
     }
     const coverageIds = localTagText(capabilities.text, "CoverageId").map(decodeXml);
-    const selection = chooseLatestRun(coverageIds);
-    if (!selection) return { ...result, message: "Le catalogue AROME ne contient aucun run récent avec une couverture de température, vent ou précipitation reconnue." };
-    const run = selection.run;
-    result.run = run;
-    result.openMeteoRun = toSingleRunTime(run);
+    const rankedRuns = rankCatalogueRuns(coverageIds);
+    if (!rankedRuns.length) return { ...result, message: "Le catalogue AROME ne contient aucun run récent avec une couverture de température, vent ou précipitation reconnue." };
+    const advertisedRun = rankedRuns[0].run;
     const geotiffFormat = advertisedGeoTiffFormat(capabilities.text);
     if (!geotiffFormat) return { ...result, message: "Le catalogue WCS n’annonce aucun format GeoTIFF reconnu; aucun fichier raster n’a été demandé." };
 
-    step = "la série Open-Meteo Single Runs du même run";
-    const openMeteoResponse = await fetchImpl(buildSingleRunsUrl(run), { signal: AbortSignal.timeout(20_000), headers: { accept: "application/json" } });
-    if (!openMeteoResponse.ok) {
-      // Le corps d’erreur d’Open-Meteo (`{"error":true,"reason":"…"}`) est la seule source qui
-      // distingue un run inexistant, un cycle non publié et un paramètre refusé : on le remonte.
+    // Alignement du run : le catalogue WCS publie parfois un cycle (03/09/15/21 UTC) qu’Open-Meteo
+    // n’a pas encore ingéré ; comparer ce cycle-là ferait échouer la requête. On borne donc le choix
+    // au dernier run publié par Open-Meteo, puis la sonde Single Runs confirme, run par run.
+    step = "les métadonnées de run Open-Meteo (dernier run publié)";
+    const openMeteoLastRunAt = await readOpenMeteoLastRunAt(fetchImpl);
+    const { candidates, skipped } = selectRunCandidates(rankedRuns, openMeteoLastRunAt);
+
+    step = "la série Open-Meteo Single Runs du run aligné";
+    let selection: CatalogueRun | null = null;
+    let openMeteoSeries: ForecastSeries | null = null;
+    const attemptedRuns: string[] = [];
+    let lastRefusal: { run: string; status: number; reason: string | null } | null = null;
+    let unreadableSeries = false;
+    for (const candidate of candidates) {
+      attemptedRuns.push(candidate.run);
+      const openMeteoResponse = await fetchImpl(buildSingleRunsUrl(candidate.run), { signal: AbortSignal.timeout(20_000), headers: { accept: "application/json" } });
+      if (openMeteoResponse.ok) {
+        const series = parseOpenMeteoSeries(await openMeteoResponse.json());
+        if (!series) { unreadableSeries = true; break; }
+        selection = candidate;
+        openMeteoSeries = series;
+        break;
+      }
+      // Le corps d’erreur d’Open-Meteo (`{"error":true,"reason":"…"}`) distingue un run inexistant,
+      // un cycle non publié et un paramètre refusé : on le remonte et il décide de la suite.
       const reason = await readOpenMeteoReason(openMeteoResponse);
-      return { ...result, message: `Open-Meteo Single Runs n’a pas fourni le run AROME ${toSingleRunTime(run)} (HTTP ${openMeteoResponse.status}${reason ? ` : ${reason}` : ""}); aucun autre run n’a été substitué.` };
+      lastRefusal = { run: candidate.run, status: openMeteoResponse.status, reason };
+      // Seul un 400 « run indisponible » autorise à essayer un cycle plus ancien ; toute autre
+      // réponse (authentification, quota, panne) arrête la comparaison au lieu de la contourner.
+      if (openMeteoResponse.status !== 400) break;
     }
-    const openMeteoSeries = parseOpenMeteoSeries(await openMeteoResponse.json());
-    if (!openMeteoSeries) return { ...result, message: "La réponse Open-Meteo Single Runs ne contient pas de série horaire exploitable." };
+    if (unreadableSeries) return { ...result, message: "La réponse Open-Meteo Single Runs ne contient pas de série horaire exploitable." };
+    if (!selection || !openMeteoSeries) {
+      const refusedRun = lastRefusal?.run ?? advertisedRun;
+      result.run = refusedRun;
+      result.openMeteoRun = toSingleRunTime(refusedRun);
+      const refusal = lastRefusal ? ` (HTTP ${lastRefusal.status}${lastRefusal.reason ? ` : ${lastRefusal.reason}` : ""})` : "";
+      const attempts = attemptedRuns.length > 1 ? ` Runs essayés sans succès : ${attemptedRuns.map(toSingleRunTime).join(", ")} UTC.` : "";
+      const skippedRuns = skipped.length ? ` Runs du catalogue écartés d’emblée (non publiés par Open-Meteo) : ${skipped.map(toSingleRunTime).join(", ")} UTC.` : "";
+      return { ...result, message: `Open-Meteo Single Runs n’a pas fourni le run AROME ${toSingleRunTime(refusedRun)}${refusal}; aucun autre run n’a été substitué.${attempts}${skippedRuns}` };
+    }
+    const run = selection.run;
+    result.run = run;
+    result.openMeteoRun = toSingleRunTime(run);
+    const alignmentNote = describeRunAlignment({ advertisedRun, comparedRun: run, openMeteoLastRunAt, skipped });
 
     step = "les métadonnées WCS DescribeCoverage";
     const metadata: Partial<Record<AromeShadowMetric, CoverageMetadata>> = {};
@@ -694,9 +796,9 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     }
     result.daily = dailyAggregate(result.hourly);
     result.status = resultStatus(result);
-    result.message = result.status === "ok"
+    result.message = (result.status === "ok"
       ? "Comparaison shadow terminée : AROME WCS et Open-Meteo portent le même run. Les prévisions affichées restent inchangées."
-      : "Comparaison partielle : seules les valeurs présentes dans les deux sources et conformes aux métadonnées sont comparées; les prévisions affichées restent inchangées.";
+      : "Comparaison partielle : seules les valeurs présentes dans les deux sources et conformes aux métadonnées sont comparées; les prévisions affichées restent inchangées.") + alignmentNote;
     return result;
   } catch (error) {
     console.error(`[arome-shadow] comparaison shadow échouée pendant ${step}`, error);
