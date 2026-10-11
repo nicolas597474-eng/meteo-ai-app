@@ -7,6 +7,7 @@
  * 3. Netatmo public stations (OAuth, when a user connection is active)
  * 4. Open-Meteo multi-point grid references (clearly not physical stations)
  * 5. openSenseMap outdoor citizen sensors (candidates, excluded from ground truth)
+ * 6. CWOP/MADIS citizen stations (real public observations, candidates)
  *
  * Ground truth weighting:
  *   50% distance normalisée (IDW quadratique, closer = more weight)
@@ -18,6 +19,7 @@
  */
 
 import { fetchOpenSenseMapCandidates } from "./openSenseMapService";
+import { fetchCwopCandidates } from "./cwopMadisService";
 import { WEATHER_SERVICES } from "./weatherServices";
 import type { CurrentModelReference } from "./modelReferenceCoherence";
 import {
@@ -71,7 +73,7 @@ export type StationData = {
   sourceTier?: 1 | 2 | 3;
 };
 
-export type StationCollectionSource = "meteofrance" | "netatmo" | "opensensemap";
+export type StationCollectionSource = "meteofrance" | "netatmo" | "opensensemap" | "cwop";
 export type StationSourceDiagnosticStatus = "success_with_data" | "success_empty" | "error" | "not_configured";
 export type StationSourceDiagnostic = {
   source: StationCollectionSource;
@@ -543,7 +545,7 @@ async function collectNearbyStationsUncached(
   // Seules les observations de station et les candidats sont assemblés ici.
   // Les modèles sont exposés séparément par fetchCurrentModelReferences().
   let netatmoStatus: import("./netatmoService").NetatmoAvailability | undefined;
-  const [meteoFrance, netatmo, openSenseMap] = await Promise.allSettled([
+  const [meteoFrance, netatmo, openSenseMap, cwop] = await Promise.allSettled([
     fetchMeteoFranceStations(lat, lon, radiusKm),
     fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm, {
       onStatus: (status) => {
@@ -552,12 +554,14 @@ async function collectNearbyStationsUncached(
       },
     }),
     fetchOpenSenseMapCandidates(lat, lon, radiusKm),
+    fetchCwopCandidates(lat, lon, radiusKm),
   ]);
 
   const sourceDiagnostics = [
     makeSourceDiagnostic("meteofrance", meteoFrance),
     makeSourceDiagnostic("netatmo", netatmo, netatmoStatus),
     makeSourceDiagnostic("opensensemap", openSenseMap),
+    makeSourceDiagnostic("cwop", cwop),
   ];
 
   const all: StationData[] = [
@@ -583,6 +587,34 @@ async function collectNearbyStationsUncached(
       reliabilityScore: SOURCE_DEFAULTS.opensensemap.reliability,
       updateFrequencyMin: SOURCE_DEFAULTS.opensensemap.updateFreqMin,
       dataAvailability: SOURCE_DEFAULTS.opensensemap.availability,
+      isActive: false,
+      qualificationStatus: "candidate",
+      sourceTier: 3,
+      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
+    })) : []),
+    // Les stations CWOP/MADIS deviennent des candidats citoyens dès leur
+    // première observation réelle : jamais actives, jamais physiques, la
+    // qualification MAE vs SYNOP décidera seule de leur promotion future.
+    ...(cwop.status === "fulfilled" ? cwop.value.map((candidate): StationData => ({
+      stationId: `cwop-${candidate.providerStationId}`,
+      source: "cwop",
+      name: candidate.name,
+      lat: candidate.lat,
+      lon: candidate.lon,
+      altitude: candidate.altitude,
+      distanceKm: candidate.distanceKm,
+      temperature: candidate.temperature,
+      humidity: candidate.humidity,
+      pressure: candidate.pressure,
+      windSpeed: candidate.windSpeed,
+      windGust: candidate.windGust,
+      windDirection: candidate.windDirection,
+      precipitation: candidate.precipitation,
+      updatedAt: candidate.updatedAt,
+      measurementTimes: candidate.measurementTimes,
+      reliabilityScore: SOURCE_DEFAULTS.cwop.reliability,
+      updateFrequencyMin: SOURCE_DEFAULTS.cwop.updateFrequencyMin,
+      dataAvailability: SOURCE_DEFAULTS.cwop.availability,
       isActive: false,
       qualificationStatus: "candidate",
       sourceTier: 3,
