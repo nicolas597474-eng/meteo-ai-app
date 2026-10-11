@@ -9,6 +9,7 @@ import { ProvenanceDisplayProvider } from "./contexts/ProvenanceDisplayContext";
 import { getSwipeNavigationTarget, isQualifiedPageSwipe, MAIN_PAGE_PATHS, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 import { useDetailedForecastPrefetch } from "./hooks/useDetailedForecastPrefetch";
 import { PageReadinessProvider, usePageReady, useRouteLoading } from "./contexts/PageReadinessContext";
+import { WeatherAILoader } from "./components/weather/WeatherAILoader";
 import {
   LayoutDashboard,
   Trophy,
@@ -249,13 +250,8 @@ function ScrollToTopOnRouteChange() {
 function RouteLoadingFallback() {
   useRouteLoading();
   return (
-    <div className="mx-auto min-h-[60vh] max-w-2xl space-y-4 px-3 py-5" role="status" aria-live="polite" aria-label="Chargement de la page">
-      <span className="sr-only">Chargement de la page…</span>
-      <div className="h-12 w-44 rounded-xl bg-slate-800/80" />
-      <div className="h-48 rounded-[22px] border border-slate-800 bg-slate-900/65" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-28 rounded-2xl border border-slate-800 bg-slate-900/65" />)}
-      </div>
+    <div className="mx-auto min-h-[60vh] max-w-2xl" role="status" aria-live="polite" aria-label="Chargement de la page">
+      <WeatherAILoader loading={true} message="Initialisation de MeteoAI…" variant="full" />
     </div>
   );
 }

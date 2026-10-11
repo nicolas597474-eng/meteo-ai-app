@@ -46,6 +46,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour, getOfficialForecastCoordinates } from "@/lib/officialForecast";
 import { useOfficialForecast } from "@/hooks/useOfficialForecast";
 import { OfficialForecastCalculationTimes } from "@/components/weather/OfficialForecastCalculationTimes";
+import { WeatherAILoader } from "@/components/weather/WeatherAILoader";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
@@ -865,20 +866,7 @@ export default function Dashboard() {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-48 bg-muted rounded-xl" />
-            <div className="h-48 bg-muted rounded-2xl" />
-            <div className="h-32 bg-muted rounded-2xl" />
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-28 bg-muted rounded-xl" />)}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <WeatherAILoader loading={true} variant="full" />;
   }
 
   if (isError) {
