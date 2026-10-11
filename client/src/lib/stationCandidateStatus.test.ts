@@ -79,3 +79,36 @@ describe("population retirée par le filtre de la carte", () => {
     expect(isUnqualifiedCitizenStation({ source: "opensensemap", qualificationStatus: "validated" })).toBe(false);
   });
 });
+
+describe("comptage des sources écartées (convergence du Classement)", () => {
+  /**
+   * Changement de comportement assumé par la convergence sur le helper.
+   *
+   * `qualificationStatus` vaut « validated » par défaut au schéma, pour toutes
+   * les sources. L'ancien filtre du Classement portait un garde
+   * `!== "validated"` trop large : une station NON citoyenne inactive n'était
+   * comptée ni dans « Candidates » ni dans « Écartées ». Elle disparaissait de
+   * tous les compteurs — précisément ce que ce dépôt s'interdit.
+   *
+   * Le helper applique l'intention réellement visée par le commentaire
+   * d'origine (« un capteur citoyen validé n'est pas écarté ») : seul un
+   * citoyen validé y échappe. Ces stations redeviennent donc visibles.
+   */
+  it("compte une station non citoyenne inactive comme écartée", () => {
+    const inactiveOfficial = { isActive: false, source: "meteofrance", sourceKind: "physical" as const, qualificationStatus: "validated" as const };
+    expect(getStationDisplayStatus(inactiveOfficial)).toBe("excluded");
+  });
+
+  it("n'écarte jamais un capteur citoyen validé, même inactif dans la fusion", () => {
+    const inactiveValidatedCitizen = { isActive: false, source: "opensensemap", qualificationStatus: "validated" as const };
+    expect(getStationDisplayStatus(inactiveValidatedCitizen)).toBe("citizen-validated");
+    expect(getStationDisplayStatus(inactiveValidatedCitizen)).not.toBe("excluded");
+  });
+
+  it("laisse une station active hors des deux populations", () => {
+    // Une station officielle active est utilisée : ni candidate, ni écartée.
+    const activeOfficial = { isActive: true, source: "meteofrance", sourceKind: "physical" as const, qualificationStatus: "validated" as const };
+    expect(getStationDisplayStatus(activeOfficial)).toBe("physical");
+    expect(getStationDisplayStatus(activeOfficial)).not.toBe("excluded");
+  });
+});
