@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./HourlyChart.tsx", import.meta.url), "utf8");
-const precipitationSummarySource = readFileSync(new URL("./weather/PrecipitationConsensusSummary.tsx", import.meta.url), "utf8");
 
 describe("HourlyChart", () => {
   it("présente les échelles avec une seule courbe de température par heure", () => {
@@ -108,31 +107,21 @@ describe("HourlyChart", () => {
     expect(source).toContain('MeteoIcon name="humidity" size={17}');
   });
 
-  it("inclut tous les accords multi-paramètres réellement disponibles", () => {
-    expect(source).toContain("Accord inter-modèles · dispersions brutes");
-    expect(source).toContain("l’incertitude statistique n’est pas mesurée ici et la fiabilité face aux observations est présentée séparément");
+  it("n’affiche plus l’accord inter-modèles ni la fréquence de consensus dans le panneau horaire", () => {
+    expect(source).not.toContain("Accord inter-modèles · dispersions brutes");
+    expect(source).not.toContain("Accord inter-modèles par dispersion brute");
+    expect(source).not.toContain("PrecipitationConsensusSummary");
+    expect(source).not.toContain("Fréquence / estimation de consensus des modèles");
+    expect(source).not.toContain("rainModelCount");
+    expect(source).not.toContain("fréquence non calibrée");
+    expect(source).not.toContain("dispersion circulaire");
+    expect(source).not.toContain("wetPrecipitationStandardDeviation");
+    expect(source).not.toContain("metrics?.dispersion");
     expect(source).toContain("multiModelMetrics");
-    expect(source).toContain("dispersion?.windSpeed");
-    expect(source).toContain("dispersion?.windGust");
-    expect(source).toContain("dispersion?.windDirection");
-    expect(source).toContain("dispersion?.humidity");
-    expect(source).toContain("dispersion?.cloudCover");
-    expect(source).toContain("PrecipitationConsensusSummary");
-    expect(precipitationSummarySource).toContain("Fréquence / estimation de consensus des modèles");
-    expect(source).toContain("rainModelCount");
-    expect(precipitationSummarySource).toContain("ce ne sont pas des probabilités météorologiques calibrées");
-    expect(precipitationSummarySource).toContain("ce ne sont pas des probabilités météorologiques calibrées");
+    expect(source).toContain("Dispersion thermique");
+    expect(source).toContain("Estimation de consensus");
     expect(source).not.toContain("tempSpread");
     expect(source).not.toContain("precipAgreement");
-    expect(source).toContain("Vent moyen");
-    expect(source).toContain("Rafales");
-    expect(source).toContain("Direction");
-    expect(source).toContain("Humidité");
-    expect(source).toContain("Nuages");
-    expect(source).toContain("standardDeviation");
-    expect(source).toContain("dispersion circulaire");
-    expect(source).toContain("wetPrecipitationStandardDeviation");
-    expect(source).toContain("fréquence non calibrée");
     expect(source).not.toContain("windAgreementParts");
     expect(source).not.toContain("Repères d’accord");
     expect(source).not.toContain("Indice d’accord des modèles");

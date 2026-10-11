@@ -24,8 +24,8 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("const precipLabelBand = 18");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, barTop - 5)");
     expect(source).toContain("ctx.fillText(p.toFixed(1), x, precipZoneBot - 5)");
-    expect(source).toContain("PrecipitationConsensusSummary");
-    expect(source).toContain("summary={day.precipitationConsensus}");
+    expect(source).not.toContain("PrecipitationConsensusSummary");
+    expect(source).not.toContain("summary={day.precipitationConsensus}");
     expect(source).toContain("if (p == null) return");
     expect(source).toContain("day.precipitation == null ? \"—\"");
     expect(source).toContain('return condition ?? "Conditions indisponibles"');
@@ -55,14 +55,15 @@ describe("FifteenDayChart", () => {
     expect(source).toContain("min-h-11");
   });
 
-  it("distingue l’accord brut du run exact et la dispersion positive de pluie", () => {
-    expect(source).toContain("requestDayOffset");
-    expect(source).toContain("heure d’émission propre à chaque modèle non archivée");
-    expect(source).toContain("Les dispersions décrivent l’accord brut; incertitude statistique non mesurée, fiabilité historique distincte.");
-    expect(source).toContain("σ pop");
-    expect(source).toContain("precipitationWetAmounts");
-    expect(source).toContain("fréquence de modèles, pas une probabilité calibrée");
+  it("n’affiche plus l’accord inter-modèles ni la fréquence de consensus dans le détail du jour", () => {
+    expect(source).not.toContain("Accord inter-modèles · dispersions brutes");
+    expect(source).not.toContain("formatAgreementSpread");
+    expect(source).not.toContain("requestDayOffset");
+    expect(source).not.toContain("precipitationWetAmounts");
+    expect(source).not.toContain("fréquence de modèles, pas une probabilité calibrée");
+    expect(source).not.toContain("Fréquence / estimation de consensus des modèles");
     expect(source).not.toContain("agreement?.horizonDays");
+    expect(source).toContain("Estimation pluie (consensus)");
   });
 
   it("réserve une zone d’alerte séparée des libellés de date", () => {

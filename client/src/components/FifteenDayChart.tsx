@@ -1,10 +1,9 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { TrendingUp, X, Thermometer, Wind, Droplets, Sun, Cloud, Sunrise, Sunset, Navigation, Eye, MapPin } from "lucide-react";
 import { MeteoIcon, getIconNameFromCondition } from "@/components/MeteoIcon";
-import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import { conditionFromWeatherValues } from "@shared/weatherConditionLabels";
 import type { PrecipitationModelConsensus } from "@shared/precipitationConsensus";
-import type { DailyAgreementMeasure, DailyModelAgreement } from "@shared/modelAgreement";
+import type { DailyModelAgreement } from "@shared/modelAgreement";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, getLabelBelowCurveY, TEMPERATURE_LABEL_ABOVE_GAP, TEMPERATURE_LABEL_BELOW_GAP, TEMPERATURE_WIND_CLEARANCE } from "@/lib/chartLabelLanes";
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
@@ -43,13 +42,6 @@ function formatDate(dateStr: string) {
   const isToday = dateStr === new Date().toISOString().slice(0, 10);
   if (isToday) return { line1: "Auj.", line2: `${d.getDate()} ${months[d.getMonth()]}` };
   return { line1: dayNames[d.getDay()], line2: `${d.getDate()} ${months[d.getMonth()]}` };
-}
-
-function formatAgreementSpread(measure: DailyAgreementMeasure | undefined, unit: string, expectedModelCount: number) {
-  if (!measure) return "Dispersion indisponible · effectif indisponible";
-  const range = measure.range == null ? "étendue indisponible" : `étendue ${measure.range.toFixed(1)} ${unit}`;
-  const standardDeviation = measure.standardDeviation == null ? "σ pop indisponible" : `σ pop ${measure.standardDeviation.toFixed(1)} ${unit}`;
-  return `${range} · ${standardDeviation} · ${measure.availableModelCount}/${expectedModelCount} modèles`;
 }
 
 function getConditionLabel(cloudCover: number | null, precip: number | null, condition: string | null): string {
@@ -152,7 +144,6 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
   const dateLabel = `${dayName} ${d.getDate()} ${months[d.getMonth()]}`;
   const cond = getConditionLabel(day.cloudCover, day.precipitation, day.condition);
   const uv = uvLabel(day.uvIndex);
-  const agreement = day.modelAgreement;
 
   return (
     <section className="mb-3 rounded-2xl border border-blue-400/25 bg-[#0a0e14] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.35)] animate-in slide-in-from-top-2 duration-200 sm:p-5" role="region" aria-labelledby="day-detail-title">
@@ -191,21 +182,7 @@ function DayDetailOverlay({ day, onClose }: { day: DayData; onClose: () => void 
           <DetailCard icon={<Cloud className="h-3.5 w-3.5 text-slate-400" />} label="Nébulosité" value={<>{day.cloudCover != null ? `${Math.round(day.cloudCover)}%` : "—"}</>} />
           <DetailCard icon={<Sunrise className="h-3.5 w-3.5 text-amber-400" />} label="Lever" value={<span className="text-amber-400">{day.sunrise ?? "—"}</span>} />
           <DetailCard icon={<Sunset className="h-3.5 w-3.5 text-orange-500" />} label="Coucher" value={<span className="text-orange-500">{day.sunset ?? "—"}</span>} />
-          <div className="col-span-3 rounded-lg border border-sky-300/15 bg-sky-300/[0.035] p-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-100">Accord inter-modèles · dispersions brutes</p>
-            <p className="mt-0.5 text-[9px] text-slate-400">Best Match exclu · jour demandé {agreement?.requestDayOffset == null ? "indisponible" : `J+${agreement.requestDayOffset}`} · heure d’émission propre à chaque modèle non archivée. Les dispersions décrivent l’accord brut; incertitude statistique non mesurée, fiabilité historique distincte.</p>
-            {agreement && <p className="mt-1 text-[9px] text-slate-500">Pluie au seuil ≥{agreement.precipitationOccurrence.thresholdMm.toFixed(1)} mm : {agreement.precipitationOccurrence.rainModelCount}/{agreement.precipitationOccurrence.availableModelCount} modèles disponibles annoncent de la pluie; fréquence de modèles, pas une probabilité calibrée.</p>}
-            <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-orange-300" />} label="Dispersion Tmax" value={formatAgreementSpread(agreement?.tempMax, "°C", agreement?.expectedModelCount ?? 0)} />
-              <DetailCard icon={<Thermometer className="h-3.5 w-3.5 text-orange-200" />} label="Dispersion Tmin" value={formatAgreementSpread(agreement?.tempMin, "°C", agreement?.expectedModelCount ?? 0)} />
-              <DetailCard icon={<Droplets className="h-3.5 w-3.5 text-sky-300" />} label="Pluie · toutes quantités" value={formatAgreementSpread(agreement?.precipitation, "mm", agreement?.expectedModelCount ?? 0)} />
-              <DetailCard icon={<Droplets className="h-3.5 w-3.5 text-blue-300" />} label={`Pluie · modèles ≥${agreement?.precipitationOccurrence.thresholdMm.toFixed(1) ?? "0,1"} mm`} value={formatAgreementSpread(agreement?.precipitationWetAmounts, "mm", agreement?.expectedModelCount ?? 0)} />
-              <DetailCard icon={<Wind className="h-3.5 w-3.5 text-emerald-300" />} label="Dispersion vent max. quotidien" value={formatAgreementSpread(agreement?.windSpeed, "km/h", agreement?.expectedModelCount ?? 0)} />
-              <DetailCard icon={<Wind className="h-3.5 w-3.5 text-teal-300" />} label="Dispersion rafales max. quotidiennes" value={formatAgreementSpread(agreement?.windGust, "km/h", agreement?.expectedModelCount ?? 0)} />
-            </div>
-          </div>
         </div>
-        <div className="mt-3"><PrecipitationConsensusSummary summary={day.precipitationConsensus} /></div>
     </section>
   );
 }
