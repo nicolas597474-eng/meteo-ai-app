@@ -86,7 +86,17 @@ import {
   upsertHourlyComparisonDiagnosticSnapshot,
   persistHourlyProviderRunEvaluation,
   getStationEvidenceSummary,
+  getCandidateOpenSenseMapStations,
+  getValidatedOfficialStationsNearReference,
+  getStationObservationsForQualification,
+  getWeatherStationQualificationVerdicts,
+  applyOpenSenseMapQualificationVerdicts,
 } from "./db";
+import {
+  deriveOpenSenseMapVerdicts,
+  OPEN_SENSE_MAP_QUALIFICATION_HISTORY_WINDOW_DAYS,
+  type OpenSenseMapQualificationVerdictUpdate,
+} from "./openSenseMapQualificationApplier";
 
 /**
  * Get today's date in YYYY-MM-DD format (Paris timezone)
@@ -314,8 +324,25 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         // accumuler l'historique exigé par la qualification MAE vs SYNOP. Ils
         // n'entrent jamais dans la synthèse physique du créneau, et une erreur
         // d'archive candidat ne peut pas interrompre la collecte officielle.
-        for (const station of getCandidateStations(discovered).filter((candidate) => candidate.source === "opensensemap")) {
+        // Un verdict déjà appliqué (validé ou exclu) demeure : l'archive
+        // horaire rafraîchit les métadonnées sans jamais rétrograder le statut.
+        const candidateStations = getCandidateStations(discovered).filter((candidate) => candidate.source === "opensensemap");
+        let persistedQualificationByStation = new Map<string, { qualificationStatus: string; exclusionReason: string | null }>();
+        if (candidateStations.length > 0) {
           try {
+            persistedQualificationByStation = new Map(
+              (await getWeatherStationQualificationVerdicts(candidateStations.map((station) => station.stationId)))
+                .map((verdict) => [verdict.stationId, verdict] as const),
+            );
+          } catch (verdictReadError: any) {
+            console.warn("[Stations] Statuts de qualification persistés illisibles, archivage en statut candidat :", verdictReadError.message);
+          }
+        }
+        for (const station of candidateStations) {
+          try {
+            const persistedVerdict = persistedQualificationByStation.get(station.stationId);
+            const persistedStatus = persistedVerdict?.qualificationStatus;
+            const isPersistedDefinitive = persistedStatus === "validated" || persistedStatus === "excluded";
             await upsertWeatherStation({
               stationId: station.stationId,
               source: station.source,
@@ -329,9 +356,11 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
               reliabilityScore: station.reliabilityScore,
               updateFrequencyMin: station.updateFrequencyMin,
               dataAvailability: station.dataAvailability,
-              isActive: 0,
-              exclusionReason: station.exclusionReason ?? "Capteur citoyen en validation — non utilisé dans la température locale",
-              qualificationStatus: "candidate",
+              isActive: persistedStatus === "validated" ? 1 : 0,
+              exclusionReason: isPersistedDefinitive
+                ? persistedVerdict?.exclusionReason ?? null
+                : station.exclusionReason ?? "Capteur citoyen en validation — non utilisé dans la température locale",
+              qualificationStatus: persistedStatus ?? "candidate",
               sourceTier: station.sourceTier ?? 3,
             });
             const candidateObservedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
@@ -518,6 +547,16 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     }
   }
 
+  // L'évaluation des capteurs citoyens openSenseMap est une extension isolée
+  // de la collecte horaire : une indisponibilité de la base ne peut jamais
+  // interrompre ni retarder l'archivage physique ni le statut renvoyé.
+  await runOptionalBackgroundTask("openSenseMap-qualification", async () => {
+    const qualification = await evaluateOpenSenseMapQualifications();
+    if (qualification.verdicts.length > 0) {
+      console.log(`[Stations] Qualification openSenseMap : ${qualification.verdicts.length} verdict(s) appliqué(s) sur ${qualification.evaluatedCandidates} capteur(s) évalué(s).`);
+    }
+  });
+
   return {
     ok: !allLocationsFailed,
     status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed",
@@ -529,6 +568,45 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     locations: results,
     errors: collectionErrors.length > 0 ? collectionErrors.map((result) => ({ locationKey: result.locationKey, attempts: result.attempts, reason: result.reason })) : undefined,
   };
+}
+
+export type OpenSenseMapQualificationEvaluationSummary = {
+  evaluatedCandidates: number;
+  verdicts: OpenSenseMapQualificationVerdictUpdate[];
+};
+
+/**
+ * Évalue chaque capteur citoyen openSenseMap encore candidat à partir de son
+ * historique archivé et des stations officielles persistées pour la même
+ * référence de favori, puis applique les verdicts définitifs. Un capteur sans
+ * historique suffisant demeure candidat sans aucune écriture : l'évaluation
+ * est idempotente et la source de vérité reste l'historique archivé.
+ */
+export async function evaluateOpenSenseMapQualifications(nowMs = Date.now()): Promise<OpenSenseMapQualificationEvaluationSummary> {
+  const candidates = await getCandidateOpenSenseMapStations();
+  if (candidates.length === 0) return { evaluatedCandidates: 0, verdicts: [] };
+
+  // Les stations officielles se lisent par référence de favori : le désaccord
+  // qui mesure la borne d'acceptation est local, jamais régional.
+  const officialStationsByReference = new Map<string, Awaited<ReturnType<typeof getValidatedOfficialStationsNearReference>>>();
+  for (const referenceKey of new Set(candidates.map((candidate) => `${candidate.refLat}:${candidate.refLon}`))) {
+    const [refLat, refLon] = referenceKey.split(":").map(Number);
+    officialStationsByReference.set(referenceKey, await getValidatedOfficialStationsNearReference(refLat, refLon));
+  }
+  const officialStations = Array.from(officialStationsByReference.values()).flat();
+
+  const sinceMs = nowMs - OPEN_SENSE_MAP_QUALIFICATION_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const observations = await getStationObservationsForQualification(
+    [
+      ...candidates.map((candidate) => candidate.stationId),
+      ...officialStations.map((station) => station.stationId),
+    ],
+    sinceMs,
+  );
+
+  const { verdicts } = deriveOpenSenseMapVerdicts({ candidates, officialStations, observations, asOf: nowMs });
+  await applyOpenSenseMapQualificationVerdicts(verdicts);
+  return { evaluatedCandidates: candidates.length, verdicts };
 }
 
 /**

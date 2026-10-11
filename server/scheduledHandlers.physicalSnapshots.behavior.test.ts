@@ -17,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   getPhysicalSnapshotCollectionTracesByDateRange: vi.fn(),
   upsertPhysicalSnapshotCollectionTrace: vi.fn(),
   insertPhysicalSnapshotCollectionTraceIfMissing: vi.fn(),
+  getWeatherStationQualificationVerdicts: vi.fn(),
+  getCandidateOpenSenseMapStations: vi.fn(),
+  getValidatedOfficialStationsNearReference: vi.fn(),
+  getStationObservationsForQualification: vi.fn(),
+  applyOpenSenseMapQualificationVerdicts: vi.fn(),
   notifyOwner: vi.fn(),
 }));
 
@@ -46,6 +51,11 @@ vi.mock("./db", async (importOriginal) => ({
   getPhysicalSnapshotCollectionTracesByDateRange: mocks.getPhysicalSnapshotCollectionTracesByDateRange,
   upsertPhysicalSnapshotCollectionTrace: mocks.upsertPhysicalSnapshotCollectionTrace,
   insertPhysicalSnapshotCollectionTraceIfMissing: mocks.insertPhysicalSnapshotCollectionTraceIfMissing,
+  getWeatherStationQualificationVerdicts: mocks.getWeatherStationQualificationVerdicts,
+  getCandidateOpenSenseMapStations: mocks.getCandidateOpenSenseMapStations,
+  getValidatedOfficialStationsNearReference: mocks.getValidatedOfficialStationsNearReference,
+  getStationObservationsForQualification: mocks.getStationObservationsForQualification,
+  applyOpenSenseMapQualificationVerdicts: mocks.applyOpenSenseMapQualificationVerdicts,
 }));
 
 vi.mock("./_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));
@@ -111,6 +121,11 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     mocks.insertQualifiedObservationSnapshotIfMissing.mockResolvedValue(true);
     mocks.upsertPhysicalSnapshotCollectionTrace.mockResolvedValue(undefined);
     mocks.insertPhysicalSnapshotCollectionTraceIfMissing.mockResolvedValue(true);
+    mocks.getWeatherStationQualificationVerdicts.mockResolvedValue([]);
+    mocks.getCandidateOpenSenseMapStations.mockResolvedValue([]);
+    mocks.getValidatedOfficialStationsNearReference.mockResolvedValue([]);
+    mocks.getStationObservationsForQualification.mockResolvedValue([]);
+    mocks.applyOpenSenseMapQualificationVerdicts.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -314,5 +329,242 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     expect(mocks.collectNearbyStations).toHaveBeenCalledTimes(1);
     expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 1 })]);
     expect(mocks.upsertPhysicalSnapshotCollectionTrace).toHaveBeenCalledWith(expect.objectContaining({ status: "stored" }));
+  });
+});
+
+describe("application des verdicts de qualification openSenseMap", () => {
+  // Fixtures explicitement marquées : données de test only, aucun appel réseau.
+
+  const liveOfficialStation = {
+    stationId: "mf-officielle",
+    source: "meteofrance",
+    name: "Station officielle témoin",
+    lat: 50.75,
+    lon: 2.5,
+    altitude: null,
+    distanceKm: 2,
+    temperature: 18.2,
+    humidity: null,
+    pressure: null,
+    windSpeed: null,
+    windGust: null,
+    windDirection: null,
+    precipitation: null,
+    updatedAt: "2026-08-27T15:45:00.000Z",
+    reliabilityScore: 92,
+    updateFrequencyMin: 60,
+    dataAvailability: 0.98,
+    isActive: true,
+    qualificationStatus: "validated",
+  };
+
+  const liveCandidateStation = (stationId: string) => ({
+    stationId,
+    source: "opensensemap",
+    name: "Capteur citoyen témoin",
+    lat: 50.757,
+    lon: 2.51,
+    altitude: null,
+    distanceKm: 0.8,
+    temperature: 18.4,
+    humidity: null,
+    pressure: null,
+    windSpeed: null,
+    windGust: null,
+    windDirection: null,
+    precipitation: null,
+    updatedAt: "2026-08-27T15:44:00.000Z",
+    measurementTimes: {
+      temperature: "2026-08-27T15:40:00.000Z",
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    },
+    reliabilityScore: 0,
+    updateFrequencyMin: 15,
+    dataAvailability: 0,
+    isActive: false,
+    qualificationStatus: "candidate",
+    sourceTier: 3,
+    exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
+  });
+
+  const archivedCandidateRow = {
+    stationId: "opensensemap-box-citoyen",
+    source: "opensensemap",
+    name: "Capteur citoyen archivé",
+    lat: 50.757,
+    lon: 2.51,
+    refLat: 50.756,
+    refLon: 2.521,
+  };
+
+  const archivedOfficialRow = (stationId: string) => ({
+    stationId,
+    source: "meteofrance",
+    name: `Station officielle ${stationId}`,
+    lat: 50.75,
+    lon: 2.5,
+    refLat: 50.756,
+    refLon: 2.521,
+  });
+
+  const qualificationObservation = (stationId: string, day: string, hour: number, minute: number, temperature: number) => ({
+    stationId,
+    observedAt: Date.parse(`2026-10-0${day}T${String(hour)}:${String(minute).padStart(2, "0")}:00.000Z`),
+    temperature,
+    measurementTimes: {
+      temperature: `2026-10-0${day}T${String(hour)}:${String(minute).padStart(2, "0")}:00.000Z`,
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    },
+  });
+
+  const archivedOfficialObservations = (stationId: string, value: number) =>
+    ["1", "2", "3"].flatMap((day) => [12, 13, 14, 15, 16, 17, 18].map((hour) => qualificationObservation(stationId, day, hour, 0, value)));
+
+  const archivedCandidateObservations = [
+    qualificationObservation("opensensemap-box-citoyen", "1", 12, 5, 18.1),
+    qualificationObservation("opensensemap-box-citoyen", "1", 14, 5, 18.1),
+    qualificationObservation("opensensemap-box-citoyen", "2", 12, 5, 18.1),
+    qualificationObservation("opensensemap-box-citoyen", "2", 14, 5, 18.1),
+    qualificationObservation("opensensemap-box-citoyen", "3", 12, 5, 18.1),
+    qualificationObservation("opensensemap-box-citoyen", "3", 16, 5, 18.1),
+    qualificationObservation("opensensemap-box-citoyen", "3", 18, 5, 18.1),
+  ];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    mocks.getTodayParis.mockReturnValue("2026-08-27");
+    mocks.getParisHour.mockReturnValue(16);
+    mocks.makeLocationKey.mockImplementation((lat: number, lon: number) => `${lat}_${lon}`);
+    mocks.collectNearbyStations.mockResolvedValue([]);
+    mocks.getPhysicalActiveStations.mockImplementation((stations: unknown[]) => stations);
+    mocks.calculateGroundTruth.mockReturnValue(emptySynthesis);
+    mocks.getQualifiedObservationSnapshotsForDate.mockResolvedValue([]);
+    mocks.getPhysicalSnapshotCollectionTracesByDateRange.mockResolvedValue([]);
+    mocks.upsertWeatherStation.mockResolvedValue(undefined);
+    mocks.upsertStationObservation.mockResolvedValue(undefined);
+    mocks.insertStationObservationIfMissing.mockResolvedValue(true);
+    mocks.refreshStationQualityProfiles.mockResolvedValue(undefined);
+    mocks.upsertQualifiedObservationSnapshot.mockResolvedValue(undefined);
+    mocks.insertQualifiedObservationSnapshotIfMissing.mockResolvedValue(true);
+    mocks.upsertPhysicalSnapshotCollectionTrace.mockResolvedValue(undefined);
+    mocks.insertPhysicalSnapshotCollectionTraceIfMissing.mockResolvedValue(true);
+    mocks.getWeatherStationQualificationVerdicts.mockResolvedValue([]);
+    mocks.getCandidateOpenSenseMapStations.mockResolvedValue([]);
+    mocks.getValidatedOfficialStationsNearReference.mockResolvedValue([]);
+    mocks.getStationObservationsForQualification.mockResolvedValue([]);
+    mocks.applyOpenSenseMapQualificationVerdicts.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("conserve le verdict d'exclusion persisté sans rétrograder le capteur en candidat", async () => {
+    mocks.collectNearbyStations.mockResolvedValue([
+      liveOfficialStation,
+      liveCandidateStation("opensensemap-box-exclu"),
+    ]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+    mocks.getWeatherStationQualificationVerdicts.mockResolvedValue([{
+      stationId: "opensensemap-box-exclu",
+      qualificationStatus: "excluded",
+      exclusionReason: "Divergences répétées : 4/10 comparaison(s) s'écartent de la médiane.",
+    }]);
+
+    await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.upsertWeatherStation).toHaveBeenCalledWith(expect.objectContaining({
+      stationId: "opensensemap-box-exclu",
+      qualificationStatus: "excluded",
+      isActive: 0,
+      exclusionReason: "Divergences répétées : 4/10 comparaison(s) s'écartent de la médiane.",
+    }));
+  });
+
+  it("archive un capteur validé comme actif, sans raison d'exclusion", async () => {
+    mocks.collectNearbyStations.mockResolvedValue([
+      liveOfficialStation,
+      liveCandidateStation("opensensemap-box-valide"),
+    ]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+    mocks.getWeatherStationQualificationVerdicts.mockResolvedValue([{
+      stationId: "opensensemap-box-valide",
+      qualificationStatus: "validated",
+      exclusionReason: null,
+    }]);
+
+    await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.upsertWeatherStation).toHaveBeenCalledWith(expect.objectContaining({
+      stationId: "opensensemap-box-valide",
+      qualificationStatus: "validated",
+      isActive: 1,
+      exclusionReason: null,
+    }));
+  });
+
+  it("applique le verdict de qualification dès que l'historique archivé suffit", async () => {
+    mocks.collectNearbyStations.mockResolvedValue([liveOfficialStation]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+    mocks.getCandidateOpenSenseMapStations.mockResolvedValue([archivedCandidateRow]);
+    mocks.getValidatedOfficialStationsNearReference.mockResolvedValue([
+      archivedOfficialRow("mf-a"),
+      archivedOfficialRow("mf-b"),
+    ]);
+    mocks.getStationObservationsForQualification.mockResolvedValue([
+      ...archivedOfficialObservations("mf-a", 18.0),
+      ...archivedOfficialObservations("mf-b", 18.2),
+      ...archivedCandidateObservations,
+    ]);
+
+    await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.applyOpenSenseMapQualificationVerdicts).toHaveBeenCalledWith([expect.objectContaining({
+      stationId: "opensensemap-box-citoyen",
+      qualificationStatus: "validated",
+      isActive: 1,
+      exclusionReason: null,
+    })]);
+  });
+
+  it("n'écrit aucun verdict tant que l'historique archivé du capteur reste insuffisant", async () => {
+    mocks.collectNearbyStations.mockResolvedValue([liveOfficialStation]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+    mocks.getCandidateOpenSenseMapStations.mockResolvedValue([archivedCandidateRow]);
+    mocks.getValidatedOfficialStationsNearReference.mockResolvedValue([
+      archivedOfficialRow("mf-a"),
+      archivedOfficialRow("mf-b"),
+    ]);
+    mocks.getStationObservationsForQualification.mockResolvedValue([
+      ...archivedOfficialObservations("mf-a", 18.0),
+      ...archivedOfficialObservations("mf-b", 18.2),
+      qualificationObservation("opensensemap-box-citoyen", "1", 12, 5, 18.1),
+    ]);
+
+    await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.applyOpenSenseMapQualificationVerdicts).not.toHaveBeenCalled();
+  });
+
+  it("isole une panne du lecteur de candidats sans interrompre la collecte horaire", async () => {
+    mocks.collectNearbyStations.mockResolvedValue([liveOfficialStation]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+    mocks.getCandidateOpenSenseMapStations.mockRejectedValue(new Error("Lecteur de candidats indisponible"));
+
+    const result = await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(result.status).toBe("completed");
+    expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 1 })]);
   });
 });
