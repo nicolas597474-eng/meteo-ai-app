@@ -15,7 +15,7 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain("modelWeight={locationWeather.ultraLocal.modelWeight}");
     expect(source).toContain("usesModelFallback={locationWeather.ultraLocal.usesModelFallback}");
     expect(source).toContain("Mes observations");
-    expect(source).toContain('<Wind className="h-3.5 w-3.5 shrink-0" />Vent actuel');
+    expect(source).toContain('<Wind className={"h-3.5 w-3.5 shrink-0 " + windSpeedTone.value} />Vent actuel');
     expect(source).toContain('MeteoIcon name="humidity" size={16}');
     expect(source).toContain("Précipitations observées (mm)");
     expect(source).toContain("acceptsPersonalPrecipitation");
