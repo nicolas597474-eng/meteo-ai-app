@@ -50,9 +50,6 @@ describe("AstronomyEventSelector — rendu mobile", () => {
     expect(markup).toContain("min-h-[4.25rem]");
     expect(markup).toContain("min-w-[11rem]");
     expect(markup).toContain("max-w-[14rem]");
-    expect(markup).not.toContain("rounded-full");
-    expect(markup).not.toContain("border-slate-");
-    expect(markup).not.toContain("border-sky-");
     for (const label of [
       "Météores",
       "Lunaire",
@@ -65,6 +62,37 @@ describe("AstronomyEventSelector — rendu mobile", () => {
     }
   });
 
+  it("arrondit la zone sélectionnée et la met en valeur sans la détacher du style du panneau", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AstronomyEventSelector, {
+        events,
+        selectedEventId: "lunar-2026",
+        onSelect: () => undefined,
+      })
+    );
+
+    expect(markup).toContain("rounded-2xl");
+    expect(markup).toContain("bg-sky-400/15");
+    expect(markup).toContain("ring-sky-300/45");
+    expect(markup).not.toContain("border-slate-");
+    expect(markup).not.toContain("border-sky-");
+  });
+
+  it("prolonge la rangée d’une fine piste sombre dont la capsule bleu clair glisse jusqu’à l’événement choisi", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AstronomyEventSelector, {
+        events,
+        selectedEventId: "lunar-2026",
+        onSelect: () => undefined,
+      })
+    );
+
+    expect(markup).toContain("h-1 rounded-full bg-slate-800");
+    expect(markup).toContain("rounded-full bg-sky-400");
+    const segmentWidth = 100 / events.length;
+    expect(markup).toContain(`width:${segmentWidth}%;left:${segmentWidth}%`);
+  });
+
   it("transmet l’identifiant de la carte activée au gestionnaire de sélection", () => {
     const onSelect = vi.fn();
     const tree = AstronomyEventSelector({
@@ -72,11 +100,14 @@ describe("AstronomyEventSelector — rendu mobile", () => {
       selectedEventId: "lunar-2026",
       onSelect,
     });
-    const buttons = (
+    const rootChildren = (
       tree.props as unknown as {
-        children: Array<{ props: { onClick: () => void } }>;
+        children: Array<{
+          props: { children: Array<{ props: { onClick: () => void } }> };
+        }>;
       }
     ).children;
+    const buttons = rootChildren[0].props.children;
 
     buttons[2].props.onClick();
     expect(onSelect).toHaveBeenCalledWith("solar-2027");
