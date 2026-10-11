@@ -921,9 +921,11 @@ function RealisticMoon({ phase, size, alt }: { phase: LunarPhaseVisual; size: "m
   return <LunarPhaseGlobe phase={phase} size={size} alt={alt} />;
 }
 
-// Décor de la demi-sphère : montagnes réalistes en courbes douces et dégradés,
-// neiges culminantes, liseré lumineux sur les crêtes, brume atmosphérique
-// et étoiles, accordés à la phase du ciel (jour / crépuscule / nuit) via index.css.
+// Décor de la demi-sphère : massif montagneux réaliste en quatre plans de
+// profondeur — crêtes en courbes organiques, dégradés de volume, faces
+// ombrées, névés accrochés aux sommets, striations rocheuses et brume
+// atmosphérique — étoiles scintillantes la nuit. Les teintes suivent la
+// phase du ciel (jour / crépuscule / nuit) via index.css.
 const CelestialLandscapeDecor = memo(function CelestialLandscapeDecor() {
   return (
     <svg className="celestial-landscape" viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true">
@@ -945,13 +947,13 @@ const CelestialLandscapeDecor = memo(function CelestialLandscapeDecor() {
           <stop offset="1" stopColor="var(--celestial-ridge-4-bottom)" />
         </linearGradient>
         <linearGradient id="celestial-haze" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="transparent" />
-          <stop offset="0.45" stopColor="var(--celestial-haze)" />
-          <stop offset="1" stopColor="transparent" />
+          <stop offset="0" stopColor="var(--celestial-haze)" stopOpacity="0" />
+          <stop offset="0.55" stopColor="var(--celestial-haze)" stopOpacity="0.45" />
+          <stop offset="1" stopColor="var(--celestial-haze)" stopOpacity="0" />
         </linearGradient>
         <radialGradient id="celestial-mist">
           <stop offset="0" stopColor="var(--celestial-mist)" />
-          <stop offset="1" stopColor="transparent" />
+          <stop offset="1" stopColor="var(--celestial-mist)" stopOpacity="0" />
         </radialGradient>
       </defs>
       <circle className="celestial-landscape-star" cx="14" cy="6" r="0.45" />
@@ -962,20 +964,27 @@ const CelestialLandscapeDecor = memo(function CelestialLandscapeDecor() {
       <circle className="celestial-landscape-star" cx="84" cy="5.5" r="0.4" />
       <circle className="celestial-landscape-star" cx="92" cy="11" r="0.35" />
       <circle className="celestial-landscape-star" cx="8" cy="12" r="0.35" />
-      <path className="celestial-landscape__far" fill="url(#celestial-ridge-1)" d="M0 36 L0 23 Q4 21.4 8 22.4 Q12 20.2 17 22 Q21 23.2 25 21.8 Q29 20 34 21.6 Q38 22.8 43 21.2 Q47 19.8 52 21.4 Q56 22.6 61 21 Q65 19.6 70 21.2 Q74 22.4 79 20.8 Q83 19.4 88 21 Q92 22.2 96 20.8 Q98.4 20.4 100 21 L100 36 Z" />
-      <rect fill="url(#celestial-haze)" x="0" y="21.5" width="100" height="9" />
-      <path className="celestial-landscape__mid" fill="url(#celestial-ridge-2)" d="M0 36 L0 25.5 Q4 22.6 8.5 24.8 Q12 22.2 16 24.2 Q20.5 20.4 26 23.6 Q30 21.4 35 23.4 Q39.5 19.4 46 23 Q50.5 21 55.5 22.8 Q60 18.8 66 22.4 Q70.5 20.4 75.5 22.6 Q80 18.4 86 22.2 Q90 20.2 94.5 22.4 Q97 23 100 22.4 L100 36 Z" />
-      <rect fill="url(#celestial-haze)" x="0" y="24" width="100" height="9.5" />
-      <path className="celestial-landscape__range" fill="url(#celestial-ridge-3)" d="M0 36 L0 27.5 Q3.5 24.6 7.5 26.8 Q11 23.4 15.5 25.6 Q20 20.8 27 24.6 Q31.5 21.6 36.5 23.8 Q41 18.6 48 23 Q52.5 19.8 57.5 22.4 Q62 17.4 69 21.8 Q73.5 19 78.5 21.6 Q83 16.6 90 21 Q93.5 19.4 96.5 21.2 Q98.4 21 100 21.6 L100 36 Z" />
-      <path className="celestial-landscape__snow" d="M39.4 21.6 L40.5 21.15 L41.6 21.05 L42.8 21.15 L44 21.3 L43.2 22.2 L42.3 21.7 L41.4 22.35 L40.5 21.75 L39.7 22.4 Z M60.4 20.3 L61.5 19.85 L62.6 19.8 L63.8 19.85 L65 20.05 L64.2 20.9 L63.3 20.4 L62.4 21.05 L61.5 20.45 L60.7 21.1 Z M81.4 19.5 L82.5 19.05 L83.6 19 L84.8 19.05 L86 19.25 L85.2 20.1 L84.3 19.6 L83.4 20.25 L82.5 19.65 L81.7 20.3 Z" />
-      <rect fill="url(#celestial-haze)" x="0" y="26.5" width="100" height="10" />
-      <path className="celestial-landscape__near" fill="url(#celestial-ridge-4)" d="M0 36 L0 30 Q3 26.4 6.5 28.6 Q9.5 25.2 13 27.4 Q17.5 21.6 24.5 26 Q29 22.8 33.5 25 Q38 18.8 45.5 23.6 Q50 20.2 54.5 22.6 Q59 16 66 21 Q70.5 18 75 20.8 Q79.5 14.4 86.5 19.4 Q90 17.2 93.5 19.6 Q96.8 19.4 100 20.4 L100 36 Z" />
-      <path className="celestial-landscape__snow" d="M57.4 19.7 L58.5 19.2 L59.6 18.95 L60.8 18.9 L62.1 19.15 L61.3 20.1 L60.4 19.55 L59.5 20.25 L58.6 19.65 L57.9 20.35 Z M68.7 19.75 L69.6 19.5 L70.5 19.5 L71.4 19.5 L72.3 19.7 L71.6 20.6 L70.7 20.1 L69.8 20.75 L68.9 20.2 Z M77.9 18 L79 17.55 L80.1 17.3 L81.3 17.25 L82.5 17.45 L81.7 18.4 L80.8 17.9 L79.9 18.6 L79 18 L78.3 18.7 Z" />
-      <path className="celestial-landscape__rim" d="M57.6 19.9 Q58.8 19.1 60.6 18.9" />
-      <path className="celestial-landscape__rim" d="M68.7 19.8 Q69.8 19.55 71.5 19.5" />
-      <path className="celestial-landscape__rim" d="M77.9 18 Q79.1 17.55 81 17.35" />
-      <ellipse className="celestial-landscape-mist celestial-landscape-mist--far" cx="50" cy="25.5" rx="46" ry="3.4" fill="url(#celestial-mist)" />
-      <ellipse className="celestial-landscape-mist celestial-landscape-mist--near" cx="52" cy="29.8" rx="48" ry="3" fill="url(#celestial-mist)" />
+      <path className="celestial-landscape__far" d="M0 36 L0 24.5 Q6 22.5 11 23.5 Q17 25.5 23 22.8 Q29 19.8 35 22.5 Q41 25.8 47 23.2 Q53 20.4 59 22.8 Q66 25.6 72 22.2 Q78 19.6 84 22.4 Q92 26 100 23 L100 36 Z" fill="url(#celestial-ridge-1)" />
+      <path className="celestial-landscape__mid" d="M0 36 L0 26.5 Q5 22.5 10 24 L14 21.8 Q19 17.5 25 20.5 L30 18.2 Q35 22.8 41 19.6 L46 17 Q52 21 58 18.4 Q63 15.4 69 19 L75 16.6 Q80 21.5 86 18.8 Q92 15.8 100 19.5 L100 36 Z" fill="url(#celestial-ridge-2)" />
+      <rect x="0" y="14" width="100" height="7" fill="url(#celestial-haze)" />
+      <path className="celestial-landscape__range" d="M0 36 L0 28 Q4 24.5 9 25.5 L13 22 Q18 14.5 24 13.2 L28 12.2 Q31 10.6 32.6 11.4 Q35 13.5 39 15 L43 14 Q47 12.6 50 13.8 Q54 15.5 57 13.6 L60.5 11.2 Q62 9.2 63.4 10 Q66.5 12 70 13.8 L74 12.8 Q78 11.2 80.6 12.2 Q83 10.8 84.8 11.6 Q88 13.8 92 15.4 L96 14.8 Q99 16.4 100 17 L100 36 Z" fill="url(#celestial-ridge-3)" />
+      <path className="celestial-landscape__shade" d="M63.4 10 Q66.5 12 70 13.8 L70 16.6 Q64.6 13 63.4 10 Z" />
+      <path className="celestial-landscape__shade" d="M84.8 11.6 Q88 13.8 92 15.4 L92 18.4 Q86.8 14.6 84.8 11.6 Z" />
+      <path className="celestial-landscape__snow" d="M27.6 12.8 L28 12.2 Q31 10.6 32.6 11.4 Q35 13.5 38.2 15 L37.6 16 Q36.2 15.5 34.9 16.2 L33.3 15.6 Q31.8 16.4 30.1 15.7 L28.7 16.2 Q27.7 14.4 27.6 12.8 Z" />
+      <path className="celestial-landscape__snow" d="M59.6 12.4 L60.5 11.2 Q62 9.2 63.4 10 Q66.5 12 69.2 13.8 L68.5 14.9 Q67.3 14.4 66.1 15.1 L64.5 14.5 Q63.1 15.2 61.6 14.5 L60.2 15.1 Q59.4 13.7 59.6 12.4 Z" />
+      <path className="celestial-landscape__snow" d="M80.6 12.2 Q83 10.8 84.8 11.6 Q88 13.8 91 15.2 L90.2 16.2 Q89 15.8 87.8 16.4 L86.4 15.9 Q85.1 16.5 83.9 15.9 L82.6 16.5 Q81 14.6 80.6 12.2 Z" />
+      <rect x="0" y="19" width="100" height="9" fill="url(#celestial-haze)" />
+      <path className="celestial-landscape__near" d="M0 36 L0 23.5 Q3 20.8 6.5 21.6 L10 19.4 Q13.5 22.6 17 20.2 L21.5 17.2 Q24 15.6 26.4 16.6 Q29.5 18.8 33 20.4 L37 19.6 Q40 22.8 44 21 L48.5 18.4 Q51.5 16.4 54.5 17.8 Q58 19.6 61.5 21.2 L65.5 19.8 Q69 17 72.5 18.6 Q76 20.4 79 19.4 L83 17 Q86.5 14.8 89.5 16 Q93.5 18.4 96.5 20.6 L100 20.2 L100 36 Z" fill="url(#celestial-ridge-4)" />
+      <path className="celestial-landscape__snow" d="M22.6 18.5 L21.5 17.2 Q24 15.6 26.4 16.6 Q29.5 18.8 32.4 20.1 L31.7 21.3 Q30.3 20.8 29.1 21.5 L27.6 20.9 Q26.3 21.6 24.9 21 L23.6 21.5 Q22.5 20.1 22.6 18.5 Z" />
+      <path className="celestial-landscape__snow" d="M50 19.3 L48.5 18.4 Q51.5 16.4 54.5 17.8 Q58 19.6 60.8 20.9 L60.1 22.1 Q58.8 21.6 57.7 22.2 L56.2 21.6 Q55 22.3 53.7 21.7 L52.4 22.2 Q50.6 20.9 50 19.3 Z" />
+      <path className="celestial-landscape__snow" d="M85.2 17.4 L83 17 Q86.5 14.8 89.5 16 Q93.5 18.4 95.8 20.2 L95 21.3 Q93.7 20.9 92.5 21.5 L91.1 20.9 Q89.9 21.6 88.7 21 L87.5 21.5 Q85.6 19.3 85.2 17.4 Z" />
+      <path className="celestial-landscape__shade" d="M26.4 16.6 Q29.5 18.8 33 20.4 L33 23.6 Q28.2 20.8 26.4 16.6 Z" />
+      <path className="celestial-landscape__shade" d="M89.5 16 Q93.5 18.4 96.5 20.6 L96.5 24 Q91 20 89.5 16 Z" />
+      <path className="celestial-landscape__rock" d="M10 19.8 L11.4 24.4 M17 20.5 L18.6 25 M26.6 17 L28.2 21.6 M33 20.6 L34.6 24.8 M44 21.3 L45.4 25.4 M54.7 18.2 L56 23 M61.5 21.4 L62.8 25.6 M72.7 19 L74.2 23.6 M83 17.3 L84.4 22 M89.7 16.4 L91 20.8" />
+      <path className="celestial-landscape__rim" d="M23.2 16.2 Q24 15.7 24.8 15.9 M51.6 17.1 Q52.2 16.9 52.8 17.2 M86.2 15.4 Q86.6 15.2 87 15.3" />
+      <rect x="0" y="24" width="100" height="12" fill="url(#celestial-haze)" />
+      <ellipse className="celestial-landscape-mist celestial-landscape-mist--far" cx="50" cy="28.5" rx="47" ry="2.6" fill="url(#celestial-mist)" />
+      <ellipse className="celestial-landscape-mist celestial-landscape-mist--near" cx="52" cy="31.5" rx="49" ry="2.2" fill="url(#celestial-mist)" />
     </svg>
   );
 });
