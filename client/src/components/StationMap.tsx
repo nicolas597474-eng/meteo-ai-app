@@ -4,7 +4,7 @@ import L from "leaflet";
 import { LocateFixed, Maximize2, Undo2, X } from "lucide-react";
 import { MapControlButton, MapZoomControl, mapActionButtonClass } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
-import { getStationQualificationBadge, isQualifiedCitizenStation } from "@/lib/stationCandidateStatus";
+import { getStationQualificationBadge, isUnqualifiedCitizenStation } from "@/lib/stationCandidateStatus";
 
 type StationMarker = {
   stationId: string;
@@ -86,16 +86,24 @@ export function StationMap({
   const [zoomLevel, setZoomLevel] = useState(normalZoom);
 
   /**
-   * Capteurs citoyens effectivement qualifiés présents dans le rayon. Le verdict
-   * vient du statut persisté relayé par la recherche de stations : aucun capteur
-   * n’est promu ici.
+   * Capteurs citoyens non qualifiés présents dans le rayon : capteurs en
+   * validation et capteurs exclus. C’est la population que le filtre retire —
+   * le verdict vient du statut persisté relayé par la recherche, aucun capteur
+   * n’est promu ni rétrogradé ici.
    */
-  const qualifiedCitizenCount = useMemo(
-    () => stations.filter((station) => isQualifiedCitizenStation(station)).length,
+  const unqualifiedCitizenCount = useMemo(
+    () => stations.filter((station) => isUnqualifiedCitizenStation(station)).length,
     [stations],
   );
+  /**
+   * Le filtre ne retire que les capteurs citoyens non qualifiés : les stations
+   * officielles SYNOP restent affichées. Ce n’est pas un détail — la
+   * qualification se *définit* par l’accord avec ces stations officielles. Les
+   * masquer retirerait l’étalon qui donne son sens au mot « qualifié » et
+   * laisserait une carte vide, indiscernable d’une carte en panne.
+   */
   const visibleStations = useMemo(
-    () => (qualifiedCitizensOnly ? stations.filter((station) => isQualifiedCitizenStation(station)) : stations),
+    () => (qualifiedCitizensOnly ? stations.filter((station) => !isUnqualifiedCitizenStation(station)) : stations),
     [qualifiedCitizensOnly, stations],
   );
   const hiddenStationCount = stations.length - visibleStations.length;
@@ -264,14 +272,16 @@ export function StationMap({
             type="button"
             onClick={() => setQualifiedCitizensOnly((current) => !current)}
             aria-pressed={qualifiedCitizensOnly}
-            aria-label="Afficher uniquement les capteurs citoyens qualifiés"
+            aria-label="Masquer les capteurs citoyens non qualifiés"
             className={`${mapActionButtonClass} w-full ${qualifiedCitizensOnly ? "border-sky-300/80 bg-sky-400/20 text-sky-100" : "text-slate-100"}`}
           >
-            {/* Un libellé qui annonce ce qui est masqué : la carte ne fait jamais
-                disparaître une station sans le dire. */}
+            {/* Le libellé dit exactement ce que le filtre retire, et l'effectif
+                concerné : la carte ne fait jamais disparaître une station sans
+                le dire, et ne promet jamais « uniquement » ce qu'elle n'affiche
+                pas — les stations officielles restent, elles sont l'étalon. */}
             {qualifiedCitizensOnly
               ? `Afficher toutes les sources (${hiddenStationCount} masquée(s))`
-              : `Capteurs citoyens qualifiés uniquement (${qualifiedCitizenCount})`}
+              : `Masquer les capteurs citoyens non qualifiés (${unqualifiedCitizenCount})`}
           </button>
           <details className="group rounded-xl border border-slate-700 bg-[#0b1524]">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-xs font-semibold text-slate-200 [&::-webkit-details-marker]:hidden">
@@ -282,7 +292,7 @@ export function StationMap({
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-blue-100 bg-blue-600" /><span><strong className="text-slate-100">Bleu</strong> — lieu de référence.</span></div>
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-emerald-400" /><span><strong className="text-slate-100">Vert</strong> — station avec relevé de moins de 90 min.</span></div>
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-amber-400" /><span><strong className="text-slate-100">Ambre</strong> — station avec relevé de plus de 90 min.</span></div>
-              <div className="flex items-start gap-2 border-t border-slate-700/70 pt-2"><span aria-hidden="true" className="mt-0.5 h-3 w-3 flex-none rounded-full border-2 border-sky-200 bg-sky-500" /><span>La couleur ne dit <strong className="text-slate-100">jamais</strong> la qualification. Le filtre « capteurs citoyens qualifiés » ne laisse passer que les capteurs citoyens au verdict <strong className="text-slate-100">validé</strong> — les capteurs en validation, les exclus et les autres sources sont alors masqués, et l’effectif masqué est annoncé sur le bouton.</span></div>
+              <div className="flex items-start gap-2 border-t border-slate-700/70 pt-2"><span aria-hidden="true" className="mt-0.5 h-3 w-3 flex-none rounded-full border-2 border-sky-200 bg-sky-500" /><span>La couleur ne dit <strong className="text-slate-100">jamais</strong> la qualification. Le filtre retire les capteurs citoyens <strong className="text-slate-100">en validation et exclus</strong> ; les stations officielles restent affichées, car la qualification se définit par l’accord avec elles. L’effectif masqué est annoncé sur le bouton.</span></div>
             </div>
           </details>
         </div>

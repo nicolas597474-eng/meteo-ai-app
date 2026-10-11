@@ -38,6 +38,24 @@ export function isQualifiedCitizenStation(station: {
   return getStationDisplayStatus({ ...station, isActive: station.isActive ?? true }) === "citizen-validated";
 }
 
+/**
+ * Vrai pour un capteur citoyen qui n'a pas encore — ou n'aura jamais — le
+ * verdict « validé ». C'est exactement la population que le filtre de la carte
+ * retire : les capteurs citoyens en validation et les capteurs citoyens exclus.
+ *
+ * Le prédicat est volontairement restreint aux sources citoyennes : une station
+ * officielle ou Netatmo n'est jamais « non qualifiée » par ce chemin, et une
+ * source écartée pour une autre raison n'est pas concernée.
+ */
+export function isUnqualifiedCitizenStation(station: {
+  isActive?: boolean;
+  source?: string | null;
+  sourceKind?: "physical" | "reference";
+  qualificationStatus?: "candidate" | "validated" | "excluded";
+}): boolean {
+  return isCitizenQualificationSource(station.source) && !isQualifiedCitizenStation(station);
+}
+
 export function getStationDisplayStatus(station: {
   isActive: boolean;
   source?: string | null;

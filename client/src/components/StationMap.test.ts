@@ -51,9 +51,17 @@ describe("carte des stations OpenStreetMap", () => {
     expect(source).toContain("onZoomOut={() => adjustExpandedZoom(-1)}");
   });
 
-  it("filtre la carte sur les capteurs citoyens qualifiés sans rien masquer en silence", () => {
-    expect(source).toContain("isQualifiedCitizenStation");
+  it("ne retire que les capteurs citoyens non qualifiés, jamais l'étalon officiel", () => {
+    expect(source).toContain("isUnqualifiedCitizenStation");
     expect(source).toContain("visibleStations.forEach((station) =>");
+    // Les stations officielles SYNOP restent : elles définissent la
+    // qualification, les masquer retirerait l'étalon et laisserait une carte
+    // vide indiscernable d'une carte en panne.
+    expect(source).toContain("stations.filter((station) => !isUnqualifiedCitizenStation(station))");
+    expect(source).not.toContain("stations.filter((station) => isQualifiedCitizenStation(station))");
+    // Le libellé annonce ce qui est retiré, il ne promet pas « uniquement ».
+    expect(source).toContain("Masquer les capteurs citoyens non qualifiés");
+    expect(source).not.toContain("Capteurs citoyens qualifiés uniquement");
     // L'effectif masqué est annoncé sur le bouton : une station ne disparaît
     // jamais sans que l'utilisateur puisse le constater.
     expect(source).toContain("masquée(s)");
