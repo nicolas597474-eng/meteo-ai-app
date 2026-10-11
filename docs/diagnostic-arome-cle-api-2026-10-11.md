@@ -2,6 +2,29 @@
 
 Date : 2026-10-11 · branche `arena/ee0b52f7-meteo-ai-app` · HEAD `bb54b14`
 
+## 0. Symptôme observé le 2026-10-11 (14:25 Paris) et cause réelle
+
+Sortie du panneau admin après un clic sur « Comparer les runs » :
+
+- `Aucun nom direction/DD reconnu dans ce run` — run inspecté `2026-10-11T09:00:00Z` ;
+- `Requête impossible — Open-Meteo Single Runs n’a pas fourni le run AROME 2026-10-11T09:00 (HTTP 400)`.
+
+**Ce que cela prouve : la clé n’est pas en cause.** Le catalogue WCS AROME a été lu avec succès et le run du jour a été identifié : l’échange OAuth2 et l’abonnement AROME fonctionnent. Le message « Aucun nom direction/DD » n’est pas non plus une erreur : c’est la limite déjà documentée de la vérification DD(10 m), qui refuse de deviner un identifiant de couverture.
+
+**La cause réelle est l’appel Open-Meteo Single Runs**, construit par `buildSingleRunsUrl()` (`server/aromeHondeghemShadow.ts:278`) :
+
+```
+https://single-runs-api.open-meteo.com/v1/forecast
+  ?latitude=…&longitude=…&run=2026-10-11T09:00&models=meteofrance_arome_france_hd
+  &hourly=temperature_2m,precipitation,wind_speed_10m
+  &start_hour=…&end_hour=…          ← paramètres refusés (HTTP 400)
+  &timezone=UTC&temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm
+```
+
+`start_hour`/`end_hour` sont les deux seuls paramètres atypiques de la requête, et les seuls qui diffèrent du client Single Runs **déjà en production dans ce dépôt** (`server/providerRunHorizon.ts:112-121`), lequel n’utilise que `run`, `models`, `hourly`, `forecast_days`, `timezone`, `timeformat`. La documentation Single Runs indique par ailleurs que l’endpoint accepte les paramètres de la Forecast API avec `run` en plus ; la fenêtre temporelle y est exprimée en jours (`forecast_days`), pas en bornes horaires.
+
+Correctif appliqué (§5, point 7) : `forecast_days` à la place de `start_hour`/`end_hour` (les échéances sont déjà filtrées sur `[run, run + 24 h[`), et remontée du motif d’erreur Open-Meteo (`{"error":true,"reason":"…"}`) dans le message affiché, de façon à distinguer un run inexistant, un cycle non encore publié et un paramètre refusé.
+
 ## 1. Cartographie : il existe trois « AROME » distincts dans le code
 
 | # | Chemin | Où | Source des données | Clé utilisée |
@@ -85,10 +108,11 @@ Le script n'affiche jamais la clé ni le jeton (empreintes masquées uniquement)
 4. **Suppression du chemin 3** : `server/realWeatherAPIs.ts` ne conserve plus que `wmoToConditionFr` ; les adaptateurs morts qui envoyaient un jeton portail-api à l'API privée `rpcache-aa` sont retirés, et `scripts/test-real-apis.mjs` renvoie vers le nouveau diagnostic au lieu de reproduire l'appel fautif.
 5. **Documentation** : `.env.example` décrit la valeur attendue (`APPLICATION_ID` base64, abonnement AROME, identifiant propre à chaque API).
 6. **Script de diagnostic** `scripts/check-arome-key.mjs` (voir §4).
+7. **Correction de l’appel Open-Meteo Single Runs** (`aromeHondeghemShadow.ts`) : `start_hour`/`end_hour` remplacés par `forecast_days`, et motif d’erreur Open-Meteo remonté dans le message. C’est le correctif du blocage observé le 2026-10-11 (§0).
 
 Non modifié volontairement : le flux AROME de production (Open-Meteo, sans clé). AROME reste absent au-delà de J+1 — horizon documenté de 2 jours du modèle, pas un défaut.
 
 ## 6. Validation
 
-- `npx vitest run` : **241 fichiers / 1248 tests verts**, dont 7 nouveaux tests d'identifiant et 2 nouveaux tests shadow (`invalid-key`, encodage de la paire).
+- `npx vitest run` : **241 fichiers / 1248 tests verts**, dont 7 tests d'identifiant et 4 tests shadow (`invalid-key`, encodage de la paire, `forecast_days` sans `start_hour`/`end_hour`, remontée du motif Open-Meteo).
 - `npx tsc --noEmit` : aucune erreur sur les fichiers modifiés (les 5 erreurs restantes sont préexistantes dans `server/fusionEngine.ts` et `shared/experimentalForecastConfidence.ts`).
