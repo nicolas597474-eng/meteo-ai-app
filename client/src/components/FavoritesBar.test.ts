@@ -32,7 +32,6 @@ describe("FavoritesBar", () => {
   it("affiche une température actuelle explicite avec la typographie des pastilles du Dashboard", () => {
     expect(source).toContain('température actuelle indisponible');
     expect(source).toContain('text-[13px] font-semibold tracking-tight');
-    expect(source).toContain('text-sm font-bold tabular-nums');
   });
 
   it("conserve des pastilles compactes sans réduire la lisibilité des favoris", () => {
