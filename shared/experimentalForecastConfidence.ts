@@ -344,12 +344,19 @@ function qualifiedComparableSubset(
   basis: "lead exact commun" | "tranche locale commune" | null;
   reason: string | null;
 } {
-  const empty = (reason: string, alignedCount = 0, qualifiedCount = 0) => ({
+  const empty = (reason: string, alignedCount = 0, qualifiedCount = 0): {
+    models: ExperimentalConfidenceModelValue[];
+    total: number;
+    alignedCount: number;
+    qualifiedCount: number;
+    basis: "lead exact commun" | "tranche locale commune" | null;
+    reason: string;
+  } => ({
     models: [] as ExperimentalConfidenceModelValue[],
     total: models.length,
     alignedCount,
     qualifiedCount,
-    basis: null as const,
+    basis: null,
     reason,
   });
   if (targetValidAt == null) return empty("Échéance exacte absente.");

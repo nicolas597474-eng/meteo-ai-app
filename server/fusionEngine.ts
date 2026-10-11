@@ -1300,10 +1300,12 @@ export function generateAdaptiveForecast(
   function qualifiedProof(
     perf: { qualified?: boolean; comparisonCount?: number; evaluatedDays?: number } | undefined
   ): { comparisonCount: number; evaluatedDays: number } | null {
+    const comparisonCount = perf?.comparisonCount;
+    const evaluatedDays = perf?.evaluatedDays;
     return perf?.qualified === true
-      && Number.isInteger(perf.comparisonCount) && perf.comparisonCount > 0
-      && Number.isInteger(perf.evaluatedDays) && perf.evaluatedDays > 0
-      ? { comparisonCount: perf.comparisonCount, evaluatedDays: perf.evaluatedDays }
+      && typeof comparisonCount === "number" && Number.isInteger(comparisonCount) && comparisonCount > 0
+      && typeof evaluatedDays === "number" && Number.isInteger(evaluatedDays) && evaluatedDays > 0
+      ? { comparisonCount, evaluatedDays }
       : null;
   }
 
