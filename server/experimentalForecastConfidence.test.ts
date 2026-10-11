@@ -1,4 +1,4 @@
-successfully downloaded text file (SHA: 34d33bdf0ab9d8f625f487910feb9e41fc969bdd)import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   calculateExperimentalForecastConfidence,
   EXPERIMENTAL_FORECAST_CONFIDENCE_WEIGHTS,
@@ -137,7 +137,7 @@ describe("experimental forecast confidence", () => {
     ).toBeNull();
   });
 
-  it("exclut les modèles non alignés sans annuler la performance historique ni l’échantillon", () => {
+  it("exclut les modèles non alignés sans annuler l’accord, la performance historique ni l’échantillon", () => {
     const result = calculateExperimentalForecastConfidence(
       input({
         models: [
@@ -147,17 +147,16 @@ describe("experimental forecast confidence", () => {
         ],
       })
     );
-    expect(
-      result.components.find(({ key }) => key === "agreement")?.score
-    ).toBeNull();
-    expect(
-      result.components.find(({ key }) => key === "agreement")?.reason
-    ).toMatch(/aucun sous-échantillon/i);
+    const agreement = result.components.find(({ key }) => key === "agreement");
     const historicalPerformance = result.components.find(
       ({ key }) => key === "historicalPerformance"
     );
     const sampleSize = result.components.find(({ key }) => key === "sampleSize");
-    // Sous-ensemble aligné : modèles 1 et 2, MAE pondérée (0,5 + 1,0) / 2 = 0,75 °C.
+    // Sous-ensemble aligné : modèles 1 et 2, étendue thermique 12 − 10 = 2 °C.
+    expect(agreement?.score).toBe(75);
+    expect(agreement?.reason).toBeNull();
+    expect(agreement?.evidence).toMatch(/2\/3 modelId distincts alignés/);
+    // Sous-ensemble qualifié : modèles 1 et 2, MAE pondérée (0,5 + 1,0) / 2 = 0,75 °C.
     expect(historicalPerformance?.score).toBe(85);
     expect(historicalPerformance?.evidence).toMatch(/2\/3 modèle\(s\)/);
     expect(sampleSize?.score).toBe(50);
