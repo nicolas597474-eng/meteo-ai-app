@@ -69,7 +69,7 @@ export type ExperimentalForecastConfidenceInput = {
 };
 
 export type ExperimentalForecastConfidenceResult = {
-  version: "experimental-v1";
+  version: "experimental-v2";
   status: "calculated" | "partial" | "unavailable";
   score: number | null;
   calculableWeight: number;
@@ -316,63 +316,88 @@ function buildSpatialCoherenceComponent(
   );
 }
 
+function hasQualifiedHistoricalScore(
+  model: ExperimentalConfidenceModelValue
+): boolean {
+  return (
+    model.calibrationStatus === "CALIBRATED" &&
+    finite(model.historicalScore?.mae) &&
+    (model.historicalScore?.mae as number) >= 0 &&
+    finite(model.historicalScore?.evaluatedDays) &&
+    (model.historicalScore?.evaluatedDays as number) > 0 &&
+    finite(model.historicalScore?.comparisonCount) &&
+    (model.historicalScore?.comparisonCount as number) > 0
+  );
+}
+
 function comparableHistoricalModels(
   models: readonly ExperimentalConfidenceModelValue[],
   targetValidAt: number | null
-): { models: ExperimentalConfidenceModelValue[]; reason: string | null } {
+): {
+  models: ExperimentalConfidenceModelValue[];
+  total: number;
+  reason: string | null;
+} {
   if (targetValidAt == null)
-    return { models: [], reason: "Échéance exacte absente." };
+    return { models: [], total: 0, reason: "Échéance exacte absente." };
   const { models: atTarget, duplicateIds } = modelValuesAtTarget(
     { modelWeights: models },
     targetValidAt
   );
   if (duplicateIds)
-    return { models: [], reason: "Plusieurs lignes portent le même modelId." };
+    return {
+      models: [],
+      total: 0,
+      reason: "Plusieurs lignes portent le même modelId.",
+    };
   if (atTarget.length === 0)
     return {
       models: [],
+      total: 0,
       reason: "Aucun modèle température aligné au validAt exact.",
     };
   if (atTarget.length !== models.length)
     return {
       models: [],
+      total: 0,
       reason:
         "Au moins une valeur de modèle n’est pas alignée au validAt exact; aucun sous-échantillon n’est utilisé.",
     };
-  if (
-    atTarget.some(
-      model =>
-        model.calibrationStatus !== "CALIBRATED" || !model.historicalScore
-    )
-  ) {
+  // Seuls les modèles avec une preuve historique qualifiée portent le facteur :
+  // les autres sont exclus de l’agrégat sans annuler la mesure.
+  const qualified = atTarget.filter(hasQualifiedHistoricalScore);
+  if (qualified.length === 0)
     return {
       models: [],
+      total: atTarget.length,
       reason:
-        "Au moins un modèle disponible n’a pas de preuve historique qualifiée; aucun poids n’est réalloué aux autres.",
+        "Aucun modèle aligné n’a de preuve historique qualifiée (CALIBRATED avec MAE et effectifs valides); aucun poids n’est réalloué aux autres facteurs.",
     };
-  }
 
-  const levels = new Set(atTarget.map(model => model.calibrationLevel));
+  const levels = new Set(qualified.map(model => model.calibrationLevel));
   if (levels.size !== 1)
     return {
       models: [],
-      reason: "Les modèles utilisent des bases de calibration différentes.",
+      total: atTarget.length,
+      reason:
+        "Les modèles avec preuve historique qualifiée utilisent des bases de calibration différentes.",
     };
-  const level = atTarget[0]?.calibrationLevel;
+  const level = qualified[0]?.calibrationLevel;
   if (level === "EXACT_LOCAL_MODEL_VARIABLE_HORIZON") {
-    const horizons = atTarget.map(model => model.horizonMinutes);
+    const horizons = qualified.map(model => model.horizonMinutes);
     if (
       horizons.some(horizon => !finite(horizon)) ||
       new Set(horizons).size !== 1
     ) {
       return {
         models: [],
+        total: atTarget.length,
         reason:
-          "Les horizons exacts des modèles ne sont pas identiques; leurs performances ne sont pas comparables.",
+          "Les horizons exacts des modèles avec preuve historique qualifiée ne sont pas identiques; leurs performances ne sont pas comparables.",
       };
     }
   } else if (level === "EXACT_LOCAL_MODEL_VARIABLE_BUCKET") {
-    const buckets = atTarget.map(model => model.horizonBucket);
+    const buckets = qualified.map(model => model.horizonBucket);
     if (
       buckets.some(
         bucket => typeof bucket !== "string" || bucket.trim() === ""
@@ -381,35 +406,20 @@ function comparableHistoricalModels(
     ) {
       return {
         models: [],
+        total: atTarget.length,
         reason:
-          "Les tranches d’horizon des modèles ne sont pas identiques; leurs performances ne sont pas comparables.",
+          "Les tranches d’horizon des modèles avec preuve historique qualifiée ne sont pas identiques; leurs performances ne sont pas comparables.",
       };
     }
   } else {
     return {
       models: [],
+      total: atTarget.length,
       reason:
         "La base locale de calibration n’est pas une preuve exacte modèle × variable × horizon.",
     };
   }
-
-  if (
-    atTarget.some(
-      model =>
-        !finite(model.historicalScore?.mae) ||
-        (model.historicalScore?.mae as number) < 0 ||
-        !finite(model.historicalScore?.evaluatedDays) ||
-        (model.historicalScore?.evaluatedDays as number) <= 0 ||
-        !finite(model.historicalScore?.comparisonCount) ||
-        (model.historicalScore?.comparisonCount as number) <= 0
-    )
-  ) {
-    return {
-      models: [],
-      reason: "La MAE ou les effectifs indépendants sont absents ou invalides.",
-    };
-  }
-  return { models: atTarget, reason: null };
+  return { models: qualified, total: atTarget.length, reason: null };
 }
 
 function buildHistoricalPerformanceComponent(
@@ -423,9 +433,20 @@ function buildHistoricalPerformanceComponent(
       "Performance historique",
       result.reason
     );
-  const worstMae = Math.max(
-    ...result.models.map(model => model.historicalScore!.mae as number)
+  // La MAE est pondérée par la masse de preuve (comparaisons historiques
+  // indépendantes) : plus un modèle dispose de preuve qualifiée, plus il pèse.
+  const comparisonCount = result.models.reduce(
+    (sum, model) => sum + (model.historicalScore!.comparisonCount as number),
+    0
   );
+  const weightedMae =
+    result.models.reduce(
+      (sum, model) =>
+        sum +
+        (model.historicalScore!.mae as number) *
+          (model.historicalScore!.comparisonCount as number),
+      0
+    ) / comparisonCount;
   const level =
     result.models[0]?.calibrationLevel === "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
       ? "lead exact commun"
@@ -433,8 +454,8 @@ function buildHistoricalPerformanceComponent(
   return availableComponent(
     "historicalPerformance",
     "Performance historique",
-    100 * (1 - worstMae / MAX_HISTORICAL_MAE_C),
-    `${result.models.length} modèle(s) avec preuve locale qualifiée et ${level}; pire MAE température ${worstMae.toFixed(2)} °C. Échelle expérimentale : MAE 0 °C → 100, 5 °C ou plus → 0; agrégation non pondérée par la fusion.`
+    100 * (1 - weightedMae / MAX_HISTORICAL_MAE_C),
+    `${result.models.length}/${result.total} modèle(s) aligné(s) avec preuve historique qualifiée et ${level}; MAE température pondérée par la masse de preuve : ${weightedMae.toFixed(2)} °C. Les modèles sans preuve qualifiée sont exclus de l’agrégat sans annuler le facteur. Échelle expérimentale : MAE 0 °C → 100, 5 °C ou plus → 0.`
   );
 }
 
@@ -570,7 +591,7 @@ function buildSampleSizeComponent(
     "sampleSize",
     "Taille d’échantillon",
     (100 * minimumDays) / SAMPLE_SIZE_REFERENCE_DAYS,
-    `Borne conservatrice : ${minimumDays} jour(s) indépendant(s) et ${minimumComparisons} comparaison(s) au minimum parmi les modèles retenus; score saturé à 30 jours. Les jours, pas les heures, portent l’échantillon.`
+    `Borne conservatrice sur les ${result.models.length}/${result.total} modèle(s) avec preuve historique qualifiée : ${minimumDays} jour(s) indépendant(s) et ${minimumComparisons} comparaison(s) au minimum; score saturé à 30 jours. Les jours, pas les heures, portent l’échantillon.`
   );
 }
 
@@ -608,7 +629,12 @@ function buildExtremePenalty(
 /**
  * Read-only, explicitly experimental index for one exact next-hour temperature
  * point. Weights are fixed; missing components are never renormalized. The
- * score is withheld until every weighted factor and the extreme check are known.
+ * historical-performance and sample-size factors only aggregate the models
+ * holding a qualified historical proof (CALIBRATED with valid MAE and sample
+ * counts); models without such proof are excluded without voiding the factor,
+ * and each proven model is weighted by its evidence mass (comparison count).
+ * The score is withheld until every weighted factor and the extreme check are
+ * known.
  */
 export function calculateExperimentalForecastConfidence(
   input: ExperimentalForecastConfidenceInput
@@ -655,7 +681,7 @@ export function calculateExperimentalForecastConfidence(
     weightedScore == null ? null : clampScore(weightedScore - extremePenalty!);
 
   return {
-    version: "experimental-v1",
+    version: "experimental-v2",
     status: fullyCalculable
       ? "calculated"
       : calculableWeight > 0
