@@ -11,6 +11,7 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/compone
 import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
+import { CollectionObservabilitySections } from "@/components/weather/CollectionObservabilitySections";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
 import { ChevronDown, Clock3, RefreshCw, X } from "lucide-react";
 
@@ -399,6 +400,8 @@ export default function Ranking() {
           </section>
           </div>
         </details>
+
+        <CollectionObservabilitySections />
       </div>
       <SourceDetailsDialog selection={selectedSource} groundTruth={liveStationData?.groundTruth} onOpenChange={(open) => { if (!open) setSelectedSource(null); }} />
       <BackToTopButton />
