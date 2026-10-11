@@ -131,6 +131,6 @@ describe("calculateExperimentalForecastConfidence — preuve historique qualifi�
 
   it("monte la version de l’indice expérimental", () => {
     const result = confidenceResult([model("a"), model("b")]);
-    expect(result.version).toBe("experimental-v3");
+    expect(result.version).toBe("experimental-v4");
   });
 });

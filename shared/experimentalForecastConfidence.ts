@@ -69,7 +69,7 @@ export type ExperimentalForecastConfidenceInput = {
 };
 
 export type ExperimentalForecastConfidenceResult = {
-  version: "experimental-v3";
+  version: "experimental-v4";
   status: "calculated" | "partial" | "unavailable";
   score: number | null;
   calculableWeight: number;
@@ -196,18 +196,12 @@ function buildAgreementComponent(
       "Accord inter-sources",
       "Plusieurs lignes portent le même modelId; le nombre de modelId distincts est ambigu."
     );
-  if (models.length !== modelWeights.length)
-    return unavailableComponent(
-      "agreement",
-      "Accord inter-sources",
-      "Au moins une valeur de modèle n’est pas alignée au validAt exact; aucun sous-échantillon n’est utilisé."
-    );
   if (models.length < 2)
     return unavailableComponent(
       "agreement",
       "Accord inter-sources",
       "Au moins deux modelId distincts avec une température au même validAt sont requis.",
-      `${models.length} modèle(s) distinct(s) exploitable(s) à cette échéance.`
+      `${models.length} modèle(s) distinct(s) exploitable(s) à cette échéance sur ${modelWeights.length} valeur(s) reçue(s).`
     );
   const values = models.map(model => model.value as number);
   const range = Math.max(...values) - Math.min(...values);
@@ -215,7 +209,7 @@ function buildAgreementComponent(
     "agreement",
     "Accord inter-sources",
     spreadScore(range),
-    `${models.length} modelId distincts, même validAt; étendue thermique ${range.toFixed(1)} °C. Des identifiants distincts ne prouvent pas une indépendance statistique entre fournisseurs. Échelle expérimentale : 0 °C → 100, 8 °C ou plus → 0.`
+    `${models.length}/${modelWeights.length} modelId distincts alignés au même validAt; étendue thermique ${range.toFixed(1)} °C. Les valeurs non alignées au validAt exact sont exclues sans annuler le facteur. Des identifiants distincts ne prouvent pas une indépendance statistique entre fournisseurs. Échelle expérimentale : 0 °C → 100, 8 °C ou plus → 0.`
   );
 }
 
@@ -650,7 +644,9 @@ function buildExtremePenalty(
  * retained model is weighted by its evidence mass (comparison count). The
  * spatial-coherence factor aggregates only the physical active stations
  * carrying their own valid, fresh temperature measurement time; other
- * stations are excluded without voiding the factor.
+ * stations are excluded without voiding the factor. The agreement factor
+ * measures the spread only over the model values aligned at the exact target
+ * validAt; non-aligned values are excluded without voiding the factor.
  * The score is withheld until every weighted factor and the extreme check are
  * known.
  */
@@ -699,7 +695,7 @@ export function calculateExperimentalForecastConfidence(
     weightedScore == null ? null : clampScore(weightedScore - extremePenalty!);
 
   return {
-    version: "experimental-v3",
+    version: "experimental-v4",
     status: fullyCalculable
       ? "calculated"
       : calculableWeight > 0
