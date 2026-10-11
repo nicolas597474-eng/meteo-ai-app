@@ -6,6 +6,7 @@ import {
   getPrecipitationTone,
   getPressureTone,
   getVisibilityTone,
+  getUvTone,
   getWindGustTone,
   getWindSpeedTone,
 } from "./observationTone";
@@ -80,6 +81,16 @@ describe("code couleur des observations actuelles", () => {
     expect(getVisibilityTone(30).level).toBe("excellente");
   });
 
+  it("colore l'indice UV selon l'échelle OMS, en vert quand il est faible", () => {
+    expect(getUvTone(0).level).toBe("faible");
+    expect(getUvTone(0).value).toBe("text-green-400");
+    expect(getUvTone(4).level).toBe("modere");
+    expect(getUvTone(6).level).toBe("eleve");
+    expect(getUvTone(9).level).toBe("tresEleve");
+    expect(getUvTone(12).level).toBe("extreme");
+    expect(getUvTone(null).value).toBe("text-white");
+  });
+
   it("garde un repli neutre blanc quand une donnée est absente", () => {
     expect(getApparentTempTone(null).value).toBe("text-white");
     expect(getPrecipitationTone(undefined).value).toBe("text-white");
@@ -109,3 +120,4 @@ describe("code couleur des observations actuelles", () => {
     }
   });
 });
+

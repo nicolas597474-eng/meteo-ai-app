@@ -58,7 +58,6 @@ describe("détails météo de l’échéance horaire sélectionnée", () => {
       "Indice UV",
       "Température ressentie",
       "Visibilité",
-      "Qualité de l’air",
     ]);
     expect(
       details.every(detail => detail.validAt === validAt && !detail.summary.includes("18:00"))
@@ -77,9 +76,10 @@ describe("détails météo de l’échéance horaire sélectionnée", () => {
       "moyennes 24 % · hautes 88 %"
     );
     expect(details.find(({ key }) => key === "uv")?.value).toBe("0.0");
-    expect(details.find(({ key }) => key === "air-quality")?.value).toBe(
-      "Non disponible"
-    );
+    expect(details.find(({ key }) => key === "precipitation")?.valueTone).toBe("text-blue-300");
+    expect(details.find(({ key }) => key === "wind")?.valueTone).toBe("text-emerald-300");
+    expect(details.find(({ key }) => key === "uv")?.valueTone).toBe("text-green-400");
+    expect(details.find(({ key }) => key === "air-quality")).toBeUndefined();
     expect(details.some(({ key }) => ["precip-type", "radiation", "weather-code"].includes(key))).toBe(false);
     expect(details.find(({ key }) => key === "precipitation")?.note).toContain(
       "2/7 modèles"
@@ -89,7 +89,7 @@ describe("détails météo de l’échéance horaire sélectionnée", () => {
   it("garde chaque ligne et chaque sous-champ avec un tiret si les valeurs ne sont pas fournies", () => {
     const details = buildHourlySelectedDetails({ validAt: null });
 
-    expect(details).toHaveLength(8);
+    expect(details).toHaveLength(7);
     for (const key of [
       "wind",
       "humidity",
@@ -107,9 +107,6 @@ describe("détails météo de l’échéance horaire sélectionnée", () => {
     );
     expect(details.find(({ key }) => key === "clouds")?.value).toBe(
       "Total — % · basses — % · moyennes — % · hautes — %"
-    );
-    expect(details.find(({ key }) => key === "air-quality")?.note).toContain(
-      "Aucune donnée horaire"
     );
     expect(details.every(detail => detail.validAt === null)).toBe(true);
     expect(details.some(({ key }) => ["precip-type", "radiation", "weather-code"].includes(key))).toBe(false);
@@ -203,3 +200,4 @@ describe("détails météo de l’échéance horaire sélectionnée", () => {
     expect(details.find(({ key }) => key === "snowfall")?.value).not.toContain("0.0 cm");
   });
 });
+

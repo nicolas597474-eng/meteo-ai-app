@@ -118,3 +118,15 @@ export function getVisibilityTone(km: number | null | undefined): ObservationTon
   if (value <= 20) return tone("bonne", "text-emerald-300");
   return tone("excellente", "text-sky-300");
 }
+
+
+/** Indice UV (échelle OMS) : faible vert → modéré jaune → élevé orange → très élevé rouge → extrême violet. */
+export function getUvTone(uv: number | null | undefined): ObservationTone {
+  const value = readNumber(uv);
+  if (value == null) return NEUTRAL;
+  if (value <= 2) return tone("faible", "text-green-400");
+  if (value <= 5) return tone("modere", "text-yellow-400");
+  if (value <= 7) return tone("eleve", "text-orange-400");
+  if (value <= 10) return tone("tresEleve", "text-red-400");
+  return tone("extreme", "text-purple-400");
+}

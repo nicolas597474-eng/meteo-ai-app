@@ -92,6 +92,8 @@ type DetailCategory = {
   validAt?: number | null;
   rows: DetailRow[];
   hourlyHistogramSeries?: HourlyHistogramSeries<ForecastHour>[];
+  /** Classe Tailwind du code couleur adaptée à l'intensité de la valeur (cadence horaire). */
+  valueTone?: string;
 };
 
 function relativeForecastAge(value: string | null | undefined): string {
@@ -229,6 +231,7 @@ function buildHourlyDetailCategories(
     summary: detail.summary,
     unit: "",
     cadence: "hourly",
+    valueTone: detail.valueTone,
     validAt: detail.validAt,
     rows: [{
       key: `${detail.key}-${entry.index}`,
@@ -512,15 +515,15 @@ function DayDetailsAccordion({ category, allHours = [] }: { category: DetailCate
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${palette?.accentClassName ?? "bg-sky-300/10 text-cyan-100"}`} style={palette ? { backgroundColor: palette.accentBackground, color: palette.accentColor } : undefined}><MeteoIcon name={category.icon} size={16} /></span>
         <span className="flex min-w-0 items-start justify-between gap-x-2 gap-y-1 sm:flex-1 sm:items-center">
           <span className="min-w-0 flex-1 text-[14px] font-semibold leading-snug text-slate-100">{category.title}</span>
-          <span className="min-w-0 max-w-[62%] whitespace-normal break-words text-right text-xs leading-relaxed tabular-nums text-slate-300 sm:max-w-[58%]">{category.summary}</span>
+          <span className={"min-w-0 max-w-[62%] whitespace-normal break-words text-right text-xs leading-relaxed tabular-nums " + (category.valueTone ?? "text-slate-300") + " sm:max-w-[58%]"}>{category.summary}</span>
           <span aria-hidden="true" className="shrink-0 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
         </span>
       </summary>
-      <div className="pb-4 pl-12 pr-1 sm:pl-14">
+      <div className="pb-4 pl-3 pr-2 sm:pl-5">
         {category.cadence === "hourly" ? (
           <>
             <div className="space-y-1 text-xs leading-relaxed text-slate-300">
-              <p className="break-words font-medium text-slate-100">{category.rows[0]?.value ?? "—"}</p>
+              <p className={"break-words font-medium " + (category.valueTone ?? "text-slate-100")}>{category.rows[0]?.value ?? "—"}</p>
               <p>validTime UTC : {formatUtcTimestamp(category.validAt)}</p>
             </div>
             {category.hourlyHistogramSeries?.map((series) => (
@@ -547,22 +550,8 @@ function DayDetailsAccordion({ category, allHours = [] }: { category: DetailCate
       </div>
     </details>
   );
-}
 
-function AirQualityAccordion() {
-  return (
-    <details className="group border-t border-sky-100/10">
-      <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-300/10 text-cyan-100"><MeteoIcon name="cloud_cover" size={16} /></span>
-        <span className="min-w-0 flex-1 text-[14px] font-semibold text-slate-100">Qualité de l’air</span>
-        <span className="text-xs text-slate-300">Non disponible</span>
-        <span aria-hidden="true" className="ml-1 text-xl leading-none text-sky-100/75 transition-transform group-open:rotate-180">⌄</span>
-      </summary>
-      <p className="pb-4 pl-14 pr-2 text-xs leading-relaxed text-slate-300">L’indice de qualité de l’air ne fait pas partie des données renvoyées à cette page. Aucune valeur n’est demandée, déduite ou inventée.</p>
-    </details>
-  );
 }
-
 export function ForecastByDaySection({
   locationName,
   hours,
@@ -920,7 +909,6 @@ export function ForecastByDaySection({
                 {selectedDateIsTodayOrTomorrow && selectedDaily
                   ? <DailyForecastMetricsPanel day={selectedDaily} sourceLabels={sourceLabels} />
                   : detailCategories.map((category) => <DayDetailsAccordion key={category.key} category={category} />)}
-                <AirQualityAccordion />
               </>
             )}
           </section>
@@ -950,3 +938,4 @@ export function ForecastByDaySection({
     </section>
   );
 }
+
