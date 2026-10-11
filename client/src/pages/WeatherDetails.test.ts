@@ -113,14 +113,15 @@ describe("page Prévisions détaillées", () => {
     expect(selectedDetailsSource).toContain("formatHourlyPrecipitationComponentValues");
     expect(selectedDetailsSource).toContain("hasPositiveSnowfall");
     expect(selectedDetailsSource).toContain("isSnowWmoWeatherCode(hour.weatherCode)");
-    expect(selectedDetailsSource).toContain("Non disponible");
-    expect(selectedDetailsSource).toContain("Aucune donnée horaire de qualité de l’air");
+    expect(selectedDetailsSource).toContain('? formatOptionalForecastValue(value, decimals) : "—"');
+    expect(selectedDetailsSource).not.toContain("qualité de l’air");
     expect(timelineSource).toContain("Soleil");
     expect(selectedDetailsSource).toContain("fréquence descriptive brute, pas une probabilité calibrée");
     expect(timelineSource).toContain("jamais une probabilité de pluie calibrée");
     expect(timelineSource).toContain("buildDailyDetailCategories");
-    expect(timelineSource).toContain("L’indice de qualité de l’air ne fait pas partie des données renvoyées à cette page");
-    expect(timelineSource).toContain("Aucune valeur n’est demandée, déduite ou inventée");
+    expect(timelineSource).not.toContain("qualité de l’air");
+    expect(timelineSource).toContain("Les données manquantes ne sont pas déduites ni remplacées");
+    expect(timelineSource).toContain("Aucune valeur n’est déduite des heures");
   });
   it("garde les valeurs sur l’heure cliquée, supprime les métadonnées sous le titre et conserve la provenance ailleurs", () => {
     expect(timelineSource).toContain("buildHourlyDetailCategories(selectedEntry, hours, indexedHours, histogramStartValidAt)");
