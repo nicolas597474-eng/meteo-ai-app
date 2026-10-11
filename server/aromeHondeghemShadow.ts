@@ -1,5 +1,6 @@
 import { fromArrayBuffer } from "geotiff";
 import { ENV } from "./_core/env";
+import { inspectMeteoFranceCredential } from "./meteoFranceCredentials";
 import { HONDEGHEM } from "./weatherServices";
 
 export const AROME_WCS_PROFILE = "MF-NWP-HIGHRES-AROME-001-FRANCE-WCS";
@@ -8,9 +9,11 @@ const METEOFRANCE_TOKEN_URL = "https://portail-api.meteofrance.fr/token";
 const OPEN_METEO_SINGLE_RUNS = "https://single-runs-api.open-meteo.com/v1/forecast";
 const OPEN_METEO_MODEL = "meteofrance_arome_france_hd";
 const MAX_HOURS = 24;
+/** Fenêtre Single Runs : le run + le lendemain suffisent pour couvrir MAX_HOURS échéances. */
+export const SINGLE_RUN_FORECAST_DAYS = Math.max(1, Math.ceil(MAX_HOURS / 24) + 1);
 const METRICS = ["temperature", "precipitation", "windSpeed"] as const;
 export type AromeShadowMetric = typeof METRICS[number];
-export type AromeShadowStatus = "ok" | "partial" | "missing-key" | "authentication-error" | "request-impossible";
+export type AromeShadowStatus = "ok" | "partial" | "missing-key" | "invalid-key" | "authentication-error" | "request-impossible";
 
 const COVERAGE_PATTERNS: Record<AromeShadowMetric, RegExp> = {
   temperature: /^TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___/i,
@@ -274,21 +277,30 @@ export function getPointFromGeoTiffBytes(
   })();
 }
 function buildSingleRunsUrl(run: string): string {
-  const start = new Date(run);
-  const end = new Date(start.getTime() + MAX_HOURS * 60 * 60 * 1000);
   const url = new URL(OPEN_METEO_SINGLE_RUNS);
   url.searchParams.set("latitude", String(HONDEGHEM.lat));
   url.searchParams.set("longitude", String(HONDEGHEM.lon));
   url.searchParams.set("run", toSingleRunTime(run));
   url.searchParams.set("models", OPEN_METEO_MODEL);
   url.searchParams.set("hourly", "temperature_2m,precipitation,wind_speed_10m");
-  url.searchParams.set("start_hour", toSingleRunTime(start.toISOString()));
-  url.searchParams.set("end_hour", toSingleRunTime(end.toISOString()));
+  // L’endpoint Single Runs n’expose pas start_hour/end_hour : la fenêtre est demandée en jours
+  // (comme dans providerRunHorizon.ts) puis les échéances sont filtrées sur [run, run + MAX_HOURS[.
+  url.searchParams.set("forecast_days", String(SINGLE_RUN_FORECAST_DAYS));
   url.searchParams.set("timezone", "UTC");
   url.searchParams.set("temperature_unit", "celsius");
   url.searchParams.set("wind_speed_unit", "kmh");
   url.searchParams.set("precipitation_unit", "mm");
   return url.toString();
+}
+/** Motif d’erreur Open-Meteo (`reason`), nettoyé et tronqué ; null si le corps n’est pas exploitable. */
+async function readOpenMeteoReason(response: Response): Promise<string | null> {
+  try {
+    const payload = await response.json() as { reason?: unknown } | null;
+    const reason = typeof payload?.reason === "string" ? payload.reason : null;
+    return reason ? reason.replace(/\s+/g, " ").trim().slice(0, 200) : null;
+  } catch {
+    return null;
+  }
 }
 function parseOpenMeteoSeries(payload: any): ForecastSeries | null {
   const hourly = payload?.hourly;
@@ -324,6 +336,7 @@ export type AromeWindDirectionVerificationStatus =
   | "not-confirmed"
   | "not-advertised"
   | "missing-key"
+  | "invalid-key"
   | "authentication-error"
   | "request-impossible";
 
@@ -381,10 +394,10 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
 ): Promise<AromeWindDirectionVerificationResult> {
   const checkedAt = (options.now?.() ?? new Date()).toISOString();
   const base = (status: AromeWindDirectionVerificationStatus, message: string, run: string | null = null, candidates: AromeWindDirectionCoverageCandidate[] = []) => ({ status, message, checkedAt, run, candidates });
-  const oauthApplicationId = options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId;
-  if (!oauthApplicationId?.trim()) {
-    return base("missing-key", "Identifiant d’application OAuth2 METEOFRANCE_API_KEY manquant : aucune requête fournisseur n’a été envoyée.");
-  }
+  const credential = inspectMeteoFranceCredential(options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId);
+  if (credential.kind === "missing") return base("missing-key", credential.message);
+  if (!credential.basic) return base("invalid-key", credential.message);
+  const oauthApplicationId = credential.basic;
 
   const fetchImpl = options.fetchImpl ?? fetch;
   let step = "l’échange OAuth2 Météo-France";
@@ -486,10 +499,10 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
  */
 export async function runHondeghemAromeShadowComparison(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
   const comparedAt = (options.now?.() ?? new Date()).toISOString();
-  const oauthApplicationId = options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId;
-  if (!oauthApplicationId?.trim()) {
-    return baseResult("missing-key", "Identifiant d’application OAuth2 METEOFRANCE_API_KEY manquant : aucune requête fournisseur n’a été envoyée.", comparedAt);
-  }
+  const credential = inspectMeteoFranceCredential(options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId);
+  if (credential.kind === "missing") return baseResult("missing-key", credential.message, comparedAt);
+  if (!credential.basic) return baseResult("invalid-key", credential.message, comparedAt);
+  const oauthApplicationId = credential.basic;
   const fetchImpl = options.fetchImpl ?? fetch;
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const decodePoint = options.decodePoint ?? getPointFromGeoTiffBytes;
@@ -513,7 +526,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     });
     if (!tokenResponse.ok) {
       if (tokenResponse.status === 401 || tokenResponse.status === 403) {
-        return { ...result, status: "authentication-error", message: `Échange OAuth2 Météo-France refusé (HTTP ${tokenResponse.status}); vérifiez l’abonnement AROME et l’identifiant d’application.` };
+        return { ...result, status: "authentication-error", message: `Échange OAuth2 Météo-France refusé (HTTP ${tokenResponse.status}). Vérifiez que METEOFRANCE_API_KEY contient bien l’APPLICATION_ID base64 du portail et que le compte est abonné à l’API AROME : un APPLICATION_ID généré pour une autre API du portail est refusé.` };
       }
       return { ...result, message: `Service de jeton OAuth2 Météo-France indisponible (HTTP ${tokenResponse.status}).` };
     }
@@ -546,7 +559,10 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     step = "la série Open-Meteo Single Runs du même run";
     const openMeteoResponse = await fetchImpl(buildSingleRunsUrl(run), { signal: AbortSignal.timeout(20_000), headers: { accept: "application/json" } });
     if (!openMeteoResponse.ok) {
-      return { ...result, message: `Open-Meteo Single Runs n’a pas fourni le run AROME ${toSingleRunTime(run)} (HTTP ${openMeteoResponse.status}); aucun autre run n’a été substitué.` };
+      // Le corps d’erreur d’Open-Meteo (`{"error":true,"reason":"…"}`) est la seule source qui
+      // distingue un run inexistant, un cycle non publié et un paramètre refusé : on le remonte.
+      const reason = await readOpenMeteoReason(openMeteoResponse);
+      return { ...result, message: `Open-Meteo Single Runs n’a pas fourni le run AROME ${toSingleRunTime(run)} (HTTP ${openMeteoResponse.status}${reason ? ` : ${reason}` : ""}); aucun autre run n’a été substitué.` };
     }
     const openMeteoSeries = parseOpenMeteoSeries(await openMeteoResponse.json());
     if (!openMeteoSeries) return { ...result, message: "La réponse Open-Meteo Single Runs ne contient pas de série horaire exploitable." };

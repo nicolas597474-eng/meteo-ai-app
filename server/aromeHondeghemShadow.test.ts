@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getPointFromGeoTiffBytes, runHondeghemAromeShadowComparison, verifyHondeghemAromeWindDirectionAvailability } from "./aromeHondeghemShadow";
+import { getPointFromGeoTiffBytes, runHondeghemAromeShadowComparison, SINGLE_RUN_FORECAST_DAYS, verifyHondeghemAromeWindDirectionAvailability } from "./aromeHondeghemShadow";
 
 const RUN = "2026-09-29T00:00:00Z";
 const coverageIds = [
@@ -25,7 +25,7 @@ const openMeteo = {
 function response(body: string | ArrayBuffer, status = 200): Response {
   return new Response(body, { status });
 }
-function createFetchMock(options?: { missingPrecip?: boolean; authStatus?: number; tokenStatus?: number; coverageFailure?: number; openMeteoStatus?: number; noGeoTiff?: boolean }) {
+function createFetchMock(options?: { missingPrecip?: boolean; authStatus?: number; tokenStatus?: number; coverageFailure?: number; openMeteoStatus?: number; openMeteoReason?: string; noGeoTiff?: boolean }) {
   let currentCoverage = "";
   const requests: Array<{ url: URL; init?: RequestInit }> = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -37,7 +37,10 @@ function createFetchMock(options?: { missingPrecip?: boolean; authStatus?: numbe
     if (url.pathname.endsWith("/GetCapabilities")) {
       return options?.authStatus ? response("", options.authStatus) : response(capabilities(options?.missingPrecip ? coverageIds.filter((id) => !id.startsWith("TOTAL_WATER")) : coverageIds, !options?.noGeoTiff));
     }
-    if (url.hostname === "single-runs-api.open-meteo.com") return response(JSON.stringify(openMeteo), options?.openMeteoStatus ?? 200);
+    if (url.hostname === "single-runs-api.open-meteo.com") {
+      if (options?.openMeteoReason) return response(JSON.stringify({ error: true, reason: options.openMeteoReason }), options?.openMeteoStatus ?? 400);
+      return response(JSON.stringify(openMeteo), options?.openMeteoStatus ?? 200);
+    }
     if (url.pathname.endsWith("/DescribeCoverage")) {
       const id = url.searchParams.get("coverageID") ?? "";
       return response(coverageDescription(id.startsWith("TEMPERATURE") ? "temperature" : id.startsWith("WIND_SPEED") ? "windSpeed" : "precipitation"));
@@ -67,6 +70,64 @@ describe("AROME Hondeghem shadow comparison", () => {
     const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "", fetchImpl: fetchImpl as typeof fetch });
     expect(result.status).toBe("missing-key");
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("interroge Single Runs avec forecast_days et sans start_hour/end_hour, non exposés par cet endpoint", async () => {
+    const { fetchImpl, requests, decodePoint } = createFetchMock();
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "synthetic-application-id",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T01:00:00Z"),
+      sleep: async () => undefined,
+      decodePoint,
+    });
+    expect(result.status, result.message).toBe("ok");
+    const singleRuns = requests.find(({ url }) => url.hostname === "single-runs-api.open-meteo.com")!;
+    expect(singleRuns.url.searchParams.get("start_hour")).toBeNull();
+    expect(singleRuns.url.searchParams.get("end_hour")).toBeNull();
+    expect(singleRuns.url.searchParams.get("forecast_days")).toBe(String(SINGLE_RUN_FORECAST_DAYS));
+  });
+
+  it("remonte le motif d’erreur Open-Meteo quand Single Runs refuse le run", async () => {
+    const { fetchImpl } = createFetchMock({ openMeteoReason: "Run 2026-09-29T00:00 is not available for model meteofrance_arome_france_hd" });
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "synthetic-application-id",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T01:00:00Z"),
+      sleep: async () => undefined,
+    });
+    expect(result.status).toBe("request-impossible");
+    expect(result.message).toContain("HTTP 400");
+    expect(result.message).toContain("is not available");
+    expect(result.message).toContain("aucun autre run n’a été substitué");
+  });
+
+  it("refuse un jeton d’accès collé dans METEOFRANCE_API_KEY sans interroger le portail", async () => {
+    const fetchImpl = vi.fn();
+    const jwt = `${Buffer.from('{"alg":"HS256"}', "utf8").toString("base64url")}.${Buffer.from('{"sub":"x"}', "utf8").toString("base64url")}.sig`;
+    const verification = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: jwt, fetchImpl: fetchImpl as typeof fetch });
+    expect(verification.status).toBe("invalid-key");
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    const comparison = await runHondeghemAromeShadowComparison({ oauthApplicationId: jwt, fetchImpl: fetchImpl as typeof fetch });
+    expect(comparison.status).toBe("invalid-key");
+    expect(comparison.message).toContain("jeton d’accès");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("encode une paire client_id:client_secret avant l’en-tête Basic", async () => {
+    const { fetchImpl, requests, decodePoint } = createFetchMock();
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "my-client-id:my-client-secret",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T01:00:00Z"),
+      sleep: async () => undefined,
+      decodePoint,
+    });
+    expect(result.status, result.message).toBe("ok");
+    const tokenRequest = requests.find(({ url }) => url.pathname === "/token")!;
+    expect((tokenRequest.init?.headers as Record<string, string>).Authorization)
+      .toBe(`Basic ${Buffer.from("my-client-id:my-client-secret", "utf8").toString("base64")}`);
   });
 
   it("découvre l’ID réel au clic et confirme seulement les métadonnées 10 m, degrés et temps du run", async () => {
