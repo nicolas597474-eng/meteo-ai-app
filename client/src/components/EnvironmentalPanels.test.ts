@@ -360,19 +360,31 @@ describe("EnvironmentalPanels", () => {
     expect(source).toContain("brightLimbAngleDeg");
     expect(source).toContain("illuminationPct");
     expect(temporalSunMoonSource).toContain("displayTimeInZone(value, astronomy.timezone)");
-    expect(source).toContain("Visibilité locale");
     expect(source).toContain("getEclipseCircumstances.useQuery");
-    expect(source).toContain("isEclipseInProgress");
-    expect(source).toContain("eclipse-visibility-live");
-    expect(source).toContain("Suivi plein écran");
-    expect(source).toContain("Quitter le plein écran");
-    expect(source).toContain("Alerte visuelle");
-    expect(source).toContain("Alerte sonore");
-    expect(source).toContain("L’éclipse commence maintenant");
     expect(temporalSunMoonSource).toContain("<RealisticMoon phase={moonPhase}");
     expect(temporalSunMoonSource).toContain("const moonPhase = position.lunar ?? astronomy.lunar");
     expect(temporalSunMoonSource).toContain("moonPhase.label");
     expect(temporalSunMoonSource).toContain("moonPhase.illuminationPct");
+  });
+
+  it("retire la visibilité locale, les alertes visuelle et sonore et le suivi plein écran du panneau astronomique", () => {
+    expect(source).not.toContain("Visibilité locale");
+    expect(source).not.toContain("Suivi plein écran");
+    expect(source).not.toContain("Quitter le plein écran");
+    expect(source).not.toContain("Alerte visuelle");
+    expect(source).not.toContain("Alerte sonore");
+    expect(source).not.toContain("L’éclipse commence maintenant");
+    expect(source).not.toContain("isEventFullscreen");
+    expect(source).not.toContain("visualEclipseAlertEnabled");
+    expect(source).not.toContain("soundEclipseAlertEnabled");
+    expect(source).not.toContain("isEclipseStartAlertVisible");
+    expect(source).not.toContain("isEclipseInProgress");
+    expect(source).not.toContain("eclipse-visibility-live");
+    expect(source).not.toContain("localVisibility");
+    expect(styles).not.toContain("eclipse-visibility-live");
+    expect(styles).not.toContain("meteoai-eclipse-pulse");
+    expect(source).toContain("Alerte astronomique");
+    expect(source).toContain("Étoiles filantes");
   });
 
   it("utilise une sphère WebGL texturée pour la Lune et un fallback 2D explicite", () => {
