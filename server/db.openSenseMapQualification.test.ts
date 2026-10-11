@@ -1,0 +1,152 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const fakeDatabase = vi.hoisted(() => {
+  const insert = vi.fn();
+  const insertValues = vi.fn();
+  const select = vi.fn();
+  const update = vi.fn();
+  const updateSet = vi.fn();
+  const drizzle = vi.fn();
+  const db = { insert, select, update };
+  return { db, drizzle, insert, insertValues, select, update, updateSet, results: [] as unknown[][] };
+});
+
+vi.mock("drizzle-orm/mysql2", () => ({ drizzle: fakeDatabase.drizzle }));
+
+import {
+  applyOpenSenseMapQualificationVerdicts,
+  getCandidateOpenSenseMapStations,
+  getStationObservationsForQualification,
+  getValidatedOfficialStationsNearReference,
+  getWeatherStationQualificationVerdicts,
+  type OpenSenseMapQualificationVerdictUpdate,
+} from "./db";
+
+function makeThenableSelect(rows: unknown[]) {
+  const promise = Promise.resolve(rows);
+  const query: Record<string, any> = {};
+  query.from = vi.fn(() => query);
+  query.where = vi.fn(() => query);
+  query.orderBy = vi.fn(() => query);
+  query.then = (onFulfilled: any, onRejected: any) => promise.then(onFulfilled, onRejected);
+  return query;
+}
+
+describe("base de données indisponible", () => {
+  // Ce describe doit rester déclaré en premier : la connexion drizzle est mise
+  // en cache au niveau du module, et ce test vérifie le comportement sans base
+  // tant qu'aucune connexion n'a encore été établie.
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.DATABASE_URL;
+  });
+
+  it("ne lève jamais depuis les lecteurs et n'applique aucun verdict", async () => {
+    await expect(getCandidateOpenSenseMapStations()).resolves.toEqual([]);
+    await expect(getValidatedOfficialStationsNearReference(50.756, 2.521)).resolves.toEqual([]);
+    await expect(getStationObservationsForQualification(["opensensemap-box-a"], 0)).resolves.toEqual([]);
+    await expect(getWeatherStationQualificationVerdicts(["opensensemap-box-a"])).resolves.toEqual([]);
+
+    const verdict: OpenSenseMapQualificationVerdictUpdate = {
+      stationId: "opensensemap-box-a",
+      qualificationStatus: "validated",
+      isActive: 1,
+      exclusionReason: null,
+    };
+    await applyOpenSenseMapQualificationVerdicts([verdict]);
+    expect(fakeDatabase.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("lecteurs et writer des verdicts de qualification openSenseMap", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeDatabase.results = [];
+    fakeDatabase.drizzle.mockReturnValue(fakeDatabase.db);
+    fakeDatabase.select.mockImplementation(() => makeThenableSelect(fakeDatabase.results.shift() ?? []));
+    fakeDatabase.update.mockImplementation(() => ({ set: fakeDatabase.updateSet }));
+    fakeDatabase.updateSet.mockImplementation(() => ({ where: vi.fn(() => Promise.resolve()) }));
+    fakeDatabase.insertValues.mockResolvedValue(undefined);
+    fakeDatabase.insert.mockReturnValue({ values: fakeDatabase.insertValues });
+    process.env.DATABASE_URL = "mysql://unit.test.invalid/meteoai";
+  });
+
+  afterEach(() => {
+    delete process.env.DATABASE_URL;
+  });
+
+  it("restitue les capteurs candidats openSenseMap depuis la table des stations", async () => {
+    const candidates = [{ stationId: "opensensemap-box-a", source: "opensensemap", qualificationStatus: "candidate" }];
+    fakeDatabase.results = [candidates];
+
+    await expect(getCandidateOpenSenseMapStations()).resolves.toEqual(candidates);
+  });
+
+  it("restitue les stations officielles validées de la même référence de favori", async () => {
+    const officials = [{ stationId: "mf-a", source: "meteofrance", qualificationStatus: "validated", isActive: 1 }];
+    fakeDatabase.results = [officials];
+
+    await expect(getValidatedOfficialStationsNearReference(50.756, 2.521)).resolves.toEqual(officials);
+  });
+
+  it("restitue les relevés archivés inchangés, heures de mesure propres comprises", async () => {
+    const measurementTimes = {
+      temperature: "2026-10-05T12:01:00.000Z",
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    };
+    const rows = [{ stationId: "opensensemap-box-a", observedAt: Date.parse("2026-10-05T12:05:00.000Z"), temperature: 18, measurementTimes }];
+    fakeDatabase.results = [rows];
+
+    const observations = await getStationObservationsForQualification(["opensensemap-box-a", "mf-a"], Date.parse("2026-09-05T00:00:00.000Z"));
+
+    expect(observations).toEqual(rows);
+    expect(observations[0]?.measurementTimes).toEqual(measurementTimes);
+  });
+
+  it("restitue les statuts de qualification persistés sans les réécrire", async () => {
+    const verdicts = [{ stationId: "opensensemap-box-a", qualificationStatus: "excluded", exclusionReason: "Divergences répétées." }];
+    fakeDatabase.results = [verdicts];
+
+    await expect(getWeatherStationQualificationVerdicts(["opensensemap-box-a"])).resolves.toEqual(verdicts);
+  });
+
+  it("applique chaque verdict définitif en ne touchant que statut, activité et raison", async () => {
+    const validated: OpenSenseMapQualificationVerdictUpdate = {
+      stationId: "opensensemap-box-a",
+      qualificationStatus: "validated",
+      isActive: 1,
+      exclusionReason: null,
+    };
+    const excluded: OpenSenseMapQualificationVerdictUpdate = {
+      stationId: "opensensemap-box-b",
+      qualificationStatus: "excluded",
+      isActive: 0,
+      exclusionReason: "Divergences répétées : 4/10 comparaison(s).",
+    };
+
+    await applyOpenSenseMapQualificationVerdicts([validated, excluded]);
+
+    expect(fakeDatabase.update).toHaveBeenCalledTimes(2);
+    expect(fakeDatabase.updateSet).toHaveBeenCalledWith({
+      qualificationStatus: "validated",
+      isActive: 1,
+      exclusionReason: null,
+    });
+    expect(fakeDatabase.updateSet).toHaveBeenCalledWith({
+      qualificationStatus: "excluded",
+      isActive: 0,
+      exclusionReason: "Divergences répétées : 4/10 comparaison(s).",
+    });
+  });
+
+  it("n'écrit rien sans verdict à appliquer", async () => {
+    await applyOpenSenseMapQualificationVerdicts([]);
+
+    expect(fakeDatabase.update).not.toHaveBeenCalled();
+  });
+});

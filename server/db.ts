@@ -1054,6 +1054,105 @@ export async function getRecentValidatedNetatmoObservations(sinceMs: number) {
   });
 }
 
+// ─── OpenSenseMap qualification verdicts ─────────────────────────────────────
+
+/** Verdict de qualification openSenseMap à persister : seuls les statuts définitifs sont écrits. */
+export type OpenSenseMapQualificationVerdictUpdate = {
+  stationId: string;
+  qualificationStatus: "validated" | "excluded";
+  isActive: number;
+  exclusionReason: string | null;
+};
+
+/**
+ * Capteurs citoyens openSenseMap encore en validation : seuls eux peuvent
+ * recevoir un verdict. Une station déjà validée ou exclue n'est jamais
+ * réévaluée ni rétrogradée par ce lecteur.
+ */
+export async function getCandidateOpenSenseMapStations() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(weatherStations).where(and(
+    eq(weatherStations.source, "opensensemap"),
+    eq(weatherStations.qualificationStatus, "candidate"),
+  ));
+}
+
+/**
+ * Stations officielles Météo-France validées et actives, archivées pour la même
+ * référence de favori que le capteur évalué. Leur désaccord réel mesure la
+ * borne d'acceptation : une station persistée pour une autre référence ne doit
+ * jamais servir de témoin.
+ */
+export async function getValidatedOfficialStationsNearReference(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  return db.select().from(weatherStations).where(and(
+    eq(weatherStations.source, "meteofrance"),
+    eq(weatherStations.qualificationStatus, "validated"),
+    eq(weatherStations.isActive, 1),
+    gte(weatherStations.refLat, latBounds.min),
+    lte(weatherStations.refLat, latBounds.max),
+    gte(weatherStations.refLon, lonBounds.min),
+    lte(weatherStations.refLon, lonBounds.max),
+  ));
+}
+
+/**
+ * Relevés archivés des stations citées par la qualification, heures de mesure
+ * propres incluses. Le lecteur ne filtre rien : seules les heures de mesure
+ * fournies comptent pour l'évaluateur, l'heure d'archive n'est jamais un
+ * substitut.
+ */
+export async function getStationObservationsForQualification(stationIds: string[], sinceMs: number) {
+  const db = await getDb();
+  const uniqueIds = Array.from(new Set(stationIds));
+  if (!db || uniqueIds.length === 0) return [];
+  return db.select().from(stationObservations).where(and(
+    inArray(stationObservations.stationId, uniqueIds),
+    gte(stationObservations.observedAt, sinceMs),
+  )).orderBy(stationObservations.observedAt);
+}
+
+/**
+ * Statut de qualification persisté de stations citoyennes. La collecte horaire
+ * s'en sert pour ne jamais rétrograder un capteur déjà qualifié ou exclu en
+ * candidat : un verdict appliqué demeure.
+ */
+export async function getWeatherStationQualificationVerdicts(stationIds: string[]) {
+  const db = await getDb();
+  const uniqueIds = Array.from(new Set(stationIds));
+  if (!db || uniqueIds.length === 0) return [];
+  return db.select({
+    stationId: weatherStations.stationId,
+    qualificationStatus: weatherStations.qualificationStatus,
+    exclusionReason: weatherStations.exclusionReason,
+  }).from(weatherStations).where(inArray(weatherStations.stationId, uniqueIds));
+}
+
+/**
+ * Applique les verdicts définitifs issus de l'évaluateur. La clause de statut
+ * candidat garantit qu'un verdict ne s'applique qu'une fois et n'écrase jamais
+ * un statut déjà promu : l'écriture est idempotente et auditable. Les autres
+ * colonnes d'identité ou de métadonnées ne sont jamais touchées.
+ */
+export async function applyOpenSenseMapQualificationVerdicts(verdicts: OpenSenseMapQualificationVerdictUpdate[]) {
+  const db = await getDb();
+  if (!db || verdicts.length === 0) return;
+  for (const verdict of verdicts) {
+    await db.update(weatherStations).set({
+      qualificationStatus: verdict.qualificationStatus,
+      isActive: verdict.isActive,
+      exclusionReason: verdict.exclusionReason,
+    }).where(and(
+      eq(weatherStations.stationId, verdict.stationId),
+      eq(weatherStations.qualificationStatus, "candidate"),
+    ));
+  }
+}
+
 /** Idempotent physical synthesis for one location and Paris hour. */
 export async function upsertQualifiedObservationSnapshot(data: InsertQualifiedObservationSnapshot): Promise<void> {
   const db = await getDb();
