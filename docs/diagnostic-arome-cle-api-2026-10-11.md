@@ -25,6 +25,50 @@ https://single-runs-api.open-meteo.com/v1/forecast
 
 Correctif appliqué (§5, point 7) : `forecast_days` à la place de `start_hour`/`end_hour` (les échéances sont déjà filtrées sur `[run, run + 24 h[`), et remontée du motif d’erreur Open-Meteo (`{"error":true,"reason":"…"}`) dans le message affiché, de façon à distinguer un run inexistant, un cycle non encore publié et un paramètre refusé.
 
+## 0 bis. L’alignement du run : ce qui bloquait encore « Relancer la comparaison »
+
+Le correctif du §0 supprimait les paramètres refusés par l’endpoint, mais un clic pouvait encore
+s’arrêter sur `Open-Meteo Single Runs n’a pas fourni le run AROME 2026-10-11T09:00 (HTTP 400)`.
+La cause n’est plus un paramètre : c’est un décalage de calendrier entre les deux sources.
+
+| Source | Cycle disponible ce jour-là | Preuve |
+|--------|-----------------------------|--------|
+| Catalogue WCS AROME (`GetCapabilities`) | `2026-10-11T09:00:00Z` — le plus récent annoncé | panneau admin, 2026-10-11 |
+| Open-Meteo Single Runs | `2026-10-11T06:00:00Z` — dernier run ingéré | `https://api.open-meteo.com/data/meteofrance_arome_france_hd/static/meta.json` → `last_run_initialisation_time = 1791698400` (06:00 UTC), `last_run_availability_time = 1791717455` (≈ 11:17 UTC), `update_interval_seconds = 10800` |
+
+Météo-France initialise AROME toutes les 3 heures (00, 03, 06 … 21 UTC) et publie les champs sur
+le WCS **avant** qu’Open-Meteo ne les ait ingérés : à 12 h 30 UTC, le catalogue proposait déjà le
+cycle 09:00 alors que l’archive Single Runs n’allait que jusqu’au 06:00. Demander un run absent de
+l’archive renvoie exactement le `400` observé — la clé, elle, n’est toujours pas en cause.
+
+**Alignement appliqué** (`server/aromeHondeghemShadow.ts`) :
+
+1. **Choix du cycle aligné** : le dernier run publié par Open-Meteo est lu dans
+   `.../data/meteofrance_arome_france_hd/static/meta.json` (`singleRunMetadataUrl()`, déjà utilisé
+   par `providerRunHorizon.ts`) ; le catalogue WCS est relu **en entier** (`rankCatalogueRuns()`,
+   tous ses runs du plus récent au plus ancien) et seuls les cycles publiés par les deux sources
+   restent candidats.
+2. **Sonde bornée, run par run** : si les métadonnées sont illisibles, ou si le cycle retenu est
+   encore refusé, la comparaison essaie **au maximum 3** runs, du plus récent au plus ancien. Un
+   `400` « run not available » autorise le cycle suivant ; toute autre réponse (401/403, quota,
+   erreur serveur) arrête la comparaison au lieu de la contourner.
+3. **Aucune substitution croisée** : les deux sources portent toujours le **même** run ; c’est le
+   choix du cycle qui est aligné, jamais une comparaison entre deux runs différents. Le message
+   final explicite l’écart retenu (« Run comparé 2026-10-11T06:00 UTC … le catalogue annonçait déjà
+   2026-10-11T09:00 UTC, qu’Open-Meteo n’avait pas encore publié »).
+4. **Messages d’échec distincts** : ils listent les runs essayés et ceux écartés d’emblée, ce qui
+   sépare « cycle pas encore publié par Open-Meteo » d’un problème d’identifiant, d’abonnement,
+   de réseau ou de quota.
+
+Une fois ce correctif déployé, un clic sur « Relancer la comparaison » doit produire le tableau
+AROME WCS ↔ Open-Meteo sur les échéances du cycle commun (jusqu’à 24), avec les écarts.
+
+Note de traçabilité : le commit `b4a0bf2` cité dans la passation (« commit d’alignement du run »)
+**n’existe dans aucune référence du dépôt** (`git ls-remote`, `GET /repos/…/commits/b4a0bf2` → 422,
+recherche de commits `alignement` / `arome` → aucune correspondance) : il n’a jamais été poussé.
+La présente section et son correctif reconstruisent cet alignement à partir du diagnostic §0 et
+des métadonnées de production.
+
 ## 1. Cartographie : il existe trois « AROME » distincts dans le code
 
 | # | Chemin | Où | Source des données | Clé utilisée |
@@ -109,10 +153,11 @@ Le script n'affiche jamais la clé ni le jeton (empreintes masquées uniquement)
 5. **Documentation** : `.env.example` décrit la valeur attendue (`APPLICATION_ID` base64, abonnement AROME, identifiant propre à chaque API).
 6. **Script de diagnostic** `scripts/check-arome-key.mjs` (voir §4).
 7. **Correction de l’appel Open-Meteo Single Runs** (`aromeHondeghemShadow.ts`) : `start_hour`/`end_hour` remplacés par `forecast_days`, et motif d’erreur Open-Meteo remonté dans le message. C’est le correctif du blocage observé le 2026-10-11 (§0).
+8. **Alignement du run** (`aromeHondeghemShadow.ts`) : le cycle comparé est le plus récent publié à la fois par le catalogue WCS et par Open-Meteo Single Runs (lecture du `meta.json` du modèle, sonde bornée à 3 runs, aucune substitution croisée). C’est le correctif du décalage de calendrier décrit au §0 bis.
 
 Non modifié volontairement : le flux AROME de production (Open-Meteo, sans clé). AROME reste absent au-delà de J+1 — horizon documenté de 2 jours du modèle, pas un défaut.
 
 ## 6. Validation
 
-- `npx vitest run` : **241 fichiers / 1248 tests verts**, dont 7 tests d'identifiant et 4 tests shadow (`invalid-key`, encodage de la paire, `forecast_days` sans `start_hour`/`end_hour`, remontée du motif Open-Meteo).
-- `npx tsc --noEmit` : aucune erreur sur les fichiers modifiés (les 5 erreurs restantes sont préexistantes dans `server/fusionEngine.ts` et `shared/experimentalForecastConfidence.ts`).
+- `npx vitest run` : **243 fichiers / 1273 tests verts (2 ignorés)**, dont 7 tests d'identifiant et 8 tests shadow (`invalid-key`, encodage de la paire, `forecast_days` sans `start_hour`/`end_hour`, remontée du motif Open-Meteo, alignement sur le `meta.json`, sonde d'un run plus ancien, conservation du run le plus récent quand les deux sources le publient, refus d'essayer un autre run hors `400`).
+- `npx tsc --noEmit` : aucune erreur.

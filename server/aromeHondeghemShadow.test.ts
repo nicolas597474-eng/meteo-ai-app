@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPointFromGeoTiffBytes, runHondeghemAromeShadowComparison, SINGLE_RUN_FORECAST_DAYS, verifyHondeghemAromeWindDirectionAvailability } from "./aromeHondeghemShadow";
 
 const RUN = "2026-09-29T00:00:00Z";
-const coverageIds = [
-  "TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___2026-09-29T00.00.00Z",
-  "TOTAL_WATER_PRECIPITATION__GROUND_OR_WATER_SURFACE___2026-09-29T00.00.00Z_PT1H",
-  "WIND_SPEED__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___2026-09-29T00.00.00Z",
-];
+/** Identifiants de couverture tels que le catalogue WCS les publie pour un run donné. */
+const coverageIdsAt = (run: string) => {
+  const stamp = run.replace(/T(\d{2}):(\d{2}):(\d{2})Z$/, "T$1.$2.$3Z");
+  return [
+    `TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___${stamp}`,
+    `TOTAL_WATER_PRECIPITATION__GROUND_OR_WATER_SURFACE___${stamp}_PT1H`,
+    `WIND_SPEED__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___${stamp}`,
+  ];
+};
+const coverageIds = coverageIdsAt(RUN);
 const capabilities = (ids = coverageIds, includeGeoTiff = true) => `<wcs:Capabilities><ows:OperationsMetadata><ows:Operation name="GetCoverage"><ows:Parameter name="format"><ows:AllowedValues>${includeGeoTiff ? "<ows:Value>image/tiff</ows:Value>" : ""}<ows:Value>application/wmo-grib</ows:Value></ows:AllowedValues></ows:Parameter></ows:Operation></ows:OperationsMetadata><wcs:Contents>${ids.map((id) => `<wcs:CoverageSummary><wcs:CoverageId>${id}</wcs:CoverageId></wcs:CoverageSummary>`).join("")}</wcs:Contents></wcs:Capabilities>`;
 const coverageDescription = (metric: "temperature" | "precipitation" | "windSpeed" | "windDirection") => {
   const unit = metric === "temperature" ? "K" : metric === "windSpeed" ? "m s-1" : metric === "windDirection" ? "degree" : "kg m-2";
@@ -25,7 +30,7 @@ const openMeteo = {
 function response(body: string | ArrayBuffer, status = 200): Response {
   return new Response(body, { status });
 }
-function createFetchMock(options?: { missingPrecip?: boolean; authStatus?: number; tokenStatus?: number; coverageFailure?: number; openMeteoStatus?: number; openMeteoReason?: string; noGeoTiff?: boolean }) {
+function createFetchMock(options?: { missingPrecip?: boolean; authStatus?: number; tokenStatus?: number; coverageFailure?: number; openMeteoStatus?: number; openMeteoReason?: string; noGeoTiff?: boolean; coverageIdList?: string[]; metaLastRun?: string | null; metaStatus?: number; unavailableRuns?: string[] }) {
   let currentCoverage = "";
   const requests: Array<{ url: URL; init?: RequestInit }> = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -35,9 +40,23 @@ function createFetchMock(options?: { missingPrecip?: boolean; authStatus?: numbe
       return response(JSON.stringify({ access_token: "synthetic-access-token", expires_in: 3600 }), options?.tokenStatus ?? 200);
     }
     if (url.pathname.endsWith("/GetCapabilities")) {
-      return options?.authStatus ? response("", options.authStatus) : response(capabilities(options?.missingPrecip ? coverageIds.filter((id) => !id.startsWith("TOTAL_WATER")) : coverageIds, !options?.noGeoTiff));
+      const ids = options?.coverageIdList ?? coverageIds;
+      return options?.authStatus
+        ? response("", options.authStatus)
+        : response(capabilities(options?.missingPrecip ? ids.filter((id) => !id.startsWith("TOTAL_WATER")) : ids, !options?.noGeoTiff));
+    }
+    if (url.hostname === "api.open-meteo.com") {
+      if (options?.metaStatus && options.metaStatus !== 200) return response("", options.metaStatus);
+      return response(JSON.stringify({
+        last_run_initialisation_time: options?.metaLastRun ? Date.parse(options.metaLastRun) / 1000 : null,
+        update_interval_seconds: 10_800,
+      }));
     }
     if (url.hostname === "single-runs-api.open-meteo.com") {
+      const requestedRun = url.searchParams.get("run") ?? "";
+      if (options?.unavailableRuns?.some((unavailable) => requestedRun === unavailable.slice(0, 16))) {
+        return response(JSON.stringify({ error: true, reason: `Run ${requestedRun} is not available for model meteofrance_arome_france_hd` }), 400);
+      }
       if (options?.openMeteoReason) return response(JSON.stringify({ error: true, reason: options.openMeteoReason }), options?.openMeteoStatus ?? 400);
       return response(JSON.stringify(openMeteo), options?.openMeteoStatus ?? 200);
     }
@@ -100,6 +119,89 @@ describe("AROME Hondeghem shadow comparison", () => {
     expect(result.message).toContain("HTTP 400");
     expect(result.message).toContain("is not available");
     expect(result.message).toContain("aucun autre run n’a été substitué");
+  });
+
+  it("aligne le run sur le dernier run publié par Open-Meteo au lieu du plus récent du catalogue WCS", async () => {
+    const { fetchImpl, requests, decodePoint } = createFetchMock({
+      coverageIdList: [...coverageIdsAt("2026-09-29T03:00:00Z"), ...coverageIds],
+      metaLastRun: RUN,
+    });
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "synthetic-application-id",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T04:00:00Z"),
+      sleep: async () => undefined,
+      decodePoint,
+    });
+
+    expect(result.status, result.message).toBe("ok");
+    expect(result.run).toBe(RUN);
+    expect(result.hourly).toHaveLength(3);
+    const singleRunsRequests = requests.filter(({ url }) => url.hostname === "single-runs-api.open-meteo.com");
+    expect(singleRunsRequests).toHaveLength(1);
+    expect(singleRunsRequests[0].url.searchParams.get("run")).toBe("2026-09-29T00:00");
+    const metadataRequest = requests.find(({ url }) => url.hostname === "api.open-meteo.com")!;
+    expect(metadataRequest.url.pathname).toBe("/data/meteofrance_arome_france_hd/static/meta.json");
+    expect(result.message).toContain("Run comparé 2026-09-29T00:00 UTC");
+    expect(result.message).toContain("2026-09-29T03:00");
+    expect(result.message).toContain("le plus récent publié à la fois par le catalogue WCS et par Open-Meteo Single Runs");
+  });
+
+  it("sonde le run plus ancien quand les métadonnées Open-Meteo sont illisibles et que Single Runs refuse le plus récent", async () => {
+    const { fetchImpl, requests, decodePoint } = createFetchMock({
+      coverageIdList: [...coverageIdsAt("2026-09-29T03:00:00Z"), ...coverageIds],
+      metaStatus: 404,
+      unavailableRuns: ["2026-09-29T03:00"],
+    });
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "synthetic-application-id",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T04:00:00Z"),
+      sleep: async () => undefined,
+      decodePoint,
+    });
+
+    expect(result.status, result.message).toBe("ok");
+    expect(result.run).toBe(RUN);
+    expect(requests.filter(({ url }) => url.hostname === "single-runs-api.open-meteo.com").map(({ url }) => url.searchParams.get("run")))
+      .toEqual(["2026-09-29T03:00", "2026-09-29T00:00"]);
+    expect(result.message).toContain("Run comparé 2026-09-29T00:00 UTC");
+    expect(result.message).toContain("2026-09-29T03:00");
+  });
+
+  it("conserve le run le plus récent du catalogue quand Open-Meteo publie au moins ce cycle", async () => {
+    const { fetchImpl, requests, decodePoint } = createFetchMock({ metaLastRun: "2026-09-29T06:00:00Z" });
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "synthetic-application-id",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T07:00:00Z"),
+      sleep: async () => undefined,
+      decodePoint,
+    });
+
+    expect(result.status, result.message).toBe("ok");
+    const singleRunsRequests = requests.filter(({ url }) => url.hostname === "single-runs-api.open-meteo.com");
+    expect(singleRunsRequests).toHaveLength(1);
+    expect(singleRunsRequests[0].url.searchParams.get("run")).toBe("2026-09-29T00:00");
+    expect(result.message).not.toContain("Run comparé");
+  });
+
+  it("n’essaie pas un autre run quand Single Runs échoue pour une raison autre qu’un run indisponible", async () => {
+    const { fetchImpl, requests } = createFetchMock({
+      coverageIdList: [...coverageIdsAt("2026-09-29T03:00:00Z"), ...coverageIds],
+      metaStatus: 404,
+      openMeteoStatus: 404,
+    });
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "synthetic-application-id",
+      fetchImpl: fetchImpl as typeof fetch,
+      sleep: async () => undefined,
+    });
+
+    expect(result.status).toBe("request-impossible");
+    expect(result.message).toContain("aucun autre run n’a été substitué");
+    expect(result.message).not.toContain("Runs essayés sans succès");
+    expect(requests.filter(({ url }) => url.hostname === "single-runs-api.open-meteo.com")).toHaveLength(1);
   });
 
   it("refuse un jeton d’accès collé dans METEOFRANCE_API_KEY sans interroger le portail", async () => {
