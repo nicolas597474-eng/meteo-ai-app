@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../_core/context";
 import type { NearbyStationsCollection, StationData } from "../stationService";
+import type { CitizenFusionActivation } from "../../drizzle/schema";
 
 vi.mock("../stationService", async () => {
   const actual = await vi.importActual<typeof import("../stationService")>("../stationService");
@@ -16,12 +17,13 @@ vi.mock("../db", async () => {
   return {
     ...actual,
     getWeatherStationQualificationVerdicts: vi.fn(),
+    getCitizenFusionActivationNearReference: vi.fn(),
   };
 });
 
 import { weatherRouter } from "./weather";
 import { collectNearbyStationsWithDiagnostics, fetchCurrentModelReferences } from "../stationService";
-import { getWeatherStationQualificationVerdicts } from "../db";
+import { getCitizenFusionActivationNearReference, getWeatherStationQualificationVerdicts } from "../db";
 
 function createPublicContext(): TrpcContext {
   return {
@@ -31,14 +33,14 @@ function createPublicContext(): TrpcContext {
   };
 }
 
-// Fixtures de test only : stations synthétiques, aucune observation réelle.
+// Fixtures de test only : stations synthÃ©tiques, aucune observation rÃ©elle.
 
 function stationFixture(): StationData {
   const now = new Date().toISOString();
   return {
     stationId: "netatmo-public-42",
     source: "netatmo",
-    name: "Netatmo · Station de test",
+    name: "Netatmo Â· Station de test",
     lat: 50.76,
     lon: 2.52,
     altitude: 10,
@@ -72,7 +74,7 @@ function citizenStationFixture(stationId: string, source: "opensensemap" | "cwop
   return {
     stationId,
     source,
-    name: `${source} · capteur citoyen de test`,
+    name: `${source} Â· capteur citoyen de test`,
     lat: 50.755,
     lon: 2.522,
     altitude: 20,
@@ -100,7 +102,7 @@ function citizenStationFixture(stationId: string, source: "opensensemap" | "cwop
     isActive: false,
     qualificationStatus: "candidate",
     sourceTier: 3,
-    exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
+    exclusionReason: "Capteur citoyen en validation â non utilisÃ© dans la tempÃ©rature locale",
   };
 }
 
@@ -110,10 +112,123 @@ beforeEach(() => {
   vi.mocked(fetchCurrentModelReferences).mockResolvedValue([]);
   vi.mocked(getWeatherStationQualificationVerdicts).mockReset();
   vi.mocked(getWeatherStationQualificationVerdicts).mockResolvedValue([]);
+  vi.mocked(getCitizenFusionActivationNearReference).mockReset();
+  vi.mocked(getCitizenFusionActivationNearReference).mockResolvedValue(null);
 });
 
-describe("weather.searchStations · verdicts de qualification persistés", () => {
-  it("surcharge le statut live des capteurs citoyens avec le verdict persisté, sans toucher aux stations physiques", async () => {
+describe("weather.searchStations Â· verdicts de qualification persistÃ©s", () => {
+  it("surcharge le statut live des capteurs citoyens avec le verdict persistÃ©, sans toucher aux stations physiques", async () => {
+    const collection: NearbyStationsCollection = {
+      stations: [
+        citizenStationFixture("opensensemap-6740", "opensensemap", 1.8),
+        citizenStationFixture("cwop-EW1234", "cwop", 4.2),
+        citizenStationFixture("opensensemap-9999", "opensensemap", 6.5),
+        stationFixture(),
+      ],
+      sourceDiagnostics: [
+        { source: "meteofrance", status: "success_empty", stationCount: 0 },
+        { source: "netatmo", status: "success_with_data", stationCount: 1 },
+        { source: "opensensemap", status: "success_with_data", stationCount: 2 },
+        { source: "cwop", status: "success_with_data", stationCount: 1 },
+      ],
+      cacheHit: false,
+    };
+    vi.mocked(collectNearbyStationsWithDiagnostics).mockResolvedValue(collection);
+    vi.mocked(getWeatherStationQualificationVerdicts).mockResolvedValue([
+      {
+        stationId: "opensensemap-6740",
+        qualificationStatus: "validated",
+        exclusionReason: null,
+      },
+      {
+        stationId: "cwop-EW1234",
+        qualificationStatus: "excluded",
+        exclusionReason:
+          "Erreur trop grande : MAE 2.9 Â°C au-delÃ  de la borne d'acceptation 1.5 Â°C, dÃ©rivÃ©e du dÃ©saccord officiel mesurÃ© (0.5 Â°C).",
+      },
+    ]);
+
+    const result = await weatherRouter.createCaller(createPublicContext()).searchStations({
+      lat: 50.76,
+      lon: 2.52,
+      radiusKm: 20,
+    });
+
+    // Seuls les capteurs citoyens sont interrogÃ©s, jamais la station physique.
+    expect(getWeatherStationQualificationVerdicts).toHaveBeenCalledTimes(1);
+    const requestedIds = vi.mocked(getWeatherStationQualificationVerdicts).mock.calls[0][0];
+    expect(requestedIds).toContain("opensensemap-6740");
+    expect(requestedIds).toContain("cwop-EW1234");
+    expect(requestedIds).toContain("opensensemap-9999");
+    expect(requestedIds).not.toContain("netatmo-public-42");
+
+    const byStationId = new Map(result.stations.map((station) => [station.stationId, station]));
+
+    // Capteur validÃ© : le verdict persistÃ© remplace le statut live Â« candidate Â»
+    // et son motif live ; isActive n'est jamais rÃ©activÃ© par la vue.
+    const validated = byStationId.get("opensensemap-6740");
+    expect(validated).toMatchObject({
+      source: "opensensemap",
+      qualificationStatus: "validated",
+      exclusionReason: null,
+      isActive: false,
+      sourceTier: 3,
+    });
+
+    // Capteur exclu : statut et motif persistÃ©s repris tels quels.
+    const excluded = byStationId.get("cwop-EW1234");
+    expect(excluded).toMatchObject({
+      source: "cwop",
+      qualificationStatus: "excluded",
+      exclusionReason:
+        "Erreur trop grande : MAE 2.9 Â°C au-delÃ  de la borne d'acceptation 1.5 Â°C, dÃ©rivÃ©e du dÃ©saccord officiel mesurÃ© (0.5 Â°C).",
+      isActive: false,
+    });
+
+    // Candidat sans verdict persistÃ© : le statut live reste la vÃ©ritÃ©.
+    const untouchedCandidate = byStationId.get("opensensemap-9999");
+    expect(untouchedCandidate).toMatchObject({
+      source: "opensensemap",
+      qualificationStatus: "candidate",
+      exclusionReason: "Capteur citoyen en validation â non utilisÃ© dans la tempÃ©rature locale",
+      isActive: false,
+    });
+
+    // Station physique : aucun overlay, aucune Ã©criture du statut.
+    const physical = byStationId.get("netatmo-public-42");
+    expect(physical).toMatchObject({
+      source: "netatmo",
+      isActive: true,
+      qualificationStatus: undefined,
+    });
+    expect(physical?.exclusionReason).toBeFalsy();
+  });
+
+  it("nâinterroge jamais les verdicts persistÃ©s quand aucune station citoyenne nâest collectÃ©e", async () => {
+    const collection: NearbyStationsCollection = {
+      stations: [stationFixture()],
+      sourceDiagnostics: [
+        { source: "meteofrance", status: "success_empty", stationCount: 0 },
+        { source: "netatmo", status: "success_with_data", stationCount: 1 },
+        { source: "opensensemap", status: "success_empty", stationCount: 0 },
+        { source: "cwop", status: "success_empty", stationCount: 0 },
+      ],
+      cacheHit: false,
+    };
+    vi.mocked(collectNearbyStationsWithDiagnostics).mockResolvedValue(collection);
+
+    const result = await weatherRouter.createCaller(createPublicContext()).searchStations({
+      lat: 50.76,
+      lon: 2.52,
+      radiusKm: 20,
+    });
+
+    expect(getWeatherStationQualificationVerdicts).not.toHaveBeenCalled();
+    expect(result.stations.map((station) => station.stationId)).toEqual(["netatmo-public-42"]);
+    expect(result.stations[0].qualificationStatus).toBeUndefined();
+  });
+
+  it("compose la température locale avec le capteur validé uniquement quand la décision activée est persistée", async () => {
     const collection: NearbyStationsCollection = {
       stations: [
         citizenStationFixture("opensensemap-6740", "opensensemap", 1.8),
@@ -144,83 +259,49 @@ describe("weather.searchStations · verdicts de qualification persistés", () =>
       },
     ]);
 
-    const result = await weatherRouter.createCaller(createPublicContext()).searchStations({
-      lat: 50.76,
-      lon: 2.52,
-      radiusKm: 20,
-    });
+    const caller = weatherRouter.createCaller(createPublicContext());
 
-    // Seuls les capteurs citoyens sont interrogés, jamais la station physique.
-    expect(getWeatherStationQualificationVerdicts).toHaveBeenCalledTimes(1);
-    const requestedIds = vi.mocked(getWeatherStationQualificationVerdicts).mock.calls[0][0];
-    expect(requestedIds).toContain("opensensemap-6740");
-    expect(requestedIds).toContain("cwop-EW1234");
-    expect(requestedIds).toContain("opensensemap-9999");
-    expect(requestedIds).not.toContain("netatmo-public-42");
+    // Sans décision activée persistée, la synthèse live reste strictement
+    // physique : aucun capteur citoyen ne rejoint la température locale.
+    const withoutActivation = await caller.searchStations({ lat: 50.76, lon: 2.52, radiusKm: 20 });
+    expect(withoutActivation.citizenFusionActivation).toBeNull();
+    expect(withoutActivation.groundTruth.stationsUsed.map((station) => station.stationId))
+      .toEqual(["netatmo-public-42"]);
 
-    const byStationId = new Map(result.stations.map((station) => [station.stationId, station]));
-
-    // Capteur validé : le verdict persisté remplace le statut live « candidate »
-    // et son motif live ; isActive n'est jamais réactivé par la vue.
-    const validated = byStationId.get("opensensemap-6740");
-    expect(validated).toMatchObject({
-      source: "opensensemap",
-      qualificationStatus: "validated",
-      exclusionReason: null,
-      isActive: false,
-      sourceTier: 3,
-    });
-
-    // Capteur exclu : statut et motif persistés repris tels quels.
-    const excluded = byStationId.get("cwop-EW1234");
-    expect(excluded).toMatchObject({
-      source: "cwop",
-      qualificationStatus: "excluded",
-      exclusionReason:
-        "Erreur trop grande : MAE 2.9 °C au-delà de la borne d'acceptation 1.5 °C, dérivée du désaccord officiel mesuré (0.5 °C).",
-      isActive: false,
-    });
-
-    // Candidat sans verdict persisté : le statut live reste la vérité.
-    const untouchedCandidate = byStationId.get("opensensemap-9999");
-    expect(untouchedCandidate).toMatchObject({
-      source: "opensensemap",
-      qualificationStatus: "candidate",
-      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
-      isActive: false,
-    });
-
-    // Station physique : aucun overlay, aucune écriture du statut.
-    const physical = byStationId.get("netatmo-public-42");
-    expect(physical).toMatchObject({
-      source: "netatmo",
-      isActive: true,
-      qualificationStatus: undefined,
-    });
-    expect(physical?.exclusionReason).toBeFalsy();
-  });
-
-  it("n’interroge jamais les verdicts persistés quand aucune station citoyenne n’est collectée", async () => {
-    const collection: NearbyStationsCollection = {
-      stations: [stationFixture()],
-      sourceDiagnostics: [
-        { source: "meteofrance", status: "success_empty", stationCount: 0 },
-        { source: "netatmo", status: "success_with_data", stationCount: 1 },
-        { source: "opensensemap", status: "success_empty", stationCount: 0 },
-        { source: "cwop", status: "success_empty", stationCount: 0 },
-      ],
-      cacheHit: false,
+    // Fixtures de test only : décision activée persistée par le cycle planifié.
+    const activationRow: CitizenFusionActivation = {
+      id: 7,
+      refLat: 50.76,
+      refLon: 2.52,
+      status: "activated",
+      version: "citizen-fusion-activation-v1",
+      reason: "Amélioration mesurée : capteurs validés activés dans la synthèse locale.",
+      comparisons: 9,
+      distinctDays: 3,
+      windowDays: 30,
+      baselineMaeC: 0.676,
+      withCitizenMaeC: 0.373,
+      improvementC: 0.303,
+      validatedCitizenStations: ["opensensemap-6740"],
+      firstComparedAt: "2026-10-05T09:00:00Z",
+      lastComparedAt: "2026-10-07T11:00:00Z",
+      evaluatedAt: Date.parse("2026-10-11T12:00:00Z"),
+      createdAt: new Date("2026-10-11T12:00:00Z"),
+      updatedAt: new Date("2026-10-11T12:00:00Z"),
     };
-    vi.mocked(collectNearbyStationsWithDiagnostics).mockResolvedValue(collection);
+    vi.mocked(getCitizenFusionActivationNearReference).mockResolvedValue(activationRow);
 
-    const result = await weatherRouter.createCaller(createPublicContext()).searchStations({
-      lat: 50.76,
-      lon: 2.52,
-      radiusKm: 20,
+    const withActivation = await caller.searchStations({ lat: 50.76, lon: 2.52, radiusKm: 20 });
+    expect(withActivation.citizenFusionActivation).toEqual({
+      status: "activated",
+      reason: activationRow.reason,
+      evaluatedAt: activationRow.evaluatedAt,
     });
-
-    expect(getWeatherStationQualificationVerdicts).not.toHaveBeenCalled();
-    expect(result.stations.map((station) => station.stationId)).toEqual(["netatmo-public-42"]);
-    expect(result.stations[0].qualificationStatus).toBeUndefined();
+    // Seul le capteur validé rejoint la synthèse : le capteur exclu et le
+    // candidat sans verdict persisté restent hors, la priorité technique
+    // reste celle de la collecte.
+    expect(withActivation.groundTruth.stationsUsed.map((station) => station.stationId).sort())
+      .toEqual(["netatmo-public-42", "opensensemap-6740"]);
   });
 });
+

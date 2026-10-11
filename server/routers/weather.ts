@@ -1,5 +1,5 @@
 /**
- * Weather Router — tRPC procedures for MeteoAI
+ * Weather Router â tRPC procedures for MeteoAI
  */
 
 import { z } from "zod";
@@ -44,6 +44,7 @@ import {
   getActivePhysicalStationsNearReference,
   getValidatedOfficialStationsNearReference,
   getStationObservationsForQualification,
+  getCitizenFusionActivationNearReference,
 } from "../db";
 import { loadCitizenQualificationEvidence } from "../citizenQualificationEvidenceLoader";
 import { indexCitizenQualificationEvidence } from "../citizenQualificationEvidenceService";
@@ -53,11 +54,13 @@ import {
   type ImpactObservationRow,
   type ImpactStationRow,
 } from "../citizenFusionImpactService";
+import { composeLocalSynthesisSources } from "../citizenFusionActivationService";
+import type { CitizenFusionActivation } from "../../drizzle/schema";
 import { collectCurrentWeatherSnapshot, collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
 import { summarizePrecipitationModels } from "../../shared/precipitationConsensus";
 import { legacyStabilityLabelForStorage } from "../legacyStabilityStorage";
-import { collectNearbyStations, collectNearbyStationsWithDiagnostics, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind } from "../stationService";
+import { collectNearbyStations, collectNearbyStationsWithDiagnostics, fetchCurrentModelReferences, getPhysicalActiveStations, rankStations, calculateGroundTruth, haversineKm, HONDEGHEM, getStationSourceKind, type StationData } from "../stationService";
 import { getStationMeasurementAgeStates } from "../stationMeasurementFreshness";
 import { calculateUltraLocal } from "../ultraLocalService";
 import { calculateReliabilityScore, detectWeatherRegime, REGIME_DEFINITIONS, type WeatherRegime } from "../statsEngine";
@@ -111,6 +114,58 @@ function getTodayParis(): string {
   return getParisDate();
 }
 
+type PersistedCitizenVerdictRow = {
+  stationId: string;
+  qualificationStatus: string | null;
+  exclusionReason: string | null;
+};
+
+type LocalSynthesisSources = {
+  physicalStations: StationData[];
+  localSynthesisStations: StationData[];
+  persistedCitizenVerdicts: ReadonlyMap<string, PersistedCitizenVerdictRow>;
+  activation: CitizenFusionActivation | null;
+};
+
+/**
+ * Charge les sources de la synthèse locale live d'une référence : stations
+ * physiques actives, verdicts de qualification persistés des capteurs
+ * citoyens et décision d'activation archivée. Sans décision « activated », la
+ * composition reste strictement physique ; avec elle, seuls les capteurs
+ * citoyens porteurs du verdict persisté « validated » rejoignent la synthèse,
+ * à priorité technique strictement inchangée. La vérité terrain horaire
+ * archivée reste physique uniquement et n'est jamais composée ici.
+ */
+async function loadLocalSynthesisSources(
+  ranked: StationData[],
+  lat: number,
+  lon: number,
+): Promise<LocalSynthesisSources> {
+  const citizenStations = ranked.filter(
+    (station) => station.source === "opensensemap" || station.source === "cwop",
+  );
+  const citizenStationIds = citizenStations.map((station) => station.stationId);
+  const [persistedCitizenVerdictRows, activation] = await Promise.all([
+    citizenStationIds.length > 0
+      ? getWeatherStationQualificationVerdicts(citizenStationIds)
+      : Promise.resolve([] as Awaited<ReturnType<typeof getWeatherStationQualificationVerdicts>>),
+    getCitizenFusionActivationNearReference(lat, lon),
+  ]);
+  const persistedCitizenVerdicts = new Map(
+    persistedCitizenVerdictRows
+      .filter((verdict) => verdict.qualificationStatus != null)
+      .map((verdict) => [verdict.stationId, verdict] as const),
+  );
+  const physicalStations = getPhysicalActiveStations(ranked);
+  const localSynthesisStations = composeLocalSynthesisSources({
+    physicalStations,
+    citizenStations,
+    activation,
+    verdictByStationId: persistedCitizenVerdicts,
+  });
+  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation };
+}
+
 export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), selectionUpdatedAt?: Date | string, sourceLabel?: string, sourceComputedAt?: Date | string | null) {
   const hourNumber = Number(currentHour);
   const updatedAt = selectionUpdatedAt == null ? new Date() : new Date(selectionUpdatedAt);
@@ -149,8 +204,8 @@ function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
   if (!record) return null;
   if (record.trace) return record.trace;
 
-  // Les snapshots précédant la traçabilité v1 contiennent déjà les poids finaux
-  // par service. On les expose sans inventer les facteurs intermédiaires.
+  // Les snapshots prÃ©cÃ©dant la traÃ§abilitÃ© v1 contiennent dÃ©jÃ  les poids finaux
+  // par service. On les expose sans inventer les facteurs intermÃ©diaires.
   const weightByService = record.weightByService && typeof record.weightByService === "object"
     ? record.weightByService as Record<string, any>
     : record;
@@ -175,7 +230,7 @@ function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
     return {
       version: 0,
       issuedAt: computedAt?.toISOString?.() ?? null,
-      method: "Fusion officielle — archive de pondérations globales",
+      method: "Fusion officielle â archive de pondÃ©rations globales",
       sourceCount: globalSources.length,
       parameterSources: {
         temperature: globalSources,
@@ -203,7 +258,7 @@ function getPersistedForecastTrace(weights: unknown, computedAt?: Date | null) {
   return {
     version: 0,
     issuedAt: computedAt?.toISOString?.() ?? null,
-    method: "Fusion officielle — archive de pondérations",
+    method: "Fusion officielle â archive de pondÃ©rations",
     sourceCount: parameterServices.length,
     parameterSources: {
       temperature: parameterSources("tempWeight"),
@@ -220,7 +275,7 @@ const detailedForecastInputSchema = z.object({
   includeExtendedPeriods: z.boolean().optional(),
 }).refine(
   ({ lat, lon }) => (lat === undefined) === (lon === undefined),
-  { message: "Les coordonnées latitude et longitude doivent être fournies ensemble." },
+  { message: "Les coordonnÃ©es latitude et longitude doivent Ãªtre fournies ensemble." },
 );
 
 export const weatherRouter = router({
@@ -231,7 +286,7 @@ export const weatherRouter = router({
       input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : HONDEGHEM,
     )),
 
-  /** Catalogue descriptif des régimes : il n’altère jamais le régime détecté. */
+  /** Catalogue descriptif des rÃ©gimes : il nâaltÃ¨re jamais le rÃ©gime dÃ©tectÃ©. */
   getRegimeCatalogue: publicProcedure.query(() => (
     Object.entries(EXTENDED_REGIME_INFO).map(([id, info]) => ({
       id,
@@ -256,8 +311,8 @@ export const weatherRouter = router({
     const today = getTodayParis();
     const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
 
-    // Snapshot, observation et prévision horaire actualisée sont comparés par
-    // le sélecteur partagé.
+    // Snapshot, observation et prÃ©vision horaire actualisÃ©e sont comparÃ©s par
+    // le sÃ©lecteur partagÃ©.
     const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
     const [meteoAI, observation, officialSnapshot] = await Promise.all([
       getMeteoAIForecastByDate(today, locKey),
@@ -277,7 +332,7 @@ export const weatherRouter = router({
       ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
       : null;
 
-    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly, getParisHour(), new Date(officialSnapshot.computedAt), "Prévision horaire officielle · 7 modèles", officialSnapshot.hourlyComputedAt));
+    const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(hourly, getParisHour(), new Date(officialSnapshot.computedAt), "PrÃ©vision horaire officielle Â· 7 modÃ¨les", officialSnapshot.hourlyComputedAt));
     const trace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
     const modelIndicator = buildModelIndicator(trace);
 
@@ -329,7 +384,7 @@ export const weatherRouter = router({
     };
   }),
 
-  /** Snapshots successifs pouvant être comparés dans la vue des pondérations. */
+  /** Snapshots successifs pouvant Ãªtre comparÃ©s dans la vue des pondÃ©rations. */
   getWeightTraceHistory: publicProcedure
     .input(z.object({ lat: latitudeSchema.optional(), lon: longitudeSchema.optional(), limit: z.number().min(2).max(60).optional() }).optional())
     .query(async ({ input }) => {
@@ -345,7 +400,7 @@ export const weatherRouter = router({
         .filter((snapshot) => snapshot.trace != null);
     }),
 
-  /** Série horaire vérifiable pour le graphique local/officiel du Dashboard. */
+  /** SÃ©rie horaire vÃ©rifiable pour le graphique local/officiel du Dashboard. */
   getLocalOfficialDeltaHistory: publicProcedure
     .input(requiredCoordinatesSchema)
     .query(async ({ input }) => {
@@ -387,7 +442,7 @@ export const weatherRouter = router({
       return buildLocalOfficialDeltaHistory(readings, officialHourlyTemperatures);
     }),
 
-  /** Écarts de poids, source par source, entre deux snapshots du même lieu. */
+  /** Ãcarts de poids, source par source, entre deux snapshots du mÃªme lieu. */
   compareWeightSnapshots: publicProcedure
     .input(z.object({
       lat: latitudeSchema.optional(),
@@ -465,10 +520,10 @@ export const weatherRouter = router({
     };
 
     // Determine impact level per parameter based on regime weights
-    const getImpact = (weight: number): "Faible" | "Modéré" | "Élevé" | "Critique" => {
+    const getImpact = (weight: number): "Faible" | "ModÃ©rÃ©" | "ÃlevÃ©" | "Critique" => {
       if (weight >= 0.30) return "Critique";
-      if (weight >= 0.20) return "Élevé";
-      if (weight >= 0.12) return "Modéré";
+      if (weight >= 0.20) return "ÃlevÃ©";
+      if (weight >= 0.12) return "ModÃ©rÃ©";
       return "Faible";
     };
 
@@ -483,16 +538,16 @@ export const weatherRouter = router({
 
     // Key factors of the moment (top 5 based on current conditions)
     const keyFactors: Array<{ label: string; icon: string }> = [];
-    if (currentParams.cloudCover != null && currentParams.cloudCover > 70) keyFactors.push({ label: "Haute couverture nuageuse", icon: "☁️" });
-    if (currentParams.humidity != null && currentParams.humidity > 75) keyFactors.push({ label: "Humidité élevée", icon: "💧" });
-    if (currentParams.pressure != null && currentParams.pressure >= 1010 && currentParams.pressure <= 1020) keyFactors.push({ label: "Pression stable", icon: "🌀" });
-    if (currentParams.precipitation != null && currentParams.precipitation > 0.5) keyFactors.push({ label: "Averses possibles", icon: "🌧️" });
-    if (currentParams.windSpeed != null && currentParams.windSpeed > 15 && currentParams.windSpeed <= 40) keyFactors.push({ label: `Vent modéré`, icon: "💨" });
-    if (currentParams.windSpeed != null && currentParams.windSpeed > 40) keyFactors.push({ label: "Vent fort", icon: "🌬️" });
-    if (currentParams.temperature != null && currentParams.temperature > 30) keyFactors.push({ label: "Forte chaleur", icon: "🌡️" });
-    if (currentParams.temperature != null && currentParams.temperature < 5) keyFactors.push({ label: "Froid marqué", icon: "❄️" });
-    if (currentParams.cloudCover != null && currentParams.cloudCover < 30) keyFactors.push({ label: "Ciel dégagé", icon: "☀️" });
-    if (currentParams.pressure != null && currentParams.pressure < 1005) keyFactors.push({ label: "Dépression active", icon: "🌀" });
+    if (currentParams.cloudCover != null && currentParams.cloudCover > 70) keyFactors.push({ label: "Haute couverture nuageuse", icon: "âï¸" });
+    if (currentParams.humidity != null && currentParams.humidity > 75) keyFactors.push({ label: "HumiditÃ© Ã©levÃ©e", icon: "ð§" });
+    if (currentParams.pressure != null && currentParams.pressure >= 1010 && currentParams.pressure <= 1020) keyFactors.push({ label: "Pression stable", icon: "ð" });
+    if (currentParams.precipitation != null && currentParams.precipitation > 0.5) keyFactors.push({ label: "Averses possibles", icon: "ð§ï¸" });
+    if (currentParams.windSpeed != null && currentParams.windSpeed > 15 && currentParams.windSpeed <= 40) keyFactors.push({ label: `Vent modÃ©rÃ©`, icon: "ð¨" });
+    if (currentParams.windSpeed != null && currentParams.windSpeed > 40) keyFactors.push({ label: "Vent fort", icon: "ð¬ï¸" });
+    if (currentParams.temperature != null && currentParams.temperature > 30) keyFactors.push({ label: "Forte chaleur", icon: "ð¡ï¸" });
+    if (currentParams.temperature != null && currentParams.temperature < 5) keyFactors.push({ label: "Froid marquÃ©", icon: "âï¸" });
+    if (currentParams.cloudCover != null && currentParams.cloudCover < 30) keyFactors.push({ label: "Ciel dÃ©gagÃ©", icon: "âï¸" });
+    if (currentParams.pressure != null && currentParams.pressure < 1005) keyFactors.push({ label: "DÃ©pression active", icon: "ð" });
     // Keep top 5
     const topFactors = keyFactors.slice(0, 5);
 
@@ -689,10 +744,10 @@ export const weatherRouter = router({
       return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting } };
     }),
 
-  /** Comparaison manuelle AROME en lecture seule, limitée à Hondeghem et sans effet sur la production. */
+  /** Comparaison manuelle AROME en lecture seule, limitÃ©e Ã  Hondeghem et sans effet sur la production. */
   compareHondeghemAromeShadow: adminProcedure
     .mutation(async () => runHondeghemAromeShadowComparison()),
-  /** Vérification au clic des candidats DD(10 m) du catalogue WCS; aucun raster ni run Single Runs n’est téléchargé. */
+  /** VÃ©rification au clic des candidats DD(10 m) du catalogue WCS; aucun raster ni run Single Runs nâest tÃ©lÃ©chargÃ©. */
   verifyHondeghemAromeWindDirection: adminProcedure
     .mutation(async () => verifyHondeghemAromeWindDirectionAvailability()),
   /** OpenWeather est un comparateur shadow manuel; il ne participe pas au moteur et ne persiste rien. */
@@ -716,7 +771,7 @@ export const weatherRouter = router({
       officialHours: input.officialHours,
     })),
 
-  /** Provenance commune : horaires, repli quotidien réel ou indisponibilité explicite. */
+  /** Provenance commune : horaires, repli quotidien rÃ©el ou indisponibilitÃ© explicite. */
   getForecastProvenance: publicProcedure
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
@@ -737,7 +792,7 @@ export const weatherRouter = router({
       return buildWeatherProvenance(snapshot, dailyFallback);
     }),
 
-  /** Bilan des lots planifiés favoris, distinct des snapshots des stations physiques. */
+  /** Bilan des lots planifiÃ©s favoris, distinct des snapshots des stations physiques. */
   getForecastCollectionReport: publicProcedure
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
@@ -801,7 +856,7 @@ export const weatherRouter = router({
       const cadence = getFavoritesForecastCadence();
       const activeForecastHours = getActiveParisForecastHours();
       const scheduleLabel = getFavoritesForecastScheduleLabel();
-      // Le dernier état de couverture par modèle vient du snapshot spécifique
+      // Le dernier Ã©tat de couverture par modÃ¨le vient du snapshot spÃ©cifique
       // au lieu; les nouveaux jobs gardent aussi leurs compteurs propres au lot.
       const lastForecastCoverage = recentCollections.find((collection) => collection.status !== "failed") ?? null;
       const lastPhysicalCollection = physicalTraces.find((trace) => trace.status !== "failed") ?? null;
@@ -843,8 +898,8 @@ export const weatherRouter = router({
         requiredHeartbeatCronUtc: cadence === "every-4-hours" ? getRequiredFavoritesForecastHeartbeatCron() : null,
         scheduleManagedExternally: true,
         scheduleCoverage: cadence === "every-4-hours"
-          ? `Mode applicatif 4 h actif : ${scheduleLabel} heure de Paris. Le Heartbeat externe doit utiliser ${getRequiredFavoritesForecastHeartbeatCron()} UTC et être mis à jour séparément; son état live n’est pas vérifiable depuis ce dépôt. Les appels hors créneaux parisiens autorisés sont ignorés.`
-          : "Override explicite en mode quotidien 05:00 Europe/Paris. Le Heartbeat est configuré hors dépôt; retirer cet override et utiliser la cadence UTC documentée après déploiement pour activer les six créneaux.",
+          ? `Mode applicatif 4 h actif : ${scheduleLabel} heure de Paris. Le Heartbeat externe doit utiliser ${getRequiredFavoritesForecastHeartbeatCron()} UTC et Ãªtre mis Ã  jour sÃ©parÃ©ment; son Ã©tat live nâest pas vÃ©rifiable depuis ce dÃ©pÃ´t. Les appels hors crÃ©neaux parisiens autorisÃ©s sont ignorÃ©s.`
+          : "Override explicite en mode quotidien 05:00 Europe/Paris. Le Heartbeat est configurÃ© hors dÃ©pÃ´t; retirer cet override et utiliser la cadence UTC documentÃ©e aprÃ¨s dÃ©ploiement pour activer les six crÃ©neaux.",
         lastForecastRun: latestForecastJob ? {
           status: latestForecastJob.status,
           startedAt: latestForecastJob.startedAt,
@@ -917,7 +972,7 @@ export const weatherRouter = router({
         })),
         flowStatuses,
         bestMatchReference: {
-          model: "Open-Meteo · Best Match",
+          model: "Open-Meteo Â· Best Match",
           daily: bestMatchDailyAudit,
           hourly: bestMatchAudit ? {
             status: bestMatchAudit.status,
@@ -959,10 +1014,10 @@ export const weatherRouter = router({
       };
     }),
 
-  /** Historique filtrable des comparaisons physiques de production, protégé dans son sous-routeur. */
+  /** Historique filtrable des comparaisons physiques de production, protÃ©gÃ© dans son sous-routeur. */
   dailyPhysicalComparisons: dailyPhysicalComparisonsRouter,
 
-  /** Rapports administrateur des nowcastings locaux, indépendants de P1–P8. */
+  /** Rapports administrateur des nowcastings locaux, indÃ©pendants de P1âP8. */
   getLocalNowcastingReports: adminProcedure
     .input(z.object({
       lat: latitudeSchema.optional(),
@@ -980,16 +1035,16 @@ export const weatherRouter = router({
       };
     }),
 
-  /** Diagnostics éphémères des appels fournisseurs, sans persistance en base. */
+  /** Diagnostics Ã©phÃ©mÃ¨res des appels fournisseurs, sans persistance en base. */
   getProviderDiagnostics: publicProcedure
     .query(() => getWeatherProviderDiagnostics()),
 
-  /** Qualité de l’air et éphémérides réelles pour le lieu actif. */
+  /** QualitÃ© de lâair et Ã©phÃ©mÃ©rides rÃ©elles pour le lieu actif. */
   getEnvironmentalSnapshot: publicProcedure
     .input(requiredCoordinatesSchema)
     .query(({ input }) => getEnvironmentalSnapshot({ lat: input.lat, lon: input.lon })),
 
-  /** Coordonnées apparentes actualisées des astres pour l'arche Soleil & Lune. */
+  /** CoordonnÃ©es apparentes actualisÃ©es des astres pour l'arche Soleil & Lune. */
   getApparentAstronomyPosition: publicProcedure
     .input(requiredCoordinatesSchema)
     .query(({ input }) => getApparentAstronomyPosition({ lat: input.lat, lon: input.lon })),
@@ -999,7 +1054,7 @@ export const weatherRouter = router({
     .input(requiredCoordinatesSchema)
     .query(({ input }) => getTerrainHorizonProfile({ lat: input.lat, lon: input.lon })),
 
-  /** Circonstances calculées pour une position choisie sur la carte d’éclipse. */
+  /** Circonstances calculÃ©es pour une position choisie sur la carte dâÃ©clipse. */
   getEclipseCircumstances: publicProcedure
     .input(z.object({
       eventId: z.enum(["lunar_partial_2026_08_28", "solar_partial_2027_08_02"]),
@@ -1039,7 +1094,7 @@ export const weatherRouter = router({
         }),
       });
       const officialHours = snapshot.hourly;
-      // Historical weighting traces remain available in Prévisions. They are
+      // Historical weighting traces remain available in PrÃ©visions. They are
       // not rendered in Dashboard, where omitting them removes several MB from
       // the mobile response without changing forecasts or model agreement.
       const hours = includeExtendedPeriods
@@ -1052,7 +1107,7 @@ export const weatherRouter = router({
       const dailyFallback = hours.length === 0
         ? buildDatedDailyFusionFallback(dailyFallbackSource, dailyFallbackTrace?.precipitationConsensus ?? null)
         : null;
-      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(officialHours, getParisHour(), new Date(snapshot.computedAt), "Prévision horaire officielle · 7 modèles", snapshot.hourlyComputedAt));
+      const officialRegime = buildOperationalRegime(meteoAI, observation, getCurrentHourlyRegimeInput(officialHours, getParisHour(), new Date(snapshot.computedAt), "PrÃ©vision horaire officielle Â· 7 modÃ¨les", snapshot.hourlyComputedAt));
       const activeForecast = officialHours[findActiveHourlyForecastIndex(officialHours, new Date(snapshot.computedAt).getTime())];
       const nextRegimeChange = officialRegime.primary
         ? findNextHourlyRegimeChange(officialHours, `${getParisHour()}:00`, officialRegime.primary.id, activeForecast?.validAt)
@@ -1092,7 +1147,7 @@ export const weatherRouter = router({
           : {
               available: false,
               issuedAt: meteoAI?.computedAt?.toISOString?.() ?? null,
-              message: "La traçabilité détaillée sera disponible après la prochaine collecte officielle.",
+              message: "La traÃ§abilitÃ© dÃ©taillÃ©e sera disponible aprÃ¨s la prochaine collecte officielle.",
             },
       };
     }),
@@ -1159,8 +1214,8 @@ export const weatherRouter = router({
           stabilityLabel: legacyStabilityLabelForStorage(expertData),
           weights: { version: 2, weightByService: meteoAI.weights, trace: meteoAI.trace } as any,
           explanation: meteoAI.coreCalibrationComplete
-            ? "Prévision calibrée à partir de preuves physiques récentes par modèle, variable et horizon."
-            : `${meteoAI.methodNote} Les valeurs réellement disponibles restent publiées avec leur statut robuste ou partiellement calibré; seule une absence de donnée bloque un champ.`,
+            ? "PrÃ©vision calibrÃ©e Ã  partir de preuves physiques rÃ©centes par modÃ¨le, variable et horizon."
+            : `${meteoAI.methodNote} Les valeurs rÃ©ellement disponibles restent publiÃ©es avec leur statut robuste ou partiellement calibrÃ©; seule une absence de donnÃ©e bloque un champ.`,
         });
         const fusionAvailableAt = Date.now();
         const fusionArchive = buildMeteoAIDailyFusionArchiveRun({
@@ -1194,7 +1249,7 @@ export const weatherRouter = router({
         });
 
         if (!isOperationalObservation(obsData)) {
-          return { success: true, date: targetDate, scoreSkipped: true, reason: "Référence de modèle archivée : aucune observation physique qualifiée disponible" };
+          return { success: true, date: targetDate, scoreSkipped: true, reason: "RÃ©fÃ©rence de modÃ¨le archivÃ©e : aucune observation physique qualifiÃ©e disponible" };
         }
 
         // Compute reliability scores
@@ -1236,20 +1291,20 @@ export const weatherRouter = router({
               conditionAccuracy: score.conditionAccuracy,
               weightedScore: score.weightedScore,
               regime: score.regime,
-              // 🌡️ Temperature dimension
+              // ð¡ï¸ Temperature dimension
               tempScore: d.temperature.score,
               tempMaxError: d.temperature.maxError,
-              // 🌧️ Precipitation dimension
+              // ð§ï¸ Precipitation dimension
               precipScore: d.precipitation.score,
               precipPod: d.precipitation.pod,
               precipFar: d.precipitation.far,
               precipCsi: d.precipitation.csi,
               precipFalsePositives: d.precipitation.falsePositives,
               precipFalseNegatives: d.precipitation.falseNegatives,
-              // 💨 Wind dimension
+              // ð¨ Wind dimension
               windScore: d.wind.score,
               windMaeGusts: d.wind.maeGusts,
-              // ☁️ Condition dimension
+              // âï¸ Condition dimension
               condScore: d.condition.score,
               condConcordance: d.condition.concordance,
               condMaeCloud: d.condition.maeCloudCover,
@@ -1269,7 +1324,7 @@ export const weatherRouter = router({
     return getRecentCollectionJobs(20);
   }),
 
-  /** Relance ponctuelle réservée à l’utilisateur propriétaire du lieu favori. */
+  /** Relance ponctuelle rÃ©servÃ©e Ã  lâutilisateur propriÃ©taire du lieu favori. */
   refreshManualFusion: protectedProcedure
     .input(z.object({ favoriteId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
@@ -1278,7 +1333,7 @@ export const weatherRouter = router({
       return refreshManualFusionForFavorite(favorite);
     }),
 
-  /** Relance ponctuelle et additive des relevés physiques du lieu possédé par l’utilisateur. */
+  /** Relance ponctuelle et additive des relevÃ©s physiques du lieu possÃ©dÃ© par lâutilisateur. */
   refreshPhysicalStationSnapshots: protectedProcedure
     .input(z.object({ favoriteId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
@@ -1297,7 +1352,7 @@ export const weatherRouter = router({
     }),
 
   /**
-   * Weather AI Lab — full transparency data for the AI Lab page
+   * Weather AI Lab â full transparency data for the AI Lab page
    */
   getAILab: publicProcedure
     .input(optionalCoordinatesSchema.optional())
@@ -1331,19 +1386,19 @@ export const weatherRouter = router({
       : (locationKey ? await getForecastsByDate(today, locationKey) : await getForecastsByDate(today));
     const jobs = await getRecentCollectionJobs(5);
 
-    // 1. Régime opérationnel partagé avec le Dashboard. Une observation ne peut
-    // remplacer la fusion officielle que si elle est plus récente, fraîche et
-    // couvre notamment la nébulosité.
+    // 1. RÃ©gime opÃ©rationnel partagÃ© avec le Dashboard. Une observation ne peut
+    // remplacer la fusion officielle que si elle est plus rÃ©cente, fraÃ®che et
+    // couvre notamment la nÃ©bulositÃ©.
     const officialSnapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
     const liveHours = officialSnapshot.hourly;
-    const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours, getParisHour(), new Date(officialSnapshot.computedAt), "Prévision horaire officielle · 7 modèles", officialSnapshot.hourlyComputedAt));
+    const operationalRegime = buildOperationalRegime(currentMeteoAI, observation, getCurrentHourlyRegimeInput(liveHours, getParisHour(), new Date(officialSnapshot.computedAt), "PrÃ©vision horaire officielle Â· 7 modÃ¨les", officialSnapshot.hourlyComputedAt));
     const regime = operationalRegime.primary?.id ?? null;
     const regimeDef = operationalRegime.primary;
     const weights = operationalRegime.blendedWeights;
 
-    // La trace persistée est la source de vérité des modèles réellement
-    // contributeurs. Les prévisions archivées ne sont pas présentées comme
-    // appliquées si elles n'apparaissent pas dans cette trace.
+    // La trace persistÃ©e est la source de vÃ©ritÃ© des modÃ¨les rÃ©ellement
+    // contributeurs. Les prÃ©visions archivÃ©es ne sont pas prÃ©sentÃ©es comme
+    // appliquÃ©es si elles n'apparaissent pas dans cette trace.
     const officialForecastNames = new Set<string>(OFFICIAL_HOURLY_MODELS.map((model) => model.name));
     const persistedTrace = getPersistedForecastTrace(meteoAI?.weights, meteoAI?.computedAt);
     const trace = filterForecastTraceToModelNames(persistedTrace, officialForecastNames);
@@ -1353,7 +1408,7 @@ export const weatherRouter = router({
       && (contributingNames.size === 0 || contributingNames.has(forecast.serviceName)));
     const modelIndicator = buildModelIndicator(trace);
 
-    // Détails des prévisions quotidiennes persistées.
+    // DÃ©tails des prÃ©visions quotidiennes persistÃ©es.
     const allServicesList = WEATHER_SERVICES.expert;
     const modelDetails = appliedForecasts.map(f => {
       const service = allServicesList.find((s: { name: string }) => s.name === f.serviceName);
@@ -1371,8 +1426,8 @@ export const weatherRouter = router({
       };
     });
 
-    // L'accord décrit la dispersion des modèles indépendants reçus. Best Match
-    // et les autres agrégateurs sont exclus; une valeur absente ne devient pas 0.
+    // L'accord dÃ©crit la dispersion des modÃ¨les indÃ©pendants reÃ§us. Best Match
+    // et les autres agrÃ©gateurs sont exclus; une valeur absente ne devient pas 0.
     const independentModelNames = WEATHER_SERVICES.expert
       .filter((model) => model.modelId !== "best_match")
       .map((model) => model.name);
@@ -1408,32 +1463,32 @@ export const weatherRouter = router({
     const aggregatorCount = activeForecasts.some((forecast) => forecast.serviceName === "Open-Meteo") ? 1 : 0;
     const namedModelCount = Math.max(0, activeForecasts.length - aggregatorCount);
     const sourceComposition = aggregatorCount > 0
-      ? `${namedModelCount} modèle(s) numérique(s) + 1 agrégateur Best Match`
-      : `${namedModelCount} modèle(s) numérique(s)`;
+      ? `${namedModelCount} modÃ¨le(s) numÃ©rique(s) + 1 agrÃ©gateur Best Match`
+      : `${namedModelCount} modÃ¨le(s) numÃ©rique(s)`;
     const aiAnalysis = [
-      `MeteoAI synthétise ${sourceComposition} pour ${formatAILabLocationLabel(coords)}.`,
+      `MeteoAI synthÃ©tise ${sourceComposition} pour ${formatAILabLocationLabel(coords)}.`,
       modelAgreement.tempMax.range == null
-        ? `Dispersion Tmax indisponible : ${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} modèles nommés ont une valeur exploitable (au moins deux sont nécessaires pour une étendue).`
-        : `L’étendue Tmax entre modèles nommés est de ${modelAgreement.tempMax.range.toFixed(1)} °C (${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} disponibles).`,
+        ? `Dispersion Tmax indisponible : ${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} modÃ¨les nommÃ©s ont une valeur exploitable (au moins deux sont nÃ©cessaires pour une Ã©tendue).`
+        : `LâÃ©tendue Tmax entre modÃ¨les nommÃ©s est de ${modelAgreement.tempMax.range.toFixed(1)} Â°C (${modelAgreement.tempMax.availableModelCount}/${modelAgreement.expectedModelCount} disponibles).`,
       regimeDef && weights
-        ? `Le régime détecté est "${regimeDef.label}" ${regimeDef.emoji} — les précipitations sont pondérées à ${Math.round(weights.precip * 100)}%, la température à ${Math.round(weights.temp * 100)}%.`
-        : "Régime indisponible : des champs météo requis sont absents ou invalides; aucune pondération de régime n’est affichée.",
-      "La fiabilité historique reste une mesure distincte, disponible uniquement par modèle, variable et horizon lorsque les preuves qualifiées atteignent leurs seuils.",
+        ? `Le rÃ©gime dÃ©tectÃ© est "${regimeDef.label}" ${regimeDef.emoji} â les prÃ©cipitations sont pondÃ©rÃ©es Ã  ${Math.round(weights.precip * 100)}%, la tempÃ©rature Ã  ${Math.round(weights.temp * 100)}%.`
+        : "RÃ©gime indisponible : des champs mÃ©tÃ©o requis sont absents ou invalides; aucune pondÃ©ration de rÃ©gime nâest affichÃ©e.",
+      "La fiabilitÃ© historique reste une mesure distincte, disponible uniquement par modÃ¨le, variable et horizon lorsque les preuves qualifiÃ©es atteignent leurs seuils.",
     ].join(" ");
 
     const officialPrecipitationSummary = meteoAI?.precipitation == null
       ? "indisponibles"
       : `${meteoAI.precipitation} mm`;
 
-    // 9. Replay steps (7 étapes de la synthèse IA)
+    // 9. Replay steps (7 Ã©tapes de la synthÃ¨se IA)
     const replaySteps = [
-      { step: 1, title: "Collecte des flux", description: `${activeForecasts.length} flux collectés lors du dernier batch planifié via Open-Meteo API (${sourceComposition})`, icon: "📡" },
-      { step: 2, title: "Détection du régime", description: regimeDef && weights ? `Régime "${regimeDef.label}" détecté — poids contextuels appliqués` : "Données requises absentes ou invalides — régime et poids non calculés", icon: "🔍" },
-      { step: 3, title: "Mesures par variable", description: "Les étendues restent en unités physiques et chaque effectif est indiqué séparément.", icon: "📐" },
-      { step: 4, title: "Pondération de fusion", description: "Les poids du régime sont des paramètres de calcul, pas une probabilité ni une note de fiabilité.", icon: "⚖️" },
-      { step: 5, title: "Accord inter-modèles", description: modelAgreement.tempMax.range == null ? "Étendue Tmax indisponible : effectif inférieur à deux ou valeurs manquantes." : `Étendue Tmax : ${modelAgreement.tempMax.range.toFixed(1)} °C (${modelAgreement.tempMax.availableModelCount} modèles).`, icon: "📊" },
-      { step: 6, title: "Synthèse MeteoAI", description: `Prévision finale : ${meteoAI?.tempMax ?? "—"}°C max, ${meteoAI?.tempMin ?? "—"}°C min, ${officialPrecipitationSummary}`, icon: "🤖" },
-      { step: 7, title: "Fiabilité historique", description: "Aucun score global : MAE, RMSE, biais, effectifs et récence doivent rester séparés par modèle × variable × horizon.", icon: "✅" },
+      { step: 1, title: "Collecte des flux", description: `${activeForecasts.length} flux collectÃ©s lors du dernier batch planifiÃ© via Open-Meteo API (${sourceComposition})`, icon: "ð¡" },
+      { step: 2, title: "DÃ©tection du rÃ©gime", description: regimeDef && weights ? `RÃ©gime "${regimeDef.label}" dÃ©tectÃ© â poids contextuels appliquÃ©s` : "DonnÃ©es requises absentes ou invalides â rÃ©gime et poids non calculÃ©s", icon: "ð" },
+      { step: 3, title: "Mesures par variable", description: "Les Ã©tendues restent en unitÃ©s physiques et chaque effectif est indiquÃ© sÃ©parÃ©ment.", icon: "ð" },
+      { step: 4, title: "PondÃ©ration de fusion", description: "Les poids du rÃ©gime sont des paramÃ¨tres de calcul, pas une probabilitÃ© ni une note de fiabilitÃ©.", icon: "âï¸" },
+      { step: 5, title: "Accord inter-modÃ¨les", description: modelAgreement.tempMax.range == null ? "Ãtendue Tmax indisponible : effectif infÃ©rieur Ã  deux ou valeurs manquantes." : `Ãtendue Tmax : ${modelAgreement.tempMax.range.toFixed(1)} Â°C (${modelAgreement.tempMax.availableModelCount} modÃ¨les).`, icon: "ð" },
+      { step: 6, title: "SynthÃ¨se MeteoAI", description: `PrÃ©vision finale : ${meteoAI?.tempMax ?? "â"}Â°C max, ${meteoAI?.tempMin ?? "â"}Â°C min, ${officialPrecipitationSummary}`, icon: "ð¤" },
+      { step: 7, title: "FiabilitÃ© historique", description: "Aucun score global : MAE, RMSE, biais, effectifs et rÃ©cence doivent rester sÃ©parÃ©s par modÃ¨le Ã variable Ã horizon.", icon: "â" },
     ];
 
     // 10. Sources with freshness info
@@ -1441,10 +1496,10 @@ export const weatherRouter = router({
     const lastObsJob = jobs.find(j => j.jobType === "observation");
 
     const sources = [
-      { name: "Open-Meteo API", type: "7 modèles + 1 agrégateur", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modèle", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Flux de prévision, pas observations" },
-      { name: "Modèles en validation", type: "Prévisions candidates", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "Collecte quotidienne", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
-      { name: "Stations physiques", type: "Observations locales", models: [], updateFrequency: "Selon la dernière collecte", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Netatmo actif ; autres sources seulement si réellement collectées" },
-      { name: "Preuves de fiabilité", type: "Comparaisons qualifiées", models: [], updateFrequency: "Après observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Métriques brutes séparées; statut indisponible tant que le seuil propre au modèle, à la variable et à l’horizon n’est pas atteint" },
+      { name: "Open-Meteo API", type: "7 modÃ¨les + 1 agrÃ©gateur", models: WEATHER_SERVICES.expert.map((model) => model.name), updateFrequency: "Selon le modÃ¨le", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Flux de prÃ©vision, pas observations" },
+      { name: "ModÃ¨les en validation", type: "PrÃ©visions candidates", models: VALIDATION_WEATHER_MODELS.map((model) => model.name), updateFrequency: "Collecte quotidienne", lastSync: lastForecastJob?.startedAt ? new Date(lastForecastJob.startedAt).toISOString() : null, quality: "Hors fusion officielle" },
+      { name: "Stations physiques", type: "Observations locales", models: [], updateFrequency: "Selon la derniÃ¨re collecte", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "Netatmo actif ; autres sources seulement si rÃ©ellement collectÃ©es" },
+      { name: "Preuves de fiabilitÃ©", type: "Comparaisons qualifiÃ©es", models: [], updateFrequency: "AprÃ¨s observation physique", lastSync: lastObsJob?.startedAt ? new Date(lastObsJob.startedAt).toISOString() : null, quality: "MÃ©triques brutes sÃ©parÃ©es; statut indisponible tant que le seuil propre au modÃ¨le, Ã  la variable et Ã  lâhorizon nâest pas atteint" },
     ];
     const latestStationCollection = (await getStationCollectionSnapshots(locationKey ?? "default", 1))[0] ?? null;
     const activeModelNames = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
@@ -1491,7 +1546,7 @@ export const weatherRouter = router({
       replaySteps,
       sources,
       forecastComparison: buildAILabForecastComparisonReadModel(officialSnapshot, coords ?? HONDEGHEM),
-      engineVersion: "MeteoAI v2.0 — Multi-Dimension",
+      engineVersion: "MeteoAI v2.0 â Multi-Dimension",
       calculatedAt: meteoAI?.computedAt ?? null,
       snapshotStatus,
       snapshotDate,
@@ -1504,7 +1559,7 @@ export const weatherRouter = router({
     };
   }),
 
-  /** Couverture des observations physiques requise avant tout score qualifié. */
+  /** Couverture des observations physiques requise avant tout score qualifiÃ©. */
   getEvidenceStatus: publicProcedure
     .input(z.object({ lat: latitudeSchema.optional(), lon: longitudeSchema.optional() }))
     .query(async ({ input }) => {
@@ -1516,8 +1571,8 @@ export const weatherRouter = router({
         requiredCoverageHours: 18,
         isEligible: evidence.coverageHours >= 18,
         evidenceTimeZone: "Europe/Paris",
-        snapshotCadence: "Chaque heure à :20 UTC",
-        dailyScoringSchedule: "22:30 UTC, sur la journée Europe/Paris précédente",
+        snapshotCadence: "Chaque heure Ã  :20 UTC",
+        dailyScoringSchedule: "22:30 UTC, sur la journÃ©e Europe/Paris prÃ©cÃ©dente",
       };
     }),
 
@@ -1545,27 +1600,19 @@ export const weatherRouter = router({
       ]);
       const stations = stationCollection.stations;
       const ranked = rankStations(stations);
-      // Un verdict de qualification appliqué demeure : la collecte live marque
-      // toujours les capteurs citoyens « candidate », on surcharge donc ici le
-      // statut et le motif persistés (validated / excluded) — uniquement pour
+      // Un verdict de qualification appliquÃ© demeure : la collecte live marque
+      // toujours les capteurs citoyens Â« candidate Â», on surcharge donc ici le
+      // statut et le motif persistÃ©s (validated / excluded) â uniquement pour
       // les capteurs citoyens openSenseMap et CWOP, sans jamais toucher
       // isActive ni les stations physiques.
-      const citizenStationIds = ranked
-        .filter((station) => station.source === "opensensemap" || station.source === "cwop")
-        .map((station) => station.stationId);
-      const persistedCitizenVerdictRows = citizenStationIds.length > 0
-        ? await getWeatherStationQualificationVerdicts(citizenStationIds)
-        : [];
-      const persistedCitizenVerdicts = new Map(
-        persistedCitizenVerdictRows
-          .filter((verdict) => verdict.qualificationStatus != null)
-          .map((verdict) => [verdict.stationId, verdict] as const),
-      );
-      const physicalStations = getPhysicalActiveStations(ranked);
+      const { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation: citizenFusionActivation } = await loadLocalSynthesisSources(ranked, lat, lon);
       const discoveredPhysicalStations = ranked.filter((station) => getStationSourceKind(station.source, station.stationId) === "physical");
       const excludedPhysicalStations = discoveredPhysicalStations.filter((station) => !station.isActive);
-      // La vérité terrain locale ne repose que sur des observations physiques validées.
-      const ultraResult = calculateUltraLocal(physicalStations, "local", lat, lon, null, null);
+      // Sans décision d'activation persistée, la synthèse locale reste
+      // strictement physique ; avec une décision « activated », seuls les
+      // capteurs citoyens validés y participent, à priorité technique
+      // strictement inchangée.
+      const ultraResult = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null);
       const modelReferences = buildModelReferenceCoherence(
         currentModelReferences,
         physicalStations
@@ -1648,8 +1695,8 @@ export const weatherRouter = router({
             updateFrequencyMin: s.updateFrequencyMin,
             dataAvailability: s.dataAvailability,
             isActive: s.isActive,
-            // Verdict persisté des capteurs citoyens uniquement ; sans ligne
-            // persistée, le statut live (« candidate ») reste la vérité.
+            // Verdict persistÃ© des capteurs citoyens uniquement ; sans ligne
+            // persistÃ©e, le statut live (Â« candidate Â») reste la vÃ©ritÃ©.
             exclusionReason: persistedCitizenVerdict
               ? persistedCitizenVerdict.exclusionReason ?? null
               : s.exclusionReason,
@@ -1659,6 +1706,11 @@ export const weatherRouter = router({
         }),
         modelReferences,
         groundTruth,
+        citizenFusionActivation: citizenFusionActivation ? {
+          status: citizenFusionActivation.status,
+          reason: citizenFusionActivation.reason,
+          evaluatedAt: citizenFusionActivation.evaluatedAt,
+        } : null,
         totalFound: stations.length,
         activeCount: physicalStations.length,
         ignoredCount: stations.filter(s => !s.isActive).length,
@@ -1678,12 +1730,12 @@ export const weatherRouter = router({
 
   /**
    * Preuve de qualification des capteurs citoyens, en lecture seule : pour
-   * chaque capteur openSenseMap/CWOP de la référence, la progression réelle
-   * (comparaisons alignées, jours distincts) et les seuils qui restent à
-   * franchir. La preuve est recalculée depuis l'historique archivé par le même
-   * évaluateur que le chemin planifié, et rien n'est écrit : consulter la
-   * progression ne promeut jamais un capteur. Endpoint séparé de
-   * `searchStations` parce que la lecture parcourt 30 jours d'historique — trop
+   * chaque capteur openSenseMap/CWOP de la rÃ©fÃ©rence, la progression rÃ©elle
+   * (comparaisons alignÃ©es, jours distincts) et les seuils qui restent Ã 
+   * franchir. La preuve est recalculÃ©e depuis l'historique archivÃ© par le mÃªme
+   * Ã©valuateur que le chemin planifiÃ©, et rien n'est Ã©crit : consulter la
+   * progression ne promeut jamais un capteur. Endpoint sÃ©parÃ© de
+   * `searchStations` parce que la lecture parcourt 30 jours d'historique â trop
    * lourd pour le chemin de recherche courant.
    */
   getCitizenQualificationEvidence: publicProcedure
@@ -1705,12 +1757,22 @@ export const weatherRouter = router({
    * locale (plan openSenseMap/CWOP : l'activation dans la fusion est
    * conditionnée par des métriques). La référence mesure l'écart de la
    * synthèse physique à la médiane des stations officielles, avec et sans les
-   * capteurs validés ; la fusion locale n'est jamais modifiée ici.
+   * capteurs validés ; le rapport reste une mesure à blanc, et la décision
+   * d'activation persistée par le cycle planifié est retournée à côté, telle
+   * quelle, jamais recalculée ici.
    */
   getCitizenFusionImpact: publicProcedure
     .input(requiredCoordinatesSchema)
     .query(async ({ input }) => {
-      const validatedCitizens = await getValidatedCitizenStationsNearReference(input.lat, input.lon);
+      const [validatedCitizens, activationRow] = await Promise.all([
+        getValidatedCitizenStationsNearReference(input.lat, input.lon),
+        getCitizenFusionActivationNearReference(input.lat, input.lon),
+      ]);
+      const activation = activationRow ? {
+        status: activationRow.status,
+        reason: activationRow.reason,
+        evaluatedAt: activationRow.evaluatedAt,
+      } : null;
       const toImpactStationRow = (station: {
         stationId: string;
         source: string;
@@ -1730,14 +1792,17 @@ export const weatherRouter = router({
       // Sans capteur validé pour cette référence, rien ne peut être mesuré :
       // la base n'est pas interrogée davantage et aucune valeur n'est inventée.
       if (validatedCitizens.length === 0) {
-        return deriveCitizenFusionImpactReport({
-          referenceLat: input.lat,
-          referenceLon: input.lon,
-          physicalStations: [],
-          validatedCitizens: [],
-          officialStations: [],
-          observations: [],
-        });
+        return {
+          ...deriveCitizenFusionImpactReport({
+            referenceLat: input.lat,
+            referenceLon: input.lon,
+            physicalStations: [],
+            validatedCitizens: [],
+            officialStations: [],
+            observations: [],
+          }),
+          activation,
+        };
       }
 
       const [physicalStations, officialStations] = await Promise.all([
@@ -1760,15 +1825,18 @@ export const weatherRouter = router({
         measurementTimes: observation.measurementTimes ?? null,
         temperature: observation.temperature ?? null,
       }));
-      return deriveCitizenFusionImpactReport({
-        referenceLat: input.lat,
-        referenceLon: input.lon,
-        physicalStations: physicalStations.map(toImpactStationRow),
-        validatedCitizens: validatedCitizens.map(toImpactStationRow),
-        officialStations: officialStations.map(toImpactStationRow),
-        observations: observationRows,
-        asOf,
-      });
+      return {
+        ...deriveCitizenFusionImpactReport({
+          referenceLat: input.lat,
+          referenceLon: input.lon,
+          physicalStations: physicalStations.map(toImpactStationRow),
+          validatedCitizens: validatedCitizens.map(toImpactStationRow),
+          officialStations: officialStations.map(toImpactStationRow),
+          observations: observationRows,
+          asOf,
+        }),
+        activation,
+      };
     }),
 
   /**
@@ -1786,8 +1854,9 @@ export const weatherRouter = router({
 
       const stations = await collectNearbyStations(lat, lon, input.radiusKm);
       const ranked = rankStations(stations);
-      // Unified engine — same as Mode Local in Dashboard
-      const result = calculateUltraLocal(ranked, "local", lat, lon, null, null);
+      // Unified engine â same as Mode Local in Dashboard
+      const { localSynthesisStations } = await loadLocalSynthesisSources(ranked, lat, lon);
+      const result = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null);
       return {
         temperature: result.temperature,
         humidity: result.humidity,
@@ -1848,26 +1917,25 @@ export const weatherRouter = router({
       const stations = await collectNearbyStations(lat, lon, input.radiusKm);
       const station = stations.find(s => s.stationId === input.stationId);
       if (!station) return null;
+      const ranked = rankStations(stations);
+      const { localSynthesisStations } = await loadLocalSynthesisSources(ranked, lat, lon);
+      // Unified engine — same as Mode Local in Dashboard
+      const gt = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null);
+      const used = gt.stationsUsed.find(s => s.stationId === input.stationId);
       return {
         ...station,
-        groundTruthContribution: (() => {
-          const ranked = rankStations(stations);
-          // Unified engine — same as Mode Local in Dashboard
-          const gt = calculateUltraLocal(ranked, "local", lat, lon, null, null);
-          const used = gt.stationsUsed.find(s => s.stationId === input.stationId);
-          return used ? {
-            weight: used.weight,
-            distanceWeight: used.distanceWeight,
-            qualityWeight: used.qualityWeight,
-            freshnessWeight: used.freshnessWeight,
-            altitudeCorrection: gt.altitudeCorrection,
-          } : null;
-        })(),
+        groundTruthContribution: used ? {
+          weight: used.weight,
+          distanceWeight: used.distanceWeight,
+          qualityWeight: used.qualityWeight,
+          freshnessWeight: used.freshnessWeight,
+          altitudeCorrection: gt.altitudeCorrection,
+        } : null,
       };
     }),
 
   /**
-   * Get lead-time scores (MAE/RMSE/biais par échéance) for a location.
+   * Get lead-time scores (MAE/RMSE/biais par Ã©chÃ©ance) for a location.
    * Returns per-service, per-bucket (0-6h, 6-24h, 1-3d, 4-7d, 8-15d) averages.
    */
   getLeadTimeScores: publicProcedure
@@ -2053,10 +2121,11 @@ export const weatherRouter = router({
       if (!sources.available) {
         const empty = buildDailyForecastVerificationReadModel(locationKey, validDate, [], []);
         const reason = sources.reason === "database_unavailable"
-          ? "Base de données indisponible : la comparaison n’est pas calculée."
-          : "Archives de prévision ou de stations indisponibles : aucune métrique n’est estimée.";
+          ? "Base de donnÃ©es indisponible : la comparaison nâest pas calculÃ©e."
+          : "Archives de prÃ©vision ou de stations indisponibles : aucune mÃ©trique nâest estimÃ©e.";
         return { ...empty, reason, meteoai: { ...empty.meteoai, reason } };
       }
       return buildDailyForecastVerificationReadModel(locationKey, validDate, sources.runs, sources.snapshots);
     }),
 });
+

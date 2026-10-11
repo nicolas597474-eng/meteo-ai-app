@@ -62,6 +62,7 @@ import {
   personalWeatherObservations,
   personalModelObservationScores,
   personalModelCalibrations,
+  citizenFusionActivations,
   InsertWeatherStation,
   InsertStationObservation,
   InsertStationQualityProfile,
@@ -72,6 +73,7 @@ import {
   InsertPersonalWeatherObservation,
   InsertPersonalModelObservationScore,
   InsertPersonalModelCalibration,
+  InsertCitizenFusionActivation,
 } from "../drizzle/schema";
 import type { HourlyComparisonDiagnostic } from "./hourlyComparisonDiagnostics";
 import { ENV } from "./_core/env";
@@ -84,6 +86,7 @@ import { HourlyForecastPersistenceError, withHourlyForecastPersistenceStages } f
 import { aggregateDailyForecastPerformance, getDailyForecastHorizon } from "./dailyForecastPerformance";
 import { buildDailyForecastObservationComparisonRevision } from "./dailyForecastComparisonRevisions";
 import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
+import { CITIZEN_FUSION_ACTIVATION_REASON_MAX_LENGTH } from "./citizenFusionActivationService";
 import type { DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
 import {
   buildDailyPhysicalComparisonHistoryPage,
@@ -120,7 +123,7 @@ export async function getDb() {
   return _db;
 }
 
-// ─── USER HELPERS ───────────────────────────────────────────────────────────
+// âââ USER HELPERS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
@@ -193,21 +196,21 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// ─── FORECAST HELPERS ───────────────────────────────────────────────────────
+// âââ FORECAST HELPERS âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-// ─── LOCATION KEY HELPERS ──────────────────────────────────────────────────
+// âââ LOCATION KEY HELPERS ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-/** Make a stable location key from lat/lon (3dp precision ≈ 111m). */
+/** Make a stable location key from lat/lon (3dp precision â 111m). */
 export function makeLocationKey(lat: number, lon: number): string {
   const latR = Math.round(lat * 1000) / 1000;
   const lonR = Math.round(lon * 1000) / 1000;
   return `${latR}_${lonR}`;
 }
 
-// ─── FORECAST HELPERS ───────────────────────────────────────────────────────
+// âââ FORECAST HELPERS âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export function requireDatabaseForWrite(db: unknown, operation: string): asserts db {
-  if (!db) throw new Error(`Base de données indisponible : impossible de ${operation}.`);
+  if (!db) throw new Error(`Base de donnÃ©es indisponible : impossible de ${operation}.`);
 }
 
 export async function insertForecasts(
@@ -216,7 +219,7 @@ export async function insertForecasts(
 ): Promise<void> {
   const db = await getDb();
   if (!db) {
-    if (options.requireDatabase) requireDatabaseForWrite(db, "enregistrer les prévisions quotidiennes");
+    if (options.requireDatabase) requireDatabaseForWrite(db, "enregistrer les prÃ©visions quotidiennes");
     return;
   }
   if (data.length === 0) return;
@@ -236,7 +239,7 @@ export async function insertForecastRuns(
 ): Promise<number> {
   const db = await getDb();
   if (!db) {
-    if (options.requireDatabase) requireDatabaseForWrite(db, "archiver les émissions de prévisions");
+    if (options.requireDatabase) requireDatabaseForWrite(db, "archiver les Ã©missions de prÃ©visions");
     return 0;
   }
   if (data.length === 0) return 0;
@@ -259,7 +262,7 @@ export async function insertMeteoAIDailyFusionRun(
   options: { requireDatabase?: boolean } = {},
 ): Promise<boolean> {
   if (row.sourceKind !== "service_forecast" || row.serviceName !== "MeteoAI" || row.provider !== "meteoai" || row.modelId !== "meteoai-official-daily-v2") {
-    throw new Error("L’archive de fusion accepte uniquement une émission quotidienne MeteoAI identifiée.");
+    throw new Error("Lâarchive de fusion accepte uniquement une Ã©mission quotidienne MeteoAI identifiÃ©e.");
   }
   const db = await getDb();
   if (!db) {
@@ -306,7 +309,7 @@ export async function getForecastsByService(serviceName: string, limit = 30) {
     .limit(limit);
 }
 
-// ─── OBSERVATION HELPERS ────────────────────────────────────────────────────
+// âââ OBSERVATION HELPERS ââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function insertObservation(data: InsertObservation): Promise<void> {
   const db = await getDb();
@@ -360,7 +363,7 @@ export async function getObservationsByDateRange(startDate: string, endDate: str
     .orderBy(observations.date);
 }
 
-// ─── RELIABILITY SCORE HELPERS ──────────────────────────────────────────────
+// âââ RELIABILITY SCORE HELPERS ââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function insertReliabilityScores(data: InsertReliabilityScore[]): Promise<void> {
   const db = await getDb();
@@ -412,8 +415,8 @@ export async function getReliabilityScoresByService(serviceName: string, limit =
 export async function getCumulativeRanking() {
   const db = await getDb();
   if (!db) return [];
-  // Les références de modèle et les lignes legacy ne constituent jamais une
-  // vérité terrain utilisable pour un classement public.
+  // Les rÃ©fÃ©rences de modÃ¨le et les lignes legacy ne constituent jamais une
+  // vÃ©ritÃ© terrain utilisable pour un classement public.
   const result = await db
     .select({
       serviceName: reliabilityScores.serviceName,
@@ -429,22 +432,22 @@ export async function getCumulativeRanking() {
       totalSamples: sql<number>`SUM(${reliabilityScores.sampleSize})`,
       evaluatedDays: sql<number>`COUNT(DISTINCT ${reliabilityScores.date})`,
       latestScoreDate: sql<string>`MAX(${reliabilityScores.date})`,
-      // 🌡️ Temperature dimension
+      // ð¡ï¸ Temperature dimension
       avgTempScore: sql<number>`AVG(${reliabilityScores.tempScore})`,
       avgTempMae: sql<number>`AVG(${reliabilityScores.maeTemp})`,
       avgTempBias: sql<number>`AVG(${reliabilityScores.biasTemp})`,
       avgTempMaxError: sql<number>`AVG(${reliabilityScores.tempMaxError})`,
-      // 🌧️ Precipitation dimension
+      // ð§ï¸ Precipitation dimension
       avgPrecipScore: sql<number>`AVG(${reliabilityScores.precipScore})`,
       avgPrecipPod: sql<number>`AVG(${reliabilityScores.precipPod})`,
       avgPrecipFar: sql<number>`AVG(${reliabilityScores.precipFar})`,
       avgPrecipCsi: sql<number>`AVG(${reliabilityScores.precipCsi})`,
       totalPrecipFalsePos: sql<number>`SUM(${reliabilityScores.precipFalsePositives})`,
       totalPrecipFalseNeg: sql<number>`SUM(${reliabilityScores.precipFalseNegatives})`,
-      // 💨 Wind dimension
+      // ð¨ Wind dimension
       avgWindScore: sql<number>`AVG(${reliabilityScores.windScore})`,
       avgWindMaeGusts: sql<number>`AVG(${reliabilityScores.windMaeGusts})`,
-      // ☁️ Condition dimension
+      // âï¸ Condition dimension
       avgCondScore: sql<number>`AVG(${reliabilityScores.condScore})`,
       avgCondConcordance: sql<number>`AVG(${reliabilityScores.condConcordance})`,
       avgCondMaeCloud: sql<number>`AVG(${reliabilityScores.condMaeCloud})`,
@@ -501,7 +504,7 @@ export async function getCumulativeRankingForLocation(locationKey = "default") {
   return result;
 }
 
-/** Les poids opérationnels exigent une observation physique explicitement qualifiée. */
+/** Les poids opÃ©rationnels exigent une observation physique explicitement qualifiÃ©e. */
 export async function getQualifiedCumulativeRankingForLocation(locationKey = "default") {
   const db = await getDb();
   if (!db) return [];
@@ -531,7 +534,7 @@ export async function getQualifiedCumulativeRankingForLocation(locationKey = "de
     .orderBy(sql`AVG(${reliabilityScores.weightedScore}) DESC`);
 }
 
-// ─── METEOAI FORECAST HELPERS ───────────────────────────────────────────────
+// âââ METEOAI FORECAST HELPERS âââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function upsertMeteoAIForecast(
   data: InsertMeteoAIForecast,
@@ -653,7 +656,7 @@ export async function getHistoricalScoreTimeSeries(days = 14, locationKey = "def
     .limit(days * 20); // up to 20 services per day
 }
 
-// ─── COLLECTION JOB HELPERS ─────────────────────────────────────────────────
+// âââ COLLECTION JOB HELPERS âââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function createCollectionJob(
   data: InsertCollectionJob,
@@ -661,7 +664,7 @@ export async function createCollectionJob(
 ): Promise<number> {
   const db = await getDb();
   if (!db) {
-    if (options.requireDatabase) requireDatabaseForWrite(db, "créer le journal de collecte");
+    if (options.requireDatabase) requireDatabaseForWrite(db, "crÃ©er le journal de collecte");
     return -1;
   }
   const result = await db.insert(collectionJobs).values(data);
@@ -675,7 +678,7 @@ export async function updateCollectionJob(
 ): Promise<void> {
   const db = await getDb();
   if (!db) {
-    if (options.requireDatabase) requireDatabaseForWrite(db, "mettre à jour le journal de collecte");
+    if (options.requireDatabase) requireDatabaseForWrite(db, "mettre Ã  jour le journal de collecte");
     return;
   }
   await db.update(collectionJobs).set(updates).where(eq(collectionJobs.id, id));
@@ -823,7 +826,7 @@ export async function claimScheduledForecastCollectionJob(
 }
 
 
-// ─── Favorite Locations ──────────────────────────────────────────────────────
+// âââ Favorite Locations ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 /**
  * Get ALL favorite locations across all users (used by cron jobs for bulk collection)
@@ -897,7 +900,7 @@ export async function setDefaultFavorite(id: number, userId: number) {
   return true;
 }
 
-// ─── Physical station snapshots ─────────────────────────────────────────────
+// âââ Physical station snapshots âââââââââââââââââââââââââââââââââââââââââââââ
 
 /** Upsert the immutable identity and latest metadata of a station candidate or validated. */
 export async function upsertWeatherStation(data: InsertWeatherStation): Promise<void> {
@@ -949,9 +952,9 @@ export async function upsertStationObservation(data: InsertStationObservation): 
 }
 
 /**
- * Écriture strictement additive pour une relance manuelle. Lorsqu'une station a
- * déjà livré une mesure pour le même instant, celle-ci demeure intacte : la
- * relance ne peut donc ni modifier ni réécrire le relevé déjà archivé.
+ * Ãcriture strictement additive pour une relance manuelle. Lorsqu'une station a
+ * dÃ©jÃ  livrÃ© une mesure pour le mÃªme instant, celle-ci demeure intacte : la
+ * relance ne peut donc ni modifier ni rÃ©Ã©crire le relevÃ© dÃ©jÃ  archivÃ©.
  */
 export async function insertStationObservationIfMissing(data: InsertStationObservation): Promise<boolean> {
   const db = await getDb();
@@ -1054,9 +1057,9 @@ export async function getRecentValidatedNetatmoObservations(sinceMs: number) {
   });
 }
 
-// ─── OpenSenseMap qualification verdicts ─────────────────────────────────────
+// âââ OpenSenseMap qualification verdicts âââââââââââââââââââââââââââââââââââââ
 
-/** Verdict de qualification openSenseMap à persister : seuls les statuts définitifs sont écrits. */
+/** Verdict de qualification openSenseMap Ã  persister : seuls les statuts dÃ©finitifs sont Ã©crits. */
 export type OpenSenseMapQualificationVerdictUpdate = {
   stationId: string;
   qualificationStatus: "validated" | "excluded";
@@ -1066,8 +1069,8 @@ export type OpenSenseMapQualificationVerdictUpdate = {
 
 /**
  * Capteurs citoyens (openSenseMap, CWOP) encore en validation : seuls eux
- * peuvent recevoir un verdict. Une station déjà validée ou exclue n'est jamais
- * réévaluée ni rétrogradée par ce lecteur.
+ * peuvent recevoir un verdict. Une station dÃ©jÃ  validÃ©e ou exclue n'est jamais
+ * rÃ©Ã©valuÃ©e ni rÃ©trogradÃ©e par ce lecteur.
  */
 export async function getCandidateOpenSenseMapStations() {
   const db = await getDb();
@@ -1079,10 +1082,10 @@ export async function getCandidateOpenSenseMapStations() {
 }
 
 /**
- * Capteurs citoyens (openSenseMap, CWOP) archivés pour une référence de favori,
+ * Capteurs citoyens (openSenseMap, CWOP) archivÃ©s pour une rÃ©fÃ©rence de favori,
  * **tous statuts confondus**. Le lecteur de preuve en a besoin pour afficher la
  * progression des capteurs encore candidats, et pas seulement des promus : un
- * capteur validé ou exclu conserve lui aussi sa preuve recalculée.
+ * capteur validÃ© ou exclu conserve lui aussi sa preuve recalculÃ©e.
  */
 export async function getCitizenStationsForQualification(refLat: number, refLon: number) {
   const db = await getDb();
@@ -1099,10 +1102,10 @@ export async function getCitizenStationsForQualification(refLat: number, refLon:
 }
 
 /**
- * Stations officielles Météo-France validées et actives, archivées pour la même
- * référence de favori que le capteur évalué. Leur désaccord réel mesure la
- * borne d'acceptation : une station persistée pour une autre référence ne doit
- * jamais servir de témoin.
+ * Stations officielles MÃ©tÃ©o-France validÃ©es et actives, archivÃ©es pour la mÃªme
+ * rÃ©fÃ©rence de favori que le capteur Ã©valuÃ©. Leur dÃ©saccord rÃ©el mesure la
+ * borne d'acceptation : une station persistÃ©e pour une autre rÃ©fÃ©rence ne doit
+ * jamais servir de tÃ©moin.
  */
 export async function getValidatedOfficialStationsNearReference(refLat: number, refLon: number) {
   const db = await getDb();
@@ -1121,10 +1124,10 @@ export async function getValidatedOfficialStationsNearReference(refLat: number, 
 }
 
 /**
- * Capteurs citoyens (openSenseMap, CWOP) porteurs d'un verdict « validated »
- * persisté pour la référence de favori demandée. L'évaluation à blanc de
+ * Capteurs citoyens (openSenseMap, CWOP) porteurs d'un verdict Â« validated Â»
+ * persistÃ© pour la rÃ©fÃ©rence de favori demandÃ©e. L'Ã©valuation Ã  blanc de
  * l'impact fusion n'examine que ces capteurs : un candidat encore en
- * validation ou un capteur exclu ne serait jamais ajouté à la synthèse.
+ * validation ou un capteur exclu ne serait jamais ajoutÃ© Ã  la synthÃ¨se.
  */
 export async function getValidatedCitizenStationsNearReference(refLat: number, refLon: number) {
   const db = await getDb();
@@ -1142,9 +1145,9 @@ export async function getValidatedCitizenStationsNearReference(refLat: number, r
 }
 
 /**
- * Stations physiques actives (Météo-France, Netatmo) archivées pour la même
- * référence de favori. L'évaluation à blanc rejoue la pondération de la
- * synthèse locale sur ces stations, sans jamais réécrire leurs métadonnées.
+ * Stations physiques actives (MÃ©tÃ©o-France, Netatmo) archivÃ©es pour la mÃªme
+ * rÃ©fÃ©rence de favori. L'Ã©valuation Ã  blanc rejoue la pondÃ©ration de la
+ * synthÃ¨se locale sur ces stations, sans jamais rÃ©Ã©crire leurs mÃ©tadonnÃ©es.
  */
 export async function getActivePhysicalStationsNearReference(refLat: number, refLon: number) {
   const db = await getDb();
@@ -1162,9 +1165,9 @@ export async function getActivePhysicalStationsNearReference(refLat: number, ref
 }
 
 /**
- * Relevés archivés des stations citées par la qualification, heures de mesure
+ * RelevÃ©s archivÃ©s des stations citÃ©es par la qualification, heures de mesure
  * propres incluses. Le lecteur ne filtre rien : seules les heures de mesure
- * fournies comptent pour l'évaluateur, l'heure d'archive n'est jamais un
+ * fournies comptent pour l'Ã©valuateur, l'heure d'archive n'est jamais un
  * substitut.
  */
 export async function getStationObservationsForQualification(stationIds: string[], sinceMs: number) {
@@ -1178,9 +1181,9 @@ export async function getStationObservationsForQualification(stationIds: string[
 }
 
 /**
- * Statut de qualification persisté de stations citoyennes. La collecte horaire
- * s'en sert pour ne jamais rétrograder un capteur déjà qualifié ou exclu en
- * candidat : un verdict appliqué demeure.
+ * Statut de qualification persistÃ© de stations citoyennes. La collecte horaire
+ * s'en sert pour ne jamais rÃ©trograder un capteur dÃ©jÃ  qualifiÃ© ou exclu en
+ * candidat : un verdict appliquÃ© demeure.
  */
 export async function getWeatherStationQualificationVerdicts(stationIds: string[]) {
   const db = await getDb();
@@ -1194,10 +1197,10 @@ export async function getWeatherStationQualificationVerdicts(stationIds: string[
 }
 
 /**
- * Applique les verdicts définitifs issus de l'évaluateur. La clause de statut
- * candidat garantit qu'un verdict ne s'applique qu'une fois et n'écrase jamais
- * un statut déjà promu : l'écriture est idempotente et auditable. Les autres
- * colonnes d'identité ou de métadonnées ne sont jamais touchées.
+ * Applique les verdicts dÃ©finitifs issus de l'Ã©valuateur. La clause de statut
+ * candidat garantit qu'un verdict ne s'applique qu'une fois et n'Ã©crase jamais
+ * un statut dÃ©jÃ  promu : l'Ã©criture est idempotente et auditable. Les autres
+ * colonnes d'identitÃ© ou de mÃ©tadonnÃ©es ne sont jamais touchÃ©es.
  */
 export async function applyOpenSenseMapQualificationVerdicts(verdicts: OpenSenseMapQualificationVerdictUpdate[]) {
   const db = await getDb();
@@ -1214,6 +1217,53 @@ export async function applyOpenSenseMapQualificationVerdicts(verdicts: OpenSense
   }
 }
 
+
+/**
+ * Dernière décision d'activation des capteurs citoyens validés persistée pour
+ * une référence de favori. L'appariement tolère l'écart de coordonnées
+ * d'archivage : la ligne la plus récente dans les bornes fait foi, jamais une
+ * clé exacte. Sans ligne persistée, la synthèse live reste strictement
+ * physique — aucune valeur n'est inventée.
+ */
+export async function getCitizenFusionActivationNearReference(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  const rows = await db.select().from(citizenFusionActivations).where(and(
+    gte(citizenFusionActivations.refLat, latBounds.min),
+    lte(citizenFusionActivations.refLat, latBounds.max),
+    gte(citizenFusionActivations.refLon, lonBounds.min),
+    lte(citizenFusionActivations.refLon, lonBounds.max),
+  )).orderBy(desc(citizenFusionActivations.evaluatedAt)).limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Archive la décision d'activation d'une référence : la ligne la plus récente
+ * dans les bornes est mise à jour, sinon la décision est insérée. L'écriture
+ * est idempotente par référence, la raison est tronquée à la longueur de sa
+ * colonne et aucune autre table n'est touchée.
+ */
+export async function upsertCitizenFusionActivation(data: InsertCitizenFusionActivation) {
+  const db = await getDb();
+  if (!db) return null;
+  const latBounds = referenceCoordinateBounds(Number(data.refLat));
+  const lonBounds = referenceCoordinateBounds(Number(data.refLon));
+  const existing = await db.select({ id: citizenFusionActivations.id }).from(citizenFusionActivations).where(and(
+    gte(citizenFusionActivations.refLat, latBounds.min),
+    lte(citizenFusionActivations.refLat, latBounds.max),
+    gte(citizenFusionActivations.refLon, lonBounds.min),
+    lte(citizenFusionActivations.refLon, lonBounds.max),
+  )).orderBy(desc(citizenFusionActivations.evaluatedAt)).limit(1);
+  const row = { ...data, reason: data.reason.slice(0, CITIZEN_FUSION_ACTIVATION_REASON_MAX_LENGTH) };
+  if (existing[0]) {
+    await db.update(citizenFusionActivations).set({ ...row, updatedAt: new Date() }).where(eq(citizenFusionActivations.id, existing[0].id));
+    return existing[0].id;
+  }
+  const result = await db.insert(citizenFusionActivations).values(row);
+  return result[0].insertId;
+}
 /** Idempotent physical synthesis for one location and Paris hour. */
 export async function upsertQualifiedObservationSnapshot(data: InsertQualifiedObservationSnapshot): Promise<void> {
   const db = await getDb();
@@ -1235,9 +1285,9 @@ export async function upsertQualifiedObservationSnapshot(data: InsertQualifiedOb
 }
 
 /**
- * Conserve le premier snapshot qualifié d'un lieu pour une heure de Paris.
- * Utilisé lors d'une relance manuelle afin de préserver sans exception les
- * snapshots précédemment archivés.
+ * Conserve le premier snapshot qualifiÃ© d'un lieu pour une heure de Paris.
+ * UtilisÃ© lors d'une relance manuelle afin de prÃ©server sans exception les
+ * snapshots prÃ©cÃ©demment archivÃ©s.
  */
 export async function insertQualifiedObservationSnapshotIfMissing(data: InsertQualifiedObservationSnapshot): Promise<boolean> {
   const db = await getDb();
@@ -1388,7 +1438,7 @@ function isDailyComparisonTableUnavailable(error: unknown): boolean {
 function warnDailyComparisonTableUnavailable(): void {
   if (dailyComparisonTableWarningLogged) return;
   dailyComparisonTableWarningLogged = true;
-  console.warn("[MeteoAI] L’archive quotidienne ou son journal de révisions n’est pas migré; aucune projection de comparaison n’est mise à jour sans journal append-only.");
+  console.warn("[MeteoAI] Lâarchive quotidienne ou son journal de rÃ©visions nâest pas migrÃ©; aucune projection de comparaison nâest mise Ã  jour sans journal append-only.");
 }
 
 /**
@@ -1704,7 +1754,7 @@ export async function upsertPhysicalSnapshotCollectionTrace(data: InsertPhysical
   });
 }
 
-/** Insère une trace seulement si ce créneau n’est pas déjà documenté. */
+/** InsÃ¨re une trace seulement si ce crÃ©neau nâest pas dÃ©jÃ  documentÃ©. */
 export async function insertPhysicalSnapshotCollectionTraceIfMissing(data: InsertPhysicalSnapshotCollectionTrace): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
@@ -1732,7 +1782,7 @@ export async function getPhysicalSnapshotCollectionTracesByDateRange(locationKey
     lte(physicalSnapshotCollectionTraces.date, endDate),
   )).orderBy(desc(physicalSnapshotCollectionTraces.date), desc(physicalSnapshotCollectionTraces.hour));
 }
-// ─── Netatmo OAuth tokens ───────────────────────────────────────────────────
+// âââ Netatmo OAuth tokens âââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function upsertNetatmoOAuthToken(userId: number, encryptedRefreshToken: string, scopes = "read_station") {
   const db = await getDb();
@@ -1788,7 +1838,7 @@ export async function consumeNetatmoOAuthState(stateHash: string, now = new Date
   return (result as unknown as { affectedRows?: number }).affectedRows === 1;
 }
 
-// ─── Location Forecasts (pre-fetched per favorite) ───────────────────────────
+// âââ Location Forecasts (pre-fetched per favorite) âââââââââââââââââââââââââââ
 
 /**
  * Upsert a pre-fetched forecast for a favorite location.
@@ -1862,7 +1912,7 @@ export async function getLocationForecastsForUser(userId: number, date: string) 
     );
 }
 
-// ─── HOURLY FORECASTS HELPERS ────────────────────────────────────────────────
+// âââ HOURLY FORECASTS HELPERS ââââââââââââââââââââââââââââââââââââââââââââââââ
 
 type HourlyForecastCapture = {
   captureRunId: string;
@@ -1906,7 +1956,7 @@ export async function insertHourlyForecasts(rows: InsertHourlyForecastWithCaptur
         const values: Array<{ variable: string; value: number | null; unit: string | null }> = row.archiveValues
           ? buildHourlyArchiveValues({ values: row.archiveValues, units: capture.units })
           : [
-              { variable: "temperature", value: row.temperature ?? null, unit: capture.units?.temperature ?? "°C" },
+              { variable: "temperature", value: row.temperature ?? null, unit: capture.units?.temperature ?? "Â°C" },
               { variable: "precipitation", value: row.precipitation ?? null, unit: capture.units?.precipitation ?? "mm" },
               { variable: "wind_speed", value: row.windSpeed ?? null, unit: capture.units?.windSpeed ?? "km/h" },
               { variable: "wind_gust", value: row.windGusts ?? null, unit: capture.units?.windGusts ?? "km/h" },
@@ -2033,8 +2083,8 @@ export const HOURLY_COLLECTION_ERROR_CODE_MAX_LENGTH = 32;
 
 /**
  * Idempotently records one model result for a scheduled batch attempt.
- * `errorCode` est tronqué à la limite de la colonne : un code trop long ne doit
- * jamais faire échouer l'écriture du journal de collecte (ER_DATA_TOO_LONG).
+ * `errorCode` est tronquÃ© Ã  la limite de la colonne : un code trop long ne doit
+ * jamais faire Ã©chouer l'Ã©criture du journal de collecte (ER_DATA_TOO_LONG).
  */
 export async function upsertHourlyForecastCollectionResults(rows: InsertHourlyForecastCollectionResult[]): Promise<void> {
   if (rows.length === 0) return;
@@ -2230,9 +2280,9 @@ export async function persistHourlyForecastEvaluationScores(rows: InsertHourlyFo
         },
       });
     }
-    // Les lignes complètes non validées sont archivées avec une version de
-    // validation NULL : elles restent consultables comme données brutes
-    // dans le labo, sans jamais remplacer une ligne validée (la mise à
+    // Les lignes complÃ¨tes non validÃ©es sont archivÃ©es avec une version de
+    // validation NULL : elles restent consultables comme donnÃ©es brutes
+    // dans le labo, sans jamais remplacer une ligne validÃ©e (la mise Ã 
     // jour de conflit est sans effet sur les valeurs existantes).
     for (const row of unvalidatedRows) {
       await db.insert(hourlyForecastEvaluationScores).values(row).onDuplicateKeyUpdate({
@@ -2453,7 +2503,7 @@ export async function getHourlyForecastEvaluationHistory(
   }
 }
 
-// ─── OBSERVATIONS PERSONNELLES ET CALIBRATION ──────────────────────────────
+// âââ OBSERVATIONS PERSONNELLES ET CALIBRATION ââââââââââââââââââââââââââââââ
 
 export async function insertPersonalWeatherObservation(data: InsertPersonalWeatherObservation): Promise<number | null> {
   const db = await getDb();
@@ -2567,7 +2617,7 @@ export async function clearPersonalModelCalibrations(userId: number, locationKey
   await db.delete(personalModelCalibrations).where(and(eq(personalModelCalibrations.userId, userId), eq(personalModelCalibrations.locationKey, locationKey)));
 }
 
-// ─── LEAD TIME SCORES HELPERS ────────────────────────────────────────────────
+// âââ LEAD TIME SCORES HELPERS ââââââââââââââââââââââââââââââââââââââââââââââââ
 
 /**
  * Insert a batch of lead-time score rows.
@@ -2648,7 +2698,7 @@ export async function getQualifiedLeadTimeScoresForLocation(locationKey: string,
     .orderBy(sql`${leadTimeScores.serviceName}`, sql`${leadTimeScores.bucket}`);
 }
 
-// ─── Reliability laboratory read models ──────────────────────────────────────
+// âââ Reliability laboratory read models ââââââââââââââââââââââââââââââââââââââ
 
 /**
  * Aggregate only score rows based on explicitly qualified physical observations.
@@ -2738,3 +2788,4 @@ export async function getLaboratoryModelArchive(locationKey: string, startDate: 
     .groupBy(forecastRuns.serviceName, forecastRuns.provider, forecastRuns.modelId)
     .orderBy(forecastRuns.serviceName);
 }
+

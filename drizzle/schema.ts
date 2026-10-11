@@ -1131,3 +1131,39 @@ export const shadowLocalPrecipitationForecastOutcomes = mysqlTable("shadow_local
 ]);
 export type ShadowLocalPrecipitationForecastOutcome = typeof shadowLocalPrecipitationForecastOutcomes.$inferSelect;
 export type InsertShadowLocalPrecipitationForecastOutcome = typeof shadowLocalPrecipitationForecastOutcomes.$inferInsert;
+
+
+/**
+ * Décision d'activation des capteurs citoyens validés dans la synthèse de
+ * température locale, dérivée du rapport d'impact à blanc (plan
+ * openSenseMap/CWOP, bloc 4). Une ligne archive la dernière décision évaluée
+ * pour une référence de favori : le statut persisté pilote la composition
+ * live, l'historique archivé demeure la source de vérité et la preuve
+ * chiffrée se recalcule à l'identique. Sans contrainte d'unicité sur la
+ * référence : l'appariement se fait par tolérance de coordonnées, jamais par
+ * clé exacte.
+ */
+export const citizenFusionActivations = mysqlTable("citizen_fusion_activations", {
+  id: int("id").autoincrement().primaryKey(),
+  refLat: float("refLat").notNull(),
+  refLon: float("refLon").notNull(),
+  status: mysqlEnum("status", ["activated", "not-activated"]).notNull(),
+  version: varchar("version", { length: 64 }).notNull(),
+  reason: varchar("reason", { length: 512 }).notNull(),
+  comparisons: int("comparisons").notNull(),
+  distinctDays: int("distinctDays").notNull(),
+  windowDays: int("windowDays").notNull(),
+  baselineMaeC: float("baselineMaeC"),
+  withCitizenMaeC: float("withCitizenMaeC"),
+  improvementC: float("improvementC"),
+  validatedCitizenStations: json("validatedCitizenStations").notNull(),
+  firstComparedAt: varchar("firstComparedAt", { length: 32 }),
+  lastComparedAt: varchar("lastComparedAt", { length: 32 }),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, table => [
+  index("citizen_fusion_activations_reference_idx").on(table.refLat, table.refLon),
+]);
+export type CitizenFusionActivation = typeof citizenFusionActivations.$inferSelect;
+export type InsertCitizenFusionActivation = typeof citizenFusionActivations.$inferInsert;
