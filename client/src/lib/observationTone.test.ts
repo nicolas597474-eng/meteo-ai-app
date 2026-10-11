@@ -12,7 +12,7 @@ import {
 } from "./observationTone";
 
 describe("code couleur des observations actuelles", () => {
-  it("colore le ressenti du violet (froid extrÃªme) au rouge (canicule)", () => {
+  it("colore le ressenti du violet (froid extrême) au rouge (canicule)", () => {
     expect(getApparentTempTone(-15).level).toBe("froidExtreme");
     expect(getApparentTempTone(-2).level).toBe("gel");
     expect(getApparentTempTone(14).level).toBe("agreable");
@@ -22,7 +22,7 @@ describe("code couleur des observations actuelles", () => {
     expect(getApparentTempTone(39).level).toBe("canicule");
   });
 
-  it("affiche 0,0 mm de prÃ©cipitations en bleu puis approfondit avec l'intensitÃ©", () => {
+  it("affiche 0,0 mm de précipitations en bleu puis approfondit avec l'intensité", () => {
     expect(getPrecipitationTone(0).level).toBe("aucune");
     expect(getPrecipitationTone(0).value).toBe("text-blue-300");
     expect(getPrecipitationTone(0.5).level).toBe("tresFaible");
@@ -32,7 +32,7 @@ describe("code couleur des observations actuelles", () => {
     expect(getPrecipitationTone(20).level).toBe("tresForte");
   });
 
-  it("colore le vent et les rafales du vert calme au rosÃ© destructeur", () => {
+  it("colore le vent et les rafales du vert calme au rosé destructeur", () => {
     expect(getWindSpeedTone(8).level).toBe("tresLegere");
     expect(getWindSpeedTone(25).level).toBe("legere");
     expect(getWindSpeedTone(40).level).toBe("moderee");
@@ -48,7 +48,7 @@ describe("code couleur des observations actuelles", () => {
     expect(getWindGustTone(130).level).toBe("destructrice");
   });
 
-  it("colore la pression en vert autour de la normale et en rosÃ© quand elle s'effondre", () => {
+  it("colore la pression en vert autour de la normale et en rosé quand elle s'effondre", () => {
     expect(getPressureTone(985).level).toBe("tresBasse");
     expect(getPressureTone(1005).level).toBe("basse");
     expect(getPressureTone(1013).level).toBe("normale");
@@ -57,7 +57,7 @@ describe("code couleur des observations actuelles", () => {
     expect(getPressureTone(1035).level).toBe("tresHaute");
   });
 
-  it("colore l'humiditÃ© du ambre sec au bleu saturÃ©", () => {
+  it("colore l'humidité du ambre sec au bleu saturé", () => {
     expect(getHumidityTone(20).level).toBe("tresSec");
     expect(getHumidityTone(40).level).toBe("sec");
     expect(getHumidityTone(55).level).toBe("confortable");
@@ -66,14 +66,14 @@ describe("code couleur des observations actuelles", () => {
     expect(getHumidityTone(95).level).toBe("sature");
   });
 
-  it("colore les nuages du bleu dÃ©gagÃ© au gris couvert", () => {
+  it("colore les nuages du bleu dégagé au gris couvert", () => {
     expect(getCloudCoverTone(5).level).toBe("degage");
     expect(getCloudCoverTone(33).level).toBe("partiellementNuageux");
     expect(getCloudCoverTone(75).level).toBe("nuageux");
     expect(getCloudCoverTone(100).level).toBe("couvert");
   });
 
-  it("colore la visibilitÃ© du rosÃ© brouillard au bleu clair excellente", () => {
+  it("colore la visibilité du rosé brouillard au bleu clair excellente", () => {
     expect(getVisibilityTone(0.5).level).toBe("brouillardDense");
     expect(getVisibilityTone(2).level).toBe("brume");
     expect(getVisibilityTone(7).level).toBe("reduite");
@@ -91,7 +91,7 @@ describe("code couleur des observations actuelles", () => {
     expect(getUvTone(null).value).toBe("text-white");
   });
 
-  it("garde un repli neutre blanc quand une donnÃ©e est absente", () => {
+  it("garde un repli neutre blanc quand une donnée est absente", () => {
     expect(getApparentTempTone(null).value).toBe("text-white");
     expect(getPrecipitationTone(undefined).value).toBe("text-white");
     expect(getWindSpeedTone(Number.NaN).value).toBe("text-white");

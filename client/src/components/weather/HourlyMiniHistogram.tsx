@@ -51,7 +51,7 @@ export function HourlyMiniHistogram<T extends HourlyHistogramForecast>({
   return (
     <div
       role="group"
-      aria-label={`${series.label}${series.unit ? `, ${series.unit}` : ""} Â· valeurs horaires officielles Â· la couleur identifie la variable, pas la qualitÃ© ni la confiance`}
+      aria-label={`${series.label}${series.unit ? `, ${series.unit}` : ""} · valeurs horaires officielles · la couleur identifie la variable, pas la qualité ni la confiance`}
       className="mt-3 min-w-0 rounded-lg border border-slate-700/60 bg-slate-900/35 p-2"
     >
       <div className="mb-1 flex min-w-0 items-baseline justify-between gap-2">
@@ -64,7 +64,7 @@ export function HourlyMiniHistogram<T extends HourlyHistogramForecast>({
             const isSelected = selectedValidAt != null && point.validAt === selectedValidAt;
             const display = formatHourlyDisplay(point.hour, allHours);
             const valueLabel = point.value == null
-              ? "â"
+              ? "—"
               : formatOptionalForecastValue(point.value, series.decimals);
             const dateLabel = compactDateLabel(point.validAt);
             const offsetLabel = compactUtcOffset(display.offsetLabel);
@@ -77,8 +77,8 @@ export function HourlyMiniHistogram<T extends HourlyHistogramForecast>({
                 key={point.key}
                 role="listitem"
                 aria-current={isSelected ? "true" : undefined}
-                aria-label={`${isSelected ? "ÃchÃ©ance sÃ©lectionnÃ©e, " : ""}${spokenTime} Â· ${series.label} ${spokenValue}`}
-                title={`${spokenTime} Â· ${series.label} ${spokenValue}`}
+                aria-label={`${isSelected ? "Échéance sélectionnée, " : ""}${spokenTime} · ${series.label} ${spokenValue}`}
+                title={`${spokenTime} · ${series.label} ${spokenValue}`}
                 className={`flex w-12 shrink-0 flex-col items-center rounded-md px-0.5 pb-0.5 text-center ${isSelected ? "bg-cyan-100/[0.08] ring-1 ring-inset ring-cyan-100/75" : ""}`}
               >
                 <span className={`block h-5 max-w-full truncate text-[10px] leading-5 tabular-nums ${isSelected ? "font-semibold text-cyan-100" : "text-slate-200"}`}>
@@ -100,7 +100,7 @@ export function HourlyMiniHistogram<T extends HourlyHistogramForecast>({
           })}
         </div>
       </div>
-      <p className="mt-0.5 text-[9px] leading-relaxed text-slate-500">Valeurs exactes indiquÃ©es; bordure cyan : Ã©chÃ©ance sÃ©lectionnÃ©e. La couleur identifie la variable, pas la qualitÃ© ni la confiance.</p>
+      <p className="mt-0.5 text-[9px] leading-relaxed text-slate-500">Valeurs exactes indiquées; bordure cyan : échéance sélectionnée. La couleur identifie la variable, pas la qualité ni la confiance.</p>
     </div>
   );
 }

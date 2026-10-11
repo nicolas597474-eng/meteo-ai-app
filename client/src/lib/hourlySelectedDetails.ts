@@ -72,11 +72,11 @@ function formatWithUnit(
 ): string {
   return finite(value)
     ? formatOptionalForecastValue(value, decimals, unit)
-    : `â${unit}`;
+    : `—${unit}`;
 }
 
 function formatNumber(value: number | null | undefined, decimals = 0): string {
-  return finite(value) ? formatOptionalForecastValue(value, decimals) : "â";
+  return finite(value) ? formatOptionalForecastValue(value, decimals) : "—";
 }
 
 /** Formats raw component values by contributor; it never averages or fills missing values. */
@@ -85,10 +85,10 @@ export function formatHourlyPrecipitationComponentValues(
   field: "rain" | "showers" | "snowfall",
   unit: string,
 ): string {
-  if (!components?.length) return `â${unit}`;
+  if (!components?.length) return `—${unit}`;
   return components
     .map(({ modelName, ...values }) => `${modelName} ${formatWithUnit(values[field], 1, unit)}`)
-    .join(" Â· ");
+    .join(" · ");
 }
 
 function windDirectionLabel(degrees: number): string {
@@ -137,8 +137,8 @@ function fallbackSourceNote(
             timeStyle: "short",
             timeZone: "Europe/Paris",
           }).format(new Date(source.retrievedAt))
-        : "heure de rÃ©ception indisponible";
-      return `${source.provider} Â· ${source.product} Â· rÃ©ponse obtenue par lâapplication ${retrieved} (Europe/Paris) Â· validTime UTC ${new Date(source.validAt).toISOString()} Â· run fournisseur non communiquÃ©, fraÃ®cheur amont inconnue.`;
+        : "heure de réception indisponible";
+      return `${source.provider} · ${source.product} · réponse obtenue par l’application ${retrieved} (Europe/Paris) · validTime UTC ${new Date(source.validAt).toISOString()} · run fournisseur non communiqué, fraîcheur amont inconnue.`;
     })
     .join(" ");
 }
@@ -179,7 +179,7 @@ export function buildHourlySelectedDetails(
     finite(precipitationMetrics?.rainModelCount) &&
     finite(precipitationMetrics?.availableModelCount);
   const precipitationNote = hasPrecipitationCounts
-    ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} modÃ¨les au seuil${finite(precipitationMetrics.thresholdMm) ? ` â¥ ${formatOptionalForecastValue(precipitationMetrics.thresholdMm, 1, " mm")}` : ""} Â· frÃ©quence descriptive brute, pas une probabilitÃ© calibrÃ©e.`
+    ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} modèles au seuil${finite(precipitationMetrics.thresholdMm) ? ` ≥ ${formatOptionalForecastValue(precipitationMetrics.thresholdMm, 1, " mm")}` : ""} · fréquence descriptive brute, pas une probabilité calibrée.`
     : undefined;
   const direction = finite(hour.windDirection)
     ? `${windDirectionLabel(hour.windDirection)} (${formatWithUnit(hour.windDirection, 1, "°")})`

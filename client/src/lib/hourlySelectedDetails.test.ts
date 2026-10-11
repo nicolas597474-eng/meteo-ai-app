@@ -6,8 +6,8 @@ import {
   selectForecastHour,
 } from "./forecastTimeline";
 
-describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionnÃ©e", () => {
-  it("affiche les composantes brutes au validTime exact et exclut les catÃ©gories hors pÃ©rimÃ¨tre", () => {
+describe("détails météo de l’échéance horaire sélectionnée", () => {
+  it("affiche les composantes brutes au validTime exact et exclut les catégories hors périmètre", () => {
     const validAt = Date.parse("2026-10-06T16:00:00.000Z");
     const details = buildHourlySelectedDetails(
       {
@@ -48,16 +48,16 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
     );
 
     expect(details.map(({ title }) => title)).toEqual([
-      "PrÃ©cipitations",
+      "Précipitations",
       "Averses",
       "Neige",
       "Vent",
-      "HumiditÃ© et rosÃ©e",
+      "Humidité et rosée",
       "Nuages",
       "Pression",
       "Indice UV",
-      "TempÃ©rature ressentie",
-      "VisibilitÃ©",
+      "Température ressentie",
+      "Visibilité",
     ]);
     expect(
       details.every(detail => detail.validAt === validAt && !detail.summary.includes("18:00"))
@@ -66,14 +66,14 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
       "0.0 mm"
     );
     expect(details.some(({ title }) => title === "Pluie")).toBe(false);
-    expect(details.find(({ key }) => key === "showers")?.value).toBe("AROME â mm Â· GFS 0.4 mm");
-    expect(details.find(({ key }) => key === "snowfall")?.value).toBe("AROME 0.3 cm Â· GFS â cm");
+    expect(details.find(({ key }) => key === "showers")?.value).toBe("AROME — mm · GFS 0.4 mm");
+    expect(details.find(({ key }) => key === "snowfall")?.value).toBe("AROME 0.3 cm · GFS — cm");
     expect(details.find(({ key }) => key === "showers")?.note).toContain("aucune moyenne");
     expect(details.find(({ key }) => key === "wind")?.value).toContain(
-      "direction N (350.0Â°)"
+      "direction N (350.0°)"
     );
     expect(details.find(({ key }) => key === "clouds")?.value).toContain(
-      "moyennes 24 % Â· hautes 88 %"
+      "moyennes 24 % · hautes 88 %"
     );
     expect(details.find(({ key }) => key === "uv")?.value).toBe("0.0");
     expect(details.find(({ key }) => key === "precipitation")?.valueTone).toBe("text-blue-300");
@@ -82,7 +82,7 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
     expect(details.find(({ key }) => key === "air-quality")).toBeUndefined();
     expect(details.some(({ key }) => ["precip-type", "radiation", "weather-code"].includes(key))).toBe(false);
     expect(details.find(({ key }) => key === "precipitation")?.note).toContain(
-      "2/7 modÃ¨les"
+      "2/7 modèles"
     );
   });
 
@@ -99,20 +99,20 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
       "apparent",
       "visibility",
     ]) {
-      expect(details.find(detail => detail.key === key)?.value).toContain("â");
+      expect(details.find(detail => detail.key === key)?.value).toContain("—");
     }
     expect(details.some(({ key }) => ["precipitation", "showers", "snowfall", "rain"].includes(key))).toBe(false);
     expect(details.find(({ key }) => key === "wind")?.value).toBe(
-      "Vent â km/h Â· direction â Â· rafales â km/h"
+      "Vent — km/h · direction — · rafales — km/h"
     );
     expect(details.find(({ key }) => key === "clouds")?.value).toBe(
-      "Total â % Â· basses â % Â· moyennes â % Â· hautes â %"
+      "Total — % · basses — % · moyennes — % · hautes — %"
     );
     expect(details.every(detail => detail.validAt === null)).toBe(true);
     expect(details.some(({ key }) => ["precip-type", "radiation", "weather-code"].includes(key))).toBe(false);
   });
 
-  it("fait suivre toutes les lignes Ã  lâheure cliquÃ©e, y compris deux heures locales rÃ©pÃ©tÃ©es", () => {
+  it("fait suivre toutes les lignes à l’heure cliquée, y compris deux heures locales répétées", () => {
     const hours = [
       {
         date: "2026-10-25",
@@ -145,13 +145,13 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
     expect(details.every(detail => detail.validAt === selected.validAt)).toBe(
       true
     );
-    expect(details.find(({ key }) => key === "precipitation")?.summary).toBe("QuantitÃ© 1.4 mm");
+    expect(details.find(({ key }) => key === "precipitation")?.summary).toBe("Quantité 1.4 mm");
     expect(details.find(({ key }) => key === "pressure")?.summary).toBe("1006 hPa");
-    expect(details.find(({ key }) => key === "apparent")?.summary).toBe("â Â°C");
+    expect(details.find(({ key }) => key === "apparent")?.summary).toBe("— °C");
     expect(details.every(({ summary }) => !summary.includes("02:00"))).toBe(true);
   });
 
-  it("affiche la provenance et la fraÃ®cheur inconnue du champ horaire complÃ©tÃ©", () => {
+  it("affiche la provenance et la fraîcheur inconnue du champ horaire complété", () => {
     const validAt = Date.parse("2026-10-06T12:00:00.000Z");
     const details = buildHourlySelectedDetails(
       {
@@ -172,7 +172,7 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
     );
 
     expect(details.find(({ key }) => key === "humidity")?.value).toContain(
-      "HumiditÃ© 55 %"
+      "Humidité 55 %"
     );
     expect(details.find(({ key }) => key === "humidity")?.note).toContain(
       "OpenWeatherMap"
@@ -181,12 +181,12 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
       "validTime UTC 2026-10-06T12:00:00.000Z"
     );
     expect(details.find(({ key }) => key === "humidity")?.note).toContain(
-      "fraÃ®cheur amont inconnue"
+      "fraîcheur amont inconnue"
     );
     expect(details.find(({ key }) => key === "wind")?.note).toBeUndefined();
   });
 
-  it("signale la neige par code WMO valide sans transformer zÃ©ro ou une valeur absente en quantitÃ©", () => {
+  it("signale la neige par code WMO valide sans transformer zéro ou une valeur absente en quantité", () => {
     const details = buildHourlySelectedDetails({
       weatherCode: 71,
       precipitationComponents: [
@@ -195,8 +195,8 @@ describe("dÃ©tails mÃ©tÃ©o de lâÃ©chÃ©ance horaire sÃ©lectionn�
       ],
     });
 
-    expect(details.find(({ key }) => key === "snowfall")?.value).toBe("Neige prÃ©vue");
-    expect(details.find(({ key }) => key === "snowfall")?.note).toContain("aucune quantitÃ© positive");
+    expect(details.find(({ key }) => key === "snowfall")?.value).toBe("Neige prévue");
+    expect(details.find(({ key }) => key === "snowfall")?.note).toContain("aucune quantité positive");
     expect(details.find(({ key }) => key === "snowfall")?.value).not.toContain("0.0 cm");
   });
 });
