@@ -17,6 +17,7 @@ import {
   ModelComparisonSection,
 } from "@/components/weather/ReliabilityComparisonSections";
 import { StationQualificationSection } from "@/components/weather/StationQualificationSection";
+import { CitizenFusionImpactSection } from "@/components/weather/CitizenFusionImpactSection";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
@@ -122,6 +123,16 @@ export default function ReliabilityLaboratory() {
     }),
     [activeLocation?.lat, activeLocation?.lon, radiusKm]
   );
+  // Impact à blanc des capteurs citoyens validés : la référence d’évaluation
+  // est le lieu actif, sur la même fenêtre d’historique archivé que la
+  // qualification ; la fusion locale n’est jamais modifiée.
+  const citizenImpactInput = useMemo(
+    () => ({
+      lat: activeLocation?.lat ?? 50.7567,
+      lon: activeLocation?.lon ?? 2.5204,
+    }),
+    [activeLocation?.lat, activeLocation?.lon]
+  );
 
   const { data, isLoading, isError, isFetching } =
     trpc.weather.getReliabilityLaboratory.useQuery(input, {
@@ -149,6 +160,14 @@ export default function ReliabilityLaboratory() {
     isLoading: nearbyStationsLoading,
     isError: nearbyStationsError,
   } = trpc.weather.searchStations.useQuery(nearbyStationsInput, {
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+  const {
+    data: citizenImpactData,
+    isLoading: citizenImpactLoading,
+    isError: citizenImpactError,
+  } = trpc.weather.getCitizenFusionImpact.useQuery(citizenImpactInput, {
     staleTime: 2 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
@@ -353,6 +372,13 @@ export default function ReliabilityLaboratory() {
           isError={nearbyStationsError}
           locationName={locationName}
           radiusKm={radiusKm}
+        />
+
+        <CitizenFusionImpactSection
+          data={citizenImpactData}
+          isLoading={citizenImpactLoading}
+          isError={citizenImpactError}
+          locationName={locationName}
         />
       </div>
       <BackToTopButton />
