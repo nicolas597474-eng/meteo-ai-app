@@ -1,6 +1,13 @@
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
 import { getStationQualificationBadge } from "@/lib/stationCandidateStatus";
+import {
+  formatQualificationParity,
+  formatQualificationRemaining,
+  qualificationCompletionRatio,
+  qualificationGateLabel,
+  type CitizenQualificationProgressView,
+} from "@/lib/citizenQualificationProgress";
 
 /**
  * Section de transparence « Stations et capteurs autour du lieu » : chaque
@@ -9,6 +16,11 @@ import { getStationQualificationBadge } from "@/lib/stationCandidateStatus";
  * son dernier relevé, sa distance, ses variables présentes et son motif
  * d’exclusion persisté. Aucune valeur n’est fabriquée : une variable absente
  * ne s’affiche pas, un âge inconnu reste « Aucun relevé ».
+ *
+ * La progression de qualification provient du serveur, qui la recalcule depuis
+ * l’historique archivé avec le même évaluateur que le chemin de verdicts. Sans
+ * preuve disponible, aucune barre n’est affichée : la section n’invente jamais
+ * un avancement.
  */
 
 type StationVariableKey =
@@ -38,6 +50,13 @@ type StationQualificationEntry = {
   exclusionReason?: string | null;
   qualificationStatus?: "candidate" | "validated" | "excluded";
 };
+
+/**
+ * Sources citoyennes éligibles à la qualification par comparaison SYNOP. La
+ * progression n’est affichée que pour elles : une station officielle ou Netatmo
+ * n’est jamais qualifiée par ce chemin.
+ */
+const CITIZEN_SOURCES: ReadonlySet<string> = new Set(["opensensemap", "cwop"]);
 
 const SOURCE_LABELS: Record<string, string> = {
   meteofrance: "Météo-France",
@@ -87,18 +106,65 @@ function minutesSince(updatedAt: string | null | undefined) {
   return Math.max(0, Math.round((Date.now() - timestamp) / 60_000));
 }
 
+/**
+ * Bloc de progression d’un capteur citoyen : parité mesurée/requise, barre
+ * d’avancement vers la porte la plus lente, et restant exact à franchir. Le
+ * restant est `null` pour un capteur validé ou écarté — aucun écran n’annonce
+ * une validation à venir pour un capteur exclu.
+ */
+function QualificationProgressBlock({ progress }: { progress: CitizenQualificationProgressView }) {
+  const remaining = formatQualificationRemaining(progress);
+  const isExcluded = progress.gate === "excluded";
+  const isComplete = progress.gate === "complete";
+  const ratio = qualificationCompletionRatio(progress);
+  const percentage = Math.round(ratio * 100);
+  return (
+    <div className="mt-2 rounded-lg border border-slate-700/60 bg-slate-950/40 px-2.5 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="text-[11px] font-semibold text-sky-100">
+          {qualificationGateLabel(progress)}
+        </span>
+        <span className="text-[11px] tabular-nums text-slate-300">
+          {formatQualificationParity(progress)}
+        </span>
+      </div>
+      {!isExcluded ? (
+        <div
+          className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percentage}
+          aria-label={`Avancement de qualification : ${percentage} %`}
+        >
+          <div
+            className={`h-full rounded-full ${isComplete ? "bg-emerald-400" : "bg-sky-400"}`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+      ) : null}
+      {remaining ? (
+        <p className="mt-1.5 text-[11px] font-medium text-amber-200">{remaining}</p>
+      ) : null}
+    </div>
+  );
+}
+
 export function StationQualificationSection({
   data,
   isLoading,
   isError,
   locationName,
   radiusKm,
+  qualificationEvidence,
 }: {
   data: { stations?: StationQualificationEntry[] } | undefined;
   isLoading: boolean;
   isError: boolean;
   locationName: string;
   radiusKm: number;
+  /** Preuve serveur par identifiant de station ; absente = aucun avancement affiché. */
+  qualificationEvidence?: Record<string, { progress: CitizenQualificationProgressView }>;
 }) {
   // Tri par distance croissante : le routeur classe par score de fusion, la
   // transparence autour du lieu se lit du plus proche au plus loin.
@@ -156,6 +222,9 @@ export function StationQualificationSection({
           {stations.map((station) => {
             const badge = getStationQualificationBadge(station);
             const ageMinutes = minutesSince(station.updatedAt);
+            const progress = CITIZEN_SOURCES.has(station.source)
+              ? qualificationEvidence?.[station.stationId]?.progress
+              : undefined;
             const presentVariables = PRESENT_VARIABLES
               .filter((variable) => typeof station[variable.key] === "number" && Number.isFinite(station[variable.key]))
               .map((variable) => `${variable.label} ${station[variable.key]?.toFixed(variable.decimals)}${variable.unit}`);
@@ -186,6 +255,7 @@ export function StationQualificationSection({
                     ? ` · Variables présentes : ${presentVariables.join(", ")}`
                     : " · Aucune variable mesurée"}
                 </p>
+                {progress ? <QualificationProgressBlock progress={progress} /> : null}
                 {badge.detail ? (
                   <p className="mt-1 text-[11px] text-rose-200">
                     Motif d’exclusion : {badge.detail}

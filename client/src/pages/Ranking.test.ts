@@ -215,7 +215,12 @@ describe("page Fiabilité", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain('displayStatus === "citizen-validated" ? "CAPTEUR VALIDÉ"');
     expect(source).toContain("Capteur citoyen validé par comparaison aux stations officielles SYNOP sur la fenêtre de qualification");
-    expect(source).toContain("station.qualificationStatus !== \"validated\"");
+    // Les populations affichées passent par le helper partagé : le statut n'est
+    // plus recalculé localement, il est lu une seule fois pour la carte, les
+    // badges et les compteurs. Le comportement « un validé n'est jamais écarté »
+    // reste vérifié, par le helper et par son test dédié.
+    expect(source).toContain('getStationDisplayStatus(station) === "excluded"');
+    expect(source).not.toContain("station.qualificationStatus !== \"validated\"");
     const dialog = readFileSync(new URL("./SourceDetailsDialog.tsx", import.meta.url), "utf8");
     expect(dialog).toContain("Capteur citoyen validé : qualifié par comparaison aux stations officielles SYNOP");
   });

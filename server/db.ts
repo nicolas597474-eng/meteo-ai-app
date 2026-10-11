@@ -1079,6 +1079,26 @@ export async function getCandidateOpenSenseMapStations() {
 }
 
 /**
+ * Capteurs citoyens (openSenseMap, CWOP) archivés pour une référence de favori,
+ * **tous statuts confondus**. Le lecteur de preuve en a besoin pour afficher la
+ * progression des capteurs encore candidats, et pas seulement des promus : un
+ * capteur validé ou exclu conserve lui aussi sa preuve recalculée.
+ */
+export async function getCitizenStationsForQualification(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  return db.select().from(weatherStations).where(and(
+    inArray(weatherStations.source, ["opensensemap", "cwop"]),
+    gte(weatherStations.refLat, latBounds.min),
+    lte(weatherStations.refLat, latBounds.max),
+    gte(weatherStations.refLon, lonBounds.min),
+    lte(weatherStations.refLon, lonBounds.max),
+  ));
+}
+
+/**
  * Stations officielles Météo-France validées et actives, archivées pour la même
  * référence de favori que le capteur évalué. Leur désaccord réel mesure la
  * borne d'acceptation : une station persistée pour une autre référence ne doit

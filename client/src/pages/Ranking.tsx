@@ -270,10 +270,21 @@ export default function Ranking() {
   const instantDeltaC = data?.instantDeltaC ?? null;
   const modelReferences = liveStationData?.modelReferences ?? [];
   const realLocalStations = currentSources.filter((station) => station.isActive && station.sourceKind === "physical");
-  const candidateSources = currentSources.filter((station) => station.qualificationStatus === "candidate");
+  // Les deux populations passent par le helper partagé, celui que la carte et
+  // les badges utilisent : une seule définition du statut affiché, donc aucune
+  // divergence possible entre le compteur et la pastille.
+  const candidateSources = currentSources.filter((station) => getStationDisplayStatus(station) === "candidate");
   // Un capteur citoyen validé n’est pas « écarté » : son verdict persisté le
   // distingue d’une source exclue, même s’il reste hors de la fusion locale.
-  const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate" && station.qualificationStatus !== "validated");
+  //
+  // Conséquence visible, assumée : une station non citoyenne inactive (Météo-
+  // France, Netatmo) est désormais comptée dans « Écartées ». L’ancien filtre
+  // portait un garde `!== "validated"` trop large — et `validated` est le défaut
+  // du schéma — si bien que ces stations n’apparaissaient dans AUCUN compteur :
+  // elles disparaissaient en silence, ce que ce dépôt s’interdit. Le helper
+  // implémente l’intention réellement visée (seul un citoyen validé échappe au
+  // statut « écarté ») et rend ces stations à nouveau visibles.
+  const ignoredSources = currentSources.filter((station) => getStationDisplayStatus(station) === "excluded");
   const physicalStationExplanation = explainPhysicalStationAvailability(
     liveStationData?.physicalStationDiagnostics,
     candidateSources.length,
