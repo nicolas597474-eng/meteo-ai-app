@@ -2284,3 +2284,57 @@
   transition: none !important;
   will-change: auto !important;
 }
+
+/* Décor de la demi-sphère « Soleil & Lune » : montagnes en perspective,
+   étoiles scintillantes et brume de vallée, accordées à la phase du ciel. */
+.celestial-landscape {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.celestial-landscape__far { fill: rgb(125 155 200 / 0.32); }
+.celestial-landscape__mid { fill: rgb(74 104 153 / 0.46); }
+.celestial-landscape__near { fill: rgb(12 24 46 / 0.78); }
+.celestial-landscape-mist { fill: rgb(226 232 240 / 0.14); }
+
+/* Jour : reliefs bleutés baignés de lumière. */
+.celestial-arc-scene--day .celestial-landscape__far { fill: rgb(147 183 224 / 0.34); }
+.celestial-arc-scene--day .celestial-landscape__mid { fill: rgb(96 133 184 / 0.5); }
+.celestial-arc-scene--day .celestial-landscape__near { fill: rgb(21 40 72 / 0.8); }
+
+/* Crépuscule : pourpres et ambré derrière les crêtes. */
+.celestial-arc-scene--twilight .celestial-landscape__far { fill: rgb(139 124 186 / 0.36); }
+.celestial-arc-scene--twilight .celestial-landscape__mid { fill: rgb(92 79 141 / 0.5); }
+.celestial-arc-scene--twilight .celestial-landscape__near { fill: rgb(21 17 42 / 0.82); }
+.celestial-arc-scene--twilight .celestial-landscape-mist { fill: rgb(251 215 170 / 0.16); }
+
+/* Nuit : bleu profond, les étoiles prennent le relais. */
+.celestial-arc-scene--night .celestial-landscape__far { fill: rgb(56 74 120 / 0.34); }
+.celestial-arc-scene--night .celestial-landscape__mid { fill: rgb(34 48 86 / 0.5); }
+.celestial-arc-scene--night .celestial-landscape__near { fill: rgb(7 12 28 / 0.85); }
+
+.celestial-landscape-star { fill: rgb(224 231 255 / 0.9); }
+.celestial-arc-scene--day .celestial-landscape-star { display: none; }
+.celestial-arc-scene--twilight .celestial-landscape-star { opacity: 0.45; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .celestial-landscape-star { animation: celestial-landscape-twinkle 4.4s ease-in-out infinite; }
+  .celestial-landscape-star:nth-of-type(2n) { animation-delay: -1.5s; }
+  .celestial-landscape-star:nth-of-type(3n) { animation-delay: -2.8s; }
+  .celestial-landscape-mist--near { animation: celestial-landscape-mist-drift 26s ease-in-out infinite; }
+  .celestial-landscape-mist--far { animation: celestial-landscape-mist-drift 34s ease-in-out -11s infinite reverse; }
+}
+
+@keyframes celestial-landscape-twinkle {
+  0%, 100% { opacity: 0.22; }
+  50% { opacity: 0.95; }
+}
+
+@keyframes celestial-landscape-mist-drift {
+  0%, 100% { transform: translateX(-2.5%); opacity: 0.12; }
+  50% { transform: translateX(2.5%); opacity: 0.3; }
+}
