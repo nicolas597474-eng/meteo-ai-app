@@ -73,9 +73,22 @@ node scripts/check-arome-key.mjs --coverage # + un GetCoverage GeoTIFF réel
 
 Le script n'affiche jamais la clé ni le jeton (empreintes masquées uniquement) et indique, étape par étape, où ça casse : forme de la valeur → échange OAuth2 → `GetCapabilities` → `DescribeCoverage` → `GetCoverage`. Un 401 à l'étape 1 = clé ; un 401/403 à l'étape 2 avec jeton obtenu = abonnement.
 
-## 5. Correctifs possibles (à valider avant implémentation)
+## 5. Correctifs appliqués sur cette branche
 
-1. **Normaliser et valider `METEOFRANCE_API_KEY`** au démarrage : accepter `id:secret` (et l'encoder en base64), détecter un JWT ou un jeton `__…__` et renvoyer un message explicite plutôt qu'un 401 générique. Faible risque.
-2. **Documenter la variable** dans `.env.example` (valeur attendue = `APPLICATION_ID` base64 du portail, abonnement AROME requis) et dans `docs/arome-hondeghem-shadow.md`.
-3. **Corriger ou supprimer le chemin 3** (`realWeatherAPIs.ts:143-179` + `scripts/test-real-apis.mjs`) : aujourd'hui il consomme une clé valide contre un service qui ne l'accepte pas.
-4. **Rien à faire** si le symptôme concerne AROME dans les prévisions affichées au-delà de J+1 : c'est l'horizon documenté du modèle.
+1. **Normalisation de `METEOFRANCE_API_KEY`** — nouveau module `server/meteoFranceCredentials.ts` :
+   - absent/vide → statut `missing-key` (inchangé) ;
+   - JWT ou jeton `__…__` du site mobile → nouveau statut **`invalid-key`**, cause explicite, **aucune requête envoyée** ;
+   - paire `client_id:client_secret` en clair → encodée automatiquement en base64 pour l'en-tête `Basic` ;
+   - base64 → transmis tel quel ; forme inconnue → transmise telle quelle (comportement historique préservé).
+2. **Messages d'authentification précisés** : un 401 sur `/token` indique désormais qu'un `APPLICATION_ID` généré pour une autre API du portail est refusé.
+3. **Interface** (`client/src/pages/WeatherDetails.tsx`) : nouveau libellé « Clé AROME inutilisable » (et « Identifiant OAuth inutilisable » pour la vérification DD) ; les deux panneaux admin affichent la cause exacte.
+4. **Suppression du chemin 3** : `server/realWeatherAPIs.ts` ne conserve plus que `wmoToConditionFr` ; les adaptateurs morts qui envoyaient un jeton portail-api à l'API privée `rpcache-aa` sont retirés, et `scripts/test-real-apis.mjs` renvoie vers le nouveau diagnostic au lieu de reproduire l'appel fautif.
+5. **Documentation** : `.env.example` décrit la valeur attendue (`APPLICATION_ID` base64, abonnement AROME, identifiant propre à chaque API).
+6. **Script de diagnostic** `scripts/check-arome-key.mjs` (voir §4).
+
+Non modifié volontairement : le flux AROME de production (Open-Meteo, sans clé). AROME reste absent au-delà de J+1 — horizon documenté de 2 jours du modèle, pas un défaut.
+
+## 6. Validation
+
+- `npx vitest run` : **241 fichiers / 1248 tests verts**, dont 7 nouveaux tests d'identifiant et 2 nouveaux tests shadow (`invalid-key`, encodage de la paire).
+- `npx tsc --noEmit` : aucune erreur sur les fichiers modifiés (les 5 erreurs restantes sont préexistantes dans `server/fusionEngine.ts` et `shared/experimentalForecastConfidence.ts`).

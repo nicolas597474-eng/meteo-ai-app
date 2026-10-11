@@ -69,6 +69,34 @@ describe("AROME Hondeghem shadow comparison", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("refuse un jeton d’accès collé dans METEOFRANCE_API_KEY sans interroger le portail", async () => {
+    const fetchImpl = vi.fn();
+    const jwt = `${Buffer.from('{"alg":"HS256"}', "utf8").toString("base64url")}.${Buffer.from('{"sub":"x"}', "utf8").toString("base64url")}.sig`;
+    const verification = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: jwt, fetchImpl: fetchImpl as typeof fetch });
+    expect(verification.status).toBe("invalid-key");
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    const comparison = await runHondeghemAromeShadowComparison({ oauthApplicationId: jwt, fetchImpl: fetchImpl as typeof fetch });
+    expect(comparison.status).toBe("invalid-key");
+    expect(comparison.message).toContain("jeton d’accès");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("encode une paire client_id:client_secret avant l’en-tête Basic", async () => {
+    const { fetchImpl, requests, decodePoint } = createFetchMock();
+    const result = await runHondeghemAromeShadowComparison({
+      oauthApplicationId: "my-client-id:my-client-secret",
+      fetchImpl: fetchImpl as typeof fetch,
+      now: () => new Date("2026-09-29T01:00:00Z"),
+      sleep: async () => undefined,
+      decodePoint,
+    });
+    expect(result.status, result.message).toBe("ok");
+    const tokenRequest = requests.find(({ url }) => url.pathname === "/token")!;
+    expect((tokenRequest.init?.headers as Record<string, string>).Authorization)
+      .toBe(`Basic ${Buffer.from("my-client-id:my-client-secret", "utf8").toString("base64")}`);
+  });
+
   it("découvre l’ID réel au clic et confirme seulement les métadonnées 10 m, degrés et temps du run", async () => {
     const syntheticDirectionId = "SYNTHETIC_WIND_DIRECTION_FIELD___2026-09-29T00.00.00Z";
     const requests: URL[] = [];

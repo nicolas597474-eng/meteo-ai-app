@@ -88,52 +88,15 @@ async function testMFOpenMeteo() {
   }
 }
 
-// ─── Météo-France via portail OAuth2 (si clé disponible) ─────────────────────
+// ─── Météo-France Portail ────────────────────────────────────────────────────
+// Ancienne version : ce test échangeait METEOFRANCE_API_KEY contre un jeton OAuth2
+// sur portail-api.meteofrance.fr, puis l'envoyait à rpcache-aa.meteofrance.com
+// (API privée du site/appli mobile) : refus 401 systématique, sans rapport avec la clé.
+// Le diagnostic AROME réel est dans scripts/check-arome-key.mjs.
 async function testMFPortail() {
-  if (!MF_KEY) { console.log("ℹ️  MF Portail : clé OAuth2 non configurée (fallback Open-Meteo utilisé)"); return; }
-
-  console.log("   🔑 Échange OAuth2 en cours...");
-  let bearerToken = null;
-  try {
-    const tokenRes = await fetch("https://portail-api.meteofrance.fr/token", {
-      method: "POST",
-      headers: { Authorization: `Basic ${MF_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: "grant_type=client_credentials",
-    });
-    if (tokenRes.ok) {
-      const tokenData = await tokenRes.json();
-      bearerToken = tokenData.access_token;
-      console.log(`   ✅ Token obtenu (expire dans ${tokenData.expires_in}s)`);
-    } else {
-      const txt = await tokenRes.text();
-      console.log(`   ⚠️  Token exchange HTTP ${tokenRes.status} — fallback Open-Meteo utilisé`);
-      console.log(`   Détail: ${txt.slice(0, 150)}`);
-      return;
-    }
-  } catch (err) {
-    console.log(`   ⚠️  Token exchange erreur: ${err.message} — fallback Open-Meteo utilisé`);
-    return;
-  }
-
-  try {
-    const url = `https://rpcache-aa.meteofrance.com/internet2018client/2.0/forecast?lat=${LAT}&lon=${LON}&lang=fr`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${bearerToken}`, Accept: "application/json" } });
-    if (res.ok) {
-      const data = await res.json();
-      const daily = data?.daily_forecast ?? [];
-      console.log(`✅ MF Portail (prévisions officielles) : ${daily.length} jours reçus`);
-      if (daily.length > 0) {
-        const d = daily[0];
-        const date = new Date(d.dt * 1000).toISOString().slice(0, 10);
-        console.log(`   📅 ${date} | 🌡 ${d.T?.min}°C — ${d.T?.max}°C | 🌧 ${d.precipitation?.["24h"]} mm | ☁️ ${d.weather?.desc}`);
-      }
-    } else {
-      const text = await res.text();
-      console.log(`   ⚠️  MF Portail HTTP ${res.status}: ${text.slice(0, 200)}`);
-    }
-  } catch (err) {
-    console.log(`   ⚠️  MF Portail erreur: ${err.message}`);
-  }
+  if (!MF_KEY) { console.log("\u2139\ufe0f  MF Portail : METEOFRANCE_API_KEY non configurée (aucun test d'authentification)"); return; }
+  console.log("   \u2795 Diagnostic de la chaîne AROME : lancer \u00ab node scripts/check-arome-key.mjs \u00bb");
+  console.log("   \u26a0\ufe0f  L'endpoint rpcache-aa.meteofrance.com n'accepte pas un jeton portail-api : il n'est plus appelé ici.");
 }
 
 await testOWM();

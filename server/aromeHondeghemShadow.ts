@@ -1,5 +1,6 @@
 import { fromArrayBuffer } from "geotiff";
 import { ENV } from "./_core/env";
+import { inspectMeteoFranceCredential } from "./meteoFranceCredentials";
 import { HONDEGHEM } from "./weatherServices";
 
 export const AROME_WCS_PROFILE = "MF-NWP-HIGHRES-AROME-001-FRANCE-WCS";
@@ -10,7 +11,7 @@ const OPEN_METEO_MODEL = "meteofrance_arome_france_hd";
 const MAX_HOURS = 24;
 const METRICS = ["temperature", "precipitation", "windSpeed"] as const;
 export type AromeShadowMetric = typeof METRICS[number];
-export type AromeShadowStatus = "ok" | "partial" | "missing-key" | "authentication-error" | "request-impossible";
+export type AromeShadowStatus = "ok" | "partial" | "missing-key" | "invalid-key" | "authentication-error" | "request-impossible";
 
 const COVERAGE_PATTERNS: Record<AromeShadowMetric, RegExp> = {
   temperature: /^TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___/i,
@@ -324,6 +325,7 @@ export type AromeWindDirectionVerificationStatus =
   | "not-confirmed"
   | "not-advertised"
   | "missing-key"
+  | "invalid-key"
   | "authentication-error"
   | "request-impossible";
 
@@ -381,10 +383,10 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
 ): Promise<AromeWindDirectionVerificationResult> {
   const checkedAt = (options.now?.() ?? new Date()).toISOString();
   const base = (status: AromeWindDirectionVerificationStatus, message: string, run: string | null = null, candidates: AromeWindDirectionCoverageCandidate[] = []) => ({ status, message, checkedAt, run, candidates });
-  const oauthApplicationId = options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId;
-  if (!oauthApplicationId?.trim()) {
-    return base("missing-key", "Identifiant d’application OAuth2 METEOFRANCE_API_KEY manquant : aucune requête fournisseur n’a été envoyée.");
-  }
+  const credential = inspectMeteoFranceCredential(options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId);
+  if (credential.kind === "missing") return base("missing-key", credential.message);
+  if (!credential.basic) return base("invalid-key", credential.message);
+  const oauthApplicationId = credential.basic;
 
   const fetchImpl = options.fetchImpl ?? fetch;
   let step = "l’échange OAuth2 Météo-France";
@@ -486,10 +488,10 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
  */
 export async function runHondeghemAromeShadowComparison(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
   const comparedAt = (options.now?.() ?? new Date()).toISOString();
-  const oauthApplicationId = options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId;
-  if (!oauthApplicationId?.trim()) {
-    return baseResult("missing-key", "Identifiant d’application OAuth2 METEOFRANCE_API_KEY manquant : aucune requête fournisseur n’a été envoyée.", comparedAt);
-  }
+  const credential = inspectMeteoFranceCredential(options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId);
+  if (credential.kind === "missing") return baseResult("missing-key", credential.message, comparedAt);
+  if (!credential.basic) return baseResult("invalid-key", credential.message, comparedAt);
+  const oauthApplicationId = credential.basic;
   const fetchImpl = options.fetchImpl ?? fetch;
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const decodePoint = options.decodePoint ?? getPointFromGeoTiffBytes;
@@ -513,7 +515,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     });
     if (!tokenResponse.ok) {
       if (tokenResponse.status === 401 || tokenResponse.status === 403) {
-        return { ...result, status: "authentication-error", message: `Échange OAuth2 Météo-France refusé (HTTP ${tokenResponse.status}); vérifiez l’abonnement AROME et l’identifiant d’application.` };
+        return { ...result, status: "authentication-error", message: `Échange OAuth2 Météo-France refusé (HTTP ${tokenResponse.status}). Vérifiez que METEOFRANCE_API_KEY contient bien l’APPLICATION_ID base64 du portail et que le compte est abonné à l’API AROME : un APPLICATION_ID généré pour une autre API du portail est refusé.` };
       }
       return { ...result, message: `Service de jeton OAuth2 Météo-France indisponible (HTTP ${tokenResponse.status}).` };
     }
