@@ -130,6 +130,17 @@ describe("page Fiabilité", () => {
     expect(source.indexOf("Carte des stations")).toBeLessThan(source.indexOf("Relevés des stations"));
   });
 
+  it("place la santé du dernier lot global et la couverture du lieu choisi tout en bas de la page", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    const sections = readFileSync(new URL("../components/weather/CollectionObservabilitySections.tsx", import.meta.url), "utf8");
+    expect(source).toContain("CollectionObservabilitySections");
+    expect(source.indexOf("Voir les relevés et comparaisons détaillés")).toBeLessThan(source.indexOf("<CollectionObservabilitySections />"));
+    expect(source.indexOf("<CollectionObservabilitySections />")).toBeLessThan(source.indexOf("<SourceDetailsDialog"));
+    expect(source.indexOf("<CollectionObservabilitySections />")).toBeLessThan(source.indexOf("<BackToTopButton"));
+    expect(sections).toContain("Santé du dernier lot global");
+    expect(sections).toContain("Couverture du lieu choisi");
+  });
+
   it("propose une relance physique explicite sans présenter la collecte comme une prévision", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("refreshPhysicalStationSnapshots.useMutation");

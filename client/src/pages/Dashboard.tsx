@@ -27,9 +27,6 @@ import { getLoginUrl } from "@/const";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WeatherStatusBadge } from "@/components/weather/WeatherStatusBadge";
 import { HourlyWeightingNotice } from "@/components/weather/HourlyWeightingNotice";
-import { countArchivedSnapshotSlots, formatCollectionDuration } from "@/lib/collectionHealth";
-import { getDashboardObservability } from "@/lib/dashboardObservability";
-import { formatCollectionTimestamp } from "@/lib/collectionTimestamp";
 import { formatCurrentStateProvenance, formatDashboardNumber, getRegimeProvenancePresentation, withCurrentSnapshotFallback, type CurrentStateFieldLike } from "@/lib/dashboardPresentation";
 import { getDashboardWind } from "@/lib/dashboardWind";
 import { getDashboardSky } from "@/lib/dashboardSky";
@@ -39,7 +36,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour, getOfficialForecastCoordinates } from "@/lib/officialForecast";
 import { useOfficialForecast } from "@/hooks/useOfficialForecast";
 import { OfficialForecastCalculationTimes } from "@/components/weather/OfficialForecastCalculationTimes";
-import type { OfficialRegimeInputDiagnostic, RegimeInputStatus } from "@shared/regimeInputDiagnostics";
 
 const HourlyChart = lazy(() => import("@/components/HourlyChart"));
 const FifteenDayChart = lazy(() => import("@/components/FifteenDayChart"));
@@ -502,40 +498,6 @@ const PERSONAL_CONDITION_OPTIONS = [
 const PERSONAL_PRECIPITATION_CONDITIONS = new Set(["few_drops", "drizzle", "light_rain", "rain", "heavy_rain", "showers", "storm"]);
 const acceptsPersonalPrecipitation = (condition: string) => PERSONAL_PRECIPITATION_CONDITIONS.has(condition);
 
-type HourlyCollectionTrace = {
-  status: "stored" | "no_station" | "failed" | "missing";
-  date: string;
-  hour: number;
-  attempts: number;
-  stationCount: number;
-  reason?: string | null;
-};
-
-type ForecastRunStatus = "completed" | "partial" | "failed";
-
-function formatCollectionDateTime(value: string | Date | null | undefined): string {
-  return value ? formatCollectionTimestamp(value) : "Aucun succès vérifiable";
-}
-
-function hourlyCollectionPresentation(trace: HourlyCollectionTrace) {
-  if (trace.status === "stored" && trace.reason?.startsWith("Archivé via la reprise automatique")) return { label: "Archivé via reprise", className: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100" };
-  if (trace.status === "stored") return { label: "Données archivées", className: "border-emerald-300/25 bg-emerald-300/10 text-emerald-100" };
-  if (trace.status === "no_station") return { label: "Aucune station qualifiée", className: "border-amber-300/25 bg-amber-300/10 text-amber-100" };
-  if (trace.status === "missing") return { label: "Créneau sans trace", className: "border-orange-300/25 bg-orange-300/10 text-orange-100" };
-  return { label: "Erreur technique", className: "border-red-300/25 bg-red-300/10 text-red-100" };
-}
-
-function hourlyCollectionMoment(trace: HourlyCollectionTrace) {
-  return `${new Date(`${trace.date}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" })} · ${String(trace.hour).padStart(2, "0")} h`;
-}
-
-const regimeInputStatusLabels: Record<RegimeInputStatus, string> = {
-  available: "Disponible",
-  missing: "Absente",
-  invalid: "Invalide",
-  stale: "Périmée",
-};
-
 function DominantRegimePanel({
   regime,
   panelDate,
@@ -660,9 +622,6 @@ export default function Dashboard() {
   const [personalSubmitResult, setPersonalSubmitResult] = useState<{ notice: string } | null>(null);
   const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
-  const [isCollectionHealthOpen, setIsCollectionHealthOpen] = useState(false);
-  const [collectionUpdateNotice, setCollectionUpdateNotice] = useState<HourlyCollectionTrace | null>(null);
-  const latestCollectionTraceKeyRef = useRef<string | null>(null);
   const [showAllLocalContributors, setShowAllLocalContributors] = useState(false);
   const [editingPersonalObservation, setEditingPersonalObservation] = useState<{ id: number; temperature: string; windSpeed: string; precipitation: string; condition: (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] } | null>(null);
   // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
@@ -775,43 +734,6 @@ export default function Dashboard() {
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
     coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
   );
-  const { data: collectionHealthReport } = trpc.weather.getForecastCollectionReport.useQuery(
-    coordsInput,
-    {
-      staleTime: 15_000,
-      refetchInterval: 15_000,
-      refetchIntervalInBackground: false,
-      refetchOnWindowFocus: true,
-    }
-  );
-  const hourlyCollectionHistory = (collectionHealthReport?.hourlyHistory ?? []) as HourlyCollectionTrace[];
-  const archivedSnapshotSlots = countArchivedSnapshotSlots(hourlyCollectionHistory);
-  const technicalFailureStreak = collectionHealthReport?.technicalFailureStreak ?? 0;
-  const missingSnapshotSlots = collectionHealthReport?.missingSnapshotSlots ?? 0;
-  const latestHourlyCollection = hourlyCollectionHistory[0] ?? null;
-  const latestForecastRun = collectionHealthReport?.lastForecastRun ?? null;
-  const latestForecastRunStatus: ForecastRunStatus | null = latestForecastRun?.status === "failed"
-    ? "failed"
-    : latestForecastRun?.status === "partial"
-      ? "partial"
-      : latestForecastRun?.status === "completed"
-        ? "completed"
-        : null;
-  const latestForecastSuccessAt = collectionHealthReport?.lastForecastSuccess?.collectedAt ?? null;
-  const latestForecastSuccessDurationMs = collectionHealthReport?.lastForecastSuccess?.status === "completed" && latestForecastRun?.status === "completed" && latestForecastSuccessAt && latestForecastRun.collectedAt
-    && new Date(latestForecastSuccessAt).getTime() === new Date(latestForecastRun.collectedAt).getTime()
-    ? latestForecastRun.durationMs
-    : null;
-  const latestCollectionTraceKey = latestHourlyCollection
-    ? [
-        latestHourlyCollection.date,
-        latestHourlyCollection.hour,
-        latestHourlyCollection.status,
-        latestHourlyCollection.stationCount,
-        latestHourlyCollection.attempts,
-        latestHourlyCollection.reason ?? "",
-      ].join("|")
-    : null;
   const utils = trpc.useUtils();
   const { data: personalObservationState, refetch: refetchPersonalObservationState } = trpc.personalObservations.dashboardState.useQuery(
     coordsInput,
@@ -884,20 +806,6 @@ export default function Dashboard() {
     const timeoutId = window.setTimeout(() => setHasWaitTimedOut(true), DASHBOARD_LOAD_TIMEOUT_MS);
     return () => window.clearTimeout(timeoutId);
   }, [isLoading]);
-
-  useEffect(() => {
-    latestCollectionTraceKeyRef.current = null;
-    setCollectionUpdateNotice(null);
-  }, [coordsInput.lat, coordsInput.lon]);
-
-  useEffect(() => {
-    if (!latestCollectionTraceKey || !latestHourlyCollection) return;
-    const previousKey = latestCollectionTraceKeyRef.current;
-    latestCollectionTraceKeyRef.current = latestCollectionTraceKey;
-    if (previousKey && previousKey !== latestCollectionTraceKey && latestHourlyCollection.status !== "missing") {
-      setCollectionUpdateNotice(latestHourlyCollection);
-    }
-  }, [latestCollectionTraceKey, latestHourlyCollection]);
 
   if (hasWaitTimedOut) {
     return (
@@ -995,17 +903,6 @@ export default function Dashboard() {
   const regimeSourceLabel = showProvenance ? regimeProvenance.sourceLabel : "";
   const regimeSourceUpdatedAt = showProvenance ? regimeProvenance.sourceTimeLabel : null;
   const liveRegimeFreshnessLabel = showProvenance ? regimeProvenance.freshnessLabel : "";
-  const regimeInputDiagnostics = Array.isArray(officialRegime?.inputDiagnostics)
-    ? officialRegime.inputDiagnostics as OfficialRegimeInputDiagnostic[]
-    : null;
-  const dashboardObservability = getDashboardObservability({
-    selectedLocationLabel: selectedLocation?.name,
-    selectedLocationRegimeInputs: regimeInputDiagnostics,
-    latestGlobalBatchStatus: latestForecastRunStatus,
-    latestGlobalBatchAt: latestForecastRun?.collectedAt ?? null,
-  });
-  const regimeInputCoverage = dashboardObservability.selectedLocationCoverage;
-  const collectionHealth = dashboardObservability.latestGlobalBatchHealth;
   const allRegimeIds = regimeCatalogue.map((candidate: any) => candidate.id);
   const allRegimesExpanded = allRegimeIds.length > 0 && allRegimeIds.every((id) => expandedRegimeIds.includes(id));
   const netatmoStatusLabel: Record<string, string> = {
@@ -1190,32 +1087,6 @@ export default function Dashboard() {
                     ☁ {regime?.weights?.condition == null ? "—" : `${Math.round(regime.weights.condition * 100)}%`}
                   </span>
                 </div>
-                <details className="mt-2 rounded-lg border border-slate-600/35 bg-slate-950/25 px-2 py-1.5">
-                  <summary className="cursor-pointer text-[9px] font-semibold text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">
-                    Couverture du lieu choisi · {dashboardObservability.selectedLocationLabel} · {regimeInputCoverage.status === "unavailable" ? "diagnostic indisponible" : `${regimeInputCoverage.available}/${regimeInputCoverage.total} disponibles`}
-                  </summary>
-                  <div className="mt-1.5 space-y-1.5" aria-label="Entrées réellement retenues pour le régime">
-                    <p className="text-[8px] leading-relaxed text-slate-400">Valeurs exactes retenues pour ce calcul; elles ne prouvent pas, à elles seules, la cause d’un régime indisponible.</p>
-                    {regimeInputDiagnostics?.length ? regimeInputDiagnostics.map((input) => {
-                      const sourceTime = formatCollectionTimestamp(input.sourceUpdatedAt);
-                      const validityTime = input.validAt && input.validAt !== input.sourceUpdatedAt
-                        ? ` · validité ${formatCollectionTimestamp(input.validAt)}`
-                        : "";
-                      const sourceAge = input.sourceAgeMinutes == null ? "âge inconnu" : `âge ${input.sourceAgeMinutes} min`;
-                      return (
-                        <div key={input.key} className="rounded-md border border-slate-700/40 bg-black/15 px-2 py-1">
-                          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-                            <span className="text-[9px] font-semibold text-slate-100">{input.label}</span>
-                            <span className="text-[9px] font-medium text-slate-200">
-                              {regimeInputStatusLabels[input.status]} · {input.value == null ? "—" : `${formatDashboardNumber(input.value)} ${input.unit}`}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 break-words text-[8px] leading-relaxed text-slate-400">{input.sourceLabel ?? "Source indisponible"} · source {sourceTime}{validityTime} · {sourceAge}</p>
-                        </div>
-                      );
-                    }) : <p className="text-[9px] text-slate-400">Diagnostic détaillé des valeurs sélectionnées indisponible.</p>}
-                  </div>
-                </details>
                 {showRegimeMenu && (
                   <div id="regime-catalogue" className="mt-2 rounded-lg border border-slate-600/35 bg-slate-950/30 p-2" aria-label="Tous les régimes météo possibles">
                     <div className="mb-2 flex items-center justify-between gap-2 px-1">
@@ -1297,13 +1168,6 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-
-            <div className="mb-3">
-              <button type="button" onClick={() => setIsCollectionHealthOpen(true)} aria-haspopup="dialog" aria-expanded={isCollectionHealthOpen} aria-controls="collection-health-panel" aria-label={`Ouvrir l’historique des collectes : ${collectionHealth.detail}`} className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left shadow-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${collectionHealth.tone}`}>
-                <span className="flex min-w-0 items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${collectionHealth.dot}`} aria-hidden="true" /><span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-[0.12em] opacity-75">Santé du dernier lot global</span><strong className="block truncate text-[11px]">{collectionHealth.label}</strong><span className="block truncate text-[9px] opacity-80">{collectionHealth.detail}</span>{collectionUpdateNotice && <span className="mt-0.5 flex items-center gap-1 text-[9px] font-semibold text-cyan-100" role="status" aria-live="polite"><Activity className="h-3 w-3 shrink-0" aria-hidden="true" />Trace · {hourlyCollectionMoment(collectionUpdateNotice)} · {hourlyCollectionPresentation(collectionUpdateNotice).label}</span>}</span></span><span className="shrink-0 text-[9px] font-semibold text-white/80">Détails&nbsp;→</span>
-                <span className="shrink-0 text-right text-[9px] leading-tight opacity-85">{collectionHealthReport ? `${archivedSnapshotSlots}/${hourlyCollectionHistory.length}` : "—/24"}<br />créneaux archivés pour ce lieu</span>
-              </button>
-            </div>
 
             {nextWeatherAlert && (
               <div className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 ${
@@ -1466,30 +1330,6 @@ export default function Dashboard() {
 
             </div>
           </div>
-
-        <Dialog open={isCollectionHealthOpen} onOpenChange={setIsCollectionHealthOpen}>
-          <DialogContent id="collection-health-panel" showCloseButton={false} className="max-h-[calc(100dvh-1rem)] overflow-y-auto border-slate-700 bg-[#10131a] p-4 text-slate-100 sm:max-w-xl" aria-label="Santé des collectes automatiques">
-            <DialogHeader><div className="flex items-start justify-between gap-3"><div><DialogTitle className="text-white">Santé des collectes</DialogTitle><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Les 24 derniers créneaux physiques pour ce lieu. Une absence de station qualifiée n’est pas une erreur technique ; un créneau sans trace est affiché explicitement.</p></div><button type="button" onClick={() => setIsCollectionHealthOpen(false)} aria-label="Fermer l’historique des collectes" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-600 text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"><X className="h-4 w-4" /></button></div></DialogHeader>
-            <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Le statut du dernier lot est global; snapshots de couverture et créneaux physiques ci-dessous concernent <strong>{selectedLocation?.name ?? "le lieu affiché"}</strong>.</p>
-            {collectionUpdateNotice && <div className="mt-3 flex items-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-cyan-50" role="status" aria-live="polite"><Activity className="h-4 w-4 shrink-0" aria-hidden="true" /><div><p className="text-[11px] font-semibold">Trace horaire mise à jour</p><p className="mt-0.5 text-[10px] text-cyan-100/80">Passage de {hourlyCollectionMoment(collectionUpdateNotice)} · {hourlyCollectionPresentation(collectionUpdateNotice).label}.</p></div></div>}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-sky-200/75">Couverture du lieu choisi</p><p className="mt-1 text-sm font-semibold text-slate-100">{formatCollectionDateTime(collectionHealthReport?.lastForecastSuccess?.collectedAt)}</p><p className="mt-1 text-[10px] text-slate-400">{collectionHealthReport?.lastForecastSuccess?.status === "completed" ? "Dernier snapshot complet pour ce lieu" : collectionHealthReport?.lastForecastSuccess?.status === "partial" ? "Dernier snapshot partiel pour ce lieu" : collectionHealthReport?.lastForecastSuccess ? "Statut du dernier snapshot local indisponible" : "Aucun snapshot local vérifiable"} · durée {formatCollectionDuration(latestForecastSuccessDurationMs)} · prochain passage global {collectionHealthReport?.nextForecastRun ? formatCollectionDateTime(collectionHealthReport.nextForecastRun) : "non connu"}.</p></div><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-[0.12em] text-cyan-200/75">Stations physiques du lieu</p><p className="mt-1 text-sm font-semibold text-slate-100">{latestHourlyCollection ? hourlyCollectionMoment(latestHourlyCollection) : "Aucun passage vérifiable"}</p><p className="mt-1 text-[10px] text-slate-400">{technicalFailureStreak ? `${technicalFailureStreak} échec(s) technique(s) consécutif(s).` : "Aucune série d’échecs techniques."}</p></div></div>
-            <div className="mt-3 space-y-2" aria-label="Deux dernières collectes globales de prévisions">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300">Deux derniers lots globaux de prévisions</p>
-              <p className="text-[10px] leading-relaxed text-slate-400">Le total horaire exige une série archivée complète, sa projection attendue et le résultat du modèle dans le journal du lot. La couverture par lieu et les relevés physiques restent suivis séparément.</p>
-              {(collectionHealthReport?.recentForecastRuns ?? []).length > 0 ? collectionHealthReport!.recentForecastRuns.map((run, index) => (
-                <article key={`${run.startedAt}-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-[11px] font-semibold text-slate-100">{formatCollectionDateTime(run.startedAt)}</p>
-                    <span className="shrink-0 text-[10px] font-medium text-slate-300">{run.status === "completed" ? "Terminée" : run.status === "partial" ? "Partielle" : run.status === "failed" ? "Échec" : "En cours"}</span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-slate-400">Journalier {run.dailyModelsCollected}/{run.dailyModelsExpected} · horaire {run.hourlyModelsCollected}/{run.hourlyModelsExpected} · {run.locationsProcessed} lieu(x).</p>
-                  {run.errorMessage && <p className="mt-1 text-[10px] leading-relaxed text-amber-200/90">{run.errorMessage}</p>}
-                </article>
-              )) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-[10px] text-slate-400">Aucune collecte de prévisions horodatée n’est encore archivée.</p>}
-            </div>
-            <div className="mt-3 space-y-2" aria-label="Historique des 24 derniers créneaux horaires">{hourlyCollectionHistory.length ? hourlyCollectionHistory.map((trace) => { const presentation = hourlyCollectionPresentation(trace); return <article key={`${trace.date}-${trace.hour}`} className={`rounded-xl border p-3 ${presentation.className}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-semibold">{hourlyCollectionMoment(trace)} · {presentation.label}</p><p className="mt-1 text-[10px] leading-relaxed opacity-85">{trace.status === "stored" ? `${trace.stationCount} station(s) qualifiée(s) archivée(s) après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.` : trace.status === "no_station" ? `Passage terminé après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""} ; aucune station qualifiée.` : trace.status === "missing" ? "Le créneau est arrivé à échéance sans trace archivée ; la reprise automatique devait le rattraper." : `Échec après ${trace.attempts} tentative${trace.attempts > 1 ? "s" : ""}.`}{trace.reason ? ` ${trace.reason}` : ""}</p></div><span className="shrink-0 text-[10px] font-semibold">{trace.status === "stored" ? "✓" : trace.status === "no_station" ? "—" : trace.status === "missing" ? "?" : "!"}</span></div></article>; }) : <p className="rounded-xl border border-slate-700 bg-black/20 p-3 text-xs text-slate-400">Aucun passage horaire n’est encore archivé pour ce lieu.</p>}</div>
-          </DialogContent>
-        </Dialog>
 
         <div className="dashboard-sky-card flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card p-2" aria-label="Mode de contexte local">
           <Radio className="h-4 w-4 shrink-0 text-primary" />
