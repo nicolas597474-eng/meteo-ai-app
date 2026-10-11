@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+successfully downloaded text file (SHA: 34d33bdf0ab9d8f625f487910feb9e41fc969bdd)import { describe, expect, it } from "vitest";
 import {
   calculateExperimentalForecastConfidence,
   EXPERIMENTAL_FORECAST_CONFIDENCE_WEIGHTS,
@@ -108,7 +108,7 @@ describe("experimental forecast confidence", () => {
     expect(result.coveragePercent).toBe(100);
     expect(result.extremePenalty).toBe(0);
     expect(result.components.map(({ score }) => score)).toEqual([
-      63, 90, 70, 99, 75, 100, 50,
+      63, 90, 80, 99, 75, 100, 50,
     ]);
     const expected = Math.round(
       result.components.reduce(
@@ -185,7 +185,7 @@ describe("experimental forecast confidence", () => {
     ).toMatch(/ne sont pas identiques/i);
   });
 
-  it("n’utilise pas la MAE d’un modèle non calibré ni les poids de fusion", () => {
+  it("exclut la MAE d’un modèle non calibré sans annuler la performance historique", () => {
     const result = calculateExperimentalForecastConfidence(
       input({
         models: [
@@ -198,13 +198,45 @@ describe("experimental forecast confidence", () => {
         ],
       })
     );
-    expect(
-      result.components.find(({ key }) => key === "historicalPerformance")
-        ?.score
-    ).toBeNull();
-    expect(
-      result.components.find(({ key }) => key === "sampleSize")?.score
-    ).toBeNull();
+    const historicalPerformance = result.components.find(
+      ({ key }) => key === "historicalPerformance"
+    );
+    const sampleSize = result.components.find(
+      ({ key }) => key === "sampleSize"
+    );
+    // Sous-ensemble qualifié : modèles 1 et 3, MAE pondérée (0,5 + 1,5) / 2 = 1,0 °C.
+    expect(result.status).toBe("calculated");
+    expect(historicalPerformance?.score).toBe(80);
+    expect(sampleSize?.score).toBe(50);
+    expect(historicalPerformance?.evidence).toMatch(/2\/3 modèle\(s\)/);
+    expect(historicalPerformance?.evidence).toMatch(
+      /MAE température pondérée par la masse de preuve : 1\.00 °C/
+    );
+    expect(result.score).toBe(81);
+  });
+
+  it("pondère la MAE agrégée par la masse de preuve de chaque modèle qualifié", () => {
+    const result = calculateExperimentalForecastConfidence(
+      input({
+        models: [
+          model(1, {
+            historicalScore: { mae: 0.5, comparisonCount: 180, evaluatedDays: 15 },
+          }),
+          model(2, {
+            historicalScore: { mae: 1.5, comparisonCount: 60, evaluatedDays: 15 },
+          }),
+          model(3, {
+            historicalScore: { mae: 1.5, comparisonCount: 60, evaluatedDays: 15 },
+          }),
+        ],
+      })
+    );
+    const historicalPerformance = result.components.find(
+      ({ key }) => key === "historicalPerformance"
+    );
+    // MAE pondérée par la masse de preuve : (0,5×180 + 1,5×60 + 1,5×60) / 300 = 0,9 °C.
+    expect(historicalPerformance?.score).toBe(82);
+    expect(historicalPerformance?.evidence).toMatch(/0\.90 °C/);
   });
 
   it("n’utilise jamais updatedAt comme substitut à l’heure de mesure propre à la température", () => {
