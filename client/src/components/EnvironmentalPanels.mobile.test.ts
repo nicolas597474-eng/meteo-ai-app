@@ -94,4 +94,42 @@ describe("mise en page mobile des panneaux environnementaux", () => {
     expect(markup).toContain("Image HMI fixe · 23 août 2011, 04:00 UTC");
     expect(markup).toContain("NASA/Goddard Space Flight Center Scientific Visualization Studio");
   });
+
+  it("n’affiche plus la visibilité locale, les alertes visuelle et sonore ni le suivi plein écran", () => {
+    const astronomy = (fixture as unknown as { astronomy: Record<string, unknown> }).astronomy;
+    const eclipseFixture = {
+      ...(fixture as unknown as Record<string, unknown>),
+      astronomy: {
+        ...astronomy,
+        outlook: {
+          moonMilestones: [{ id: "full_moon", label: "Pleine lune", date: "2026-10-26" }],
+          nextSolarMilestone: { label: "Solstice de décembre", date: "2026-12-21" },
+          daylightChangeTomorrowSeconds: -240,
+          upcomingEclipses: [
+            {
+              id: "lunar_partial_2026_08_28",
+              title: "Éclipse lunaire partielle",
+              date: "2026-08-28",
+              visibility: "Visible depuis la France",
+              safetyNote: null,
+              sourceLabel: "NASA / Timeanddate",
+              sourceUrl: "https://example.test/eclipse",
+              skyOutlook: null,
+            },
+          ],
+          upcomingMeteorShowers: [],
+        },
+      },
+    } as never;
+    const markup = renderToStaticMarkup(createElement(EnvironmentalPanels, { data: eclipseFixture, isLoading: false }));
+
+    expect(markup).toContain("Alerte astronomique");
+    expect(markup).toContain("Éclipse lunaire partielle");
+    expect(markup).not.toContain("Visibilité locale");
+    expect(markup).not.toContain("Alerte visuelle");
+    expect(markup).not.toContain("Alerte sonore");
+    expect(markup).not.toContain("Suivi plein écran");
+    expect(markup).not.toContain("Suivi immersif");
+    expect(markup).not.toContain("Quitter le plein écran");
+  });
 });
