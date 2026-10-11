@@ -69,7 +69,7 @@ export type ExperimentalForecastConfidenceInput = {
 };
 
 export type ExperimentalForecastConfidenceResult = {
-  version: "experimental-v2";
+  version: "experimental-v3";
   status: "calculated" | "partial" | "unavailable";
   score: number | null;
   calculableWeight: number;
@@ -270,32 +270,41 @@ function buildSpatialCoherenceComponent(
       `${candidates.length} station(s) avec température.`
     );
 
-  const timed = candidates.map(station => ({
-    station,
-    timestamp: parseTimestamp(station.measurementTimes?.temperature),
-  }));
-  if (timed.some(({ timestamp }) => timestamp == null)) {
+  // Sous-ensemble exploitable : chaque station doit porter l'heure de mesure
+  // propre à sa température, non future et fraîche (≤180 min). Les autres
+  // stations sont exclues sans annuler le facteur; updatedAt n'est jamais un
+  // substitut.
+  const exploitable: Array<{
+    station: ExperimentalConfidenceStation;
+    timestamp: number;
+  }> = [];
+  let withoutOwnTimestamp = 0;
+  let staleOrFuture = 0;
+  for (const station of candidates) {
+    const timestamp = parseTimestamp(station.measurementTimes?.temperature);
+    if (timestamp == null) {
+      withoutOwnTimestamp++;
+      continue;
+    }
+    if (
+      timestamp > nowMs ||
+      nowMs - timestamp > STATION_MAX_AGE_MINUTES * 60_000
+    ) {
+      staleOrFuture++;
+      continue;
+    }
+    exploitable.push({ station, timestamp });
+  }
+  if (exploitable.length < 2)
     return unavailableComponent(
       "spatialCoherence",
       "Cohérence spatiale",
-      "L’heure de mesure propre à la température manque pour au moins une station; updatedAt n’est pas utilisé comme substitut.",
-      `${candidates.length} station(s) avec température, horodatage par variable incomplet.`
+      withoutOwnTimestamp > 0
+        ? "L’heure de mesure propre à la température manque pour au moins une station; updatedAt n’est pas utilisé comme substitut."
+        : "Au moins un relevé thermique est futur ou dépasse la limite de fraîcheur de 180 min.",
+      `${exploitable.length} station(s) exploitable(s) sur ${candidates.length} avec température; les autres sont exclues sans annuler le facteur.`
     );
-  }
-  const timestamps = timed.map(({ timestamp }) => timestamp as number);
-  if (
-    timestamps.some(
-      timestamp =>
-        timestamp > nowMs ||
-        nowMs - timestamp > STATION_MAX_AGE_MINUTES * 60_000
-    )
-  ) {
-    return unavailableComponent(
-      "spatialCoherence",
-      "Cohérence spatiale",
-      "Au moins un relevé thermique est futur ou dépasse la limite de fraîcheur de 180 min."
-    );
-  }
+  const timestamps = exploitable.map(({ timestamp }) => timestamp);
   const timeRangeMinutes =
     (Math.max(...timestamps) - Math.min(...timestamps)) / 60_000;
   if (timeRangeMinutes > STATION_ALIGNMENT_MINUTES) {
@@ -303,16 +312,16 @@ function buildSpatialCoherenceComponent(
       "spatialCoherence",
       "Cohérence spatiale",
       "Les relevés ne sont pas comparables : plus de 60 min séparent leurs heures de mesure.",
-      `Écart temporel constaté : ${Math.round(timeRangeMinutes)} min.`
+      `Écart temporel constaté : ${Math.round(timeRangeMinutes)} min sur ${exploitable.length} station(s) exploitable(s).`
     );
   }
-  const values = candidates.map(station => station.temperature as number);
+  const values = exploitable.map(({ station }) => station.temperature as number);
   const range = Math.max(...values) - Math.min(...values);
   return availableComponent(
     "spatialCoherence",
     "Cohérence spatiale",
     spreadScore(range),
-    `${candidates.length} stations physiques; mesures propres à la température, fraîches (≤180 min) et espacées de ${Math.round(timeRangeMinutes)} min au plus; étendue ${range.toFixed(1)} °C. Échelle expérimentale : 0 °C → 100, 8 °C ou plus → 0.`
+    `${exploitable.length} station(s) physique(s) exploitable(s) sur ${candidates.length} (horodatage propre à la température, fraîches ≤180 min, espacées de ${Math.round(timeRangeMinutes)} min au plus); étendue ${range.toFixed(1)} °C. Les stations sans heure de mesure valide ou avec relevé futur ou périmé sont exclues sans annuler le facteur. Échelle expérimentale : 0 °C → 100, 8 °C ou plus → 0.`
   );
 }
 
@@ -330,103 +339,112 @@ function hasQualifiedHistoricalScore(
   );
 }
 
-function comparableHistoricalModels(
+function qualifiedComparableSubset(
   models: readonly ExperimentalConfidenceModelValue[],
   targetValidAt: number | null
 ): {
   models: ExperimentalConfidenceModelValue[];
   total: number;
+  alignedCount: number;
+  qualifiedCount: number;
+  basis: "lead exact commun" | "tranche locale commune" | null;
   reason: string | null;
 } {
-  if (targetValidAt == null)
-    return { models: [], total: 0, reason: "Échéance exacte absente." };
+  const empty = (reason: string, alignedCount = 0, qualifiedCount = 0) => ({
+    models: [] as ExperimentalConfidenceModelValue[],
+    total: models.length,
+    alignedCount,
+    qualifiedCount,
+    basis: null as const,
+    reason,
+  });
+  if (targetValidAt == null) return empty("Échéance exacte absente.");
   const { models: atTarget, duplicateIds } = modelValuesAtTarget(
     { modelWeights: models },
     targetValidAt
   );
-  if (duplicateIds)
-    return {
-      models: [],
-      total: 0,
-      reason: "Plusieurs lignes portent le même modelId.",
-    };
+  if (duplicateIds) return empty("Plusieurs lignes portent le même modelId.");
   if (atTarget.length === 0)
-    return {
-      models: [],
-      total: 0,
-      reason: "Aucun modèle température aligné au validAt exact.",
-    };
-  if (atTarget.length !== models.length)
-    return {
-      models: [],
-      total: 0,
-      reason:
-        "Au moins une valeur de modèle n’est pas alignée au validAt exact; aucun sous-échantillon n’est utilisé.",
-    };
-  // Seuls les modèles avec une preuve historique qualifiée portent le facteur :
-  // les autres sont exclus de l’agrégat sans annuler la mesure.
+    return empty("Aucun modèle température aligné au validAt exact.");
+  // Seuls les modèles alignés au validAt exact avec une preuve historique
+  // qualifiée portent le facteur : les autres sont exclus de l'agrégat sans
+  // annuler la mesure.
   const qualified = atTarget.filter(hasQualifiedHistoricalScore);
   if (qualified.length === 0)
     return {
       models: [],
-      total: atTarget.length,
+      total: models.length,
+      alignedCount: atTarget.length,
+      qualifiedCount: 0,
+      basis: null,
       reason:
         "Aucun modèle aligné n’a de preuve historique qualifiée (CALIBRATED avec MAE et effectifs valides); aucun poids n’est réalloué aux autres facteurs.",
     };
-
-  const levels = new Set(qualified.map(model => model.calibrationLevel));
-  if (levels.size !== 1)
-    return {
-      models: [],
-      total: atTarget.length,
-      reason:
-        "Les modèles avec preuve historique qualifiée utilisent des bases de calibration différentes.",
-    };
-  const level = qualified[0]?.calibrationLevel;
-  if (level === "EXACT_LOCAL_MODEL_VARIABLE_HORIZON") {
-    const horizons = qualified.map(model => model.horizonMinutes);
+  // Chaque modèle n’est comparable que sur sa base exacte propre (lead exact
+  // ou tranche d’horizon) : les modèles qualifiés sont regroupés par base et
+  // l’agrégat suit le groupe comparable portant la plus grande masse de
+  // preuve (puis le plus grand effectif, puis l’ordre de déclaration); les
+  // autres sont exclus sans annuler le facteur.
+  type ComparableGroup = {
+    models: ExperimentalConfidenceModelValue[];
+    mass: number;
+    basis: "lead exact commun" | "tranche locale commune";
+  };
+  const groups = new Map<string, ComparableGroup>();
+  for (const model of qualified) {
+    const level = model.calibrationLevel;
+    let key: string | null = null;
+    let basis: ComparableGroup["basis"] | null = null;
     if (
-      horizons.some(horizon => !finite(horizon)) ||
-      new Set(horizons).size !== 1
+      level === "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" &&
+      finite(model.horizonMinutes)
     ) {
-      return {
-        models: [],
-        total: atTarget.length,
-        reason:
-          "Les horizons exacts des modèles avec preuve historique qualifiée ne sont pas identiques; leurs performances ne sont pas comparables.",
-      };
-    }
-  } else if (level === "EXACT_LOCAL_MODEL_VARIABLE_BUCKET") {
-    const buckets = qualified.map(model => model.horizonBucket);
-    if (
-      buckets.some(
-        bucket => typeof bucket !== "string" || bucket.trim() === ""
-      ) ||
-      new Set(buckets).size !== 1
+      key = `horizon:${model.horizonMinutes}`;
+      basis = "lead exact commun";
+    } else if (
+      level === "EXACT_LOCAL_MODEL_VARIABLE_BUCKET" &&
+      typeof model.horizonBucket === "string" &&
+      model.horizonBucket.trim() !== ""
     ) {
-      return {
-        models: [],
-        total: atTarget.length,
-        reason:
-          "Les tranches d’horizon des modèles avec preuve historique qualifiée ne sont pas identiques; leurs performances ne sont pas comparables.",
-      };
+      key = `bucket:${model.horizonBucket.trim()}`;
+      basis = "tranche locale commune";
     }
-  } else {
-    return {
-      models: [],
-      total: atTarget.length,
-      reason:
-        "La base locale de calibration n’est pas une preuve exacte modèle × variable × horizon.",
-    };
+    if (key == null || basis == null) continue;
+    const group = groups.get(key) ?? { models: [], mass: 0, basis };
+    group.models.push(model);
+    group.mass += model.historicalScore!.comparisonCount as number;
+    groups.set(key, group);
   }
-  return { models: qualified, total: atTarget.length, reason: null };
+  const ranked = Array.from(groups.values()).sort(
+    (left, right) =>
+      right.mass - left.mass || right.models.length - left.models.length
+  );
+  const heaviest = ranked[0];
+  if (!heaviest || heaviest.models.length === 0)
+    return {
+      models: [],
+      total: models.length,
+      alignedCount: atTarget.length,
+      qualifiedCount: qualified.length,
+      basis: null,
+      reason:
+        "Aucun modèle avec preuve historique qualifiée ne repose sur une base exacte modèle × variable × horizon.",
+    };
+  return {
+    models: heaviest.models,
+    total: models.length,
+    alignedCount: atTarget.length,
+    qualifiedCount: qualified.length,
+    basis: heaviest.basis,
+    reason: null,
+  };
 }
 
 function buildHistoricalPerformanceComponent(
   modelWeights: readonly ExperimentalConfidenceModelValue[],
   targetValidAt: number | null
 ): ExperimentalConfidenceComponent {
-  const result = comparableHistoricalModels(modelWeights, targetValidAt);
+  const result = qualifiedComparableSubset(modelWeights, targetValidAt);
   if (result.reason)
     return unavailableComponent(
       "historicalPerformance",
@@ -447,15 +465,11 @@ function buildHistoricalPerformanceComponent(
           (model.historicalScore!.comparisonCount as number),
       0
     ) / comparisonCount;
-  const level =
-    result.models[0]?.calibrationLevel === "EXACT_LOCAL_MODEL_VARIABLE_HORIZON"
-      ? "lead exact commun"
-      : "tranche locale commune";
   return availableComponent(
     "historicalPerformance",
     "Performance historique",
     100 * (1 - weightedMae / MAX_HISTORICAL_MAE_C),
-    `${result.models.length}/${result.total} modèle(s) aligné(s) avec preuve historique qualifiée et ${level}; MAE température pondérée par la masse de preuve : ${weightedMae.toFixed(2)} °C. Les modèles sans preuve qualifiée sont exclus de l’agrégat sans annuler le facteur. Échelle expérimentale : MAE 0 °C → 100, 5 °C ou plus → 0.`
+    `${result.models.length}/${result.total} modèle(s) aligné(s) avec preuve historique qualifiée sur ${result.basis}; MAE température pondérée par la masse de preuve : ${weightedMae.toFixed(2)} °C. Les modèles non alignés, sans preuve qualifiée ou sur une autre base exacte sont exclus de l’agrégat sans annuler le facteur. Échelle expérimentale : MAE 0 °C → 100, 5 °C ou plus → 0.`
   );
 }
 
@@ -570,7 +584,7 @@ function buildSampleSizeComponent(
   modelWeights: readonly ExperimentalConfidenceModelValue[],
   targetValidAt: number | null
 ): ExperimentalConfidenceComponent {
-  const result = comparableHistoricalModels(modelWeights, targetValidAt);
+  const result = qualifiedComparableSubset(modelWeights, targetValidAt);
   if (result.reason)
     return unavailableComponent(
       "sampleSize",
@@ -591,7 +605,7 @@ function buildSampleSizeComponent(
     "sampleSize",
     "Taille d’échantillon",
     (100 * minimumDays) / SAMPLE_SIZE_REFERENCE_DAYS,
-    `Borne conservatrice sur les ${result.models.length}/${result.total} modèle(s) avec preuve historique qualifiée : ${minimumDays} jour(s) indépendant(s) et ${minimumComparisons} comparaison(s) au minimum; score saturé à 30 jours. Les jours, pas les heures, portent l’échantillon.`
+    `Borne conservatrice sur les ${result.models.length}/${result.total} modèle(s) aligné(s) avec preuve historique qualifiée sur ${result.basis} : ${minimumDays} jour(s) indépendant(s) et ${minimumComparisons} comparaison(s) au minimum; les autres sont exclus sans annuler le facteur; score saturé à 30 jours. Les jours, pas les heures, portent l’échantillon.`
   );
 }
 
@@ -629,10 +643,14 @@ function buildExtremePenalty(
 /**
  * Read-only, explicitly experimental index for one exact next-hour temperature
  * point. Weights are fixed; missing components are never renormalized. The
- * historical-performance and sample-size factors only aggregate the models
- * holding a qualified historical proof (CALIBRATED with valid MAE and sample
- * counts); models without such proof are excluded without voiding the factor,
- * and each proven model is weighted by its evidence mass (comparison count).
+* The historical-performance and sample-size factors aggregate only the
+ * models holding a qualified historical proof on one comparable exact basis:
+ * models not aligned at the target validAt, without a qualified proof, or on
+ * another exact basis are excluded without voiding the factor, and each
+ * retained model is weighted by its evidence mass (comparison count). The
+ * spatial-coherence factor aggregates only the physical active stations
+ * carrying their own valid, fresh temperature measurement time; other
+ * stations are excluded without voiding the factor.
  * The score is withheld until every weighted factor and the extreme check are
  * known.
  */
@@ -681,7 +699,7 @@ export function calculateExperimentalForecastConfidence(
     weightedScore == null ? null : clampScore(weightedScore - extremePenalty!);
 
   return {
-    version: "experimental-v2",
+    version: "experimental-v3",
     status: fullyCalculable
       ? "calculated"
       : calculableWeight > 0

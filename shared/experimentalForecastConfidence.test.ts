@@ -114,18 +114,23 @@ describe("calculateExperimentalForecastConfidence — preuve historique qualifi�
     expect(historical?.evidence).toContain("1/2");
   });
 
-  it("reste non calculable si les modèles prouvés mélangent des bases de calibration", () => {
+  it("agrège le groupe de base comparable le plus lourd quand les bases diffèrent", () => {
     const result = confidenceResult([
       model("a"),
       model("b", { calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" }),
     ]);
     const historical = findComponent(result, "historicalPerformance");
-    expect(historical?.score).toBeNull();
-    expect(historical?.reason).toContain("bases de calibration différentes");
+    const sampleSize = findComponent(result, "sampleSize");
+    // Égalité de masse de preuve (50 vs 50) : le premier groupe comparable déclaré l'emporte.
+    expect(historical?.score).toBe(80);
+    expect(historical?.reason).toBeNull();
+    expect(historical?.evidence).toContain("1/2");
+    expect(historical?.evidence).toContain("tranche locale commune");
+    expect(sampleSize?.score).toBe(40);
   });
 
   it("monte la version de l’indice expérimental", () => {
     const result = confidenceResult([model("a"), model("b")]);
-    expect(result.version).toBe("experimental-v2");
+    expect(result.version).toBe("experimental-v3");
   });
 });
