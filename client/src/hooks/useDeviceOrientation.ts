@@ -79,6 +79,15 @@ export function useDeviceOrientation(options: UseDeviceOrientationOptions = {}) 
     return cleanup;
   }, []);
 
+  const stopTracking = useCallback(() => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    headingSourceRef.current = "none";
+    setHeadingSource("none");
+    setDeviceHeading(null);
+    setStatus("idle");
+  }, []);
+
   const requestPermission = useCallback(async (): Promise<boolean> => {
     if (typeof window === "undefined" || !isSupported) {
       setStatus("unsupported");
@@ -131,11 +140,19 @@ export function useDeviceOrientation(options: UseDeviceOrientationOptions = {}) 
     return () => window.clearTimeout(timeoutId);
   }, [status]);
 
+  useEffect(() => {
+    return () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
+  }, []);
+
   return {
     deviceHeading,
     status,
     headingSource,
     isSupported,
     requestPermission,
+    stopTracking,
   };
 }
