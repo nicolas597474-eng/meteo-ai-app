@@ -579,6 +579,7 @@ async function collectNearbyStationsUncached(
       windDirection: candidate.windDirection,
       precipitation: candidate.precipitation,
       updatedAt: candidate.updatedAt,
+      measurementTimes: candidate.measurementTimes,
       reliabilityScore: SOURCE_DEFAULTS.opensensemap.reliability,
       updateFrequencyMin: SOURCE_DEFAULTS.opensensemap.updateFreqMin,
       dataAvailability: SOURCE_DEFAULTS.opensensemap.availability,

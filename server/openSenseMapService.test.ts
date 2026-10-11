@@ -18,4 +18,27 @@ describe("openSenseMap candidate mapping", () => {
     expect(mapOpenSenseMapBox({ _id: "in", exposure: "indoor", currentLocation: { coordinates: [2.52, 50.756] } }, 50.7567, 2.5204, 5)).toBeNull();
     expect(mapOpenSenseMapBox({ _id: "empty", exposure: "outdoor", currentLocation: { coordinates: [2.52, 50.756] }, sensors: [] }, 50.7567, 2.5204, 5)).toBeNull();
   });
+
+  it("conserve l'heure de mesure propre à chaque variable sans la déduire d'une autre", () => {
+    const candidate = mapOpenSenseMapBox({
+      _id: "box-times",
+      exposure: "outdoor",
+      currentLocation: { coordinates: [2.52, 50.756] },
+      sensors: [
+        { title: "Temperature", unit: "°C", lastMeasurement: { value: 18.1, createdAt: "2026-08-12T12:04:00.000Z" } },
+        { title: "humidity", unit: "%", lastMeasurement: { value: 55, createdAt: "2026-08-12T12:10:00.000Z" } },
+      ],
+    }, 50.7567, 2.5204, 5);
+
+    expect(candidate?.measurementTimes).toEqual({
+      temperature: "2026-08-12T12:04:00.000Z",
+      humidity: "2026-08-12T12:10:00.000Z",
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    });
+    expect(candidate?.updatedAt).toBe("2026-08-12T12:10:00.000Z");
+  });
 });

@@ -310,6 +310,49 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           if (await insertStationObservationIfMissing(observation)) directReadingsAdded++;
         });
 
+        // Les capteurs citoyens openSenseMap sont archivés comme candidats pour
+        // accumuler l'historique exigé par la qualification MAE vs SYNOP. Ils
+        // n'entrent jamais dans la synthèse physique du créneau, et une erreur
+        // d'archive candidat ne peut pas interrompre la collecte officielle.
+        for (const station of getCandidateStations(discovered).filter((candidate) => candidate.source === "opensensemap")) {
+          try {
+            await upsertWeatherStation({
+              stationId: station.stationId,
+              source: station.source,
+              name: station.name,
+              lat: station.lat,
+              lon: station.lon,
+              altitude: station.altitude,
+              refLat: favorite.lat,
+              refLon: favorite.lon,
+              distanceKm: station.distanceKm,
+              reliabilityScore: station.reliabilityScore,
+              updateFrequencyMin: station.updateFrequencyMin,
+              dataAvailability: station.dataAvailability,
+              isActive: 0,
+              exclusionReason: station.exclusionReason ?? "Capteur citoyen en validation — non utilisé dans la température locale",
+              qualificationStatus: "candidate",
+              sourceTier: station.sourceTier ?? 3,
+            });
+            const candidateObservedAt = station.updatedAt ? Date.parse(station.updatedAt) : NaN;
+            if (!Number.isFinite(candidateObservedAt)) continue;
+            await insertStationObservationIfMissing({
+              stationId: station.stationId,
+              observedAt: candidateObservedAt,
+              measurementTimes: station.measurementTimes ?? null,
+              temperature: station.temperature,
+              humidity: station.humidity,
+              pressure: station.pressure,
+              windSpeed: station.windSpeed,
+              windGust: station.windGust,
+              windDirection: station.windDirection,
+              precipitation: station.precipitation,
+            });
+          } catch (candidateError: any) {
+            console.warn(`[Stations] Archive du capteur citoyen ${station.stationId} ignorée :`, candidateError.message);
+          }
+        }
+
         await refreshStationQualityProfiles(physical.map((station) => station.stationId));
         if (preserveArchivedEvidence && successfulEvidenceAlreadyArchived) {
           locationResult = {

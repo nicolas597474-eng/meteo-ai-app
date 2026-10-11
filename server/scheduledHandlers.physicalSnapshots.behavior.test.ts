@@ -187,6 +187,79 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     }));
   });
 
+  it("archive les capteurs citoyens candidats avec leur heure de mesure propre sans les compter comme stations physiques", async () => {
+    const candidateMeasurementTimes = {
+      temperature: "2026-08-27T15:40:00.000Z",
+      humidity: null,
+      pressure: null,
+      windSpeed: "2026-08-27T15:41:00.000Z",
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    };
+    mocks.collectNearbyStations.mockResolvedValue([{
+      stationId: "mf-officielle",
+      source: "meteofrance",
+      name: "Station officielle témoin",
+      lat: 50.75,
+      lon: 2.5,
+      altitude: null,
+      distanceKm: 2,
+      temperature: 18.2,
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+      updatedAt: "2026-08-27T15:45:00.000Z",
+      reliabilityScore: 92,
+      updateFrequencyMin: 60,
+      dataAvailability: 0.98,
+      isActive: true,
+      qualificationStatus: "validated",
+    }, {
+      stationId: "opensensemap-box-citoyen",
+      source: "opensensemap",
+      name: "Capteur citoyen témoin",
+      lat: 50.757,
+      lon: 2.51,
+      altitude: null,
+      distanceKm: 0.8,
+      temperature: 18.4,
+      humidity: null,
+      pressure: null,
+      windSpeed: 9,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+      updatedAt: "2026-08-27T15:44:00.000Z",
+      measurementTimes: candidateMeasurementTimes,
+      reliabilityScore: 0,
+      updateFrequencyMin: 15,
+      dataAvailability: 0,
+      isActive: false,
+      qualificationStatus: "candidate",
+      sourceTier: 3,
+      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
+    }]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+
+    const result = await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.upsertWeatherStation).toHaveBeenCalledWith(expect.objectContaining({
+      stationId: "opensensemap-box-citoyen",
+      qualificationStatus: "candidate",
+      isActive: 0,
+    }));
+    expect(mocks.insertStationObservationIfMissing).toHaveBeenCalledWith(expect.objectContaining({
+      stationId: "opensensemap-box-citoyen",
+      observedAt: Date.parse("2026-08-27T15:44:00.000Z"),
+      measurementTimes: candidateMeasurementTimes,
+    }));
+    expect(result.locations).toEqual([expect.objectContaining({ stored: true, stationCount: 2 })]);
+  });
+
   it("classe l’absence persistante de station comme no_station après cinq essais, sans alerte technique", async () => {
     const result = await settleWithRetries(
       collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled"),
