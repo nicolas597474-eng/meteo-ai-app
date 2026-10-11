@@ -2390,3 +2390,166 @@
   0%, 100% { transform: translateX(-2.5%); opacity: 0.12; }
   50% { transform: translateX(2.5%); opacity: 0.3; }
 }
+
+/* ─── MeteoAI Holographic 3D Weather AI Loader ───────────────────────────── */
+
+.weather-ai-loader {
+  contain: layout style paint;
+  will-change: opacity, transform;
+}
+
+.weather-ai-loader--exiting {
+  pointer-events: none;
+  transition: opacity 340ms cubic-bezier(0.23, 1, 0.32, 1), transform 340ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .weather-ai-loader__ambient-glow {
+    animation: wai-ambient-pulse 5.4s ease-in-out infinite alternate;
+  }
+
+  .weather-ai-loader__radar-sweep {
+    animation: wai-radar-spin 4.5s linear infinite;
+  }
+
+  .weather-ai-loader__orbit-dash-1 {
+    animation: wai-orbit-flow-1 8s linear infinite;
+  }
+
+  .weather-ai-loader__orbit-dash-2 {
+    animation: wai-orbit-flow-2 11s linear infinite reverse;
+  }
+
+  .weather-ai-loader__continents {
+    animation: wai-continents-drift 22s linear infinite;
+  }
+
+  .weather-ai-loader__clouds {
+    animation: wai-clouds-float 16s ease-in-out infinite alternate;
+  }
+
+  .weather-ai-loader__rain {
+    animation: wai-rain-fall 1.4s linear infinite;
+  }
+
+  .weather-ai-loader__wind {
+    animation: wai-wind-sweep 3.6s ease-in-out infinite;
+  }
+
+  .weather-ai-loader__atmosphere-ring {
+    animation: wai-atmosphere-pulse 3.8s ease-in-out infinite alternate;
+  }
+
+  .weather-ai-loader__core--breathe {
+    animation: wai-core-pulse 2.8s ease-in-out infinite;
+  }
+
+  .weather-ai-particle.p-1 { animation: wai-particle-in-1 2.4s ease-in-out infinite; }
+  .weather-ai-particle.p-2 { animation: wai-particle-in-2 2.7s ease-in-out 0.4s infinite; }
+  .weather-ai-particle.p-3 { animation: wai-particle-in-3 3.1s ease-in-out 0.8s infinite; }
+  .weather-ai-particle.p-4 { animation: wai-particle-in-4 2.6s ease-in-out 1.2s infinite; }
+  .weather-ai-particle.p-5 { animation: wai-particle-in-5 2.9s ease-in-out 0.2s infinite; }
+  .weather-ai-particle.p-6 { animation: wai-particle-in-6 2.5s ease-in-out 0.6s infinite; }
+}
+
+@keyframes wai-ambient-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.95; }
+}
+
+@keyframes wai-radar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes wai-orbit-flow-1 {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 40; }
+}
+
+@keyframes wai-orbit-flow-2 {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 40; }
+}
+
+@keyframes wai-continents-drift {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(70px); }
+}
+
+@keyframes wai-clouds-float {
+  0% { transform: translateX(-4px) translateY(1px); }
+  100% { transform: translateX(6px) translateY(-1px); }
+}
+
+@keyframes wai-rain-fall {
+  0% { transform: translateY(-4px); opacity: 0; }
+  40% { opacity: 0.7; }
+  100% { transform: translateY(6px); opacity: 0; }
+}
+
+@keyframes wai-wind-sweep {
+  0%, 100% { stroke-dashoffset: 20; opacity: 0.25; }
+  50% { stroke-dashoffset: 0; opacity: 0.65; }
+}
+
+@keyframes wai-atmosphere-pulse {
+  0% { stroke-opacity: 0.45; }
+  100% { stroke-opacity: 0.85; }
+}
+
+@keyframes wai-core-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@keyframes wai-particle-in-1 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { transform: translate(45px, 38px); opacity: 0; }
+}
+
+@keyframes wai-particle-in-2 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { transform: translate(-45px, 38px); opacity: 0; }
+}
+
+@keyframes wai-particle-in-3 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { transform: translate(-52px, -32px); opacity: 0; }
+}
+
+@keyframes wai-particle-in-4 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { transform: translate(46px, -38px); opacity: 0; }
+}
+
+@keyframes wai-particle-in-5 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { transform: translate(0, 58px); opacity: 0; }
+}
+
+@keyframes wai-particle-in-6 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { transform: translate(0, -58px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-ai-loader--reduced-motion *,
+  .weather-ai-loader * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+

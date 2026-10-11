@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { MeteoIcon } from "@/components/MeteoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WeatherAILoader } from "@/components/weather/WeatherAILoader";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
@@ -84,19 +85,16 @@ export default function WeatherDetails() {
   const activeOfficialHour = data?.hours
     ? getActiveOfficialForecastHour(data.hours, Date.now())
     : null;
-  if (isLoading) {
-    return (
-      <div role="status" aria-live="polite" aria-busy="true" aria-label="Chargement des prévisions" className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
-        <div className="mx-auto w-full min-w-0 max-w-none space-y-4 px-1 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:px-3 sm:py-4">
-          <h1 className="px-2 text-sm font-semibold text-sky-100">Chargement des prévisions</h1>
-          {slowLoad && <div role="status" className="min-w-0 w-full max-w-full rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-100">La source météo met plus de temps que prévu. MeteoAI réessaie uniquement les erreurs temporaires.</div>}
-          <Skeleton aria-hidden="true" className="h-64 w-full rounded-2xl" />
-          <Skeleton aria-hidden="true" className="h-48 w-full rounded-2xl" />
-          <Skeleton aria-hidden="true" className="h-64 w-full rounded-2xl" />
-        </div>
-      </div>
-    );
-  }
+   if (isLoading) {
+     return (
+       <div role="status" aria-live="polite" aria-busy="true" aria-label="Chargement des prévisions" className="weather-page-sky min-h-dvh w-full overflow-x-clip bg-[#0d1117]" style={pageSkyStyle}>
+         <div className="mx-auto w-full min-w-0 max-w-none px-1 pt-[max(env(safe-area-inset-top),0.25rem)] sm:max-w-2xl sm:px-3 sm:py-4">
+           {slowLoad && <div role="status" className="mb-4 min-w-0 w-full max-w-full rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-100">La source météo met plus de temps que prévu. MeteoAI réessaie uniquement les erreurs temporaires.</div>}
+           <WeatherAILoader loading={true} message="Chargement des prévisions" variant="full" />
+         </div>
+       </div>
+     );
+   }
 
   if (isError || !data) {
     const isTimeout = /timeout|délai|aborted/i.test(error?.message ?? "");
