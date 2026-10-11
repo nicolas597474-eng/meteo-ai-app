@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFusion, detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
+import { computeFusion, detectExtendedRegime, detectMultiRegime, EXTENDED_REGIME_INFO, generateAdaptiveForecast, getLeadTimeWeights, isEligibleGlobalReliabilityScore, type FusionSource } from "./fusionEngine";
 import { MODEL_FUSION_WEIGHT_CAP, normalizeModelWeightsWithCap, regularizeModelPerformance, type DailyFusionMetric, type ModelPerformanceEvidence } from "./fusionPerformance";
 
 function station(
@@ -428,5 +428,63 @@ describe("détection de régime sans valeurs météorologiques inventées", () =
     expect(detectMultiRegime(deepFrostInput)?.activeRegimes.map(({ id }) => id)).toContain("deep_frost");
     expect(detectExtendedRegime(windyInput)).toBe("windy");
     expect(detectMultiRegime(windyInput)?.activeRegimes.map(({ id }) => id)).toContain("windy");
+  });
+});
+
+// ─── generateAdaptiveForecast — poids de fusion par preuve qualifiée ─────────
+
+describe("generateAdaptiveForecast — pondération par preuve historique qualifiée", () => {
+  const forecasts = [
+    { serviceName: "A", tempMax: 20, tempMin: 10, precipitation: 0, windSpeed: 10 },
+    { serviceName: "B", tempMax: 22, tempMin: 12, precipitation: 1, windSpeed: 12 },
+  ];
+
+  it("garde un poids neutre aux services sans preuve qualifiée, même avec une MAE ou un score global", () => {
+    const result = generateAdaptiveForecast(forecasts, {
+      A: { maeTemp: 0.2, weightedScore: 95 },
+      B: { weightedScore: 5 },
+    });
+
+    expect(result.weights).toEqual({
+      A: { tempWeight: 0.5, precipWeight: 0.5, windWeight: 0.5 },
+      B: { tempWeight: 0.5, precipWeight: 0.5, windWeight: 0.5 },
+    });
+  });
+
+  it("surpondère le service avec preuve qualifiée en respectant le plafond individuel", () => {
+    const result = generateAdaptiveForecast(forecasts, {
+      A: { maeTemp: 0.5, qualified: true, comparisonCount: 100, evaluatedDays: 60 },
+      B: {},
+    });
+
+    expect(result.weights.A.tempWeight).toBe(0.65);
+    expect(result.weights.B.tempWeight).toBe(0.35);
+  });
+
+  it("rétrécit l’avantage de performance quand la masse de preuve est mince", () => {
+    const strongEvidence = generateAdaptiveForecast(forecasts, {
+      A: { maeTemp: 0.5, qualified: true, comparisonCount: 100, evaluatedDays: 60 },
+      B: { maeTemp: 1.5, qualified: true, comparisonCount: 100, evaluatedDays: 60 },
+    });
+    const thinEvidence = generateAdaptiveForecast(forecasts, {
+      A: { maeTemp: 0.5, qualified: true, comparisonCount: 100, evaluatedDays: 60 },
+      B: { maeTemp: 1.5, qualified: true, comparisonCount: 4, evaluatedDays: 5 },
+    });
+
+    expect(strongEvidence.weights.A.tempWeight).toBe(0.65);
+    expect(strongEvidence.weights.B.tempWeight).toBe(0.35);
+    // Preuve mince : la MAE de B est rétractée vers la médiane, son poids remonte.
+    expect(thinEvidence.weights.B.tempWeight).toBe(0.384);
+    expect(thinEvidence.weights.A.tempWeight).toBe(0.616);
+  });
+
+  it("ignore une qualification déclarée sans effectifs valides", () => {
+    const result = generateAdaptiveForecast(forecasts, {
+      A: { maeTemp: 0.5, qualified: true },
+      B: {},
+    });
+
+    expect(result.weights.A.tempWeight).toBe(0.5);
+    expect(result.weights.B.tempWeight).toBe(0.5);
   });
 });

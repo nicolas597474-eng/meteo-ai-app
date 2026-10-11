@@ -32,6 +32,7 @@ import {
   calculateRobustFallbackMultipliers,
   normalizeModelWeightsWithCap,
   MODEL_FUSION_WEIGHT_CAP,
+  PERFORMANCE_PRIOR_DAYS,
   type ModelPerformanceContext,
   type ModelPerformanceEvidence,
   type RegularizedPerformance,
@@ -1245,7 +1246,15 @@ export function computeFusion(
 /**
  * Generate MeteoAI forecast using per-parameter adaptive weighting.
  * Each parameter (tempMax, tempMin, precip, wind) uses its own set of weights
- * based on the historical MAE of each service for that specific parameter.
+ * based on the qualified historical MAE of each service for that parameter.
+ *
+ * Qualified evidence only: a service carries a performance weight solely when
+ * its MAE comes from a qualified historical proof (calibration exacte avec
+ * comparaisons et jours indépendants valides). Une MAE isolée sans masse de
+ * preuve ni un score global hors maille exacte ne modifient jamais un poids,
+ * comme dans computeFusion ; la MAE de chaque service prouvé est rétractée vers
+ * la médiane des MAE prouvées, plus fortement quand sa masse de preuve est
+ * mince, et chaque poids respecte le plafond individuel commun.
  *
  * This replaces the single-score weighting in generateMeteoAIForecast.
  */
@@ -1263,7 +1272,12 @@ export function generateAdaptiveForecast(
     maeTemp?: number;
     maePrecip?: number;
     maeWind?: number;
+    /** Conservé pour compatibilité d'appel ; jamais utilisé comme poids. */
     weightedScore?: number;
+    /** True uniquement quand la MAE provient d'une preuve historique qualifiée. */
+    qualified?: boolean;
+    comparisonCount?: number;
+    evaluatedDays?: number;
   }>
 ): {
   tempMax: number | null;
@@ -1283,25 +1297,60 @@ export function generateAdaptiveForecast(
     };
   }
 
-  // Compute per-parameter weights: 1/MAE (lower MAE → higher weight)
-  // Fallback to global score if MAE not available
+  function qualifiedProof(
+    perf: { qualified?: boolean; comparisonCount?: number; evaluatedDays?: number } | undefined
+  ): { comparisonCount: number; evaluatedDays: number } | null {
+    return perf?.qualified === true
+      && Number.isInteger(perf.comparisonCount) && perf.comparisonCount > 0
+      && Number.isInteger(perf.evaluatedDays) && perf.evaluatedDays > 0
+      ? { comparisonCount: perf.comparisonCount, evaluatedDays: perf.evaluatedDays }
+      : null;
+  }
+
+  // Poids par paramètre depuis les seules preuves qualifiées : la MAE de chaque
+  // service prouvé est rétractée vers la médiane des MAE prouvées selon sa
+  // masse de preuve, bornée comme dans le moteur de fusion officiel.
   function computeParamWeights(
     field: "maeTemp" | "maePrecip" | "maeWind"
   ): Record<string, number> {
-    const raw: Record<string, number> = {};
+    const proven = new Map<string, { mae: number; reliability: number }>();
     for (const f of forecasts) {
       const perf = performanceByService[f.serviceName];
+      const proof = qualifiedProof(perf);
       const mae = perf?.[field];
-      // If MAE available and > 0, use 1/MAE; else fallback to global score or 50
-      raw[f.serviceName] = mae != null && mae > 0
-        ? 1 / mae
-        : (perf?.weightedScore ?? 50) / 100;
+      if (!proof || typeof mae !== "number" || !Number.isFinite(mae) || mae <= 0) continue;
+      proven.set(f.serviceName, {
+        mae,
+        reliability: proof.evaluatedDays / (proof.evaluatedDays + PERFORMANCE_PRIOR_DAYS),
+      });
     }
-    const total = Object.values(raw).reduce((s, v) => s + v, 0);
+    const sortedProvenMaes = Array.from(proven.values()).map((item) => item.mae).sort((a, b) => a - b);
+    const baseline = sortedProvenMaes.length > 0
+      ? sortedProvenMaes.length % 2 === 0
+        ? (sortedProvenMaes[sortedProvenMaes.length / 2 - 1]! + sortedProvenMaes[sortedProvenMaes.length / 2]!) / 2
+        : sortedProvenMaes[Math.floor(sortedProvenMaes.length / 2)]!
+      : null;
+
+    const raw: Record<string, number> = {};
+    for (const f of forecasts) {
+      const item = proven.get(f.serviceName);
+      // Sans preuve historique qualifiée, ni une MAE isolée ni un score global
+      // hors maille exacte ne modifient le poids : il reste neutre.
+      raw[f.serviceName] = item && baseline != null
+        ? Math.min(2, Math.max(0.3, 1 / Math.max(baseline + item.reliability * (item.mae - baseline), 0.5)))
+        : 1;
+    }
+    const capped = normalizeModelWeightsWithCap(
+      forecasts.map((f) => ({ modelId: f.serviceName, rawWeight: raw[f.serviceName] ?? 1 })),
+      1,
+      MODEL_FUSION_WEIGHT_CAP,
+    );
     const normalized: Record<string, number> = {};
-    for (const [name, w] of Object.entries(raw)) {
-      normalized[name] = total > 0 ? w / total : 1 / forecasts.length;
+    if (capped) {
+      for (const f of forecasts) normalized[f.serviceName] = capped.get(f.serviceName) ?? 0;
+      return normalized;
     }
+    for (const f of forecasts) normalized[f.serviceName] = 1 / forecasts.length;
     return normalized;
   }
 
@@ -1342,7 +1391,7 @@ export function generateAdaptiveForecast(
     windGust: wavg("windGust", windWeights),
     cloudCover: wavg("cloudCover", tempWeights), // use temp weights for cloud cover
     weights,
-    methodNote: `Fusion adaptative par paramètre: ${forecasts.length} services, pondération 1/MAE`,
+    methodNote: `Fusion adaptative par paramètre : ${forecasts.length} services ; seuls les modèles avec preuve historique qualifiée portent un poids de performance régularisé par leur masse de preuve, plafonné à ${Math.round(MODEL_FUSION_WEIGHT_CAP * 100)} %`,
   };
 }
 
