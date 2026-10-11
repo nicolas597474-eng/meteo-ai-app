@@ -271,7 +271,9 @@ export default function Ranking() {
   const modelReferences = liveStationData?.modelReferences ?? [];
   const realLocalStations = currentSources.filter((station) => station.isActive && station.sourceKind === "physical");
   const candidateSources = currentSources.filter((station) => station.qualificationStatus === "candidate");
-  const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate");
+  // Un capteur citoyen validé n’est pas « écarté » : son verdict persisté le
+  // distingue d’une source exclue, même s’il reste hors de la fusion locale.
+  const ignoredSources = currentSources.filter((station) => !station.isActive && station.qualificationStatus !== "candidate" && station.qualificationStatus !== "validated");
   const physicalStationExplanation = explainPhysicalStationAvailability(
     liveStationData?.physicalStationDiagnostics,
     candidateSources.length,
@@ -417,7 +419,9 @@ const SOURCE_LABELS: Record<string, string> = {
   opensensemap: "openSenseMap · capteur citoyen",
   netatmo: "STATION NETATMO",
   wunderground: "Grille régionale · GFS",
-  cwop: "Grille régionale · ECMWF",
+  // Vestige des fausses grilles retiré : CWOP est un réseau de stations
+  // citoyennes réelles (MADIS), jamais une grille de modèle.
+  cwop: "CWOP/MADIS · capteur citoyen",
   davis: "Référence de grille",
   infoclimat: "Grille locale · AROME",
 };
@@ -426,12 +430,12 @@ function StationSourceCard({ station, rank, physical, onOpenDetails }: { station
   const temperature = station.temperature === null || station.temperature === undefined ? "—" : `${Number(station.temperature).toFixed(1)}°`;
   const displayStatus = getStationDisplayStatus(station);
   const isAuthenticatedNetatmo = displayStatus === "physical" && station.source === "netatmo" && String(station.stationId ?? "").startsWith("netatmo-");
-  const sourceTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : displayStatus === "candidate" ? "warning" : "info";
-  const statusTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : displayStatus === "candidate" ? "warning" : displayStatus === "reference" ? "info" : "danger";
-  const statusLabel = isAuthenticatedNetatmo ? "NIVEAU 1 · AUTHENTIFIÉE" : displayStatus === "physical" ? "STATION RÉELLE" : displayStatus === "candidate" ? "CAPTEUR EN VALIDATION" : displayStatus === "reference" ? "RÉFÉRENCE / GRILLE" : "SOURCE ÉCARTÉE";
-  const markerClass = displayStatus === "physical" ? "bg-emerald-400" : displayStatus === "candidate" ? "bg-amber-300" : displayStatus === "reference" ? "bg-sky-400" : "bg-rose-400";
-  const inactiveClass = displayStatus === "excluded" ? "border-rose-500/25 bg-rose-500/5 opacity-80" : "border-slate-800 bg-[#090b10]";
-  const description = displayStatus === "candidate" ? "Capteur citoyen en validation : profil opérationnel seulement. Performance météo individuelle non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique; il reste hors de la température locale." : isAuthenticatedNetatmo ? "Observation issue de l’API Netatmo autorisée ; identifiant de station vérifiable et provenance physique." : station.exclusionReason ? `Écartée : ${station.exclusionReason}` : null;
+  const sourceTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : displayStatus === "candidate" ? "warning" : displayStatus === "citizen-validated" ? "success" : "info";
+  const statusTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : displayStatus === "candidate" ? "warning" : displayStatus === "citizen-validated" ? "success" : displayStatus === "reference" ? "info" : "danger";
+  const statusLabel = isAuthenticatedNetatmo ? "NIVEAU 1 · AUTHENTIFIÉE" : displayStatus === "physical" ? "STATION RÉELLE" : displayStatus === "candidate" ? "CAPTEUR EN VALIDATION" : displayStatus === "citizen-validated" ? "CAPTEUR VALIDÉ" : displayStatus === "reference" ? "RÉFÉRENCE / GRILLE" : "SOURCE ÉCARTÉE";
+  const markerClass = displayStatus === "physical" ? "bg-emerald-400" : displayStatus === "candidate" ? "bg-amber-300" : displayStatus === "citizen-validated" ? "bg-emerald-300" : displayStatus === "reference" ? "bg-sky-400" : "bg-rose-400";
+  const inactiveClass = displayStatus === "excluded" ? "border-rose-500/25 bg-rose-500/5 opacity-80" : displayStatus === "citizen-validated" ? "border-emerald-500/25 bg-emerald-500/5" : "border-slate-800 bg-[#090b10]";
+  const description = displayStatus === "candidate" ? "Capteur citoyen en validation : profil opérationnel seulement. Performance météo individuelle non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique; il reste hors de la température locale." : displayStatus === "citizen-validated" ? "Capteur citoyen validé par comparaison aux stations officielles SYNOP sur la fenêtre de qualification ; il reste hors de la fusion locale des stations physiques." : isAuthenticatedNetatmo ? "Observation issue de l’API Netatmo autorisée ; identifiant de station vérifiable et provenance physique." : station.exclusionReason ? `Écartée : ${station.exclusionReason}` : null;
   const quality = station.qualityProfile;
   const qualityLabel = quality?.status === "fiable" ? "PROFIL OPÉRATIONNEL STABLE" : quality?.status === "qualifiee" ? "PROFIL DE RELEVÉS QUALIFIÉ" : quality?.status === "degradee" ? "PROFIL DE RELEVÉS DÉGRADÉ" : quality?.status === "en_observation" ? "PROFIL DE RELEVÉS EN OBSERVATION" : null;
   const qualityTone: WeatherStatusBadgeTone = quality?.status === "fiable" ? "success" : quality?.status === "qualifiee" ? "info" : quality?.status === "degradee" ? "warning" : "neutral";

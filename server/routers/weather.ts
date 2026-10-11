@@ -39,6 +39,7 @@ import {
   getQualifiedEvidenceStatus,
   getStationQualityProfiles,
   getFavoriteLocations,
+  getWeatherStationQualificationVerdicts,
 } from "../db";
 import { collectCurrentWeatherSnapshot, collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
@@ -1532,6 +1533,22 @@ export const weatherRouter = router({
       ]);
       const stations = stationCollection.stations;
       const ranked = rankStations(stations);
+      // Un verdict de qualification appliqué demeure : la collecte live marque
+      // toujours les capteurs citoyens « candidate », on surcharge donc ici le
+      // statut et le motif persistés (validated / excluded) — uniquement pour
+      // les capteurs citoyens openSenseMap et CWOP, sans jamais toucher
+      // isActive ni les stations physiques.
+      const citizenStationIds = ranked
+        .filter((station) => station.source === "opensensemap" || station.source === "cwop")
+        .map((station) => station.stationId);
+      const persistedCitizenVerdictRows = citizenStationIds.length > 0
+        ? await getWeatherStationQualificationVerdicts(citizenStationIds)
+        : [];
+      const persistedCitizenVerdicts = new Map(
+        persistedCitizenVerdictRows
+          .filter((verdict) => verdict.qualificationStatus != null)
+          .map((verdict) => [verdict.stationId, verdict] as const),
+      );
       const physicalStations = getPhysicalActiveStations(ranked);
       const discoveredPhysicalStations = ranked.filter((station) => getStationSourceKind(station.source, station.stationId) === "physical");
       const excludedPhysicalStations = discoveredPhysicalStations.filter((station) => !station.isActive);
@@ -1585,33 +1602,40 @@ export const weatherRouter = router({
         lat,
         lon,
         radiusKm,
-        stations: ranked.map(s => ({
-          stationId: s.stationId,
-          source: s.source,
-          sourceKind: getStationSourceKind(s.source, s.stationId),
-          name: s.name,
-          lat: s.lat,
-          lon: s.lon,
-          altitude: s.altitude,
-          distanceKm: s.distanceKm,
-          temperature: s.temperature,
-          humidity: s.humidity,
-          pressure: s.pressure,
-          windSpeed: s.windSpeed,
-          windGust: s.windGust,
-          windDirection: s.windDirection,
-          precipitation: s.precipitation,
-          updatedAt: s.updatedAt,
-          measurementTimes: s.measurementTimes ?? null,
-          measurementAgeByField: getStationMeasurementAgeStates(s.measurementTimes),
-          reliabilityScore: s.reliabilityScore,
-          updateFrequencyMin: s.updateFrequencyMin,
-          dataAvailability: s.dataAvailability,
-          isActive: s.isActive,
-          exclusionReason: s.exclusionReason,
-          qualificationStatus: s.qualificationStatus,
-          sourceTier: s.sourceTier,
-        })),
+        stations: ranked.map(s => {
+          const persistedCitizenVerdict = persistedCitizenVerdicts.get(s.stationId);
+          return {
+            stationId: s.stationId,
+            source: s.source,
+            sourceKind: getStationSourceKind(s.source, s.stationId),
+            name: s.name,
+            lat: s.lat,
+            lon: s.lon,
+            altitude: s.altitude,
+            distanceKm: s.distanceKm,
+            temperature: s.temperature,
+            humidity: s.humidity,
+            pressure: s.pressure,
+            windSpeed: s.windSpeed,
+            windGust: s.windGust,
+            windDirection: s.windDirection,
+            precipitation: s.precipitation,
+            updatedAt: s.updatedAt,
+            measurementTimes: s.measurementTimes ?? null,
+            measurementAgeByField: getStationMeasurementAgeStates(s.measurementTimes),
+            reliabilityScore: s.reliabilityScore,
+            updateFrequencyMin: s.updateFrequencyMin,
+            dataAvailability: s.dataAvailability,
+            isActive: s.isActive,
+            // Verdict persisté des capteurs citoyens uniquement ; sans ligne
+            // persistée, le statut live (« candidate ») reste la vérité.
+            exclusionReason: persistedCitizenVerdict
+              ? persistedCitizenVerdict.exclusionReason ?? null
+              : s.exclusionReason,
+            qualificationStatus: persistedCitizenVerdict?.qualificationStatus ?? s.qualificationStatus,
+            sourceTier: s.sourceTier,
+          };
+        }),
         modelReferences,
         groundTruth,
         totalFound: stations.length,

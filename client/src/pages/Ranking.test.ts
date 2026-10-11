@@ -204,4 +204,19 @@ describe("page Fiabilité", () => {
     expect(chart).toContain('toPoint("officialTemperature")');
     expect(chart).toContain('toPoint("stationTemperature")');
   });
+
+  it("étiquette les vraies stations CWOP comme capteurs citoyens, jamais comme grille", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain('cwop: "CWOP/MADIS · capteur citoyen"');
+    expect(source).not.toContain("cwop: \"Grille régionale · ECMWF\"");
+  });
+
+  it("affiche un capteur citoyen validé sans le marquer source écartée", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain('displayStatus === "citizen-validated" ? "CAPTEUR VALIDÉ"');
+    expect(source).toContain("Capteur citoyen validé par comparaison aux stations officielles SYNOP sur la fenêtre de qualification");
+    expect(source).toContain("station.qualificationStatus !== \"validated\"");
+    const dialog = readFileSync(new URL("./SourceDetailsDialog.tsx", import.meta.url), "utf8");
+    expect(dialog).toContain("Capteur citoyen validé : qualifié par comparaison aux stations officielles SYNOP");
+  });
 });

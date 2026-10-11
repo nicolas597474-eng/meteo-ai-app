@@ -16,6 +16,7 @@ import {
   MethodologySection,
   ModelComparisonSection,
 } from "@/components/weather/ReliabilityComparisonSections";
+import { StationQualificationSection } from "@/components/weather/StationQualificationSection";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
@@ -110,6 +111,17 @@ export default function ReliabilityLaboratory() {
     }),
     [activeLocation?.lat, activeLocation?.lon]
   );
+  // Stations et capteurs autour du lieu : la section de transparence des
+  // badges de qualification (officielle, citoyen en validation, validé, exclu)
+  // lit la même recherche que la page Stations, au rayon du lieu actif.
+  const nearbyStationsInput = useMemo(
+    () => ({
+      lat: activeLocation?.lat ?? 50.7567,
+      lon: activeLocation?.lon ?? 2.5204,
+      radiusKm,
+    }),
+    [activeLocation?.lat, activeLocation?.lon, radiusKm]
+  );
 
   const { data, isLoading, isError, isFetching } =
     trpc.weather.getReliabilityLaboratory.useQuery(input, {
@@ -129,6 +141,14 @@ export default function ReliabilityLaboratory() {
     isLoading: yesterdayLoading,
     isError: yesterdayError,
   } = trpc.weather.getYesterdayForecastObservation.useQuery(yesterdayInput, {
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+  const {
+    data: nearbyStationsData,
+    isLoading: nearbyStationsLoading,
+    isError: nearbyStationsError,
+  } = trpc.weather.searchStations.useQuery(nearbyStationsInput, {
     staleTime: 2 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
@@ -326,6 +346,14 @@ export default function ReliabilityLaboratory() {
             />
           </div>
         </details>
+
+        <StationQualificationSection
+          data={nearbyStationsData}
+          isLoading={nearbyStationsLoading}
+          isError={nearbyStationsError}
+          locationName={locationName}
+          radiusKm={radiusKm}
+        />
       </div>
       <BackToTopButton />
     </main>
