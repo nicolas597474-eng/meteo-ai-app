@@ -6,7 +6,6 @@ import { formatHourlyDisplay } from "@/lib/hourlyDisplay";
 import { getChartTemperatureScale } from "@/lib/chartTemperatureScale";
 import { getLabelAboveCurveY, TEMPERATURE_LABEL_ABOVE_GAP } from "@/lib/chartLabelLanes";
 import { drawTemperatureCurveSegments, getTemperatureTone } from "@/lib/chartTemperatureTone";
-import { PrecipitationConsensusSummary } from "@/components/weather/PrecipitationConsensusSummary";
 import type { HourlyMultiModelMetrics } from "@shared/hourlyModelMetrics";
 import { findActiveHourlyForecastIndex } from "@shared/hourlyForecastTime";
 import { useProvenanceDisplay } from "@/contexts/ProvenanceDisplayContext";
@@ -128,26 +127,8 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
   const cond = getConditionLabel(hour.cloudCover, hour.precipitation, hour.condition);
   const metrics = hour.multiModelMetrics ?? null;
   const temperatureMetrics = metrics?.temperature;
-  const precipitationMetrics = metrics?.precipitation;
-  const dispersion = metrics?.dispersion;
   const hasGust = hour.windGust != null && hour.windGust > 0;
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const precipitationValues = precipitationMetrics?.modelValues.map((value) => value.amountMm) ?? [];
-  const precipitationRange = precipitationValues.length >= 2
-    ? Math.max(...precipitationValues) - Math.min(...precipitationValues)
-    : null;
-  const wetPrecipitationValues = precipitationMetrics?.thresholdMm == null
-    ? []
-    : precipitationValues.filter((value) => value >= precipitationMetrics.thresholdMm);
-  const wetPrecipitationMean = wetPrecipitationValues.length > 0
-    ? wetPrecipitationValues.reduce((sum, value) => sum + value, 0) / wetPrecipitationValues.length
-    : null;
-  const wetPrecipitationRange = wetPrecipitationValues.length >= 2
-    ? Math.max(...wetPrecipitationValues) - Math.min(...wetPrecipitationValues)
-    : null;
-  const wetPrecipitationStandardDeviation = wetPrecipitationValues.length >= 2 && wetPrecipitationMean != null
-    ? Math.sqrt(wetPrecipitationValues.reduce((sum, value) => sum + (value - wetPrecipitationMean) ** 2, 0) / wetPrecipitationValues.length)
-    : null;
 
   return (
     <section className="mb-3 rounded-2xl border border-blue-400/25 bg-[#0a0e14] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.35)] animate-in slide-in-from-top-2 duration-200" role="region" aria-labelledby="hour-detail-title">
@@ -167,22 +148,6 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
           </button>
         </div>
 
-        {metrics && <section className="mb-2 rounded-xl border border-sky-300/20 bg-slate-900/35 px-3 py-2.5" aria-label="Accord inter-modèles par dispersion brute">
-          <p className="text-[12px] font-bold text-sky-100">Accord inter-modèles · dispersions brutes</p>
-          <p className="mb-2 text-[9px] text-slate-400">Best Match exclu · étendues et σ population décrivent la dispersion des prévisions reçues; l’incertitude statistique n’est pas mesurée ici et la fiabilité face aux observations est présentée séparément. Direction : étendue circulaire.</p>
-          <div className="space-y-1 text-[10px] text-slate-200">
-            <div className="flex justify-between gap-2"><span>Température</span><span className="text-right font-semibold">{temperatureMetrics?.range == null ? "étendue indisponible" : `étendue ${temperatureMetrics.range.toFixed(1)} °C`} · {temperatureMetrics?.standardDeviation == null ? "σ population indisponible" : `σ pop ${temperatureMetrics.standardDeviation.toFixed(1)} °C`} · {temperatureMetrics ? `${temperatureMetrics.availableModelCount}/${metrics.expectedModelCount} modèles` : "effectif indisponible"}</span></div>
-            <div><p className="flex justify-between gap-2"><span>Pluie {precipitationMetrics?.thresholdMm == null ? "(seuil indisponible)" : `(≥${precipitationMetrics.thresholdMm.toFixed(1)} mm)`}</span><span className="text-right font-semibold">{precipitationMetrics ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} modèles au seuil` : "effectif pluie indisponible"} · fréquence non calibrée</span></p><p className="mt-0.5 text-right text-slate-400">Toutes quantités : étendue {precipitationRange == null ? "indisponible" : `${precipitationRange.toFixed(1)} mm`} · modèles pluvieux : étendue {wetPrecipitationRange == null ? "indisponible" : `${wetPrecipitationRange.toFixed(1)} mm`} · σ pop {wetPrecipitationStandardDeviation == null ? "indisponible" : `${wetPrecipitationStandardDeviation.toFixed(1)} mm`} · n={wetPrecipitationValues.length}</p></div>
-            {([
-              ["Vent moyen", dispersion?.windSpeed, "km/h"],
-              ["Rafales", dispersion?.windGust, "km/h"],
-              ["Direction", dispersion?.windDirection, "°"],
-              ["Humidité", dispersion?.humidity, "%"],
-              ["Nuages", dispersion?.cloudCover, "%"],
-            ] as const).map(([label, item, unit]) => <div key={label} className="flex justify-between gap-2"><span>{label}</span><span className="text-right font-semibold">{item?.range == null ? "étendue indisponible" : `${item.range.toFixed(1)} ${unit}`} · {label === "Direction" ? "dispersion circulaire" : item?.standardDeviation == null ? "σ population indisponible" : `σ pop ${item.standardDeviation.toFixed(1)} ${unit}`} · {item?.availableModelCount == null ? "effectif indisponible" : `${item.availableModelCount}/${metrics.expectedModelCount} modèles`}</span></div>)}
-          </div>
-          <PrecipitationConsensusSummary summary={precipitationMetrics} compact />
-        </section>}
         {metrics && (
           <div className="mb-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06]">
             <button type="button" onClick={() => setComparisonOpen((open) => !open)} aria-expanded={comparisonOpen} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-amber-50 active:scale-[0.99]">
@@ -242,7 +207,6 @@ function HourDetailOverlay({ hour, onClose }: { hour: HourData; onClose: () => v
             <div className="flex items-center gap-1.5 mb-1"><Droplets className="h-3.5 w-3.5 text-blue-400" /><span className="text-[10px] uppercase tracking-wider text-slate-500">Estimation de consensus</span></div>
             <p className="text-sm font-bold text-blue-400">{hour.precipitation != null ? `${hour.precipitation.toFixed(1)} mm` : "—"}</p>
             {hour.precipType ? <p className="mt-0.5 text-[10px] text-slate-500">{hour.precipType === "snow" ? "Neige" : hour.precipType === "freezing_rain" ? "Pluie verglaçante" : "Pluie"}{hour.precipIntensity ? ` · ${hour.precipIntensity === "heavy" ? "forte" : hour.precipIntensity === "moderate" ? "modérée" : "faible"}` : ""}</p> : null}
-            <div className="mt-2"><PrecipitationConsensusSummary summary={precipitationMetrics} compact={false} /></div>
           </div>
 
           {/* Humidité */}
