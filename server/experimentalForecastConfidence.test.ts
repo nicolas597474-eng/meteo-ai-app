@@ -137,7 +137,7 @@ describe("experimental forecast confidence", () => {
     ).toBeNull();
   });
 
-  it("refuse le sous-échantillonnage si un modèle n’est pas aligné au validAt exact", () => {
+  it("exclut les modèles non alignés sans annuler la performance historique ni l’échantillon", () => {
     const result = calculateExperimentalForecastConfidence(
       input({
         models: [
@@ -153,16 +153,17 @@ describe("experimental forecast confidence", () => {
     expect(
       result.components.find(({ key }) => key === "agreement")?.reason
     ).toMatch(/aucun sous-échantillon/i);
-    expect(
-      result.components.find(({ key }) => key === "historicalPerformance")
-        ?.score
-    ).toBeNull();
-    expect(
-      result.components.find(({ key }) => key === "sampleSize")?.score
-    ).toBeNull();
+    const historicalPerformance = result.components.find(
+      ({ key }) => key === "historicalPerformance"
+    );
+    const sampleSize = result.components.find(({ key }) => key === "sampleSize");
+    // Sous-ensemble aligné : modèles 1 et 2, MAE pondérée (0,5 + 1,0) / 2 = 0,75 °C.
+    expect(historicalPerformance?.score).toBe(85);
+    expect(historicalPerformance?.evidence).toMatch(/2\/3 modèle\(s\)/);
+    expect(sampleSize?.score).toBe(50);
   });
 
-  it("refuse de comparer la performance et l’échantillon de modèles à horizons exacts différents", () => {
+  it("agrège la base comparable la plus lourde quand les horizons exacts diffèrent", () => {
     const models = [
       model(1, { calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" }),
       model(2, {
@@ -172,17 +173,16 @@ describe("experimental forecast confidence", () => {
       model(3, { calibrationLevel: "EXACT_LOCAL_MODEL_VARIABLE_HORIZON" }),
     ];
     const result = calculateExperimentalForecastConfidence(input({ models }));
-    expect(
-      result.components.find(({ key }) => key === "historicalPerformance")
-        ?.score
-    ).toBeNull();
-    expect(
-      result.components.find(({ key }) => key === "sampleSize")?.score
-    ).toBeNull();
-    expect(
-      result.components.find(({ key }) => key === "historicalPerformance")
-        ?.reason
-    ).toMatch(/ne sont pas identiques/i);
+    const historicalPerformance = result.components.find(
+      ({ key }) => key === "historicalPerformance"
+    );
+    const sampleSize = result.components.find(({ key }) => key === "sampleSize");
+    // Base comparable la plus lourde : horizon 60 min (modèles 1 et 3, masse 120
+    // contre 60); MAE pondérée (0,5 + 1,5) / 2 = 1,0 °C; l’horizon isolé est exclu.
+    expect(historicalPerformance?.score).toBe(80);
+    expect(historicalPerformance?.evidence).toMatch(/lead exact commun/);
+    expect(historicalPerformance?.evidence).toMatch(/2\/3 modèle\(s\)/);
+    expect(sampleSize?.score).toBe(50);
   });
 
   it("exclut la MAE d’un modèle non calibré sans annuler la performance historique", () => {
@@ -279,6 +279,26 @@ describe("experimental forecast confidence", () => {
     expect(
       result.components.find(({ key }) => key === "spatialCoherence")?.reason
     ).toMatch(/plus de 60 min/i);
+  });
+
+  it("exclut les stations sans heure de mesure propre sans annuler la cohérence spatiale", () => {
+    const result = calculateExperimentalForecastConfidence(
+      input({
+        stations: [
+          station("station-a"),
+          station("station-b"),
+          station("station-c", { measurementTimes: null }),
+        ],
+      })
+    );
+    const spatialCoherence = result.components.find(
+      ({ key }) => key === "spatialCoherence"
+    );
+    // Sous-ensemble exploitable : stations a et b, étendue 2 °C.
+    expect(spatialCoherence?.score).toBe(75);
+    expect(spatialCoherence?.evidence).toMatch(
+      /2 station\(s\) physique\(s\) exploitable\(s\) sur 3/
+    );
   });
 
   it("rend la fraîcheur/couverture indisponible si les timestamps des modèles comptés ne sont pas tous exposés", () => {
