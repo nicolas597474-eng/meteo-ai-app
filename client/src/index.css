@@ -2285,8 +2285,10 @@
   will-change: auto !important;
 }
 
-/* Décor de la demi-sphère « Soleil & Lune » : montagnes en perspective,
-   étoiles scintillantes et brume de vallée, accordées à la phase du ciel. */
+/* Décor de la demi-sphère « Soleil & Lune » : massif montagneux réaliste —
+   quatre plans de profondeur en courbes organiques, dégradés de volume,
+   faces ombrées, névés sommitaux, striations rocheuses et brume
+   atmosphérique, accordés à la phase du ciel (jour / crépuscule / nuit). */
 .celestial-landscape {
   position: absolute;
   inset: 0;
@@ -2296,26 +2298,76 @@
   pointer-events: none;
 }
 
-.celestial-landscape__far { fill: rgb(125 155 200 / 0.32); }
-.celestial-landscape__mid { fill: rgb(74 104 153 / 0.46); }
-.celestial-landscape__near { fill: rgb(12 24 46 / 0.78); }
-.celestial-landscape-mist { fill: rgb(226 232 240 / 0.14); }
+/* Teintes par défaut (jour) : perspective atmosphérique bleutée,
+   neige éclatante et brume légère dans la vallée. */
+.celestial-arc-scene {
+  --celestial-ridge-1-top: rgb(173 203 235 / 0.4);
+  --celestial-ridge-1-bottom: rgb(139 171 209 / 0.3);
+  --celestial-ridge-2-top: rgb(122 158 204 / 0.5);
+  --celestial-ridge-2-bottom: rgb(87 123 171 / 0.42);
+  --celestial-ridge-3-top: rgb(66 100 148 / 0.58);
+  --celestial-ridge-3-bottom: rgb(37 61 103 / 0.6);
+  --celestial-ridge-4-top: rgb(24 44 80 / 0.84);
+  --celestial-ridge-4-bottom: rgb(9 18 38 / 0.94);
+  --celestial-snow: rgb(238 245 253 / 0.85);
+  --celestial-rim: rgb(255 238 205 / 0.6);
+  --celestial-shade: rgb(6 12 28 / 0.5);
+  --celestial-rock: rgb(6 14 30 / 0.45);
+  --celestial-haze: rgb(198 215 236 / 0.3);
+  --celestial-mist: rgb(226 232 240 / 0.18);
+}
 
-/* Jour : reliefs bleutés baignés de lumière. */
-.celestial-arc-scene--day .celestial-landscape__far { fill: rgb(147 183 224 / 0.34); }
-.celestial-arc-scene--day .celestial-landscape__mid { fill: rgb(96 133 184 / 0.5); }
-.celestial-arc-scene--day .celestial-landscape__near { fill: rgb(21 40 72 / 0.8); }
+/* Crépuscule : pourpres, lumière ambrée et alpenglow sur les crêtes. */
+.celestial-arc-scene--twilight {
+  --celestial-ridge-1-top: rgb(186 168 214 / 0.42);
+  --celestial-ridge-1-bottom: rgb(150 136 186 / 0.34);
+  --celestial-ridge-2-top: rgb(140 118 176 / 0.5);
+  --celestial-ridge-2-bottom: rgb(99 83 139 / 0.46);
+  --celestial-ridge-3-top: rgb(84 66 124 / 0.6);
+  --celestial-ridge-3-bottom: rgb(47 35 83 / 0.62);
+  --celestial-ridge-4-top: rgb(30 22 56 / 0.86);
+  --celestial-ridge-4-bottom: rgb(12 8 30 / 0.94);
+  --celestial-snow: rgb(241 233 249 / 0.7);
+  --celestial-rim: rgb(255 190 130 / 0.75);
+  --celestial-shade: rgb(10 6 26 / 0.55);
+  --celestial-rock: rgb(12 8 28 / 0.5);
+  --celestial-haze: rgb(224 178 200 / 0.26);
+  --celestial-mist: rgb(251 215 170 / 0.2);
+}
 
-/* Crépuscule : pourpres et ambré derrière les crêtes. */
-.celestial-arc-scene--twilight .celestial-landscape__far { fill: rgb(139 124 186 / 0.36); }
-.celestial-arc-scene--twilight .celestial-landscape__mid { fill: rgb(92 79 141 / 0.5); }
-.celestial-arc-scene--twilight .celestial-landscape__near { fill: rgb(21 17 42 / 0.82); }
-.celestial-arc-scene--twilight .celestial-landscape-mist { fill: rgb(251 215 170 / 0.16); }
+/* Nuit : bleu profond, neiges lunistes et brume discrète. */
+.celestial-arc-scene--night {
+  --celestial-ridge-1-top: rgb(74 92 132 / 0.38);
+  --celestial-ridge-1-bottom: rgb(52 66 102 / 0.32);
+  --celestial-ridge-2-top: rgb(52 68 108 / 0.46);
+  --celestial-ridge-2-bottom: rgb(36 48 82 / 0.44);
+  --celestial-ridge-3-top: rgb(30 42 74 / 0.58);
+  --celestial-ridge-3-bottom: rgb(18 26 52 / 0.62);
+  --celestial-ridge-4-top: rgb(10 16 36 / 0.88);
+  --celestial-ridge-4-bottom: rgb(4 7 20 / 0.95);
+  --celestial-snow: rgb(198 212 242 / 0.45);
+  --celestial-rim: rgb(148 178 235 / 0.4);
+  --celestial-shade: rgb(2 4 14 / 0.5);
+  --celestial-rock: rgb(2 6 18 / 0.45);
+  --celestial-haze: rgb(90 110 160 / 0.2);
+  --celestial-mist: rgb(180 196 230 / 0.13);
+}
 
-/* Nuit : bleu profond, les étoiles prennent le relais. */
-.celestial-arc-scene--night .celestial-landscape__far { fill: rgb(56 74 120 / 0.34); }
-.celestial-arc-scene--night .celestial-landscape__mid { fill: rgb(34 48 86 / 0.5); }
-.celestial-arc-scene--night .celestial-landscape__near { fill: rgb(7 12 28 / 0.85); }
+/* Névés, faces ombrées, roches et liserés de lumière des crêtes. */
+.celestial-landscape__snow { fill: var(--celestial-snow); }
+.celestial-landscape__shade { fill: var(--celestial-shade); }
+.celestial-landscape__rock {
+  fill: none;
+  stroke: var(--celestial-rock);
+  stroke-width: 0.3;
+  stroke-linecap: round;
+}
+.celestial-landscape__rim {
+  fill: none;
+  stroke: var(--celestial-rim);
+  stroke-width: 0.35;
+  stroke-linecap: round;
+}
 
 .celestial-landscape-star { fill: rgb(224 231 255 / 0.9); }
 .celestial-arc-scene--day .celestial-landscape-star { display: none; }
