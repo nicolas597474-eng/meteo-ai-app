@@ -35,6 +35,16 @@ export type OpenSenseMapCandidate = {
   windDirection: number | null;
   precipitation: number | null;
   updatedAt: string | null;
+  /** Horodatage de mesure fourni par capteur pour chaque variable ; jamais déduit. */
+  measurementTimes: {
+    temperature: string | null;
+    humidity: string | null;
+    pressure: string | null;
+    windSpeed: string | null;
+    windGust: string | null;
+    windDirection: string | null;
+    precipitation: string | null;
+  };
 };
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -101,6 +111,15 @@ export function mapOpenSenseMapBox(
     windDirection: windDirection.value,
     precipitation: precipitation.value,
     updatedAt: dates[0] ?? null,
+    measurementTimes: {
+      temperature: temperature.createdAt,
+      humidity: humidity.createdAt,
+      pressure: pressure.createdAt,
+      windSpeed: windSpeed.createdAt,
+      windGust: windGust.createdAt,
+      windDirection: windDirection.createdAt,
+      precipitation: precipitation.createdAt,
+    },
   };
 }
 
