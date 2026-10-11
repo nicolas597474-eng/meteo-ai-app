@@ -590,7 +590,7 @@ export async function evaluateOpenSenseMapQualifications(nowMs = Date.now()): Pr
   // Les stations officielles se lisent par référence de favori : le désaccord
   // qui mesure la borne d'acceptation est local, jamais régional.
   const officialStationsByReference = new Map<string, Awaited<ReturnType<typeof getValidatedOfficialStationsNearReference>>>();
-  for (const referenceKey of new Set(candidates.map((candidate) => `${candidate.refLat}:${candidate.refLon}`))) {
+  for (const referenceKey of Array.from(new Set(candidates.map((candidate) => `${candidate.refLat}:${candidate.refLon}`)))) {
     const [refLat, refLon] = referenceKey.split(":").map(Number);
     officialStationsByReference.set(referenceKey, await getValidatedOfficialStationsNearReference(refLat, refLon));
   }
@@ -606,7 +606,9 @@ export async function evaluateOpenSenseMapQualifications(nowMs = Date.now()): Pr
   );
 
   const { verdicts } = deriveOpenSenseMapVerdicts({ candidates, officialStations, observations, asOf: nowMs });
-  await applyOpenSenseMapQualificationVerdicts(verdicts);
+  if (verdicts.length > 0) {
+    await applyOpenSenseMapQualificationVerdicts(verdicts);
+  }
   return { evaluatedCandidates: candidates.length, verdicts };
 }
 

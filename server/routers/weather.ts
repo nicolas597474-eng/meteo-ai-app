@@ -1614,6 +1614,15 @@ export const weatherRouter = router({
         radiusKm,
         stations: ranked.map(s => {
           const persistedCitizenVerdict = persistedCitizenVerdicts.get(s.stationId);
+          const qualificationStatus = persistedCitizenVerdict?.qualificationStatus ?? s.qualificationStatus;
+          const normalizedQualificationStatus: "candidate" | "validated" | "excluded" | undefined =
+            qualificationStatus === "candidate"
+              ? "candidate"
+              : qualificationStatus === "validated"
+                ? "validated"
+                : qualificationStatus === "excluded"
+                  ? "excluded"
+                  : undefined;
           return {
             stationId: s.stationId,
             source: s.source,
@@ -1642,7 +1651,7 @@ export const weatherRouter = router({
             exclusionReason: persistedCitizenVerdict
               ? persistedCitizenVerdict.exclusionReason ?? null
               : s.exclusionReason,
-            qualificationStatus: persistedCitizenVerdict?.qualificationStatus ?? s.qualificationStatus,
+            qualificationStatus: normalizedQualificationStatus,
             sourceTier: s.sourceTier,
           };
         }),

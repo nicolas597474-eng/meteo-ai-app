@@ -613,7 +613,7 @@ async function collectNearbyStationsUncached(
       updatedAt: candidate.updatedAt,
       measurementTimes: candidate.measurementTimes,
       reliabilityScore: SOURCE_DEFAULTS.cwop.reliability,
-      updateFrequencyMin: SOURCE_DEFAULTS.cwop.updateFrequencyMin,
+      updateFrequencyMin: SOURCE_DEFAULTS.cwop.updateFreqMin,
       dataAvailability: SOURCE_DEFAULTS.cwop.availability,
       isActive: false,
       qualificationStatus: "candidate",
