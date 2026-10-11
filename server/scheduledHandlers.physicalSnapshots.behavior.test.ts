@@ -275,6 +275,60 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     expect(result.locations).toEqual([expect.objectContaining({ stored: true, stationCount: 2 })]);
   });
 
+  it("archive une station CWOP candidate comme capteur citoyen, sans la compter comme station physique", async () => {
+    const cwopMeasurementTimes = {
+      temperature: "2026-08-27T15:40:00.000Z",
+      humidity: null,
+      pressure: "2026-08-27T15:40:00.000Z",
+      windSpeed: "2026-08-27T15:40:00.000Z",
+      windGust: null,
+      windDirection: "2026-08-27T15:40:00.000Z",
+      precipitation: null,
+    };
+    mocks.collectNearbyStations.mockResolvedValue([{
+      stationId: "cwop-EW1234",
+      source: "cwop",
+      name: "Station CWOP témoin",
+      lat: 50.757,
+      lon: 2.51,
+      altitude: 25,
+      distanceKm: 0.8,
+      temperature: 18.4,
+      humidity: null,
+      pressure: 1011.3,
+      windSpeed: 11.1,
+      windGust: null,
+      windDirection: 140,
+      precipitation: null,
+      updatedAt: "2026-08-27T15:40:00.000Z",
+      measurementTimes: cwopMeasurementTimes,
+      reliabilityScore: 60,
+      updateFrequencyMin: 15,
+      dataAvailability: 0.7,
+      isActive: false,
+      qualificationStatus: "candidate",
+      sourceTier: 3,
+      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
+    }]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+
+    const result = await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.upsertWeatherStation).toHaveBeenCalledWith(expect.objectContaining({
+      stationId: "cwop-EW1234",
+      source: "cwop",
+      qualificationStatus: "candidate",
+      isActive: 0,
+      sourceTier: 3,
+    }));
+    expect(mocks.insertStationObservationIfMissing).toHaveBeenCalledWith(expect.objectContaining({
+      stationId: "cwop-EW1234",
+      observedAt: Date.parse("2026-08-27T15:40:00.000Z"),
+      measurementTimes: cwopMeasurementTimes,
+    }));
+    expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 1 })]);
+  });
+
   it("classe l’absence persistante de station comme no_station après cinq essais, sans alerte technique", async () => {
     const result = await settleWithRetries(
       collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled"),
@@ -358,9 +412,9 @@ describe("application des verdicts de qualification openSenseMap", () => {
     qualificationStatus: "validated",
   };
 
-  const liveCandidateStation = (stationId: string) => ({
+  const liveCandidateStation = (stationId: string, source = "opensensemap") => ({
     stationId,
-    source: "opensensemap",
+    source,
     name: "Capteur citoyen témoin",
     lat: 50.757,
     lon: 2.51,
@@ -532,6 +586,35 @@ describe("application des verdicts de qualification openSenseMap", () => {
 
     expect(mocks.applyOpenSenseMapQualificationVerdicts).toHaveBeenCalledWith([expect.objectContaining({
       stationId: "opensensemap-box-citoyen",
+      qualificationStatus: "validated",
+      isActive: 1,
+      exclusionReason: null,
+    })]);
+  });
+
+  it("applique la même qualification à une station CWOP candidate dont l'historique suffit", async () => {
+    const cwopArchivedCandidateRow = { ...archivedCandidateRow, stationId: "cwop-EW1234", source: "cwop" };
+    const cwopArchivedCandidateObservations = archivedCandidateObservations.map((observation) => ({
+      ...observation,
+      stationId: "cwop-EW1234",
+    }));
+    mocks.collectNearbyStations.mockResolvedValue([liveOfficialStation]);
+    mocks.calculateGroundTruth.mockReturnValue(qualifiedSynthesis);
+    mocks.getCandidateOpenSenseMapStations.mockResolvedValue([cwopArchivedCandidateRow]);
+    mocks.getValidatedOfficialStationsNearReference.mockResolvedValue([
+      archivedOfficialRow("mf-a"),
+      archivedOfficialRow("mf-b"),
+    ]);
+    mocks.getStationObservationsForQualification.mockResolvedValue([
+      ...archivedOfficialObservations("mf-a", 18.0),
+      ...archivedOfficialObservations("mf-b", 18.2),
+      ...cwopArchivedCandidateObservations,
+    ]);
+
+    await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
+
+    expect(mocks.applyOpenSenseMapQualificationVerdicts).toHaveBeenCalledWith([expect.objectContaining({
+      stationId: "cwop-EW1234",
       qualificationStatus: "validated",
       isActive: 1,
       exclusionReason: null,

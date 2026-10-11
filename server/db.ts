@@ -1065,15 +1065,15 @@ export type OpenSenseMapQualificationVerdictUpdate = {
 };
 
 /**
- * Capteurs citoyens openSenseMap encore en validation : seuls eux peuvent
- * recevoir un verdict. Une station déjà validée ou exclue n'est jamais
+ * Capteurs citoyens (openSenseMap, CWOP) encore en validation : seuls eux
+ * peuvent recevoir un verdict. Une station déjà validée ou exclue n'est jamais
  * réévaluée ni rétrogradée par ce lecteur.
  */
 export async function getCandidateOpenSenseMapStations() {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(weatherStations).where(and(
-    eq(weatherStations.source, "opensensemap"),
+    inArray(weatherStations.source, ["opensensemap", "cwop"]),
     eq(weatherStations.qualificationStatus, "candidate"),
   ));
 }

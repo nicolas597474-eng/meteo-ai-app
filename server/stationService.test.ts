@@ -152,15 +152,18 @@ describe("getPhysicalActiveStations", () => {
 });
 
 describe("getCandidateStations", () => {
-  it("conserve les capteurs citoyens candidats sans les transformer en station physique", () => {
+  it("conserve les capteurs citoyens candidats openSenseMap et CWOP sans les transformer en station physique", () => {
     const candidates = getCandidateStations([
       makeStation({ stationId: "opensensemap-box-1", source: "opensensemap", isActive: false, qualificationStatus: "candidate", sourceTier: 3 }),
+      makeStation({ stationId: "cwop-EW1234", source: "cwop", isActive: false, qualificationStatus: "candidate", sourceTier: 3 }),
       makeStation({ stationId: "mf-59000", source: "meteofrance", qualificationStatus: "validated", sourceTier: 1 }),
     ]);
 
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0].stationId).toBe("opensensemap-box-1");
-    expect(getStationSourceKind(candidates[0].source, candidates[0].stationId)).toBe("reference");
+    expect(candidates).toHaveLength(2);
+    expect(candidates.map((station) => station.stationId)).toEqual(["opensensemap-box-1", "cwop-EW1234"]);
+    for (const candidate of candidates) {
+      expect(getStationSourceKind(candidate.source, candidate.stationId)).toBe("reference");
+    }
   });
 });
 

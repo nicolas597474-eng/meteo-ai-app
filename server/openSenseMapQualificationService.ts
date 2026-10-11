@@ -1,6 +1,6 @@
 /**
- * Qualification des capteurs citoyens openSenseMap par historique comparé aux
- * stations officielles SYNOP — opensensemap-qualification-v1.
+ * Qualification des capteurs citoyens openSenseMap et CWOP par historique
+ * comparé aux stations officielles SYNOP — citizen-qualification-v2.
  *
  * Philosophie du dépôt, appliquée intégralement :
  * - aucune donnée n'est fabriquée : chaque comparaison exige l'heure de mesure
@@ -20,7 +20,18 @@
 
 import type { StationMeasurementTimes } from "./stationMeasurementFreshness";
 
-export const OPEN_SENSE_MAP_QUALIFICATION_VERSION = "opensensemap-qualification-v1" as const;
+/**
+ * Sources citoyennes éligibles à la qualification : openSenseMap (capteurs
+ * outdoor) et CWOP (stations du réseau MADIS). Toute autre source persistée
+ * n'est ni évaluée ni réécrite par ce chemin.
+ */
+export const CITIZEN_QUALIFICATION_SOURCES: ReadonlySet<string> = new Set(["opensensemap", "cwop"]);
+
+/**
+ * Version du jeu de règles : v1 couvrait openSenseMap seul ; v2 étend le
+ * périmètre aux stations citoyennes CWOP sans changer une seule règle mesurée.
+ */
+export const OPEN_SENSE_MAP_QUALIFICATION_VERSION = "citizen-qualification-v2" as const;
 
 /**
  * Gates de qualification. Le minimum de 7 comparaisons provient du plan
@@ -188,8 +199,9 @@ function buildProfile(
 }
 
 /**
- * Dérive le profil de qualification d'un capteur openSenseMap à partir de son
- * historique et de celui des stations officielles SYNOP. Une comparaison
+ * Dérive le profil de qualification d'un capteur citoyen openSenseMap ou CWOP
+ * à partir de son historique et de celui des stations officielles SYNOP. Une
+ * comparaison
  * aligne le relevé du capteur sur la médiane d'au moins deux stations
  * officielles de la même heure de mesure, à condition que leurs relevés ne
  * soient pas postérieurs au moment mesuré du capteur.
@@ -202,11 +214,11 @@ export function deriveOpenSenseMapQualificationProfile(input: {
   const asOf = Number.isFinite(input.asOf) ? input.asOf! : Date.now();
   const { candidate } = input;
 
-  if (candidate.source !== "opensensemap") {
+  if (!CITIZEN_QUALIFICATION_SOURCES.has(candidate.source)) {
     return buildProfile(
       candidate.stationId,
       "candidate",
-      "Seul un capteur openSenseMap est éligible à cette qualification par comparaison SYNOP.",
+      "Seuls les capteurs citoyens openSenseMap et CWOP sont éligibles à cette qualification par comparaison SYNOP ; les autres sources ne sont ni évaluées ni réécrites.",
       emptyEvidence(),
     );
   }

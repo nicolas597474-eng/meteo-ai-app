@@ -320,13 +320,14 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           if (await insertStationObservationIfMissing(observation)) directReadingsAdded++;
         });
 
-        // Les capteurs citoyens openSenseMap sont archivés comme candidats pour
-        // accumuler l'historique exigé par la qualification MAE vs SYNOP. Ils
-        // n'entrent jamais dans la synthèse physique du créneau, et une erreur
-        // d'archive candidat ne peut pas interrompre la collecte officielle.
-        // Un verdict déjà appliqué (validé ou exclu) demeure : l'archive
-        // horaire rafraîchit les métadonnées sans jamais rétrograder le statut.
-        const candidateStations = getCandidateStations(discovered).filter((candidate) => candidate.source === "opensensemap");
+        // Les capteurs citoyens openSenseMap et CWOP sont archivés comme
+        // candidats pour accumuler l'historique exigé par la qualification MAE
+        // vs SYNOP. Ils n'entrent jamais dans la synthèse physique du créneau,
+        // et une erreur d'archive candidat ne peut pas interrompre la collecte
+        // officielle. Un verdict déjà appliqué (validé ou exclu) demeure :
+        // l'archive horaire rafraîchit les métadonnées sans jamais rétrograder
+        // le statut.
+        const candidateStations = getCandidateStations(discovered).filter((candidate) => candidate.source === "opensensemap" || candidate.source === "cwop");
         let persistedQualificationByStation = new Map<string, { qualificationStatus: string; exclusionReason: string | null }>();
         if (candidateStations.length > 0) {
           try {
@@ -576,8 +577,8 @@ export type OpenSenseMapQualificationEvaluationSummary = {
 };
 
 /**
- * Évalue chaque capteur citoyen openSenseMap encore candidat à partir de son
- * historique archivé et des stations officielles persistées pour la même
+ * Évalue chaque capteur citoyen openSenseMap ou CWOP encore candidat à partir
+ * de son historique archivé et des stations officielles persistées pour la même
  * référence de favori, puis applique les verdicts définitifs. Un capteur sans
  * historique suffisant demeure candidat sans aucune écriture : l'évaluation
  * est idempotente et la source de vérité reste l'historique archivé.

@@ -136,6 +136,38 @@ describe("dérivation des verdicts depuis les lignes persistées", () => {
     }]);
   });
 
+  it("qualifie une station CWOP candidate avec les mêmes preuves mesurées", () => {
+    const cwopCandidateRow: QualificationStationRow = {
+      stationId: "cwop-EW1234",
+      source: "cwop",
+      lat: 50.757,
+      lon: 2.51,
+      refLat: 50.756,
+      refLon: 2.521,
+    };
+    const cwopObservations = sufficientCandidateObservations.map((observation) => ({
+      ...observation,
+      stationId: cwopCandidateRow.stationId,
+    }));
+
+    const { profiles, verdicts } = deriveOpenSenseMapVerdicts({
+      candidates: [cwopCandidateRow],
+      officialStations: officialRows,
+      observations: [...officialObservations("mf-a", 18.0), ...officialObservations("mf-b", 18.2), ...cwopObservations],
+      asOf: AS_OF,
+    });
+
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]?.status).toBe("validated");
+    expect(profiles[0]?.evidence).toMatchObject({ comparisons: 7, distinctDays: 3, officialStationsUsed: ["mf-a", "mf-b"] });
+    expect(verdicts).toEqual([{
+      stationId: "cwop-EW1234",
+      qualificationStatus: "validated",
+      isActive: 1,
+      exclusionReason: null,
+    }]);
+  });
+
   it("n'utilise jamais une station officielle persistée pour une autre référence d'archivage", () => {
     const { profiles, verdicts } = deriveOpenSenseMapVerdicts({
       candidates: [candidateRow],

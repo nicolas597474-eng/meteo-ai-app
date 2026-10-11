@@ -1,7 +1,7 @@
 /**
- * Application des verdicts de qualification openSenseMap — pont pur entre les
- * archives persistées (weather_stations, station_observations) et
- * l'évaluateur opensensemap-qualification-v1.
+ * Application des verdicts de qualification des capteurs citoyens openSenseMap
+ * et CWOP — pont pur entre les archives persistées (weather_stations,
+ * station_observations) et l'évaluateur citizen-qualification-v2.
  *
  * Philosophie du dépôt, appliquée intégralement :
  * - ce module ne lit ni n'écrit la base et n'appelle aucun fournisseur : les
@@ -20,6 +20,7 @@
 
 import type { StationMeasurementTimes } from "./stationMeasurementFreshness";
 import {
+  CITIZEN_QUALIFICATION_SOURCES,
   deriveOpenSenseMapQualificationProfile,
   type OpenSenseMapQualificationProfile,
   type QualificationStation,
@@ -129,7 +130,7 @@ export function toPersistedOpenSenseMapVerdict(
 }
 
 /**
- * Déroute chaque capteur citoyen openSenseMap encore candidat vers
+ * Déroute chaque capteur citoyen openSenseMap ou CWOP encore candidat vers
  * l'évaluateur, avec les stations officielles persistées pour sa propre
  * référence d'archivage, puis convertit les statuts définitifs en verdicts.
  * Le résultat est déterministe : mêmes lignes en entrée, mêmes verdicts.
@@ -145,9 +146,9 @@ export function deriveOpenSenseMapVerdicts(input: {
   const verdicts: OpenSenseMapQualificationVerdictUpdate[] = [];
 
   for (const candidate of input.candidates) {
-    // Seul un capteur openSenseMap est éligible ; une autre source persistée
-    // n'est jamais évaluée ni réécrite par ce chemin.
-    if (candidate.source !== "opensensemap") continue;
+    // Seuls les capteurs citoyens (openSenseMap, CWOP) sont éligibles ; toute
+    // autre source persistée n'est jamais évaluée ni réécrite par ce chemin.
+    if (!CITIZEN_QUALIFICATION_SOURCES.has(candidate.source)) continue;
     const officialStations = input.officialStations
       .filter((official) => official.source === "meteofrance" && isSameQualificationReference(candidate, official))
       .map((official) => buildQualificationStation(official, readingsByStation.get(official.stationId) ?? []));

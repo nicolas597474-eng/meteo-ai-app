@@ -217,7 +217,7 @@ describe("qualification openSenseMap par historique MAE vs SYNOP", () => {
     expect(profile.reason).toContain(`1/${OPEN_SENSE_MAP_QUALIFICATION_GATES.minimumComparisons}`);
   });
 
-  it("n'évalue qu'un capteur openSenseMap, jamais une autre source", () => {
+  it("n'évalue que les capteurs citoyens openSenseMap et CWOP, jamais une autre source", () => {
     const profile = deriveOpenSenseMapQualificationProfile({
       candidate: makeCandidate([
         candidateReading("1", 12, 5, 18.1),
@@ -233,8 +233,39 @@ describe("qualification openSenseMap par historique MAE vs SYNOP", () => {
     });
 
     expect(profile.status).toBe("candidate");
-    expect(profile.reason).toContain("openSenseMap");
+    expect(profile.reason).toContain("openSenseMap et CWOP");
     expect(profile.evidence.comparisons).toBe(0);
+  });
+
+  it("qualifie un capteur CWOP avec les mêmes preuves mesurées qu'un capteur openSenseMap", () => {
+    const profile = deriveOpenSenseMapQualificationProfile({
+      candidate: makeCandidate([
+        candidateReading("1", 12, 5, 18.1),
+        candidateReading("1", 14, 5, 18.1),
+        candidateReading("2", 12, 5, 18.1),
+        candidateReading("2", 14, 5, 18.1),
+        candidateReading("3", 12, 5, 18.1),
+        candidateReading("3", 16, 5, 18.1),
+        candidateReading("3", 18, 5, 18.1),
+      ], "cwop"),
+      officialStations: OFFICIAL_STATIONS,
+      asOf: AS_OF,
+    });
+
+    expect(profile.version).toBe(OPEN_SENSE_MAP_QUALIFICATION_VERSION);
+    expect(profile.status).toBe("validated");
+    expect(profile.reason).toContain("Capteur qualifié");
+    expect(profile.evidence).toMatchObject({
+      comparisons: 7,
+      retainedComparisons: 7,
+      outlierComparisons: 0,
+      distinctDays: 3,
+      officialStationsUsed: ["mf-a", "mf-b"],
+      meanOfficialDisagreementC: 0.1,
+      acceptanceBoundC: 1,
+      meanAbsoluteErrorC: 0,
+      meanBiasC: 0,
+    });
   });
 
   it("reste candidat sans aucune comparaison alignée et l'explique sans substitution d'heure", () => {
