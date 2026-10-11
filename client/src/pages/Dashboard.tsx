@@ -91,9 +91,39 @@ function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalP
 // libellés cardinaux blancs agrandis et très lisibles, aiguille fine bleu
 // lumineux avec queue bleue, moyeu métallique à point bleu brillant.
 function WindRose({ direction }: { direction: number | null }) {
-  const { deviceHeading, status: orientationStatus, requestPermission } = useDeviceOrientation({ autoStart: true });
-  const compassHeading = deviceHeading ?? 0;
-  const isOrientationActive = orientationStatus === "tracking" && deviceHeading != null;
+  const { deviceHeading, status: orientationStatus, requestPermission, stopTracking } = useDeviceOrientation({ autoStart: false });
+  const [isRotationEnabled, setIsRotationEnabled] = useState(false);
+  // Bascule rotation / fixe : 1er clic = rotation auto (cap téléphone),
+  // 2e clic = retour en position fixe (nord en haut, cap 0°).
+  const compassHeading = isRotationEnabled ? (deviceHeading ?? 0) : 0;
+  const isOrientationActive = isRotationEnabled && orientationStatus === "tracking" && deviceHeading != null;
+  const isActivating = isRotationEnabled && !isOrientationActive;
+
+  // Si le capteur est refusé ou indisponible, on revient en position fixe.
+  useEffect(() => {
+    if (isRotationEnabled && (orientationStatus === "denied" || orientationStatus === "unsupported")) {
+      setIsRotationEnabled(false);
+    }
+  }, [isRotationEnabled, orientationStatus]);
+
+  const handleToggleRotation = () => {
+    if (isRotationEnabled) {
+      stopTracking();
+      setIsRotationEnabled(false);
+    } else {
+      setIsRotationEnabled(true);
+      void requestPermission().then((granted) => {
+        if (!granted) setIsRotationEnabled(false);
+      });
+    }
+  };
+
+  const activatingHint =
+    orientationStatus === "waiting" ? "En attente du capteur…"
+    : orientationStatus === "no-data" ? "Aucun cap reçu"
+    : orientationStatus === "denied" ? "Capteur refusé"
+    : orientationStatus === "unsupported" ? "Capteur indisponible"
+    : "Activation…";
 
   const cardinalDirections = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"] as const;
   const cardinalNames = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ouest", "ouest", "nord-ouest"] as const;
@@ -138,17 +168,13 @@ function WindRose({ direction }: { direction: number | null }) {
   return (
     <button
       type="button"
-      onClick={() => {
-        if (!isOrientationActive) {
-          void requestPermission();
-        }
-      }}
-      className="mx-auto flex flex-col items-center gap-0.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sky-300 cursor-pointer"
-      role="img"
-      aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.${isOrientationActive ? ` Cap téléphone : ${Math.round(compassHeading)}°.` : " Touchez pour orienter la boussole."}`}
-      title={isOrientationActive ? `Boussole orientée · Cap ${Math.round(compassHeading)}°` : "Touchez pour activer l'orientation par le téléphone"}
+      onClick={handleToggleRotation}
+      aria-pressed={isRotationEnabled}
+      className="mx-auto flex cursor-pointer flex-col items-center gap-0.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+      aria-label={`Boussole du vent : huit directions, nord en haut. ${directionDescription}.${isOrientationActive ? ` Cap téléphone : ${Math.round(compassHeading)}°. Touchez pour figer la boussole.` : isActivating ? ` ${activatingHint} Touchez pour annuler et figer la boussole.` : " Touchez pour orienter la boussole. Second clic pour figer."}`}
+      title={isOrientationActive ? `Boussole orientée · Cap ${Math.round(compassHeading)}° — Touchez pour figer` : isActivating ? `${activatingHint} — Touchez pour annuler` : "Touchez pour activer l'orientation par le téléphone"}
     >
-      <div className="relative isolate grid size-[5.5rem] place-items-center rounded-full bg-[#0A1A2F] shadow-[0_8px_18px_rgba(0,8,20,0.75),0_0_16px_rgba(0,191,255,0.28)] ring-1 ring-sky-100/20 sm:size-[6.5rem]">
+      <div className={`relative isolate grid size-[5.5rem] place-items-center rounded-full bg-[#0A1A2F] shadow-[0_8px_18px_rgba(0,8,20,0.75),0_0_16px_rgba(0,191,255,0.28)] ring-1 transition sm:size-[6.5rem] ${isOrientationActive ? "ring-2 ring-sky-300/70" : isActivating ? "ring-amber-200/60" : "ring-sky-100/20"}`}>
         <svg viewBox="0 0 160 160" className="absolute inset-0 z-10 size-full overflow-visible" aria-hidden="true">
           <defs>
             <linearGradient id="wind-compass-bezel" x1="0" y1="0" x2="0" y2="1">
@@ -378,11 +404,15 @@ function WindRose({ direction }: { direction: number | null }) {
         </svg>
       </div>
       <p className="min-h-4 text-center text-[10px] font-bold leading-tight text-cyan-100">{directionDescription}</p>
-      {isOrientationActive && (
-        <span className="text-[9px] font-medium text-cyan-200/90 leading-none">
-          Cap {Math.round(compassHeading)}°
+      {isOrientationActive ? (
+        <span className="text-[9px] font-medium leading-none text-cyan-200/90">
+          Cap {Math.round(compassHeading)}° · Touchez pour figer
         </span>
-      )}
+      ) : isActivating ? (
+        <span className="text-[9px] font-medium leading-none text-amber-200/90">
+          {activatingHint}
+        </span>
+      ) : null}
     </button>
   );
 }
