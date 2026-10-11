@@ -40,7 +40,17 @@ import {
   getStationQualityProfiles,
   getFavoriteLocations,
   getWeatherStationQualificationVerdicts,
+  getValidatedCitizenStationsNearReference,
+  getActivePhysicalStationsNearReference,
+  getValidatedOfficialStationsNearReference,
+  getStationObservationsForQualification,
 } from "../db";
+import {
+  CITIZEN_FUSION_IMPACT_HISTORY_WINDOW_DAYS,
+  deriveCitizenFusionImpactReport,
+  type ImpactObservationRow,
+  type ImpactStationRow,
+} from "../citizenFusionImpactService";
 import { collectCurrentWeatherSnapshot, collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
 import { summarizePrecipitationModels } from "../../shared/precipitationConsensus";
@@ -1653,6 +1663,77 @@ export const weatherRouter = router({
         referenceSourceCount: modelReferences.length,
         fetchedAt: new Date().toISOString(),
       };
+    }),
+
+  /**
+   * Évaluation à blanc de l'impact des capteurs citoyens validés sur l'erreur
+   * locale (plan openSenseMap/CWOP : l'activation dans la fusion est
+   * conditionnée par des métriques). La référence mesure l'écart de la
+   * synthèse physique à la médiane des stations officielles, avec et sans les
+   * capteurs validés ; la fusion locale n'est jamais modifiée ici.
+   */
+  getCitizenFusionImpact: publicProcedure
+    .input(requiredCoordinatesSchema)
+    .query(async ({ input }) => {
+      const validatedCitizens = await getValidatedCitizenStationsNearReference(input.lat, input.lon);
+      const toImpactStationRow = (station: {
+        stationId: string;
+        source: string;
+        lat: number;
+        lon: number;
+        distanceKm: number;
+        reliabilityScore: number | null;
+      }): ImpactStationRow => ({
+        stationId: station.stationId,
+        source: station.source,
+        lat: Number(station.lat),
+        lon: Number(station.lon),
+        distanceKm: Number(station.distanceKm),
+        reliabilityScore: Number(station.reliabilityScore ?? 50),
+      });
+
+      // Sans capteur validé pour cette référence, rien ne peut être mesuré :
+      // la base n'est pas interrogée davantage et aucune valeur n'est inventée.
+      if (validatedCitizens.length === 0) {
+        return deriveCitizenFusionImpactReport({
+          referenceLat: input.lat,
+          referenceLon: input.lon,
+          physicalStations: [],
+          validatedCitizens: [],
+          officialStations: [],
+          observations: [],
+        });
+      }
+
+      const [physicalStations, officialStations] = await Promise.all([
+        getActivePhysicalStationsNearReference(input.lat, input.lon),
+        getValidatedOfficialStationsNearReference(input.lat, input.lon),
+      ]);
+      const asOf = Date.now();
+      const sinceMs = asOf - CITIZEN_FUSION_IMPACT_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+      const observations = await getStationObservationsForQualification(
+        [
+          ...validatedCitizens.map((station) => station.stationId),
+          ...physicalStations.map((station) => station.stationId),
+          ...officialStations.map((station) => station.stationId),
+        ],
+        sinceMs,
+      );
+      const observationRows: ImpactObservationRow[] = observations.map((observation) => ({
+        stationId: observation.stationId,
+        observedAt: Number(observation.observedAt),
+        measurementTimes: observation.measurementTimes ?? null,
+        temperature: observation.temperature ?? null,
+      }));
+      return deriveCitizenFusionImpactReport({
+        referenceLat: input.lat,
+        referenceLon: input.lon,
+        physicalStations: physicalStations.map(toImpactStationRow),
+        validatedCitizens: validatedCitizens.map(toImpactStationRow),
+        officialStations: officialStations.map(toImpactStationRow),
+        observations: observationRows,
+        asOf,
+      });
     }),
 
   /**

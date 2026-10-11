@@ -24,6 +24,13 @@ const source = [
     ),
     "utf8"
   ),
+  readFileSync(
+    new URL(
+      "../components/weather/CitizenFusionImpactSection.tsx",
+      import.meta.url
+    ),
+    "utf8"
+  ),
   // Les libellés des badges de qualification vivent dans la lib partagée.
   readFileSync(
     new URL("../lib/stationCandidateStatus.ts", import.meta.url),
@@ -124,5 +131,26 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
     expect(source).toContain("Aucune donnée n’est fabriquée");
     expect(source).toContain("Aucun relevé");
     expect(source).toContain("Aucune variable mesurée");
+  });
+
+  it("évalue à blanc l’impact des capteurs validés sans jamais modifier la fusion", () => {
+    expect(source).toContain("getCitizenFusionImpact");
+    expect(source).toContain("Impact à blanc des capteurs citoyens validés");
+    // Les deux bras de la comparaison sont explicites, jamais confondus.
+    expect(source).toContain("MAE synthèse physique seule");
+    expect(source).toContain("MAE avec capteurs validés");
+    expect(source).toContain("Amélioration moyenne mesurée");
+    expect(source).toContain("distance 50 %");
+    expect(source).toContain("priorité de source 30 %");
+    // Les verdicts mesurés sont affichés tels quels, sans embellissement.
+    expect(source).toContain("AMÉLIORATION MESURÉE");
+    expect(source).toContain("AUCUNE AMÉLIORATION MESURÉE");
+    expect(source).toContain("HISTORIQUE INSUFFISANT");
+    expect(source).toContain("Aucun capteur citoyen validé archivé");
+    // Aucune donnée fabriquée et aucun changement implicite de la fusion.
+    expect(source).toContain("aucune valeur n’est inventée");
+    expect(source).toContain("l’heure d’archive n’est jamais un substitut");
+    expect(source).toContain("aucune pondération n’est activée");
+    expect(source).toContain("la fusion locale, la vérité terrain et les pondérations restent inchangées");
   });
 });

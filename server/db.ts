@@ -1101,6 +1101,47 @@ export async function getValidatedOfficialStationsNearReference(refLat: number, 
 }
 
 /**
+ * Capteurs citoyens (openSenseMap, CWOP) porteurs d'un verdict « validated »
+ * persisté pour la référence de favori demandée. L'évaluation à blanc de
+ * l'impact fusion n'examine que ces capteurs : un candidat encore en
+ * validation ou un capteur exclu ne serait jamais ajouté à la synthèse.
+ */
+export async function getValidatedCitizenStationsNearReference(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  return db.select().from(weatherStations).where(and(
+    inArray(weatherStations.source, ["opensensemap", "cwop"]),
+    eq(weatherStations.qualificationStatus, "validated"),
+    gte(weatherStations.refLat, latBounds.min),
+    lte(weatherStations.refLat, latBounds.max),
+    gte(weatherStations.refLon, lonBounds.min),
+    lte(weatherStations.refLon, lonBounds.max),
+  ));
+}
+
+/**
+ * Stations physiques actives (Météo-France, Netatmo) archivées pour la même
+ * référence de favori. L'évaluation à blanc rejoue la pondération de la
+ * synthèse locale sur ces stations, sans jamais réécrire leurs métadonnées.
+ */
+export async function getActivePhysicalStationsNearReference(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  return db.select().from(weatherStations).where(and(
+    inArray(weatherStations.source, ["meteofrance", "netatmo"]),
+    eq(weatherStations.isActive, 1),
+    gte(weatherStations.refLat, latBounds.min),
+    lte(weatherStations.refLat, latBounds.max),
+    gte(weatherStations.refLon, lonBounds.min),
+    lte(weatherStations.refLon, lonBounds.max),
+  ));
+}
+
+/**
  * Relevés archivés des stations citées par la qualification, heures de mesure
  * propres incluses. Le lecteur ne filtre rien : seules les heures de mesure
  * fournies comptent pour l'évaluateur, l'heure d'archive n'est jamais un
