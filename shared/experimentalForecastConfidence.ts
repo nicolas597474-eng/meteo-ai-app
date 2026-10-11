@@ -642,8 +642,8 @@ function buildExtremePenalty(
 
 /**
  * Read-only, explicitly experimental index for one exact next-hour temperature
- * point. Weights are fixed; missing components are never renormalized. The
-* The historical-performance and sample-size factors aggregate only the
+ * point. Weights are fixed; missing components are never renormalized.
+ * The historical-performance and sample-size factors aggregate only the
  * models holding a qualified historical proof on one comparable exact basis:
  * models not aligned at the target validAt, without a qualified proof, or on
  * another exact basis are excluded without voiding the factor, and each
