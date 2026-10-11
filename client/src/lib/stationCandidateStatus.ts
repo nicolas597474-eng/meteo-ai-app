@@ -9,7 +9,34 @@ type QualifiableStation = {
 };
 
 /** Sources citoyennes éligibles à la qualification par comparaison SYNOP. */
-const CITIZEN_QUALIFICATION_SOURCES: ReadonlySet<string> = new Set(["opensensemap", "cwop"]);
+export const CITIZEN_QUALIFICATION_SOURCES: ReadonlySet<string> = new Set(["opensensemap", "cwop"]);
+
+/**
+ * Vrai pour une source éligible à la qualification citoyenne. Le test vit ici
+ * pour que la carte, les badges et le classement partagent la même définition :
+ * recopier la liste ailleurs la ferait diverger.
+ */
+export function isCitizenQualificationSource(source?: string | null): boolean {
+  return source != null && CITIZEN_QUALIFICATION_SOURCES.has(source);
+}
+
+/**
+ * Vrai pour un capteur citoyen effectivement qualifié (verdict « validé »
+ * persisté). C'est la seule population que le filtre « capteurs citoyens
+ * qualifiés » de la carte laisse passer : un capteur en validation ou écarté
+ * n'est jamais qualifié.
+ */
+export function isQualifiedCitizenStation(station: {
+  isActive?: boolean;
+  source?: string | null;
+  sourceKind?: "physical" | "reference";
+  qualificationStatus?: "candidate" | "validated" | "excluded";
+}): boolean {
+  // Un statut d'activité inconnu n'écarte jamais le capteur : seul un `isActive`
+  // explicitement faux le fait. Le verdict citoyen « validé » ne dépend de toute
+  // façon pas de l'activité, et ce prédicat ne teste que lui.
+  return getStationDisplayStatus({ ...station, isActive: station.isActive ?? true }) === "citizen-validated";
+}
 
 export function getStationDisplayStatus(station: {
   isActive: boolean;

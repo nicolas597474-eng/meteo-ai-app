@@ -51,6 +51,28 @@ describe("carte des stations OpenStreetMap", () => {
     expect(source).toContain("onZoomOut={() => adjustExpandedZoom(-1)}");
   });
 
+  it("filtre la carte sur les capteurs citoyens qualifiés sans rien masquer en silence", () => {
+    expect(source).toContain("isQualifiedCitizenStation");
+    expect(source).toContain("visibleStations.forEach((station) =>");
+    // L'effectif masqué est annoncé sur le bouton : une station ne disparaît
+    // jamais sans que l'utilisateur puisse le constater.
+    expect(source).toContain("masquée(s)");
+    expect(source).toContain("aria-pressed={qualifiedCitizensOnly}");
+    // Le filtre est désactivé par défaut : la carte montre tout au premier rendu.
+    expect(source).toContain("const [qualifiedCitizensOnly, setQualifiedCitizensOnly] = useState(false);");
+    // Les marqueurs se redessinent quand le filtre change, sinon la carte
+    // garderait l'ancien jeu de stations.
+    expect(source).toContain("[qualifiedCitizensOnly, stations]");
+    expect(source).toContain("[center.lat, center.lon, visibleStations]");
+  });
+
+  it("affiche le badge de qualification réel dans l'infobulle", () => {
+    expect(source).toContain("getStationQualificationBadge");
+    expect(source).toContain("qualification.label");
+    // La légende rappelle que la couleur encode la fraîcheur, pas la qualification.
+    expect(source).toContain("ne dit <strong");
+  });
+
   it("ne conserve pas les contrôles de fond Satellite ni Street View de Google", () => {
     expect(source).not.toContain("MapTypeToggle");
     expect(source).not.toContain("google.maps");

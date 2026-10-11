@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import L from "leaflet";
 import { LocateFixed, Maximize2, Undo2, X } from "lucide-react";
 import { MapControlButton, MapZoomControl, mapActionButtonClass } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
+import { getStationQualificationBadge, isQualifiedCitizenStation } from "@/lib/stationCandidateStatus";
 
 type StationMarker = {
   stationId: string;
@@ -15,6 +16,9 @@ type StationMarker = {
   source?: string | null;
   reliabilityScore?: number | null;
   readings?: unknown[];
+  isActive?: boolean;
+  sourceKind?: "physical" | "reference";
+  qualificationStatus?: "candidate" | "validated" | "excluded";
   latest?: {
     temperature?: number | null;
     humidity?: number | null;
@@ -44,6 +48,15 @@ function stationInfoHtml(station: StationMarker) {
   const latest = station.latest;
   const freshness = stationFreshness(station.ageMinutes);
   const sourcePriority = station.reliabilityScore === null || station.reliabilityScore === undefined ? "—" : `${Math.round(station.reliabilityScore)}/100`;
+  // Badge de qualification réel, repris du helper partagé : un capteur citoyen
+  // en validation n'est jamais présenté comme qualifié, et inversement.
+  const qualification = getStationQualificationBadge({
+    isActive: station.isActive ?? true,
+    source: station.source,
+    sourceKind: station.sourceKind,
+    qualificationStatus: station.qualificationStatus,
+    exclusionReason: null,
+  });
   const rows = [
     ["Température", stationMetric(latest?.temperature, " °C")],
     ["Humidité", stationMetric(latest?.humidity, " %", 0)],
@@ -51,7 +64,7 @@ function stationInfoHtml(station: StationMarker) {
     ["Rafales", stationMetric(latest?.windGust, " km/h")],
     ["Pluie", stationMetric(latest?.precipitation, " mm")],
   ];
-  return `<div style="box-sizing:border-box;min-width:248px;max-width:280px;padding:12px;border:1px solid #38bdf8;border-radius:12px;background:#071018;color:#f8fafc;font-family:system-ui,sans-serif;line-height:1.35"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><strong style="font-size:15px;line-height:1.2;color:#ffffff">${escapeHtml(station.name)}</strong><span style="flex:none;border:1px solid #34d399;border-radius:999px;padding:3px 6px;color:#a7f3d0;font-size:10px;font-weight:700">${escapeHtml(sourcePriority)}</span></div><p style="margin:6px 0 10px;color:#cbd5e1;font-size:11px;font-weight:500">${escapeHtml(station.source ?? "Station physique")} · ${station.distanceKm.toFixed(1)} km</p><div style="margin:0 0 10px;border-left:2px solid ${freshness.color};padding-left:7px;color:${freshness.color};font-size:11px;font-weight:700">Dernier relevé : ${escapeHtml(freshness.label)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">${rows.map(([label, value]) => `<div style="background:#111c2e;border:1px solid #334155;border-radius:8px;padding:7px"><span style="display:block;margin-bottom:2px;color:#bae6fd;font-size:10px;font-weight:600">${label}</span><span style="color:#ffffff;font-size:13px;font-weight:700">${escapeHtml(value)}</span></div>`).join("")}</div><div style="margin-top:10px;border-top:1px solid #334155;padding-top:8px;color:#cbd5e1;font-size:11px"><strong style="color:#a7f3d0">Priorité technique de réseau/source : ${escapeHtml(sourcePriority)}</strong> · utilisée par le classement, pas une performance météo individuelle mesurée · ${station.readings?.length ?? 0} relevé(s) conservé(s)</div></div>`;
+  return `<div style="box-sizing:border-box;min-width:248px;max-width:280px;padding:12px;border:1px solid #38bdf8;border-radius:12px;background:#071018;color:#f8fafc;font-family:system-ui,sans-serif;line-height:1.35"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><strong style="font-size:15px;line-height:1.2;color:#ffffff">${escapeHtml(station.name)}</strong><span style="flex:none;border:1px solid #34d399;border-radius:999px;padding:3px 6px;color:#a7f3d0;font-size:10px;font-weight:700">${escapeHtml(sourcePriority)}</span></div><p style="margin:6px 0 4px;color:#cbd5e1;font-size:11px;font-weight:500">${escapeHtml(station.source ?? "Station physique")} · ${station.distanceKm.toFixed(1)} km</p><p style="margin:0 0 10px"><span style="border:1px solid #38bdf8;border-radius:999px;padding:2px 6px;color:#bae6fd;font-size:10px;font-weight:700">${escapeHtml(qualification.label)}</span></p><div style="margin:0 0 10px;border-left:2px solid ${freshness.color};padding-left:7px;color:${freshness.color};font-size:11px;font-weight:700">Dernier relevé : ${escapeHtml(freshness.label)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">${rows.map(([label, value]) => `<div style="background:#111c2e;border:1px solid #334155;border-radius:8px;padding:7px"><span style="display:block;margin-bottom:2px;color:#bae6fd;font-size:10px;font-weight:600">${label}</span><span style="color:#ffffff;font-size:13px;font-weight:700">${escapeHtml(value)}</span></div>`).join("")}</div><div style="margin-top:10px;border-top:1px solid #334155;padding-top:8px;color:#cbd5e1;font-size:11px"><strong style="color:#a7f3d0">Priorité technique de réseau/source : ${escapeHtml(sourcePriority)}</strong> · utilisée par le classement, pas une performance météo individuelle mesurée · ${station.readings?.length ?? 0} relevé(s) conservé(s)</div></div>`;
 }
 
 export function StationMap({
@@ -66,8 +79,26 @@ export function StationMap({
   const [mapReady, setMapReady] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFocusedOnLocation, setIsFocusedOnLocation] = useState(false);
+  // Filtre « capteurs citoyens qualifiés » : désactivé par défaut, la carte ne
+  // masque jamais une station sans que l’utilisateur l’ait demandé.
+  const [qualifiedCitizensOnly, setQualifiedCitizensOnly] = useState(false);
   const normalZoom = stations.length > 0 ? 11 : 10;
   const [zoomLevel, setZoomLevel] = useState(normalZoom);
+
+  /**
+   * Capteurs citoyens effectivement qualifiés présents dans le rayon. Le verdict
+   * vient du statut persisté relayé par la recherche de stations : aucun capteur
+   * n’est promu ici.
+   */
+  const qualifiedCitizenCount = useMemo(
+    () => stations.filter((station) => isQualifiedCitizenStation(station)).length,
+    [stations],
+  );
+  const visibleStations = useMemo(
+    () => (qualifiedCitizensOnly ? stations.filter((station) => isQualifiedCitizenStation(station)) : stations),
+    [qualifiedCitizensOnly, stations],
+  );
+  const hiddenStationCount = stations.length - visibleStations.length;
 
   const focusCurrentLocation = useCallback(() => {
     const map = mapRef.current;
@@ -117,7 +148,7 @@ export function StationMap({
       .bindTooltip("Lieu de référence")
       .addTo(markerLayer);
 
-    stations.forEach((station) => {
+    visibleStations.forEach((station) => {
       const freshness = station.ageMinutes !== null && station.ageMinutes <= 90 ? "#34d399" : "#fbbf24";
       L.circleMarker([station.lat, station.lon], {
         color: "#071018",
@@ -130,7 +161,7 @@ export function StationMap({
         .bindTooltip(`${station.name} · ${station.distanceKm.toFixed(1)} km`)
         .addTo(markerLayer);
     });
-  }, [center.lat, center.lon, stations]);
+  }, [center.lat, center.lon, visibleStations]);
 
   useEffect(() => {
     if (mapRef.current) renderMarkers(mapRef.current);
@@ -229,6 +260,19 @@ export function StationMap({
               Agrandir la carte
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setQualifiedCitizensOnly((current) => !current)}
+            aria-pressed={qualifiedCitizensOnly}
+            aria-label="Afficher uniquement les capteurs citoyens qualifiés"
+            className={`${mapActionButtonClass} w-full ${qualifiedCitizensOnly ? "border-sky-300/80 bg-sky-400/20 text-sky-100" : "text-slate-100"}`}
+          >
+            {/* Un libellé qui annonce ce qui est masqué : la carte ne fait jamais
+                disparaître une station sans le dire. */}
+            {qualifiedCitizensOnly
+              ? `Afficher toutes les sources (${hiddenStationCount} masquée(s))`
+              : `Capteurs citoyens qualifiés uniquement (${qualifiedCitizenCount})`}
+          </button>
           <details className="group rounded-xl border border-slate-700 bg-[#0b1524]">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-xs font-semibold text-slate-200 [&::-webkit-details-marker]:hidden">
               <span>Légende des marqueurs</span>
@@ -238,6 +282,7 @@ export function StationMap({
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-blue-100 bg-blue-600" /><span><strong className="text-slate-100">Bleu</strong> — lieu de référence.</span></div>
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-emerald-400" /><span><strong className="text-slate-100">Vert</strong> — station avec relevé de moins de 90 min.</span></div>
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-amber-400" /><span><strong className="text-slate-100">Ambre</strong> — station avec relevé de plus de 90 min.</span></div>
+              <div className="flex items-start gap-2 border-t border-slate-700/70 pt-2"><span aria-hidden="true" className="mt-0.5 h-3 w-3 flex-none rounded-full border-2 border-sky-200 bg-sky-500" /><span>La couleur ne dit <strong className="text-slate-100">jamais</strong> la qualification. Le filtre « capteurs citoyens qualifiés » ne laisse passer que les capteurs citoyens au verdict <strong className="text-slate-100">validé</strong> — les capteurs en validation, les exclus et les autres sources sont alors masqués, et l’effectif masqué est annoncé sur le bouton.</span></div>
             </div>
           </details>
         </div>

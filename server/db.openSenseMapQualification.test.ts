@@ -16,6 +16,7 @@ vi.mock("drizzle-orm/mysql2", () => ({ drizzle: fakeDatabase.drizzle }));
 import {
   applyOpenSenseMapQualificationVerdicts,
   getCandidateOpenSenseMapStations,
+  getCitizenStationsForQualification,
   getStationObservationsForQualification,
   getValidatedOfficialStationsNearReference,
   getWeatherStationQualificationVerdicts,
@@ -43,6 +44,7 @@ describe("base de données indisponible", () => {
 
   it("ne lève jamais depuis les lecteurs et n'applique aucun verdict", async () => {
     await expect(getCandidateOpenSenseMapStations()).resolves.toEqual([]);
+    await expect(getCitizenStationsForQualification(50.756, 2.521)).resolves.toEqual([]);
     await expect(getValidatedOfficialStationsNearReference(50.756, 2.521)).resolves.toEqual([]);
     await expect(getStationObservationsForQualification(["opensensemap-box-a"], 0)).resolves.toEqual([]);
     await expect(getWeatherStationQualificationVerdicts(["opensensemap-box-a"])).resolves.toEqual([]);
@@ -80,6 +82,19 @@ describe("lecteurs et writer des verdicts de qualification openSenseMap", () => 
     fakeDatabase.results = [candidates];
 
     await expect(getCandidateOpenSenseMapStations()).resolves.toEqual(candidates);
+  });
+
+  it("restitue les capteurs citoyens de la référence, tous statuts confondus", async () => {
+    // Le lecteur de preuve doit voir aussi les capteurs déjà promus ou écartés :
+    // filtrer sur « candidat » priverait l'affichage de leur preuve recalculée.
+    const citizens = [
+      { stationId: "opensensemap-box-a", source: "opensensemap", qualificationStatus: "candidate" },
+      { stationId: "cwop-lfqq", source: "cwop", qualificationStatus: "validated" },
+      { stationId: "opensensemap-box-b", source: "opensensemap", qualificationStatus: "excluded" },
+    ];
+    fakeDatabase.results = [citizens];
+
+    await expect(getCitizenStationsForQualification(50.756, 2.521)).resolves.toEqual(citizens);
   });
 
   it("restitue les stations officielles validées de la même référence de favori", async () => {

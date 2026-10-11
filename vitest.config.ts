@@ -15,7 +15,16 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["server/**/*.test.ts", "server/**/*.spec.ts", "client/src/**/*.test.ts", "client/src/**/*.spec.ts"],
+    // `shared/**` est couvert par la même collecte : ses contrats sont partagés
+    // entre client et serveur, un test qui n'est jamais exécuté ne protège rien.
+    include: [
+      "server/**/*.test.ts",
+      "server/**/*.spec.ts",
+      "client/src/**/*.test.ts",
+      "client/src/**/*.spec.ts",
+      "shared/**/*.test.ts",
+      "shared/**/*.spec.ts",
+    ],
     setupFiles: ["./vitest.setup.ts"],
   },
 });

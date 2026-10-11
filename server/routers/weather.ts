@@ -45,6 +45,8 @@ import {
   getValidatedOfficialStationsNearReference,
   getStationObservationsForQualification,
 } from "../db";
+import { loadCitizenQualificationEvidence } from "../citizenQualificationEvidenceLoader";
+import { indexCitizenQualificationEvidence } from "../citizenQualificationEvidenceService";
 import {
   CITIZEN_FUSION_IMPACT_HISTORY_WINDOW_DAYS,
   deriveCitizenFusionImpactReport,
@@ -1671,6 +1673,30 @@ export const weatherRouter = router({
         sourceDiagnosticsFromCache: stationCollection.cacheHit,
         referenceSourceCount: modelReferences.length,
         fetchedAt: new Date().toISOString(),
+      };
+    }),
+
+  /**
+   * Preuve de qualification des capteurs citoyens, en lecture seule : pour
+   * chaque capteur openSenseMap/CWOP de la référence, la progression réelle
+   * (comparaisons alignées, jours distincts) et les seuils qui restent à
+   * franchir. La preuve est recalculée depuis l'historique archivé par le même
+   * évaluateur que le chemin planifié, et rien n'est écrit : consulter la
+   * progression ne promeut jamais un capteur. Endpoint séparé de
+   * `searchStations` parce que la lecture parcourt 30 jours d'historique — trop
+   * lourd pour le chemin de recherche courant.
+   */
+  getCitizenQualificationEvidence: publicProcedure
+    .input(optionalCoordinatesSchema.optional())
+    .query(async ({ input }) => {
+      const lat = input?.lat ?? HONDEGHEM.lat;
+      const lon = input?.lon ?? HONDEGHEM.lon;
+      const readModel = await loadCitizenQualificationEvidence(lat, lon);
+      return {
+        lat,
+        lon,
+        ...readModel,
+        byStationId: indexCitizenQualificationEvidence(readModel.entries),
       };
     }),
 

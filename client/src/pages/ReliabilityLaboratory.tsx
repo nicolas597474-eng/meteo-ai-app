@@ -163,6 +163,14 @@ export default function ReliabilityLaboratory() {
     staleTime: 2 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
+  // Progression de qualification des capteurs citoyens : preuve recalculée par
+  // le serveur depuis l’historique archivé, avec le même évaluateur que les
+  // verdicts. Aucune écriture, aucun seuil recopié côté client.
+  const { data: qualificationEvidenceData } =
+    trpc.weather.getCitizenQualificationEvidence.useQuery(citizenImpactInput, {
+      staleTime: 5 * 60 * 1000,
+      placeholderData: keepPreviousData,
+    });
   const {
     data: citizenImpactData,
     isLoading: citizenImpactLoading,
@@ -372,6 +380,7 @@ export default function ReliabilityLaboratory() {
           isError={nearbyStationsError}
           locationName={locationName}
           radiusKm={radiusKm}
+          qualificationEvidence={qualificationEvidenceData?.byStationId}
         />
 
         <CitizenFusionImpactSection
