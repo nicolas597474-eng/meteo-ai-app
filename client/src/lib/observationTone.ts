@@ -1,16 +1,16 @@
 /**
- * Code couleur du panneau « Observations actuelles ».
+ * Code couleur du panneau Â« Observations actuelles Â».
  *
- * Chaque grandeur météorologique reçoit une teinte adaptée à son intensité :
- * la valeur (et son icône) se colorent pour une lecture immédiate, sans avoir
- * besoin d'interpréter les chiffres. Exemples : ressenti doux = vert,
- * précipitations 0,0 mm = bleu, UV faible = vert, vent fort = orange/rouge.
+ * Chaque grandeur mÃ©tÃ©orologique reÃ§oit une teinte adaptÃ©e Ã  son intensitÃ© :
+ * la valeur (et son icÃ´ne) se colorent pour une lecture immÃ©diate, sans avoir
+ * besoin d'interprÃ©ter les chiffres. Exemples : ressenti doux = vert,
+ * prÃ©cipitations 0,0 mm = bleu, UV faible = vert, vent fort = orange/rouge.
  */
 
 export type ObservationTone = {
   /** Identifiant stable du niveau, utile aux tests. */
   level: string;
-  /** Classe Tailwind appliquée à la valeur et à l'icône. */
+  /** Classe Tailwind appliquÃ©e Ã  la valeur et Ã  l'icÃ´ne. */
   value: string;
 };
 
@@ -24,7 +24,7 @@ function readNumber(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** Ressenti (°C) : froid violet → gel bleu clair → doux vert → chaud jaune/orange → canicule rouge. */
+/** Ressenti (Â°C) : froid violet â gel bleu clair â doux vert â chaud jaune/orange â canicule rouge. */
 export function getApparentTempTone(celsius: number | null | undefined): ObservationTone {
   const value = readNumber(celsius);
   if (value == null) return NEUTRAL;
@@ -38,7 +38,7 @@ export function getApparentTempTone(celsius: number | null | undefined): Observa
   return tone("canicule", "text-red-400");
 }
 
-/** Couverture nuageuse (%) : ciel dégagé bleu → gris de plus en plus dense quand le ciel se couvre. */
+/** Couverture nuageuse (%) : ciel dÃ©gagÃ© bleu â gris de plus en plus dense quand le ciel se couvre. */
 export function getCloudCoverTone(percent: number | null | undefined): ObservationTone {
   const value = readNumber(percent);
   if (value == null) return NEUTRAL;
@@ -49,7 +49,7 @@ export function getCloudCoverTone(percent: number | null | undefined): Observati
   return tone("couvert", "text-slate-500");
 }
 
-/** Vent moyen (km/h) : léger vert → modéré jaune → fort orange → violent rouge/rosé. */
+/** Vent moyen (km/h) : lÃ©ger vert â modÃ©rÃ© jaune â fort orange â violent rouge/rosÃ©. */
 export function getWindSpeedTone(kmh: number | null | undefined): ObservationTone {
   const value = readNumber(kmh);
   if (value == null) return NEUTRAL;
@@ -61,7 +61,7 @@ export function getWindSpeedTone(kmh: number | null | undefined): ObservationTon
   return tone("violente", "text-rose-400");
 }
 
-/** Rafales (km/h) : mêmes familles que le vent moyen, seuils décalés vers le haut. */
+/** Rafales (km/h) : mÃªmes familles que le vent moyen, seuils dÃ©calÃ©s vers le haut. */
 export function getWindGustTone(kmh: number | null | undefined): ObservationTone {
   const value = readNumber(kmh);
   if (value == null) return NEUTRAL;
@@ -73,7 +73,7 @@ export function getWindGustTone(kmh: number | null | undefined): ObservationTone
   return tone("destructrice", "text-rose-400");
 }
 
-/** Pression de surface (hPa) : très basse rosé (temps perturbé) → normale vert → anticyclone bleu. */
+/** Pression de surface (hPa) : trÃ¨s basse rosÃ© (temps perturbÃ©) â normale vert â anticyclone bleu. */
 export function getPressureTone(hpa: number | null | undefined): ObservationTone {
   const value = readNumber(hpa);
   if (value == null) return NEUTRAL;
@@ -84,7 +84,7 @@ export function getPressureTone(hpa: number | null | undefined): ObservationTone
   return tone("tresHaute", "text-cyan-200");
 }
 
-/** Humidité (%) : sec ambre → confortable vert → humide cyan → saturé bleu. */
+/** HumiditÃ© (%) : sec ambre â confortable vert â humide cyan â saturÃ© bleu. */
 export function getHumidityTone(percent: number | null | undefined): ObservationTone {
   const value = readNumber(percent);
   if (value == null) return NEUTRAL;
@@ -96,7 +96,7 @@ export function getHumidityTone(percent: number | null | undefined): Observation
   return tone("sature", "text-blue-300");
 }
 
-/** Précipitations (mm) : 0,0 mm en bleu, puis la teinte s'approfondit avec l'intensité de la pluie. */
+/** PrÃ©cipitations (mm) : 0,0 mm en bleu, puis la teinte s'approfondit avec l'intensitÃ© de la pluie. */
 export function getPrecipitationTone(mm: number | null | undefined): ObservationTone {
   const value = readNumber(mm);
   if (value == null) return NEUTRAL;
@@ -108,7 +108,7 @@ export function getPrecipitationTone(mm: number | null | undefined): Observation
   return tone("tresForte", "text-red-400");
 }
 
-/** Visibilité (km) : brouillard rosé → brume orange → bonne verte → excellente bleu clair. */
+/** VisibilitÃ© (km) : brouillard rosÃ© â brume orange â bonne verte â excellente bleu clair. */
 export function getVisibilityTone(km: number | null | undefined): ObservationTone {
   const value = readNumber(km);
   if (value == null) return NEUTRAL;
@@ -117,4 +117,16 @@ export function getVisibilityTone(km: number | null | undefined): ObservationTon
   if (value <= 10) return tone("reduite", "text-amber-200");
   if (value <= 20) return tone("bonne", "text-emerald-300");
   return tone("excellente", "text-sky-300");
+}
+
+
+/** Indice UV (échelle OMS) : faible vert → modéré jaune → élevé orange → très élevé rouge → extrême violet. */
+export function getUvTone(uv: number | null | undefined): ObservationTone {
+  const value = readNumber(uv);
+  if (value == null) return NEUTRAL;
+  if (value <= 2) return tone("faible", "text-green-400");
+  if (value <= 5) return tone("modere", "text-yellow-400");
+  if (value <= 7) return tone("eleve", "text-orange-400");
+  if (value <= 10) return tone("tresEleve", "text-red-400");
+  return tone("extreme", "text-purple-400");
 }

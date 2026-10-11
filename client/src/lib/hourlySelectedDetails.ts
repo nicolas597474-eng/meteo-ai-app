@@ -1,4 +1,14 @@
 import { formatOptionalForecastValue } from "./forecastTimeline";
+import {
+  getApparentTempTone,
+  getCloudCoverTone,
+  getHumidityTone,
+  getPrecipitationTone,
+  getPressureTone,
+  getUvTone,
+  getVisibilityTone,
+  getWindSpeedTone,
+} from "./observationTone";
 import { isSnowWmoWeatherCode } from "./forecastDayDisplay";
 import type {
   HourlyFallbackProvenance,
@@ -47,6 +57,8 @@ export type HourlySelectedDetail = {
   summary: string;
   validAt: number | null;
   note?: string;
+  /** Classe Tailwind (code couleur) adaptée à l'intensité de la valeur. */
+  valueTone?: string;
 };
 
 function finite(value: number | null | undefined): value is number {
@@ -60,11 +72,11 @@ function formatWithUnit(
 ): string {
   return finite(value)
     ? formatOptionalForecastValue(value, decimals, unit)
-    : `—${unit}`;
+    : `â${unit}`;
 }
 
 function formatNumber(value: number | null | undefined, decimals = 0): string {
-  return finite(value) ? formatOptionalForecastValue(value, decimals) : "—";
+  return finite(value) ? formatOptionalForecastValue(value, decimals) : "â";
 }
 
 /** Formats raw component values by contributor; it never averages or fills missing values. */
@@ -73,10 +85,10 @@ export function formatHourlyPrecipitationComponentValues(
   field: "rain" | "showers" | "snowfall",
   unit: string,
 ): string {
-  if (!components?.length) return `—${unit}`;
+  if (!components?.length) return `â${unit}`;
   return components
     .map(({ modelName, ...values }) => `${modelName} ${formatWithUnit(values[field], 1, unit)}`)
-    .join(" · ");
+    .join(" Â· ");
 }
 
 function windDirectionLabel(degrees: number): string {
@@ -125,8 +137,8 @@ function fallbackSourceNote(
             timeStyle: "short",
             timeZone: "Europe/Paris",
           }).format(new Date(source.retrievedAt))
-        : "heure de réception indisponible";
-      return `${source.provider} · ${source.product} · réponse obtenue par l’application ${retrieved} (Europe/Paris) · validTime UTC ${new Date(source.validAt).toISOString()} · run fournisseur non communiqué, fraîcheur amont inconnue.`;
+        : "heure de rÃ©ception indisponible";
+      return `${source.provider} Â· ${source.product} Â· rÃ©ponse obtenue par lâapplication ${retrieved} (Europe/Paris) Â· validTime UTC ${new Date(source.validAt).toISOString()} Â· run fournisseur non communiquÃ©, fraÃ®cheur amont inconnue.`;
     })
     .join(" ");
 }
@@ -146,7 +158,8 @@ export function buildHourlySelectedDetails(
     title: string,
     icon: string,
     value: string,
-    note?: string
+    note?: string,
+    valueTone?: string
   ): HourlySelectedDetail => ({
     key,
     title,
@@ -155,6 +168,7 @@ export function buildHourlySelectedDetails(
     summary: value,
     validAt,
     ...(note ? { note } : {}),
+    ...(valueTone ? { valueTone } : {}),
   });
   const precipitationMetrics =
     hour.multiModelMetrics?.source === "official_seven_models" &&
@@ -165,11 +179,21 @@ export function buildHourlySelectedDetails(
     finite(precipitationMetrics?.rainModelCount) &&
     finite(precipitationMetrics?.availableModelCount);
   const precipitationNote = hasPrecipitationCounts
-    ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} modèles au seuil${finite(precipitationMetrics.thresholdMm) ? ` ≥ ${formatOptionalForecastValue(precipitationMetrics.thresholdMm, 1, " mm")}` : ""} · fréquence descriptive brute, pas une probabilité calibrée.`
+    ? `${precipitationMetrics.rainModelCount}/${precipitationMetrics.availableModelCount} modÃ¨les au seuil${finite(precipitationMetrics.thresholdMm) ? ` â¥ ${formatOptionalForecastValue(precipitationMetrics.thresholdMm, 1, " mm")}` : ""} Â· frÃ©quence descriptive brute, pas une probabilitÃ© calibrÃ©e.`
     : undefined;
   const direction = finite(hour.windDirection)
     ? `${windDirectionLabel(hour.windDirection)} (${formatWithUnit(hour.windDirection, 1, "°")})`
     : "—";
+  // Code couleur : teinte adaptée à l'intensité de chaque valeur, identique au panneau
+  // « Observations actuelles » du dashboard (précipitations 0,0 mm = bleu, UV faible = vert…).
+  const maxComponentValue = (field: "showers" | "snowfall"): number | null => {
+    const values = (hour.precipitationComponents ?? [])
+      .map((component) => component[field])
+      .filter(finite);
+    return values.length ? Math.max(...values) : null;
+  };
+  const maxShowers = maxComponentValue("showers");
+  const maxSnowfall = maxComponentValue("snowfall");
   const details: HourlySelectedDetail[] = [];
   if (finite(hour.precipitation)) {
     details.push(make(
@@ -177,7 +201,8 @@ export function buildHourlySelectedDetails(
       "Précipitations",
       "precipitation",
       `Quantité ${formatWithUnit(hour.precipitation, 1, " mm")}`,
-      precipitationNote
+      precipitationNote,
+      getPrecipitationTone(hour.precipitation).value
     ));
   }
   const precipitationComponents = hour.precipitationComponents ?? [];
@@ -187,7 +212,8 @@ export function buildHourlySelectedDetails(
       "Averses",
       "precipitation",
       formatHourlyPrecipitationComponentValues(precipitationComponents, "showers", " mm"),
-      "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."
+      "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution.",
+      maxShowers != null ? getPrecipitationTone(maxShowers).value : undefined
     ));
   }
   const hasPositiveSnowfall = precipitationComponents.some(
@@ -200,7 +226,14 @@ export function buildHourlySelectedDetails(
     const snowNote = hasPositiveSnowfall
       ? "Valeurs brutes des modèles contributeurs au total de précipitations; aucune moyenne ni substitution."
       : "Code météo WMO valide indiquant de la neige; aucune quantité positive de neige n’est fournie pour cette échéance.";
-    details.push(make("snowfall", "Neige", "snow", snowValue, snowNote));
+    details.push(make(
+      "snowfall",
+      "Neige",
+      "snow",
+      snowValue,
+      snowNote,
+      maxSnowfall != null ? getPrecipitationTone(maxSnowfall).value : undefined
+    ));
   }
   details.push(
     make(
@@ -211,47 +244,56 @@ export function buildHourlySelectedDetails(
       fallbackSourceNote(hour.fallbackProvenance, [
         "windSpeed",
         "windDirection",
-      ])
+      ]),
+      finite(hour.windSpeed) ? getWindSpeedTone(hour.windSpeed).value : undefined
     ),
     make(
       "humidity",
       "Humidité et rosée",
       "humidity",
       `Humidité ${formatWithUnit(hour.humidity, 0, " %")} · point de rosée ${formatWithUnit(hour.dewPoint, 1, " °C")}`,
-      fallbackSourceNote(hour.fallbackProvenance, ["humidity"])
+      fallbackSourceNote(hour.fallbackProvenance, ["humidity"]),
+      finite(hour.humidity) ? getHumidityTone(hour.humidity).value : undefined
     ),
     make(
       "clouds",
       "Nuages",
       "cloud_cover",
       `Total ${formatWithUnit(hour.cloudCover, 0, " %")} · basses ${formatWithUnit(hour.cloudLow, 0, " %")} · moyennes ${formatWithUnit(hour.cloudMid, 0, " %")} · hautes ${formatWithUnit(hour.cloudHigh, 0, " %")}`,
-      fallbackSourceNote(hour.fallbackProvenance, ["cloudCover"])
+      fallbackSourceNote(hour.fallbackProvenance, ["cloudCover"]),
+      finite(hour.cloudCover) ? getCloudCoverTone(hour.cloudCover).value : undefined
     ),
     make(
       "pressure",
       "Pression",
       "pressure",
-      formatWithUnit(hour.pressure, 0, " hPa")
+      formatWithUnit(hour.pressure, 0, " hPa"),
+      undefined,
+      finite(hour.pressure) ? getPressureTone(hour.pressure).value : undefined
     ),
-    make("uv", "Indice UV", "sunny", formatNumber(hour.uvIndex, 1)),
+    make(
+      "uv",
+      "Indice UV",
+      "sunny",
+      formatNumber(hour.uvIndex, 1),
+      undefined,
+      finite(hour.uvIndex) ? getUvTone(hour.uvIndex).value : undefined
+    ),
     make(
       "apparent",
       "Température ressentie",
       "thermometer",
-      formatWithUnit(hour.apparentTemp, 1, " °C")
+      formatWithUnit(hour.apparentTemp, 1, " °C"),
+      undefined,
+      finite(hour.apparentTemp) ? getApparentTempTone(hour.apparentTemp).value : undefined
     ),
     make(
       "visibility",
       "Visibilité",
       "eye",
-      formatWithUnit(hour.visibility, 1, " km")
-    ),
-    make(
-      "air-quality",
-      "Qualité de l’air",
-      "cloud_cover",
-      "Non disponible",
-      "Aucune donnée horaire de qualité de l’air n’est fournie par cette prévision officielle."
+      formatWithUnit(hour.visibility, 1, " km"),
+      undefined,
+      finite(hour.visibility) ? getVisibilityTone(hour.visibility).value : undefined
     )
   );
   return details;
