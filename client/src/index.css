@@ -2301,8 +2301,6 @@
 /* Teintes par défaut (jour) : perspective atmosphérique bleutée,
    neige éclatante et brume légère dans la vallée. */
 .celestial-arc-scene {
-  --celestial-ridge-1-top: rgb(173 203 235 / 0.4);
-  --celestial-ridge-1-bottom: rgb(139 171 209 / 0.3);
   --celestial-ridge-3-top: rgb(66 100 148 / 0.58);
   --celestial-ridge-3-bottom: rgb(37 61 103 / 0.6);
   --celestial-ridge-5-top: rgb(11 22 44 / 0.92);
@@ -2314,8 +2312,6 @@
 
 /* Crépuscule : pourpres, lumière ambrée et alpenglow sur les crêtes. */
 .celestial-arc-scene--twilight {
-  --celestial-ridge-1-top: rgb(186 168 214 / 0.42);
-  --celestial-ridge-1-bottom: rgb(150 136 186 / 0.34);
   --celestial-ridge-3-top: rgb(84 66 124 / 0.6);
   --celestial-ridge-3-bottom: rgb(47 35 83 / 0.62);
   --celestial-ridge-5-top: rgb(16 12 36 / 0.92);
@@ -2327,8 +2323,6 @@
 
 /* Nuit : bleu profond, neiges lunistes et brume discrète. */
 .celestial-arc-scene--night {
-  --celestial-ridge-1-top: rgb(74 92 132 / 0.38);
-  --celestial-ridge-1-bottom: rgb(52 66 102 / 0.32);
   --celestial-ridge-3-top: rgb(30 42 74 / 0.58);
   --celestial-ridge-3-bottom: rgb(18 26 52 / 0.62);
   --celestial-ridge-5-top: rgb(5 9 24 / 0.94);

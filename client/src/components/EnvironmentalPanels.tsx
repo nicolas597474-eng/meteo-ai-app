@@ -922,7 +922,7 @@ function RealisticMoon({ phase, size, alt }: { phase: LunarPhaseVisual; size: "m
   return <LunarPhaseGlobe phase={phase} size={size} alt={alt} />;
 }
 
-// Décor de la demi-sphère : massif montagneux réaliste en trois plans de
+// Décor de la demi-sphère : massif montagneux réaliste en deux plans de
 // profondeur — silhouettes fractales (déplacement du point médian), calottes
 // et névés enneigés sur les sommets, perspective aérienne par voiles de
 // brume entre les plans, collines forestières au premier plan — étoiles
@@ -933,10 +933,6 @@ const CelestialLandscapeDecor = memo(function CelestialLandscapeDecor() {
   return (
     <svg className="celestial-landscape" viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true">
       <defs>
-        <linearGradient id="celestial-ridge-1" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--celestial-ridge-1-top)" />
-          <stop offset="1" stopColor="var(--celestial-ridge-1-bottom)" />
-        </linearGradient>
         <linearGradient id="celestial-ridge-3" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="var(--celestial-ridge-3-top)" />
           <stop offset="1" stopColor="var(--celestial-ridge-3-bottom)" />
@@ -954,12 +950,12 @@ const CelestialLandscapeDecor = memo(function CelestialLandscapeDecor() {
           <stop offset="0" stopColor="var(--celestial-mist)" />
           <stop offset="1" stopColor="var(--celestial-mist)" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id="celestial-snow-cap" gradientUnits="userSpaceOnUse" x1="0" y1="20.76" x2="0" y2="24.2">
+        <linearGradient id="celestial-snow-cap" gradientUnits="userSpaceOnUse" x1="0" y1="23.76" x2="0" y2="27.2">
           <stop offset="0" stopColor="var(--celestial-snow)" stopOpacity="0.97" />
           <stop offset="0.7" stopColor="var(--celestial-snow)" stopOpacity="0.7" />
           <stop offset="1" stopColor="var(--celestial-snow)" stopOpacity="0.05" />
         </linearGradient>
-        <linearGradient id="celestial-snow-range" gradientUnits="userSpaceOnUse" x1="0" y1="20.76" x2="0" y2="25.8">
+        <linearGradient id="celestial-snow-range" gradientUnits="userSpaceOnUse" x1="0" y1="23.76" x2="0" y2="28.8">
           <stop offset="0" stopColor="var(--celestial-snow)" stopOpacity="0.92" />
           <stop offset="0.6" stopColor="var(--celestial-snow)" stopOpacity="0.5" />
           <stop offset="1" stopColor="var(--celestial-snow)" stopOpacity="0" />
@@ -968,8 +964,7 @@ const CelestialLandscapeDecor = memo(function CelestialLandscapeDecor() {
       {LANDSCAPE_STARS.map((star) => (
         <circle key={`${star.x}-${star.y}`} className="celestial-landscape-star" cx={star.x} cy={star.y} r={star.r} />
       ))}
-      <path className="celestial-landscape__far" d={celestialLandscape.far} fill="url(#celestial-ridge-1)" />
-      <rect x="0" y="20" width="100" height="9" fill="url(#celestial-haze)" />
+      <rect x="0" y="23" width="100" height="6" fill="url(#celestial-haze)" />
       <path className="celestial-landscape__range" d={celestialLandscape.range} fill="url(#celestial-ridge-3)" />
       {celestialLandscape.snowCaps.map((d, index) => (
         <path key={`celestial-snow-cap-${index}`} d={d} fill="url(#celestial-snow-cap)" />
@@ -977,7 +972,7 @@ const CelestialLandscapeDecor = memo(function CelestialLandscapeDecor() {
       {celestialLandscape.snowFields.map((d, index) => (
         <path key={`celestial-snow-field-${index}`} d={d} fill="url(#celestial-snow-range)" />
       ))}
-      <rect x="0" y="25.4" width="100" height="4.4" fill="url(#celestial-haze)" />
+      <rect x="0" y="28.4" width="100" height="3" fill="url(#celestial-haze)" />
       <path className="celestial-landscape__near" d={celestialLandscape.near} fill="url(#celestial-ridge-5)" />
       <ellipse className="celestial-landscape-mist celestial-landscape-mist--far" cx="50" cy="31.8" rx="47" ry="2" fill="url(#celestial-mist)" />
       <ellipse className="celestial-landscape-mist celestial-landscape-mist--near" cx="52" cy="33.4" rx="49" ry="1.7" fill="url(#celestial-mist)" />
