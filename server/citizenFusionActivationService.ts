@@ -111,18 +111,24 @@ export function deriveCitizenFusionActivationDecision(
  * une décision activée, seuls les capteurs citoyens porteurs du verdict
  * persisté « validated » rejoignent la synthèse : la priorité technique de
  * chaque station reste celle de la collecte, jamais inventée ici, et les
- * seuils du moteur ultra-local continuent de s'appliquer tels quels.
+ * seuils du moteur ultra-local continuent de s'appliquer tels quels. Un
+ * capteur validé porteur d'une anomalie aiguë persistée (bloc 6) est
+ * suspendu temporairement : son verdict demeure intact, seule sa
+ * participation live attend une nouvelle preuve mesurée.
  */
 export function composeLocalSynthesisSources(input: {
   physicalStations: readonly StationData[];
   citizenStations: readonly StationData[];
   activation: CitizenFusionActivationSnapshot;
   verdictByStationId: ReadonlyMap<string, PersistedCitizenVerdict>;
+  /** Capteurs citoyens porteurs d'une anomalie aiguë persistée : suspendus de la composition live, verdict intact. */
+  anomalousStationIds?: ReadonlySet<string>;
 }): StationData[] {
   const physicalStations = [...input.physicalStations];
   if (input.activation?.status !== "activated") return physicalStations;
   const activatedCitizens: StationData[] = input.citizenStations
     .filter((station) => input.verdictByStationId.get(station.stationId)?.qualificationStatus === "validated")
+    .filter((station) => !input.anomalousStationIds?.has(station.stationId))
     .map((station) => ({
       ...station,
       // La décision activée restaure la participation ; le verdict persisté

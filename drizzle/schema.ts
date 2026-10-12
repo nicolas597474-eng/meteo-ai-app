@@ -1206,3 +1206,37 @@ export const citizenSensorWeights = mysqlTable("citizen_sensor_weights", {
 ]);
 export type CitizenSensorWeight = typeof citizenSensorWeights.$inferSelect;
 export type InsertCitizenSensorWeight = typeof citizenSensorWeights.$inferInsert;
+
+export const citizenSensorAnomalies = mysqlTable("citizen_sensor_anomalies", {
+  id: int("id").autoincrement().primaryKey(),
+  refLat: float("refLat").notNull(),
+  refLon: float("refLon").notNull(),
+  stationId: varchar("stationId", { length: 128 }).notNull(),
+  version: varchar("version", { length: 64 }).notNull(),
+  /** Statut mesuré dans la fenêtre récente : « nominal » ou « anomaly » ; « unproven » n'est jamais archivé. */
+  status: varchar("status", { length: 32 }).notNull(),
+  reason: varchar("reason", { length: 512 }).notNull(),
+  recentMaeC: float("recentMaeC").notNull(),
+  /** Biais signé récent — diagnostic archivé, jamais appliqué au signal. */
+  recentBiasC: float("recentBiasC"),
+  /** Décalage de biais récent par rapport au biais de référence — diagnostic archivé, jamais appliqué au signal. */
+  biasShiftC: float("biasShiftC"),
+  recentComparisons: int("recentComparisons").notNull(),
+  recentDistinctDays: int("recentDistinctDays").notNull(),
+  recentMeanOfficialDisagreementC: float("recentMeanOfficialDisagreementC"),
+  baselineMaeC: float("baselineMaeC"),
+  baselineAcceptanceBoundC: float("baselineAcceptanceBoundC"),
+  /** Borne effectivement appliquée : la plus stricte de la borne d'acceptation locale et du multiple de l'erreur habituelle augmenté d'une marge. */
+  anomalyThresholdC: float("anomalyThresholdC"),
+  baselineWindowDays: int("baselineWindowDays").notNull(),
+  recentWindowDays: int("recentWindowDays").notNull(),
+  firstComparedAt: varchar("firstComparedAt", { length: 32 }),
+  lastComparedAt: varchar("lastComparedAt", { length: 32 }),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, table => [
+  index("citizen_sensor_anomalies_reference_idx").on(table.refLat, table.refLon),
+]);
+export type CitizenSensorAnomaly = typeof citizenSensorAnomalies.$inferSelect;
+export type InsertCitizenSensorAnomaly = typeof citizenSensorAnomalies.$inferInsert;

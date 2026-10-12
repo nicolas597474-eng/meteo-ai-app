@@ -64,6 +64,7 @@ import {
   personalModelCalibrations,
   citizenFusionActivations,
   citizenSensorWeights,
+  citizenSensorAnomalies,
   InsertWeatherStation,
   InsertStationObservation,
   InsertStationQualityProfile,
@@ -76,6 +77,7 @@ import {
   InsertPersonalModelCalibration,
   InsertCitizenFusionActivation,
   InsertCitizenSensorWeight,
+  InsertCitizenSensorAnomaly,
 } from "../drizzle/schema";
 import type { HourlyComparisonDiagnostic } from "./hourlyComparisonDiagnostics";
 import { ENV } from "./_core/env";
@@ -1315,6 +1317,59 @@ export async function upsertCitizenSensorWeight(data: InsertCitizenSensorWeight)
     return existing[0].id;
   }
   const result = await db.insert(citizenSensorWeights).values(data);
+  return result[0].insertId;
+}
+
+/**
+ * Dernier signal d'anomalie persisté de chaque capteur citoyen pour une
+ * référence de favori. L'appariement tolère l'écart de coordonnées
+ * d'archivage : la ligne la plus récente par capteur dans les bornes fait
+ * foi, jamais une clé exacte. Sans ligne « anomaly » persistée, le capteur
+ * rejoint la synthèse — aucune valeur n'est inventée.
+ */
+export async function getCitizenSensorAnomaliesNearReference(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  const rows = await db.select().from(citizenSensorAnomalies).where(and(
+    gte(citizenSensorAnomalies.refLat, latBounds.min),
+    lte(citizenSensorAnomalies.refLat, latBounds.max),
+    gte(citizenSensorAnomalies.refLon, lonBounds.min),
+    lte(citizenSensorAnomalies.refLon, lonBounds.max),
+  )).orderBy(desc(citizenSensorAnomalies.evaluatedAt));
+  const latestByStationId = new Map<string, typeof citizenSensorAnomalies.$inferSelect>();
+  for (const row of rows) {
+    if (!latestByStationId.has(row.stationId)) latestByStationId.set(row.stationId, row);
+  }
+  return Array.from(latestByStationId.values());
+}
+
+/**
+ * Archive le signal d'anomalie d'un capteur citoyen pour une référence : la
+ * ligne la plus récente dans les bornes pour ce capteur est mise à jour,
+ * sinon le signal est inséré. L'écriture est idempotente par capteur et par
+ * référence, et aucune autre table n'est touchée. Un signal « unproven »
+ * n'arrive jamais ici : l'acquittement exige une preuve mesurée, jamais une
+ * absence de preuve, et la décision précédente demeure.
+ */
+export async function upsertCitizenSensorAnomaly(data: InsertCitizenSensorAnomaly) {
+  const db = await getDb();
+  if (!db) return null;
+  const latBounds = referenceCoordinateBounds(Number(data.refLat));
+  const lonBounds = referenceCoordinateBounds(Number(data.refLon));
+  const existing = await db.select({ id: citizenSensorAnomalies.id }).from(citizenSensorAnomalies).where(and(
+    gte(citizenSensorAnomalies.refLat, latBounds.min),
+    lte(citizenSensorAnomalies.refLat, latBounds.max),
+    gte(citizenSensorAnomalies.refLon, lonBounds.min),
+    lte(citizenSensorAnomalies.refLon, lonBounds.max),
+    eq(citizenSensorAnomalies.stationId, data.stationId),
+  )).orderBy(desc(citizenSensorAnomalies.evaluatedAt)).limit(1);
+  if (existing[0]) {
+    await db.update(citizenSensorAnomalies).set({ ...data, updatedAt: new Date() }).where(eq(citizenSensorAnomalies.id, existing[0].id));
+    return existing[0].id;
+  }
+  const result = await db.insert(citizenSensorAnomalies).values(data);
   return result[0].insertId;
 }
 /** Idempotent physical synthesis for one location and Paris hour. */

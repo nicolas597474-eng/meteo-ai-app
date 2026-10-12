@@ -46,6 +46,7 @@ import {
   getStationObservationsForQualification,
   getCitizenFusionActivationNearReference,
   getCitizenSensorWeightsNearReference,
+  getCitizenSensorAnomaliesNearReference,
 } from "../db";
 import { loadCitizenQualificationEvidence } from "../citizenQualificationEvidenceLoader";
 import { indexCitizenQualificationEvidence } from "../citizenQualificationEvidenceService";
@@ -128,6 +129,8 @@ type LocalSynthesisSources = {
   activation: CitizenFusionActivation | null;
   /** Multiplicateurs de performance des capteurs citoyens validés (bloc 5) ; station absente = neutre 1. */
   citizenPerformanceMultiplierById: ReadonlyMap<string, number>;
+  /** Capteurs citoyens porteurs d'une anomalie aiguë persistée (bloc 6) ; déjà suspendus de la composition live. */
+  citizenAnomalyStationIds: ReadonlySet<string>;
 };
 
 /**
@@ -139,8 +142,11 @@ type LocalSynthesisSources = {
  * à priorité technique strictement inchangée. Les poids adaptatifs des
  * capteurs validés, dérivés de leur preuve historique par le cycle planifié,
  * modulent ensuite leur poids spatial sans jamais toucher les stations
- * physiques. La vérité terrain horaire archivée reste physique uniquement et
- * n'est jamais composée ici.
+ * physiques. Un capteur validé porteur d'une anomalie aiguë persistée est de
+ * même suspendu temporairement de la composition : son verdict demeure
+ * intact, seule sa participation live attend une nouvelle preuve mesurée.
+ * La vérité terrain horaire archivée reste physique uniquement et n'est
+ * jamais composée ici.
  */
 async function loadLocalSynthesisSources(
   ranked: StationData[],
@@ -151,17 +157,26 @@ async function loadLocalSynthesisSources(
     (station) => station.source === "opensensemap" || station.source === "cwop",
   );
   const citizenStationIds = citizenStations.map((station) => station.stationId);
-  const [persistedCitizenVerdictRows, activation, sensorWeightRows] = await Promise.all([
+  const [persistedCitizenVerdictRows, activation, sensorWeightRows, anomalyRows] = await Promise.all([
     citizenStationIds.length > 0
       ? getWeatherStationQualificationVerdicts(citizenStationIds)
       : Promise.resolve([] as Awaited<ReturnType<typeof getWeatherStationQualificationVerdicts>>),
     getCitizenFusionActivationNearReference(lat, lon),
     getCitizenSensorWeightsNearReference(lat, lon),
+    getCitizenSensorAnomaliesNearReference(lat, lon),
   ]);
   const persistedCitizenVerdicts = new Map(
     persistedCitizenVerdictRows
       .filter((verdict) => verdict.qualificationStatus != null)
       .map((verdict) => [verdict.stationId, verdict] as const),
+  );
+  // Seule la ligne la plus récente par capteur fait foi : un signal
+  // « nominal » plus récent restaure la participation, sans jamais toucher au
+  // verdict persisté.
+  const citizenAnomalyStationIds = new Set(
+    anomalyRows
+      .filter((row) => row.status === "anomaly")
+      .map((row) => row.stationId),
   );
   const physicalStations = getPhysicalActiveStations(ranked);
   const localSynthesisStations = composeLocalSynthesisSources({
@@ -169,6 +184,7 @@ async function loadLocalSynthesisSources(
     citizenStations,
     activation,
     verdictByStationId: persistedCitizenVerdicts,
+    anomalousStationIds: citizenAnomalyStationIds,
   });
   // Seuls les poids des capteurs réellement composés dans la synthèse sont
   // transmis : une ligne obsolète ne peut jamais moduler une station physique
@@ -179,7 +195,7 @@ async function loadLocalSynthesisSources(
       .filter((row) => composedStationIds.has(row.stationId) && Number.isFinite(row.performanceMultiplier))
       .map((row) => [row.stationId, row.performanceMultiplier] as const),
   );
-  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation, citizenPerformanceMultiplierById };
+  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation, citizenPerformanceMultiplierById, citizenAnomalyStationIds };
 }
 
 export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), selectionUpdatedAt?: Date | string, sourceLabel?: string, sourceComputedAt?: Date | string | null) {
