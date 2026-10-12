@@ -439,7 +439,10 @@ export function evaluateHourlyForecastRuns(
     if (observationAt == null) continue;
     const matchingModels = Array.from(models.values()).filter((model) => model.locationKey === snapshot.locationKey && model.targetDate === snapshot.date);
     for (const model of matchingModels) {
-      const validRows = forecastValues.filter((row) => modelKey(descriptorOf(row)) === modelKey(model) && row.validTime === observationAt);
+      // Index lookup instead of a full scan per snapshot × model: identical rows,
+      // but keeps multi-week read-only recomputation linear instead of quadratic.
+      const validRows = HOURLY_FORECAST_VARIABLES.flatMap((variable) =>
+        valuesBySeries.get(forecastSeriesKey({ ...model, validTime: observationAt, variable })) ?? []);
       const earliestByVariable = new Map<HourlyForecastVariable, number>();
       for (const variable of HOURLY_FORECAST_VARIABLES) {
         const earliest = earliestContributorObservedAt(snapshot, variable);

@@ -128,9 +128,10 @@ export async function buildReliabilityLaboratory(input: {
   const history = await getHourlyForecastEvaluationHistory(locationKey, trendStartDate, throughDate, [], { includeLegacy: true });
   const storedRows = history.rows as HourlyHistoricalScoreRow[];
   const storedLegacyRows = history.legacyRows as HourlyHistoricalScoreRow[];
-  // Bounded to 60 days so a 90/365-day period never replays a whole year of
-  // immutable runs in one read; stored aggregates still cover the full window.
-  const recomputeWindowDays = Math.min(period.days, 60);
+  // Bounded to 30 days so a 90/365-day period never replays months of immutable
+  // runs and snapshot JSON in one read; stored aggregates still cover the rest
+  // of the window, and 30 days is exactly the trend's recent window.
+  const recomputeWindowDays = Math.min(period.days, 30);
   const recomputeStartDate = getParisDateDaysAgo(recomputeWindowDays);
   const storedDates = new Set(storedRows.map((row) => row.date));
   const missingDates = Array.from({ length: recomputeWindowDays }, (_, index) => getParisDateDaysAgo(index + 1))
