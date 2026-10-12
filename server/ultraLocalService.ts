@@ -292,6 +292,8 @@ export function calculateUltraLocal(
     recordStationReadings?: boolean;
     /** Retained for caller compatibility; station-derived reference altitudes are never inferred. */
     inferReferenceAltitude?: boolean;
+    /** Multiplicateurs de performance par identifiant de station ; une station absente de la map demeure au neutre 1. */
+    performanceMultiplierById?: ReadonlyMap<string, number>;
   } = {},
 ): UltraLocalResult {
   const config = MODE_CONFIG[mode];
@@ -427,6 +429,7 @@ export function calculateUltraLocal(
       const coreWeights = buildNormalizedSpatialWeights(timedSources, {
         now,
         refAltitude: config.altitudeCorrection ? effectiveAltitude : null,
+        performanceMultiplierById: options.performanceMultiplierById,
       });
       bandStations.forEach((entry, index) => {
         const core = coreWeights[index];

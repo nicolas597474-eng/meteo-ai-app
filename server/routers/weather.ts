@@ -45,6 +45,7 @@ import {
   getValidatedOfficialStationsNearReference,
   getStationObservationsForQualification,
   getCitizenFusionActivationNearReference,
+  getCitizenSensorWeightsNearReference,
 } from "../db";
 import { loadCitizenQualificationEvidence } from "../citizenQualificationEvidenceLoader";
 import { indexCitizenQualificationEvidence } from "../citizenQualificationEvidenceService";
@@ -125,6 +126,8 @@ type LocalSynthesisSources = {
   localSynthesisStations: StationData[];
   persistedCitizenVerdicts: ReadonlyMap<string, PersistedCitizenVerdictRow>;
   activation: CitizenFusionActivation | null;
+  /** Multiplicateurs de performance des capteurs citoyens validés (bloc 5) ; station absente = neutre 1. */
+  citizenPerformanceMultiplierById: ReadonlyMap<string, number>;
 };
 
 /**
@@ -133,8 +136,11 @@ type LocalSynthesisSources = {
  * citoyens et décision d'activation archivée. Sans décision « activated », la
  * composition reste strictement physique ; avec elle, seuls les capteurs
  * citoyens porteurs du verdict persisté « validated » rejoignent la synthèse,
- * à priorité technique strictement inchangée. La vérité terrain horaire
- * archivée reste physique uniquement et n'est jamais composée ici.
+ * à priorité technique strictement inchangée. Les poids adaptatifs des
+ * capteurs validés, dérivés de leur preuve historique par le cycle planifié,
+ * modulent ensuite leur poids spatial sans jamais toucher les stations
+ * physiques. La vérité terrain horaire archivée reste physique uniquement et
+ * n'est jamais composée ici.
  */
 async function loadLocalSynthesisSources(
   ranked: StationData[],
@@ -145,11 +151,12 @@ async function loadLocalSynthesisSources(
     (station) => station.source === "opensensemap" || station.source === "cwop",
   );
   const citizenStationIds = citizenStations.map((station) => station.stationId);
-  const [persistedCitizenVerdictRows, activation] = await Promise.all([
+  const [persistedCitizenVerdictRows, activation, sensorWeightRows] = await Promise.all([
     citizenStationIds.length > 0
       ? getWeatherStationQualificationVerdicts(citizenStationIds)
       : Promise.resolve([] as Awaited<ReturnType<typeof getWeatherStationQualificationVerdicts>>),
     getCitizenFusionActivationNearReference(lat, lon),
+    getCitizenSensorWeightsNearReference(lat, lon),
   ]);
   const persistedCitizenVerdicts = new Map(
     persistedCitizenVerdictRows
@@ -163,7 +170,16 @@ async function loadLocalSynthesisSources(
     activation,
     verdictByStationId: persistedCitizenVerdicts,
   });
-  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation };
+  // Seuls les poids des capteurs réellement composés dans la synthèse sont
+  // transmis : une ligne obsolète ne peut jamais moduler une station physique
+  // ni un capteur que le verdict persisté n'autorise plus.
+  const composedStationIds = new Set(localSynthesisStations.map((station) => station.stationId));
+  const citizenPerformanceMultiplierById = new Map(
+    sensorWeightRows
+      .filter((row) => composedStationIds.has(row.stationId) && Number.isFinite(row.performanceMultiplier))
+      .map((row) => [row.stationId, row.performanceMultiplier] as const),
+  );
+  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation, citizenPerformanceMultiplierById };
 }
 
 export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), selectionUpdatedAt?: Date | string, sourceLabel?: string, sourceComputedAt?: Date | string | null) {
@@ -1605,14 +1621,15 @@ export const weatherRouter = router({
       // statut et le motif persistés (validated / excluded) — uniquement pour
       // les capteurs citoyens openSenseMap et CWOP, sans jamais toucher
       // isActive ni les stations physiques.
-      const { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation: citizenFusionActivation } = await loadLocalSynthesisSources(ranked, lat, lon);
+      const { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation: citizenFusionActivation, citizenPerformanceMultiplierById } = await loadLocalSynthesisSources(ranked, lat, lon);
       const discoveredPhysicalStations = ranked.filter((station) => getStationSourceKind(station.source, station.stationId) === "physical");
       const excludedPhysicalStations = discoveredPhysicalStations.filter((station) => !station.isActive);
       // Sans décision d'activation persistée, la synthèse locale reste
       // strictement physique ; avec une décision « activated », seuls les
       // capteurs citoyens validés y participent, à priorité technique
-      // strictement inchangée.
-      const ultraResult = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null);
+      // strictement inchangée, modulée seulement par la preuve historique
+      // persistée de chaque capteur.
+      const ultraResult = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null, { performanceMultiplierById: citizenPerformanceMultiplierById });
       const modelReferences = buildModelReferenceCoherence(
         currentModelReferences,
         physicalStations
@@ -1855,8 +1872,8 @@ export const weatherRouter = router({
       const stations = await collectNearbyStations(lat, lon, input.radiusKm);
       const ranked = rankStations(stations);
       // Unified engine — same as Mode Local in Dashboard
-      const { localSynthesisStations } = await loadLocalSynthesisSources(ranked, lat, lon);
-      const result = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null);
+      const { localSynthesisStations, citizenPerformanceMultiplierById } = await loadLocalSynthesisSources(ranked, lat, lon);
+      const result = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null, { performanceMultiplierById: citizenPerformanceMultiplierById });
       return {
         temperature: result.temperature,
         humidity: result.humidity,
@@ -1918,9 +1935,9 @@ export const weatherRouter = router({
       const station = stations.find(s => s.stationId === input.stationId);
       if (!station) return null;
       const ranked = rankStations(stations);
-      const { localSynthesisStations } = await loadLocalSynthesisSources(ranked, lat, lon);
+      const { localSynthesisStations, citizenPerformanceMultiplierById } = await loadLocalSynthesisSources(ranked, lat, lon);
       // Unified engine — same as Mode Local in Dashboard
-      const gt = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null);
+      const gt = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null, { performanceMultiplierById: citizenPerformanceMultiplierById });
       const used = gt.stationsUsed.find(s => s.stationId === input.stationId);
       return {
         ...station,

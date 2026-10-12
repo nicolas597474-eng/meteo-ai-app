@@ -95,6 +95,7 @@ import {
   getWeatherStationQualificationVerdicts,
   applyOpenSenseMapQualificationVerdicts,
   upsertCitizenFusionActivation,
+  upsertCitizenSensorWeight,
 } from "./db";
 import {
   deriveOpenSenseMapVerdicts,
@@ -108,6 +109,8 @@ import {
   type ImpactStationRow,
 } from "./citizenFusionImpactService";
 import { deriveCitizenFusionActivationDecision } from "./citizenFusionActivationService";
+import { loadCitizenQualificationEvidence } from "./citizenQualificationEvidenceLoader";
+import { deriveCitizenSensorWeights } from "./citizenSensorWeightingService";
 
 /**
  * Get today's date in YYYY-MM-DD format (Paris timezone)
@@ -580,6 +583,17 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     }
   });
 
+  // La pondération adaptative des capteurs validés suit la même isolation :
+  // chaque poids se recalcule depuis la preuve historique archivée, et une
+  // indisponibilité de la base ne peut jamais interrompre ni retarder
+  // l'archivage physique ni le statut renvoyé.
+  await runOptionalBackgroundTask("citizen-sensor-weights", async () => {
+    const weighting = await evaluateCitizenSensorWeights();
+    if (weighting.persisted > 0) {
+      console.log(`[Stations] Pondération capteurs citoyens : ${weighting.persisted} poids archivé(s) sur ${weighting.weightedSensors} capteur(s) validé(s), ${weighting.evaluatedReferences} référence(s) évaluée(s).`);
+    }
+  });
+
   return {
     ok: !allLocationsFailed,
     status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed",
@@ -742,6 +756,84 @@ export async function evaluateCitizenFusionActivations(nowMs = Date.now()): Prom
       summary.persisted += 1;
     } catch (error) {
       console.warn(`[MeteoAI] Citizen fusion activation evaluation failed for reference ${reference.lat},${reference.lon}:`, error);
+    }
+  }
+  return summary;
+}
+
+export type CitizenSensorWeightEvaluationSummary = {
+  /** Références de favori évaluées (au moins un capteur validé persisté). */
+  evaluatedReferences: number;
+  /** Capteurs validés dotés d'un poids dérivé de leur preuve mesurée. */
+  weightedSensors: number;
+  /** Poids archivés (insertion ou mise à jour). */
+  persisted: number;
+};
+
+/**
+ * Recalcule, pour chaque référence de favori distincte, le poids adaptatif de
+ * chaque capteur citoyen validé participant à la synthèse de température
+ * locale. La preuve se recalcule depuis l'historique archivé par le même
+ * évaluateur que la qualification, puis le poids se dérive et s'archive : la
+ * mesure reste la source de vérité, jamais l'inverse. Une référence sans
+ * capteur validé ne sollicite ni n'écrit rien — les lignes éventuellement
+ * persistées d'un capteur déchu restent inertes car la composition live
+ * exige le verdict persisté à jour — et une erreur isolée n'interrompt
+ * jamais les autres références. Les stations physiques ne reçoivent jamais
+ * de multiplicateur : leur poids spatial demeure strictement inchangé.
+ */
+export async function evaluateCitizenSensorWeights(nowMs = Date.now()): Promise<CitizenSensorWeightEvaluationSummary> {
+  const favorites = await getAllFavoriteLocations();
+  const references = new Map<string, { lat: number; lon: number }>();
+  for (const favorite of favorites) {
+    references.set(`${favorite.lat}:${favorite.lon}`, { lat: favorite.lat, lon: favorite.lon });
+  }
+
+  const summary: CitizenSensorWeightEvaluationSummary = {
+    evaluatedReferences: 0,
+    weightedSensors: 0,
+    persisted: 0,
+  };
+
+  for (const reference of Array.from(references.values())) {
+    try {
+      const validatedCitizens = await getValidatedCitizenStationsNearReference(reference.lat, reference.lon);
+      if (validatedCitizens.length === 0) continue;
+
+      const evidence = await loadCitizenQualificationEvidence(reference.lat, reference.lon, nowMs);
+      const validatedStationIds = new Set(validatedCitizens.map((station) => station.stationId));
+      const weightSet = deriveCitizenSensorWeights({
+        entries: evidence.entries.filter((entry) => validatedStationIds.has(entry.stationId)),
+        windowDays: evidence.historyWindowDays,
+        evaluatedAt: nowMs,
+      });
+      summary.evaluatedReferences += 1;
+      summary.weightedSensors += weightSet.weights.length;
+      for (const weight of weightSet.weights) {
+        await upsertCitizenSensorWeight({
+          refLat: reference.lat,
+          refLon: reference.lon,
+          stationId: weight.stationId,
+          version: weightSet.version,
+          performanceMultiplier: weight.performanceMultiplier,
+          meanAbsoluteErrorC: weight.meanAbsoluteErrorC,
+          regularizedMaeC: weight.regularizedMaeC,
+          meanBiasC: weight.meanBiasC,
+          sampleReliability: weight.sampleReliability,
+          comparisons: weight.comparisons,
+          retainedComparisons: weight.retainedComparisons,
+          distinctDays: weight.distinctDays,
+          windowDays: weightSet.windowDays,
+          meanOfficialDisagreementC: weight.meanOfficialDisagreementC,
+          acceptanceBoundC: weight.acceptanceBoundC,
+          firstComparedAt: weight.firstComparedAt,
+          lastComparedAt: weight.lastComparedAt,
+          evaluatedAt: weightSet.evaluatedAt,
+        });
+        summary.persisted += 1;
+      }
+    } catch (error) {
+      console.warn(`[MeteoAI] Citizen sensor weight evaluation failed for reference ${reference.lat},${reference.lon}:`, error);
     }
   }
   return summary;

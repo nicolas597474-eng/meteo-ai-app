@@ -1167,3 +1167,42 @@ export const citizenFusionActivations = mysqlTable("citizen_fusion_activations",
 ]);
 export type CitizenFusionActivation = typeof citizenFusionActivations.$inferSelect;
 export type InsertCitizenFusionActivation = typeof citizenFusionActivations.$inferInsert;
+
+/**
+ * Poids adaptatif d'un capteur citoyen validé dans la synthèse de température
+ * locale, dérivé de sa preuve historique mesurée (plan openSenseMap/CWOP,
+ * bloc 5). Une ligne archive le dernier poids évalué pour un capteur d'une
+ * référence de favori : la preuve se recalcule à l'identique par
+ * l'évaluateur versionné, la ligne la plus récente fait foi et
+ * l'historique archivé demeure la source de vérité. Sans contrainte
+ * d'unicité sur la référence : l'appariement se fait par tolérance de
+ * coordonnées, jamais par clé exacte.
+ */
+export const citizenSensorWeights = mysqlTable("citizen_sensor_weights", {
+  id: int("id").autoincrement().primaryKey(),
+  refLat: float("refLat").notNull(),
+  refLon: float("refLon").notNull(),
+  stationId: varchar("stationId", { length: 128 }).notNull(),
+  version: varchar("version", { length: 64 }).notNull(),
+  performanceMultiplier: float("performanceMultiplier").notNull(),
+  meanAbsoluteErrorC: float("meanAbsoluteErrorC").notNull(),
+  regularizedMaeC: float("regularizedMaeC").notNull(),
+  /** Biais signé face aux témoins officiels — diagnostic archivé, jamais appliqué au poids. */
+  meanBiasC: float("meanBiasC"),
+  sampleReliability: float("sampleReliability").notNull(),
+  comparisons: int("comparisons").notNull(),
+  retainedComparisons: int("retainedComparisons").notNull(),
+  distinctDays: int("distinctDays").notNull(),
+  windowDays: int("windowDays").notNull(),
+  meanOfficialDisagreementC: float("meanOfficialDisagreementC"),
+  acceptanceBoundC: float("acceptanceBoundC"),
+  firstComparedAt: varchar("firstComparedAt", { length: 32 }),
+  lastComparedAt: varchar("lastComparedAt", { length: 32 }),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, table => [
+  index("citizen_sensor_weights_reference_idx").on(table.refLat, table.refLon),
+]);
+export type CitizenSensorWeight = typeof citizenSensorWeights.$inferSelect;
+export type InsertCitizenSensorWeight = typeof citizenSensorWeights.$inferInsert;
