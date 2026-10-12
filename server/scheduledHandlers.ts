@@ -971,16 +971,17 @@ export async function evaluateCitizenSensorAnomalies(nowMs = Date.now()): Promis
 
       const entries: CitizenSensorAnomalyEntry[] = [];
       for (const citizen of validatedCitizens) {
-        // La référence de l'anomalie est la preuve mesurée qui valide le
-        // capteur sur la fenêtre complète : sans elle, aucune borne
-        // d'anomalie ne peut être mesurée, le capteur n'est pas évalué.
+        // Le verdict persisté « validated » est l'autorité de participation.
+        // La preuve recalculée fournit les bornes et comparaisons ; son statut
+        // peut temporairement redevenir candidat si la fenêtre récente est
+        // insuffisante, ce qui doit produire « unproven » sans archivage.
         const evidence = evidenceByStationId[citizen.stationId];
-        if (evidence?.status !== "validated") continue;
+        if (!evidence) continue;
         const candidate = candidates.find((row) => row.stationId === citizen.stationId);
         if (!candidate) continue;
         entries.push({
           stationId: citizen.stationId,
-          status: evidence.status,
+          status: "validated",
           baseline: evidence.evidence,
           comparisons: buildQualificationComparisons(
             buildQualificationStation(candidate, observationsByStationId.get(citizen.stationId) ?? []),
