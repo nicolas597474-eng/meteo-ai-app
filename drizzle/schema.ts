@@ -1240,3 +1240,38 @@ export const citizenSensorAnomalies = mysqlTable("citizen_sensor_anomalies", {
 ]);
 export type CitizenSensorAnomaly = typeof citizenSensorAnomalies.$inferSelect;
 export type InsertCitizenSensorAnomaly = typeof citizenSensorAnomalies.$inferInsert;
+
+export const citizenVariableQualifications = mysqlTable("citizen_variable_qualifications", {
+  id: int("id").autoincrement().primaryKey(),
+  refLat: float("refLat").notNull(),
+  refLon: float("refLon").notNull(),
+  stationId: varchar("stationId", { length: 128 }).notNull(),
+  /** Grandeur évaluée : « humidity », « pressure » ou « windSpeed » ; la température reste l'autorité de la fusion. */
+  variable: varchar("variable", { length: 32 }).notNull(),
+  version: varchar("version", { length: 64 }).notNull(),
+  /** Statut définitif seulement : « validated » ou « excluded » ; un profil candidat n'est jamais archivé. */
+  status: varchar("status", { length: 32 }).notNull(),
+  reason: varchar("reason", { length: 512 }).notNull(),
+  comparisons: int("comparisons").notNull(),
+  retainedComparisons: int("retainedComparisons").notNull(),
+  outlierComparisons: int("outlierComparisons").notNull(),
+  distinctDays: int("distinctDays").notNull(),
+  /** Témoins officiels alignés sur la preuve, tels que servis par l'évaluateur. */
+  officialStationsUsed: json("officialStationsUsed").$type<string[]>().notNull(),
+  meanOfficialDisagreement: float("meanOfficialDisagreement"),
+  /** Borne d'acceptation mesurée, dérivée du désaccord officiel, jamais décrétée. */
+  acceptanceBound: float("acceptanceBound"),
+  meanAbsoluteError: float("meanAbsoluteError"),
+  /** Biais signé — diagnostic archivé, jamais appliqué à une synthèse. */
+  meanBias: float("meanBias"),
+  firstComparedAt: varchar("firstComparedAt", { length: 32 }),
+  lastComparedAt: varchar("lastComparedAt", { length: 32 }),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, table => [
+  index("citizen_variable_qualifications_reference_idx").on(table.refLat, table.refLon),
+]);
+export type CitizenVariableQualification = typeof citizenVariableQualifications.$inferSelect;
+export type InsertCitizenVariableQualification = typeof citizenVariableQualifications.$inferInsert;
+

@@ -428,6 +428,13 @@
       "when": 1791848400000,
       "tag": "0060_citizen_sensor_anomalies",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "5",
+      "when": 1791855600000,
+      "tag": "0061_citizen_variable_qualifications",
+      "breakpoints": true
     }
   ]
 }

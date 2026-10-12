@@ -98,6 +98,7 @@ import {
   upsertCitizenFusionActivation,
   upsertCitizenSensorWeight,
   upsertCitizenSensorAnomaly,
+  upsertCitizenVariableQualification,
 } from "./db";
 import {
   buildQualificationStation,
@@ -121,6 +122,7 @@ import {
   type CitizenSensorAnomalyEntry,
 } from "./citizenSensorAnomalyService";
 import { buildQualificationComparisons } from "./openSenseMapQualificationService";
+import { deriveCitizenVariableQualifications } from "./citizenVariableQualificationService";
 import {
   buildCitizenQualificationEvidence,
   indexCitizenQualificationEvidence,
@@ -619,6 +621,18 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     }
   });
 
+  // La qualification multi-variables suit la même isolation : chaque grandeur
+  // au-delà de la température est mesurée par le même alignement que la
+  // qualification, sans jamais réécrire le verdict de température ni toucher
+  // les stations physiques, et une indisponibilité de la base ne peut jamais
+  // interrompre ni retarder l'archivage physique ni le statut renvoyé.
+  await runOptionalBackgroundTask("citizen-variable-qualification", async () => {
+    const variableQualification = await evaluateCitizenVariableQualifications();
+    if (variableQualification.persisted > 0) {
+      console.log(`[Stations] Qualification multi-variables : ${variableQualification.persisted} profil(s) archivé(s) sur ${variableQualification.evaluatedCandidates} capteur(s) citoyen(s), ${variableQualification.evaluatedReferences} référence(s) évaluée(s).`);
+    }
+  });
+
   return {
     ok: !allLocationsFailed,
     status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed",
@@ -994,6 +1008,95 @@ export async function evaluateCitizenSensorAnomalies(nowMs = Date.now()): Promis
       }
     } catch (error) {
       console.warn(`[MeteoAI] Citizen sensor anomaly evaluation failed for reference ${reference.lat},${reference.lon}:`, error);
+    }
+  }
+  return summary;
+}
+
+export type CitizenVariableQualificationEvaluationSummary = {
+  /** Références de favori évaluées (au moins un capteur citoyen persisté). */
+  evaluatedReferences: number;
+  /** Capteurs citoyens évalués, une seule fois par capteur quel que soit le nombre de grandeurs. */
+  evaluatedCandidates: number;
+  /** Profils définitifs archivés (insertion ou mise à jour) ; un profil candidat n'est jamais archivé. */
+  persisted: number;
+};
+
+/**
+ * Évalue, pour chaque référence de favori distincte, la qualification
+ * multi-variables (humidité, pression, vent) de chaque capteur citoyen
+ * persisté, par le même alignement horaire et les mêmes portes structurelles
+ * que la qualification de température. La température demeure l'autorité de la
+ * participation à la fusion : ces profils sont des preuves additives par
+ * grandeur, aucun statut de station n'est jamais réécrit. Seuls les statuts
+ * définitifs sont archivés — un capteur toujours candidat sur une grandeur
+ * continue d'accumuler son historique — et une erreur isolée n'interrompt
+ * jamais les autres références.
+ */
+export async function evaluateCitizenVariableQualifications(nowMs = Date.now()): Promise<CitizenVariableQualificationEvaluationSummary> {
+  const favorites = await getAllFavoriteLocations();
+  const references = new Map<string, { lat: number; lon: number }>();
+  for (const favorite of favorites) {
+    references.set(`${favorite.lat}:${favorite.lon}`, { lat: favorite.lat, lon: favorite.lon });
+  }
+
+  const summary: CitizenVariableQualificationEvaluationSummary = {
+    evaluatedReferences: 0,
+    evaluatedCandidates: 0,
+    persisted: 0,
+  };
+
+  for (const reference of Array.from(references.values())) {
+    try {
+      // Les lectures sont volontairement identiques à celles du chemin de
+      // qualification : même fenêtre d'historique, mêmes témoins officiels,
+      // même asOf — la grandeur se mesure sur le même historique archivé que
+      // la température.
+      const candidates = await getCitizenStationsForQualification(reference.lat, reference.lon);
+      if (candidates.length === 0) continue;
+      const officialStations = await getValidatedOfficialStationsNearReference(reference.lat, reference.lon);
+      const sinceMs = nowMs - OPEN_SENSE_MAP_QUALIFICATION_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+      const observations = await getStationObservationsForQualification(
+        [
+          ...candidates.map((candidate) => candidate.stationId),
+          ...officialStations.map((station) => station.stationId),
+        ],
+        sinceMs,
+      );
+
+      summary.evaluatedReferences += 1;
+      summary.evaluatedCandidates += new Set(candidates.map((candidate) => candidate.stationId)).size;
+      const profiles = deriveCitizenVariableQualifications({ candidates, officialStations, observations, asOf: nowMs });
+      for (const profile of profiles) {
+        // Un verdict ne s'applique qu'aux statuts définitifs : un profil
+        // toujours candidat n'est jamais écrit, son historique continue de
+        // s'accumuler.
+        if (profile.status === "candidate") continue;
+        await upsertCitizenVariableQualification({
+          refLat: reference.lat,
+          refLon: reference.lon,
+          stationId: profile.stationId,
+          variable: profile.variable,
+          version: profile.version,
+          status: profile.status,
+          reason: profile.reason,
+          comparisons: profile.evidence.comparisons,
+          retainedComparisons: profile.evidence.retainedComparisons,
+          outlierComparisons: profile.evidence.outlierComparisons,
+          distinctDays: profile.evidence.distinctDays,
+          officialStationsUsed: profile.evidence.officialStationsUsed,
+          meanOfficialDisagreement: profile.evidence.meanOfficialDisagreement,
+          acceptanceBound: profile.evidence.acceptanceBound,
+          meanAbsoluteError: profile.evidence.meanAbsoluteError,
+          meanBias: profile.evidence.meanBias,
+          firstComparedAt: profile.evidence.firstComparedAt,
+          lastComparedAt: profile.evidence.lastComparedAt,
+          evaluatedAt: nowMs,
+        });
+        summary.persisted += 1;
+      }
+    } catch (error) {
+      console.warn(`[MeteoAI] Citizen variable qualification evaluation failed for reference ${reference.lat},${reference.lon}:`, error);
     }
   }
   return summary;
