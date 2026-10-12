@@ -65,6 +65,7 @@ import {
   citizenFusionActivations,
   citizenSensorWeights,
   citizenSensorAnomalies,
+  citizenVariableQualifications,
   InsertWeatherStation,
   InsertStationObservation,
   InsertStationQualityProfile,
@@ -78,6 +79,7 @@ import {
   InsertCitizenFusionActivation,
   InsertCitizenSensorWeight,
   InsertCitizenSensorAnomaly,
+  InsertCitizenVariableQualification,
 } from "../drizzle/schema";
 import type { HourlyComparisonDiagnostic } from "./hourlyComparisonDiagnostics";
 import { ENV } from "./_core/env";
@@ -91,6 +93,7 @@ import { aggregateDailyForecastPerformance, getDailyForecastHorizon } from "./da
 import { buildDailyForecastObservationComparisonRevision } from "./dailyForecastComparisonRevisions";
 import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 import { CITIZEN_FUSION_ACTIVATION_REASON_MAX_LENGTH } from "./citizenFusionActivationService";
+import { CITIZEN_VARIABLE_QUALIFICATION_REASON_MAX_LENGTH } from "./citizenVariableQualificationService";
 import type { DailyFusionHorizon, ModelPerformanceEvidence } from "./fusionPerformance";
 import {
   buildDailyPhysicalComparisonHistoryPage,
@@ -1370,6 +1373,63 @@ export async function upsertCitizenSensorAnomaly(data: InsertCitizenSensorAnomal
     return existing[0].id;
   }
   const result = await db.insert(citizenSensorAnomalies).values(data);
+  return result[0].insertId;
+}
+
+/**
+ * Dernier profil de qualification multi-variables persisté de chaque capteur
+ * citoyen pour une référence de favori. L'appariement tolère l'écart de
+ * coordonnées d'archivage : la ligne la plus récente par capteur et par
+ * grandeur dans les bornes fait foi, jamais une clé exacte. Sans ligne
+ * persistée, la grandeur n'est pas qualifiée — aucune valeur n'est inventée.
+ */
+export async function getCitizenVariableQualificationsNearReference(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  const rows = await db.select().from(citizenVariableQualifications).where(and(
+    gte(citizenVariableQualifications.refLat, latBounds.min),
+    lte(citizenVariableQualifications.refLat, latBounds.max),
+    gte(citizenVariableQualifications.refLon, lonBounds.min),
+    lte(citizenVariableQualifications.refLon, lonBounds.max),
+  )).orderBy(desc(citizenVariableQualifications.evaluatedAt));
+  const latestByKey = new Map<string, typeof citizenVariableQualifications.$inferSelect>();
+  for (const row of rows) {
+    const key = `${row.stationId}:${row.variable}`;
+    if (!latestByKey.has(key)) latestByKey.set(key, row);
+  }
+  return Array.from(latestByKey.values());
+}
+
+/**
+ * Archive le profil de qualification d'une grandeur d'un capteur citoyen pour
+ * une référence : la ligne la plus récente dans les bornes pour ce capteur et
+ * cette grandeur est mise à jour, sinon le profil est inséré. L'écriture est
+ * idempotente par capteur, par grandeur et par référence, la raison est
+ * tronquée à la longueur de sa colonne, et aucune autre table n'est touchée.
+ * Un profil candidat n'arrive jamais ici : un verdict ne s'applique qu'aux
+ * statuts définitifs, l'historique continue de s'accumuler.
+ */
+export async function upsertCitizenVariableQualification(data: InsertCitizenVariableQualification) {
+  const db = await getDb();
+  if (!db) return null;
+  const latBounds = referenceCoordinateBounds(Number(data.refLat));
+  const lonBounds = referenceCoordinateBounds(Number(data.refLon));
+  const existing = await db.select({ id: citizenVariableQualifications.id }).from(citizenVariableQualifications).where(and(
+    gte(citizenVariableQualifications.refLat, latBounds.min),
+    lte(citizenVariableQualifications.refLat, latBounds.max),
+    gte(citizenVariableQualifications.refLon, lonBounds.min),
+    lte(citizenVariableQualifications.refLon, lonBounds.max),
+    eq(citizenVariableQualifications.stationId, data.stationId),
+    eq(citizenVariableQualifications.variable, data.variable),
+  )).orderBy(desc(citizenVariableQualifications.evaluatedAt)).limit(1);
+  const row = { ...data, reason: data.reason.slice(0, CITIZEN_VARIABLE_QUALIFICATION_REASON_MAX_LENGTH) };
+  if (existing[0]) {
+    await db.update(citizenVariableQualifications).set({ ...row, updatedAt: new Date() }).where(eq(citizenVariableQualifications.id, existing[0].id));
+    return existing[0].id;
+  }
+  const result = await db.insert(citizenVariableQualifications).values(row);
   return result[0].insertId;
 }
 /** Idempotent physical synthesis for one location and Paris hour. */
