@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { sdk } from "./_core/sdk";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
-import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, collectExpertForecasts, collectExpertForecastsWithDiagnostics, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
+import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, HONDEGHEM, collectExpertForecasts, collectExpertForecastsWithDiagnostics, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
 import { buildHourlyModelCollectionCoverage, confirmDailyArchiveCoverage, HOURLY_FORECAST_VARIABLES, type DailyModelCollectionCoverage } from "./forecastVariableCoverage";
 import { isHourlyForecastArchiveComplete, isHourlyForecastRunHealthy } from "./forecastHealth";
 import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour, getParisHourlyTimestamps } from "./weatherTime";
@@ -216,6 +216,33 @@ export function shouldNotifyOwnerForTechnicalFailures(streak: number): boolean {
 }
 
 type PhysicalSnapshotFavorite = Awaited<ReturnType<typeof getAllFavoriteLocations>>[number];
+
+/**
+ * Lieux favoris + lieu par défaut affiché par les modèles de lecture. Une
+ * session anonyme (prévisualisation non authentifiée) n'a aucun favori : sans
+ * ce repli, les jobs d'archivage (runs immuables, snapshots physiques)
+ * n'écrivent rien alors que toutes les pages rendent Hondeghem — le laboratoire
+ * afficherait « aucune preuve archivée » avec un pipeline pourtant sain. Le job
+ * nocturne de scoring incluait déjà ce lieu ; l'écriture et la lecture sont
+ * désormais alignées.
+ */
+export function withDefaultCollectionLocation(
+  favorites: readonly PhysicalSnapshotFavorite[],
+): PhysicalSnapshotFavorite[] {
+  const seen = new Set<string>();
+  const unique: PhysicalSnapshotFavorite[] = [];
+  for (const favorite of favorites) {
+    const key = makeLocationKey(favorite.lat, favorite.lon);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(favorite);
+  }
+  const defaultKey = makeLocationKey(HONDEGHEM.lat, HONDEGHEM.lon);
+  if (!seen.has(defaultKey)) {
+    unique.push({ id: 0, userId: 0, lat: HONDEGHEM.lat, lon: HONDEGHEM.lon, name: "Hondeghem", customName: null, localMode: "standard", isDefault: 1, position: 0, radiusKm: 20, preferredModels: null, tempUnit: "celsius", alertsEnabled: 1, alertThresholds: null, createdAt: new Date(), updatedAt: new Date() });
+  }
+  return unique;
+}
 
 export type PhysicalSnapshotCollectionTrigger = "scheduled" | "manual" | "recovery";
 
@@ -1305,25 +1332,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
 
     try {
       // Get all favorite locations across all users
-      const allFavorites = await getAllFavoriteLocations();
-
-      // Deduplicate by locationKey to avoid redundant API calls
-      const seen = new Set<string>();
-      const uniqueLocations: typeof allFavorites = [];
-      for (const fav of allFavorites) {
-        const key = makeLocationKey(fav.lat, fav.lon);
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueLocations.push(fav);
-        }
-      }
-
-      // Also always include the default Hondeghem location
-      const { HONDEGHEM } = await import("./weatherServices");
-      const defaultKey = makeLocationKey(HONDEGHEM.lat, HONDEGHEM.lon);
-      if (!seen.has(defaultKey)) {
-        uniqueLocations.push({ id: 0, userId: 0, lat: HONDEGHEM.lat, lon: HONDEGHEM.lon, name: "Hondeghem", customName: null, localMode: "standard", isDefault: 1, position: 0, radiusKm: 20, preferredModels: null, tempUnit: "celsius", alertsEnabled: 1, alertThresholds: null, createdAt: new Date(), updatedAt: new Date() });
-      }
+      const uniqueLocations = withDefaultCollectionLocation(await getAllFavoriteLocations());
 
       console.log(`[MeteoAI] Processing observations for ${uniqueLocations.length} unique locations`);
 
@@ -1587,30 +1596,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     // Get all favorites across all users
     const allFavorites = await getAllFavoriteLocations();
 
-    if (allFavorites.length === 0) {
-      console.log("[MeteoAI] No favorite locations found, skipping.");
-      await updateCollectionJob(jobId, {
-        status: "completed",
-        servicesCollected: 0,
-        dailyModelsCollected: 0,
-        dailyModelsExpected: 0,
-        hourlyModelsCollected: 0,
-        hourlyModelsExpected: 0,
-        completedAt: new Date(),
-      });
-      return res.json({ ok: true, locationsProcessed: 0 });
-    }
-
-    // Deduplicate by lat/lon to avoid redundant API calls
-    const seen = new Set<string>();
-    const uniqueLocations: typeof allFavorites = [];
-    for (const fav of allFavorites) {
-      const key = `${fav.lat.toFixed(3)},${fav.lon.toFixed(3)}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueLocations.push(fav);
-      }
-    }
+    // Une session anonyme n'a aucun favori : le lieu par défaut affiché par les
+    // modèles de lecture doit être archivé lui aussi, sinon la chaîne de preuve
+    // immuable (runs, snapshots, scores) reste vide et le laboratoire de
+    // fiabilité affiche « aucune preuve archivée » sans défaut visible.
+    const uniqueLocations = withDefaultCollectionLocation(allFavorites);
 
     console.log(`[MeteoAI] Processing ${uniqueLocations.length} unique locations (${allFavorites.length} total favorites)`);
     const expectedModelsPerLocation = getModelCoverage([], OFFICIAL_DAILY_COVERAGE_MODELS).expected.length;
@@ -2330,7 +2320,7 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
   try {
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-    const favorites = await getAllFavoriteLocations();
+    const favorites = withDefaultCollectionLocation(await getAllFavoriteLocations());
     const trigger: PhysicalSnapshotCollectionTrigger = req.body?.snapshotMode === "recovery" ? "recovery" : "scheduled";
     res.json(await collectPhysicalObservationSnapshotsForFavorites(favorites, trigger));
   } catch (error: any) {
