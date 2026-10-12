@@ -276,6 +276,22 @@ export function resolveOfficialDailyForecastSnapshot(coords: { lat: number; lon:
  * is limited to the short Dashboard path: the archived receipt time remains
  * visible, no value is invented, and a new live collection is started after it.
  */
+/**
+ * Délai maximal d'attente de l'état actuel en direct sur le chemin archive.
+ * Au-delà, la réponse part sans état actuel : l'interface retombe alors sur
+ * la requête dédiée `getCurrentModelSnapshot`, puis affiche « indisponible ».
+ */
+export const ARCHIVE_CURRENT_SNAPSHOT_DEADLINE_MS = 2_000;
+
+/** Resolves with `fallback` if `promise` is still pending after `ms` or rejects. */
+export function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise.catch(() => fallback), deadline]).finally(() => clearTimeout(timer));
+}
+
 async function readArchivedOfficialHourlySnapshot(
   coords: { lat: number; lon: number },
   weatherDate: string,
@@ -288,7 +304,7 @@ async function readArchivedOfficialHourlySnapshot(
       getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
       getParisDateDaysAgo(1),
     ),
-    collectCurrentWeatherSnapshot(coords),
+    withDeadline(collectCurrentWeatherSnapshot(coords), ARCHIVE_CURRENT_SNAPSHOT_DEADLINE_MS, null),
   ]);
   const modelForecasts = reconstructOfficialHourlyModelsFromArchive(rows, weatherDate);
   if (modelForecasts.length === 0) return null;
@@ -382,7 +398,7 @@ export function resolveOfficialWeatherSnapshot(
 
   const createSnapshot = () => (async () => {
     const [hourlyResult, currentSnapshot, dailySnapshot] = await Promise.all([
-      collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays }),
+      collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays, interactive: true }),
       collectCurrentWeatherSnapshot(coords),
       includeDaily ? resolveOfficialDailyForecastSnapshot(coords) : Promise.resolve({ daily: [], modelsUsed: [] }),
     ]);

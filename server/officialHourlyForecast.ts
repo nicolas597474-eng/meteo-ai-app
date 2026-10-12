@@ -1093,16 +1093,29 @@ export function computeOfficialHourlyForecast(
 }
 
 /** Collects one shared official hourly forecast and its read-only historical score window. */
+/**
+ * Budget de latence du chemin interactif (page Dashboard / Prévisions).
+ * Sans lui, un fournisseur lent peut retenir la page jusqu'à ~37 s
+ * (2 tentatives de 12 s + seconde passe). Ces bornes laissent les réponses
+ * normales intactes et limitent le pire cas à ~20 s.
+ */
+export const INTERACTIVE_HOURLY_MODEL_TIMEOUT_MS = 10_000;
+export const INTERACTIVE_HOURLY_RETRY_BUDGET_MS = 10_000;
+
 export async function collectOfficialHourlyForecast(
   targetDate: string,
   coords?: { lat: number; lon: number },
-  options: { forecastDays?: number } = {},
+  options: { forecastDays?: number; interactive?: boolean } = {},
 ): Promise<CollectedOfficialHourlyForecast> {
   const location = coords ?? HONDEGHEM;
   const collection = await collectHourlyForecastAllModelsWithDiagnostics(targetDate, location, {
     includeBestMatch: false,
     includeNextDay: true,
     forecastDays: options.forecastDays ?? 2,
+    ...(options.interactive ? {
+      timeoutMs: INTERACTIVE_HOURLY_MODEL_TIMEOUT_MS,
+      retryBudgetMs: INTERACTIVE_HOURLY_RETRY_BUDGET_MS,
+    } : {}),
   });
   const modelForecasts = collection.forecasts;
   const availabilityReasonByModel = Object.fromEntries(collection.diagnostics

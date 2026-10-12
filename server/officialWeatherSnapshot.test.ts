@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, getOfficialWeatherSnapshotCacheKey, isHourlyCoverageNonDecreasing, mergeManualHourlyForecast, refreshOfficialWeatherSnapshotForecastWindow } from "./officialWeatherSnapshot";
+import { withDeadline, buildDatedDailyFusionFallback, buildOfficialWeatherSnapshot, getOfficialSnapshotTtlMs, getOfficialWeatherSnapshotCacheKey, isHourlyCoverageNonDecreasing, mergeManualHourlyForecast, refreshOfficialWeatherSnapshotForecastWindow } from "./officialWeatherSnapshot";
 import { makeLocationKey } from "./db";
 
 const unavailableWeighting = {
@@ -223,5 +223,22 @@ describe("buildOfficialWeatherSnapshot", () => {
       windSpeed: 18,
       condition: "Nuageux",
     });
+  });
+});
+
+describe("withDeadline (chemin archive, état actuel borné)", () => {
+  it("renvoie la valeur si elle arrive avant l'échéance", async () => {
+    await expect(withDeadline(Promise.resolve("live"), 50, "fallback")).resolves.toBe("live");
+  });
+
+  it("renvoie le repli si la valeur n'arrive pas avant l'échéance", async () => {
+    const slow = new Promise<string>((resolve) => setTimeout(() => resolve("late"), 200));
+    const started = Date.now();
+    await expect(withDeadline(slow, 20, "fallback")).resolves.toBe("fallback");
+    expect(Date.now() - started).toBeLessThan(150);
+  });
+
+  it("renvoie le repli si la source rejette", async () => {
+    await expect(withDeadline(Promise.reject(new Error("timeout")), 50, null)).resolves.toBeNull();
   });
 });
