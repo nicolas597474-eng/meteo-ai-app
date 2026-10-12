@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getHourlyForecastEvaluationHistory: vi.fn(),
+  getQualifiedObservationSnapshotsByDateRange: vi.fn(() => []),
+  getHourlyForecastRunValuesByDateRange: vi.fn(() => []),
   makeLocationKey: vi.fn(() => "50.700_2.500"),
 }));
 

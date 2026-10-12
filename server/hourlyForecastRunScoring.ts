@@ -242,8 +242,13 @@ function earliestContributorObservedAt(
     const weight = station.fieldWeights[field];
     if (typeof weight !== "number" || !Number.isFinite(weight) || weight < 0) return null;
     if (weight === 0) continue;
-    if (!isRecord(station.measurementTimes)) return null;
-    const observedAt = absoluteMeasurementEpoch(station.measurementTimes[field]);
+    // Snapshots archived before per-field measurement times keep the station-level
+    // absolute timestamp as their only measurement evidence — the same fallback the
+    // daily verifier applies. A per-field table missing this field's own time still
+    // rejects the field: an absent measurement is never replaced by another field's.
+    const observedAt = isRecord(station.measurementTimes)
+      ? absoluteMeasurementEpoch(station.measurementTimes[field])
+      : absoluteMeasurementEpoch(station.observedAt);
     if (observedAt == null) return null;
     earliest = Math.min(earliest, observedAt);
     contributorCount += 1;
@@ -434,7 +439,10 @@ export function evaluateHourlyForecastRuns(
     if (observationAt == null) continue;
     const matchingModels = Array.from(models.values()).filter((model) => model.locationKey === snapshot.locationKey && model.targetDate === snapshot.date);
     for (const model of matchingModels) {
-      const validRows = forecastValues.filter((row) => modelKey(descriptorOf(row)) === modelKey(model) && row.validTime === observationAt);
+      // Index lookup instead of a full scan per snapshot × model: identical rows,
+      // but keeps multi-week read-only recomputation linear instead of quadratic.
+      const validRows = HOURLY_FORECAST_VARIABLES.flatMap((variable) =>
+        valuesBySeries.get(forecastSeriesKey({ ...model, validTime: observationAt, variable })) ?? []);
       const earliestByVariable = new Map<HourlyForecastVariable, number>();
       for (const variable of HOURLY_FORECAST_VARIABLES) {
         const earliest = earliestContributorObservedAt(snapshot, variable);
