@@ -421,6 +421,13 @@
       "when": 1791841200000,
       "tag": "0059_citizen_sensor_weights",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1791848400000,
+      "tag": "0060_citizen_sensor_anomalies",
+      "breakpoints": true
     }
   ]
 }
