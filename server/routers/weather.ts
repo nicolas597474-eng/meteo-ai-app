@@ -47,6 +47,7 @@ import {
   getCitizenFusionActivationNearReference,
   getCitizenSensorWeightsNearReference,
   getCitizenSensorAnomaliesNearReference,
+  getCitizenVariableQualificationsNearReference,
 } from "../db";
 import { loadCitizenQualificationEvidence } from "../citizenQualificationEvidenceLoader";
 import { indexCitizenQualificationEvidence } from "../citizenQualificationEvidenceService";
@@ -1770,17 +1771,26 @@ export const weatherRouter = router({
    * progression ne promeut jamais un capteur. Endpoint séparé de
    * `searchStations` parce que la lecture parcourt 30 jours d'historique — trop
    * lourd pour le chemin de recherche courant.
+   *
+   * Depuis le bloc 7, les profils multi-variables (humidité, pression, vent)
+   * persistés par le cycle planifié sont retournés à côté, tels quels : la
+   * température reste l'autorité de la fusion, ces preuves par grandeur ne
+   * provoquent aucune activation implicite.
    */
   getCitizenQualificationEvidence: publicProcedure
     .input(optionalCoordinatesSchema.optional())
     .query(async ({ input }) => {
       const lat = input?.lat ?? HONDEGHEM.lat;
       const lon = input?.lon ?? HONDEGHEM.lon;
-      const readModel = await loadCitizenQualificationEvidence(lat, lon);
+      const [readModel, variableQualifications] = await Promise.all([
+        loadCitizenQualificationEvidence(lat, lon),
+        getCitizenVariableQualificationsNearReference(lat, lon),
+      ]);
       return {
         lat,
         lon,
         ...readModel,
+        variableQualifications,
         byStationId: indexCitizenQualificationEvidence(readModel.entries),
       };
     }),
