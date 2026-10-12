@@ -91,14 +91,18 @@ import {
   getValidatedCitizenStationsNearReference,
   getActivePhysicalStationsNearReference,
   getCitizenFusionActivationNearReference,
+  getCitizenStationsForQualification,
   getStationObservationsForQualification,
   getWeatherStationQualificationVerdicts,
   applyOpenSenseMapQualificationVerdicts,
   upsertCitizenFusionActivation,
   upsertCitizenSensorWeight,
+  upsertCitizenSensorAnomaly,
 } from "./db";
 import {
+  buildQualificationStation,
   deriveOpenSenseMapVerdicts,
+  groupQualificationObservationsByStation,
   OPEN_SENSE_MAP_QUALIFICATION_HISTORY_WINDOW_DAYS,
   type OpenSenseMapQualificationVerdictUpdate,
 } from "./openSenseMapQualificationApplier";
@@ -111,6 +115,16 @@ import {
 import { deriveCitizenFusionActivationDecision } from "./citizenFusionActivationService";
 import { loadCitizenQualificationEvidence } from "./citizenQualificationEvidenceLoader";
 import { deriveCitizenSensorWeights } from "./citizenSensorWeightingService";
+import {
+  CITIZEN_ANOMALY_RECENT_WINDOW_DAYS,
+  deriveCitizenSensorAnomalies,
+  type CitizenSensorAnomalyEntry,
+} from "./citizenSensorAnomalyService";
+import { buildQualificationComparisons } from "./openSenseMapQualificationService";
+import {
+  buildCitizenQualificationEvidence,
+  indexCitizenQualificationEvidence,
+} from "./citizenQualificationEvidenceService";
 
 /**
  * Get today's date in YYYY-MM-DD format (Paris timezone)
@@ -594,6 +608,17 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     }
   });
 
+  // La détection d'anomalies aiguës des capteurs validés suit la même
+  // isolation : la preuve qui accuse est aussi forte que celle qui valide,
+  // et une indisponibilité de la base ne peut jamais interrompre ni retarder
+  // l'archivage physique ni le statut renvoyé.
+  await runOptionalBackgroundTask("citizen-anomaly-detection", async () => {
+    const anomalyDetection = await evaluateCitizenSensorAnomalies();
+    if (anomalyDetection.flagged > 0) {
+      console.log(`[Stations] Anomalies capteurs citoyens : ${anomalyDetection.flagged} capteur(s) validé(s) en anomalie aiguë sur ${anomalyDetection.evaluatedSensors} évalué(s), ${anomalyDetection.evaluatedReferences} référence(s) évaluée(s).`);
+    }
+  });
+
   return {
     ok: !allLocationsFailed,
     status: allLocationsFailed ? "failed" : collectionErrors.length > 0 ? "partial" : "completed",
@@ -834,6 +859,141 @@ export async function evaluateCitizenSensorWeights(nowMs = Date.now()): Promise<
       }
     } catch (error) {
       console.warn(`[MeteoAI] Citizen sensor weight evaluation failed for reference ${reference.lat},${reference.lon}:`, error);
+    }
+  }
+  return summary;
+}
+
+export type CitizenSensorAnomalyEvaluationSummary = {
+  /** Références de favori évaluées (au moins un capteur validé doté d'une preuve de référence mesurée). */
+  evaluatedReferences: number;
+  /** Capteurs validés dotés d'un signal d'anomalie dérivé de leur preuve mesurée. */
+  evaluatedSensors: number;
+  /** Capteurs en anomalie aiguë mesurée dans la fenêtre récente. */
+  flagged: number;
+  /** Signaux archivés (insertion ou mise à jour) ; un signal « unproven » n'est jamais archivé. */
+  persisted: number;
+};
+
+/**
+ * Dérive, pour chaque référence de favori distincte, le signal d'anomalie
+ * aiguë de chaque capteur citoyen validé : son comportement récent (fenêtre
+ * de quelques jours) est comparé à sa propre preuve historique mesurée sur
+ * la fenêtre complète, par le même alignement horaire que la qualification.
+ * Le signal « anomaly » suspend temporairement le capteur de la synthèse
+ * live sans jamais réécrire son verdict ; le signal « unproven » n'est
+ * jamais archivé : l'acquittement exige une preuve mesurée, et la décision
+ * précédente demeure. Une référence sans capteur validé ne sollicite ni
+ * n'écrit rien, et une erreur isolée n'interrompt jamais les autres
+ * références. Les stations physiques ne sont jamais touchées ici.
+ */
+export async function evaluateCitizenSensorAnomalies(nowMs = Date.now()): Promise<CitizenSensorAnomalyEvaluationSummary> {
+  const favorites = await getAllFavoriteLocations();
+  const references = new Map<string, { lat: number; lon: number }>();
+  for (const favorite of favorites) {
+    references.set(`${favorite.lat}:${favorite.lon}`, { lat: favorite.lat, lon: favorite.lon });
+  }
+
+  const summary: CitizenSensorAnomalyEvaluationSummary = {
+    evaluatedReferences: 0,
+    evaluatedSensors: 0,
+    flagged: 0,
+    persisted: 0,
+  };
+
+  for (const reference of Array.from(references.values())) {
+    try {
+      const validatedCitizens = await getValidatedCitizenStationsNearReference(reference.lat, reference.lon);
+      if (validatedCitizens.length === 0) continue;
+
+      // Les lectures sont volontairement identiques à celles du chemin de
+      // qualification : même fenêtre d'historique, mêmes témoins officiels,
+      // même asOf — l'anomalie se mesure sur la preuve qui a validé le capteur.
+      const candidates = await getCitizenStationsForQualification(reference.lat, reference.lon);
+      const officialStations = await getValidatedOfficialStationsNearReference(reference.lat, reference.lon);
+      const sinceMs = nowMs - OPEN_SENSE_MAP_QUALIFICATION_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+      const observations = await getStationObservationsForQualification(
+        [
+          ...candidates.map((candidate) => candidate.stationId),
+          ...officialStations.map((station) => station.stationId),
+        ],
+        sinceMs,
+      );
+
+      const evidenceByStationId = indexCitizenQualificationEvidence(
+        buildCitizenQualificationEvidence({ candidates, officialStations, observations, asOf: nowMs }),
+      );
+      const observationsByStationId = groupQualificationObservationsByStation(observations);
+      const officialQualificationStations = officialStations.map((station) =>
+        buildQualificationStation(station, observationsByStationId.get(station.stationId) ?? []),
+      );
+
+      const entries: CitizenSensorAnomalyEntry[] = [];
+      for (const citizen of validatedCitizens) {
+        // La référence de l'anomalie est la preuve mesurée qui valide le
+        // capteur sur la fenêtre complète : sans elle, aucune borne
+        // d'anomalie ne peut être mesurée, le capteur n'est pas évalué.
+        const evidence = evidenceByStationId[citizen.stationId];
+        if (evidence?.status !== "validated") continue;
+        const candidate = candidates.find((row) => row.stationId === citizen.stationId);
+        if (!candidate) continue;
+        entries.push({
+          stationId: citizen.stationId,
+          status: evidence.status,
+          baseline: evidence.evidence,
+          comparisons: buildQualificationComparisons(
+            buildQualificationStation(candidate, observationsByStationId.get(citizen.stationId) ?? []),
+            officialQualificationStations,
+            nowMs,
+          ),
+        });
+      }
+      if (entries.length === 0) continue;
+
+      summary.evaluatedReferences += 1;
+      const anomalySet = deriveCitizenSensorAnomalies({
+        entries,
+        baselineWindowDays: OPEN_SENSE_MAP_QUALIFICATION_HISTORY_WINDOW_DAYS,
+        recentWindowDays: CITIZEN_ANOMALY_RECENT_WINDOW_DAYS,
+        evaluatedAt: nowMs,
+      });
+      summary.evaluatedSensors += anomalySet.anomalies.length;
+      for (const signal of anomalySet.anomalies) {
+        if (signal.status === "anomaly") summary.flagged += 1;
+        // Un signal « unproven » n'est jamais archivé : l'acquittement
+        // exige une preuve mesurée, jamais une absence de preuve, et la
+        // décision précédente demeure jusqu'à nouvelle mesure.
+        if (signal.status === "unproven") continue;
+        // Les signaux « nominal » et « anomaly » portent toujours un MAE
+        // récent mesuré ; la garde ne fait que l'attester, aucune valeur
+        // n'est inventée.
+        if (signal.recentMaeC == null) continue;
+        await upsertCitizenSensorAnomaly({
+          refLat: reference.lat,
+          refLon: reference.lon,
+          stationId: signal.stationId,
+          version: anomalySet.version,
+          status: signal.status,
+          reason: signal.reason,
+          recentMaeC: signal.recentMaeC,
+          recentBiasC: signal.recentBiasC,
+          biasShiftC: signal.biasShiftC,
+          recentComparisons: signal.recentComparisons,
+          recentDistinctDays: signal.recentDistinctDays,
+          recentMeanOfficialDisagreementC: signal.recentMeanOfficialDisagreementC,
+          baselineMaeC: signal.baselineMaeC,
+          baselineAcceptanceBoundC: signal.baselineAcceptanceBoundC,
+          anomalyThresholdC: signal.anomalyThresholdC,
+          baselineWindowDays: anomalySet.baselineWindowDays,
+          recentWindowDays: anomalySet.recentWindowDays,
+          firstComparedAt: signal.firstComparedAt,
+          lastComparedAt: signal.lastComparedAt,
+          evaluatedAt: anomalySet.evaluatedAt,
+        });
+        summary.persisted += 1;
+      }
+    } catch (error) {
+      console.warn(`[MeteoAI] Citizen sensor anomaly evaluation failed for reference ${reference.lat},${reference.lon}:`, error);
     }
   }
   return summary;
