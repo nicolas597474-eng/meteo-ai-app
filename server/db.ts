@@ -2081,16 +2081,30 @@ export async function getPhysicalStationHistory(
     ))
     .orderBy(desc(weatherStations.reliabilityScore));
 
-  const stationSeries = await Promise.all(stations.map(async (station) => {
-    const readings = await db
+  // Une seule lecture groupée remplace une requête par station : la latence
+  // de l'API de données est payée une fois, pas une fois par station.
+  // L'ordre par station est conservé (tri global sur observedAt, puis
+  // regroupement séquentiel stable).
+  const stationIds = stations.map((station) => station.stationId);
+  const readingsByStationId = new Map<string, (typeof stationObservations.$inferSelect)[]>();
+  if (stationIds.length > 0) {
+    const observationRows = await db
       .select()
       .from(stationObservations)
       .where(and(
-        eq(stationObservations.stationId, station.stationId),
+        inArray(stationObservations.stationId, stationIds),
         gte(stationObservations.observedAt, sinceMs),
       ))
       .orderBy(stationObservations.observedAt);
-    return { ...station, readings };
+    for (const row of observationRows) {
+      const readings = readingsByStationId.get(row.stationId);
+      if (readings) readings.push(row);
+      else readingsByStationId.set(row.stationId, [row]);
+    }
+  }
+  const stationSeries = stations.map((station) => ({
+    ...station,
+    readings: readingsByStationId.get(station.stationId) ?? [],
   }));
 
   const latestGroundTruth = await db

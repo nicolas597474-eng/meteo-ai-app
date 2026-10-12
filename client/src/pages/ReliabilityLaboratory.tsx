@@ -136,7 +136,7 @@ export default function ReliabilityLaboratory() {
 
   const { data, isLoading, isError, isFetching } =
     trpc.weather.getReliabilityLaboratory.useQuery(input, {
-      staleTime: 2 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,
       placeholderData: keepPreviousData,
     });
   const {
@@ -144,7 +144,7 @@ export default function ReliabilityLaboratory() {
     isLoading: overviewLoading,
     isError: overviewError,
   } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput, {
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
   const {
@@ -152,7 +152,7 @@ export default function ReliabilityLaboratory() {
     isLoading: yesterdayLoading,
     isError: yesterdayError,
   } = trpc.weather.getYesterdayForecastObservation.useQuery(yesterdayInput, {
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
   const {
@@ -176,7 +176,7 @@ export default function ReliabilityLaboratory() {
     isLoading: citizenImpactLoading,
     isError: citizenImpactError,
   } = trpc.weather.getCitizenFusionImpact.useQuery(citizenImpactInput, {
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
   const verificationPairs = useMemo(

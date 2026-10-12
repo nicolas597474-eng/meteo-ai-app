@@ -95,7 +95,7 @@ import { buildAILabForecastComparisonReadModel, formatAILabLocationLabel } from 
 import { getCollectedModelNames, getMissingModelNames } from "../stationCollectionModels";
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
-import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
+import { buildReliabilityLaboratoryCached } from "../weatherReliabilityLab";
 import { getApparentAstronomyPosition, getEnvironmentalSnapshot, getTerrainHorizonProfile } from "../environmentalData";
 import { refreshManualFusionForFavorite } from "../manualFusion";
 import { getLocalEclipseCircumstances } from "../eclipseVisibility";
@@ -2157,7 +2157,7 @@ export const weatherRouter = router({
       period: z.enum(["24h", "7d", "30d", "90d", "365d"]).default("30d"),
       horizon: z.enum(["0-6h", "6-24h", "24-48h", "2-3d", "4-7d", "8-10d", "11-15d"]).default("6-24h"),
     }).optional())
-    .query(async ({ input }) => buildReliabilityLaboratory({
+    .query(async ({ input }) => buildReliabilityLaboratoryCached({
       lat: input?.lat ?? HONDEGHEM.lat,
       lon: input?.lon ?? HONDEGHEM.lon,
       period: input?.period ?? "30d",
