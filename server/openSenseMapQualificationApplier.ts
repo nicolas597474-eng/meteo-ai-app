@@ -16,6 +16,10 @@
  * l'évaluateur est déterministe et versionné, elle se recalcule à l'identique
  * depuis l'historique archivé, qui demeure la source de vérité. Seule la raison
  * d'exclusion est persistée, tronquée à la longueur de sa colonne.
+ *
+ * Depuis le bloc 7, les relevés transportent aussi, de façon additive,
+ * l'humidité, la pression et le vent au profit de la qualification
+ * multi-variables ; l'évaluateur de température ne les lit jamais.
  */
 
 import type { StationMeasurementTimes } from "./stationMeasurementFreshness";
@@ -47,6 +51,10 @@ export type QualificationObservationRow = {
   /** Heure d'archive de la collecte ; jamais un substitut d'heure de mesure. */
   observedAt: number;
   temperature: number | null;
+  /** Grandeur additionnelle du chemin multi-variables (bloc 7) : additive, jamais lue par l'évaluateur de température. */
+  humidity?: number | null;
+  pressure?: number | null;
+  windSpeed?: number | null;
   measurementTimes: StationMeasurementTimes | null;
 };
 
@@ -90,12 +98,17 @@ export function buildQualificationStation(
     lat: station.lat,
     lon: station.lon,
     // L'heure d'archive (observedAt) transite telle quelle : l'évaluateur
-    // n'aligne que les heures de mesure propres à la température et n'utilise
-    // jamais l'heure d'archive comme substitut.
+    // n'aligne que les heures de mesure propres à chaque grandeur et
+    // n'utilise jamais l'heure d'archive comme substitut. Les grandeurs du
+    // chemin multi-variables (bloc 7) transitent telles quelles, sans
+    // valeur fabriquée.
     readings: readings.map((reading) => ({
       observedAt: reading.observedAt,
       measurementTimes: reading.measurementTimes,
       temperature: reading.temperature,
+      humidity: reading.humidity ?? null,
+      pressure: reading.pressure ?? null,
+      windSpeed: reading.windSpeed ?? null,
     })),
   };
 }

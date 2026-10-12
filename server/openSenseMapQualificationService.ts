@@ -16,6 +16,11 @@
  * Ce module est pur et déterministe : il ne lit ni n'écrit la base et
  * n'appelle aucun fournisseur. L'application du verdict (promotion du statut
  * persisted) reste hors de son périmètre.
+ *
+ * Depuis le bloc 7, l'alignement horaire et les portes structurelles sont
+ * généralisés par grandeur (buildVariableComparisons) ; ce module demeure
+ * l'autorité de la température, et la qualification multi-variables s'en
+ * sert sans jamais la réécrire.
  */
 
 import type { StationMeasurementTimes } from "./stationMeasurementFreshness";
@@ -60,11 +65,17 @@ export const OPEN_SENSE_MAP_QUALIFICATION_GATES = {
 
 const HOUR_MS = 60 * 60 * 1000;
 
+export type QualificationVariable = "temperature" | "humidity" | "pressure" | "windSpeed";
+
 export type QualificationReading = {
   /** Heure d'archive de la collecte ; jamais un substitut d'heure de mesure. */
   observedAt?: number | Date | string | null;
   measurementTimes?: StationMeasurementTimes | null;
   temperature?: number | null;
+  /** Grandeur additionnelle du chemin multi-variables (bloc 7) : additive, jamais lue par l'évaluateur de température. */
+  humidity?: number | null;
+  pressure?: number | null;
+  windSpeed?: number | null;
 };
 
 export type QualificationStation = {
@@ -155,18 +166,21 @@ function roundC(value: number): number {
 }
 
 /**
- * Extrait les points de température exploitables d'une station : heure de
- * mesure propre à la température, valide, non future, valeur finie. Les
- * relevés non conformes sont exclus sans annuler les autres.
+ * Extrait les points exploitables d'une station pour une grandeur donnée :
+ * heure de mesure propre à la grandeur, valide, non future, valeur finie.
+ * Les relevés non conformes sont exclus sans annuler les autres. La
+ * généralisation est stricte : la température suit exactement le même
+ * chemin qu'avant le bloc 7.
  */
-export function collectQualificationTemperaturePoints(
+export function collectQualificationVariablePoints(
   station: QualificationStation,
   asOf: number,
+  variable: QualificationVariable,
 ): MeasuredPoint[] {
   const points = new Map<number, number>();
   for (const reading of station.readings) {
-    const epoch = parseStrictMeasurementEpoch(reading.measurementTimes?.temperature);
-    const value = reading.temperature;
+    const epoch = parseStrictMeasurementEpoch(reading.measurementTimes?.[variable]);
+    const value: number | null | undefined = reading[variable];
     if (epoch === null || epoch > asOf || !isFiniteNumber(value)) continue;
     if (!points.has(epoch)) points.set(epoch, value);
   }
@@ -176,26 +190,39 @@ export function collectQualificationTemperaturePoints(
 }
 
 /**
- * Construit les comparaisons horaires alignées d'un capteur citoyen face aux
- * stations officielles : même heure de mesure propre à la température, double
- * référence officielle minimum, médiane des témoins, jamais l'heure d'archive.
- * Ce point d'entrée purement déterministe sert à la fois à l'évaluateur de
- * qualification et à la détection d'anomalies récentes (bloc 6) : les deux
- * chemins partagent exactement le même alignement, jamais deux
- * implémentations d'un même seuil.
+ * Extrait les points de température exploitables d'une station : la
+ * spécialisation historique du collecteur générique, comportement inchangé.
  */
-export function buildQualificationComparisons(
+export function collectQualificationTemperaturePoints(
+  station: QualificationStation,
+  asOf: number,
+): MeasuredPoint[] {
+  return collectQualificationVariablePoints(station, asOf, "temperature");
+}
+
+/**
+ * Construit les comparaisons horaires alignées d'un capteur citoyen face aux
+ * stations officielles pour une grandeur donnée : même heure de mesure propre
+ * à la grandeur, double référence officielle minimum, médiane des témoins,
+ * jamais l'heure d'archive. Ce point d'entrée purement déterministe sert à la
+ * fois à l'évaluateur de qualification, à la détection d'anomalies récentes
+ * (bloc 6) et à la qualification multi-variables (bloc 7) : tous les chemins
+ * partagent exactement le même alignement, jamais deux implémentations d'un
+ * même seuil.
+ */
+export function buildVariableComparisons(
   candidate: QualificationStation,
   officialStations: readonly QualificationStation[],
   asOf: number,
+  variable: QualificationVariable,
 ): QualificationComparison[] {
   const officials = officialStations.filter((station) => station.source === "meteofrance");
   const officialPointsByStation = officials.map((station) => ({
     stationId: station.stationId,
-    points: collectQualificationTemperaturePoints(station, asOf),
+    points: collectQualificationVariablePoints(station, asOf, variable),
   }));
 
-  const candidatePoints = collectQualificationTemperaturePoints(candidate, asOf);
+  const candidatePoints = collectQualificationVariablePoints(candidate, asOf, variable);
   const comparisons: QualificationComparison[] = [];
 
   for (const point of candidatePoints) {
@@ -226,6 +253,21 @@ export function buildQualificationComparisons(
     });
   }
   return comparisons;
+}
+
+/**
+ * Construit les comparaisons horaires alignées de température d'un capteur
+ * citoyen face aux stations officielles : la spécialisation historique du
+ * comparateur générique, comportement inchangé — l'évaluateur de
+ * qualification et la détection d'anomalies récentes (bloc 6) l'appellent
+ * pour la température.
+ */
+export function buildQualificationComparisons(
+  candidate: QualificationStation,
+  officialStations: readonly QualificationStation[],
+  asOf: number,
+): QualificationComparison[] {
+  return buildVariableComparisons(candidate, officialStations, asOf, "temperature");
 }
 
 function emptyEvidence(): OpenSenseMapQualificationEvidence {
