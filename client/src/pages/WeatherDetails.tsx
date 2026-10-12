@@ -27,11 +27,25 @@ import { withCurrentStationTemperature } from "@/lib/currentStationTemperature";
 export default function WeatherDetails() {
   const { activeLocation } = useLocation();
   const { user } = useAuth();
-  const { style: pageSkyStyle } = usePageWeatherSky({ includeExtendedPeriods: true });
-  const { query: detailedForecastQuery, coordinates } = useOfficialForecast(activeLocation, { includeExtendedPeriods: true });
+  const { style: pageSkyStyle } = usePageWeatherSky();
+  const { query: essentialForecastQuery, coordinates } = useOfficialForecast(activeLocation);
+  const { data: essentialForecast, isLoading: essentialLoading, isError: essentialError, error: essentialForecastError, refetch: refetchEssentialForecast } = essentialForecastQuery;
+  const { query: detailedForecastQuery } = useOfficialForecast(activeLocation, {
+    includeExtendedPeriods: true,
+    enabled: !!essentialForecast,
+  });
   const stationTemperature = useCurrentStationTemperature(coordinates);
-  const { data, isLoading, isFetching, isError, error, refetch } = detailedForecastQuery;
-  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(coordinates, { staleTime: 60 * 1000, refetchOnWindowFocus: false });
+  const { data: detailedForecast, isFetching: detailedFetching, error: detailedForecastError, refetch: refetchDetailedForecast } = detailedForecastQuery;
+  const data = detailedForecast ?? essentialForecast;
+  const isLoading = essentialLoading;
+  const isFetching = essentialForecastQuery.isFetching;
+  const isError = essentialError && !essentialForecast;
+  const error = essentialForecastError;
+  const refetch = async () => {
+    await refetchEssentialForecast();
+    if (essentialForecast) await refetchDetailedForecast();
+  };
+  const isEnrichingDiagnostics = !!essentialForecast && detailedFetching && !detailedForecast;
   const [slowLoad, setSlowLoad] = useState(false);
   const aromeShadow = trpc.weather.compareHondeghemAromeShadow.useMutation();
   const windDirectionVerification = trpc.weather.verifyHondeghemAromeWindDirection.useMutation();
@@ -130,6 +144,8 @@ export default function WeatherDetails() {
             hourlyComputedAt: data.officialSnapshot?.hourlyComputedAt,
           }}
         />
+        {isEnrichingDiagnostics && <p role="status" className="rounded-xl border border-sky-300/20 bg-sky-300/[0.05] px-3 py-2 text-[11px] text-sky-100">Les valeurs essentielles sont affichées. Les diagnostics horaires détaillés se complètent en arrière-plan.</p>}
+        {detailedForecastError && !detailedForecast && <p role="status" className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[11px] text-amber-100">Les diagnostics détaillés ne sont pas encore disponibles ; les prévisions essentielles affichées restent utilisables.</p>}
 
         {user?.role === "admin" && <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-violet-300/25 bg-violet-300/[0.045] p-3 sm:rounded-[24px] sm:p-4" aria-labelledby="arome-shadow-title">
           <div className="flex flex-wrap items-start justify-between gap-3">

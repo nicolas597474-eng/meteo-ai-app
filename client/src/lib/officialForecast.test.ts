@@ -8,7 +8,7 @@ const sharedHookSource = readFileSync(new URL("../hooks/useOfficialForecast.ts",
 const pageSkyHookSource = readFileSync(new URL("../hooks/usePageWeatherSky.ts", import.meta.url), "utf8");
 
 describe("prévision horaire officielle partagée", () => {
-  it("garde le Dashboard en horizon court et active explicitement l’horizon étendu dans Prévisions", () => {
+  it("garde le Dashboard en horizon court et enrichit ensuite les Prévisions avec l’horizon étendu", () => {
     expect(getOfficialForecastCoordinates(null)).toEqual({ lat: 50.7567, lon: 2.5204 });
     const location = { lat: 48.8566, lon: 2.3522, name: "Paris" };
     expect(getOfficialForecastQueryInput(location)).toEqual({
@@ -26,8 +26,10 @@ describe("prévision horaire officielle partagée", () => {
     expect(dashboardSource).toContain("enabled: !!officialForecast");
     expect(dashboardSource).not.toContain("periodHours");
     expect(dashboardSource).not.toContain("includeExtendedPeriods: true");
-    expect(detailsSource).toContain("useOfficialForecast(activeLocation, { includeExtendedPeriods: true })");
-    expect(detailsSource).toContain("usePageWeatherSky({ includeExtendedPeriods: true })");
+    expect(detailsSource).toContain("useOfficialForecast(activeLocation);");
+    expect(detailsSource).toContain("includeExtendedPeriods: true,");
+    expect(detailsSource).toContain("enabled: !!essentialForecast,");
+    expect(detailsSource).toContain("usePageWeatherSky();");
     expect(pageSkyHookSource).toContain("useOfficialForecast(activeLocation, options)");
     expect(sharedHookSource).toContain("OFFICIAL_FORECAST_REFETCH_INTERVAL_MS");
     expect(sharedHookSource).toContain("refetchIntervalInBackground: false");

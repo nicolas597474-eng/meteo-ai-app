@@ -6,15 +6,17 @@ import { getOfficialForecastQueryInput, OFFICIAL_FORECAST_REFETCH_INTERVAL_MS } 
 
 export function useOfficialForecast(
   location: ActiveLocation | null | undefined,
-  options: { includeExtendedPeriods?: boolean } = {},
+  options: { includeExtendedPeriods?: boolean; enabled?: boolean } = {},
 ) {
   const includeExtendedPeriods = options.includeExtendedPeriods ?? false;
+  const enabled = options.enabled ?? true;
   const queryInput = useMemo(
     () => getOfficialForecastQueryInput(location, includeExtendedPeriods),
     [location?.lat, location?.lon, includeExtendedPeriods],
   );
   const query = trpc.weather.getDetailedForecast.useQuery(queryInput, {
     trpc: { abortOnUnmount: true },
+    enabled,
     staleTime: 60 * 1000,
     refetchInterval: OFFICIAL_FORECAST_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: false,

@@ -6,14 +6,17 @@ const styleSource = readFileSync(new URL("../index.css", import.meta.url), "utf8
 const selectedDetailsSource = readFileSync(new URL("../lib/hourlySelectedDetails.ts", import.meta.url), "utf8");
 const displayDaysSource = readFileSync(new URL("../lib/forecastDayDisplay.ts", import.meta.url), "utf8");
 describe("page Prévisions détaillées", () => {
-  it("consomme les heures officielles étendues de la PR #103 et garde periodHours comme référence API séparée", () => {
-    expect(pageSource).toContain("useOfficialForecast(activeLocation, { includeExtendedPeriods: true })");
-    expect(pageSource).toContain("usePageWeatherSky({ includeExtendedPeriods: true })");
+  it("affiche les données essentielles avant de charger les diagnostics horaires étendus", () => {
+    expect(pageSource).toContain("useOfficialForecast(activeLocation);");
+    expect(pageSource).toContain("includeExtendedPeriods: true,");
+    expect(pageSource).toContain("enabled: !!essentialForecast,");
+    expect(pageSource).toContain("Les valeurs essentielles sont affichées");
+    expect(pageSource).toContain("usePageWeatherSky();");
     expect(pageSource).toContain("dailyDays={data.days ?? []}");
     expect(pageSource).toContain("dailySources={data.modelsUsed ?? []}");
     expect(pageSource).toContain("hours={displayHours}");
     expect(pageSource).not.toContain("periodHours");
-    expect(pageSource).not.toContain("includeExtendedPeriods: false");
+    expect(pageSource).not.toContain("periodHours");
     expect(displayDaysSource).toContain("kind: \"official-daily-fusion\"");
     expect(displayDaysSource).toContain("kind: \"official-hourly\"");
   });

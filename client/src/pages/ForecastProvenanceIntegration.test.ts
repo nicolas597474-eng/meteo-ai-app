@@ -31,11 +31,12 @@ describe("provenance unifiée des pages météo", () => {
     const router = readFileSync(new URL("../../../server/routers/weather.ts", import.meta.url), "utf8");
 
     expect(dashboard).toContain("useOfficialForecast(selectedLocation)");
-    expect(details).toContain("useOfficialForecast(activeLocation, { includeExtendedPeriods: true })");
-    expect(details).toContain("usePageWeatherSky({ includeExtendedPeriods: true })");
+    expect(details).toContain("useOfficialForecast(activeLocation);");
+    expect(details).toContain("includeExtendedPeriods: true,");
+    expect(details).toContain("enabled: !!essentialForecast,");
+    expect(details).toContain("usePageWeatherSky();");
     expect(sharedHook).toContain("trpc.weather.getDetailedForecast.useQuery(queryInput");
     expect(sharedHook).toContain("OFFICIAL_FORECAST_REFETCH_INTERVAL_MS");
-    expect(details).toContain("getForecastProvenance.useQuery(coordinates");
     expect(dashboard).toContain("getActiveOfficialForecastHour(hours, forecastNowMs)");
     expect(details).toContain("getActiveOfficialForecastHour(data.hours, Date.now())");
     expect(dashboard).toContain("activeHourIndex={currentHourIndex}");

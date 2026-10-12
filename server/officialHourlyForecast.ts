@@ -1169,16 +1169,14 @@ export async function collectOfficialHourlyForecast(
         signal: budgetSignal,
       } : options.signal ? { signal: options.signal } : {}),
     });
-    const collectionResult = budgetExpired == null
-      ? { kind: "collected" as const, collection: await collectionPromise }
-      : await Promise.race([
-        collectionPromise.then((resolved) => ({ kind: "collected" as const, collection: resolved })),
-        budgetExpired,
-      ]);
-    if (collectionResult === "budget_expired") {
+    // L’expiration annule les requêtes encore en vol via `budgetSignal`, mais
+    // l’agrégateur attend que leurs diagnostics soient matérialisés. Ainsi les
+    // modèles déjà reçus restent visibles comme réponse partielle au lieu d’être
+    // effacés par une course avec le minuteur global.
+    collection = await collectionPromise;
+    if (budgetSignal?.aborted && collection.forecasts.length === 0) {
       return unavailableInteractiveHourlyResult("Le fournisseur n’a pas répondu avant le budget interactif; aucune valeur horaire n’est publiée.");
     }
-    collection = collectionResult.collection;
     const modelForecasts = collection.forecasts;
     const availabilityReasonByModel = Object.fromEntries(collection.diagnostics
       .filter((diagnostic) => diagnostic.status !== "succeeded")

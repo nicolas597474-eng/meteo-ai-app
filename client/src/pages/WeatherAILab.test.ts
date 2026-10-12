@@ -148,7 +148,8 @@ describe("Weather AI Lab — transparence de fusion", () => {
     expect(source).toContain('className="order-[-2] grid grid-cols-2 gap-2 sm:grid-cols-4"');
     expect(source).toContain('className="order-[-4] flex items-center justify-between gap-2"');
     expect(source).toContain("getLocalNowcastingReports");
-    expect(source).toContain('enabled: user?.role === "admin"');
+    expect(source).toContain('enabled: diagnosticsEnabled && user?.role === "admin"');
+    expect(source).toContain("setDiagnosticsEnabled(true)");
     expect(source).toContain("LocalTemperatureNowcastingPanel");
     expect(source).toContain("LocalPrecipitationNowcastingPanel");
     expect(source).toContain('user?.role === "admin" && localNowcastingReports?.temperature');

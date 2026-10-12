@@ -674,6 +674,7 @@ export default function Dashboard() {
   const [isPersonalObservationOpen, setIsPersonalObservationOpen] = useState(false);
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
   const [showAllLocalContributors, setShowAllLocalContributors] = useState(false);
+  const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(false);
   const [editingPersonalObservation, setEditingPersonalObservation] = useState<{ id: number; temperature: string; windSpeed: string; precipitation: string; condition: (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] } | null>(null);
   // LocationContext owns the selected place, including its station radius.
   // Dashboard must never fall back to the retired dashboard-only location key.
@@ -740,6 +741,7 @@ export default function Dashboard() {
   const { data: dash, isFetching: dashFetching, refetch: refetchDashboard } = trpc.weather.getDashboard.useQuery(
     coordsInput,
     {
+      enabled: diagnosticsEnabled,
       staleTime: 60 * 1000,
       refetchInterval: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
@@ -770,13 +772,13 @@ export default function Dashboard() {
   const hourlyError = officialError;
   const hourlyFetching = officialFetching;
   const { data: localOfficialHistory } = trpc.weather.getLocalOfficialDeltaHistory.useQuery(
-    coordsInput, { staleTime: 5 * 60 * 1000 }
+    coordsInput, { enabled: diagnosticsEnabled, staleTime: 5 * 60 * 1000 }
   );
   const { data: regimeCatalogue = [] } = trpc.weather.getRegimeCatalogue.useQuery(
-    undefined, { staleTime: 60 * 60 * 1000 }
+    undefined, { enabled: diagnosticsEnabled, staleTime: 60 * 60 * 1000 }
   );
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
-    coordsInput, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
+    coordsInput, { enabled: diagnosticsEnabled, staleTime: 60 * 1000, refetchOnWindowFocus: false }
   );
   const utils = trpc.useUtils();
   const { data: personalObservationState, refetch: refetchPersonalObservationState } = trpc.personalObservations.dashboardState.useQuery(
@@ -837,6 +839,13 @@ export default function Dashboard() {
   // screen skeleton while that horizon refreshes after a cold start.
   const isLoading = officialLoading && hourlyLoading && !fastCurrentSnapshot;
   const isError = officialError && hourlyError && !fastCurrentSnapshot;
+
+  useEffect(() => {
+    if (!fastCurrentSnapshot && !officialForecast) return;
+    const timer = window.setTimeout(() => setDiagnosticsEnabled(true), 250);
+    return () => window.clearTimeout(timer);
+  }, [fastCurrentSnapshot, officialForecast]);
+
   const refreshCurrentWeather = async () => {
     setHasWaitTimedOut(false);
     await Promise.all([refetchDashboard(), refetchOfficialForecast()]);

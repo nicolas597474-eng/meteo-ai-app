@@ -1,4 +1,4 @@
-import { useId } from "react";
+import React, { useId } from "react";
 
 /**
  * MeteoIcon — Pack d'icônes MeteoAI personnalisé
@@ -266,6 +266,23 @@ export function getIconNameFromRegime(regimeId: string): string {
 
 type GlyphIds = { cloud: string; sun: string; rain: string; cyan: string; violet: string };
 
+/**
+ * Produit une goutte avec des coordonnées absolues et arrondies. Les anciens
+ * raccourcis SVG concaténaient des nombres négatifs flottants (par exemple
+ * `0-5.699999…`) : Chromium pouvait alors rejeter l'attribut `d` entier.
+ */
+export function buildFuturisticRainDropPath(cx: number, cy: number, radius: number): string {
+  const value = (number: number) => (Number.isFinite(number) ? number : 0).toFixed(2);
+  const top = cy - radius * 2.2;
+  const shoulder = cy - radius * 0.55;
+  const lower = cy + radius * 1.95;
+  const left = cx - radius * 1.55;
+  const right = cx + radius * 1.55;
+  const middle = cy + radius * 0.92;
+
+  return `M ${value(cx)} ${value(top)} C ${value(left)} ${value(shoulder)} ${value(left)} ${value(middle)} ${value(cx)} ${value(lower)} C ${value(right)} ${value(middle)} ${value(right)} ${value(shoulder)} ${value(cx)} ${value(top)} Z`;
+}
+
 function FuturisticCloud({ ids, storm = false }: { ids: GlyphIds; storm?: boolean }) {
   const edge = storm ? "#94a3b8" : "#e2e8f0";
   return <><ellipse cx="32" cy="45.5" rx="21" ry="3.2" fill="#020617" opacity="0.3" /><g fill={`url(#${ids.cloud})`} stroke={edge} strokeOpacity="0.7" strokeWidth="0.8"><circle cx="18" cy="34" r="8.2" /><circle cx="27" cy="28.2" r="11.8" /><circle cx="39" cy="29.5" r="12.6" /><circle cx="48" cy="35" r="8.8" /><ellipse cx="32" cy="37.8" rx="22" ry="9.4" /></g><path d="M18 31c2.1-4.4 5.4-6.8 9.7-6.8 2.6 0 4.8.7 6.6 2.1" fill="none" stroke="#fff" strokeOpacity="0.53" strokeWidth="2.2" strokeLinecap="round" /><ellipse cx="40" cy="24" rx="4.3" ry="2.4" fill="#fff" opacity="0.24" /></>;
@@ -278,7 +295,7 @@ function FuturisticSun({ ids, hot = false }: { ids: GlyphIds; hot?: boolean }) {
 
 function FuturisticRain({ ids, dense = false }: { ids: GlyphIds; dense?: boolean }) {
   const drops = dense ? [[16, 47, 3.6], [26, 51, 4], [37, 47, 3.8], [48, 51, 4]] : [[21, 48, 3.8], [32, 52, 4.1], [44, 48, 3.8]];
-  return <>{drops.map(([cx, cy, r]) => <g key={`${cx}-${cy}`}><path d={`M${cx} ${cy - r * 2.2}c0 0-${r * 1.5} ${r * 1.9}-${r * 1.5} ${r * 3.1} 0 ${r * 1.9} ${r * 1.5} ${r * 3.1} ${r * 3.3} ${r * 3.1} ${r * 1.8} 0 ${r * 3.3}-${r * 1.2} ${r * 3.3}-${r * 3.1} 0-${r * 1.2}-${r * 1.5}-${r * 3.1}-${r * 1.5}Z`} fill={`url(#${ids.rain})`} stroke="#e0f2fe" strokeOpacity="0.48" strokeWidth="0.55" /><ellipse cx={cx - r * 0.35} cy={cy - r * 0.1} rx={r * 0.35} ry={r * 0.72} fill="#fff" opacity="0.38" /></g>)}</>;
+  return <>{drops.map(([cx, cy, r]) => <g key={`${cx}-${cy}`}><path d={buildFuturisticRainDropPath(cx, cy, r)} fill={`url(#${ids.rain})`} stroke="#e0f2fe" strokeOpacity="0.48" strokeWidth="0.55" /><ellipse cx={cx - r * 0.35} cy={cy - r * 0.1} rx={r * 0.35} ry={r * 0.72} fill="#fff" opacity="0.38" /></g>)}</>;
 }
 
 function FuturisticGlyph({ name, ids }: { name: string; ids: GlyphIds }) {

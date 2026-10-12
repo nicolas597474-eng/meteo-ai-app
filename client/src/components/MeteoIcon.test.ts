@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { buildFuturisticRainDropPath } from "./MeteoIcon";
 
 const source = readFileSync(new URL("./MeteoIcon.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
@@ -54,5 +55,14 @@ describe("MeteoIcon", () => {
   it("respecte les variantes responsive cachées afin de ne jamais dupliquer une icône", () => {
     expect(styles).toContain(".meteo-icon-shell.hidden { display: none; }");
     expect(styles).toContain(".meteo-icon-shell.sm\\:block { display: block; }");
+  });
+
+  it("génère des chemins de pluie SVG finis et séparés, sans concaténation de flottants", () => {
+    for (const [cx, cy, radius] of [[21, 48, 3.8], [32, 52, 4.1], [44, 48, 3.8]] as const) {
+      const path = buildFuturisticRainDropPath(cx, cy, radius);
+      expect(path).toMatch(/^M -?\d+\.\d{2} -?\d+\.\d{2} C /);
+      expect(path).toMatch(/ C -?\d+\.\d{2} -?\d+\.\d{2} -?\d+\.\d{2} -?\d+\.\d{2} -?\d+\.\d{2} -?\d+\.\d{2} Z$/);
+      expect(path).not.toMatch(/NaN|Infinity|undefined|\d{8,}/);
+    }
   });
 });

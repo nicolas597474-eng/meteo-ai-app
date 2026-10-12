@@ -825,24 +825,25 @@ export default function WeatherAILab() {
   const { user } = useAuth();
   const { activeLocation } = useLocation();
   const { style: pageSkyStyle } = usePageWeatherSky();
-  const input = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
+  const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(false);
+  const input = useMemo(() => activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined, [activeLocation?.lat, activeLocation?.lon]);
   const { data, isLoading, isFetching, error, refetch } = trpc.weather.getAILab.useQuery(input, {
     staleTime: 2 * 60_000,
     refetchOnWindowFocus: false,
     retry: shouldRetryWeatherQuery,
     retryDelay: weatherRetryDelay,
   });
-  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(input, { staleTime: 60_000, refetchOnWindowFocus: false });
-  const { data: forecastCollectionReport } = trpc.weather.getForecastCollectionReport.useQuery(input, { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false });
+  const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(input, { enabled: diagnosticsEnabled, staleTime: 60_000, refetchOnWindowFocus: false });
+  const { data: forecastCollectionReport } = trpc.weather.getForecastCollectionReport.useQuery(input, { enabled: diagnosticsEnabled, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false });
   const { data: localNowcastingReports } = trpc.weather.getLocalNowcastingReports.useQuery(input, {
-    enabled: user?.role === "admin",
+    enabled: diagnosticsEnabled && user?.role === "admin",
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: false,
   });
-  const stationInput = { lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 };
-  const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
-  const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { staleTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const stationInput = useMemo(() => ({ lat: activeLocation?.lat, lon: activeLocation?.lon, radiusKm: 20 }), [activeLocation?.lat, activeLocation?.lon]);
+  const { data: stationData, isLoading: stationsLoading, error: stationsError } = trpc.weather.searchStations.useQuery(stationInput, { enabled: diagnosticsEnabled, staleTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const { data: stationEvidence } = trpc.weather.getEvidenceStatus.useQuery({ lat: activeLocation?.lat, lon: activeLocation?.lon }, { enabled: diagnosticsEnabled, staleTime: 5 * 60_000, refetchOnWindowFocus: false });
   const utils = trpc.useUtils();
   const refreshFusion = trpc.weather.refreshManualFusion.useMutation({
     onSuccess: async (result) => {
@@ -867,6 +868,12 @@ export default function WeatherAILab() {
   const manualRefreshResult = refreshFusion.data && "daily" in refreshFusion.data ? refreshFusion.data : null;
   const [slowLoad, setSlowLoad] = useState(false);
   const [selectedCollectionModel, setSelectedCollectionModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!data) return;
+    const timer = window.setTimeout(() => setDiagnosticsEnabled(true), 250);
+    return () => window.clearTimeout(timer);
+  }, [data]);
 
   useEffect(() => {
     if (!isLoading && !isFetching) {
