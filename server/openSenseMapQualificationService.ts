@@ -101,11 +101,13 @@ export type OpenSenseMapQualificationProfile = {
 
 type MeasuredPoint = { epoch: number; value: number };
 
-type QualificationComparison = {
+export type QualificationComparison = {
   error: number;
   officialDisagreement: number;
   utcDay: string;
   comparedAt: number;
+  /** Témoins officiels alignés sur la comparaison ; l'évaluateur en dérive la preuve sans les réévaluer. */
+  officialStationIds: readonly string[];
 };
 
 function isFiniteNumber(value: unknown): value is number {
@@ -173,6 +175,59 @@ export function collectQualificationTemperaturePoints(
     .sort((left, right) => left.epoch - right.epoch);
 }
 
+/**
+ * Construit les comparaisons horaires alignées d'un capteur citoyen face aux
+ * stations officielles : même heure de mesure propre à la température, double
+ * référence officielle minimum, médiane des témoins, jamais l'heure d'archive.
+ * Ce point d'entrée purement déterministe sert à la fois à l'évaluateur de
+ * qualification et à la détection d'anomalies récentes (bloc 6) : les deux
+ * chemins partagent exactement le même alignement, jamais deux
+ * implémentations d'un même seuil.
+ */
+export function buildQualificationComparisons(
+  candidate: QualificationStation,
+  officialStations: readonly QualificationStation[],
+  asOf: number,
+): QualificationComparison[] {
+  const officials = officialStations.filter((station) => station.source === "meteofrance");
+  const officialPointsByStation = officials.map((station) => ({
+    stationId: station.stationId,
+    points: collectQualificationTemperaturePoints(station, asOf),
+  }));
+
+  const candidatePoints = collectQualificationTemperaturePoints(candidate, asOf);
+  const comparisons: QualificationComparison[] = [];
+
+  for (const point of candidatePoints) {
+    const bucket = Math.floor(point.epoch / HOUR_MS) * HOUR_MS;
+    const officialValues: Array<{ stationId: string; value: number }> = [];
+    for (const { stationId, points } of officialPointsByStation) {
+      let latest: MeasuredPoint | null = null;
+      for (const official of points) {
+        if (official.epoch > point.epoch) break;
+        if (Math.floor(official.epoch / HOUR_MS) * HOUR_MS !== bucket) continue;
+        latest = official;
+      }
+      if (latest) officialValues.push({ stationId, value: latest.value });
+    }
+    // Sans deux références officielles dans la même heure, la comparaison est
+    // exclue sans annuler les autres relevés du capteur.
+    if (officialValues.length < OPEN_SENSE_MAP_QUALIFICATION_GATES.minimumOfficialReferencesPerComparison) continue;
+
+    const values = officialValues.map((entry) => entry.value);
+    const officialMedian = median(values);
+    if (officialMedian === null) continue;
+    comparisons.push({
+      error: point.value - officialMedian,
+      officialDisagreement: mean(values.map((value) => Math.abs(value - officialMedian))) ?? 0,
+      utcDay: new Date(point.epoch).toISOString().slice(0, 10),
+      comparedAt: point.epoch,
+      officialStationIds: officialValues.map((entry) => entry.stationId),
+    });
+  }
+  return comparisons;
+}
+
 function emptyEvidence(): OpenSenseMapQualificationEvidence {
   return {
     comparisons: 0,
@@ -223,43 +278,8 @@ export function deriveOpenSenseMapQualificationProfile(input: {
     );
   }
 
-  const officialStations = input.officialStations.filter((station) => station.source === "meteofrance");
-  const officialPointsByStation = officialStations.map((station) => ({
-    stationId: station.stationId,
-    points: collectQualificationTemperaturePoints(station, asOf),
-  }));
-
-  const candidatePoints = collectQualificationTemperaturePoints(candidate, asOf);
-  const comparisons: QualificationComparison[] = [];
-  const officialStationsUsed = new Set<string>();
-
-  for (const point of candidatePoints) {
-    const bucket = Math.floor(point.epoch / HOUR_MS) * HOUR_MS;
-    const officialValues: Array<{ stationId: string; value: number }> = [];
-    for (const { stationId, points } of officialPointsByStation) {
-      let latest: MeasuredPoint | null = null;
-      for (const official of points) {
-        if (official.epoch > point.epoch) break;
-        if (Math.floor(official.epoch / HOUR_MS) * HOUR_MS !== bucket) continue;
-        latest = official;
-      }
-      if (latest) officialValues.push({ stationId, value: latest.value });
-    }
-    // Sans deux références officielles dans la même heure, la comparaison est
-    // exclue sans annuler les autres relevés du capteur.
-    if (officialValues.length < OPEN_SENSE_MAP_QUALIFICATION_GATES.minimumOfficialReferencesPerComparison) continue;
-
-    const values = officialValues.map((entry) => entry.value);
-    const officialMedian = median(values);
-    if (officialMedian === null) continue;
-    officialValues.forEach((entry) => officialStationsUsed.add(entry.stationId));
-    comparisons.push({
-      error: point.value - officialMedian,
-      officialDisagreement: mean(values.map((value) => Math.abs(value - officialMedian))) ?? 0,
-      utcDay: new Date(point.epoch).toISOString().slice(0, 10),
-      comparedAt: point.epoch,
-    });
-  }
+  const comparisons = buildQualificationComparisons(candidate, input.officialStations, asOf);
+  const officialStationsUsed = new Set(comparisons.flatMap((comparison) => comparison.officialStationIds));
 
   if (comparisons.length === 0) {
     return buildProfile(
