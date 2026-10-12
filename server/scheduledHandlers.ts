@@ -31,7 +31,12 @@ import { buildQualifiedDailyObservation } from "./physicalObservationAggregation
 import { buildDailyForecastObservationComparisons, buildForecastRunArchiveRows } from "./dailyForecastPerformance";
 import { buildMeteoAIDailyFusionArchiveRun } from "./dailyForecastVerification";
 import { scoreQualifiedHourlyModels } from "./qualifiedHourlyScoring";
-import { evaluateHourlyForecastRuns, normalizeHourlyForecastVariable } from "./hourlyForecastRunScoring";
+import {
+  evaluateHourlyForecastRuns,
+  normalizeHourlyForecastVariable,
+  type HourlyForecastRunEvaluation,
+  type HourlyPhysicalSnapshot,
+} from "./hourlyForecastRunScoring";
 import type { HourlyComparisonDiagnostic } from "./hourlyComparisonDiagnostics";
 import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 import { evaluateProviderRunForecasts } from "./providerRunHorizon";
@@ -89,6 +94,7 @@ import {
   getQualifiedObservationSnapshotsForDate,
   getPhysicalSnapshotCollectionTracesByDateRange,
   getHourlyForecastRunValues,
+  getHourlyForecastEvaluationHistory,
   persistHourlyForecastEvaluationScores,
   persistHourlyForecastExactComparisons,
   persistHourlyForecastExactEvaluationScores,
@@ -1394,6 +1400,85 @@ export async function collectForecastsHandler(req: Request, res: Response) {
   }
 }
 
+export const HOURLY_SCORING_BACKFILL_WINDOW_DAYS = 30;
+export const HOURLY_SCORING_BACKFILL_MAX_SCORES_PER_NIGHT = 7;
+
+/**
+ * Fenêtre de rattrapage alignée sur la fenêtre de relecture du laboratoire de
+ * fiabilité : les 30 dates civiles Paris finissant à hier, les plus récentes
+ * d'abord. Une date plus ancienne n'est jamais relue ni rescorée.
+ */
+export function listHourlyScoringBackfillWindowDates(now = new Date()): string[] {
+  return Array.from(
+    { length: HOURLY_SCORING_BACKFILL_WINDOW_DAYS },
+    (_, index) => getParisDateDaysAgo(index + 1, now),
+  );
+}
+
+/**
+ * Dates de la fenêtre sans aucune ligne de score archivée — validée ou legacy
+ * (version NULL) : une date partiellement scorée par le job principal n'est pas
+ * « manquante », ses lignes sont déjà idempotentes. L'ordre de la fenêtre est
+ * conservé, les plus récentes d'abord.
+ */
+export function findMissingHourlyScoringDates(
+  windowDates: readonly string[],
+  storedRows: readonly { date: string }[],
+  storedLegacyRows: readonly { date: string }[] = [],
+): string[] {
+  const storedDates = new Set<string>([...storedRows, ...storedLegacyRows].map((row) => row.date));
+  return windowDates.filter((date) => !storedDates.has(date));
+}
+
+/**
+ * Évalue les runs horaires immuables archivés d'une date contre les snapshots
+ * qualifiés, puis archive les scores détaillés par maille modèle/variable/
+ * horizon. Chemin partagé entre le scoring de la veille et le rattrapage
+ * planifié : les deux produisent des lignes strictement identiques, et la
+ * persistance reste idempotente (une ligne validée n'est jamais écrasée par
+ * une ligne non validée).
+ * Garde-fou : retourne null sans rien écrire si la date n'a ni snapshot ni run
+ * archivé — une date sans preuve ne doit jamais produire de ligne de score.
+ */
+async function scoreHourlyForecastDate(
+  locationKey: string,
+  date: string,
+  snapshots?: HourlyPhysicalSnapshot[],
+): Promise<HourlyForecastRunEvaluation | null> {
+  const evidence = snapshots ?? await getQualifiedObservationSnapshotsForDate(locationKey, date);
+  if (evidence.length === 0) return null;
+  const hourlyForecastRuns = await getHourlyForecastRunValues(locationKey, date);
+  if (hourlyForecastRuns.length === 0) return null;
+  const evaluation = evaluateHourlyForecastRuns(
+    evidence,
+    hourlyForecastRuns.flatMap((run) => {
+      const variable = normalizeHourlyForecastVariable(run.variable);
+      return variable ? [{ ...run, variable }] : [];
+    }),
+  );
+  // Archive tous les agrégats complets du jour : les lignes non validées sont
+  // écrites avec une version de validation NULL et restent consultables comme
+  // données brutes, sans jamais remplacer une ligne validée.
+  await persistHourlyForecastEvaluationScores(evaluation.scores.map((score) => ({
+    locationKey: score.locationKey,
+    date: score.date,
+    sourceName: score.sourceName,
+    modelName: score.modelName,
+    modelId: score.modelId,
+    variable: score.variable,
+    horizonBucket: score.horizonBucket,
+    observationCount: score.observationCount,
+    evaluableObservationCount: score.evaluableObservationCount,
+    sampleSize: score.sampleSize,
+    coverageRatio: score.coverageRatio,
+    mae: score.mae,
+    rmse: score.rmse,
+    bias: score.bias,
+    scoringValidationVersion: score.scoringValidationVersion,
+  })));
+  return evaluation;
+}
+
 /**
  * Handler: Collect observations and compute reliability scores for ALL favorite locations
  * Triggered daily at 00h30 Paris time (22h30 UTC)
@@ -1511,8 +1596,8 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             console.warn(`[ProviderRunScore] ${locName}: évaluation provider-run ignorée; scores de disponibilité historiques inchangés.`);
           }
 
-          const hourlyForecastRuns = await getHourlyForecastRunValues(locKey, yesterday);
-          if (hourlyForecastRuns.length === 0) {
+          const evaluation = await scoreHourlyForecastDate(locKey, yesterday, snapshots);
+          if (!evaluation) {
             const emptyHourlyEvaluation = evaluateHourlyForecastRuns(snapshots, []);
             comparisonDiagnostics.push(...emptyHourlyEvaluation.diagnostics);
             console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(emptyHourlyEvaluation.diagnostics)}`);
@@ -1520,37 +1605,13 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune capture horaire vérifiable archivée; les anciennes séries mutables ne sont pas réutilisées`);
             continue;
           }
-          const evaluation = evaluateHourlyForecastRuns(
-            snapshots,
-            hourlyForecastRuns.flatMap((run) => {
-              const variable = normalizeHourlyForecastVariable(run.variable);
-              return variable ? [{ ...run, variable }] : [];
-            }),
-          );
           comparisonDiagnostics.push(...evaluation.diagnostics);
           console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(evaluation.diagnostics)}`);
           await upsertHourlyComparisonDiagnosticSnapshot({ locationKey: locKey, cycleDate: yesterday, diagnostics: comparisonDiagnostics });
           const hourlyScores = evaluation.compatibilityScores;
-          // Archive tous les agrégats complets du jour : les lignes non validées
-          // sont écrites avec une version de validation NULL et restent
-          // consultables comme données brutes, sans jamais remplacer une ligne validée.
-          await persistHourlyForecastEvaluationScores(evaluation.scores.map((score) => ({
-            locationKey: score.locationKey,
-            date: score.date,
-            sourceName: score.sourceName,
-            modelName: score.modelName,
-            modelId: score.modelId,
-            variable: score.variable,
-            horizonBucket: score.horizonBucket,
-            observationCount: score.observationCount,
-            evaluableObservationCount: score.evaluableObservationCount,
-            sampleSize: score.sampleSize,
-            coverageRatio: score.coverageRatio,
-            mae: score.mae,
-            rmse: score.rmse,
-            bias: score.bias,
-            scoringValidationVersion: score.scoringValidationVersion,
-          })));
+          // Les scores détaillés du jour sont déjà archivés par le chemin partagé
+          // scoreHourlyForecastDate : lignes validées mises à jour, lignes
+          // incomplètes en version NULL, jamais l'inverse.
           const exactComparisonsStored = await persistHourlyForecastExactComparisons(evaluation.exactComparisons.flatMap((comparison) => {
             if (comparison.forecastRunValueId == null || comparison.observationSnapshotId == null) return [];
             return [{ ...comparison, forecastRunValueId: comparison.forecastRunValueId, observationSnapshotId: comparison.observationSnapshotId }];
@@ -1604,6 +1665,57 @@ export async function collectObservationsHandler(req: Request, res: Response) {
         }
       }
 
+      // Rattrapage planifié du scoring horaire : une nuit interrompue (redéploiement,
+      // instance endormie) laisse un trou dans les scores archivés, et la page Fiabilité
+      // doit alors recalculer ces dates en lecture à chaque visite. Ce rattrapage comble
+      // les dates sans aucune ligne archivée dans la fenêtre de 30 jours pour que le
+      // laboratoire n'ait plus rien à recalculer. Il s'exécute sous le même lease que le
+      // scoring de la veille, après lui, donc jamais en parallèle. Borné et résiliable :
+      // au plus HOURLY_SCORING_BACKFILL_MAX_SCORES_PER_NIGHT dates complètes par nuit,
+      // les plus récentes d'abord ; le reste reprend les nuits suivantes. Une date sans
+      // preuve archivée n'écrit rien et ne consomme pas de budget.
+      let backfillScoredDates = 0;
+      let backfillSkippedDates = 0;
+      try {
+        const backfillWindowDates = listHourlyScoringBackfillWindowDates(now);
+        const backfillFromDate = backfillWindowDates[backfillWindowDates.length - 1]!;
+        const backfillThroughDate = backfillWindowDates[0]!;
+        for (const loc of uniqueLocations) {
+          if (backfillScoredDates >= HOURLY_SCORING_BACKFILL_MAX_SCORES_PER_NIGHT) break;
+          const backfillLocKey = makeLocationKey(loc.lat, loc.lon);
+          const backfillLocName = loc.customName ?? loc.name;
+          const backfillHistory = await getHourlyForecastEvaluationHistory(
+            backfillLocKey,
+            backfillFromDate,
+            backfillThroughDate,
+            [],
+            { includeLegacy: true },
+          );
+          if (!backfillHistory.available) continue;
+          const backfillMissingDates = findMissingHourlyScoringDates(
+            backfillWindowDates,
+            backfillHistory.rows,
+            backfillHistory.legacyRows,
+          );
+          for (const missingDate of backfillMissingDates) {
+            if (backfillScoredDates >= HOURLY_SCORING_BACKFILL_MAX_SCORES_PER_NIGHT) break;
+            const backfillEvaluation = await scoreHourlyForecastDate(backfillLocKey, missingDate);
+            if (!backfillEvaluation) {
+              backfillSkippedDates += 1;
+              continue;
+            }
+            backfillScoredDates += 1;
+            console.log(`[MeteoAI] Backfill ${backfillLocName} ${missingDate}: ${backfillEvaluation.scores.length} ligne(s) de score archivée(s)`);
+          }
+        }
+      } catch (backfillError) {
+        // Le rattrapage ne fait jamais échouer le passage principal : il reprendra la nuit suivante.
+        console.warn("[MeteoAI] Hourly scoring backfill interrupted; it will resume next night:", backfillError);
+      }
+      if (backfillScoredDates > 0 || backfillSkippedDates > 0) {
+        console.log(`[MeteoAI] Rattrapage horaire : ${backfillScoredDates} date(s) de score reconstituée(s), ${backfillSkippedDates} date(s) sans preuve archivée`);
+      }
+
       await updateCollectionJob(jobId, {
         status: "completed",
         servicesCollected: totalScores,
@@ -1615,6 +1727,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
         `${uniqueLocations.length} lieu(x) traité(s), ${totalScores} scores calculés.`,
         "",
         ...locationSummaries,
+        ...(backfillScoredDates > 0 ? ["", `🧮 Rattrapage planifié : ${backfillScoredDates} date(s) de score reconstituée(s) sur la fenêtre de ${HOURLY_SCORING_BACKFILL_WINDOW_DAYS} jours.`] : []),
         ...(errors.length > 0 ? ["", `⚠️ Erreurs: ${errors.slice(0, 3).join(", ")}`] : []),
       ].join("\n");
 
@@ -1624,6 +1737,8 @@ export async function collectObservationsHandler(req: Request, res: Response) {
         locationsProcessed: uniqueLocations.length,
         totalScores,
         warningCount: errors.length,
+        backfillScoredDates,
+        backfillSkippedDates,
         requestId,
       });
     } catch (err: any) {
