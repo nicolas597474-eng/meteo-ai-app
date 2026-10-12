@@ -310,3 +310,41 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
       && diagnostic.projectionReady)).toBe(true);
   });
 });
+
+describe("collectHourlyForecastAllModels latency budget (chemin interactif)", () => {
+  beforeEach(() => {
+    mockedFetchWeather.mockReset();
+  });
+
+  const partialResponse = () => ({
+    ...completeResponse(),
+    hourly: { time: unixTimes.slice(0, 3), temperature_2m: [10, 11, 12] },
+  });
+  const coords = { lat: 50.7567, lon: 2.5204 };
+
+  it("transmet le délai par tentative demandé à chaque appel fournisseur", async () => {
+    mockedFetchWeather.mockResolvedValue(response(completeResponse()));
+
+    await collectHourlyForecastAllModelsWithDiagnostics("2026-10-25", coords, { includeBestMatch: false, timeoutMs: 10_000 });
+
+    expect(mockedFetchWeather).toHaveBeenCalledTimes(OFFICIAL_HOURLY_MODELS.length);
+    expect(mockedFetchWeather.mock.calls.every(([, , options]) => options?.timeoutMs === 10_000)).toBe(true);
+  });
+
+  it("ne relance pas les modèles incomplets quand le budget de latence est épuisé", async () => {
+    mockedFetchWeather.mockResolvedValue(response(partialResponse()));
+
+    const result = await collectHourlyForecastAllModelsWithDiagnostics("2026-10-25", coords, { includeBestMatch: false, retryBudgetMs: 0 });
+
+    expect(mockedFetchWeather).toHaveBeenCalledTimes(OFFICIAL_HOURLY_MODELS.length);
+    expect(result.diagnostics.every((item) => item.status !== "succeeded" && item.projectionReady === false)).toBe(true);
+  });
+
+  it("relance les modèles incomplets lorsqu'aucun budget n'est fixé (collecte planifiée inchangée)", async () => {
+    mockedFetchWeather.mockResolvedValue(response(partialResponse()));
+
+    await collectHourlyForecastAllModelsWithDiagnostics("2026-10-25", coords, { includeBestMatch: false });
+
+    expect(mockedFetchWeather).toHaveBeenCalledTimes(OFFICIAL_HOURLY_MODELS.length * 2);
+  });
+});

@@ -1162,8 +1162,20 @@ function classifyHourlyProviderError(error: unknown): string {
 export async function collectHourlyForecastAllModelsWithDiagnostics(
   targetDate: string,
   coords?: { lat: number; lon: number },
-  options: { includeBestMatch?: boolean; includeNextDay?: boolean; forecastDays?: number } = {},
+  options: {
+    includeBestMatch?: boolean;
+    includeNextDay?: boolean;
+    forecastDays?: number;
+    /** Délai par tentative fournisseur ; 12 s par défaut (collecte planifiée). */
+    timeoutMs?: number;
+    /**
+     * Au-delà de ce délai écoulé depuis le début de la collecte, la seconde
+     * passe n'est pas lancée : les modèles incomplets gardent leur diagnostic.
+     */
+    retryBudgetMs?: number;
+  } = {},
 ): Promise<CollectedHourlyForecastModels> {
+  const collectionStartedAt = Date.now();
   const location = coords ?? HONDEGHEM;
   const nextDate = options.includeNextDay ? shiftParisCivilDate(targetDate, 1) : null;
   const hasExplicitForecastDays = Number.isFinite(options.forecastDays);
@@ -1196,7 +1208,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
         url.searchParams.set("models", model.modelId);
       }
 
-      const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts, cacheTtlMs: 0 });
+      const response = await fetchWeather(url.toString(), {}, { timeoutMs: options.timeoutMs ?? 12_000, attempts, cacheTtlMs: 0 });
       attemptCount = getWeatherResponseAttemptCount(response);
       if (!response.ok) {
         const errorCode = response.status >= 500 ? "provider_http_5xx" : response.status >= 400 ? "provider_http_4xx" : "provider_http_error";
@@ -1327,7 +1339,11 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
   const firstPass = await Promise.all(modelsToCollect.map((model) => collectModel(model, 2)));
   const retryIndexes = firstPass.map((result, index) => result.diagnostic.projectionReady ? -1 : index).filter((index) => index >= 0);
   const retryPass = new Map<number, ModelAttempt>();
-  if (retryIndexes.length > 0) {
+  const retryBudgetExhausted = Date.now() - collectionStartedAt >= (options.retryBudgetMs ?? Number.POSITIVE_INFINITY);
+  if (retryIndexes.length > 0 && retryBudgetExhausted) {
+    console.warn(`[HourlyAll] Retry skipped for ${retryIndexes.length} incomplete model source(s): latency budget exhausted.`);
+  }
+  if (retryIndexes.length > 0 && !retryBudgetExhausted) {
     console.warn(`[HourlyAll] Retry targeted for ${retryIndexes.length} incomplete model source(s).`);
     await new Promise((resolve) => setTimeout(resolve, 1_200));
     const retryResults = await Promise.all(retryIndexes.map((index) => collectModel(modelsToCollect[index], 1)));

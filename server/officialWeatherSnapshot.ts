@@ -382,7 +382,7 @@ export function resolveOfficialWeatherSnapshot(
 
   const createSnapshot = () => (async () => {
     const [hourlyResult, currentSnapshot, dailySnapshot] = await Promise.all([
-      collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays }),
+      collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays, interactive: true }),
       collectCurrentWeatherSnapshot(coords),
       includeDaily ? resolveOfficialDailyForecastSnapshot(coords) : Promise.resolve({ daily: [], modelsUsed: [] }),
     ]);
