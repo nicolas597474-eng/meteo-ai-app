@@ -3,8 +3,9 @@ import { readFileSync } from "node:fs";
 import { MAIN_PAGE_PATHS, getSwipeNavigationTarget, isQualifiedPageSwipe, PAGE_SWIPE_IGNORE_SELECTOR } from "./lib/pageNavigation";
 
 describe("navigation entre pages par glissement", () => {
-  it("ordonne les six pages principales", () => {
-    expect(MAIN_PAGE_PATHS).toEqual(["/", "/details", "/laboratoire", "/ranking", "/history", "/ai-lab"]);
+  it("ordonne uniquement les pages qui ont une entrée visible de navigation", () => {
+    expect(MAIN_PAGE_PATHS).toEqual(["/", "/details", "/laboratoire", "/ranking", "/ai-lab"]);
+    expect(MAIN_PAGE_PATHS).not.toContain("/history");
   });
 
   it("navigue dans les deux sens sans dépasser les extrémités", () => {
@@ -12,6 +13,7 @@ describe("navigation entre pages par glissement", () => {
     expect(getSwipeNavigationTarget("/details", 120)).toBe("/");
     expect(getSwipeNavigationTarget("/ai-lab", -120)).toBeNull();
     expect(getSwipeNavigationTarget("/", 120)).toBeNull();
+    expect(getSwipeNavigationTarget("/ranking", -120)).toBe("/ai-lab");
   });
 
   it("ignore les routes secondaires", () => {

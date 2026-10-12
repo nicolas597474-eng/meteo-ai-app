@@ -1,6 +1,7 @@
 import { eq, desc, and, gte, lte, lt, sql, isNull, isNotNull, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { acquireForecastLease, decideScheduledForecastJobDisposition, FORECAST_REFRESH_LOCK_LEASE_MS } from "./forecastRefreshLock";
+import { createHash } from "node:crypto";
+import { acquireForecastLease, decideScheduledForecastJobDisposition, FORECAST_REFRESH_LOCK_LEASE_MS, renewForecastLease } from "./forecastRefreshLock";
 import { getParisDate } from "./weatherTime";
 import { buildHourlyArchiveValues } from "./forecastVariableCoverage";
 import {
@@ -66,6 +67,7 @@ import {
   citizenSensorWeights,
   citizenSensorAnomalies,
   citizenVariableQualifications,
+  citizenEvaluationEvents,
   InsertWeatherStation,
   InsertStationObservation,
   InsertStationQualityProfile,
@@ -320,7 +322,7 @@ export async function getForecastsByService(serviceName: string, limit = 30) {
 
 export async function insertObservation(data: InsertObservation): Promise<void> {
   const db = await getDb();
-  if (!db) return;
+  requireDatabaseForWrite(db, "enregistrer l'observation quotidienne qualifiée");
   // Upsert: if observation for this date+location exists, update it
   await db.insert(observations).values(data).onDuplicateKeyUpdate({
     set: {
@@ -749,6 +751,10 @@ export async function acquireForecastRefreshLock(
         ));
       return affectedRows(result) > 0;
     },
+    async renewIfOwned() {
+      // Cette opération n'est jamais appelée lors de l'acquisition.
+      return false;
+    },
   }, { lockKey, ownerToken, now, leaseMs });
 }
 
@@ -760,6 +766,31 @@ export async function releaseForecastRefreshLock(lockKey: string, ownerToken: st
     eq(forecastRefreshLocks.lockKey, lockKey),
     eq(forecastRefreshLocks.ownerToken, ownerToken),
   ));
+}
+
+/** Prolonge atomiquement un lease vivant détenu par cette invocation uniquement. */
+export async function renewForecastRefreshLock(
+  lockKey: string,
+  ownerToken: string,
+  now = new Date(),
+  leaseMs = FORECAST_REFRESH_LOCK_LEASE_MS,
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable while renewing forecast refresh lock.");
+  return renewForecastLease({
+    async insertIfAbsent() { return false; },
+    async claimIfExpired() { return false; },
+    async renewIfOwned(input) {
+      const result = await db.update(forecastRefreshLocks)
+        .set({ leaseExpiresAt: input.leaseExpiresAt })
+        .where(and(
+          eq(forecastRefreshLocks.lockKey, input.lockKey),
+          eq(forecastRefreshLocks.ownerToken, input.ownerToken),
+          sql`${forecastRefreshLocks.leaseExpiresAt} > ${input.now}`,
+        ));
+      return affectedRows(result) > 0;
+    },
+  }, { lockKey, ownerToken, now, leaseMs });
 }
 
 export type ScheduledForecastJobClaim =
@@ -827,6 +858,74 @@ export async function claimScheduledForecastCollectionJob(
     ),
   ));
 
+  return affectedRows(result) > 0
+    ? { claimed: true, jobId: existing.id }
+    : { claimed: false, reason: "in-progress" };
+}
+
+export type ScheduledObservationJobClaim =
+  | { claimed: true; jobId: number }
+  | { claimed: false; reason: "already-completed" | "in-progress" };
+
+/** Un cycle persistant de scoring par date civile Paris, reprenable après abandon. */
+export async function claimScheduledObservationCollectionJob(
+  dateParis: string,
+  scheduleCronTaskUid: string,
+  now = new Date(),
+): Promise<ScheduledObservationJobClaim> {
+  const scheduleRunKey = `observations:${dateParis}`;
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable while claiming scheduled observation collection.");
+
+  let existing = (await db.select().from(collectionJobs)
+    .where(eq(collectionJobs.scheduleRunKey, scheduleRunKey)).limit(1))[0];
+  if (!existing) {
+    try {
+      const result = await db.insert(collectionJobs).values({
+        jobType: "observation",
+        status: "running",
+        scheduleCronTaskUid,
+        scheduleRunKey,
+        servicesCollected: 0,
+        dailyModelsCollected: 0,
+        dailyModelsExpected: 0,
+        hourlyModelsCollected: 0,
+        hourlyModelsExpected: 0,
+        startedAt: now,
+      });
+      const jobId = Number((result as any)[0]?.insertId ?? 0);
+      if (jobId > 0) return { claimed: true, jobId };
+      throw new Error("Scheduled observation collection job insert returned no id.");
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) throw error;
+      existing = (await db.select().from(collectionJobs)
+        .where(eq(collectionJobs.scheduleRunKey, scheduleRunKey)).limit(1))[0];
+      if (!existing) throw new Error("Duplicate observation collection cycle exists but could not be read.");
+    }
+  }
+
+  const disposition = decideScheduledForecastJobDisposition(existing, now);
+  if (disposition !== "retry") return { claimed: false, reason: disposition };
+  const staleBefore = new Date(now.getTime() - FORECAST_REFRESH_LOCK_LEASE_MS);
+  const result = await db.update(collectionJobs).set({
+    status: "running",
+    scheduleCronTaskUid,
+    servicesCollected: 0,
+    dailyModelsCollected: 0,
+    dailyModelsExpected: 0,
+    hourlyModelsCollected: 0,
+    hourlyModelsExpected: 0,
+    errorMessage: null,
+    startedAt: now,
+    completedAt: null,
+  }).where(and(
+    eq(collectionJobs.id, existing.id),
+    or(
+      eq(collectionJobs.status, "pending"),
+      eq(collectionJobs.status, "failed"),
+      and(eq(collectionJobs.status, "running"), lte(collectionJobs.startedAt, staleBefore)),
+    ),
+  ));
   return affectedRows(result) > 0
     ? { claimed: true, jobId: existing.id }
     : { claimed: false, reason: "in-progress" };
@@ -936,26 +1035,11 @@ export async function upsertWeatherStation(data: InsertWeatherStation): Promise<
 }
 
 /**
- * Idempotent station reading write. The station timestamp is the natural key so
- * cron retries refresh the same reading rather than creating duplicate evidence.
+ * Compatibilité historique : l'observation brute est insert-only. Un doublon
+ * (stationId, observedAt) laisse intacts le premier payload et collectedAt.
  */
 export async function upsertStationObservation(data: InsertStationObservation): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  const existing = await db
-    .select({ id: stationObservations.id })
-    .from(stationObservations)
-    .where(and(
-      eq(stationObservations.stationId, data.stationId),
-      eq(stationObservations.observedAt, data.observedAt),
-    ))
-    .limit(1);
-
-  if (existing[0]) {
-    await db.update(stationObservations).set({ ...data, collectedAt: new Date() }).where(eq(stationObservations.id, existing[0].id));
-    return;
-  }
-  await db.insert(stationObservations).values(data);
+  await insertStationObservationIfMissing(data);
 }
 
 /**
@@ -1203,16 +1287,45 @@ export async function getWeatherStationQualificationVerdicts(stationIds: string[
   }).from(weatherStations).where(inArray(weatherStations.stationId, uniqueIds));
 }
 
+/** Référence exacte d'un verdict de qualification, jamais une proximité tolérée. */
+export type CitizenQualificationReference = { refLat: number; refLon: number };
+
 /**
  * Applique les verdicts définitifs issus de l'évaluateur. La clause de statut
  * candidat garantit qu'un verdict ne s'applique qu'une fois et n'écrase jamais
- * un statut déjà promu : l'écriture est idempotente et auditable. Les autres
- * colonnes d'identité ou de métadonnées ne sont jamais touchées.
+ * un statut déjà promu. L'événement append-only est écrit avant la projection
+ * mutable : l'historique de qualification demeure donc disponible même si la
+ * projection est ensuite indisponible.
  */
-export async function applyOpenSenseMapQualificationVerdicts(verdicts: OpenSenseMapQualificationVerdictUpdate[]) {
+export async function applyOpenSenseMapQualificationVerdicts(
+  verdicts: OpenSenseMapQualificationVerdictUpdate[],
+  referencesByStationId: ReadonlyMap<string, CitizenQualificationReference>,
+) {
   const db = await getDb();
   if (!db || verdicts.length === 0) return;
   for (const verdict of verdicts) {
+    const reference = referencesByStationId.get(verdict.stationId);
+    if (!reference) throw new Error(`Qualification reference is required for station ${verdict.stationId}.`);
+    const recordedAt = Date.now();
+    await appendCitizenEvaluationEvent(db, {
+      kind: "variable",
+      refLat: reference.refLat,
+      refLon: reference.refLon,
+      stationId: verdict.stationId,
+      variable: "temperature",
+      evaluatedAt: recordedAt,
+      payload: {
+        stationId: verdict.stationId,
+        variable: "temperature",
+        qualificationStatus: verdict.qualificationStatus,
+        isActive: verdict.isActive,
+        exclusionReason: verdict.exclusionReason,
+        // Évite que l'unicité du ledger confonde une revalidation ultérieure
+        // avec une validation historique. Ce nonce n'est jamais lu comme date
+        // d'effet : getCitizenQualificationEffectiveTimes… lit createdAt.
+        recordedAt,
+      },
+    });
     await db.update(weatherStations).set({
       qualificationStatus: verdict.qualificationStatus,
       isActive: verdict.isActive,
@@ -1222,6 +1335,97 @@ export async function applyOpenSenseMapQualificationVerdicts(verdicts: OpenSense
       eq(weatherStations.qualificationStatus, "candidate"),
     ));
   }
+}
+
+type CitizenEvaluationEventKind = "activation" | "weight" | "anomaly" | "variable";
+
+/**
+ * Identité d'événement indépendante des anciennes projections à tolérance
+ * spatiale. La précision à six décimales est explicite : elle ne fusionne pas
+ * rétroactivement les références historiques proches.
+ */
+export function makeExactCitizenReferenceKey(refLat: number, refLon: number): string {
+  return `${Number(refLat).toFixed(6)},${Number(refLon).toFixed(6)}`;
+}
+
+function stableEventJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableEventJson).join(",")}]`;
+  const object = value as Record<string, unknown>;
+  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${stableEventJson(object[key])}`).join(",")}}`;
+}
+
+export async function appendCitizenEvaluationEvent(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  input: {
+    kind: CitizenEvaluationEventKind;
+    refLat: number;
+    refLon: number;
+    stationId?: string | null;
+    variable?: string | null;
+    evaluatedAt: number | Date;
+    payload: Record<string, unknown>;
+  },
+): Promise<void> {
+  const payload = input.payload;
+  const payloadHash = createHash("sha256").update(stableEventJson(payload)).digest("hex");
+  try {
+    await db.insert(citizenEvaluationEvents).values({
+      referenceKey: makeExactCitizenReferenceKey(input.refLat, input.refLon),
+      kind: input.kind,
+      stationId: input.stationId ?? null,
+      variable: input.variable ?? null,
+      evaluatedAt: input.evaluatedAt instanceof Date ? input.evaluatedAt.getTime() : input.evaluatedAt,
+      payload,
+      payloadHash,
+    });
+  } catch (error) {
+    // La contrainte unique rend le retry du même événement idempotent. Toute
+    // autre erreur, notamment une migration absente, bloque la projection.
+    if (!isDuplicateKeyError(error)) throw error;
+  }
+}
+
+/**
+ * Début réel de la dernière séquence continue « validated » par station. La
+ * référence est exacte à six décimales et seul createdAt du ledger exprime la
+ * disponibilité : evaluatedAt peut décrire une preuve plus ancienne.
+ */
+export async function getCitizenQualificationEffectiveTimesNearReference(
+  refLat: number,
+  refLon: number,
+): Promise<Map<string, number>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const events = await db.select({
+    id: citizenEvaluationEvents.id,
+    stationId: citizenEvaluationEvents.stationId,
+    payload: citizenEvaluationEvents.payload,
+    createdAt: citizenEvaluationEvents.createdAt,
+  }).from(citizenEvaluationEvents).where(and(
+    eq(citizenEvaluationEvents.referenceKey, makeExactCitizenReferenceKey(refLat, refLon)),
+    eq(citizenEvaluationEvents.kind, "variable"),
+    eq(citizenEvaluationEvents.variable, "temperature"),
+    isNotNull(citizenEvaluationEvents.stationId),
+  )).orderBy(citizenEvaluationEvents.createdAt, citizenEvaluationEvents.id);
+
+  const effectiveTimes = new Map<string, number>();
+  for (const event of events) {
+    if (!event.stationId) continue;
+    const qualificationStatus = (event.payload as Record<string, unknown>)?.qualificationStatus;
+    if (qualificationStatus !== "validated") {
+      effectiveTimes.delete(event.stationId);
+      continue;
+    }
+    // La revalidation continue ne décale jamais le début de disponibilité.
+    if (!effectiveTimes.has(event.stationId)) {
+      const createdAt = event.createdAt instanceof Date
+        ? event.createdAt.getTime()
+        : new Date(event.createdAt).getTime();
+      if (Number.isFinite(createdAt)) effectiveTimes.set(event.stationId, createdAt);
+    }
+  }
+  return effectiveTimes;
 }
 
 
@@ -1254,7 +1458,7 @@ export async function getCitizenFusionActivationNearReference(refLat: number, re
  */
 export async function upsertCitizenFusionActivation(data: InsertCitizenFusionActivation) {
   const db = await getDb();
-  if (!db) return null;
+  requireDatabaseForWrite(db, "archiver la décision d'activation citoyenne");
   const latBounds = referenceCoordinateBounds(Number(data.refLat));
   const lonBounds = referenceCoordinateBounds(Number(data.refLon));
   const existing = await db.select({ id: citizenFusionActivations.id }).from(citizenFusionActivations).where(and(
@@ -1264,6 +1468,13 @@ export async function upsertCitizenFusionActivation(data: InsertCitizenFusionAct
     lte(citizenFusionActivations.refLon, lonBounds.max),
   )).orderBy(desc(citizenFusionActivations.evaluatedAt)).limit(1);
   const row = { ...data, reason: data.reason.slice(0, CITIZEN_FUSION_ACTIVATION_REASON_MAX_LENGTH) };
+  await appendCitizenEvaluationEvent(db, {
+    kind: "activation",
+    refLat: Number(row.refLat),
+    refLon: Number(row.refLon),
+    evaluatedAt: row.evaluatedAt,
+    payload: row,
+  });
   if (existing[0]) {
     await db.update(citizenFusionActivations).set({ ...row, updatedAt: new Date() }).where(eq(citizenFusionActivations.id, existing[0].id));
     return existing[0].id;
@@ -1305,7 +1516,7 @@ export async function getCitizenSensorWeightsNearReference(refLat: number, refLo
  */
 export async function upsertCitizenSensorWeight(data: InsertCitizenSensorWeight) {
   const db = await getDb();
-  if (!db) return null;
+  requireDatabaseForWrite(db, "archiver le poids de capteur citoyen");
   const latBounds = referenceCoordinateBounds(Number(data.refLat));
   const lonBounds = referenceCoordinateBounds(Number(data.refLon));
   const existing = await db.select({ id: citizenSensorWeights.id }).from(citizenSensorWeights).where(and(
@@ -1315,6 +1526,14 @@ export async function upsertCitizenSensorWeight(data: InsertCitizenSensorWeight)
     lte(citizenSensorWeights.refLon, lonBounds.max),
     eq(citizenSensorWeights.stationId, data.stationId),
   )).orderBy(desc(citizenSensorWeights.evaluatedAt)).limit(1);
+  await appendCitizenEvaluationEvent(db, {
+    kind: "weight",
+    refLat: Number(data.refLat),
+    refLon: Number(data.refLon),
+    stationId: data.stationId,
+    evaluatedAt: data.evaluatedAt,
+    payload: data,
+  });
   if (existing[0]) {
     await db.update(citizenSensorWeights).set({ ...data, updatedAt: new Date() }).where(eq(citizenSensorWeights.id, existing[0].id));
     return existing[0].id;
@@ -1358,7 +1577,7 @@ export async function getCitizenSensorAnomaliesNearReference(refLat: number, ref
  */
 export async function upsertCitizenSensorAnomaly(data: InsertCitizenSensorAnomaly) {
   const db = await getDb();
-  if (!db) return null;
+  requireDatabaseForWrite(db, "archiver l'anomalie de capteur citoyen");
   const latBounds = referenceCoordinateBounds(Number(data.refLat));
   const lonBounds = referenceCoordinateBounds(Number(data.refLon));
   const existing = await db.select({ id: citizenSensorAnomalies.id }).from(citizenSensorAnomalies).where(and(
@@ -1368,6 +1587,14 @@ export async function upsertCitizenSensorAnomaly(data: InsertCitizenSensorAnomal
     lte(citizenSensorAnomalies.refLon, lonBounds.max),
     eq(citizenSensorAnomalies.stationId, data.stationId),
   )).orderBy(desc(citizenSensorAnomalies.evaluatedAt)).limit(1);
+  await appendCitizenEvaluationEvent(db, {
+    kind: "anomaly",
+    refLat: Number(data.refLat),
+    refLon: Number(data.refLon),
+    stationId: data.stationId,
+    evaluatedAt: data.evaluatedAt,
+    payload: data,
+  });
   if (existing[0]) {
     await db.update(citizenSensorAnomalies).set({ ...data, updatedAt: new Date() }).where(eq(citizenSensorAnomalies.id, existing[0].id));
     return existing[0].id;
@@ -1413,7 +1640,7 @@ export async function getCitizenVariableQualificationsNearReference(refLat: numb
  */
 export async function upsertCitizenVariableQualification(data: InsertCitizenVariableQualification) {
   const db = await getDb();
-  if (!db) return null;
+  requireDatabaseForWrite(db, "archiver la qualification citoyenne par variable");
   const latBounds = referenceCoordinateBounds(Number(data.refLat));
   const lonBounds = referenceCoordinateBounds(Number(data.refLon));
   const existing = await db.select({ id: citizenVariableQualifications.id }).from(citizenVariableQualifications).where(and(
@@ -1425,6 +1652,15 @@ export async function upsertCitizenVariableQualification(data: InsertCitizenVari
     eq(citizenVariableQualifications.variable, data.variable),
   )).orderBy(desc(citizenVariableQualifications.evaluatedAt)).limit(1);
   const row = { ...data, reason: data.reason.slice(0, CITIZEN_VARIABLE_QUALIFICATION_REASON_MAX_LENGTH) };
+  await appendCitizenEvaluationEvent(db, {
+    kind: "variable",
+    refLat: Number(row.refLat),
+    refLon: Number(row.refLon),
+    stationId: row.stationId,
+    variable: row.variable,
+    evaluatedAt: row.evaluatedAt,
+    payload: row,
+  });
   if (existing[0]) {
     await db.update(citizenVariableQualifications).set({ ...row, updatedAt: new Date() }).where(eq(citizenVariableQualifications.id, existing[0].id));
     return existing[0].id;
@@ -1459,17 +1695,7 @@ export async function upsertQualifiedObservationSnapshot(data: InsertQualifiedOb
  */
 export async function insertQualifiedObservationSnapshotIfMissing(data: InsertQualifiedObservationSnapshot): Promise<boolean> {
   const db = await getDb();
-  if (!db) return false;
-  const existing = await db
-    .select({ id: qualifiedObservationSnapshots.id })
-    .from(qualifiedObservationSnapshots)
-    .where(and(
-      eq(qualifiedObservationSnapshots.locationKey, data.locationKey),
-      eq(qualifiedObservationSnapshots.date, data.date),
-      eq(qualifiedObservationSnapshots.hour, data.hour),
-    ))
-    .limit(1);
-  if (existing[0]) return false;
+  requireDatabaseForWrite(db, "archiver le snapshot physique qualifié");
   try {
     await db.insert(qualifiedObservationSnapshots).values(data);
     return true;
@@ -1925,19 +2151,14 @@ export async function upsertPhysicalSnapshotCollectionTrace(data: InsertPhysical
 /** Insère une trace seulement si ce créneau n’est pas déjà documenté. */
 export async function insertPhysicalSnapshotCollectionTraceIfMissing(data: InsertPhysicalSnapshotCollectionTrace): Promise<boolean> {
   const db = await getDb();
-  if (!db) return false;
-  const existing = await db
-    .select({ id: physicalSnapshotCollectionTraces.id })
-    .from(physicalSnapshotCollectionTraces)
-    .where(and(
-      eq(physicalSnapshotCollectionTraces.locationKey, data.locationKey),
-      eq(physicalSnapshotCollectionTraces.date, data.date),
-      eq(physicalSnapshotCollectionTraces.hour, data.hour),
-    ))
-    .limit(1);
-  if (existing[0]) return false;
-  await db.insert(physicalSnapshotCollectionTraces).values(data);
-  return true;
+  requireDatabaseForWrite(db, "archiver la trace de collecte physique");
+  try {
+    await db.insert(physicalSnapshotCollectionTraces).values(data);
+    return true;
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return false;
+    throw error;
+  }
 }
 
 /** Read per-hour physical snapshot collection traces over the selected history period. */
@@ -2967,4 +3188,3 @@ export async function getLaboratoryModelArchive(locationKey: string, startDate: 
     .groupBy(forecastRuns.serviceName, forecastRuns.provider, forecastRuns.modelId)
     .orderBy(forecastRuns.serviceName);
 }
-

@@ -63,7 +63,7 @@ describe("préchargement météo des lieux favoris", () => {
     expect(started).toEqual([1]);
   });
 
-  it("précharge au niveau App les prévisions et données de tous les favoris connectés", () => {
+  it("ne réchauffe au niveau App que les prévisions planifiées du favori actif, à l’inactivité", () => {
     const component = readFileSync(
       new URL("../components/FavoriteWeatherPreloader.tsx", import.meta.url),
       "utf8"
@@ -71,11 +71,13 @@ describe("préchargement météo des lieux favoris", () => {
     const app = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
 
     expect(app).toContain("<FavoriteWeatherPreloader />");
-    expect(component).toContain("enabled: Boolean(user) && !loading");
+    expect(component).toContain("activeLocation?.favoriteId");
+    expect(component).toContain("window.requestIdleCallback");
+    expect(component).toContain("window.cancelIdleCallback");
     expect(component).toContain("getPreloadedForecasts");
-    expect(component).toContain("getDashboard.prefetch");
-    expect(component).toContain("getDetailedForecast.prefetch");
-    expect(component).toContain("getDashboardDailyForecast.prefetch");
-    expect(component).toContain("FAVORITE_WEATHER_PRELOAD_CONCURRENCY");
+    expect(component).not.toContain("getDashboard.prefetch");
+    expect(component).not.toContain("getDetailedForecast.prefetch");
+    expect(component).not.toContain("getDashboardDailyForecast.prefetch");
+    expect(component).not.toContain("preloadFavoriteWeatherLocations(");
   });
 });

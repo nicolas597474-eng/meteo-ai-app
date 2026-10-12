@@ -3,6 +3,7 @@ import {
   DEFAULT_WINDY_MAP_PREFERENCES,
   WINDY_MAP_PREFERENCES_STORAGE_KEY,
   getWindyMapPreferences,
+  makeLegacyWindyMapLocationKey,
   makeWindyMapLocationKey,
   readWindyMapPreferences,
   writeWindyMapPreferences,
@@ -39,12 +40,15 @@ describe("windyMapPreferences", () => {
     Reflect.deleteProperty(globalThis, "window");
   });
 
-  it("crée une clé stable avec quatre décimales par lieu", () => {
-    expect(makeWindyMapLocationKey(50.912345, 2.412356)).toBe("50.9123,2.4124");
+  it("isole les favoris par identifiant et garde des coordonnées précises hors favori", () => {
+    expect(makeWindyMapLocationKey(50.912345, 2.412356, 42)).toBe("favorite:42");
+    expect(makeWindyMapLocationKey(50.912345, 2.412356)).toBe("coordinates:50.912345,2.412356");
+    expect(makeWindyMapLocationKey(50.912346, 2.412356)).not.toBe(makeWindyMapLocationKey(50.912345, 2.412356));
+    expect(makeLegacyWindyMapLocationKey(50.912345, 2.412356)).toBe("50.9123,2.4124");
   });
 
   it("retourne les réglages par défaut lorsqu’aucun lieu n’est encore mémorisé", () => {
-    expect(getWindyMapPreferences("50.9123,2.4124")).toEqual(DEFAULT_WINDY_MAP_PREFERENCES);
+    expect(getWindyMapPreferences("favorite:42")).toEqual(DEFAULT_WINDY_MAP_PREFERENCES);
   });
 
   it("conserve séparément la couche et les deux zooms pour chaque lieu", () => {
@@ -68,5 +72,16 @@ describe("windyMapPreferences", () => {
   it("reste tolérant à un contenu JSON corrompu", () => {
     storage.setItem(WINDY_MAP_PREFERENCES_STORAGE_KEY, "pas-du-json");
     expect(readWindyMapPreferences()).toEqual({});
+  });
+
+  it("migre une préférence legacy sans faire collisionner deux favoris proches", () => {
+    const legacyKey = makeLegacyWindyMapLocationKey(50.912345, 2.412356);
+    writeWindyMapPreferences(legacyKey, { layer: "wind", compactZoom: 10, fullscreenZoom: 12 });
+
+    expect(getWindyMapPreferences("favorite:101", legacyKey)).toEqual({ layer: "wind", compactZoom: 10, fullscreenZoom: 12 });
+    writeWindyMapPreferences("favorite:102", { layer: "clouds", compactZoom: 6, fullscreenZoom: 7 });
+
+    expect(getWindyMapPreferences("favorite:101")).toEqual({ layer: "wind", compactZoom: 10, fullscreenZoom: 12 });
+    expect(getWindyMapPreferences("favorite:102")).toEqual({ layer: "clouds", compactZoom: 6, fullscreenZoom: 7 });
   });
 });

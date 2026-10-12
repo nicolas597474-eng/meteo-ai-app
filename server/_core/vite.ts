@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import { getStaticAssetCacheControl } from "./staticAssetCaching";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -58,10 +59,15 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders(res, filePath) {
+      res.setHeader("Cache-Control", getStaticAssetCacheControl(filePath));
+    },
+  }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

@@ -11,6 +11,7 @@ vi.mock("../db", async () => {
     getValidatedOfficialStationsNearReference: vi.fn(),
     getStationObservationsForQualification: vi.fn(),
     getCitizenFusionActivationNearReference: vi.fn(),
+    getCitizenQualificationEffectiveTimesNearReference: vi.fn(),
   };
 });
 
@@ -21,6 +22,7 @@ import {
   getValidatedCitizenStationsNearReference,
   getValidatedOfficialStationsNearReference,
   getCitizenFusionActivationNearReference,
+  getCitizenQualificationEffectiveTimesNearReference,
 } from "../db";
 
 function createPublicContext(): TrpcContext {
@@ -112,6 +114,7 @@ beforeEach(() => {
   vi.mocked(getStationObservationsForQualification).mockReset();
   vi.mocked(getCitizenFusionActivationNearReference).mockReset();
   vi.mocked(getCitizenFusionActivationNearReference).mockResolvedValue(null);
+  vi.mocked(getCitizenQualificationEffectiveTimesNearReference).mockResolvedValue(new Map([["opensensemap-6740", Date.parse("2026-10-01T00:00:00Z")]]));
 });
 
 describe("weather.getCitizenFusionImpact · évaluation à blanc des capteurs validés", () => {
@@ -230,4 +233,3 @@ describe("weather.getCitizenFusionImpact · évaluation à blanc des capteurs va
     expect(report.status).toBe("improves");
   });
 });
-

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeFusion, type FusionSource } from "./fusionEngine";
 import { calculateGroundTruth, type StationData } from "./stationService";
-import { buildNormalizedSpatialWeights, evaluateSpatialQuality } from "./spatialFusionCore";
+import { buildNormalizedSpatialWeights, evaluateSpatialQuality, getSpatialFreshnessScore, normalizeSpatialWeights } from "./spatialFusionCore";
 import { calculateUltraLocal } from "./ultraLocalService";
 
 const now = new Date().toISOString();
@@ -49,6 +49,110 @@ describe("noyau spatial commun", () => {
     const outlier = results.find((result) => result.source.id === "outlier")!;
     expect(outlier.checks.find((check) => check.code === "coherence")?.passed).toBe(false);
     expect(results[0].altitudeAdjustmentC).toBeCloseTo(-0.065, 3);
+  });
+
+  it("refuse un horodatage futur au QC et au poids direct, mais admet exactement maintenant", () => {
+    const referenceNow = Date.parse("2026-10-12T10:00:00.000Z");
+    const options = { now: referenceNow, maxDistanceKm: 10, maxFreshnessMin: 60, minReliabilityScore: 40, maxTempDeviationC: 8 };
+    const [futureMillisecond, futureHour, exactlyNow] = evaluateSpatialQuality([
+      { id: "future-ms", distanceKm: 1, reliabilityScore: 90, updatedAt: new Date(referenceNow + 1), temperature: 20 },
+      { id: "future-hour", distanceKm: 1, reliabilityScore: 90, updatedAt: new Date(referenceNow + 3_600_000), temperature: 20 },
+      { id: "now", distanceKm: 1, reliabilityScore: 90, updatedAt: new Date(referenceNow), temperature: 20 },
+    ], options);
+
+    expect(getSpatialFreshnessScore(new Date(referenceNow + 1), referenceNow)).toBe(0);
+    expect(getSpatialFreshnessScore(new Date(referenceNow + 3_600_000), referenceNow)).toBe(0);
+    for (const result of [futureMillisecond, futureHour]) {
+      expect(result.passed).toBe(false);
+      expect(result.checks.find((check) => check.code === "freshness")).toMatchObject({
+        passed: false,
+        value: "horodatage futur",
+        reason: "Horodatage futur",
+      });
+    }
+    expect(exactlyNow.passed).toBe(true);
+
+    const weights = buildNormalizedSpatialWeights([
+      { id: "future", distanceKm: 1, reliabilityScore: 90, updatedAt: new Date(referenceNow + 1), temperature: 99 },
+      { id: "current", distanceKm: 1, reliabilityScore: 90, updatedAt: new Date(referenceNow), temperature: 20 },
+    ], { now: referenceNow });
+    expect(weights.map((weight) => weight.finalWeight)).toEqual([0, 1]);
+  });
+
+  it("ne laisse aucune contribution future atteindre Ground Truth, Ultra-local standard ou la fusion avancée", () => {
+    const futureAt = new Date(Date.now() + 3_600_000).toISOString();
+    const futureStation = station({
+      stationId: "future-station",
+      updatedAt: futureAt,
+      measurementTimes: {
+        temperature: futureAt,
+        humidity: futureAt,
+        pressure: futureAt,
+        windSpeed: futureAt,
+        windGust: futureAt,
+        windDirection: futureAt,
+        precipitation: futureAt,
+      },
+    });
+    const groundTruth = calculateGroundTruth([futureStation]);
+    const ultraLocal = calculateUltraLocal([futureStation], "standard", 50.75, 2.52, null, null, { recordStationReadings: false });
+    const advanced = computeFusion([{
+      id: futureStation.stationId,
+      name: futureStation.name,
+      distanceKm: futureStation.distanceKm,
+      altitude: futureStation.altitude,
+      temperature: futureStation.temperature,
+      humidity: futureStation.humidity,
+      pressure: futureStation.pressure,
+      windSpeed: futureStation.windSpeed,
+      windGust: futureStation.windGust,
+      precipitation: futureStation.precipitation,
+      updatedAt: futureAt,
+      measurementTimes: futureStation.measurementTimes,
+      reliabilityScore: futureStation.reliabilityScore,
+      type: "station",
+    }], {
+      maxDistanceKm: 20,
+      maxFreshnessMin: 120,
+      minReliabilityScore: 30,
+      maxTempDeviationC: 8,
+      altitudeCorrectionEnabled: false,
+      anomalyDetectionEnabled: false,
+      adaptiveWeightingEnabled: false,
+      modelWeightFraction: 0,
+    });
+
+    expect(groundTruth.temperature).toBeNull();
+    expect(groundTruth.stationsUsed).toEqual([]);
+    expect(ultraLocal.temperature).toBeNull();
+    expect(ultraLocal.stationsUsed).toEqual([]);
+    expect(advanced.temperature).toBeNull();
+    expect(advanced.usedSources).toEqual([]);
+  });
+
+  it("n’égalise jamais des sources explicitement annulées par tous les modulateurs", () => {
+    const sources = [
+      { id: "a", distanceKm: 1, reliabilityScore: 80, updatedAt: now, temperature: 20 },
+      { id: "b", distanceKm: 2, reliabilityScore: 80, updatedAt: now, temperature: 30 },
+    ];
+    const allPerformanceZero = buildNormalizedSpatialWeights(sources, {
+      performanceMultiplierById: new Map([["a", 0], ["b", 0]]),
+    });
+    const allAnomalyZero = buildNormalizedSpatialWeights(sources, {
+      anomalyPenaltyById: new Map([["a", 0], ["b", 0]]),
+    });
+    const oneAdmissible = buildNormalizedSpatialWeights(sources, {
+      performanceMultiplierById: new Map([["a", 0], ["b", 1]]),
+    });
+
+    expect(allPerformanceZero.map((weight) => weight.finalWeight)).toEqual([0, 0]);
+    expect(allAnomalyZero.map((weight) => weight.finalWeight)).toEqual([0, 0]);
+    expect(oneAdmissible.map((weight) => weight.finalWeight)).toEqual([0, 1]);
+  });
+
+  it("conserve l’égalisation explicitement demandée pour une liste sans signal", () => {
+    expect(normalizeSpatialWeights([0, Number.NaN, -1])).toEqual([1 / 3, 1 / 3, 1 / 3]);
+    expect(normalizeSpatialWeights([0, Number.NaN, -1], "zero")).toEqual([0, 0, 0]);
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(

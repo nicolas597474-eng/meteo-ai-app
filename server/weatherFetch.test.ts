@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchWeather, getWeatherFetchCacheMetrics, getWeatherProviderDiagnostics, getWeatherResponseAttemptCount, isTransientWeatherStatus, resetWeatherFetchCache, resetWeatherProviderDiagnostics } from "./weatherFetch";
+import { fetchWeather, getWeatherFetchCacheMetrics, getWeatherProviderDiagnostics, getWeatherResponseAttemptCount, isTransientWeatherStatus, resetWeatherFetchCache, resetWeatherProviderDiagnostics, WEATHER_FETCH_CACHE_MAX_ENTRIES } from "./weatherFetch";
 
 afterEach(() => {
   resetWeatherFetchCache();
@@ -119,5 +119,64 @@ describe("reprises des sources météo", () => {
       lastRetries: 0,
       freshnessMs: null,
     }]);
+  });
+
+  it("ne réitère jamais un 4xx non transitoire, mais réitère 429 et 5xx dans la borne demandée", async () => {
+    const forbidden = vi.fn().mockResolvedValue(new Response("forbidden", { status: 403 }));
+    vi.stubGlobal("fetch", forbidden);
+    const response403 = await fetchWeather("https://api.example.test/forbidden", {}, { attempts: 3, cacheTtlMs: 0 });
+    expect(response403.status).toBe(403);
+    expect(forbidden).toHaveBeenCalledTimes(1);
+
+    const transient = vi.fn()
+      .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+      .mockResolvedValueOnce(new Response("temporary", { status: 503 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", transient);
+    const recovered = await fetchWeather("https://api.example.test/transient", {}, { attempts: 3, cacheTtlMs: 0 });
+    expect(recovered.status).toBe(200);
+    expect(transient).toHaveBeenCalledTimes(3);
+    expect(getWeatherResponseAttemptCount(recovered)).toBe(3);
+  });
+
+  it("coalesce deux GET froids identiques en un seul appel fournisseur et rend deux corps lisibles", async () => {
+    let resolveNetwork!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { resolveNetwork = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = fetchWeather("https://api.example.test/coalesced", {}, { cacheTtlMs: 10_000 });
+    const second = fetchWeather("https://api.example.test/coalesced", {}, { cacheTtlMs: 10_000 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(getWeatherFetchCacheMetrics()).toMatchObject({ inFlight: 1, misses: 1 });
+    resolveNetwork(new Response(JSON.stringify({ shared: true }), { status: 200 }));
+
+    const [one, two] = await Promise.all([first, second]);
+    expect(await one.json()).toEqual({ shared: true });
+    expect(await two.json()).toEqual({ shared: true });
+    expect(getWeatherResponseAttemptCount(one)).toBe(1);
+    expect(getWeatherResponseAttemptCount(two)).toBe(1);
+  });
+
+  it("propage un AbortSignal appelant au fournisseur et ne relance pas l’abandon", async () => {
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    const pending = fetchWeather("https://api.example.test/cancel", { signal: controller.signal }, { attempts: 3, timeoutMs: 5_000, cacheTtlMs: 0 });
+    controller.abort(new DOMException("interactive budget", "AbortError"));
+
+    await expect(pending).rejects.toThrow("interactive budget");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("évince en LRU le cache de réponses borné", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => new Response(JSON.stringify({ url: String(input) }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    for (let index = 0; index < WEATHER_FETCH_CACHE_MAX_ENTRIES + 2; index += 1) {
+      await fetchWeather(`https://api.example.test/lru/${index}`, {}, { cacheTtlMs: 10_000 });
+    }
+    expect(getWeatherFetchCacheMetrics().entries).toBe(WEATHER_FETCH_CACHE_MAX_ENTRIES);
   });
 });

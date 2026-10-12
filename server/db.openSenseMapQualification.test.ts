@@ -17,11 +17,17 @@ import {
   applyOpenSenseMapQualificationVerdicts,
   getCandidateOpenSenseMapStations,
   getCitizenStationsForQualification,
+  getCitizenQualificationEffectiveTimesNearReference,
   getStationObservationsForQualification,
   getValidatedOfficialStationsNearReference,
   getWeatherStationQualificationVerdicts,
   type OpenSenseMapQualificationVerdictUpdate,
 } from "./db";
+
+const qualificationReferences = new Map([
+  ["opensensemap-box-a", { refLat: 50.756, refLon: 2.521 }],
+  ["opensensemap-box-b", { refLat: 50.756, refLon: 2.521 }],
+]);
 
 function makeThenableSelect(rows: unknown[]) {
   const promise = Promise.resolve(rows);
@@ -55,7 +61,7 @@ describe("base de données indisponible", () => {
       isActive: 1,
       exclusionReason: null,
     };
-    await applyOpenSenseMapQualificationVerdicts([verdict]);
+    await applyOpenSenseMapQualificationVerdicts([verdict], qualificationReferences);
     expect(fakeDatabase.update).not.toHaveBeenCalled();
   });
 });
@@ -130,7 +136,7 @@ describe("lecteurs et writer des verdicts de qualification openSenseMap", () => 
     await expect(getWeatherStationQualificationVerdicts(["opensensemap-box-a"])).resolves.toEqual(verdicts);
   });
 
-  it("applique chaque verdict définitif en ne touchant que statut, activité et raison", async () => {
+  it("archive chaque verdict avant de mettre à jour sa projection courante", async () => {
     const validated: OpenSenseMapQualificationVerdictUpdate = {
       stationId: "opensensemap-box-a",
       qualificationStatus: "validated",
@@ -144,8 +150,16 @@ describe("lecteurs et writer des verdicts de qualification openSenseMap", () => 
       exclusionReason: "Divergences répétées : 4/10 comparaison(s).",
     };
 
-    await applyOpenSenseMapQualificationVerdicts([validated, excluded]);
+    await applyOpenSenseMapQualificationVerdicts([validated, excluded], qualificationReferences);
 
+    expect(fakeDatabase.insertValues).toHaveBeenCalledWith(expect.objectContaining({
+      referenceKey: "50.756000,2.521000",
+      kind: "variable",
+      stationId: "opensensemap-box-a",
+      variable: "temperature",
+      payload: expect.objectContaining({ qualificationStatus: "validated" }),
+    }));
+    expect(fakeDatabase.insert.mock.invocationCallOrder[0]).toBeLessThan(fakeDatabase.update.mock.invocationCallOrder[0]!);
     expect(fakeDatabase.update).toHaveBeenCalledTimes(2);
     expect(fakeDatabase.updateSet).toHaveBeenCalledWith({
       qualificationStatus: "validated",
@@ -160,8 +174,25 @@ describe("lecteurs et writer des verdicts de qualification openSenseMap", () => 
   });
 
   it("n'écrit rien sans verdict à appliquer", async () => {
-    await applyOpenSenseMapQualificationVerdicts([]);
+    await applyOpenSenseMapQualificationVerdicts([], qualificationReferences);
 
     expect(fakeDatabase.update).not.toHaveBeenCalled();
+  });
+
+  it("retient createdAt au début de la dernière séquence continue validée, jamais evaluatedAt", async () => {
+    fakeDatabase.results = [[
+      { id: 1, stationId: "opensensemap-box-a", payload: { qualificationStatus: "validated" }, createdAt: new Date("2026-10-10T10:00:00.000Z") },
+      { id: 2, stationId: "opensensemap-box-a", payload: { qualificationStatus: "validated" }, createdAt: new Date("2026-10-10T11:00:00.000Z") },
+      { id: 3, stationId: "opensensemap-box-a", payload: { qualificationStatus: "excluded" }, createdAt: new Date("2026-10-10T12:00:00.000Z") },
+      { id: 4, stationId: "opensensemap-box-a", payload: { qualificationStatus: "validated", recordedAt: 0 }, createdAt: new Date("2026-10-10T13:00:00.000Z") },
+      { id: 5, stationId: "opensensemap-box-b", payload: { qualificationStatus: "validated" }, createdAt: new Date("2026-10-10T14:00:00.000Z") },
+    ]];
+
+    const effectiveTimes = await getCitizenQualificationEffectiveTimesNearReference(50.756, 2.521);
+
+    expect(effectiveTimes).toEqual(new Map([
+      ["opensensemap-box-a", Date.parse("2026-10-10T13:00:00.000Z")],
+      ["opensensemap-box-b", Date.parse("2026-10-10T14:00:00.000Z")],
+    ]));
   });
 });

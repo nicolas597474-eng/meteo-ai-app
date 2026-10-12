@@ -56,16 +56,34 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function latestValue(sensors: OpenSenseMapSensor[], matcher: RegExp) {
+type MeasurementKind = "temperature" | "pressure" | "wind" | "other";
+
+function toMetric(value: number, unit: string | undefined, kind: MeasurementKind): number {
+  const normalized = (unit ?? "").trim().toLowerCase().replace(/\s/g, "");
+  if (kind === "wind" && ["m/s", "ms-1", "m·s⁻¹"].includes(normalized)) return value * 3.6;
+  if (kind === "wind" && ["mph", "mi/h"].includes(normalized)) return value * 1.609344;
+  if (kind === "wind" && ["kn", "kt", "knots"].includes(normalized)) return value * 1.852;
+  if (kind === "pressure" && normalized === "pa") return value / 100;
+  if (kind === "pressure" && normalized === "kpa") return value * 10;
+  if (kind === "temperature" && ["°f", "fahrenheit"].includes(normalized)) return (value - 32) * 5 / 9;
+  return value;
+}
+
+function latestValue(sensors: OpenSenseMapSensor[], matcher: RegExp, exclude?: RegExp, kind: MeasurementKind = "other") {
   const matches = sensors
     .filter((sensor) => matcher.test(`${sensor.title ?? ""} ${sensor.unit ?? ""}`.toLowerCase()))
-    .map((sensor) => ({
-      value: Number(sensor.lastMeasurement?.value),
-      createdAt: sensor.lastMeasurement?.createdAt ?? null,
-    }))
+    .filter((sensor) => !exclude?.test(`${sensor.title ?? ""} ${sensor.unit ?? ""}`.toLowerCase()))
+    .filter((sensor) => sensor.lastMeasurement?.value != null && String(sensor.lastMeasurement.value).trim() !== "")
+    .map((sensor) => {
+      const rawDate = sensor.lastMeasurement?.createdAt;
+      return {
+        value: toMetric(Number(sensor.lastMeasurement?.value), sensor.unit, kind),
+        createdAt: rawDate && Number.isFinite(Date.parse(rawDate)) ? rawDate : null,
+      };
+    })
     .filter((reading) => Number.isFinite(reading.value));
   if (matches.length === 0) return { value: null, createdAt: null };
-  return matches.sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))[0];
+  return matches.sort((a, b) => (b.createdAt ? Date.parse(b.createdAt) : -Infinity) - (a.createdAt ? Date.parse(a.createdAt) : -Infinity))[0];
 }
 
 export function mapOpenSenseMapBox(
@@ -83,19 +101,19 @@ export function mapOpenSenseMapBox(
   if (distanceKm > radiusKm) return null;
 
   const sensors = box.sensors ?? [];
-  const temperature = latestValue(sensors, /temp(?:eratur|erature)?|°c|celsius/);
+  const temperature = latestValue(sensors, /temp(?:eratur|erature)?|°c|°f|celsius/, undefined, "temperature");
   const humidity = latestValue(sensors, /humidity|humidit|feuchte|relativ/);
-  const pressure = latestValue(sensors, /pressure|press|luftdruck/);
-  const windSpeed = latestValue(sensors, /wind(?: speed|speed|geschwindigkeit)?/);
-  const windGust = latestValue(sensors, /gust|rafale|b[oö]e/);
+  const pressure = latestValue(sensors, /pressure|press|luftdruck/, undefined, "pressure");
+  const windSpeed = latestValue(sensors, /wind(?: speed|speed|geschwindigkeit)?/, /direction|richtung|gust|rafale|b[oö]e/, "wind");
+  const windGust = latestValue(sensors, /gust|rafale|b[oö]e/, undefined, "wind");
   const windDirection = latestValue(sensors, /wind.*(?:direction|richtung)|direction.*wind/);
-  const precipitation = latestValue(sensors, /precip|rain|pluie|niederschlag/);
+  const precipitation = latestValue(sensors, /precip|rain|pluie|niederschlag/, /rate|intensity|intensit|mm\/h|mm\/hr/);
   const dates = [temperature, humidity, pressure, windSpeed, windGust, windDirection, precipitation]
     .map((measurement) => measurement.createdAt)
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => Date.parse(b) - Date.parse(a));
 
-  if (temperature.value == null && windSpeed.value == null && precipitation.value == null) return null;
+  if ([temperature, humidity, pressure, windSpeed, windGust, windDirection, precipitation].every((reading) => reading.value == null)) return null;
   return {
     providerStationId: box._id,
     name: box.name?.trim() || "Capteur openSenseMap",

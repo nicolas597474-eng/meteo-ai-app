@@ -1275,3 +1275,19 @@ export const citizenVariableQualifications = mysqlTable("citizen_variable_qualif
 export type CitizenVariableQualification = typeof citizenVariableQualifications.$inferSelect;
 export type InsertCitizenVariableQualification = typeof citizenVariableQualifications.$inferInsert;
 
+/** Append-only evaluation ledger; current citizen tables remain read projections. */
+export const citizenEvaluationEvents = mysqlTable("citizen_evaluation_events", {
+  id: int("id").autoincrement().primaryKey(),
+  referenceKey: varchar("referenceKey", { length: 64 }).notNull(),
+  kind: mysqlEnum("kind", ["activation", "weight", "anomaly", "variable"]).notNull(),
+  stationId: varchar("stationId", { length: 128 }),
+  variable: varchar("variable", { length: 32 }),
+  evaluatedAt: bigint("evaluatedAt", { mode: "number" }).notNull(),
+  payload: json("payload").$type<Record<string, unknown>>().notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("citizen_evaluation_events_identity").on(table.kind, table.referenceKey, table.payloadHash),
+  index("citizen_evaluation_events_reference_time").on(table.referenceKey, table.evaluatedAt, table.id),
+]);
+export type CitizenEvaluationEvent = typeof citizenEvaluationEvents.$inferSelect;

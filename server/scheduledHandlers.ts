@@ -7,14 +7,24 @@
 import type { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import { sdk } from "./_core/sdk";
+import { getCitizenQualificationEffectiveTimesNearReference } from "./db";
+import { restrictCitizenImpactToProspectiveEvidence } from "./citizenProspectiveEvidence";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { WEATHER_SERVICES, OFFICIAL_HOURLY_MODELS, HONDEGHEM, collectExpertForecasts, collectExpertForecastsWithDiagnostics, collectObservations, collectHourlyForecastAllModelsWithDiagnostics, collectValidationForecasts, collectValidationHourlyForecasts } from "./weatherServices";
 import { buildHourlyModelCollectionCoverage, confirmDailyArchiveCoverage, HOURLY_FORECAST_VARIABLES, type DailyModelCollectionCoverage } from "./forecastVariableCoverage";
 import { isHourlyForecastArchiveComplete, isHourlyForecastRunHealthy } from "./forecastHealth";
-import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour, getParisHourlyTimestamps } from "./weatherTime";
+import { getParisDate, getParisDateDaysAgo, getParisForecastSlot, getParisHour, getParisHourlyTimestamps, getParisMinute } from "./weatherTime";
 import { getActiveParisForecastHours } from "./forecastScheduleConfig";
-import { FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, FORECAST_REFRESH_LOCK_LEASE_MS, getLocationForecastRefreshLockKey } from "./forecastRefreshLock";
+import {
+  FAVORITES_FORECAST_SCHEDULER_LOCK_KEY,
+  FORECAST_REFRESH_LOCK_LEASE_MS,
+  getLocationForecastRefreshLockKey,
+  getObservationScoringLeaseLockKey,
+  getPhysicalSnapshotLeaseLockKey,
+  startForecastLeaseRenewal,
+  type ForecastLeaseRenewal,
+} from "./forecastRefreshLock";
 import { aggregateForecastCondition } from "./weatherConditionAggregation";
 import { isOperationalObservation } from "./observationProvenance";
 import { buildQualifiedDailyObservation } from "./physicalObservationAggregation";
@@ -44,8 +54,10 @@ import {
   HourlyForecastPersistenceError,
   upsertHourlyForecastCollectionResults,
   claimScheduledForecastCollectionJob,
+  claimScheduledObservationCollectionJob,
   acquireForecastRefreshLock,
   releaseForecastRefreshLock,
+  renewForecastRefreshLock,
   insertObservation,
   upsertHourlyCompatibilityReliabilityScores,
   upsertMeteoAIForecast,
@@ -140,6 +152,27 @@ function getTodayParis(): string {
  */
 function getYesterdayParis(): string {
   return getParisDateDaysAgo(1);
+}
+
+/** Créneau admis pour le heartbeat double UTC : 00:30–00:50 heure de Paris. */
+export function isObservationScoringSlot(now = new Date()): boolean {
+  return getParisHour(now) === 0 && getParisMinute(now) >= 30 && getParisMinute(now) <= 50;
+}
+
+export function createScheduledCallbackRequestId(): string {
+  return randomUUID();
+}
+
+/** Les détails peuvent rester dans les journaux privés, jamais dans la réponse cron. */
+export function logScheduledCallbackError(operation: string, requestId: string, error: unknown): void {
+  console.error(`[MeteoAI] ${operation} failed`, {
+    requestId,
+    errorType: error instanceof Error ? error.name : typeof error,
+  });
+}
+
+export function sendScheduledCallbackError(res: Response, requestId: string): void {
+  res.status(500).json({ error: "scheduled-collection-failed", requestId });
 }
 
 const OFFICIAL_HOURLY_COVERAGE_MODELS = OFFICIAL_HOURLY_MODELS.map((model) => model.name);
@@ -256,6 +289,8 @@ export type PhysicalSnapshotCollectionLocationResult = {
   snapshotPreserved?: boolean;
   durationMs?: number;
   reason?: string;
+  traceWriteStatus?: "inserted" | "already-exists" | "updated" | "storage-unavailable";
+  storageError?: "trace_storage_unavailable";
 };
 
 /**
@@ -325,10 +360,35 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
       return;
     }
 
-    let locationResult: PhysicalSnapshotCollectionLocationResult | null = null;
-    let directReadingsAdded = 0;
-    for (let attempt = 0; attempt < HOURLY_SNAPSHOT_MAX_ATTEMPTS; attempt++) {
+    const physicalLeaseLockKey = getPhysicalSnapshotLeaseLockKey(locationKey, date, hour);
+    const physicalLeaseOwnerToken = randomUUID();
+    const physicalLeaseAcquired = await acquireForecastRefreshLock(physicalLeaseLockKey, physicalLeaseOwnerToken);
+    if (!physicalLeaseAcquired) {
+      results.push({
+        locationKey,
+        stationCount: 0,
+        stored: false,
+        attempts: 0,
+        skipped: true,
+        reason: "Collecte du même créneau déjà en cours ; reprise ignorée.",
+        durationMs: Date.now() - locationStartedAt,
+      });
+      return;
+    }
+    const physicalLeaseRenewal = startForecastLeaseRenewal(() =>
+      renewForecastRefreshLock(physicalLeaseLockKey, physicalLeaseOwnerToken),
+    );
+
+    try {
+      let locationResult: PhysicalSnapshotCollectionLocationResult | null = null;
+      let directReadingsAdded = 0;
+      for (let attempt = 0; attempt < HOURLY_SNAPSHOT_MAX_ATTEMPTS; attempt++) {
       try {
+        physicalLeaseRenewal.assertHeld();
+        // Une relance longue prolonge le lease avant un nouvel appel fournisseur.
+        if (attempt > 0 && !await renewForecastRefreshLock(physicalLeaseLockKey, physicalLeaseOwnerToken)) {
+          throw new Error("Lease de collecte physique perdu pendant la relance.");
+        }
         const discovered = await collectNearbyStations(
           favorite.lat,
           favorite.lon,
@@ -336,6 +396,9 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           favorite.customName ?? favorite.name,
           { netatmoUserId: favorite.userId },
         );
+        // Le fournisseur peut dépasser la période de renouvellement : aucun
+        // relevé ni snapshot ne doit être écrit après une perte de lease.
+        physicalLeaseRenewal.assertHeld();
         const physical = getPhysicalActiveStations(discovered);
         const synthesis = calculateGroundTruth(physical);
         const measurementTimesByStationId = new Map(
@@ -475,6 +538,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           break;
         }
 
+        physicalLeaseRenewal.assertHeld();
         const snapshot = {
           locationKey,
           date,
@@ -537,6 +601,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         break;
       } catch (error: any) {
         const message = error instanceof Error ? error.message : "Erreur de collecte inconnue";
+        if (message.startsWith("Lease de collecte perdu")) throw error;
         if (shouldRetryHourlyFavorite(attempt)) {
           console.warn(`[MeteoAI] Physical snapshot collection failed for ${favorite.customName ?? favorite.name}; retrying (${attempt + 2}/${HOURLY_SNAPSHOT_MAX_ATTEMPTS}):`, message);
           await new Promise<void>((resolve) => setTimeout(resolve, HOURLY_SNAPSHOT_RETRY_DELAY_MS));
@@ -546,9 +611,9 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, directReadingsAdded, reason: `Erreur de collecte après relance : ${message}` };
         results.push(locationResult);
       }
-    }
+      }
 
-    if (locationResult) {
+      if (locationResult) {
       locationResult.durationMs = Date.now() - locationStartedAt;
       const status: "stored" | "failed" | "no_station" = locationResult.stored
         ? "stored"
@@ -566,22 +631,41 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         stationCount: locationResult.stationCount,
         reason: locationResult.reason ?? null,
       };
-      if (!traceForHour) {
-        await insertPhysicalSnapshotCollectionTraceIfMissing(trace);
-      } else if (status === "stored" && traceForHour.status !== "stored") {
-        await upsertPhysicalSnapshotCollectionTrace({
-          ...trace,
-          reason: trigger === "recovery"
-            ? "Snapshot archivé par la reprise automatique après un passage principal sans preuve réussie."
-            : "Snapshot archivé par une nouvelle exécution planifiée après une trace initiale sans preuve réussie.",
-        });
-      } else {
-        console.info(`[MeteoAI] Physical trace preserved for ${locationKey} at ${date} ${hour}h (${traceForHour.status}).`);
+        try {
+          if (!traceForHour) {
+            const traceInserted = await insertPhysicalSnapshotCollectionTraceIfMissing(trace);
+            locationResult.traceWriteStatus = traceInserted ? "inserted" : "already-exists";
+          } else if (status === "stored" && traceForHour.status !== "stored") {
+            await upsertPhysicalSnapshotCollectionTrace({
+              ...trace,
+              reason: trigger === "recovery"
+                ? "Snapshot archivé par la reprise automatique après un passage principal sans preuve réussie."
+                : "Snapshot archivé par une nouvelle exécution planifiée après une trace initiale sans preuve réussie.",
+            });
+            locationResult.traceWriteStatus = "updated";
+          } else {
+            locationResult.traceWriteStatus = "already-exists";
+            console.info(`[MeteoAI] Physical trace preserved for ${locationKey} at ${date} ${hour}h (${traceForHour.status}).`);
+          }
+        } catch (traceError) {
+          locationResult.traceWriteStatus = "storage-unavailable";
+          locationResult.storageError = "trace_storage_unavailable";
+          console.error(`[MeteoAI] Physical trace persistence failed for ${locationKey}`, {
+            errorType: traceError instanceof Error ? traceError.name : typeof traceError,
+          });
+        }
+      }
+    } finally {
+      physicalLeaseRenewal.stop();
+      try {
+        await releaseForecastRefreshLock(physicalLeaseLockKey, physicalLeaseOwnerToken);
+      } catch (releaseError) {
+        console.warn(`[MeteoAI] Could not release physical snapshot lease for ${locationKey}:`, releaseError);
       }
     }
   });
 
-  const collectionErrors = results.filter((result) => result.reason?.startsWith("Erreur de collecte"));
+  const collectionErrors = results.filter((result) => result.reason?.startsWith("Erreur de collecte") || result.storageError === "trace_storage_unavailable");
   const collectedResults = results.filter((result) => !result.skipped);
   const allLocationsFailed = collectedResults.length > 0 && collectionErrors.length === collectedResults.length;
   if (trigger === "scheduled" && collectionErrors.length > 0) {
@@ -709,7 +793,10 @@ export async function evaluateOpenSenseMapQualifications(nowMs = Date.now()): Pr
 
   const { verdicts } = deriveOpenSenseMapVerdicts({ candidates, officialStations, observations, asOf: nowMs });
   if (verdicts.length > 0) {
-    await applyOpenSenseMapQualificationVerdicts(verdicts);
+    await applyOpenSenseMapQualificationVerdicts(
+      verdicts,
+      new Map(candidates.map((candidate) => [candidate.stationId, { refLat: candidate.refLat, refLon: candidate.refLon }] as const)),
+    );
   }
   return { evaluatedCandidates: candidates.length, verdicts };
 }
@@ -796,7 +883,7 @@ export async function evaluateCitizenFusionActivations(nowMs = Date.now()): Prom
         physicalStations: physicalStations.map(toImpactStationRow),
         validatedCitizens: validatedCitizens.map(toImpactStationRow),
         officialStations: officialStations.map(toImpactStationRow),
-        observations: observationRows,
+        observations: restrictCitizenImpactToProspectiveEvidence(observationRows, validatedCitizens.map(station => station.stationId), await getCitizenQualificationEffectiveTimesNearReference(reference.lat, reference.lon)),
         asOf: nowMs,
       });
       const decision = deriveCitizenFusionActivationDecision(report, nowMs);
@@ -1157,11 +1244,13 @@ export async function processWithConcurrency<T>(
  * Triggered daily at 07h30 Paris time
  */
 export async function collectForecastsHandler(req: Request, res: Response) {
+  let requestId = "";
   try {
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) {
       return res.status(403).json({ error: "cron-only" });
     }
+    requestId = createScheduledCallbackRequestId();
 
     const today = getTodayParis();
     console.log(`[MeteoAI] Starting forecast collection for ${today}`);
@@ -1299,13 +1388,9 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       throw err;
     }
   } catch (error: any) {
-    console.error("[MeteoAI] Forecast collection error:", error);
-    res.status(500).json({
-      error: error.message,
-      stack: error.stack,
-      context: { url: req.url, taskUid: (error as any).taskUid },
-      timestamp: new Date().toISOString(),
-    });
+    requestId ||= createScheduledCallbackRequestId();
+    logScheduledCallbackError("Forecast collection", requestId, error);
+    sendScheduledCallbackError(res, requestId);
   }
 }
 
@@ -1315,21 +1400,41 @@ export async function collectForecastsHandler(req: Request, res: Response) {
  * Collects real observations for yesterday per location, then computes per-model scores
  */
 export async function collectObservationsHandler(req: Request, res: Response) {
+  let observationLeaseOwnerToken: string | null = null;
+  let observationLeaseLockKey: string | null = null;
+  let observationLeaseRenewal: ForecastLeaseRenewal | null = null;
+  let requestId = "";
   try {
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) {
       return res.status(403).json({ error: "cron-only" });
     }
 
+    requestId = createScheduledCallbackRequestId();
+    const now = new Date();
+    if (!isObservationScoringSlot(now)) {
+      return res.json({ ok: true, skipped: "outside-observation-scoring-slot", requestId });
+    }
+
     // Collect observations for yesterday (full day data available at 00h30)
-    const yesterday = getYesterdayParis();
+    const yesterday = getParisDateDaysAgo(1, now);
     console.log(`[MeteoAI] Starting per-location observation collection for ${yesterday}`);
 
-    const jobId = await createCollectionJob({
-      jobType: "observation",
-      status: "running",
-      scheduleCronTaskUid: user.taskUid,
-    });
+    observationLeaseLockKey = getObservationScoringLeaseLockKey(yesterday);
+    observationLeaseOwnerToken = randomUUID();
+    const leaseAcquired = await acquireForecastRefreshLock(observationLeaseLockKey, observationLeaseOwnerToken, now);
+    if (!leaseAcquired) {
+      return res.json({ ok: true, skipped: "collection-in-progress", date: yesterday, requestId });
+    }
+    observationLeaseRenewal = startForecastLeaseRenewal(() =>
+      renewForecastRefreshLock(observationLeaseLockKey!, observationLeaseOwnerToken!),
+    );
+
+    const jobClaim = await claimScheduledObservationCollectionJob(yesterday, user.taskUid, now);
+    if (!jobClaim.claimed) {
+      return res.json({ ok: true, skipped: jobClaim.reason, date: yesterday, requestId });
+    }
+    const jobId = jobClaim.jobId;
 
     try {
       // Get all favorite locations across all users
@@ -1518,7 +1623,8 @@ export async function collectObservationsHandler(req: Request, res: Response) {
         date: yesterday,
         locationsProcessed: uniqueLocations.length,
         totalScores,
-        errors: errors.length > 0 ? errors : undefined,
+        warningCount: errors.length,
+        requestId,
       });
     } catch (err: any) {
       await updateCollectionJob(jobId, {
@@ -1529,13 +1635,18 @@ export async function collectObservationsHandler(req: Request, res: Response) {
       throw err;
     }
   } catch (error: any) {
-    console.error("[MeteoAI] Observation collection error:", error);
-    res.status(500).json({
-      error: error.message,
-      stack: error.stack,
-      context: { url: req.url },
-      timestamp: new Date().toISOString(),
-    });
+    requestId ||= createScheduledCallbackRequestId();
+    logScheduledCallbackError("Observation collection", requestId, error);
+    sendScheduledCallbackError(res, requestId);
+  } finally {
+    observationLeaseRenewal?.stop();
+    if (observationLeaseOwnerToken && observationLeaseLockKey) {
+      try {
+        await releaseForecastRefreshLock(observationLeaseLockKey, observationLeaseOwnerToken);
+      } catch (releaseError) {
+        console.warn("[MeteoAI] Could not release observation scoring lease:", releaseError);
+      }
+    }
   }
 }
 
@@ -1555,6 +1666,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
   let jobId = -1;
   let hourlyBatchAttemptId = "";
   let scheduledLockOwnerToken: string | null = null;
+  let scheduledLeaseRenewal: ForecastLeaseRenewal | null = null;
+  let requestId = "";
   let today = "";
   let locationsProcessed = 0;
   let dailyModelsCollected = 0;
@@ -1566,6 +1679,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     if (!user.isCron || !user.taskUid) {
       return res.status(403).json({ error: "cron-only" });
     }
+    requestId = createScheduledCallbackRequestId();
     const activeHours = getActiveParisForecastHours();
     const slot = getParisForecastSlot(new Date(), activeHours);
     if (!slot) {
@@ -1583,6 +1697,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       return res.json({ ok: true, skipped: "collection-in-progress", slot: slot.key });
     }
     scheduledLockOwnerToken = lockOwnerToken;
+    scheduledLeaseRenewal = startForecastLeaseRenewal(() =>
+      renewForecastRefreshLock(FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, lockOwnerToken),
+    );
 
     const jobClaim = await claimScheduledForecastCollectionJob(slot.key, user.taskUid);
     if (!jobClaim.claimed) {
@@ -1634,6 +1751,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         errors.push(`${fav.name}: une collecte manuelle ou planifiée est déjà en cours pour ce lieu.`);
         return;
       }
+      const locationLeaseRenewal = startForecastLeaseRenewal(() =>
+        renewForecastRefreshLock(locationLockKey, locationLockOwnerToken),
+      );
       try {
        try {
         console.log(`[MeteoAI] Collecting forecasts for ${fav.name} (${fav.lat}, ${fav.lon})`);
@@ -2251,6 +2371,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         errors.push(`${fav.name}: ${err.message}`);
       }
       } finally {
+        locationLeaseRenewal.stop();
         try {
           await releaseForecastRefreshLock(locationLockKey, locationLockOwnerToken);
         } catch (error) {
@@ -2277,7 +2398,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       dailyModelCoverage: { collected: dailyModelsCollected, expected: dailyModelsExpected },
       hourlyModelCoverage: { collected: hourlyModelsCollected, expected: hourlyModelsExpected },
       coverageByLocation,
-      errors: errors.length > 0 ? errors : undefined,
+      errorCount: errors.length,
+      requestId,
     });
   } catch (error: any) {
     if (jobId > 0) {
@@ -2295,14 +2417,11 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         console.error("[MeteoAI] Could not persist failed collection status:", updateError);
       }
     }
-    console.error("[MeteoAI] Favorites forecast collection error:", error);
-    res.status(500).json({
-      error: error.message,
-      stack: error.stack,
-      context: { url: req.url },
-      timestamp: new Date().toISOString(),
-    });
+    requestId ||= createScheduledCallbackRequestId();
+    logScheduledCallbackError("Favorites forecast collection", requestId, error);
+    sendScheduledCallbackError(res, requestId);
   } finally {
+    scheduledLeaseRenewal?.stop();
     if (scheduledLockOwnerToken) {
       try {
         await releaseForecastRefreshLock(FAVORITES_FORECAST_SCHEDULER_LOCK_KEY, scheduledLockOwnerToken);
@@ -2318,14 +2437,17 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
  * are excluded before the location synthesis is persisted.
  */
 export async function collectPhysicalObservationSnapshotsHandler(req: Request, res: Response) {
+  let requestId = "";
   try {
     const user = await sdk.authenticateRequest(req);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+    requestId = createScheduledCallbackRequestId();
     const favorites = withDefaultCollectionLocation(await getAllFavoriteLocations());
     const trigger: PhysicalSnapshotCollectionTrigger = req.body?.snapshotMode === "recovery" ? "recovery" : "scheduled";
-    res.json(await collectPhysicalObservationSnapshotsForFavorites(favorites, trigger));
+    res.json({ ...(await collectPhysicalObservationSnapshotsForFavorites(favorites, trigger)), requestId });
   } catch (error: any) {
-    console.error("[MeteoAI] Physical snapshot collection error:", error);
-    res.status(500).json({ error: error.message, stack: error.stack, context: { url: req.url }, timestamp: new Date().toISOString() });
+    requestId ||= createScheduledCallbackRequestId();
+    logScheduledCallbackError("Physical snapshot collection", requestId, error);
+    sendScheduledCallbackError(res, requestId);
   }
 }

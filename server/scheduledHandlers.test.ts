@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildStationCollectionSnapshot, getForecastCollectionJobStatus, getModelCoverage, processWithConcurrency } from "./scheduledHandlers";
+import { buildStationCollectionSnapshot, getForecastCollectionJobStatus, getModelCoverage, isObservationScoringSlot, processWithConcurrency } from "./scheduledHandlers";
 import { requireDatabaseForWrite } from "./db";
 import { OFFICIAL_HOURLY_MODELS, VALIDATION_WEATHER_MODELS } from "./weatherServices";
 
@@ -155,6 +155,17 @@ describe("cadence automatique des prévisions", () => {
 
     expect(physicalCollector).toContain("await processWithConcurrency(Array.from(unique.values()), 2");
     expect(physicalCollector).toContain("async (favorite) =>");
+  });
+});
+
+describe("créneau de scoring des observations", () => {
+  it("accepte 00:30 Paris avec les deux offsets UTC, sans confondre le créneau suivant", () => {
+    // CEST: 22:30Z la veille; CET: 23:30Z la veille. Les deux arrivent dans
+    // le même créneau civil Paris et seront ensuite dédupliqués par date.
+    expect(isObservationScoringSlot(new Date("2026-06-14T22:30:00.000Z"))).toBe(true);
+    expect(isObservationScoringSlot(new Date("2026-01-14T23:30:00.000Z"))).toBe(true);
+    expect(isObservationScoringSlot(new Date("2026-06-14T22:50:00.000Z"))).toBe(true);
+    expect(isObservationScoringSlot(new Date("2026-06-14T22:51:00.000Z"))).toBe(false);
   });
 });
 

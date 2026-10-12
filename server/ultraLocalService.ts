@@ -433,6 +433,11 @@ export function calculateUltraLocal(
       });
       bandStations.forEach((entry, index) => {
         const core = coreWeights[index];
+        // Un zéro du noyau signifie une exclusion explicite (p. ex. tous les
+        // multiplicateurs de performance ou pénalités). Ne pas conserver une
+        // pseudo-contribution à poids nul dans les fieldWeights ni la compter
+        // comme station utilisée : aucune masse ne doit être redistribuée.
+        if (core.finalWeight <= 0) return;
         result.set(entry.station.stationId, {
           station: entry.station,
           weight: core.finalWeight * bandInfo.effectiveWeight,

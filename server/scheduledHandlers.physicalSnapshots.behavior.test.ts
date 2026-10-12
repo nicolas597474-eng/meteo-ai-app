@@ -22,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   getValidatedOfficialStationsNearReference: vi.fn(),
   getStationObservationsForQualification: vi.fn(),
   applyOpenSenseMapQualificationVerdicts: vi.fn(),
+  acquireForecastRefreshLock: vi.fn(),
+  renewForecastRefreshLock: vi.fn(),
+  releaseForecastRefreshLock: vi.fn(),
   notifyOwner: vi.fn(),
 }));
 
@@ -56,11 +59,18 @@ vi.mock("./db", async (importOriginal) => ({
   getValidatedOfficialStationsNearReference: mocks.getValidatedOfficialStationsNearReference,
   getStationObservationsForQualification: mocks.getStationObservationsForQualification,
   applyOpenSenseMapQualificationVerdicts: mocks.applyOpenSenseMapQualificationVerdicts,
+  acquireForecastRefreshLock: mocks.acquireForecastRefreshLock,
+  renewForecastRefreshLock: mocks.renewForecastRefreshLock,
+  releaseForecastRefreshLock: mocks.releaseForecastRefreshLock,
 }));
 
 vi.mock("./_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));
 
-import { collectPhysicalObservationSnapshotsForFavorites } from "./scheduledHandlers";
+import {
+  collectPhysicalObservationSnapshotsForFavorites,
+  HOURLY_SNAPSHOT_MAX_ATTEMPTS,
+  HOURLY_SNAPSHOT_RETRY_DELAY_MS,
+} from "./scheduledHandlers";
 
 const emptySynthesis = {
   stationCount: 0,
@@ -97,7 +107,7 @@ const favorite = (lat: number, lon: number) => ({
 });
 
 async function settleWithRetries<T>(pending: Promise<T>): Promise<T> {
-  await vi.runAllTimersAsync();
+  await vi.advanceTimersByTimeAsync(HOURLY_SNAPSHOT_RETRY_DELAY_MS * HOURLY_SNAPSHOT_MAX_ATTEMPTS);
   return pending;
 }
 
@@ -126,6 +136,9 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     mocks.getValidatedOfficialStationsNearReference.mockResolvedValue([]);
     mocks.getStationObservationsForQualification.mockResolvedValue([]);
     mocks.applyOpenSenseMapQualificationVerdicts.mockResolvedValue(undefined);
+    mocks.acquireForecastRefreshLock.mockResolvedValue(true);
+    mocks.renewForecastRefreshLock.mockResolvedValue(true);
+    mocks.releaseForecastRefreshLock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -148,6 +161,9 @@ describe("comportement des cinq tentatives de snapshots physiques", () => {
     expect(result.status).toBe("completed");
     expect(result.locations).toEqual([expect.objectContaining({ stored: true, attempts: 5, stationCount: 2 })]);
     expect(mocks.insertPhysicalSnapshotCollectionTraceIfMissing).toHaveBeenCalledWith(expect.objectContaining({ status: "stored", attempts: 5 }));
+    expect(mocks.acquireForecastRefreshLock).toHaveBeenCalledWith("physical-snapshot:50.756_2.521:2026-08-27:16", expect.any(String));
+    expect(mocks.renewForecastRefreshLock).toHaveBeenCalledTimes(4);
+    expect(mocks.releaseForecastRefreshLock).toHaveBeenCalledWith("physical-snapshot:50.756_2.521:2026-08-27:16", expect.any(String));
   });
 
   it("s’arrête dès le premier succès sans consommer de relance inutile", async () => {
@@ -518,6 +534,9 @@ describe("application des verdicts de qualification openSenseMap", () => {
     mocks.getValidatedOfficialStationsNearReference.mockResolvedValue([]);
     mocks.getStationObservationsForQualification.mockResolvedValue([]);
     mocks.applyOpenSenseMapQualificationVerdicts.mockResolvedValue(undefined);
+    mocks.acquireForecastRefreshLock.mockResolvedValue(true);
+    mocks.renewForecastRefreshLock.mockResolvedValue(true);
+    mocks.releaseForecastRefreshLock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -584,12 +603,15 @@ describe("application des verdicts de qualification openSenseMap", () => {
 
     await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
 
-    expect(mocks.applyOpenSenseMapQualificationVerdicts).toHaveBeenCalledWith([expect.objectContaining({
-      stationId: "opensensemap-box-citoyen",
-      qualificationStatus: "validated",
-      isActive: 1,
-      exclusionReason: null,
-    })]);
+    expect(mocks.applyOpenSenseMapQualificationVerdicts).toHaveBeenCalledWith(
+      [expect.objectContaining({
+        stationId: "opensensemap-box-citoyen",
+        qualificationStatus: "validated",
+        isActive: 1,
+        exclusionReason: null,
+      })],
+      new Map([["opensensemap-box-citoyen", { refLat: 50.756, refLon: 2.521 }]]),
+    );
   });
 
   it("applique la même qualification à une station CWOP candidate dont l'historique suffit", async () => {
@@ -613,12 +635,15 @@ describe("application des verdicts de qualification openSenseMap", () => {
 
     await collectPhysicalObservationSnapshotsForFavorites([favorite(50.756, 2.521)] as any, "scheduled");
 
-    expect(mocks.applyOpenSenseMapQualificationVerdicts).toHaveBeenCalledWith([expect.objectContaining({
-      stationId: "cwop-EW1234",
-      qualificationStatus: "validated",
-      isActive: 1,
-      exclusionReason: null,
-    })]);
+    expect(mocks.applyOpenSenseMapQualificationVerdicts).toHaveBeenCalledWith(
+      [expect.objectContaining({
+        stationId: "cwop-EW1234",
+        qualificationStatus: "validated",
+        isActive: 1,
+        exclusionReason: null,
+      })],
+      new Map([["cwop-EW1234", { refLat: 50.756, refLon: 2.521 }]]),
+    );
   });
 
   it("n'écrit aucun verdict tant que l'historique archivé du capteur reste insuffisant", async () => {

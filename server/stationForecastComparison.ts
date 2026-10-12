@@ -1,4 +1,5 @@
 import type { HourlyPoint } from "./weatherServices";
+import type { StationMeasurementTimes } from "./stationMeasurementFreshness";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -30,6 +31,28 @@ function toEpoch(value: number | Date | string): number | null {
 function average(values: Array<number | null>): number | null {
   const finite = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   return finite.length ? Math.round((finite.reduce((sum, value) => sum + value, 0) / finite.length) * 10) / 10 : null;
+}
+
+/** No archive-time substitution; a rain accumulation needs an attested one-hour period. */
+export function qualifyStationForecastReadings(
+  readings: readonly (StationForecastReading & { measurementTimes?: StationMeasurementTimes | null; precipitationPeriodHours?: number | null })[],
+  now = Date.now(),
+): StationForecastReading[] {
+  return readings.flatMap(reading => {
+    const archivedAt = toEpoch(reading.observedAt);
+    const groups = new Map<number, StationForecastReading>();
+    for (const field of ["temperature", "windSpeed", "precipitation"] as const) {
+      if (field === "precipitation" && reading.precipitationPeriodHours !== 1) continue;
+      const raw = reading.measurementTimes?.[field];
+      const at = typeof raw === "string" ? Date.parse(raw) : NaN;
+      if (!Number.isFinite(at) || archivedAt == null || at > archivedAt || at > now || reading[field] == null || !Number.isFinite(reading[field])) continue;
+      const key = Math.floor(at / HOUR_MS) * HOUR_MS;
+      const point = groups.get(key) ?? { observedAt: at, temperature: null, windSpeed: null, precipitation: null };
+      point[field] = reading[field];
+      groups.set(key, point);
+    }
+    return Array.from(groups.values());
+  });
 }
 
 function getLocalHour(hour: string): number | null {

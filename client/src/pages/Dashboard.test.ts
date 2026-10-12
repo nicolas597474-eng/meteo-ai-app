@@ -248,8 +248,11 @@ describe("Dashboard avec état courant sourcé par variable", () => {
     expect(source).toContain('import("@/components/EnvironmentalPanels")');
     expect(source).toContain('rootMargin: "800px 0px"');
     expect(source).toContain('typeof IntersectionObserver === "undefined"');
-    expect(source).toContain("<EnvironmentalPanels {...props} />");
-    expect(source).toContain("<DeferredEnvironmentalPanels data={environmentalData} isLoading={environmentalFetching} />");
+    const deferred = source.slice(source.indexOf("function DeferredEnvironmentalPanels"), source.indexOf("function DeferredEnvironmentalPanels") + 2000);
+    expect(deferred).toContain("getEnvironmentalSnapshot.useQuery");
+    expect(deferred).toContain("enabled: shouldLoad");
+    expect(deferred).toContain("<EnvironmentalPanels");
+    expect(source).toContain("<DeferredEnvironmentalPanels coords={coordsInput} />");
     expect(source).not.toContain('import { EnvironmentalPanels } from "@/components/EnvironmentalPanels"');
   });
 

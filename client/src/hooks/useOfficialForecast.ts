@@ -14,6 +14,7 @@ export function useOfficialForecast(
     [location?.lat, location?.lon, includeExtendedPeriods],
   );
   const query = trpc.weather.getDetailedForecast.useQuery(queryInput, {
+    trpc: { abortOnUnmount: true },
     staleTime: 60 * 1000,
     refetchInterval: OFFICIAL_FORECAST_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: false,

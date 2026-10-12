@@ -435,6 +435,13 @@
       "when": 1791855600000,
       "tag": "0061_citizen_variable_qualifications",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "5",
+      "when": 1791791508304,
+      "tag": "0062_citizen_evaluation_events",
+      "breakpoints": true
     }
   ]
 }

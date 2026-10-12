@@ -46,6 +46,22 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   });
   const [isLocating, setIsLocating] = useState(false);
 
+  // Dashboard used to own a second `meteoai_last_location` copy. Promote it
+  // once to the shared context, then remove it so radius changes cannot drift
+  // between Dashboard and Stations.
+  useEffect(() => {
+    try {
+      if (activeLocation) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(activeLocation));
+      }
+      localStorage.removeItem(LEGACY_DASHBOARD_LOCATION_KEY);
+    } catch {
+      // Storage can be unavailable in private browsing.
+    }
+    // This is a one-time migration, not a mirror of each location update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const setActiveLocation = useCallback((loc: ActiveLocation | null) => {
     setActiveLocationState(loc);
     try {

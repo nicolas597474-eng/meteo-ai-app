@@ -17,6 +17,11 @@ interface RateLimitEntry {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
+/** Static chunks can number in hundreds in Vite; they must not exhaust API quotas. */
+export function isRateLimitedApiPath(path: string): boolean {
+  return (path === "/api" || path.startsWith("/api/")) && path !== "/api/health";
+}
+
 /**
  * Rate limiting middleware for Express
  * Limits requests per IP address
@@ -246,18 +251,17 @@ export function hashString(input: string): string {
 // CORS SECURITY
 // =============================================================================
 
-const allowedOrigins = [
-  'https://meteoai-7i8fkmsr.manus.space',
-  'https://*.manus.space',
-  'https://*.manus.computer',
-  'https://*.manus-asia.computer',
-  'https://*.manusvm.computer',
-  'https://*.manuscomputer.ai',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:5173',
-];
+export function isAllowedCorsOrigin(origin: string, production = ENV.isProduction): boolean {
+  let url: URL;
+  try { url = new URL(origin); } catch { return false; }
+  if (url.origin !== origin || url.username || url.password) return false;
+  const exact = ['https://meteoai-7i8fkmsr.manus.space',
+    ...(process.env.CORS_ALLOWED_ORIGINS ?? '').split(',').map(value => value.trim()).filter(Boolean)];
+  if (exact.includes(origin)) return true;
+  if (production) return false;
+  if (['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'].includes(origin)) return true;
+  return url.protocol === 'https:' && /^[^.]+\.(?:manus\.space|manus\.computer|manus-asia\.computer|manusvm\.computer|manuscomputer\.ai)$/.test(url.hostname);
+}
 
 /**
  * CORS middleware with strict origin validation
@@ -265,14 +269,8 @@ const allowedOrigins = [
 export function corsMiddleware(req: Request, res: Response, next: NextFunction) {
   const origin = req.headers.origin;
   
-  if (origin && allowedOrigins.some(allowed => {
-    if (allowed.includes('*')) {
-      const domain = allowed.replace('*', '[^.]+');
-      const regex = new RegExp(`^https?://${domain}$`);
-      return regex.test(origin);
-    }
-    return origin === allowed;
-  })) {
+  if (origin && isAllowedCorsOrigin(origin)) {
+    res.vary('Origin');
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

@@ -31,6 +31,33 @@
 import type { CitizenFusionImpactReport, CitizenFusionImpactStatus } from "./citizenFusionImpactService";
 import type { StationData } from "./stationService";
 
+/** Les seules grandeurs citoyennes couvertes par les profils additifs persistés. */
+export const CITIZEN_VARIABLE_ADMISSION_FIELDS = ["humidity", "pressure", "windSpeed"] as const;
+export type CitizenVariableAdmissionField = (typeof CITIZEN_VARIABLE_ADMISSION_FIELDS)[number];
+
+/** Ligne minimale compatible avec citizen_variable_qualifications, fournie par le routeur. */
+export type PersistedCitizenVariableVerdict = {
+  stationId: string;
+  variable: CitizenVariableAdmissionField | string;
+  status: string | null;
+};
+
+export type CitizenVariableAdmissionExclusion = {
+  stationId: string;
+  variable: CitizenVariableAdmissionField;
+  status: string | null;
+  reason: "qualification_missing" | "qualification_candidate" | "qualification_excluded" | "qualification_not_validated";
+};
+
+export type CitizenVariableAdmissionResult = {
+  /** Copies filtrées, à transmettre directement à calculateUltraLocal. */
+  stations: StationData[];
+  /** Trace déterministe des valeurs citoyennes neutralisées, pour la provenance route/UI. */
+  exclusions: CitizenVariableAdmissionExclusion[];
+};
+
+const CITIZEN_FUSION_SOURCES = new Set<StationData["source"]>(["opensensemap", "cwop"]);
+
 /** Version du jeu de règles de la décision d'activation. */
 export const CITIZEN_FUSION_ACTIVATION_VERSION = "citizen-fusion-activation-v1" as const;
 
@@ -103,6 +130,63 @@ export function deriveCitizenFusionActivationDecision(
     lastComparedAt: report.lastComparedAt,
     evaluatedAt,
   };
+}
+
+function admissionExclusionReason(status: string | null | undefined): CitizenVariableAdmissionExclusion["reason"] {
+  if (status == null) return "qualification_missing";
+  if (status === "candidate") return "qualification_candidate";
+  if (status === "excluded") return "qualification_excluded";
+  return "qualification_not_validated";
+}
+
+/**
+ * Applique les profils de qualification additifs avant toute fusion par champ.
+ *
+ * La température reste gouvernée par `composeLocalSynthesisSources` et sa
+ * décision d'activation dédiée. Ici, pour un capteur citoyen déjà composé,
+ * humidité, pression et vitesse du vent ne sont admises que si leur dernier
+ * verdict fourni est exactement `validated`. Une qualification `candidate`,
+ * `excluded`, absente ou inconnue neutralise la valeur (`null`) : Ultra-local
+ * ne la verra donc pas et ne redistribuera jamais son poids vers cette mesure.
+ * Les stations physiques et les autres champs demeurent inchangés.
+ *
+ * Le routeur doit fournir une ligne par `{ stationId, variable }`, idéalement
+ * déjà réduite au verdict le plus récent pour sa référence. En cas de doublon,
+ * le premier verdict fourni fait foi : l'appelant contrôle ainsi explicitement
+ * son ordre/provenance de persistance.
+ */
+export function applyCitizenVariableQualificationAdmission(input: {
+  stations: readonly StationData[];
+  variableVerdicts: readonly PersistedCitizenVariableVerdict[];
+}): CitizenVariableAdmissionResult {
+  const statusByStationAndVariable = new Map<string, string | null>();
+  for (const verdict of input.variableVerdicts) {
+    if (!CITIZEN_VARIABLE_ADMISSION_FIELDS.includes(verdict.variable as CitizenVariableAdmissionField)) continue;
+    const key = `${verdict.stationId}\u001f${verdict.variable}`;
+    if (!statusByStationAndVariable.has(key)) statusByStationAndVariable.set(key, verdict.status);
+  }
+
+  const exclusions: CitizenVariableAdmissionExclusion[] = [];
+  const stations = input.stations.map((station) => {
+    if (!CITIZEN_FUSION_SOURCES.has(station.source)) return station;
+    const filtered = { ...station };
+    for (const variable of CITIZEN_VARIABLE_ADMISSION_FIELDS) {
+      const status = statusByStationAndVariable.get(`${station.stationId}\u001f${variable}`);
+      if (status === "validated") continue;
+      // Preserve a truly absent raw value as absent, but do not report an
+      // exclusion that could not otherwise have contributed to the fusion.
+      if (filtered[variable] == null) continue;
+      filtered[variable] = null;
+      exclusions.push({
+        stationId: station.stationId,
+        variable,
+        status: status ?? null,
+        reason: admissionExclusionReason(status),
+      });
+    }
+    return filtered;
+  });
+  return { stations, exclusions };
 }
 
 /**

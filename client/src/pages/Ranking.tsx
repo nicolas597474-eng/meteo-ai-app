@@ -25,6 +25,10 @@ type ComparisonPoint = {
 
 type SourceSelection = { kind: "station" | "model"; source: any };
 
+// Contract exposed by station snapshot observability. Forecast scheduling is a
+// separate flow and must not be presented as the physical-stations cadence.
+const STATION_SNAPSHOT_CADENCE_LABEL = "Chaque heure à :20 UTC";
+
 function formatAge(minutes: number | null) {
   if (minutes === null) return "Aucun relevé";
   if (minutes < 2) return "À l’instant";
@@ -191,14 +195,28 @@ export default function Ranking() {
   const { activeLocation, setActiveLocation } = useLocation();
   const { style: pageSkyStyle } = usePageWeatherSky();
   const [periodDays, setPeriodDays] = useState<1 | 7>(1);
-  const [radiusKm, setRadiusKm] = useState(activeLocation?.radiusKm ?? 20);
+  const radiusKm = activeLocation?.radiusKm ?? 20;
   const [selectedSource, setSelectedSource] = useState<SourceSelection | null>(null);
   const [physicalCollectionMessage, setPhysicalCollectionMessage] = useState<{ tone: "success" | "warning" | "danger" | "info"; text: string } | null>(null);
   const coords = activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : undefined;
   const utils = trpc.useUtils();
   const overviewInput = useMemo(() => ({ ...(coords ?? {}), periodDays, radiusKm }), [coords?.lat, coords?.lon, periodDays, radiusKm]);
-  const { data, isLoading } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput);
-  const { data: liveStationData, isLoading: liveStationsLoading } = trpc.weather.searchStations.useQuery(
+  const {
+    data,
+    error: overviewError,
+    isError: isOverviewError,
+    isFetching: isOverviewFetching,
+    isLoading,
+    refetch: refetchOverview,
+  } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput);
+  const {
+    data: liveStationData,
+    error: liveStationsError,
+    isError: isLiveStationsError,
+    isFetching: isLiveStationsFetching,
+    isLoading: liveStationsLoading,
+    refetch: refetchLiveStations,
+  } = trpc.weather.searchStations.useQuery(
     { ...(coords ?? { lat: 50.7567, lon: 2.5204 }), radiusKm },
     { staleTime: 5 * 60 * 1000 },
   );
@@ -247,15 +265,12 @@ export default function Ranking() {
     },
   });
 
-  useEffect(() => {
-    setRadiusKm(activeLocation?.radiusKm ?? 20);
-  }, [activeLocation?.favoriteId, activeLocation?.lat, activeLocation?.lon, activeLocation?.radiusKm]);
-
   const changeRadius = (nextRadius: number) => {
-    setRadiusKm(nextRadius);
+    // LocationContext is the shared source of truth, even for a temporary or
+    // unsaved location. Dashboard therefore sees this radius immediately.
+    if (activeLocation) setActiveLocation({ ...activeLocation, radiusKm: nextRadius });
     if (activeLocation?.favoriteId) {
       updateFavorite.mutate({ id: activeLocation.favoriteId, radiusKm: nextRadius });
-      setActiveLocation({ ...activeLocation, radiusKm: nextRadius });
     }
   };
 
@@ -300,15 +315,28 @@ export default function Ranking() {
             <h1 className="mt-2 text-xl font-bold text-white">Stations & fiabilité locale</h1>
             <p className="mt-1 text-xs text-slate-500">Relevés physiques et comparaison avec la prévision officielle.</p>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-700/80 bg-[#0b0f16]/75 px-2.5 py-1 text-[10px] font-medium text-slate-400" aria-label="Collecte automatique quotidienne à 05h00, heure de Paris">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-700/80 bg-[#0b0f16]/75 px-2.5 py-1 text-[10px] font-medium text-slate-400" aria-label={`Relevés physiques automatiques : ${STATION_SNAPSHOT_CADENCE_LABEL}`}>
             <Clock3 className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
-            Auto · 05h00 Paris
+            {STATION_SNAPSHOT_CADENCE_LABEL}
           </span>
         </header>
 
+        {(isOverviewError || isLiveStationsError) ? (
+          <section role="alert" className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-400/[0.06] p-4" aria-label="Erreur de chargement des stations">
+            <h2 className="text-sm font-semibold text-rose-100">Données de stations temporairement indisponibles</h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-300">{isOverviewError && isLiveStationsError ? "La synthèse et la recherche de stations ont échoué." : isOverviewError ? "La synthèse de fiabilité n’a pas pu être chargée." : "La recherche de stations n’a pas pu être chargée."} Cette erreur technique ne signifie pas qu’il n’existe aucune station dans ce rayon.</p>
+            {(data || liveStationData) ? <p className="mt-1 text-[11px] text-amber-100">Données précédentes affichées lorsqu’elles sont disponibles.</p> : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {isOverviewError ? <button type="button" disabled={isOverviewFetching} onClick={() => void refetchOverview()} className="min-h-10 rounded-md border border-rose-300/50 px-3 text-xs font-semibold text-rose-100 disabled:cursor-wait disabled:opacity-60">{isOverviewFetching ? "Relance en cours…" : "Réessayer la synthèse"}</button> : null}
+              {isLiveStationsError ? <button type="button" disabled={isLiveStationsFetching} onClick={() => void refetchLiveStations()} className="min-h-10 rounded-md border border-rose-300/50 px-3 text-xs font-semibold text-rose-100 disabled:cursor-wait disabled:opacity-60">{isLiveStationsFetching ? "Relance en cours…" : "Réessayer les stations"}</button> : null}
+            </div>
+            {(overviewError?.message || liveStationsError?.message) ? <p className="mt-2 text-[10px] text-slate-400">{overviewError?.message ?? liveStationsError?.message}</p> : null}
+          </section>
+        ) : null}
+
         <section className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-400/[0.06] p-4">
           <div><h2 className="font-semibold text-white">Votre situation locale</h2><p className="mt-1 text-xs leading-relaxed text-slate-300">Les stations les plus proches et les plus fraîches décrivent le contexte observé autour de {locationName}. Les effectifs et valeurs physiques sont affichés séparément, sans note 0–100.</p></div>
-          <div className="mt-3 grid grid-cols-3 gap-2"><Metric label="Stations utilisées" value={String(stations.length)} icon="stations" color="text-emerald-400" /><Metric label="Température" value={liveStationData?.groundTruth?.temperature == null ? "—" : `${Number(liveStationData.groundTruth.temperature).toFixed(1)}°C`} icon="temperature" color="text-amber-300" /><Metric label="Dernier relevé" value={latest?.computedAt ? formatAge(Math.max(0, Math.round((Date.now() - new Date(latest.computedAt).getTime()) / 60000))) : "—"} icon="refresh" color="text-slate-300" /></div>
+          <div className="mt-3 grid grid-cols-3 gap-2"><Metric label="Stations utilisées" value={isOverviewError && !data ? "—" : String(stations.length)} icon="stations" color="text-emerald-400" /><Metric label="Température" value={isLiveStationsError && !liveStationData ? "—" : liveStationData?.groundTruth?.temperature == null ? "—" : `${Number(liveStationData.groundTruth.temperature).toFixed(1)}°C`} icon="temperature" color="text-amber-300" /><Metric label="Dernier relevé" value={isOverviewError && !data ? "—" : latest?.computedAt ? formatAge(Math.max(0, Math.round((Date.now() - new Date(latest.computedAt).getTime()) / 60000))) : "—"} icon="refresh" color="text-slate-300" /></div>
           <div className="mt-3 space-y-3" aria-label="Détails de la synthèse locale">
             <h3 className="px-1 text-xs font-semibold text-sky-100">Détails de la synthèse locale</h3>
               <div className="rounded-xl border border-sky-500/20 bg-[#10131a] p-3"><div><h3 className="text-sm font-semibold text-white">Synthèse multi-source</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Les observations disponibles sont séparées des références de modèles; aucun indice global de confiance n’est affiché.</p></div><div className="mt-3 grid grid-cols-3 gap-2"><Reading label="Température" value={liveStationData?.groundTruth?.temperature == null ? "—" : `${Number(liveStationData.groundTruth.temperature).toFixed(1)}°C`} /><Reading label="Humidité" value={liveStationData?.groundTruth?.humidity == null ? "—" : `${Number(liveStationData.groundTruth.humidity).toFixed(0)}%`} /><Reading label="Pression" value={liveStationData?.groundTruth?.pressure == null ? "—" : `${Number(liveStationData.groundTruth.pressure).toFixed(0)} hPa`} /><Reading label="Vent" value={liveStationData?.groundTruth?.windSpeed == null ? "—" : `${Number(liveStationData.groundTruth.windSpeed).toFixed(1)} km/h`} /><Reading label="Rafales" value={liveStationData?.groundTruth?.windGust == null ? "—" : `${Number(liveStationData.groundTruth.windGust).toFixed(1)} km/h`} /><Reading label="Précip." value={liveStationData?.groundTruth?.precipitation == null ? "—" : `${Number(liveStationData.groundTruth.precipitation).toFixed(1)} mm`} /></div></div>
@@ -354,7 +382,7 @@ export default function Ranking() {
           <p className="mt-3 text-[11px] text-slate-500">{activeLocation?.favoriteId ? "Ce choix est enregistré pour ce lieu favori." : "Ce choix reste valable pour cette consultation."}</p>
         </section>
 
-        <LiveSourceSummary
+        {isLiveStationsError && !liveStationData ? null : <LiveSourceSummary
           groundTruth={liveStationData?.groundTruth}
           realLocalStations={realLocalStations}
           modelReferences={modelReferences}
@@ -364,7 +392,7 @@ export default function Ranking() {
           isLoading={liveStationsLoading}
           physicalStationExplanation={physicalStationExplanation}
           onOpenDetails={(source, kind) => setSelectedSource({ source, kind })}
-        />
+        />}
 
         <details className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-3">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden"><span>Voir les autres sources disponibles</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform details-open:rotate-180" /></summary>
@@ -377,7 +405,7 @@ export default function Ranking() {
           <section className="rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-white">Relevés des stations</h2><p className="text-xs text-slate-500">Stations physiques validées autour du lieu.</p></div><MeteoIcon name="stations" size={22} /></div>
           {stations.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-500">Aucune station physique n’est encore archivée pour ce lieu. La première collecte est prévue à 05h00.</div>
+            <div className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-500">Aucune station physique n’est encore archivée pour ce lieu. Les relevés physiques sont vérifiés {STATION_SNAPSHOT_CADENCE_LABEL.toLowerCase()}.</div>
           ) : (
             <div className="space-y-2">
               {stations.map((station: any) => {

@@ -63,9 +63,24 @@ function EnvironmentalPanelsPlaceholder() {
   );
 }
 
-function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalPanels>) {
+function DeferredEnvironmentalPanels({ coords }: { coords: { lat: number; lon: number } }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
+  const {
+    data,
+    error,
+    isError,
+    isFetching,
+    isLoading,
+    refetch,
+  } = trpc.weather.getEnvironmentalSnapshot.useQuery(coords, {
+    // The query and the visual component share this exact intersection gate.
+    // Nothing environment-related starts on an above-the-fold Dashboard.
+    enabled: shouldLoad,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
 
   useEffect(() => {
     const target = containerRef.current;
@@ -88,7 +103,14 @@ function DeferredEnvironmentalPanels(props: ComponentProps<typeof EnvironmentalP
     <div ref={containerRef}>
       {shouldLoad ? (
         <Suspense fallback={<EnvironmentalPanelsPlaceholder />}>
-          <EnvironmentalPanels {...props} />
+          <EnvironmentalPanels
+            data={data}
+            error={error}
+            isError={isError}
+            isFetching={isFetching}
+            isLoading={isLoading}
+            onRetry={() => void refetch()}
+          />
         </Suspense>
       ) : <EnvironmentalPanelsPlaceholder />}
     </div>
@@ -493,17 +515,6 @@ function UVBadge({ uv }: { uv: number | null }) {
   );
 }
 
-function getStoredLocation(): { lat: number; lon: number; name: string; radiusKm?: number } | null {
-  try {
-    const stored = localStorage.getItem("meteoai_last_location");
-    return stored ? JSON.parse(stored) : null;
-  } catch { return null; }
-}
-
-function storeLocation(loc: { lat: number; lon: number; name: string; radiusKm?: number }) {
-  try { localStorage.setItem("meteoai_last_location", JSON.stringify(loc)); } catch {}
-}
-
 function getStoredLocalMode(): "standard" | "local" | "ultra-local" {
   try {
     const stored = localStorage.getItem("meteoai_local_mode");
@@ -649,7 +660,6 @@ function DominantRegimePanel({
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { activeLocation: contextLocation, setActiveLocation: setContextLocation } = useLocation();
-  const [activeLocation, setActiveLocation] = useState<{ lat: number; lon: number; name: string; radiusKm?: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" } | null>(getStoredLocation);
   const [localMode, setLocalMode] = useState<"standard" | "local" | "ultra-local">(getStoredLocalMode);
   const [weatherEffectsMode] = useState<DashboardWeatherEffectsMode>(getDashboardWeatherEffectsMode);
   const { showProvenance } = useProvenanceDisplay();
@@ -665,14 +675,11 @@ export default function Dashboard() {
   const [isPersonalHistoryOpen, setIsPersonalHistoryOpen] = useState(false);
   const [showAllLocalContributors, setShowAllLocalContributors] = useState(false);
   const [editingPersonalObservation, setEditingPersonalObservation] = useState<{ id: number; temperature: string; windSpeed: string; precipitation: string; condition: (typeof PERSONAL_CONDITION_OPTIONS)[number]["id"] } | null>(null);
-  // Le contexte partagé est prioritaire : Dashboard et Classement interrogent
-  // alors strictement les mêmes coordonnées pour la prévision officielle.
-  const selectedLocation = contextLocation ?? activeLocation;
+  // LocationContext owns the selected place, including its station radius.
+  // Dashboard must never fall back to the retired dashboard-only location key.
+  const selectedLocation = contextLocation;
 
   const handleLocationChange = (loc: { lat: number; lon: number; name: string; radiusKm: number; favoriteId?: number; localMode?: "standard" | "local" | "ultra-local" }) => {
-    setActiveLocation(loc);
-    storeLocation(loc);
-    // Sync to LocationContext so all pages (Ranking, History, AI Lab) use this location
     setContextLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, favoriteId: loc.favoriteId, radiusKm: loc.radiusKm, localMode: loc.localMode ?? "standard" });
     if (loc.localMode) {
       setLocalMode(loc.localMode);
@@ -688,9 +695,9 @@ export default function Dashboard() {
   // Use location-aware query when a location is selected
   const queryInput = useMemo(() => ({
     ...getOfficialForecastCoordinates(selectedLocation),
-    radiusKm: activeLocation?.radiusKm ?? 20,
+    radiusKm: selectedLocation?.radiusKm ?? 20,
     localMode,
-  }), [selectedLocation?.lat, selectedLocation?.lon, activeLocation?.radiusKm, localMode]);
+  }), [selectedLocation?.lat, selectedLocation?.lon, selectedLocation?.radiusKm, localMode]);
 
   const needsLocalStations = localMode !== "standard";
   const { data: locationWeather, isFetching: locationWeatherFetching, isPlaceholderData: locationWeatherIsPlaceholder } = trpc.favorites.getLocationWeather.useQuery(
@@ -741,7 +748,7 @@ export default function Dashboard() {
   // Réponse officielle consolidée : le hook partagé alimente Dashboard et Détails avec le même lieu et la même politique de rafraîchissement.
   const { query: officialForecastQuery } = useOfficialForecast(selectedLocation);
   const { data: officialForecast, isLoading: officialLoading, isError: officialError, isFetching: officialFetching, refetch: refetchOfficialForecast } = officialForecastQuery;
-  const { data: dashboardDailyForecast, isLoading: dashboardDailyLoading } = trpc.weather.getDashboardDailyForecast.useQuery(
+  const { data: dashboardDailyForecast, isLoading: dashboardDailyLoading, isFetching: dashboardDailyFetching, refetch: refetchDashboardDaily } = trpc.weather.getDashboardDailyForecast.useQuery(
     coordsInput,
     {
       // The daily horizon is visually below the current conditions. Waiting for
@@ -762,10 +769,6 @@ export default function Dashboard() {
   const hourlyLoading = officialLoading;
   const hourlyError = officialError;
   const hourlyFetching = officialFetching;
-  const { data: environmentalData, isFetching: environmentalFetching } = trpc.weather.getEnvironmentalSnapshot.useQuery(
-    coordsInput,
-    { staleTime: 10 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 }
-  );
   const { data: localOfficialHistory } = trpc.weather.getLocalOfficialDeltaHistory.useQuery(
     coordsInput, { staleTime: 5 * 60 * 1000 }
   );
@@ -872,10 +875,13 @@ export default function Dashboard() {
   if (isError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center max-w-sm w-full">
+        <div role="alert" className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center max-w-sm w-full">
           <Activity className="h-10 w-10 mx-auto text-red-400 mb-3" />
           <h2 className="text-lg font-semibold text-red-400 mb-1">Erreur de chargement</h2>
           <p className="text-sm text-muted-foreground">Impossible de charger les prévisions.</p>
+          <button type="button" disabled={officialFetching || dashFetching} onClick={() => void refreshCurrentWeather()} className="mt-5 min-h-11 rounded-md border border-primary/50 px-4 text-sm font-medium text-primary disabled:cursor-wait disabled:opacity-60">
+            {officialFetching || dashFetching ? "Relance en cours…" : "Réessayer"}
+          </button>
         </div>
       </div>
     );
@@ -1073,7 +1079,7 @@ export default function Dashboard() {
 
         {/* ── Favorites Bar ── */}
         <FavoritesBar
-          activeLocation={activeLocation}
+          activeLocation={selectedLocation}
           onLocationChange={handleLocationChange}
           prefetchedWeather={prefetchedWeather}
           activeWeather={activeFavoriteWeather}
@@ -1559,10 +1565,16 @@ export default function Dashboard() {
             <Suspense fallback={<div className="h-72 bg-muted rounded-xl animate-pulse" />}>
               <FifteenDayChart days={days} locationName={selectedLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name} />
             </Suspense>
-          ) : null}
+          ) : (
+            <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-5 text-center">
+              <p className="text-sm font-medium text-blue-100">Prévisions journalières temporairement indisponibles.</p>
+              <p className="mt-1 text-xs text-muted-foreground">La collecte partagée peut continuer en arrière-plan. Les conditions présentes et les heures disponibles restent visibles.</p>
+              <button type="button" disabled={dashboardDailyFetching} onClick={() => void refetchDashboardDaily()} className="mt-3 min-h-10 rounded-md border border-primary/50 px-3 text-xs font-semibold text-primary disabled:opacity-60">{dashboardDailyFetching ? "Relance en cours…" : "Réessayer les jours"}</button>
+            </div>
+          )}
         </div>
 
-        <DeferredEnvironmentalPanels data={environmentalData} isLoading={environmentalFetching} />
+        <DeferredEnvironmentalPanels coords={coordsInput} />
 
       </div>
       <BackToTopButton />

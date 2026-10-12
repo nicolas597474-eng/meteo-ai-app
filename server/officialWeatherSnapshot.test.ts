@@ -31,12 +31,12 @@ const modelCurrentSnapshot = {
 };
 
 describe("buildOfficialWeatherSnapshot", () => {
-  it("isole les coordonnées précises en cache sans changer la clé DB canonique arrondie", () => {
+  it("normalise les coordonnées de cache à la précision métier sans changer la clé DB canonique", () => {
     const first = { lat: 50.75631, lon: 2.52031 };
     const second = { lat: 50.75649, lon: 2.52049 };
 
     expect(makeLocationKey(first.lat, first.lon)).toBe(makeLocationKey(second.lat, second.lon));
-    expect(getOfficialWeatherSnapshotCacheKey(first, "2026-08-12", 492)).not.toBe(
+    expect(getOfficialWeatherSnapshotCacheKey(first, "2026-08-12", 492)).toBe(
       getOfficialWeatherSnapshotCacheKey(second, "2026-08-12", 492),
     );
     expect(getOfficialWeatherSnapshotCacheKey(first, "2026-08-12", 492, 2)).not.toBe(
@@ -71,6 +71,7 @@ describe("buildOfficialWeatherSnapshot", () => {
     expect(snapshot.validAt).toBe("2026-08-12T14:00");
     expect(snapshot.sourceKind).toBe("official_forecast");
     expect(snapshot.source).toBe("open-meteo");
+    expect(snapshot).toMatchObject({ snapshotStatus: "live", staleReason: null });
     expect(snapshot.hourlyWeighting.bestMatchIncluded).toBe(false);
   });
 

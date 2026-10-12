@@ -38,8 +38,20 @@ function normalizePreferences(value: unknown): WindyMapPreferences {
   };
 }
 
-export function makeWindyMapLocationKey(lat: number, lon: number) {
+export function makeLegacyWindyMapLocationKey(lat: number, lon: number) {
   return `${lat.toFixed(4)},${lon.toFixed(4)}`;
+}
+
+/**
+ * A saved favorite is the product-level identity for preferences. Coordinates
+ * stay as a precise fallback for temporary locations; the old four-decimal key
+ * is retained only to migrate an existing setting on first access.
+ */
+export function makeWindyMapLocationKey(lat: number, lon: number, favoriteId?: number) {
+  if (typeof favoriteId === "number" && Number.isInteger(favoriteId) && favoriteId > 0) {
+    return `favorite:${favoriteId}`;
+  }
+  return `coordinates:${lat.toFixed(6)},${lon.toFixed(6)}`;
 }
 
 export function readWindyMapPreferences(): WindyMapPreferencesByLocation {
@@ -76,6 +88,17 @@ export function writeWindyMapPreferences(locationKey: string, preferences: Windy
   }
 }
 
-export function getWindyMapPreferences(locationKey: string): WindyMapPreferences {
-  return readWindyMapPreferences()[locationKey] ?? DEFAULT_WINDY_MAP_PREFERENCES;
+export function getWindyMapPreferences(locationKey: string, legacyLocationKey?: string): WindyMapPreferences {
+  const current = readWindyMapPreferences();
+  const saved = current[locationKey];
+  if (saved) return saved;
+
+  const legacy = legacyLocationKey ? current[legacyLocationKey] : undefined;
+  if (!legacy) return DEFAULT_WINDY_MAP_PREFERENCES;
+
+  // Preserve existing layer and both zooms when upgrading from the legacy
+  // coordinate-rounded key. Keep the legacy value too: another favorite at the
+  // same historical coordinate must be able to migrate independently.
+  writeWindyMapPreferences(locationKey, legacy);
+  return legacy;
 }

@@ -8,7 +8,7 @@ vi.mock("./weatherFetch", () => ({
 }));
 
 import { DAILY_FORECAST_REQUEST_KEYS } from "./forecastVariableCoverage";
-import { collectExpertForecastsWithDiagnostics } from "./weatherServices";
+import { collectExpertForecastsWithDiagnostics, getModelRequestedForecastDays } from "./weatherServices";
 
 const targetDate = "2026-10-02";
 const days = Array.from({ length: 16 }, (_, index) => {
@@ -64,13 +64,35 @@ describe("collectExpertForecasts — collecte quotidienne par variable", () => {
     const aromeCoverage = result.diagnostics.find((model) => model.modelName === "AROME")!;
     expect(aromeCoverage.status).toBe("partial");
     expect(aromeCoverage.variables.find((variable) => variable.key === "relative_humidity_2m_mean"))
-      .toMatchObject({ requested: true, documentationStatus: "unconfirmed", status: "available", receivedCount: 16 });
+      .toMatchObject({ requested: true, documentationStatus: "unconfirmed", status: "available", receivedCount: 2 });
     expect(aromeCoverage.variables.find((variable) => variable.key === "cloud_cover_mean"))
-      .toMatchObject({ requested: true, documentationStatus: "unconfirmed", status: "missing", receivedCount: 0, missingCount: 16 });
+      .toMatchObject({ requested: true, documentationStatus: "unconfirmed", status: "missing", receivedCount: 0, missingCount: 2 });
     expect(result.forecasts.find((model) => model.serviceName === "AROME"))
       .toMatchObject({ precipitation: 0, humidity: 50, cloudCover: null });
     expect(result.diagnostics.find((model) => model.modelName === "ARPEGE")?.variables.find((variable) => variable.key === "cloud_cover_mean"))
-      .toMatchObject({ status: "available", receivedCount: 16 });
+      .toMatchObject({ status: "available", receivedCount: 4 });
+  });
+
+  it("borne l’horizon demandé par modèle sans retirer les variables possibles", async () => {
+    fetchWeatherMock.mockResolvedValue(responseForDaily(completeDaily()));
+
+    await collectExpertForecastsWithDiagnostics(targetDate);
+
+    const requestByModel = new Map(fetchWeatherMock.mock.calls.map(([input]) => {
+      const url = new URL(String(input), "https://api.open-meteo.com");
+      return [url.searchParams.get("models") ?? "best_match", url] as const;
+    }));
+    expect(requestByModel.get("meteofrance_arome_france_hd")?.searchParams.get("forecast_days")).toBe("2");
+    expect(requestByModel.get("meteofrance_arpege_europe")?.searchParams.get("forecast_days")).toBe("4");
+    expect(requestByModel.get("dwd_icon_eu")?.searchParams.get("forecast_days")).toBe("5");
+    expect(requestByModel.get("ecmwf_ifs025")?.searchParams.get("forecast_days")).toBe("15");
+    expect(requestByModel.get("gfs_seamless")?.searchParams.get("forecast_days")).toBe("16");
+    expect(requestByModel.get("gem_seamless")?.searchParams.get("forecast_days")).toBe("10");
+    expect(requestByModel.get("ukmo_seamless")?.searchParams.get("forecast_days")).toBe("7");
+    expect(requestByModel.get("meteofrance_arome_france_hd")?.searchParams.get("daily")?.split(","))
+      .toEqual(DAILY_FORECAST_REQUEST_KEYS);
+    expect(getModelRequestedForecastDays("AROME")).toBe(2);
+    expect(getModelRequestedForecastDays("Open-Meteo")).toBe(16);
   });
 
   it("ne transforme pas une réponse datée mais vide en forecast ou en succès artificiel", async () => {

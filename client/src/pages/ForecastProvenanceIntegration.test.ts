@@ -46,8 +46,10 @@ describe("provenance unifiée des pages météo", () => {
     expect(router).toContain("...(includeExtendedPeriods ? {");
     expect(router).toContain('periodHoursSource: "open_meteo_best_match_reference"');
     expect(router).toContain("projectHourlyForecastForDashboard(hourlyFallback.hours)");
-    expect(router).toContain("includeDaily: includeExtendedPeriods");
-    expect(router).toContain("loadExtendedPeriods: () => collectHourlyForecast(today, coords, 16)");
+    expect(router).toContain("includeDaily: false, signal");
+    expect(router).toContain("includeExtendedPeriods ? resolveOfficialDailyForecastSnapshot");
+    expect(router).toContain("loadExtendedPeriods: () => withDeadline(collectHourlyForecast(today, coords, 16");
+    expect(router).toContain("dailyStatus: snapshot.dailyStatus");
     expect(router).toContain("hourlyWeighting: snapshot.hourlyWeighting");
     expect(dashboard).toContain("hourlyComputedAt={officialForecast?.officialSnapshot?.hourlyComputedAt}");
     expect(dashboard).toContain("computedAt={officialForecast?.officialSnapshot?.computedAt}");

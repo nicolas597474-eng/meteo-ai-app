@@ -2,8 +2,9 @@ import { getDailyFusionPerformanceEvidence, getHourlyForecastEvaluationHistory, 
 import { getParisDate, getParisDateDaysAgo, getParisHour } from "./weatherTime";
 import { collect15DayForecast, collectCurrentWeatherSnapshot, type CurrentWeatherSnapshot, type DayForecast, type HourlyPoint } from "./weatherServices";
 import { findActiveHourlyForecastIndex, keepCurrentAndFutureHourlyForecasts } from "../shared/hourlyForecastTime";
-import { collectOfficialHourlyForecast, computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
+import { collectOfficialHourlyForecast, computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, OFFICIAL_HOURLY_MODEL_NAMES, reconstructOfficialHourlyModelsFromArchive, type OfficialHourlyWeightingSummary } from "./officialHourlyForecast";
 import { computeOfficialDailyForecastWithDiagnostics } from "./officialForecast";
+import { waitForInteractiveRequest } from "./interactiveRequestCancellation";
 import type { PrecipitationModelConsensus } from "../shared/precipitationConsensus";
 import type { ManualHourlyOverride } from "../shared/hourlyModelMetrics";
 
@@ -13,6 +14,11 @@ export type OfficialWeatherSnapshot = {
   validAt: string | null;
   computedAt: string;
   hourlyComputedAt: string;
+  /** `stale` is returned only for a real prior archive/cache while a live refresh runs. */
+  snapshotStatus: "live" | "stale";
+  staleReason: "archived_hourly_run" | "refreshing_previous_snapshot" | null;
+  /** An empty series is never a forecast of zero: it means the short interactive budget was exhausted or no model data exists. */
+  hourlyStatus: "ready" | "not_ready";
   sourceKind: "official_forecast";
   source: "open-meteo";
   hourlyWeighting: OfficialHourlyWeightingSummary;
@@ -79,15 +85,27 @@ type CacheEntry = {
 export type OfficialDailyForecastSnapshot = {
   daily: DayForecast[];
   modelsUsed: string[];
+  /** `not_ready` means a bounded daily load did not complete; it is not an empty weather forecast. */
+  dailyStatus: "ready" | "not_ready";
 };
 type DailyCacheEntry = { expiresAt: number; value: Promise<OfficialDailyForecastSnapshot> };
 type ManualHourlyForecast = { expiresAt: number; hours: HourlyPoint[]; computedAt: string; weighting?: OfficialHourlyWeightingSummary; reason: string };
 const snapshotCache = new Map<string, CacheEntry>();
+/** In-flight work is deliberately separate from the completed-value cache. */
+const snapshotInFlight = new Map<string, Promise<OfficialWeatherSnapshot>>();
 const dailySnapshotCache = new Map<string, DailyCacheEntry>();
 const manualHourlyForecastCache = new Map<string, ManualHourlyForecast>();
+export const OFFICIAL_SNAPSHOT_CACHE_MAX_ENTRIES = 48;
+export const OFFICIAL_DAILY_SNAPSHOT_CACHE_MAX_ENTRIES = 48;
+export const MANUAL_HOURLY_FORECAST_CACHE_MAX_ENTRIES = 48;
 const SNAPSHOT_TTL_MS = 2 * 60_000;
 const DAILY_SNAPSHOT_TTL_MS = 5 * 60_000;
+const EMPTY_DAILY_SNAPSHOT_TTL_MS = 12_000;
 const EMPTY_HOURLY_SNAPSHOT_TTL_MS = 12_000;
+/** Entire cold interactive path, including the archive read before the live provider collection. */
+export const OFFICIAL_SNAPSHOT_INTERACTIVE_BUDGET_MS = 7_000;
+/** Current conditions are useful but must not block a short forecast response. */
+export const INTERACTIVE_CURRENT_SNAPSHOT_DEADLINE_MS = 6_000;
 const HOURLY_NUMERIC_COVERAGE_FIELDS = [
   "temp", "apparentTemp", "precipitation", "windSpeed", "windGust", "windDirection",
   "cloudCover", "humidity", "uvIndex", "weatherCode", "pressure", "dewPoint", "visibility",
@@ -155,6 +173,9 @@ export function buildOfficialWeatherSnapshot(input: {
     validAt: currentForecast ? `${currentForecast.date ?? input.weatherDate}T${currentForecast.hour}` : null,
     computedAt: input.computedAt.toISOString(),
     hourlyComputedAt: input.computedAt.toISOString(),
+    snapshotStatus: "live",
+    staleReason: null,
+    hourlyStatus: hourly.length > 0 ? "ready" : "not_ready",
     sourceKind: "official_forecast",
     source: "open-meteo",
     hourlyWeighting: input.hourlyWeighting,
@@ -212,8 +233,8 @@ export function mergeManualHourlyForecast(
   };
 }
 
-function preciseCacheLocationKey(coords: { lat: number; lon: number }) {
-  return `${makeLocationKey(coords.lat, coords.lon)}:${coords.lat.toString()}:${coords.lon.toString()}`;
+function normalizedCacheLocationKey(coords: { lat: number; lon: number }) {
+  return `${coords.lat.toFixed(3)},${coords.lon.toFixed(3)}`;
 }
 
 export function getOfficialWeatherSnapshotCacheKey(
@@ -225,17 +246,51 @@ export function getOfficialWeatherSnapshotCacheKey(
   // Current/future-window filtering happens on every read. Tying the cache to
   // the current hour forced an unnecessary cold multi-model collection at each
   // hour boundary, even when an otherwise valid snapshot was already present.
-  return `${preciseCacheLocationKey(coords)}:${weatherDate}:${hourlyForecastDays}`;
+  return `${normalizedCacheLocationKey(coords)}:${weatherDate}:${hourlyForecastDays}`;
 }
 
 function manualForecastCacheKey(cacheLocationKey: string, weatherDate: string) {
   return `${cacheLocationKey}:${weatherDate}`;
 }
 
+function touchLruEntry<T>(cache: Map<string, T>, key: string, value: T): void {
+  cache.delete(key);
+  cache.set(key, value);
+}
+
+function trimExpiringLru<T extends { expiresAt: number }>(cache: Map<string, T>, maxEntries: number, now = Date.now()): void {
+  for (const [key, entry] of Array.from(cache.entries())) {
+    if (entry.expiresAt <= now) cache.delete(key);
+  }
+  while (cache.size > maxEntries) {
+    const oldest = cache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    cache.delete(oldest);
+  }
+}
+
+function markSnapshotStale(
+  snapshot: OfficialWeatherSnapshot,
+  staleReason: NonNullable<OfficialWeatherSnapshot["staleReason"]>,
+): OfficialWeatherSnapshot {
+  return { ...snapshot, snapshotStatus: "stale", staleReason };
+}
+
+export function getOfficialWeatherSnapshotCacheMetrics() {
+  trimExpiringLru(snapshotCache, OFFICIAL_SNAPSHOT_CACHE_MAX_ENTRIES);
+  trimExpiringLru(dailySnapshotCache, OFFICIAL_DAILY_SNAPSHOT_CACHE_MAX_ENTRIES);
+  trimExpiringLru(manualHourlyForecastCache, MANUAL_HOURLY_FORECAST_CACHE_MAX_ENTRIES);
+  return {
+    snapshots: snapshotCache.size,
+    dailySnapshots: dailySnapshotCache.size,
+    manualHourlyForecasts: manualHourlyForecastCache.size,
+  };
+}
+
 async function collectOfficialDailyForecastSnapshot(coords: { lat: number; lon: number }): Promise<OfficialDailyForecastSnapshot> {
   const issuedAt = Date.now();
   const locationKey = makeLocationKey(coords.lat, coords.lon);
-  const dailyResult = await collect15DayForecast(coords, {
+  const result = await withDeadline(collect15DayForecast(coords, {
     issuedAt,
     resolveOfficialFusion: async (targetDate, forecasts, referenceAt, availabilityReasonByModel) => {
       const fusionEvidence = await getDailyFusionPerformanceEvidence(
@@ -253,22 +308,36 @@ async function collectOfficialDailyForecastSnapshot(coords: { lat: number; lon: 
         availabilityReasonByModel,
       });
     },
-  });
-  return { daily: dailyResult.days, modelsUsed: dailyResult.modelsUsed };
+  }), 60_000, null);
+  if (!result) return { daily: [], modelsUsed: [], dailyStatus: "not_ready" };
+  return { daily: result.days, modelsUsed: result.modelsUsed, dailyStatus: "ready" };
 }
 
 /** The daily horizon is independent from the current-hour response and caches separately. */
-export function resolveOfficialDailyForecastSnapshot(coords: { lat: number; lon: number }): Promise<OfficialDailyForecastSnapshot> {
-  const cacheKey = `${preciseCacheLocationKey(coords)}:${getParisDate()}`;
+export function resolveOfficialDailyForecastSnapshot(
+  coords: { lat: number; lon: number },
+  options: { signal?: AbortSignal } = {},
+): Promise<OfficialDailyForecastSnapshot> {
+  const cacheKey = `${normalizedCacheLocationKey(coords)}:${getParisDate()}`;
+  trimExpiringLru(dailySnapshotCache, OFFICIAL_DAILY_SNAPSHOT_CACHE_MAX_ENTRIES);
   const cached = dailySnapshotCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (cached && cached.expiresAt > Date.now()) {
+    touchLruEntry(dailySnapshotCache, cacheKey, cached);
+    return waitForInteractiveRequest(withDeadline(cached.value, OFFICIAL_SNAPSHOT_INTERACTIVE_BUDGET_MS, { daily: [], modelsUsed: [], dailyStatus: "not_ready" } as OfficialDailyForecastSnapshot), options.signal);
+  }
 
   const value = collectOfficialDailyForecastSnapshot(coords);
-  dailySnapshotCache.set(cacheKey, { expiresAt: Date.now() + DAILY_SNAPSHOT_TTL_MS, value });
-  void value.catch(() => {
+  const entry: DailyCacheEntry = { expiresAt: Date.now() + DAILY_SNAPSHOT_TTL_MS, value };
+  touchLruEntry(dailySnapshotCache, cacheKey, entry);
+  trimExpiringLru(dailySnapshotCache, OFFICIAL_DAILY_SNAPSHOT_CACHE_MAX_ENTRIES);
+  void value.then((snapshot) => {
+    if (dailySnapshotCache.get(cacheKey)?.value === value) {
+      entry.expiresAt = Date.now() + (snapshot.dailyStatus === "ready" ? DAILY_SNAPSHOT_TTL_MS : EMPTY_DAILY_SNAPSHOT_TTL_MS);
+    }
+  }).catch(() => {
     if (dailySnapshotCache.get(cacheKey)?.value === value) dailySnapshotCache.delete(cacheKey);
   });
-  return value;
+  return waitForInteractiveRequest(withDeadline(value, OFFICIAL_SNAPSHOT_INTERACTIVE_BUDGET_MS, { daily: [], modelsUsed: [], dailyStatus: "not_ready" } as OfficialDailyForecastSnapshot), options.signal);
 }
 
 /**
@@ -295,17 +364,25 @@ export function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): P
 async function readArchivedOfficialHourlySnapshot(
   coords: { lat: number; lon: number },
   weatherDate: string,
+  deadlineAt: number,
 ): Promise<OfficialWeatherSnapshot | null> {
+  const remainingBudgetMs = Math.max(0, deadlineAt - Date.now());
+  if (remainingBudgetMs === 0) return null;
   const locationKey = makeLocationKey(coords.lat, coords.lon);
-  const [rows, history, currentSnapshot] = await Promise.all([
+  const archive = Promise.all([
     getHourlyForecastRunValues(locationKey, weatherDate),
     getHourlyForecastEvaluationHistory(
       locationKey,
       getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
       getParisDateDaysAgo(1),
     ),
-    withDeadline(collectCurrentWeatherSnapshot(coords), ARCHIVE_CURRENT_SNAPSHOT_DEADLINE_MS, null),
+    // This wait is consumer-local: the unsigned current singleflight remains
+    // available to another reader after the archive path gives up.
+    withDeadline(collectCurrentWeatherSnapshot(coords), Math.min(ARCHIVE_CURRENT_SNAPSHOT_DEADLINE_MS, remainingBudgetMs), null),
   ]);
+  const archived = await withDeadline(archive, remainingBudgetMs, null);
+  if (!archived) return null;
+  const [rows, history, currentSnapshot] = archived;
   const modelForecasts = reconstructOfficialHourlyModelsFromArchive(rows, weatherDate);
   if (modelForecasts.length === 0) return null;
   const computed = computeOfficialHourlyForecast(modelForecasts, history.rows, {
@@ -320,7 +397,7 @@ async function readArchivedOfficialHourlySnapshot(
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   if (receiptTimes.length === 0) return null;
   const receivedAt = Math.max(...receiptTimes);
-  return buildOfficialWeatherSnapshot({
+  return markSnapshotStale(buildOfficialWeatherSnapshot({
     lat: coords.lat,
     lon: coords.lon,
     weatherDate,
@@ -331,18 +408,29 @@ async function readArchivedOfficialHourlySnapshot(
     daily: [],
     modelsUsed: modelForecasts.map((forecast) => forecast.modelName),
     parisHour: String(getParisHour()).padStart(2, "0"),
-  });
+  }), "archived_hourly_run");
 }
 
 function applyManualHourlyForecast(snapshot: OfficialWeatherSnapshot, coords: { lat: number; lon: number }): OfficialWeatherSnapshot {
-  const key = manualForecastCacheKey(preciseCacheLocationKey(coords), snapshot.weatherDate);
+  const key = manualForecastCacheKey(normalizedCacheLocationKey(coords), snapshot.weatherDate);
   const cached = manualHourlyForecastCache.get(key);
   if (!cached) return snapshot;
   if (cached.expiresAt <= Date.now()) {
     manualHourlyForecastCache.delete(key);
     return snapshot;
   }
+  touchLruEntry(manualHourlyForecastCache, key, cached);
   return mergeManualHourlyForecast(snapshot, cached.hours, new Date(cached.computedAt), cached.weighting, cached.reason);
+}
+
+function unavailableSnapshotHourlyResult(reason: string) {
+  return computeOfficialHourlyForecast([], [], {
+    historyAvailable: false,
+    exactHistoryAvailable: false,
+    availabilityReasonByModel: Object.fromEntries(
+      OFFICIAL_HOURLY_MODEL_NAMES.map((model) => [model, reason]),
+    ),
+  });
 }
 
 /** Cache a completed manual forecast refresh while preserving the official current snapshot. */
@@ -355,10 +443,11 @@ export function cacheManualHourlyForecast(
   reason = "Relance manuelle explicite du moteur horaire officiel multi-modèles.",
 ): void {
   if (hours.length === 0 || hours.some((hour) => typeof hour.validAt !== "number" || !Number.isFinite(hour.validAt))) return;
-  const cacheLocationKey = preciseCacheLocationKey(coords);
+  const cacheLocationKey = normalizedCacheLocationKey(coords);
   const manualKey = manualForecastCacheKey(cacheLocationKey, weatherDate);
   const expiresAt = Date.now() + getOfficialSnapshotTtlMs(hours);
-  manualHourlyForecastCache.set(manualKey, { expiresAt, hours, computedAt: computedAt.toISOString(), weighting, reason });
+  touchLruEntry(manualHourlyForecastCache, manualKey, { expiresAt, hours, computedAt: computedAt.toISOString(), weighting, reason });
+  trimExpiringLru(manualHourlyForecastCache, MANUAL_HOURLY_FORECAST_CACHE_MAX_ENTRIES);
 
   const snapshotPrefix = `${cacheLocationKey}:${weatherDate}:`;
   snapshotCache.forEach((cached, cacheKey) => {
@@ -384,23 +473,35 @@ export function cacheManualHourlyForecast(
  */
 export function resolveOfficialWeatherSnapshot(
   coords: { lat: number; lon: number },
-  options: { hourlyForecastDays?: number; includeDaily?: boolean } = {},
+  options: { hourlyForecastDays?: number; includeDaily?: boolean; signal?: AbortSignal } = {},
 ): Promise<OfficialWeatherSnapshot> {
   const weatherDate = getParisDate();
   const requestedDays = Number.isFinite(options.hourlyForecastDays) ? Math.floor(options.hourlyForecastDays!) : 2;
   const hourlyForecastDays = Math.min(16, Math.max(2, requestedDays));
-  const includeDaily = options.includeDaily !== false;
-  const cacheKey = `${getOfficialWeatherSnapshotCacheKey(coords, weatherDate, Math.floor(Date.now() / (60 * 60_000)), hourlyForecastDays)}:${includeDaily ? "full" : "hourly"}`;
+  // The 15-day horizon is an independent request. Do not make current weather
+  // wait for it; callers needing it use resolveOfficialDailyForecastSnapshot.
+  const cacheKey = `${getOfficialWeatherSnapshotCacheKey(coords, weatherDate, Math.floor(Date.now() / (60 * 60_000)), hourlyForecastDays)}:hourly`;
   const cached = snapshotCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
+    touchLruEntry(snapshotCache, cacheKey, cached);
+    return waitForInteractiveRequest(
+      cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now())),
+      options.signal,
+    );
   }
 
-  const createSnapshot = () => (async () => {
-    const [hourlyResult, currentSnapshot, dailySnapshot] = await Promise.all([
-      collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays, interactive: true }),
-      collectCurrentWeatherSnapshot(coords),
-      includeDaily ? resolveOfficialDailyForecastSnapshot(coords) : Promise.resolve({ daily: [], modelsUsed: [] }),
+  const createSnapshot = (deadlineAt: number) => (async () => {
+    const currentWaitMs = Math.max(0, Math.min(INTERACTIVE_CURRENT_SNAPSHOT_DEADLINE_MS, deadlineAt - Date.now()));
+    const hourlyWaitMs = Math.max(0, deadlineAt - Date.now());
+    const [hourlyResult, currentSnapshot] = await Promise.all([
+      // Do not pass the request signal: this is shared work and has its own
+      // bounded provider AbortController. Consumer cancellation only stops its wait.
+      withDeadline(
+        collectOfficialHourlyForecast(weatherDate, coords, { forecastDays: hourlyForecastDays, interactive: true, deadlineAt }),
+        hourlyWaitMs,
+        unavailableSnapshotHourlyResult("Le budget global de la réponse interactive est expiré; aucune valeur horaire n’est publiée."),
+      ),
+      withDeadline(collectCurrentWeatherSnapshot(coords), currentWaitMs, null),
     ]);
     return applyManualHourlyForecast(buildOfficialWeatherSnapshot({
       lat: coords.lat,
@@ -410,8 +511,8 @@ export function resolveOfficialWeatherSnapshot(
       hourly: hourlyResult.hours,
       currentSnapshot,
       hourlyWeighting: hourlyResult.weighting,
-      daily: dailySnapshot.daily,
-      modelsUsed: dailySnapshot.modelsUsed,
+      daily: [],
+      modelsUsed: [],
       parisHour: String(getParisHour()).padStart(2, "0"),
     }), coords);
   })().then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
@@ -421,10 +522,11 @@ export function resolveOfficialWeatherSnapshot(
   // sent, and a failed refresh retains the proven previous snapshot.
   if (cached) {
     if (!cached.refreshing) {
-      const refresh = createSnapshot();
+      const refresh = createSnapshot(Date.now() + OFFICIAL_SNAPSHOT_INTERACTIVE_BUDGET_MS);
       cached.refreshing = refresh;
       void refresh.then((snapshot) => {
         if (snapshotCache.get(cacheKey) !== cached) return;
+        if (snapshot.hourlyStatus !== "ready") { cached.refreshing = undefined; return; }
         snapshotCache.set(cacheKey, {
           expiresAt: Date.now() + getOfficialSnapshotTtlMs(snapshot.hourly),
           value: Promise.resolve(snapshot),
@@ -433,39 +535,59 @@ export function resolveOfficialWeatherSnapshot(
         if (snapshotCache.get(cacheKey) === cached) cached.refreshing = undefined;
       });
     }
-    return cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(snapshot, Date.now()));
+    return waitForInteractiveRequest(cached.value.then((snapshot) => refreshOfficialWeatherSnapshotForecastWindow(
+      markSnapshotStale(snapshot, "refreshing_previous_snapshot"), Date.now(),
+    )), options.signal);
   }
 
-  let entry: CacheEntry;
-  const value = includeDaily
-    ? createSnapshot()
-    : readArchivedOfficialHourlySnapshot(coords, weatherDate).then((archivedSnapshot) => {
-      if (!archivedSnapshot) return createSnapshot();
+  const existingFlight = snapshotInFlight.get(cacheKey);
+  if (existingFlight) return waitForInteractiveRequest(existingFlight, options.signal);
 
-      const refresh = createSnapshot();
-      entry.refreshing = refresh;
-      void refresh.then((snapshot) => {
-        if (snapshotCache.get(cacheKey) !== entry) return;
+  const deadlineAt = Date.now() + OFFICIAL_SNAPSHOT_INTERACTIVE_BUDGET_MS;
+  // Live models must not lose their budget waiting for a slow historical DB.
+  let completedLive: OfficialWeatherSnapshot | undefined;
+  const liveSnapshot = createSnapshot(deadlineAt).then(snapshot => { completedLive = snapshot; return snapshot; });
+  const archiveOrLive = readArchivedOfficialHourlySnapshot(coords, weatherDate, deadlineAt).then((archivedSnapshot) => {
+    if (!archivedSnapshot || completedLive?.hourlyStatus === "ready") return liveSnapshot;
+
+    // A proven archive is immediately useful. Refresh it in the background;
+    // the stale value in the completed cache remains honest until replacement.
+    const entry: CacheEntry = {
+      expiresAt: Date.now() + getOfficialSnapshotTtlMs(archivedSnapshot.hourly),
+      value: Promise.resolve(archivedSnapshot),
+    };
+    touchLruEntry(snapshotCache, cacheKey, entry);
+    trimExpiringLru(snapshotCache, OFFICIAL_SNAPSHOT_CACHE_MAX_ENTRIES);
+    const refresh = liveSnapshot;
+    entry.refreshing = refresh;
+    void refresh.then((snapshot) => {
+      if (snapshotCache.get(cacheKey) === entry) {
+        if (snapshot.hourlyStatus !== "ready") { entry.refreshing = undefined; return; }
         snapshotCache.set(cacheKey, {
           expiresAt: Date.now() + getOfficialSnapshotTtlMs(snapshot.hourly),
           value: Promise.resolve(snapshot),
         });
-      }).catch(() => {
-        if (snapshotCache.get(cacheKey) === entry) entry.refreshing = undefined;
-      });
-      return archivedSnapshot;
+      }
+    }).catch(() => {
+      if (snapshotCache.get(cacheKey) === entry) entry.refreshing = undefined;
     });
-  entry = { expiresAt: Date.now() + SNAPSHOT_TTL_MS, value };
-  snapshotCache.set(cacheKey, entry);
+    return archivedSnapshot;
+  });
+  const value = Promise.race([archiveOrLive, liveSnapshot.then(snapshot => snapshot.hourlyStatus === "ready" ? snapshot : archiveOrLive)]);
+  snapshotInFlight.set(cacheKey, value);
   void value.then((snapshot) => {
-    const current = snapshotCache.get(cacheKey);
-    if (current?.value === value) {
-      current.expiresAt = Date.now() + getOfficialSnapshotTtlMs(snapshot.hourly);
+    if (snapshotInFlight.get(cacheKey) === value) snapshotInFlight.delete(cacheKey);
+    // Archive results already own their cache entry. A cold live result is only
+    // cached after it completed, never as a potentially stuck promise.
+    if (!snapshotCache.has(cacheKey) || snapshotCache.get(cacheKey)!.expiresAt <= Date.now()) {
+      touchLruEntry(snapshotCache, cacheKey, {
+        expiresAt: Date.now() + getOfficialSnapshotTtlMs(snapshot.hourly),
+        value: Promise.resolve(snapshot),
+      });
+      trimExpiringLru(snapshotCache, OFFICIAL_SNAPSHOT_CACHE_MAX_ENTRIES);
     }
+  }).catch(() => {
+    if (snapshotInFlight.get(cacheKey) === value) snapshotInFlight.delete(cacheKey);
   });
-  void value.catch(() => {
-    const current = snapshotCache.get(cacheKey);
-    if (current?.value === value) snapshotCache.delete(cacheKey);
-  });
-  return value;
+  return waitForInteractiveRequest(value, options.signal);
 }

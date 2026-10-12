@@ -11,6 +11,7 @@ vi.mock("./db", async () => {
     getValidatedOfficialStationsNearReference: vi.fn(),
     getStationObservationsForQualification: vi.fn(),
     getCitizenFusionActivationNearReference: vi.fn(),
+    getCitizenQualificationEffectiveTimesNearReference: vi.fn(),
     upsertCitizenFusionActivation: vi.fn(),
   };
 });
@@ -20,6 +21,7 @@ import {
   getAllFavoriteLocations,
   getActivePhysicalStationsNearReference,
   getCitizenFusionActivationNearReference,
+  getCitizenQualificationEffectiveTimesNearReference,
   getStationObservationsForQualification,
   getValidatedCitizenStationsNearReference,
   getValidatedOfficialStationsNearReference,
@@ -135,9 +137,22 @@ beforeEach(() => {
   vi.mocked(upsertCitizenFusionActivation).mockReset();
   vi.mocked(getAllFavoriteLocations).mockResolvedValue([]);
   vi.mocked(getCitizenFusionActivationNearReference).mockResolvedValue(null);
+  vi.mocked(getCitizenQualificationEffectiveTimesNearReference).mockResolvedValue(new Map([["opensensemap-6740", Date.parse("2026-10-01T00:00:00Z")]]));
 });
 
 describe("evaluateCitizenFusionActivations · activation automatique par métriques", () => {
+  it("n’active pas un capteur actuellement validé sans événement d’admission antérieur", async () => {
+    vi.mocked(getAllFavoriteLocations).mockResolvedValue([favoriteFixture(1)]);
+    vi.mocked(getValidatedCitizenStationsNearReference).mockResolvedValue([stationFixture("opensensemap-6740", "opensensemap", 1.5, 60)]);
+    vi.mocked(getActivePhysicalStationsNearReference).mockResolvedValue([stationFixture("netatmo-public-42", "netatmo", 2, 65)]);
+    vi.mocked(getValidatedOfficialStationsNearReference).mockResolvedValue([stationFixture("mf-70260", "meteofrance", 12, 92), stationFixture("mf-70290", "meteofrance", 18, 88)]);
+    vi.mocked(getStationObservationsForQualification).mockResolvedValue(observationsFixture());
+    vi.mocked(getCitizenQualificationEffectiveTimesNearReference).mockResolvedValue(new Map());
+    const summary = await evaluateCitizenFusionActivations(AS_OF);
+    expect(summary.activated).toBe(0);
+    expect(upsertCitizenFusionActivation).toHaveBeenCalledWith(expect.objectContaining({status: "not-activated", comparisons: 0}));
+  });
+
   it("passe toute référence sans capteur validé ni décision archivée, sans rien lire ni écrire", async () => {
     vi.mocked(getAllFavoriteLocations).mockResolvedValue([favoriteFixture(1)]);
     vi.mocked(getValidatedCitizenStationsNearReference).mockResolvedValue([]);

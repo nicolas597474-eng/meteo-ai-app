@@ -12,7 +12,8 @@ describe("weather.getStationReliabilityOverview", () => {
     expect(procedure).toContain("reconstructOfficialHourlyModelsFromArchive(hourlyRunValues, date)");
     expect(procedure).toContain("getHourlyForecastEvaluationHistory(");
     expect(procedure).toContain("computeOfficialHourlyForecast(");
-    expect(procedure).toContain("buildStationForecastComparison24h(date, officialHourlyForecast.hours");
+    expect(procedure).toContain("reconstructHistoricalOfficialHours(");
+    expect(procedure).toContain("buildStationForecastComparison24h(date, historicalHours");
     expect(procedure).toContain("officialHourlyWeighting: officialHourlyForecast.weighting");
     expect(procedure).not.toContain('modelName === "best_match"');
     expect(procedure).not.toContain("getStoredHourlyForecasts");
@@ -28,8 +29,9 @@ describe("weather.getLocalOfficialDeltaHistory", () => {
 
     expect(procedure).toContain("getHourlyForecastRunValues(locationKey, today)");
     expect(procedure).toContain("getHourlyForecastRunValues(locationKey, yesterday)");
-    expect(procedure).toContain("computeOfficialHourlyForecast(");
-    expect(procedure).toContain("buildLocalOfficialDeltaHistory(readings, officialHourlyTemperatures)");
+    expect(procedure).toContain("reconstructHistoricalOfficialTemperatures(readings,");
+    expect(procedure).toContain("selectOfficialHourlyTemperaturesBeforeLocalMeasurements(readings, candidates)");
+    expect(procedure).toContain("buildLocalOfficialDeltaHistory(readings, selectedOfficialHourlyTemperaturePoints(selections))");
     expect(procedure).not.toContain("getStoredHourlyForecasts");
     expect(procedure).not.toContain('modelName === "best_match"');
   });

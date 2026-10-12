@@ -33,6 +33,7 @@ import {
   DAILY_FORECAST_REQUEST_KEYS,
   finiteCoverageValue,
   HOURLY_FORECAST_VARIABLES,
+  MODEL_FORECAST_HORIZONS,
   type DailyModelCollectionCoverage,
   type HourlySourceValueStatus,
   type HourlyVariableSourceDiagnostic,
@@ -58,6 +59,27 @@ export const WEATHER_SERVICES = {
   /** Marques documentaires uniquement : aucune donnée ne doit être affichée ou scorée sans intégration réelle. */
   inactivePublicCatalogue: ["Meteoblue", "AccuWeather", "Apple Weather", "Weather.com", "Ventusky", "Weatherbit", "World Weather Online", "La Chaîne Météo"] as const,
 };
+
+/**
+ * IDs applicatifs archivés → IDs effectivement demandés à Open-Meteo.
+ * Le probe public borné du 2026-10-12 accepte aussi les aliases documentés
+ * ncep_/cmc_, mais ne fournit aucune métadonnée qui justifierait de changer
+ * des archives actives. Les IDs actifs sont donc explicitement conservés.
+ */
+export const OPEN_METEO_PROVIDER_MODEL_ID_BY_APPLICATION_MODEL_ID: Readonly<Record<string, string>> = {
+  gfs_seamless: "gfs_seamless",
+  gem_seamless: "gem_seamless",
+};
+
+export function getOpenMeteoProviderModelId(applicationModelId: string): string {
+  return OPEN_METEO_PROVIDER_MODEL_ID_BY_APPLICATION_MODEL_ID[applicationModelId] ?? applicationModelId;
+}
+
+/** Limit only the request horizon; every requested variable remains requested. */
+export function getModelRequestedForecastDays(modelName: string, productMaximumDays = 16): number {
+  const documentedMaximum = MODEL_FORECAST_HORIZONS[modelName]?.maximumDocumentedDays;
+  return Math.max(1, Math.min(productMaximumDays, documentedMaximum ?? productMaximumDays));
+}
 
 /** Modèles observés séparément avant toute éventuelle qualification. */
 export const VALIDATION_WEATHER_MODELS = [
@@ -130,7 +152,7 @@ export async function collectExpertForecastsWithDiagnostics(
       modelName: service.name,
       modelId: service.modelId,
       isOfficialModel: service.modelId !== "best_match",
-      requestedDays: 16,
+      requestedDays: getModelRequestedForecastDays(service.name),
       targetDate,
     };
     try {
@@ -142,7 +164,7 @@ export async function collectExpertForecastsWithDiagnostics(
       url.searchParams.set("daily", DAILY_FORECAST_REQUEST_KEYS.join(","));
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("forecast_days", String(base.requestedDays));
-      if (service.modelId !== "best_match") url.searchParams.set("models", service.modelId);
+      if (service.modelId !== "best_match") url.searchParams.set("models", getOpenMeteoProviderModelId(service.modelId));
 
       const response = await fetchWeather(url.toString(), {}, { timeoutMs: 12_000, attempts: 2 });
       const requestAttempts = getWeatherResponseAttemptCount(response);
@@ -858,7 +880,7 @@ export async function collectHourlyForecast(
   targetDate: string,
   coords?: { lat: number; lon: number },
   forecastDays = 2,
-  options: { now?: number } = {},
+  options: { now?: number; signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<HourlyPoint[]> {
   const location = coords ?? HONDEGHEM;
   const now = options.now ?? Date.now();
@@ -871,7 +893,7 @@ export async function collectHourlyForecast(
     url.searchParams.set("timeformat", "unixtime");
     url.searchParams.set("forecast_days", String(Math.min(16, Math.max(1, forecastDays))));
 
-    const response = await fetchWeather(url.toString(), {}, { timeoutMs: 8_000, attempts: 1 });
+    const response = await fetchWeather(url.toString(), { signal: options.signal }, { timeoutMs: options.timeoutMs ?? 8_000, attempts: 1 });
     if (!response.ok) return [];
 
     const data = await response.json();
@@ -948,11 +970,75 @@ export async function collectHourlyForecast(
   }
 }
 
+type CurrentSnapshotCacheEntry = {
+  expiresAt: number;
+  value: Promise<CurrentWeatherSnapshot | null>;
+};
+
+export const CURRENT_WEATHER_SNAPSHOT_TTL_MS = 20_000;
+export const CURRENT_WEATHER_SNAPSHOT_CACHE_MAX_ENTRIES = 64;
+const currentWeatherSnapshotCache = new Map<string, CurrentSnapshotCacheEntry>();
+
+function currentSnapshotCacheKey(coords: { lat: number; lon: number }): string {
+  // Coordinates received from UI calls can vary below the useful model-grid
+  // precision. Canonicalise only the in-memory key; DB/archive keys are untouched.
+  return `${coords.lat.toFixed(3)},${coords.lon.toFixed(3)}`;
+}
+
+function trimCurrentSnapshotCache(now = Date.now()): void {
+  for (const [key, entry] of Array.from(currentWeatherSnapshotCache.entries())) {
+    if (entry.expiresAt <= now) currentWeatherSnapshotCache.delete(key);
+  }
+  while (currentWeatherSnapshotCache.size > CURRENT_WEATHER_SNAPSHOT_CACHE_MAX_ENTRIES) {
+    const oldest = currentWeatherSnapshotCache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    currentWeatherSnapshotCache.delete(oldest);
+  }
+}
+
+export function getCurrentWeatherSnapshotCacheMetrics() {
+  trimCurrentSnapshotCache();
+  return { entries: currentWeatherSnapshotCache.size };
+}
+
+export function resetCurrentWeatherSnapshotCache(): void {
+  currentWeatherSnapshotCache.clear();
+}
+
 /** Fetches Open-Meteo's model-provided current snapshot separately from hourly forecast values. */
 export async function collectCurrentWeatherSnapshot(
   coords?: { lat: number; lon: number },
+  options: { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<CurrentWeatherSnapshot | null> {
   const location = coords ?? HONDEGHEM;
+  const key = currentSnapshotCacheKey(location);
+  const now = Date.now();
+  trimCurrentSnapshotCache(now);
+  const cached = currentWeatherSnapshotCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    // Map insertion order is the LRU order.
+    currentWeatherSnapshotCache.delete(key);
+    currentWeatherSnapshotCache.set(key, cached);
+    return cached.value;
+  }
+
+  // A caller-owned signal must remain cancellable and cannot be allowed to
+  // cancel another reader's shared work. Unsigned calls are true single-flight.
+  if (options.signal) return collectCurrentWeatherSnapshotUncached(location, options);
+  const value = collectCurrentWeatherSnapshotUncached(location, options);
+  currentWeatherSnapshotCache.set(key, { expiresAt: now + CURRENT_WEATHER_SNAPSHOT_TTL_MS, value });
+  trimCurrentSnapshotCache();
+  void value.catch(() => {
+    if (currentWeatherSnapshotCache.get(key)?.value === value) currentWeatherSnapshotCache.delete(key);
+  });
+  return value;
+}
+
+async function collectCurrentWeatherSnapshotUncached(
+  location: { lat: number; lon: number },
+  options: { signal?: AbortSignal; timeoutMs?: number },
+): Promise<CurrentWeatherSnapshot | null> {
+  const value = (async (): Promise<CurrentWeatherSnapshot | null> => {
   try {
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", location.lat.toString());
@@ -961,7 +1047,10 @@ export async function collectCurrentWeatherSnapshot(
     url.searchParams.set("timezone", "Europe/Paris");
     url.searchParams.set("timeformat", "unixtime");
 
-    const response = await fetchWeather(url.toString(), {}, { timeoutMs: 8_000, attempts: 1 });
+    const response = await fetchWeather(url.toString(), { signal: options.signal }, {
+      timeoutMs: options.timeoutMs ?? 6_000,
+      attempts: 1,
+    });
     if (!response.ok) return null;
     const payload = await response.json();
     const current = payload.current;
@@ -991,6 +1080,8 @@ export async function collectCurrentWeatherSnapshot(
     console.error("[CurrentSnapshot] Error fetching Open-Meteo current model snapshot:", error);
     return null;
   }
+  })();
+  return value;
 }
 
 /**
@@ -1173,6 +1264,8 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
      * passe n'est pas lancée : les modèles incomplets gardent leur diagnostic.
      */
     retryBudgetMs?: number;
+    /** Propagé au transport fournisseur pour les lectures interactives annulables. */
+    signal?: AbortSignal;
   } = {},
 ): Promise<CollectedHourlyForecastModels> {
   const collectionStartedAt = Date.now();
@@ -1196,6 +1289,9 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
   const collectModel = async (model: typeof modelsToCollect[number], attempts: number): Promise<ModelAttempt> => {
     const requestStartedAt = Date.now();
     let attemptCount = 0;
+    const modelForecastDays = model.modelId
+      ? getModelRequestedForecastDays(model.name, forecastDays)
+      : forecastDays;
     try {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", location.lat.toString());
@@ -1203,12 +1299,16 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
       url.searchParams.set("hourly", HOURLY_FORECAST_VARIABLES.map((definition) => definition.apiKey).join(","));
       url.searchParams.set("timezone", "Europe/Paris");
       url.searchParams.set("timeformat", "unixtime");
-      url.searchParams.set("forecast_days", String(forecastDays));
+      url.searchParams.set("forecast_days", String(modelForecastDays));
       if (model.modelId) {
-        url.searchParams.set("models", model.modelId);
+        url.searchParams.set("models", getOpenMeteoProviderModelId(model.modelId));
       }
 
-      const response = await fetchWeather(url.toString(), {}, { timeoutMs: options.timeoutMs ?? 12_000, attempts, cacheTtlMs: 0 });
+      const response = await fetchWeather(url.toString(), { signal: options.signal }, {
+        timeoutMs: options.timeoutMs ?? 12_000,
+        attempts,
+        cacheTtlMs: 0,
+      });
       attemptCount = getWeatherResponseAttemptCount(response);
       if (!response.ok) {
         const errorCode = response.status >= 500 ? "provider_http_5xx" : response.status >= 400 ? "provider_http_4xx" : "provider_http_error";
@@ -1343,7 +1443,7 @@ export async function collectHourlyForecastAllModelsWithDiagnostics(
   if (retryIndexes.length > 0 && retryBudgetExhausted) {
     console.warn(`[HourlyAll] Retry skipped for ${retryIndexes.length} incomplete model source(s): latency budget exhausted.`);
   }
-  if (retryIndexes.length > 0 && !retryBudgetExhausted) {
+  if (retryIndexes.length > 0 && !retryBudgetExhausted && !options.signal?.aborted) {
     console.warn(`[HourlyAll] Retry targeted for ${retryIndexes.length} incomplete model source(s).`);
     await new Promise((resolve) => setTimeout(resolve, 1_200));
     const retryResults = await Promise.all(retryIndexes.map((index) => collectModel(modelsToCollect[index], 1)));

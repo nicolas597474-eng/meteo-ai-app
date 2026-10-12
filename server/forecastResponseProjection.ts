@@ -1,4 +1,4 @@
-import type { HourlyPoint } from "./weatherServices";
+import type { HourlyPoint, DayForecast } from "./weatherServices";
 
 /**
  * The Dashboard never exposes the per-variable, per-model historical weight
@@ -9,4 +9,18 @@ import type { HourlyPoint } from "./weatherServices";
  */
 export function projectHourlyForecastForDashboard(hours: readonly HourlyPoint[]): HourlyPoint[] {
   return hours.map(({ forecastWeighting: _forecastWeighting, ...hour }) => hour as HourlyPoint);
+}
+
+/** Detailed model/variable traces remain intact in the full forecast route. */
+export function projectDailyForecastForDashboard(days: readonly DayForecast[]) {
+  return days.map(({ officialFusion, ...day }) => ({
+    ...day,
+    officialFusion: {
+      issuedAt: officialFusion.issuedAt,
+      referenceAt: officialFusion.referenceAt,
+      horizonBucket: officialFusion.horizonBucket,
+      availabilityStatus: officialFusion.availabilityStatus,
+      calibrationStatus: officialFusion.calibrationStatus,
+    },
+  }));
 }

@@ -301,7 +301,17 @@ describe("collectHourlyForecastAllModels immutable run metadata", () => {
 
     expect(result.forecasts).toHaveLength(7);
     expect(result.forecasts[0]?.hours.map(({ validAt }) => validAt)).toContain(laterValidAt);
-    expect(mockedFetchWeather.mock.calls.map(([input]) => new URL(String(input))).every((url) => url.searchParams.get("forecast_days") === "16")).toBe(true);
+    const requestedHorizonByModel = new Map(mockedFetchWeather.mock.calls.map(([input]) => {
+      const url = new URL(String(input));
+      return [url.searchParams.get("models"), url.searchParams.get("forecast_days")] as const;
+    }));
+    expect(requestedHorizonByModel.get("meteofrance_arome_france_hd")).toBe("2");
+    expect(requestedHorizonByModel.get("meteofrance_arpege_europe")).toBe("4");
+    expect(requestedHorizonByModel.get("dwd_icon_eu")).toBe("5");
+    expect(requestedHorizonByModel.get("ecmwf_ifs025")).toBe("15");
+    expect(requestedHorizonByModel.get("gfs_seamless")).toBe("16");
+    expect(requestedHorizonByModel.get("gem_seamless")).toBe("10");
+    expect(requestedHorizonByModel.get("ukmo_seamless")).toBe("7");
     expect(result.diagnostics.every((diagnostic) => diagnostic.status === "succeeded"
       && diagnostic.hoursReceived === 48
       && diagnostic.valuesReceived === 960

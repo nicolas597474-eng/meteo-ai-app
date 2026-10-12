@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Crosshair, Maximize2, X } from "lucide-react";
 import { MapZoomControl } from "@/components/MapControls";
-import { getWindyMapPreferences, makeWindyMapLocationKey, type WindyMapPreferences, writeWindyMapPreferences } from "./windyMapPreferences";
+import { getWindyMapPreferences, makeLegacyWindyMapLocationKey, makeWindyMapLocationKey, type WindyMapPreferences, writeWindyMapPreferences } from "./windyMapPreferences";
 
 type WindyLayer = {
   id: string;
@@ -82,6 +82,7 @@ type WindyMapProps = {
   lat: number;
   lon: number;
   locationName?: string;
+  favoriteId?: number;
 };
 
 function LayerSelector({
@@ -115,21 +116,22 @@ function LayerSelector({
   );
 }
 
-export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
-  const preferenceLocationKey = makeWindyMapLocationKey(lat, lon);
-  const [preferences, setPreferences] = useState<WindyMapPreferences>(() => getWindyMapPreferences(preferenceLocationKey));
+export function WindyMap({ lat, lon, locationName, favoriteId }: WindyMapProps) {
+  const preferenceLocationKey = makeWindyMapLocationKey(lat, lon, favoriteId);
+  const legacyPreferenceLocationKey = makeLegacyWindyMapLocationKey(lat, lon);
+  const [preferences, setPreferences] = useState<WindyMapPreferences>(() => getWindyMapPreferences(preferenceLocationKey, legacyPreferenceLocationKey));
   const { layer: activeLayer, compactZoom, fullscreenZoom } = preferences;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [fullscreenHeight, setFullscreenHeight] = useState<number | null>(null);
-  const fullscreenHistoryPushed = useRef(false);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullscreenTransitioning, setIsFullscreenTransitioning] = useState(false);
+  const fullscreenTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    setPreferences(getWindyMapPreferences(preferenceLocationKey));
+    setPreferences(getWindyMapPreferences(preferenceLocationKey, legacyPreferenceLocationKey));
     setIframeKey((current) => current + 1);
-  }, [preferenceLocationKey]);
+  }, [legacyPreferenceLocationKey, preferenceLocationKey]);
 
   const handleLayerChange = useCallback((layerId: string) => {
     setPreferences((current) => {
@@ -141,19 +143,17 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
   }, [preferenceLocationKey]);
 
   const openFullscreen = useCallback(() => {
-    if (typeof window !== "undefined" && !isFullscreen) {
-      window.history.pushState(
-        { ...(window.history.state ?? {}), windyMapFullscreen: true },
-        "",
-        window.location.href,
-      );
-      fullscreenHistoryPushed.current = true;
-    }
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
     setIsFullscreenTransitioning(true);
     setIsFullscreen(true);
     if (typeof document !== "undefined" && !document.fullscreenElement) {
-      void document.documentElement.requestFullscreen().catch(() => undefined);
+      void document.documentElement.requestFullscreen().catch(() => {
+        // A browser can refuse native fullscreen. Do not leave a React-only
+        // fullscreen portal behind; opening the map never changes history.
+        setIsFullscreen(false);
+        setIsFullscreenTransitioning(false);
+        window.requestAnimationFrame(() => fullscreenTriggerRef.current?.focus());
+      });
     }
     transitionTimer.current = setTimeout(() => setIsFullscreenTransitioning(false), 260);
   }, [isFullscreen]);
@@ -191,19 +191,28 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
     setIsFullscreen(false);
     if (typeof document !== "undefined" && document.fullscreenElement) void document.exitFullscreen();
     transitionTimer.current = setTimeout(() => setIsFullscreenTransitioning(false), 260);
-    if (
-      typeof window !== "undefined" &&
-      fullscreenHistoryPushed.current &&
-      window.history.state?.windyMapFullscreen
-    ) {
-      fullscreenHistoryPushed.current = false;
-      window.history.back();
-    }
+    window.requestAnimationFrame(() => fullscreenTriggerRef.current?.focus());
   }, []);
 
   useEffect(() => () => {
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleFullscreenChange = () => {
+      if (document.fullscreenElement || !isFullscreen) return;
+      // Escape/native browser exit must close the portal too, but must not call
+      // history.back(): opening fullscreen intentionally never changes history.
+      setIsFullscreen(false);
+      setIsFullscreenTransitioning(false);
+      window.requestAnimationFrame(() => fullscreenTriggerRef.current?.focus());
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!isFullscreen || typeof window === "undefined") return;
@@ -214,7 +223,6 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
     };
 
     const handlePopState = () => {
-      fullscreenHistoryPushed.current = false;
       setIsFullscreen(false);
     };
 
@@ -347,6 +355,7 @@ export function WindyMap({ lat, lon, locationName }: WindyMapProps) {
           type="button"
           onClick={openFullscreen}
           aria-label="Agrandir la carte"
+          ref={fullscreenTriggerRef}
           className="absolute bottom-3 right-3 z-20 grid h-10 w-11 place-items-center rounded-xl border border-white/20 bg-[#0d1117]/80 text-slate-200 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#0d1117] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         >
           <Maximize2 className="h-5 w-5" />

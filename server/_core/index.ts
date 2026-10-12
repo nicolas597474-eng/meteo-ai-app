@@ -9,7 +9,8 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { rateLimiter, securityHeaders, corsMiddleware } from "./security";
+import { rateLimiter, securityHeaders, corsMiddleware, isRateLimitedApiPath } from "./security";
+import { weatherHttpCompression } from "./httpCompression";
 
 async function startServer() {
   // Validate environment configuration
@@ -27,10 +28,11 @@ async function startServer() {
   
   // 2. Security headers
   app.use(securityHeaders);
+  app.use(weatherHttpCompression);
   
-  // 3. Rate limiting (apply to all routes except health checks)
+  // 3. Limit API traffic, not the JavaScript/CSS needed to render the application.
   app.use((req, res, next) => {
-    if (req.path === '/health' || req.path === '/api/health') {
+    if (!isRateLimitedApiPath(req.path)) {
       return next();
     }
     return rateLimiter(req, res, next);

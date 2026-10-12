@@ -79,12 +79,33 @@ describe("page Fiabilité", () => {
     expect(source).toContain("aria-expanded={showAdditionalModelReferences}");
   });
 
-  it("présente la collecte planifiée dans une indication compacte et accessible", () => {
+  it("présente la cadence horaire contractuelle des relevés physiques dans une indication compacte et accessible", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Clock3");
-    expect(source).toContain("Collecte automatique quotidienne à 05h00, heure de Paris");
-    expect(source).toContain("Auto · 05h00 Paris");
+    expect(source).toContain('STATION_SNAPSHOT_CADENCE_LABEL = "Chaque heure à :20 UTC"');
+    expect(source).toContain("Relevés physiques automatiques");
+    expect(source).not.toContain("Auto · 05h00 Paris");
+    expect(source).not.toContain("Collecte automatique quotidienne à 05h00");
     expect(source).toContain("rounded-full border border-slate-700/80");
+  });
+
+  it("distingue une erreur technique de stations d’une absence réelle et permet les reprises ciblées", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("isOverviewError");
+    expect(source).toContain("isLiveStationsError");
+    expect(source).toContain('role="alert"');
+    expect(source).toContain("Données de stations temporairement indisponibles");
+    expect(source).toContain("Cette erreur technique ne signifie pas qu’il n’existe aucune station");
+    expect(source).toContain("Réessayer la synthèse");
+    expect(source).toContain("Réessayer les stations");
+    expect(source).toContain("Données précédentes affichées lorsqu’elles sont disponibles.");
+  });
+
+  it("porte le rayon unique du LocationContext vers Dashboard, y compris hors favori", () => {
+    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
+    expect(source).toContain("const radiusKm = activeLocation?.radiusKm ?? 20;");
+    expect(source).toContain("if (activeLocation) setActiveLocation({ ...activeLocation, radiusKm: nextRadius });");
+    expect(source).not.toContain("const [radiusKm, setRadiusKm]");
   });
 
   it("retire les trois bilans techniques demandés après la carte des stations", () => {

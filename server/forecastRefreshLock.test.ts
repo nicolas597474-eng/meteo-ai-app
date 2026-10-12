@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   acquireForecastLease,
   decideScheduledForecastJobDisposition,
   FORECAST_REFRESH_LOCK_LEASE_MS,
+  getPhysicalSnapshotLeaseLockKey,
+  renewForecastLease,
+  startForecastLeaseRenewal,
   type ForecastLeaseStore,
 } from "./forecastRefreshLock";
 
@@ -19,6 +22,12 @@ function memoryStore(initial: Record<string, Lease> = {}) {
     async claimIfExpired({ lockKey, ownerToken, now, leaseExpiresAt }) {
       const current = leases.get(lockKey);
       if (!current || current.leaseExpiresAt.getTime() > now.getTime()) return false;
+      leases.set(lockKey, { ownerToken, leaseExpiresAt });
+      return true;
+    },
+    async renewIfOwned({ lockKey, ownerToken, now, leaseExpiresAt }) {
+      const current = leases.get(lockKey);
+      if (!current || current.ownerToken !== ownerToken || current.leaseExpiresAt.getTime() <= now.getTime()) return false;
       leases.set(lockKey, { ownerToken, leaseExpiresAt });
       return true;
     },
@@ -68,6 +77,76 @@ describe("leases distribués du refresh prévision", () => {
       ownerToken: "second",
       now,
     })).toBe(false);
+  });
+
+  it("renouvelle seulement le lease vivant détenu par son propriétaire", async () => {
+    const acquiredAt = new Date("2026-09-30T08:00:00.000Z");
+    const renewAt = new Date(acquiredAt.getTime() + 60_000);
+    const { store, leases } = memoryStore({
+      "forecast-location:50.756_2.521": {
+        ownerToken: "owner-a",
+        leaseExpiresAt: new Date(acquiredAt.getTime() + FORECAST_REFRESH_LOCK_LEASE_MS),
+      },
+    });
+
+    await expect(renewForecastLease(store, {
+      lockKey: "forecast-location:50.756_2.521",
+      ownerToken: "owner-a",
+      now: renewAt,
+    })).resolves.toBe(true);
+    expect(leases.get("forecast-location:50.756_2.521")?.leaseExpiresAt.getTime())
+      .toBe(renewAt.getTime() + FORECAST_REFRESH_LOCK_LEASE_MS);
+
+    await expect(renewForecastLease(store, {
+      lockKey: "forecast-location:50.756_2.521",
+      ownerToken: "owner-b",
+      now: renewAt,
+    })).resolves.toBe(false);
+  });
+
+  it("refuse de ressusciter le lease expiré de son ancien propriétaire", async () => {
+    const expiredAt = new Date("2026-09-30T08:00:00.000Z");
+    const { store } = memoryStore({
+      "forecast-location:50.756_2.521": { ownerToken: "abandoned", leaseExpiresAt: expiredAt },
+    });
+    await expect(renewForecastLease(store, {
+      lockKey: "forecast-location:50.756_2.521",
+      ownerToken: "abandoned",
+      now: new Date(expiredAt.getTime() + 1),
+    })).resolves.toBe(false);
+  });
+});
+
+describe("clé et watchdog de lease physique", () => {
+  it("construit exactement 64 caractères pour un locationKey de 32 caractères", () => {
+    const locationKey = "x".repeat(32);
+    const key = getPhysicalSnapshotLeaseLockKey(locationKey, "2026-10-12", 3);
+    expect(key).toBe(`physical-snapshot:${locationKey}:2026-10-12:03`);
+    expect(key).toHaveLength(64);
+    expect(() => getPhysicalSnapshotLeaseLockKey("x".repeat(33), "2026-10-12", 3)).toThrow(RangeError);
+    expect(() => getPhysicalSnapshotLeaseLockKey(locationKey, "12-10-2026", 3)).toThrow(RangeError);
+    expect(() => getPhysicalSnapshotLeaseLockKey(locationKey, "2026-10-12", 24)).toThrow(RangeError);
+  });
+
+  it("unref le watchdog local et l'arrête sans lancer de renouvellement additionnel", async () => {
+    const timer = { unref: vi.fn() } as any;
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval").mockReturnValue(timer);
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval").mockImplementation(() => undefined);
+    const renew = vi.fn().mockResolvedValue(true);
+    try {
+      const watchdog = startForecastLeaseRenewal(renew, { renewalMs: 1_000 });
+      expect(timer.unref).toHaveBeenCalledOnce();
+      await expect(watchdog.renewNow()).resolves.toBe(true);
+      expect(renew).toHaveBeenCalledOnce();
+
+      watchdog.stop();
+      await expect(watchdog.renewNow()).resolves.toBe(true);
+      expect(renew).toHaveBeenCalledOnce();
+      expect(clearIntervalSpy).toHaveBeenCalledWith(timer);
+    } finally {
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    }
   });
 });
 

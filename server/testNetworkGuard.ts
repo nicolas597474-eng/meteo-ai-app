@@ -72,6 +72,9 @@ function createBlockedNetworkError(): Error & { code: string } {
 
 function getSocketTarget(args: unknown[]): SocketTarget {
   const [first, second] = args;
+  // Node can pass a normalized [options, callback] tuple as the first argument.
+  // Inspect its real target recursively instead of rejecting valid loopback fixtures.
+  if (Array.isArray(first)) return getSocketTarget(first);
   if (typeof first === "string") return { kind: "local-path" };
   if (typeof first === "number") {
     return { kind: "host", host: typeof second === "string" ? second : "localhost" };

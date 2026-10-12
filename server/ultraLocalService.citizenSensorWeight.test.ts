@@ -76,4 +76,20 @@ describe("calculateUltraLocal — pondération adaptative des capteurs citoyens"
 
     expect(poids(avecMapVide)).toEqual(poids(reference));
   });
+
+  it("n’égalise pas des stations dont tous les multiplicateurs sont nuls", () => {
+    const stations = [
+      station({ stationId: "citoyen-a", source: "opensensemap", temperature: 12, reliabilityScore: 80, sourceTier: 3 }),
+      station({ stationId: "citoyen-b", source: "cwop", temperature: 28, reliabilityScore: 80, sourceTier: 3 }),
+    ];
+    const result = calculateUltraLocal(stations, "local", 50.75, 2.52, null, null, {
+      recordStationReadings: false,
+      performanceMultiplierById: new Map([["citoyen-a", 0], ["citoyen-b", 0]]),
+    });
+
+    expect(result.temperature).toBeNull();
+    expect(result.stationCount).toBe(0);
+    expect(result.stationsUsed).toEqual([]);
+    expect(result.confidenceScore).toBeNull();
+  });
 });

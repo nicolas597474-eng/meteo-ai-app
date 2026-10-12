@@ -20,7 +20,7 @@ const fakeDatabase = vi.hoisted(() => {
 
 vi.mock("drizzle-orm/mysql2", () => ({ drizzle: fakeDatabase.drizzle }));
 
-import { getPhysicalStationHistory, upsertStationObservation } from "./db";
+import { getPhysicalStationHistory, insertStationObservationIfMissing, upsertStationObservation } from "./db";
 
 describe("archives station_observations", () => {
   beforeEach(() => {
@@ -71,6 +71,26 @@ describe("archives station_observations", () => {
 
     expect(fakeDatabase.insertValues).toHaveBeenCalledWith(observation);
     expect(fakeDatabase.insertValues.mock.calls[0]?.[0].measurementTimes).toEqual(measurementTimes);
+  });
+
+  it("conserve le premier relevé lorsque stationId et observedAt existent déjà", async () => {
+    const observation: InsertStationObservation = {
+      stationId: "station-duplicate-test",
+      observedAt: Date.parse("2026-10-05T12:05:00.000Z"),
+      measurementTimes: { temperature: "2026-10-05T12:05:00.000Z" },
+      temperature: 18,
+      humidity: null,
+      pressure: null,
+      windSpeed: null,
+      windGust: null,
+      windDirection: null,
+      precipitation: null,
+    };
+    fakeDatabase.results = [[{ id: 42 }]];
+
+    await expect(insertStationObservationIfMissing(observation)).resolves.toBe(false);
+    expect(fakeDatabase.insert).not.toHaveBeenCalled();
+    expect(fakeDatabase.insertValues).not.toHaveBeenCalled();
   });
 
   it("restitue measurementTimes inchangé depuis le lecteur des archives physiques", async () => {

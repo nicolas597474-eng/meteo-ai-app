@@ -91,11 +91,21 @@ describe("WindyMap", () => {
   });
 
   it("restaure la couche et les zooms selon le lieu actif", () => {
-    expect(source).toContain("makeWindyMapLocationKey(lat, lon)");
-    expect(source).toContain("getWindyMapPreferences(preferenceLocationKey)");
+    expect(source).toContain("makeWindyMapLocationKey(lat, lon, favoriteId)");
+    expect(source).toContain("makeLegacyWindyMapLocationKey(lat, lon)");
+    expect(source).toContain("getWindyMapPreferences(preferenceLocationKey, legacyPreferenceLocationKey)");
     expect(source).toContain("writeWindyMapPreferences(preferenceLocationKey, next)");
     expect(source).toContain("const { layer: activeLayer, compactZoom, fullscreenZoom } = preferences");
-    expect(source).toContain("setPreferences(getWindyMapPreferences(preferenceLocationKey))");
+    expect(source).toContain("setPreferences(getWindyMapPreferences(preferenceLocationKey, legacyPreferenceLocationKey))");
+  });
+
+  it("synchronise une sortie plein écran native et restitue le focus sans retour historique intempestif", () => {
+    expect(source).toContain('document.addEventListener("fullscreenchange", handleFullscreenChange)');
+    expect(source).toContain("if (document.fullscreenElement || !isFullscreen) return;");
+    expect(source).toContain("fullscreenTriggerRef.current?.focus()");
+    expect(source).toContain("requestFullscreen().catch");
+    expect(source).not.toContain("window.history.pushState");
+    expect(source).not.toContain("window.history.back()");
   });
 
   it("conserve la couche météo sans basculement de fond non fiable", () => {

@@ -57,7 +57,7 @@ import {
   type ImpactObservationRow,
   type ImpactStationRow,
 } from "../citizenFusionImpactService";
-import { composeLocalSynthesisSources } from "../citizenFusionActivationService";
+import { composeLocalSynthesisSources, applyCitizenVariableQualificationAdmission, type CitizenVariableAdmissionExclusion } from "../citizenFusionActivationService";
 import type { CitizenFusionActivation } from "../../drizzle/schema";
 import { collectCurrentWeatherSnapshot, collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
@@ -81,12 +81,15 @@ import { PROVIDER_RUN_MODEL_CAPABILITIES } from "../providerRunCapabilities";
 import { compareTraceWeights } from "../weightComparison";
 import { findActiveHourlyForecastIndex } from "../../shared/hourlyForecastTime";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
-import { buildLocalOfficialDeltaHistory } from "../localOfficialHistory";
+import { buildLocalOfficialDeltaHistory, selectOfficialHourlyTemperaturesBeforeLocalMeasurements, selectedOfficialHourlyTemperaturePoints } from "../localOfficialHistory";
+import { reconstructHistoricalOfficialTemperatures, reconstructHistoricalOfficialHours } from "../historicalOfficialForecast";
+import { getCitizenQualificationEffectiveTimesNearReference } from "../db";
+import { restrictCitizenImpactToProspectiveEvidence } from "../citizenProspectiveEvidence";
 import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights, filterForecastTraceToModelNames } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
-import { buildDatedDailyFusionFallback, resolveOfficialDailyForecastSnapshot, resolveOfficialWeatherSnapshot } from "../officialWeatherSnapshot";
-import { projectHourlyForecastForDashboard } from "../forecastResponseProjection";
+import { buildDatedDailyFusionFallback, resolveOfficialDailyForecastSnapshot, resolveOfficialWeatherSnapshot, withDeadline } from "../officialWeatherSnapshot";
+import { projectHourlyForecastForDashboard, projectDailyForecastForDashboard } from "../forecastResponseProjection";
 import { buildLiveAILabSnapshot, type LiveModelForecast } from "../aiLabLiveSnapshot";
 import { buildAILabForecastComparisonReadModel, formatAILabLocationLabel } from "../aiLabForecastComparison";
 import { getCollectedModelNames, getMissingModelNames } from "../stationCollectionModels";
@@ -96,7 +99,7 @@ import { buildReliabilityLaboratory } from "../weatherReliabilityLab";
 import { getApparentAstronomyPosition, getEnvironmentalSnapshot, getTerrainHorizonProfile } from "../environmentalData";
 import { refreshManualFusionForFavorite } from "../manualFusion";
 import { getLocalEclipseCircumstances } from "../eclipseVisibility";
-import { getWeatherProviderDiagnostics } from "../weatherFetch";
+import { getWeatherProviderDiagnostics, fetchWeather } from "../weatherFetch";
 import { buildWeatherProvenance } from "../weatherProvenance";
 import { buildEveningEvidence } from "../historyEvidence";
 import { collectPhysicalObservationSnapshotsForFavorites } from "../scheduledHandlers";
@@ -109,7 +112,7 @@ import { runHondeghemAromeShadowComparison, verifyHondeghemAromeWindDirectionAva
 import { compareOpenWeatherForecastWithOfficial } from "../openWeatherShadow";
 import { fillOpenWeatherHourlyGaps } from "../openWeatherHourlyFallback";
 import { computeOfficialHourlyForecast, OFFICIAL_HOURLY_HISTORY_DAYS, reconstructOfficialHourlyModelsFromArchive } from "../officialHourlyForecast";
-import { buildStationForecastComparison24h } from "../stationForecastComparison";
+import { buildStationForecastComparison24h, qualifyStationForecastReadings } from "../stationForecastComparison";
 import { dailyPhysicalComparisonsRouter } from "./dailyPhysicalComparisons";
 import { loadDetailedForecastSources } from "../detailedForecastLoading";
 
@@ -132,6 +135,7 @@ type LocalSynthesisSources = {
   citizenPerformanceMultiplierById: ReadonlyMap<string, number>;
   /** Capteurs citoyens porteurs d'une anomalie aiguë persistée (bloc 6) ; déjà suspendus de la composition live. */
   citizenAnomalyStationIds: ReadonlySet<string>;
+  citizenVariableExclusions: CitizenVariableAdmissionExclusion[];
 };
 
 /**
@@ -158,13 +162,14 @@ async function loadLocalSynthesisSources(
     (station) => station.source === "opensensemap" || station.source === "cwop",
   );
   const citizenStationIds = citizenStations.map((station) => station.stationId);
-  const [persistedCitizenVerdictRows, activation, sensorWeightRows, anomalyRows] = await Promise.all([
+  const [persistedCitizenVerdictRows, activation, sensorWeightRows, anomalyRows, variableVerdictRows] = await Promise.all([
     citizenStationIds.length > 0
       ? getWeatherStationQualificationVerdicts(citizenStationIds)
       : Promise.resolve([] as Awaited<ReturnType<typeof getWeatherStationQualificationVerdicts>>),
     getCitizenFusionActivationNearReference(lat, lon),
     getCitizenSensorWeightsNearReference(lat, lon),
     getCitizenSensorAnomaliesNearReference(lat, lon),
+    citizenStationIds.length > 0 ? getCitizenVariableQualificationsNearReference(lat, lon) : Promise.resolve([]),
   ]);
   const persistedCitizenVerdicts = new Map(
     persistedCitizenVerdictRows
@@ -180,13 +185,15 @@ async function loadLocalSynthesisSources(
       .map((row) => row.stationId),
   );
   const physicalStations = getPhysicalActiveStations(ranked);
-  const localSynthesisStations = composeLocalSynthesisSources({
+  const composedStations = composeLocalSynthesisSources({
     physicalStations,
     citizenStations,
     activation,
     verdictByStationId: persistedCitizenVerdicts,
     anomalousStationIds: citizenAnomalyStationIds,
   });
+  const admission = applyCitizenVariableQualificationAdmission({ stations: composedStations, variableVerdicts: variableVerdictRows });
+  const localSynthesisStations = admission.stations;
   // Seuls les poids des capteurs réellement composés dans la synthèse sont
   // transmis : une ligne obsolète ne peut jamais moduler une station physique
   // ni un capteur que le verdict persisté n'autorise plus.
@@ -196,7 +203,7 @@ async function loadLocalSynthesisSources(
       .filter((row) => composedStationIds.has(row.stationId) && Number.isFinite(row.performanceMultiplier))
       .map((row) => [row.stationId, row.performanceMultiplier] as const),
   );
-  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation, citizenPerformanceMultiplierById, citizenAnomalyStationIds };
+  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation, citizenPerformanceMultiplierById, citizenAnomalyStationIds, citizenVariableExclusions: admission.exclusions };
 }
 
 export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), selectionUpdatedAt?: Date | string, sourceLabel?: string, sourceComputedAt?: Date | string | null) {
@@ -451,28 +458,16 @@ export const weatherRouter = router({
           getParisDateDaysAgo(1),
         ),
       ]);
-      const todayOfficialForecast = computeOfficialHourlyForecast(
-        reconstructOfficialHourlyModelsFromArchive(todayRows, today),
-        hourlyScoreHistory.rows,
-        { historyAvailable: hourlyScoreHistory.available },
-      );
-      const yesterdayOfficialForecast = computeOfficialHourlyForecast(
-        reconstructOfficialHourlyModelsFromArchive(yesterdayRows, yesterday),
-        hourlyScoreHistory.rows,
-        { historyAvailable: hourlyScoreHistory.available },
-      );
-      const officialHourlyTemperatures = [...todayOfficialForecast.hours, ...yesterdayOfficialForecast.hours]
-        .flatMap((hour) => typeof hour.validAt === "number" && Number.isFinite(hour.validAt) && hour.temp != null
-          ? [{ validAt: hour.validAt, temperature: hour.temp }]
-          : []);
-      const readings = physicalHistory.stations.flatMap((station) => station.readings.map((reading) => ({
-        stationId: station.stationId,
-        observedAt: reading.observedAt,
-        temperature: reading.temperature,
-        distanceKm: Number(station.distanceKm),
-        reliabilityScore: Number(station.reliabilityScore),
-      })));
-      return buildLocalOfficialDeltaHistory(readings, officialHourlyTemperatures);
+      const readings = physicalHistory.stations.flatMap((station) => station.readings.flatMap((reading) => {
+        const raw = reading.measurementTimes?.temperature;
+        const measuredAt = typeof raw === "string" ? Date.parse(raw) : NaN;
+        if (!Number.isFinite(measuredAt) || measuredAt > Date.now() || measuredAt > reading.observedAt) return [];
+        return [{ stationId: station.stationId, observedAt: measuredAt, temperature: reading.temperature,
+          distanceKm: Number(station.distanceKm), reliabilityScore: Number(station.reliabilityScore) }];
+      }));
+      const candidates = reconstructHistoricalOfficialTemperatures(readings, [...todayRows, ...yesterdayRows], hourlyScoreHistory.rows);
+      const selections = selectOfficialHourlyTemperaturesBeforeLocalMeasurements(readings, candidates);
+      return buildLocalOfficialDeltaHistory(readings, selectedOfficialHourlyTemperaturePoints(selections));
     }),
 
   /** Écarts de poids, source par source, entre deux snapshots du même lieu. */
@@ -751,19 +746,19 @@ export const weatherRouter = router({
    */
   get15DayForecast: publicProcedure
     .input(optionalCoordinatesSchema.optional())
-    .query(async ({ input }) => {
+    .query(async ({ input, signal }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
-      const snapshot = await resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM);
-      return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, days: snapshot.daily, modelsUsed: snapshot.modelsUsed, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
+      const [snapshot, daily] = await Promise.all([resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, { includeDaily: false, signal }), resolveOfficialDailyForecastSnapshot(coords ?? HONDEGHEM, { signal })]);
+      return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, days: daily.daily, modelsUsed: daily.modelsUsed, dailyStatus: daily.dailyStatus, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source } };
     }),
 
   /** Daily horizon loaded after the Dashboard's critical current-weather response. */
   getDashboardDailyForecast: publicProcedure
     .input(optionalCoordinatesSchema.optional())
-    .query(async ({ input }) => {
+    .query(async ({ input, signal }) => {
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : HONDEGHEM;
-      const daily = await resolveOfficialDailyForecastSnapshot(coords);
-      return { days: daily.daily, modelsUsed: daily.modelsUsed };
+      const daily = await resolveOfficialDailyForecastSnapshot(coords, { signal });
+      return { days: projectDailyForecastForDashboard(daily.daily), modelsUsed: daily.modelsUsed, dailyStatus: daily.dailyStatus };
     }),
 
   /**
@@ -1101,29 +1096,38 @@ export const weatherRouter = router({
    */
   getDetailedForecast: publicProcedure
     .input(detailedForecastInputSchema.optional())
-    .query(async ({ input }) => {
+    .query(async ({ input, signal }) => {
+      const deadlineAt = Date.now() + 7_200;
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
       const coords = input?.lat != null && input?.lon != null ? { lat: input.lat, lon: input.lon } : undefined;
       const locKey = input?.lat != null && input?.lon != null ? makeLocationKey(input.lat, input.lon) : "default";
       const includeExtendedPeriods = input?.includeExtendedPeriods !== false;
 
       const { snapshot, periodHours, metadata: [meteoAI, observation, recentForecasts], hourlyFallback } = await loadDetailedForecastSources({
-        loadSnapshot: () => resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, {
-          hourlyForecastDays: includeExtendedPeriods ? 16 : 2,
-          includeDaily: includeExtendedPeriods,
-        }),
+        loadSnapshot: async () => {
+          const [snapshot, daily] = await Promise.all([
+            resolveOfficialWeatherSnapshot(coords ?? HONDEGHEM, { hourlyForecastDays: includeExtendedPeriods ? 16 : 2, includeDaily: false, signal }),
+            includeExtendedPeriods ? resolveOfficialDailyForecastSnapshot(coords ?? HONDEGHEM, { signal }) : Promise.resolve(null),
+          ]);
+          return daily ? { ...snapshot, daily: daily.daily, modelsUsed: daily.modelsUsed, dailyStatus: daily.dailyStatus } : { ...snapshot, dailyStatus: "not_requested" as const };
+        },
         includeExtendedPeriods,
-        loadExtendedPeriods: () => collectHourlyForecast(today, coords, 16),
-        loadMetadata: () => Promise.all([
-          getMeteoAIForecastByDate(today, locKey),
-          getObservationByDate(today, locKey),
+        loadExtendedPeriods: () => withDeadline(collectHourlyForecast(today, coords, 16, { signal, timeoutMs: 7_000 }), 7_000, []),
+        loadMetadata: () => withDeadline(Promise.all([
+          getMeteoAIForecastByDate(today, locKey).then(value => value ?? null),
+          getObservationByDate(today, locKey).then(value => value ?? null),
           getLatestMeteoAIForecasts(1, locKey),
-        ]),
+        ]), 2_000, [null, null, []]),
         loadHourlyFallback: (officialHours) => fillOpenWeatherHourlyGaps({
           apiKey: ENV.openWeatherMapApiKey,
           lat: (coords ?? HONDEGHEM).lat,
           lon: (coords ?? HONDEGHEM).lon,
           hours: officialHours,
+          fetchImpl: (url, init) => {
+            const remainingMs = deadlineAt - Date.now();
+            if (remainingMs <= 0) return Promise.reject(new DOMException("Forecast response budget exhausted", "AbortError"));
+            return fetchWeather(url, { ...init, signal }, { timeoutMs: remainingMs, attempts: 1 });
+          },
         }),
       });
       const officialHours = snapshot.hourly;
@@ -1151,7 +1155,8 @@ export const weatherRouter = router({
       return {
         today: snapshot.weatherDate,
         currentSnapshot: snapshot.currentSnapshot,
-        officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting },
+        officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, hourlyComputedAt: snapshot.hourlyComputedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting, hourlyStatus: snapshot.hourlyStatus, snapshotStatus: snapshot.snapshotStatus, staleReason: snapshot.staleReason },
+        dailyStatus: snapshot.dailyStatus,
         hours,
         ...(includeExtendedPeriods ? {
           hourlyFallbackDiagnostics: hourlyFallback.diagnostics,
@@ -1875,7 +1880,7 @@ export const weatherRouter = router({
           physicalStations: physicalStations.map(toImpactStationRow),
           validatedCitizens: validatedCitizens.map(toImpactStationRow),
           officialStations: officialStations.map(toImpactStationRow),
-          observations: observationRows,
+          observations: restrictCitizenImpactToProspectiveEvidence(observationRows, validatedCitizens.map(station => station.stationId), await getCitizenQualificationEffectiveTimesNearReference(input.lat, input.lon)),
           asOf,
         }),
         activation,
@@ -2050,8 +2055,13 @@ export const weatherRouter = router({
         hourlyScoreHistory.rows,
         { historyAvailable: hourlyScoreHistory.available },
       );
-      const stationHourlyReadings = stationData.stations.flatMap((station) => station.readings.filter((reading) => reading.observedAt >= sinceMs));
-      const comparison24h = buildStationForecastComparison24h(date, officialHourlyForecast.hours, stationHourlyReadings);
+      const stationHourlyReadings = qualifyStationForecastReadings(stationData.stations.flatMap((station) => station.readings.filter((reading) => reading.observedAt >= sinceMs)), now);
+      const historicalHours = reconstructHistoricalOfficialHours(
+        stationHourlyReadings.map(reading => Math.floor(Number(reading.observedAt) / 3_600_000) * 3_600_000),
+        hourlyRunValues,
+        hourlyScoreHistory.rows,
+      ).map(point => point.hour);
+      const comparison24h = buildStationForecastComparison24h(date, historicalHours, stationHourlyReadings);
 
       const parisDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
       const dateFormatter = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "short" });
@@ -2171,4 +2181,3 @@ export const weatherRouter = router({
       return buildDailyForecastVerificationReadModel(locationKey, validDate, sources.runs, sources.snapshots);
     }),
 });
-

@@ -1095,78 +1095,159 @@ export function computeOfficialHourlyForecast(
 /** Collects one shared official hourly forecast and its read-only historical score window. */
 /**
  * Budget de latence du chemin interactif (page Dashboard / Prévisions).
- * Sans lui, un fournisseur lent peut retenir la page jusqu'à ~37 s
- * (2 tentatives de 12 s + seconde passe). Ces bornes laissent les réponses
- * normales intactes et limitent le pire cas à ~20 s.
+ * Le contrôleur local annule réellement les requêtes fournisseurs avant le
+ * seuil UX de 8 s. Le mode scheduled ne passe jamais par cette borne.
  */
-export const INTERACTIVE_HOURLY_MODEL_TIMEOUT_MS = 10_000;
-export const INTERACTIVE_HOURLY_RETRY_BUDGET_MS = 10_000;
+export const INTERACTIVE_HOURLY_RESPONSE_BUDGET_MS = 7_200;
+export const INTERACTIVE_HOURLY_MODEL_TIMEOUT_MS = 6_500;
+export const INTERACTIVE_HOURLY_RETRY_BUDGET_MS = 0;
+
+export type CollectOfficialHourlyForecastOptions = {
+  forecastDays?: number;
+  interactive?: boolean;
+  /** Caller-owned cancellation for a non-shared, direct collection. */
+  signal?: AbortSignal;
+  /** Absolute deadline set before any preceding interactive work (for example archive I/O). */
+  deadlineAt?: number;
+};
+
+function unavailableInteractiveHourlyResult(reason: string): CollectedOfficialHourlyForecast {
+  const availabilityReasonByModel = Object.fromEntries(
+    OFFICIAL_HOURLY_MODEL_NAMES.map((modelName) => [modelName, reason]),
+  );
+  return {
+    ...computeOfficialHourlyForecast([], [], {
+      historyAvailable: false,
+      exactHistoryAvailable: false,
+      availabilityReasonByModel,
+    }),
+    modelForecasts: [],
+  };
+}
 
 export async function collectOfficialHourlyForecast(
   targetDate: string,
   coords?: { lat: number; lon: number },
-  options: { forecastDays?: number; interactive?: boolean } = {},
+  options: CollectOfficialHourlyForecastOptions = {},
 ): Promise<CollectedOfficialHourlyForecast> {
   const location = coords ?? HONDEGHEM;
-  const collection = await collectHourlyForecastAllModelsWithDiagnostics(targetDate, location, {
-    includeBestMatch: false,
-    includeNextDay: true,
-    forecastDays: options.forecastDays ?? 2,
-    ...(options.interactive ? {
-      timeoutMs: INTERACTIVE_HOURLY_MODEL_TIMEOUT_MS,
-      retryBudgetMs: INTERACTIVE_HOURLY_RETRY_BUDGET_MS,
-    } : {}),
-  });
-  const modelForecasts = collection.forecasts;
-  const availabilityReasonByModel = Object.fromEntries(collection.diagnostics
-    .filter((diagnostic) => diagnostic.status !== "succeeded")
-    .map((diagnostic) => [diagnostic.modelName, diagnostic.errorCode ?? `Collecte ${diagnostic.status}; ${diagnostic.valuesReceived}/${diagnostic.expectedValueCount} valeurs reçues.`]));
-  const referenceAt = Date.now();
-  let historyAvailable = false;
-  let exactHistoryAvailable = false;
-  let historyScores: OfficialHourlyEvaluationHistoryScore[] = [];
-  let exactHistoryScores: OfficialHourlyEvaluationHistoryScore[] = [];
-  const exactHistoryKeys = new Map<string, HourlyExactHorizonHistoryKey>();
-  for (const forecast of modelForecasts) {
-    if (!MODEL_NAME_SET.has(forecast.modelName)
-      || forecast.sourceName !== "open-meteo"
-      || forecast.modelId !== MODEL_ID_BY_NAME.get(forecast.modelName)
-      || !isFiniteNumber(forecast.providerRunAt)
-      || !Number.isSafeInteger(forecast.providerRunAt)
-      || !isFiniteNumber(forecast.availableAt)
-      || forecast.providerRunAt > forecast.availableAt) continue;
-    for (const hour of forecast.hours) {
-      if (!isFiniteNumber(hour.validAt) || hour.validAt <= forecast.providerRunAt) continue;
-      const horizonMilliseconds = hour.validAt - forecast.providerRunAt;
-      if (!Number.isSafeInteger(horizonMilliseconds) || !getForecastHorizonWindow(horizonMilliseconds / 60_000)) continue;
-      for (const variable of HISTORY_VARIABLES) {
-        if (!isFiniteNumber(hour[FORECAST_FIELD_BY_VARIABLE[variable]])) continue;
-        const key = {
-          modelName: forecast.modelName,
-          modelId: forecast.modelId!,
-          variable,
-          horizonMilliseconds,
-        };
-        exactHistoryKeys.set([key.modelName, key.modelId, key.variable, key.horizonMilliseconds].join("|"), key);
+  const startedAt = Date.now();
+  const interactiveBudgetMs = options.interactive
+    ? Math.max(0, Math.min(
+      INTERACTIVE_HOURLY_RESPONSE_BUDGET_MS,
+      options.deadlineAt == null ? INTERACTIVE_HOURLY_RESPONSE_BUDGET_MS : options.deadlineAt - startedAt,
+    ))
+    : null;
+  if (interactiveBudgetMs === 0) {
+    return unavailableInteractiveHourlyResult("Le budget de réponse interactive est déjà expiré; aucune prévision horaire n’est publiée.");
+  }
+  const interactiveController = options.interactive
+    ? new AbortController()
+    : null;
+  const budgetSignal = interactiveController
+    ? AbortSignal.any([interactiveController.signal, ...(options.signal ? [options.signal] : [])])
+    : options.signal;
+  let resolveBudgetExpiry: (() => void) | null = null;
+  const budgetExpired = interactiveController
+    ? new Promise<"budget_expired">((resolve) => { resolveBudgetExpiry = () => resolve("budget_expired"); })
+    : null;
+  const budgetTimer = interactiveController
+    ? setTimeout(() => {
+      interactiveController.abort(new DOMException("Interactive weather budget exhausted", "TimeoutError"));
+      resolveBudgetExpiry?.();
+    }, interactiveBudgetMs!)
+    : null;
+  let collection;
+  try {
+    const collectionPromise = collectHourlyForecastAllModelsWithDiagnostics(targetDate, location, {
+      includeBestMatch: false,
+      includeNextDay: true,
+      forecastDays: options.forecastDays ?? 2,
+      ...(options.interactive ? {
+        timeoutMs: INTERACTIVE_HOURLY_MODEL_TIMEOUT_MS,
+        retryBudgetMs: INTERACTIVE_HOURLY_RETRY_BUDGET_MS,
+        signal: budgetSignal,
+      } : options.signal ? { signal: options.signal } : {}),
+    });
+    const collectionResult = budgetExpired == null
+      ? { kind: "collected" as const, collection: await collectionPromise }
+      : await Promise.race([
+        collectionPromise.then((resolved) => ({ kind: "collected" as const, collection: resolved })),
+        budgetExpired,
+      ]);
+    if (collectionResult === "budget_expired") {
+      return unavailableInteractiveHourlyResult("Le fournisseur n’a pas répondu avant le budget interactif; aucune valeur horaire n’est publiée.");
+    }
+    collection = collectionResult.collection;
+    const modelForecasts = collection.forecasts;
+    const availabilityReasonByModel = Object.fromEntries(collection.diagnostics
+      .filter((diagnostic) => diagnostic.status !== "succeeded")
+      .map((diagnostic) => [diagnostic.modelName, diagnostic.errorCode ?? `Collecte ${diagnostic.status}; ${diagnostic.valuesReceived}/${diagnostic.expectedValueCount} valeurs reçues.`]));
+    const referenceAt = Date.now();
+    let historyAvailable = false;
+    let exactHistoryAvailable = false;
+    let historyScores: OfficialHourlyEvaluationHistoryScore[] = [];
+    let exactHistoryScores: OfficialHourlyEvaluationHistoryScore[] = [];
+    const exactHistoryKeys = new Map<string, HourlyExactHorizonHistoryKey>();
+    for (const forecast of modelForecasts) {
+      if (!MODEL_NAME_SET.has(forecast.modelName)
+        || forecast.sourceName !== "open-meteo"
+        || forecast.modelId !== MODEL_ID_BY_NAME.get(forecast.modelName)
+        || !isFiniteNumber(forecast.providerRunAt)
+        || !Number.isSafeInteger(forecast.providerRunAt)
+        || !isFiniteNumber(forecast.availableAt)
+        || forecast.providerRunAt > forecast.availableAt) continue;
+      for (const hour of forecast.hours) {
+        if (!isFiniteNumber(hour.validAt) || hour.validAt <= forecast.providerRunAt) continue;
+        const horizonMilliseconds = hour.validAt - forecast.providerRunAt;
+        if (!Number.isSafeInteger(horizonMilliseconds) || !getForecastHorizonWindow(horizonMilliseconds / 60_000)) continue;
+        for (const variable of HISTORY_VARIABLES) {
+          if (!isFiniteNumber(hour[FORECAST_FIELD_BY_VARIABLE[variable]])) continue;
+          const key = {
+            modelName: forecast.modelName,
+            modelId: forecast.modelId!,
+            variable,
+            horizonMilliseconds,
+          };
+          exactHistoryKeys.set([key.modelName, key.modelId, key.variable, key.horizonMilliseconds].join("|"), key);
+        }
       }
     }
+    try {
+      const historyRequest = getHourlyForecastEvaluationHistory(
+        makeLocationKey(location.lat, location.lon),
+        getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
+        getParisDateDaysAgo(1),
+        Array.from(exactHistoryKeys.values()),
+      );
+      const remainingBudgetMs = interactiveBudgetMs == null
+        ? null
+        : Math.max(0, interactiveBudgetMs - (Date.now() - startedAt));
+      const history = remainingBudgetMs == null
+        ? await historyRequest
+        : remainingBudgetMs === 0
+          ? null
+          : await new Promise<Awaited<typeof historyRequest> | null>((resolve) => {
+            const timer = setTimeout(() => resolve(null), remainingBudgetMs);
+            void historyRequest.then(
+              (value) => { clearTimeout(timer); resolve(value); },
+              () => { clearTimeout(timer); resolve(null); },
+            );
+          });
+      if (history) {
+        historyAvailable = history.available;
+        historyScores = history.rows;
+        exactHistoryAvailable = history.exactAvailable;
+        exactHistoryScores = history.exactRows;
+      }
+    } catch (error) {
+      console.warn("[OfficialHourly] Historical scores unavailable; available forecasts will use a robust non-calibrated weighting:", error);
+    }
+    return {
+      ...computeOfficialHourlyForecast(modelForecasts, historyScores, { historyAvailable, exactHistoryAvailable, exactHistoryScores, referenceAt, availabilityReasonByModel }),
+      modelForecasts,
+    };
+  } finally {
+    if (budgetTimer) clearTimeout(budgetTimer);
   }
-  try {
-    const history = await getHourlyForecastEvaluationHistory(
-      makeLocationKey(location.lat, location.lon),
-      getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
-      getParisDateDaysAgo(1),
-      Array.from(exactHistoryKeys.values()),
-    );
-    historyAvailable = history.available;
-    historyScores = history.rows;
-    exactHistoryAvailable = history.exactAvailable;
-    exactHistoryScores = history.exactRows;
-  } catch (error) {
-    console.warn("[OfficialHourly] Historical scores unavailable; available forecasts will use a robust non-calibrated weighting:", error);
-  }
-  return {
-    ...computeOfficialHourlyForecast(modelForecasts, historyScores, { historyAvailable, exactHistoryAvailable, exactHistoryScores, referenceAt, availabilityReasonByModel }),
-    modelForecasts,
-  };
 }

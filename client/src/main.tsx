@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { httpBatchLink, httpLink, splitLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
@@ -38,15 +38,21 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
-const trpcClient = trpc.createClient({
-  links: [
-    httpBatchLink({
-      url: "/api/trpc",
-      transformer: superjson,
-      // Une requête météo lente ne doit pas faire échouer le lot contenant
-      // la navigation, l’authentification et les autres données de la page.
-      maxItems: 1,
-      headers() {
+const FAST_BATCHED_QUERY_PATHS = new Set([
+  // Small metadata/read-model requests that often mount together. Keep this
+  // allow-list deliberately narrow: forecast, snapshot and station searches
+  // may wait on providers and must never create head-of-line blocking here.
+  "weather.getRegimeCatalogue",
+  "weather.getForecastProvenance",
+  "weather.getStationRankingCriteria",
+  "favorites.list",
+  "favorites.getPreloadedForecasts",
+]);
+
+const transportOptions = {
+  url: "/api/trpc",
+  transformer: superjson,
+  headers() {
         // Preview auto-login fallback: when the browser blocks iframe cookies
         // (Safari ITP / private browsing / WebView), the runtime mirrors the
         // session into sessionStorage so we can forward it as a Bearer token.
@@ -65,13 +71,26 @@ const trpcClient = trpc.createClient({
           // sessionStorage unavailable
         }
         return {};
+  },
+  fetch(input: RequestInfo | URL, init?: RequestInit) {
+    return globalThis.fetch(input, {
+      ...(init ?? {}),
+      credentials: "include",
+    });
+  },
+};
+
+const trpcClient = trpc.createClient({
+  links: [
+    splitLink({
+      condition(op) {
+        return op.type === "query" && FAST_BATCHED_QUERY_PATHS.has(op.path);
       },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
-      },
+      // Independent lightweight reads share a small bounded batch.
+      true: httpBatchLink({ ...transportOptions, maxItems: 6 }),
+      // Forecasts, provider-backed snapshots, searches and all mutations stay
+      // on individual requests to avoid global batch head-of-line blocking.
+      false: httpLink(transportOptions),
     }),
   ],
 });

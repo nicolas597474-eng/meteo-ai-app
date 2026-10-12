@@ -109,6 +109,12 @@ export default function WeatherDetails() {
   return (
     <div className="weather-page-sky forecast-details-page min-h-dvh w-full overflow-x-clip bg-[#061426]" style={pageSkyStyle}>
       <div className="mx-auto w-full min-w-0 max-w-none space-y-3 px-4 pt-[max(env(safe-area-inset-top),0.25rem)] pb-24 sm:max-w-2xl sm:space-y-5 sm:px-3 sm:py-4 sm:pb-28">
+        {(data.dailyStatus === "not_ready" || data.officialSnapshot.hourlyStatus === "not_ready" || data.officialSnapshot.snapshotStatus === "stale") && (
+          <div role="status" className="rounded-xl border border-amber-300/25 bg-amber-300/[0.06] p-3 text-xs text-amber-100">
+            <p>{data.officialSnapshot.snapshotStatus === "stale" ? "Dernière prévision archivée affichée pendant le rafraîchissement." : "Prévisions partiellement disponibles : une source n’a pas encore répondu."} Les données manquantes ne sont pas inventées.</p>
+            <button type="button" disabled={isFetching} onClick={() => void refetch()} className="mt-2 min-h-10 rounded-lg border border-amber-300/30 px-3 font-semibold disabled:opacity-50">{isFetching ? "Rafraîchissement…" : "Réessayer les données manquantes"}</button>
+          </div>
+        )}
         <ForecastByDaySection
           locationName={activeLocation?.name ?? DEFAULT_OFFICIAL_FORECAST_LOCATION.name}
           hours={displayHours}
@@ -263,7 +269,7 @@ export default function WeatherDetails() {
             </div>
           </div>
           {activeLocation ? (
-            <WindyMap lat={activeLocation.lat} lon={activeLocation.lon} locationName={activeLocation.name} />
+            <WindyMap lat={activeLocation.lat} lon={activeLocation.lon} locationName={activeLocation.name} favoriteId={activeLocation.favoriteId} />
           ) : (
             <p className="text-xs text-slate-400">Sélectionnez un lieu favori pour afficher la carte météo.</p>
           )}

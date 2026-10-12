@@ -54,15 +54,48 @@ function sourceTimestamp(value: Date | string | null | undefined): number | null
 
 export function getSpatialFreshnessScore(updatedAt: Date | string | null | undefined, now = Date.now()): number {
   const observedAt = sourceTimestamp(updatedAt);
+  // Un relevé daté dans le futur n'est pas une mesure fraîche : il est
+  // temporellement indisponible. Ne jamais le ramener artificiellement à 0 min.
+  if (observedAt != null && observedAt > now) return 0;
   const ageMin = observedAt == null ? 60 : Math.max(0, (now - observedAt) / 60_000);
   return Math.exp(-ageMin / 60);
 }
 
-export function normalizeSpatialWeights(values: readonly number[]): number[] {
+export type SpatialZeroWeightPolicy = "uniform" | "zero";
+
+/**
+ * Normalise des poids positifs. Le repli uniforme conserve le comportement
+ * historique pour une liste sans signal intrinsèque. Les appelants qui ont
+ * explicitement annulé toutes les sources doivent demander `zero` : rétablir
+ * une moyenne égale contournerait alors une pénalité ou un multiplicateur.
+ */
+export function normalizeSpatialWeights(
+  values: readonly number[],
+  zeroWeightPolicy: SpatialZeroWeightPolicy = "uniform",
+): number[] {
   const safe = values.map((value) => Number.isFinite(value) && value > 0 ? value : 0);
   const total = safe.reduce((sum, value) => sum + value, 0);
   if (total > 0) return safe.map((value) => value / total);
+  if (zeroWeightPolicy === "zero") return safe.map(() => 0);
   return safe.length === 0 ? [] : safe.map(() => 1 / safe.length);
+}
+
+/**
+ * Variante interne qui conserve l'égalisation historique d'une composante
+ * dépourvue de signal (p. ex. toutes les fiabilités à 0), mais seulement parmi
+ * les sources déjà temporellement admissibles. Ainsi, une date future ne peut
+ * jamais profiter du repli uniforme, tandis que les parts IDW 50/30/20 des
+ * sources valides restent inchangées.
+ */
+function normalizeTemporalEligibleComponent(
+  values: readonly number[],
+  temporalEligibility: readonly boolean[],
+): number[] {
+  const safe = values.map((value, index) => temporalEligibility[index] && Number.isFinite(value) && value > 0 ? value : 0);
+  const total = safe.reduce((sum, value) => sum + value, 0);
+  if (total > 0) return safe.map((value) => value / total);
+  const eligibleCount = temporalEligibility.filter(Boolean).length;
+  return eligibleCount === 0 ? safe : temporalEligibility.map((eligible) => eligible ? 1 / eligibleCount : 0);
 }
 
 /**
@@ -88,9 +121,16 @@ export function evaluateSpatialQuality<T extends SpatialFusionSource>(
     checks.push({ code: "distance", passed: distanceOk, value: Number.isFinite(distance) ? `${distance.toFixed(1)} km` : "inconnue", threshold: `≤ ${options.maxDistanceKm} km`, reason: "Distance hors périmètre" });
 
     const timestamp = sourceTimestamp(source.updatedAt);
-    const ageMin = timestamp == null ? Number.POSITIVE_INFINITY : Math.max(0, (now - timestamp) / 60_000);
+    const futureTimestamp = timestamp != null && timestamp > now;
+    const ageMin = timestamp == null || futureTimestamp ? Number.POSITIVE_INFINITY : Math.max(0, (now - timestamp) / 60_000);
     const freshnessOk = ageMin <= options.maxFreshnessMin;
-    checks.push({ code: "freshness", passed: freshnessOk, value: Number.isFinite(ageMin) ? `${Math.round(ageMin)} min` : "inconnue", threshold: `≤ ${options.maxFreshnessMin} min`, reason: "Donnée trop ancienne" });
+    checks.push({
+      code: "freshness",
+      passed: freshnessOk,
+      value: futureTimestamp ? "horodatage futur" : Number.isFinite(ageMin) ? `${Math.round(ageMin)} min` : "inconnue",
+      threshold: `≤ ${options.maxFreshnessMin} min`,
+      reason: futureTimestamp ? "Horodatage futur" : "Donnée trop ancienne",
+    });
 
     const reliability = Math.max(0, Math.min(100, source.reliabilityScore ?? 50));
     const reliabilityOk = reliability >= options.minReliabilityScore;
@@ -172,12 +212,24 @@ export function buildNormalizedSpatialWeights<T extends SpatialFusionSource>(
   const now = options.now ?? Date.now();
   const idwExponent = options.idwExponent ?? SPATIAL_FUSION_IDW_EXPONENT;
   const distanceEpsilonKm = options.distanceEpsilonKm ?? SPATIAL_FUSION_DISTANCE_EPSILON_KM;
-  const distanceRaw = sources.map((source) => 1 / Math.pow(Math.max(0, source.distanceKm) + distanceEpsilonKm, idwExponent));
-  const qualityRaw = sources.map((source) => Math.max(0, Math.min(100, source.reliabilityScore ?? 50)) / 100);
-  const freshnessRaw = sources.map((source) => getSpatialFreshnessScore(source.updatedAt, now));
-  const distanceWeights = normalizeSpatialWeights(distanceRaw);
-  const qualityWeights = normalizeSpatialWeights(qualityRaw);
-  const freshnessWeights = normalizeSpatialWeights(freshnessRaw);
+  // Cette API est aussi appelée directement par quelques consommateurs. Une
+  // source future doit donc être nulle ici, même si leur QC amont est contourné.
+  const temporalEligibility = sources.map((source) => {
+    const timestamp = sourceTimestamp(source.updatedAt);
+    return timestamp == null || timestamp <= now;
+  });
+  const distanceRaw = sources.map((source, index) => temporalEligibility[index]
+    ? 1 / Math.pow(Math.max(0, source.distanceKm) + distanceEpsilonKm, idwExponent)
+    : 0);
+  const qualityRaw = sources.map((source, index) => temporalEligibility[index]
+    ? Math.max(0, Math.min(100, source.reliabilityScore ?? 50)) / 100
+    : 0);
+  const freshnessRaw = sources.map((source, index) => temporalEligibility[index]
+    ? getSpatialFreshnessScore(source.updatedAt, now)
+    : 0);
+  const distanceWeights = normalizeTemporalEligibleComponent(distanceRaw, temporalEligibility);
+  const qualityWeights = normalizeTemporalEligibleComponent(qualityRaw, temporalEligibility);
+  const freshnessWeights = normalizeTemporalEligibleComponent(freshnessRaw, temporalEligibility);
   const preliminary = sources.map((source, index) => {
     const performanceWeight = Math.max(0, options.performanceMultiplierById?.get(source.id) ?? 1);
     const anomalyPenalty = Math.max(0, Math.min(1, options.anomalyPenaltyById?.get(source.id) ?? 1));
@@ -185,7 +237,9 @@ export function buildNormalizedSpatialWeights<T extends SpatialFusionSource>(
       + qualityWeights[index] * SPATIAL_FUSION_COMPONENT_SHARES.quality
       + freshnessWeights[index] * SPATIAL_FUSION_COMPONENT_SHARES.freshness) * performanceWeight * anomalyPenalty;
   });
-  const finalWeights = normalizeSpatialWeights(preliminary);
+  // Les poids nuls ci-dessus proviennent de modulateurs explicites (performance
+  // ou anomalie). Une normalisation uniforme les réintroduirait à tort.
+  const finalWeights = normalizeSpatialWeights(preliminary, "zero");
 
   return sources.map((source, index) => {
     const altitudeAdjustmentC = options.refAltitude != null && source.altitude != null

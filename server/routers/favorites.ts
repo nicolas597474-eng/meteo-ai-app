@@ -118,7 +118,7 @@ export function getModeAlignedFusionConstraints(mode: LocalMode) {
 }
 
 import { collectNearbyStations, rankStations, calculateGroundTruth, getPhysicalActiveStations, fetchCurrentModelReferences } from "../stationService";
-import { collect15DayForecast, collectHourlyForecast } from "../weatherServices";
+import { collect15DayForecast, collectHourlyForecast, collectCurrentWeatherSnapshot } from "../weatherServices";
 import { computeFusion, EXTENDED_REGIME_INFO, type FusionSource } from "../fusionEngine";
 import { buildFavoriteHourlyRegime } from "../favoriteRegime";
 import { calculateUltraLocal, getUltraLocalConfig, type LocalMode } from "../ultraLocalService";
@@ -249,8 +249,8 @@ export const favoritesRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const localRadiusKm = Math.max(...getUltraLocalConfig("local").config.radiusBands.map((band) => band.maxKm));
-      const [officialSnapshot, stations] = await Promise.all([
-        resolveOfficialWeatherSnapshot({ lat: input.lat, lon: input.lon }, { includeDaily: false }),
+      const [currentSnapshot, stations] = await Promise.all([
+        collectCurrentWeatherSnapshot({ lat: input.lat, lon: input.lon }),
         collectNearbyStations(
           input.lat,
           input.lon,
@@ -259,12 +259,15 @@ export const favoritesRouter = router({
           getDashboardNetatmoCollectionOptions(ctx.user),
         ),
       ]);
-      return buildCurrentDashboardWeatherState({
+      const state = buildCurrentDashboardWeatherState({
         lat: input.lat,
         lon: input.lon,
-        snapshot: officialSnapshot.currentSnapshot,
+        snapshot: currentSnapshot,
         stations,
       });
+      // Raw observations are diagnostic data, not needed by the current card.
+      for (const field of Object.values(state.fields)) delete field.observations;
+      return state;
     }),
 
   /**

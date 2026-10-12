@@ -1,6 +1,6 @@
 export const isTransientWeatherStatus = (status: number) => status === 408 || status === 429 || status >= 500;
 
-type WeatherFetchOptions = {
+export type WeatherFetchOptions = {
   timeoutMs?: number;
   attempts?: number;
   cacheTtlMs?: number;
@@ -29,9 +29,17 @@ export type WeatherProviderDiagnostic = {
 };
 
 type ProviderDiagnosticState = Omit<WeatherProviderDiagnostic, "freshnessMs">;
+type InFlightWeatherResponse = {
+  response: CachedWeatherResponse;
+  attempts: number;
+};
 
+/** Bound process-local state: public coordinate URLs must not grow these Maps indefinitely. */
+export const WEATHER_FETCH_CACHE_MAX_ENTRIES = 128;
+export const WEATHER_PROVIDER_DIAGNOSTICS_MAX_ENTRIES = 64;
 const responseCache = new Map<string, CachedWeatherResponse>();
 const providerDiagnostics = new Map<string, ProviderDiagnosticState>();
+const inFlightGetRequests = new Map<string, Promise<InFlightWeatherResponse>>();
 const responseAttemptCounts = new WeakMap<Response, number>();
 let cacheHits = 0;
 let cacheMisses = 0;
@@ -65,6 +73,22 @@ function responseFromCache(cached: CachedWeatherResponse): Response {
   });
 }
 
+function touchLruEntry<T>(cache: Map<string, T>, key: string, value: T): void {
+  cache.delete(key);
+  cache.set(key, value);
+}
+
+function trimResponseCache(now = Date.now()): void {
+  for (const [key, entry] of Array.from(responseCache.entries())) {
+    if (entry.expiresAt <= now) responseCache.delete(key);
+  }
+  while (responseCache.size > WEATHER_FETCH_CACHE_MAX_ENTRIES) {
+    const oldest = responseCache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    responseCache.delete(oldest);
+  }
+}
+
 async function makeCachedWeatherResponse(response: Response, expiresAt: number): Promise<CachedWeatherResponse> {
   const snapshot = response.clone();
   return {
@@ -77,11 +101,17 @@ async function makeCachedWeatherResponse(response: Response, expiresAt: number):
 }
 
 function recordProviderDiagnostic(diagnostic: ProviderDiagnosticState) {
-  providerDiagnostics.set(diagnostic.provider, diagnostic);
+  touchLruEntry(providerDiagnostics, diagnostic.provider, diagnostic);
+  while (providerDiagnostics.size > WEATHER_PROVIDER_DIAGNOSTICS_MAX_ENTRIES) {
+    const oldest = providerDiagnostics.keys().next().value as string | undefined;
+    if (!oldest) break;
+    providerDiagnostics.delete(oldest);
+  }
 }
 
 export function getWeatherFetchCacheMetrics() {
-  return { entries: responseCache.size, hits: cacheHits, misses: cacheMisses };
+  trimResponseCache();
+  return { entries: responseCache.size, inFlight: inFlightGetRequests.size, hits: cacheHits, misses: cacheMisses };
 }
 
 export function getWeatherProviderDiagnostics(now = Date.now()): WeatherProviderDiagnostic[] {
@@ -97,6 +127,7 @@ export function getWeatherProviderDiagnostics(now = Date.now()): WeatherProvider
 
 export function resetWeatherFetchCache() {
   responseCache.clear();
+  inFlightGetRequests.clear();
   cacheHits = 0;
   cacheMisses = 0;
 }
@@ -105,17 +136,113 @@ export function resetWeatherProviderDiagnostics() {
   providerDiagnostics.clear();
 }
 
+function combinedAbortSignal(external: AbortSignal | null | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return external ? AbortSignal.any([external, timeout]) : timeout;
+}
+
+function retryDelay(attempt: number, signal: AbortSignal | null | undefined): Promise<void> {
+  const delayMs = Math.min(1_000, 200 * (2 ** Math.max(0, attempt - 1)));
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException("Request aborted", "AbortError"));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, delayMs);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(signal.reason ?? new DOMException("Request aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+
+async function executeWeatherRequest(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  options: Required<WeatherFetchOptions>,
+  provider: string,
+): Promise<InFlightWeatherResponse> {
+  let lastError: unknown;
+  let lastStatus: number | null = null;
+  const startedAt = Date.now();
+
+  for (let attempt = 1; attempt <= options.attempts; attempt += 1) {
+    if (init.signal?.aborted) throw init.signal.reason ?? new DOMException("Request aborted", "AbortError");
+    try {
+      // The caller signal reaches the provider transport; the timeout remains per attempt.
+      const response = await fetch(input, { ...init, signal: combinedAbortSignal(init.signal, options.timeoutMs) });
+      const completedAt = Date.now();
+      if (response.ok) {
+        const snapshot = await makeCachedWeatherResponse(response, completedAt + options.cacheTtlMs);
+        recordProviderDiagnostic({
+          provider,
+          lastOutcome: "success",
+          lastObservedAt: new Date(completedAt).toISOString(),
+          lastNetworkAttemptAt: new Date(startedAt).toISOString(),
+          lastSuccessAt: new Date(completedAt).toISOString(),
+          lastDurationMs: completedAt - startedAt,
+          lastStatus: response.status,
+          lastError: null,
+          lastAttempts: attempt,
+          lastRetries: attempt - 1,
+        });
+        return { response: snapshot, attempts: attempt };
+      }
+
+      lastStatus = response.status;
+      if (!isTransientWeatherStatus(response.status) || attempt === options.attempts) {
+        const snapshot = await makeCachedWeatherResponse(response, completedAt);
+        const previous = providerDiagnostics.get(provider);
+        recordProviderDiagnostic({
+          provider,
+          lastOutcome: "http_error",
+          lastObservedAt: new Date(completedAt).toISOString(),
+          lastNetworkAttemptAt: new Date(startedAt).toISOString(),
+          lastSuccessAt: previous?.lastSuccessAt ?? null,
+          lastDurationMs: completedAt - startedAt,
+          lastStatus,
+          lastError: `HTTP ${response.status}`,
+          lastAttempts: attempt,
+          lastRetries: attempt - 1,
+        });
+        return { response: snapshot, attempts: attempt };
+      }
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      // A user/server-budget abort is definitive; never turn it into a retry.
+      if (init.signal?.aborted) throw init.signal.reason ?? error;
+      lastError = error;
+    }
+
+    if (attempt < options.attempts) await retryDelay(attempt, init.signal);
+  }
+
+  const completedAt = Date.now();
+  const previous = providerDiagnostics.get(provider);
+  recordProviderDiagnostic({
+    provider,
+    lastOutcome: "network_error",
+    lastObservedAt: new Date(completedAt).toISOString(),
+    lastNetworkAttemptAt: new Date(startedAt).toISOString(),
+    lastSuccessAt: previous?.lastSuccessAt ?? null,
+    lastDurationMs: completedAt - startedAt,
+    lastStatus,
+    lastError: lastError instanceof Error ? lastError.message : "Source météo indisponible",
+    lastAttempts: options.attempts,
+    lastRetries: Math.max(0, options.attempts - 1),
+  });
+  throw lastError instanceof Error ? lastError : new Error("La source météo est indisponible.");
+}
+
 export async function fetchWeather(
   input: RequestInfo | URL,
   init: RequestInit = {},
   options: WeatherFetchOptions = {}
 ): Promise<Response> {
   const timeoutMs = options.timeoutMs ?? 10_000;
-  const attempts = options.attempts ?? 2;
+  const attempts = Math.max(1, Math.floor(options.attempts ?? 2));
   const cacheTtlMs = options.cacheTtlMs ?? 20_000;
   const key = cacheKey(input, init);
   const provider = providerName(input);
   const now = Date.now();
+  trimResponseCache(now);
   const cached = key ? responseCache.get(key) : null;
   if (cached && cached.expiresAt > now) {
     cacheHits += 1;
@@ -132,90 +259,34 @@ export async function fetchWeather(
       lastAttempts: 0,
       lastRetries: 0,
     });
+    touchLruEntry(responseCache, key!, cached);
     const cachedResponse = responseFromCache(cached);
     responseAttemptCounts.set(cachedResponse, 0);
     return cachedResponse;
   }
   if (key) {
     responseCache.delete(key);
-    cacheMisses += 1;
   }
 
-  let lastError: unknown;
-  let lastStatus: number | null = null;
-  const startedAt = Date.now();
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      const response = await fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-      if (response.ok) {
-        if (key && cacheTtlMs > 0) {
-          try {
-            const expiresAt = Date.now() + cacheTtlMs;
-            responseCache.set(key, await makeCachedWeatherResponse(response, expiresAt));
-          } catch {
-            // La réponse réseau reste rendue à l’appel courant, sans conserver
-            // un flux potentiellement consommé pour un appel ultérieur.
-            responseCache.delete(key);
-          }
-        }
-        const completedAt = Date.now();
-        recordProviderDiagnostic({
-          provider,
-          lastOutcome: "success",
-          lastObservedAt: new Date(completedAt).toISOString(),
-          lastNetworkAttemptAt: new Date(startedAt).toISOString(),
-          lastSuccessAt: new Date(completedAt).toISOString(),
-          lastDurationMs: completedAt - startedAt,
-          lastStatus: response.status,
-          lastError: null,
-          lastAttempts: attempt,
-          lastRetries: attempt - 1,
-        });
-        responseAttemptCounts.set(response, attempt);
-        return response;
+  const resolvedOptions = { timeoutMs, attempts, cacheTtlMs };
+  // Signal-bearing work is not shared: cancelling one request must not abort an
+  // unrelated reader. Ordinary cacheable GETs are single-flight.
+  const shared = key && !init.signal ? inFlightGetRequests.get(key) : undefined;
+  if (!shared) cacheMisses += 1;
+  const request = shared ?? executeWeatherRequest(input, init, resolvedOptions, provider);
+  if (key && !init.signal && !shared) {
+    inFlightGetRequests.set(key, request);
+    void request.then((result) => {
+      if (cacheTtlMs > 0) {
+        touchLruEntry(responseCache, key, result.response);
+        trimResponseCache();
       }
-
-      lastStatus = response.status;
-      if (!isTransientWeatherStatus(response.status) || attempt === attempts) {
-        const completedAt = Date.now();
-        const previous = providerDiagnostics.get(provider);
-        recordProviderDiagnostic({
-          provider,
-          lastOutcome: "http_error",
-          lastObservedAt: new Date(completedAt).toISOString(),
-          lastNetworkAttemptAt: new Date(startedAt).toISOString(),
-          lastSuccessAt: previous?.lastSuccessAt ?? null,
-          lastDurationMs: completedAt - startedAt,
-          lastStatus,
-          lastError: `HTTP ${response.status}`,
-          lastAttempts: attempt,
-          lastRetries: attempt - 1,
-        });
-        responseAttemptCounts.set(response, attempt);
-        return response;
-      }
-      lastError = new Error(`HTTP ${response.status}`);
-    } catch (error) {
-      lastError = error;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }).catch(() => undefined).finally(() => {
+      if (inFlightGetRequests.get(key) === request) inFlightGetRequests.delete(key);
+    });
   }
-
-  const completedAt = Date.now();
-  const previous = providerDiagnostics.get(provider);
-  recordProviderDiagnostic({
-    provider,
-    lastOutcome: "network_error",
-    lastObservedAt: new Date(completedAt).toISOString(),
-    lastNetworkAttemptAt: new Date(startedAt).toISOString(),
-    lastSuccessAt: previous?.lastSuccessAt ?? null,
-    lastDurationMs: completedAt - startedAt,
-    lastStatus,
-    lastError: lastError instanceof Error ? lastError.message : "Source météo indisponible",
-    lastAttempts: attempts,
-    lastRetries: Math.max(0, attempts - 1),
-  });
-  throw lastError instanceof Error ? lastError : new Error("La source météo est indisponible.");
+  const result = await request;
+  const response = responseFromCache(result.response);
+  responseAttemptCounts.set(response, result.attempts);
+  return response;
 }
