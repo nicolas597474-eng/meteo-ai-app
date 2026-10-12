@@ -31,7 +31,7 @@ function createPublicContext(): TrpcContext {
   };
 }
 
-// Fixtures de test only : stations et relevÃ©s synthÃ©tiques, aucune observation rÃ©elle.
+// Fixtures de test only : stations et relevés synthétiques, aucune observation réelle.
 
 const REFERENCE = { lat: 50.7567, lon: 2.5204 };
 
@@ -57,7 +57,7 @@ function stationFixture(
     id: 1,
     stationId,
     source,
-    name: `${stationId} Â· station de test`,
+    name: `${stationId} · station de test`,
     lat: 50.76,
     lon: 2.52,
     altitude: 20,
@@ -80,7 +80,7 @@ function observationFixture(stationId: string, measuredAtIso: string, temperatur
   return {
     id: 1,
     stationId,
-    // L'heure d'archive diffÃ¨re de l'heure de mesure : elle ne doit jamais servir.
+    // L'heure d'archive diffère de l'heure de mesure : elle ne doit jamais servir.
     observedAt: Date.parse(measuredAtIso) + 5 * 60 * 1000,
     temperature,
     humidity: null,
@@ -114,8 +114,8 @@ beforeEach(() => {
   vi.mocked(getCitizenFusionActivationNearReference).mockResolvedValue(null);
 });
 
-describe("weather.getCitizenFusionImpact Â· Ã©valuation Ã  blanc des capteurs validÃ©s", () => {
-  it("ne mesure rien et n'interroge pas davantage la base sans capteur validÃ© pour la rÃ©fÃ©rence", async () => {
+describe("weather.getCitizenFusionImpact · évaluation à blanc des capteurs validés", () => {
+  it("ne mesure rien et n'interroge pas davantage la base sans capteur validé pour la référence", async () => {
     vi.mocked(getValidatedCitizenStationsNearReference).mockResolvedValue([]);
 
     const report = await weatherRouter
@@ -126,7 +126,7 @@ describe("weather.getCitizenFusionImpact Â· Ã©valuation Ã  blanc des capte
     expect(getValidatedCitizenStationsNearReference).toHaveBeenCalledWith(REFERENCE.lat, REFERENCE.lon);
     // La décision d'activation persistée est relue en parallèle, même sans capteur validé.
     expect(getCitizenFusionActivationNearReference).toHaveBeenCalledTimes(1);
-    // Sans capteur validÃ©, aucun autre lecteur n'est sollicitÃ© : rien n'est mesurÃ©.
+    // Sans capteur validé, aucun autre lecteur n'est sollicité : rien n'est mesuré.
     expect(getActivePhysicalStationsNearReference).not.toHaveBeenCalled();
     expect(getValidatedOfficialStationsNearReference).not.toHaveBeenCalled();
     expect(getStationObservationsForQualification).not.toHaveBeenCalled();
@@ -139,7 +139,7 @@ describe("weather.getCitizenFusionImpact Â· Ã©valuation Ã  blanc des capte
     expect(report.activation).toBeNull();
   });
 
-  it("mesure l'Ã©cart des deux bras sur l'historique archivÃ© sans jamais Ã©crire en base", async () => {
+  it("mesure l'écart des deux bras sur l'historique archivé sans jamais écrire en base", async () => {
     vi.mocked(getValidatedCitizenStationsNearReference).mockResolvedValue([
       stationFixture("opensensemap-6740", "opensensemap", 1.5, 60),
     ]);
@@ -158,8 +158,8 @@ describe("weather.getCitizenFusionImpact Â· Ã©valuation Ã  blanc des capte
       .createCaller(createPublicContext())
       .getCitizenFusionImpact({ lat: REFERENCE.lat, lon: REFERENCE.lon });
 
-    // Les relevÃ©s couvrent capteurs validÃ©s, stations physiques et rÃ©fÃ©rences
-    // officielles de la mÃªme rÃ©fÃ©rence de favori.
+    // Les relevés couvrent capteurs validés, stations physiques et références
+    // officielles de la même référence de favori.
     expect(getStationObservationsForQualification).toHaveBeenCalledTimes(1);
     const [requestedIds] = vi.mocked(getStationObservationsForQualification).mock.calls[0];
     expect(requestedIds).toContain("opensensemap-6740");
@@ -167,14 +167,14 @@ describe("weather.getCitizenFusionImpact Â· Ã©valuation Ã  blanc des capte
     expect(requestedIds).toContain("mf-70260");
     expect(requestedIds).toContain("mf-70290");
 
-    // Le rapport est mesurÃ©, pas estimÃ© : mÃªmes lignes en entrÃ©e, mÃªme rapport.
+    // Le rapport est mesuré, pas estimé : mêmes lignes en entrée, même rapport.
     expect(report.status).toBe("improves");
     expect(report.comparisons).toBe(MEASURED_HOURS.length);
     expect(report.distinctDays).toBe(3);
     expect(report.baselineMaeC).toBeCloseTo(0.676, 3);
     expect(report.withCitizenMaeC).toBeCloseTo(0.373, 3);
     expect(report.improvementC).toBeCloseTo(0.303, 3);
-    expect(report.reason).toContain("rien n'est activÃ© ici");
+    expect(report.reason).toContain("rien n'est activé ici");
     expect(report.activation).toBeNull();
   });
 

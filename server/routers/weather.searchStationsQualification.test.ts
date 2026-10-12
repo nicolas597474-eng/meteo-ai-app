@@ -33,14 +33,14 @@ function createPublicContext(): TrpcContext {
   };
 }
 
-// Fixtures de test only : stations synthÃ©tiques, aucune observation rÃ©elle.
+// Fixtures de test only : stations synthétiques, aucune observation réelle.
 
 function stationFixture(): StationData {
   const now = new Date().toISOString();
   return {
     stationId: "netatmo-public-42",
     source: "netatmo",
-    name: "Netatmo Â· Station de test",
+    name: "Netatmo · Station de test",
     lat: 50.76,
     lon: 2.52,
     altitude: 10,
@@ -74,7 +74,7 @@ function citizenStationFixture(stationId: string, source: "opensensemap" | "cwop
   return {
     stationId,
     source,
-    name: `${source} Â· capteur citoyen de test`,
+    name: `${source} · capteur citoyen de test`,
     lat: 50.755,
     lon: 2.522,
     altitude: 20,
@@ -102,7 +102,7 @@ function citizenStationFixture(stationId: string, source: "opensensemap" | "cwop
     isActive: false,
     qualificationStatus: "candidate",
     sourceTier: 3,
-    exclusionReason: "Capteur citoyen en validation â non utilisÃ© dans la tempÃ©rature locale",
+    exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
   };
 }
 
@@ -116,8 +116,8 @@ beforeEach(() => {
   vi.mocked(getCitizenFusionActivationNearReference).mockResolvedValue(null);
 });
 
-describe("weather.searchStations Â· verdicts de qualification persistÃ©s", () => {
-  it("surcharge le statut live des capteurs citoyens avec le verdict persistÃ©, sans toucher aux stations physiques", async () => {
+describe("weather.searchStations · verdicts de qualification persistés", () => {
+  it("surcharge le statut live des capteurs citoyens avec le verdict persisté, sans toucher aux stations physiques", async () => {
     const collection: NearbyStationsCollection = {
       stations: [
         citizenStationFixture("opensensemap-6740", "opensensemap", 1.8),
@@ -144,7 +144,7 @@ describe("weather.searchStations Â· verdicts de qualification persistÃ©s", (
         stationId: "cwop-EW1234",
         qualificationStatus: "excluded",
         exclusionReason:
-          "Erreur trop grande : MAE 2.9 Â°C au-delÃ  de la borne d'acceptation 1.5 Â°C, dÃ©rivÃ©e du dÃ©saccord officiel mesurÃ© (0.5 Â°C).",
+          "Erreur trop grande : MAE 2.9 °C au-delà de la borne d'acceptation 1.5 °C, dérivée du désaccord officiel mesuré (0.5 °C).",
       },
     ]);
 
@@ -154,7 +154,7 @@ describe("weather.searchStations Â· verdicts de qualification persistÃ©s", (
       radiusKm: 20,
     });
 
-    // Seuls les capteurs citoyens sont interrogÃ©s, jamais la station physique.
+    // Seuls les capteurs citoyens sont interrogés, jamais la station physique.
     expect(getWeatherStationQualificationVerdicts).toHaveBeenCalledTimes(1);
     const requestedIds = vi.mocked(getWeatherStationQualificationVerdicts).mock.calls[0][0];
     expect(requestedIds).toContain("opensensemap-6740");
@@ -164,8 +164,8 @@ describe("weather.searchStations Â· verdicts de qualification persistÃ©s", (
 
     const byStationId = new Map(result.stations.map((station) => [station.stationId, station]));
 
-    // Capteur validÃ© : le verdict persistÃ© remplace le statut live Â« candidate Â»
-    // et son motif live ; isActive n'est jamais rÃ©activÃ© par la vue.
+    // Capteur validé : le verdict persisté remplace le statut live « candidate »
+    // et son motif live ; isActive n'est jamais réactivé par la vue.
     const validated = byStationId.get("opensensemap-6740");
     expect(validated).toMatchObject({
       source: "opensensemap",
@@ -175,26 +175,26 @@ describe("weather.searchStations Â· verdicts de qualification persistÃ©s", (
       sourceTier: 3,
     });
 
-    // Capteur exclu : statut et motif persistÃ©s repris tels quels.
+    // Capteur exclu : statut et motif persistés repris tels quels.
     const excluded = byStationId.get("cwop-EW1234");
     expect(excluded).toMatchObject({
       source: "cwop",
       qualificationStatus: "excluded",
       exclusionReason:
-        "Erreur trop grande : MAE 2.9 Â°C au-delÃ  de la borne d'acceptation 1.5 Â°C, dÃ©rivÃ©e du dÃ©saccord officiel mesurÃ© (0.5 Â°C).",
+        "Erreur trop grande : MAE 2.9 °C au-delà de la borne d'acceptation 1.5 °C, dérivée du désaccord officiel mesuré (0.5 °C).",
       isActive: false,
     });
 
-    // Candidat sans verdict persistÃ© : le statut live reste la vÃ©ritÃ©.
+    // Candidat sans verdict persisté : le statut live reste la vérité.
     const untouchedCandidate = byStationId.get("opensensemap-9999");
     expect(untouchedCandidate).toMatchObject({
       source: "opensensemap",
       qualificationStatus: "candidate",
-      exclusionReason: "Capteur citoyen en validation â non utilisÃ© dans la tempÃ©rature locale",
+      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
       isActive: false,
     });
 
-    // Station physique : aucun overlay, aucune Ã©criture du statut.
+    // Station physique : aucun overlay, aucune écriture du statut.
     const physical = byStationId.get("netatmo-public-42");
     expect(physical).toMatchObject({
       source: "netatmo",
@@ -204,7 +204,7 @@ describe("weather.searchStations Â· verdicts de qualification persistÃ©s", (
     expect(physical?.exclusionReason).toBeFalsy();
   });
 
-  it("nâinterroge jamais les verdicts persistÃ©s quand aucune station citoyenne nâest collectÃ©e", async () => {
+  it("n’interroge jamais les verdicts persistés quand aucune station citoyenne n’est collectée", async () => {
     const collection: NearbyStationsCollection = {
       stations: [stationFixture()],
       sourceDiagnostics: [

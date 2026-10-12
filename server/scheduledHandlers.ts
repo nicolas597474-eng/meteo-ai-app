@@ -191,7 +191,7 @@ export function countConsecutiveTechnicalFailures(traces: Array<{ status: string
   return count;
 }
 
-/** Une seule alerte est demandÃ©e au franchissement exact du seuil, sans rÃ©pÃ©tition. */
+/** Une seule alerte est demandée au franchissement exact du seuil, sans répétition. */
 export function shouldNotifyOwnerForTechnicalFailures(streak: number): boolean {
   return streak === TECHNICAL_FAILURE_ALERT_THRESHOLD;
 }
@@ -214,8 +214,8 @@ export type PhysicalSnapshotCollectionLocationResult = {
 
 /**
  * Collecte les observations physiques pour un ensemble de favoris. Les modes
- * manuel et de reprise restent strictement additifs : un relevÃ©, snapshot ou
- * trace dÃ©jÃ  archivÃ© pour lâheure de Paris en cours nâest jamais rÃ©Ã©crit.
+ * manuel et de reprise restent strictement additifs : un relevé, snapshot ou
+ * trace déjà archivé pour l’heure de Paris en cours n’est jamais réécrit.
  */
 export async function collectPhysicalObservationSnapshotsForFavorites(
   favorites: readonly PhysicalSnapshotFavorite[],
@@ -231,9 +231,9 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
   const preserveArchivedEvidence = trigger === "manual" || trigger === "recovery";
   const recoveryOnly = trigger === "recovery";
 
-  // Deux lieux sont collectÃ©s en parallÃ¨le, comme la collecte de prÃ©visions.
-  // Cela conserve les Ã©critures indÃ©pendantes par lieu tout en Ã©vitant que deux
-  // appels fournisseurs successifs dÃ©passent le dÃ©lai du callback Heartbeat.
+  // Deux lieux sont collectés en parallèle, comme la collecte de prévisions.
+  // Cela conserve les écritures indépendantes par lieu tout en évitant que deux
+  // appels fournisseurs successifs dépassent le délai du callback Heartbeat.
   await processWithConcurrency(Array.from(unique.values()), 2, async (favorite) => {
     const locationKey = makeLocationKey(favorite.lat, favorite.lon);
     const locationStartedAt = Date.now();
@@ -250,13 +250,13 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
       traceForHour = traces.find((trace) => trace.hour === hour) ?? null;
     }
 
-    // La principale comme la reprise s'arrÃªtent immÃ©diatement lorsqu'une preuve
-    // rÃ©ussie existe dÃ©jÃ  pour le crÃ©neau. Une ancienne trace no_station/failed
-    // n'empÃªche pas la reprise de tenter de produire le snapshot manquant.
+    // La principale comme la reprise s'arrêtent immédiatement lorsqu'une preuve
+    // réussie existe déjà pour le créneau. Une ancienne trace no_station/failed
+    // n'empêche pas la reprise de tenter de produire le snapshot manquant.
     const successfulEvidenceAlreadyArchived = snapshotAlreadyArchived || traceForHour?.status === "stored";
     if ((trigger === "scheduled" || recoveryOnly) && successfulEvidenceAlreadyArchived) {
-      // Un passage normal peut rapprocher les Ã©missions pending du snapshot
-      // dÃ©jÃ  archivÃ©, sans nouvelle collecte ni rÃ©Ã©criture de celui-ci.
+      // Un passage normal peut rapprocher les émissions pending du snapshot
+      // déjà archivé, sans nouvelle collecte ni réécriture de celui-ci.
       await runOptionalBackgroundTask(`local-precipitation-nowcast-outcome:${locationKey}:${date}:${hour}`, () =>
         evaluateLocalPrecipitationNowcastOutcomesForSnapshot({
           locationKey,
@@ -272,8 +272,8 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         skipped: true,
         snapshotPreserved: true,
         reason: trigger === "recovery"
-          ? "CrÃ©neau dÃ©jÃ  archivÃ© par le passage horaire principal ; reprise ignorÃ©e."
-          : "CrÃ©neau dÃ©jÃ  archivÃ© ; nouvelle exÃ©cution planifiÃ©e ignorÃ©e.",
+          ? "Créneau déjà archivé par le passage horaire principal ; reprise ignorée."
+          : "Créneau déjà archivé ; nouvelle exécution planifiée ignorée.",
         durationMs: Date.now() - locationStartedAt,
       });
       return;
@@ -331,12 +331,12 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           if (await insertStationObservationIfMissing(observation)) directReadingsAdded++;
         });
 
-        // Les capteurs citoyens openSenseMap et CWOP sont archivÃ©s comme
-        // candidats pour accumuler l'historique exigÃ© par la qualification MAE
-        // vs SYNOP. Ils n'entrent jamais dans la synthÃ¨se physique du crÃ©neau,
+        // Les capteurs citoyens openSenseMap et CWOP sont archivés comme
+        // candidats pour accumuler l'historique exigé par la qualification MAE
+        // vs SYNOP. Ils n'entrent jamais dans la synthèse physique du créneau,
         // et une erreur d'archive candidat ne peut pas interrompre la collecte
-        // officielle. Un verdict dÃ©jÃ  appliquÃ© (validÃ© ou exclu) demeure :
-        // l'archive horaire rafraÃ®chit les mÃ©tadonnÃ©es sans jamais rÃ©trograder
+        // officielle. Un verdict déjà appliqué (validé ou exclu) demeure :
+        // l'archive horaire rafraîchit les métadonnées sans jamais rétrograder
         // le statut.
         const candidateStations = getCandidateStations(discovered).filter((candidate) => candidate.source === "opensensemap" || candidate.source === "cwop");
         let persistedQualificationByStation = new Map<string, { qualificationStatus: string; exclusionReason: string | null }>();
@@ -347,7 +347,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
                 .map((verdict) => [verdict.stationId, verdict] as const),
             );
           } catch (verdictReadError: any) {
-            console.warn("[Stations] Statuts de qualification persistÃ©s illisibles, archivage en statut candidat :", verdictReadError.message);
+            console.warn("[Stations] Statuts de qualification persistés illisibles, archivage en statut candidat :", verdictReadError.message);
           }
         }
         for (const station of candidateStations) {
@@ -371,7 +371,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
               isActive: persistedStatus === "validated" ? 1 : 0,
               exclusionReason: isPersistedDefinitive
                 ? persistedVerdict?.exclusionReason ?? null
-                : station.exclusionReason ?? "Capteur citoyen en validation â non utilisÃ© dans la tempÃ©rature locale",
+                : station.exclusionReason ?? "Capteur citoyen en validation — non utilisé dans la température locale",
               qualificationStatus: persistedStatus ?? "candidate",
               sourceTier: station.sourceTier ?? 3,
             });
@@ -390,7 +390,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
               precipitation: station.precipitation,
             });
           } catch (candidateError: any) {
-            console.warn(`[Stations] Archive du capteur citoyen ${station.stationId} ignorÃ©e :`, candidateError.message);
+            console.warn(`[Stations] Archive du capteur citoyen ${station.stationId} ignorée :`, candidateError.message);
           }
         }
 
@@ -403,7 +403,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
             attempts: attempt + 1,
             directReadingsAdded,
             snapshotPreserved: true,
-            reason: "Le snapshot horaire dÃ©jÃ  archivÃ© est conservÃ© ; seuls les nouveaux relevÃ©s directs ont Ã©tÃ© ajoutÃ©s.",
+            reason: "Le snapshot horaire déjà archivé est conservé ; seuls les nouveaux relevés directs ont été ajoutés.",
           };
           results.push(locationResult);
           break;
@@ -423,7 +423,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
             stored: false,
             attempts: attempt + 1,
             directReadingsAdded,
-            reason: "Aucune station physique qualifiÃ©e",
+            reason: "Aucune station physique qualifiée",
           };
           results.push(locationResult);
           break;
@@ -452,7 +452,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
               attempts: attempt + 1,
               directReadingsAdded,
               reason: trigger === "recovery"
-                ? "ArchivÃ© via la reprise automatique aprÃ¨s lâabsence de trace du passage principal."
+                ? "Archivé via la reprise automatique après l’absence de trace du passage principal."
                 : undefined,
             }
           : {
@@ -462,10 +462,10 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
               attempts: attempt + 1,
               directReadingsAdded,
               snapshotPreserved: true,
-              reason: "Le snapshot horaire a Ã©tÃ© archivÃ© entre-temps ; les nouveaux relevÃ©s directs ont Ã©tÃ© conservÃ©s sans le remplacer.",
+              reason: "Le snapshot horaire a été archivé entre-temps ; les nouveaux relevés directs ont été conservés sans le remplacer.",
             };
-        // Extension strictement shadow : toute indisponibilitÃ© du nowcasting ne
-        // peut ni bloquer ni rÃ©Ã©crire le snapshot physique ou la prÃ©vision publique.
+        // Extension strictement shadow : toute indisponibilité du nowcasting ne
+        // peut ni bloquer ni réécrire le snapshot physique ou la prévision publique.
         await runOptionalBackgroundTask(`local-temperature-nowcast:${locationKey}:${date}:${hour}`, () =>
           rebuildLocalTemperatureNowcastForSnapshot({
             locationKey,
@@ -473,8 +473,8 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
             observationHour: hour,
           }),
         );
-        // Le signal prÃ©cipitations reste catÃ©goriel : il ne modifie aucun
-        // montant officiel et toute indisponibilitÃ© reste non bloquante.
+        // Le signal précipitations reste catégoriel : il ne modifie aucun
+        // montant officiel et toute indisponibilité reste non bloquante.
         await runOptionalBackgroundTask(`local-precipitation-nowcast:${locationKey}:${date}:${hour}`, async () => {
           await rebuildLocalPrecipitationNowcastForSnapshot({
             locationKey,
@@ -497,7 +497,7 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
           continue;
         }
         console.error(`[MeteoAI] Physical snapshot collection failed after ${HOURLY_SNAPSHOT_MAX_ATTEMPTS} attempts for ${favorite.customName ?? favorite.name}:`, message);
-        locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, directReadingsAdded, reason: `Erreur de collecte aprÃ¨s relance : ${message}` };
+        locationResult = { locationKey, stationCount: 0, stored: false, attempts: attempt + 1, directReadingsAdded, reason: `Erreur de collecte après relance : ${message}` };
         results.push(locationResult);
       }
     }
@@ -526,8 +526,8 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
         await upsertPhysicalSnapshotCollectionTrace({
           ...trace,
           reason: trigger === "recovery"
-            ? "Snapshot archivÃ© par la reprise automatique aprÃ¨s un passage principal sans preuve rÃ©ussie."
-            : "Snapshot archivÃ© par une nouvelle exÃ©cution planifiÃ©e aprÃ¨s une trace initiale sans preuve rÃ©ussie.",
+            ? "Snapshot archivé par la reprise automatique après un passage principal sans preuve réussie."
+            : "Snapshot archivé par une nouvelle exécution planifiée après une trace initiale sans preuve réussie.",
         });
       } else {
         console.info(`[MeteoAI] Physical trace preserved for ${locationKey} at ${date} ${hour}h (${traceForHour.status}).`);
@@ -547,11 +547,11 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     const newlyAlertableFailures = thresholdBreaches.filter((failure) => shouldNotifyOwnerForTechnicalFailures(failure.streak));
     if (newlyAlertableFailures.length > 0) {
     const parisTime = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
-      const failedList = newlyAlertableFailures.map((failure) => `â¢ ${failure.locationKey} â ${failure.reason ?? "raison inconnue"} (${failure.streak} Ã©checs techniques consÃ©cutifs)`).join("\n");
+      const failedList = newlyAlertableFailures.map((failure) => `• ${failure.locationKey} — ${failure.reason ?? "raison inconnue"} (${failure.streak} échecs techniques consécutifs)`).join("\n");
     try {
       await notifyOwner({
-          title: "MeteoAI Â· Ãchecs techniques horaires rÃ©pÃ©tÃ©s",
-          content: `Au moins ${TECHNICAL_FAILURE_ALERT_THRESHOLD} collectes physiques consÃ©cutives ont Ã©chouÃ© Ã  ${parisTime} (heure de Paris).\n\nLieux concernÃ©s :\n${failedList}\n\nLes crÃ©neaux Â« aucune station qualifiÃ©e Â» ne dÃ©clenchent pas cette alerte. Les prÃ©visions et archives existantes ne sont pas modifiÃ©es.`,
+          title: "MeteoAI · Échecs techniques horaires répétés",
+          content: `Au moins ${TECHNICAL_FAILURE_ALERT_THRESHOLD} collectes physiques consécutives ont échoué à ${parisTime} (heure de Paris).\n\nLieux concernés :\n${failedList}\n\nLes créneaux « aucune station qualifiée » ne déclenchent pas cette alerte. Les prévisions et archives existantes ne sont pas modifiées.`,
       });
     } catch (notifError) {
         console.warn("[MeteoAI] Owner notification failed after repeated technical collection failures:", notifError);
@@ -559,13 +559,13 @@ export async function collectPhysicalObservationSnapshotsForFavorites(
     }
   }
 
-  // L'Ã©valuation des capteurs citoyens openSenseMap est une extension isolÃ©e
-  // de la collecte horaire : une indisponibilitÃ© de la base ne peut jamais
-  // interrompre ni retarder l'archivage physique ni le statut renvoyÃ©.
+  // L'évaluation des capteurs citoyens openSenseMap est une extension isolée
+  // de la collecte horaire : une indisponibilité de la base ne peut jamais
+  // interrompre ni retarder l'archivage physique ni le statut renvoyé.
   await runOptionalBackgroundTask("openSenseMap-qualification", async () => {
     const qualification = await evaluateOpenSenseMapQualifications();
     if (qualification.verdicts.length > 0) {
-      console.log(`[Stations] Qualification openSenseMap : ${qualification.verdicts.length} verdict(s) appliquÃ©(s) sur ${qualification.evaluatedCandidates} capteur(s) Ã©valuÃ©(s).`);
+      console.log(`[Stations] Qualification openSenseMap : ${qualification.verdicts.length} verdict(s) appliqué(s) sur ${qualification.evaluatedCandidates} capteur(s) évalué(s).`);
     }
   });
 
@@ -599,18 +599,18 @@ export type OpenSenseMapQualificationEvaluationSummary = {
 };
 
 /**
- * Ãvalue chaque capteur citoyen openSenseMap ou CWOP encore candidat Ã  partir
- * de son historique archivÃ© et des stations officielles persistÃ©es pour la mÃªme
- * rÃ©fÃ©rence de favori, puis applique les verdicts dÃ©finitifs. Un capteur sans
- * historique suffisant demeure candidat sans aucune Ã©criture : l'Ã©valuation
- * est idempotente et la source de vÃ©ritÃ© reste l'historique archivÃ©.
+ * Évalue chaque capteur citoyen openSenseMap ou CWOP encore candidat à partir
+ * de son historique archivé et des stations officielles persistées pour la même
+ * référence de favori, puis applique les verdicts définitifs. Un capteur sans
+ * historique suffisant demeure candidat sans aucune écriture : l'évaluation
+ * est idempotente et la source de vérité reste l'historique archivé.
  */
 export async function evaluateOpenSenseMapQualifications(nowMs = Date.now()): Promise<OpenSenseMapQualificationEvaluationSummary> {
   const candidates = await getCandidateOpenSenseMapStations();
   if (candidates.length === 0) return { evaluatedCandidates: 0, verdicts: [] };
 
-  // Les stations officielles se lisent par rÃ©fÃ©rence de favori : le dÃ©saccord
-  // qui mesure la borne d'acceptation est local, jamais rÃ©gional.
+  // Les stations officielles se lisent par référence de favori : le désaccord
+  // qui mesure la borne d'acceptation est local, jamais régional.
   const officialStationsByReference = new Map<string, Awaited<ReturnType<typeof getValidatedOfficialStationsNearReference>>>();
   for (const referenceKey of Array.from(new Set(candidates.map((candidate) => `${candidate.refLat}:${candidate.refLon}`)))) {
     const [refLat, refLon] = referenceKey.split(":").map(Number);
@@ -667,7 +667,7 @@ export async function evaluateCitizenFusionActivations(nowMs = Date.now()): Prom
     persisted: 0,
   };
 
-  for (const reference of references.values()) {
+  for (const reference of Array.from(references.values())) {
     try {
       const [validatedCitizens, existingActivation] = await Promise.all([
         getValidatedCitizenStationsNearReference(reference.lat, reference.lon),
@@ -748,9 +748,9 @@ export async function evaluateCitizenFusionActivations(nowMs = Date.now()): Prom
 }
 
 /**
- * ExÃ©cute chaque lieu une seule fois, avec une concurrence bornÃ©e. La collecte
- * reste donc complÃ¨te pour tous les favoris, sans sÃ©rialiser inutilement les
- * appels indÃ©pendants ni surcharger le fournisseur mÃ©tÃ©o.
+ * Exécute chaque lieu une seule fois, avec une concurrence bornée. La collecte
+ * reste donc complète pour tous les favoris, sans sérialiser inutilement les
+ * appels indépendants ni surcharger le fournisseur météo.
  */
 export async function processWithConcurrency<T>(
   items: readonly T[],
@@ -789,7 +789,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       status: "running",
       scheduleCronTaskUid: user.taskUid,
     }, { requireDatabase: true });
-    if (jobId <= 0) throw new Error("Impossible de crÃ©er le journal de collecte quotidien.");
+    if (jobId <= 0) throw new Error("Impossible de créer le journal de collecte quotidien.");
 
     try {
       // Default location key for Hondeghem (legacy)
@@ -817,13 +817,13 @@ export async function collectForecastsHandler(req: Request, res: Response) {
       }));
 
       if (forecastRows.length === 0) {
-        throw new Error("Aucune prÃ©vision quotidienne exploitable Ã  persister.");
+        throw new Error("Aucune prévision quotidienne exploitable à persister.");
       }
       await insertForecasts(forecastRows, { requireDatabase: true });
       const issuedAt = Date.now();
 
-      // Les sept modÃ¨les dÃ©terministes alimentent la fusion officielle. Best Match
-      // reste archivÃ© comme rÃ©fÃ©rence dÃ©rivÃ©e, sÃ©parÃ©e et non pondÃ©rÃ©e.
+      // Les sept modèles déterministes alimentent la fusion officielle. Best Match
+      // reste archivé comme référence dérivée, séparée et non pondérée.
       const allForecasts = expertData;
 
       if (allForecasts.length > 0) {
@@ -848,18 +848,18 @@ export async function collectForecastsHandler(req: Request, res: Response) {
         // Do not ask the LLM to narrate an uncalibrated equal-source ensemble.
         let explanation = meteoAI.coreCalibrationComplete
           ? ""
-          : `${meteoAI.methodNote} Les valeurs disponibles restent publiÃ©es avec un statut explicite de calibration robuste ou partielle.`;
+          : `${meteoAI.methodNote} Les valeurs disponibles restent publiées avec un statut explicite de calibration robuste ou partielle.`;
         if (meteoAI.coreCalibrationComplete) {
           try {
             const llmResult = await invokeLLM({
               messages: [
                 {
                   role: "system",
-                  content: "Tu es MeteoAI, un assistant mÃ©tÃ©o expert pour Hondeghem (Nord). GÃ©nÃ¨re une explication concise (3-4 phrases) de la prÃ©vision du jour en franÃ§ais, en citant les sources disponibles et sans inventer de note globale de confiance.",
+                  content: "Tu es MeteoAI, un assistant météo expert pour Hondeghem (Nord). Génère une explication concise (3-4 phrases) de la prévision du jour en français, en citant les sources disponibles et sans inventer de note globale de confiance.",
                 },
                 {
                   role: "user",
-                  content: `PrÃ©vision MeteoAI pour ${today}:\n- TempÃ©rature: ${meteoAI.tempMin}Â°C Ã  ${meteoAI.tempMax}Â°C\n- PrÃ©cipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- ${allForecasts.filter((forecast) => OFFICIAL_DAILY_COVERAGE_MODEL_SET.has(forecast.serviceName)).length} modÃ¨les dÃ©terministes disponibles; Best Match est une rÃ©fÃ©rence dÃ©rivÃ©e non pondÃ©rÃ©e\n\nGÃ©nÃ¨re une explication naturelle et concise, sans score global.`,
+                  content: `Prévision MeteoAI pour ${today}:\n- Température: ${meteoAI.tempMin}°C à ${meteoAI.tempMax}°C\n- Précipitations: ${meteoAI.precipitation}mm\n- Vent: ${meteoAI.windSpeed} km/h\n- ${allForecasts.filter((forecast) => OFFICIAL_DAILY_COVERAGE_MODEL_SET.has(forecast.serviceName)).length} modèles déterministes disponibles; Best Match est une référence dérivée non pondérée\n\nGénère une explication naturelle et concise, sans score global.`,
                 },
               ],
               maxTokens: 300,
@@ -868,7 +868,7 @@ export async function collectForecastsHandler(req: Request, res: Response) {
             explanation = typeof rawContent === "string" ? rawContent : "";
           } catch (e) {
             console.warn("[MeteoAI] LLM explanation failed:", e);
-            explanation = `PrÃ©vision calculÃ©e Ã  partir des preuves physiques disponibles. Aucun indice global de stabilitÃ© ou de confiance nâest publiÃ©.`;
+            explanation = `Prévision calculée à partir des preuves physiques disponibles. Aucun indice global de stabilité ou de confiance n’est publié.`;
           }
         }
 
@@ -988,7 +988,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           const snapshots = await getQualifiedObservationSnapshotsForDate(locKey, yesterday);
           const dailyObservation = buildQualifiedDailyObservation(snapshots);
           if (!dailyObservation.isQualified) {
-            locationSummaries.push(`ð ${locName}: ${dailyObservation.reason} â score opÃ©rationnel non mis Ã  jour`);
+            locationSummaries.push(`📍 ${locName}: ${dailyObservation.reason} — score opérationnel non mis à jour`);
             continue;
           }
 
@@ -1002,8 +1002,8 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             windGust: dailyObservation.windGust,
             humidity: null,
             cloudCover: null,
-            condition: "Observation physique agrÃ©gÃ©e",
-            source: "Stations physiques qualifiÃ©es",
+            condition: "Observation physique agrégée",
+            source: "Stations physiques qualifiées",
             provenanceType: "physical_observation",
             isQualified: 1,
             rawData: { coverageHours: dailyObservation.coverageHours, aggregation: dailyObservation.reason } as any,
@@ -1013,7 +1013,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           const dailyComparisons = buildDailyForecastObservationComparisons(locKey, yesterday, dailyForecastRuns, snapshots);
           if (dailyComparisons.length > 0) {
             const comparisonsStored = await upsertDailyForecastObservationComparisons(dailyComparisons);
-            console.log(`[MeteoAI] ${locName}: ${dailyComparisons.length} comparaison(s) physique(s) ${comparisonsStored ? "archivÃ©e(s)" : "en attente de migration"}`);
+            console.log(`[MeteoAI] ${locName}: ${dailyComparisons.length} comparaison(s) physique(s) ${comparisonsStored ? "archivée(s)" : "en attente de migration"}`);
           }
 
           // Separate provider-run lead metrics; the existing availability-time/bucket evaluator below is untouched.
@@ -1031,14 +1031,14 @@ export async function collectObservationsHandler(req: Request, res: Response) {
                 comparisons: providerRunComparisons,
                 scores: providerRunEvaluation.scores,
               });
-              console.log(`[ProviderRunScore] ${locName}: ${providerRunEvaluation.scores.length} score(s), ${providerRunEvaluation.comparisons.length} comparaison(s) ${providerRunSaved ? "archivÃ©e(s)" : "en attente de migration"}`);
+              console.log(`[ProviderRunScore] ${locName}: ${providerRunEvaluation.scores.length} score(s), ${providerRunEvaluation.comparisons.length} comparaison(s) ${providerRunSaved ? "archivée(s)" : "en attente de migration"}`);
             } else if (providerRunArchive.available) {
               const emptyProviderRunEvaluation = evaluateProviderRunForecasts(snapshots, []);
               comparisonDiagnostics.push(...emptyProviderRunEvaluation.diagnostics);
               console.info(`[SingleRunComparisonDiagnostic] ${locName}: ${JSON.stringify(emptyProviderRunEvaluation.diagnostics)}`);
             }
           } catch {
-            console.warn(`[ProviderRunScore] ${locName}: Ã©valuation provider-run ignorÃ©e; scores de disponibilitÃ© historiques inchangÃ©s.`);
+            console.warn(`[ProviderRunScore] ${locName}: évaluation provider-run ignorée; scores de disponibilité historiques inchangés.`);
           }
 
           const hourlyForecastRuns = await getHourlyForecastRunValues(locKey, yesterday);
@@ -1047,7 +1047,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
             comparisonDiagnostics.push(...emptyHourlyEvaluation.diagnostics);
             console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(emptyHourlyEvaluation.diagnostics)}`);
             await upsertHourlyComparisonDiagnosticSnapshot({ locationKey: locKey, cycleDate: yesterday, diagnostics: comparisonDiagnostics });
-            locationSummaries.push(`ð ${locName}: observation qualifiÃ©e (${dailyObservation.coverageHours} h), mais aucune capture horaire vÃ©rifiable archivÃ©e; les anciennes sÃ©ries mutables ne sont pas rÃ©utilisÃ©es`);
+            locationSummaries.push(`📍 ${locName}: observation qualifiée (${dailyObservation.coverageHours} h), mais aucune capture horaire vérifiable archivée; les anciennes séries mutables ne sont pas réutilisées`);
             continue;
           }
           const evaluation = evaluateHourlyForecastRuns(
@@ -1061,9 +1061,9 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           console.info(`[HourlyComparisonDiagnostic] ${locName}: ${JSON.stringify(evaluation.diagnostics)}`);
           await upsertHourlyComparisonDiagnosticSnapshot({ locationKey: locKey, cycleDate: yesterday, diagnostics: comparisonDiagnostics });
           const hourlyScores = evaluation.compatibilityScores;
-          // Archive tous les agrÃ©gats complets du jour : les lignes non validÃ©es
-          // sont Ã©crites avec une version de validation NULL et restent
-          // consultables comme donnÃ©es brutes, sans jamais remplacer une ligne validÃ©e.
+          // Archive tous les agrégats complets du jour : les lignes non validées
+          // sont écrites avec une version de validation NULL et restent
+          // consultables comme données brutes, sans jamais remplacer une ligne validée.
           await persistHourlyForecastEvaluationScores(evaluation.scores.map((score) => ({
             locationKey: score.locationKey,
             date: score.date,
@@ -1126,7 +1126,7 @@ export async function collectObservationsHandler(req: Request, res: Response) {
           const coveredGroups = evaluation.scores.filter((score) => score.sampleSize > 0).length;
           const comparisonCount = evaluation.scores.reduce((total, score) => total + score.sampleSize, 0);
           totalScores += hourlyScores.length + evaluation.scores.length;
-          locationSummaries.push(`ð ${locName}: ${hourlyScores.length} score(s) agrÃ©gÃ©(s) compatibles; ${coveredGroups}/${evaluation.scores.length} groupes dÃ©taillÃ©s modÃ¨le/variable/horizon couverts, ${comparisonCount} comparaison(s) physiques`);
+          locationSummaries.push(`📍 ${locName}: ${hourlyScores.length} score(s) agrégé(s) compatibles; ${coveredGroups}/${evaluation.scores.length} groupes détaillés modèle/variable/horizon couverts, ${comparisonCount} comparaison(s) physiques`);
 
         } catch (err: any) {
           console.error(`[MeteoAI] Error processing ${locName}:`, err.message);
@@ -1142,10 +1142,10 @@ export async function collectObservationsHandler(req: Request, res: Response) {
 
       // Send owner notification with per-location summary
       const notifContent = [
-        `${uniqueLocations.length} lieu(x) traitÃ©(s), ${totalScores} scores calculÃ©s.`,
+        `${uniqueLocations.length} lieu(x) traité(s), ${totalScores} scores calculés.`,
         "",
         ...locationSummaries,
-        ...(errors.length > 0 ? ["", `â ï¸ Erreurs: ${errors.slice(0, 3).join(", ")}`] : []),
+        ...(errors.length > 0 ? ["", `⚠️ Erreurs: ${errors.slice(0, 3).join(", ")}`] : []),
       ].join("\n");
 
       res.json({
@@ -1263,8 +1263,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
     hourlyModelsExpected = uniqueLocations.length * OFFICIAL_HOURLY_COVERAGE_MODELS.length;
     await updateCollectionJob(jobId, { dailyModelsExpected, hourlyModelsExpected });
 
-    // Les relevÃ©s physiques ont leur propre tÃ¢che horaire : les exÃ©cuter ici
-    // pouvait faire dÃ©passer le dÃ©lai dâun batch de prÃ©visions favoris.
+    // Les relevés physiques ont leur propre tâche horaire : les exécuter ici
+    // pouvait faire dépasser le délai d’un batch de prévisions favoris.
     const stationCollectionDeferred = true;
     const errors: string[] = [];
     const coverageByLocation: Array<{
@@ -1276,16 +1276,16 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
       stations: Awaited<ReturnType<typeof getStationEvidenceSummary>>;
     }> = [];
 
-    // Deux lieux sont traitÃ©s en parallÃ¨le. Ã l'heure actuelle, cela permet
-    // d'achever les deux favoris avant le dÃ©lai du callback, tout en bornant
-    // les appels rÃ©seau et les Ã©critures en base lorsque la liste grandit.
+    // Deux lieux sont traités en parallèle. À l'heure actuelle, cela permet
+    // d'achever les deux favoris avant le délai du callback, tout en bornant
+    // les appels réseau et les écritures en base lorsque la liste grandit.
     await processWithConcurrency(uniqueLocations, 2, async (fav) => {
       const locKey = makeLocationKey(fav.lat, fav.lon);
       const locationLockKey = getLocationForecastRefreshLockKey(locKey);
       const locationLockOwnerToken = randomUUID();
       const locationLockAcquired = await acquireForecastRefreshLock(locationLockKey, locationLockOwnerToken);
       if (!locationLockAcquired) {
-        errors.push(`${fav.name}: une collecte manuelle ou planifiÃ©e est dÃ©jÃ  en cours pour ce lieu.`);
+        errors.push(`${fav.name}: une collecte manuelle ou planifiée est déjà en cours pour ce lieu.`);
         return;
       }
       try {
@@ -1366,7 +1366,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               updateFrequencyMin: station.updateFrequencyMin,
               dataAvailability: station.dataAvailability,
               isActive: 0,
-              exclusionReason: station.exclusionReason ?? "Capteur citoyen en validation â non utilisÃ© dans la tempÃ©rature locale",
+              exclusionReason: station.exclusionReason ?? "Capteur citoyen en validation — non utilisé dans la température locale",
               qualificationStatus: "candidate",
               sourceTier: station.sourceTier ?? 3,
             });
@@ -1403,12 +1403,12 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             stationCount: localSynthesis.stationCount,
             confidenceScore: localSynthesis.confidenceScore,
           });
-          console.log(`[Stations] ${fav.name}: ${physicalStations.length} station(s) physique(s) stockÃ©e(s)`);
+          console.log(`[Stations] ${fav.name}: ${physicalStations.length} station(s) physique(s) stockée(s)`);
         } catch (stationError: any) {
-          console.warn(`[Stations] Collection Ã©chouÃ©e pour ${fav.name}:`, stationError.message);
+          console.warn(`[Stations] Collection échouée pour ${fav.name}:`, stationError.message);
         }
         if (stationCollectionDeferred) {
-          console.log(`[Stations] ${fav.name}: relevÃ©s physiques confiÃ©s Ã  la collecte horaire dÃ©diÃ©e`);
+          console.log(`[Stations] ${fav.name}: relevés physiques confiés à la collecte horaire dédiée`);
         }
 
         // Collect expert forecasts for this location
@@ -1429,8 +1429,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         );
         console.log(`[Models] ${fav.name}: quotidien ${dailyCoverage.collected.length}/${dailyCoverage.expected.length}`);
         if (dailyCoverage.missing.length > 0) {
-          console.warn(`[Models] ${fav.name}: quotidien indisponible â ${dailyCoverage.missing.join(", ")}`);
-          errors.push(`${fav.name}: couverture quotidienne partielle â modÃ¨les manquants : ${dailyCoverage.missing.join(", ")}.`);
+          console.warn(`[Models] ${fav.name}: quotidien indisponible — ${dailyCoverage.missing.join(", ")}`);
+          errors.push(`${fav.name}: couverture quotidienne partielle — modèles manquants : ${dailyCoverage.missing.join(", ")}.`);
         }
         let hourlyCoverage = getModelCoverage([], OFFICIAL_HOURLY_COVERAGE_MODELS);
         const archivedHourlyModelNames = new Set<string>();
@@ -1543,7 +1543,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                     : "partial";
                 if (finalStatus === "partial" && !errorCode) {
                   // La colonne `errorCode` du journal horaire est un varchar(32) : un code plus
-                  // long ferait Ã©chouer l'Ã©criture du journal (ER_DATA_TOO_LONG).
+                  // long ferait échouer l'écriture du journal (ER_DATA_TOO_LONG).
                   errorCode = diagnostic.projectionReady
                     ? "partial_projection_published"
                     : "partial_projection_retained";
@@ -1559,10 +1559,10 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                 finalStatus = archiveRowsWritten > 0 ? "partial" : "safe_error";
                 const errorDetails = formatHourlyJournalWriteError(writeError);
                 const failureLabel = errorCode === "projection_write_failed"
-                  ? `projection horaire de ${model.modelName} non confirmÃ©e (${projectionRowsWritten}/${diagnostic.expectedHoursCount})`
-                  : `archivage horaire de ${model.modelName} non confirmÃ© (${errorCode})`;
-                errors.push(`${fav.name}: ${failureLabel} â ${errorDetails}.`);
-                console.warn(`[HourlyArchive] ${fav.name}/${model.modelName}: ${failureLabel} â ${errorDetails}.`);
+                  ? `projection horaire de ${model.modelName} non confirmée (${projectionRowsWritten}/${diagnostic.expectedHoursCount})`
+                  : `archivage horaire de ${model.modelName} non confirmé (${errorCode})`;
+                errors.push(`${fav.name}: ${failureLabel} — ${errorDetails}.`);
+                console.warn(`[HourlyArchive] ${fav.name}/${model.modelName}: ${failureLabel} — ${errorDetails}.`);
               }
             }
 
@@ -1615,8 +1615,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
               resultJournaled = true;
             } catch (error) {
               const errorDetails = formatHourlyJournalWriteError(error);
-              errors.push(`${fav.name}: rÃ©sultat horaire de ${model.modelName} non journalisÃ© â ${errorDetails}.`);
-              console.warn(`[HourlyAudit] ${fav.name}/${model.modelName}: could not persist final result â ${errorDetails}.`);
+              errors.push(`${fav.name}: résultat horaire de ${model.modelName} non journalisé — ${errorDetails}.`);
+              console.warn(`[HourlyAudit] ${fav.name}/${model.modelName}: could not persist final result — ${errorDetails}.`);
             }
             if (isHourlyForecastRunHealthy({
               isOfficialModel: OFFICIAL_HOURLY_COVERAGE_MODEL_SET.has(model.modelName),
@@ -1633,9 +1633,9 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           }
 
           hourlyCoverage = getModelCoverage(Array.from(archivedHourlyModelNames), OFFICIAL_HOURLY_COVERAGE_MODELS);
-          console.log(`[Models] ${fav.name}: horaire archivÃ© ${hourlyCoverage.collected.length}/${hourlyCoverage.expected.length}`);
+          console.log(`[Models] ${fav.name}: horaire archivé ${hourlyCoverage.collected.length}/${hourlyCoverage.expected.length}`);
           if (hourlyCoverage.missing.length > 0) {
-            console.warn(`[Models] ${fav.name}: horaire indisponible â ${hourlyCoverage.missing.join(", ")}`);
+            console.warn(`[Models] ${fav.name}: horaire indisponible — ${hourlyCoverage.missing.join(", ")}`);
           }
           try {
             const validationHourly = await collectValidationHourlyForecasts(today, { lat: fav.lat, lon: fav.lon });
@@ -1654,7 +1654,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
                   availableAt: forecast.availableAt,
                 },
                 archiveValues: hour,
-                modelName: `${modelName} Â· validation`,
+                modelName: `${modelName} · validation`,
                 temperature: hour.temperature,
                 apparentTemperature: hour.apparentTemperature,
                 precipitation: hour.precipitation,
@@ -1668,12 +1668,12 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             }
             console.log(`[Validation] ${fav.name}: ${validationHourly.length} source(s) horaire(s) candidate(s)`);
           } catch {
-            errors.push(`${fav.name}: collecte des modÃ¨les candidats partielle.`);
+            errors.push(`${fav.name}: collecte des modèles candidats partielle.`);
             console.warn(`[Validation] ${fav.name}: candidate hourly collection or write failed.`);
           }
           console.log(`[HourlyAll] Received ${hourlyAllModels.length} model response(s) for ${fav.name}`);
         } catch {
-          errors.push(`${fav.name}: collecte horaire partielle; rÃ©sultat non confirmÃ©.`);
+          errors.push(`${fav.name}: collecte horaire partielle; résultat non confirmé.`);
           console.warn(`[HourlyAll] ${fav.name}: collection failed before per-model completion.`);
           for (const model of hourlyCollectionCatalog) {
             try {
@@ -1708,7 +1708,7 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         try {
           const providerRunArchiveState = await getLatestHourlyProviderRunCaptures(locKey);
           if (!providerRunArchiveState.available) {
-            console.warn(`[ProviderRun] ${fav.name}: tables provider-run absentes; aucune requÃªte Single Runs Ã©mise.`);
+            console.warn(`[ProviderRun] ${fav.name}: tables provider-run absentes; aucune requête Single Runs émise.`);
           } else {
             const providerRunBatch = await collectProviderRunBatch({
               targetDate: today,
@@ -1719,20 +1719,20 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
             const persistedProviderRuns = await persistHourlyProviderRunCaptureBatch(providerRunBatch.captures, providerRunBatch.values);
             const capturedProviderModels = providerRunBatch.captures.filter((capture) => capture.status === "succeeded").length;
             if (persistedProviderRuns) {
-              console.log(`[ProviderRun] ${fav.name}: ${capturedProviderModels}/${OFFICIAL_HOURLY_MODELS.length} captures Single Runs isolÃ©es`);
+              console.log(`[ProviderRun] ${fav.name}: ${capturedProviderModels}/${OFFICIAL_HOURLY_MODELS.length} captures Single Runs isolées`);
             } else {
-              console.warn(`[ProviderRun] ${fav.name}: capture Single Runs non persistÃ©e; pipeline horaire inchangÃ©.`);
+              console.warn(`[ProviderRun] ${fav.name}: capture Single Runs non persistée; pipeline horaire inchangé.`);
             }
           }
         } catch {
-          console.warn(`[ProviderRun] ${fav.name}: sidecar Single Runs indisponible; pipeline horaire inchangÃ©.`);
+          console.warn(`[ProviderRun] ${fav.name}: sidecar Single Runs indisponible; pipeline horaire inchangé.`);
         }
         if (hourlyCoverage.missing.length > 0) {
-          errors.push(`${fav.name}: couverture horaire partielle â modÃ¨les manquants : ${hourlyCoverage.missing.join(", ")}.`);
+          errors.push(`${fav.name}: couverture horaire partielle — modèles manquants : ${hourlyCoverage.missing.join(", ")}.`);
         }
         if (expertData.length === 0) {
           console.warn(`[MeteoAI] No data for ${fav.name}`);
-          errors.push(`${fav.name}: aucun modÃ¨le quotidien n'a fourni de prÃ©vision.`);
+          errors.push(`${fav.name}: aucun modèle quotidien n'a fourni de prévision.`);
           await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
             locationKey: locKey,
             date: today,
@@ -1770,8 +1770,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           condition: f.condition,
           rawData: f.rawData as any,
         }));
-        // Ãcriture strictement limitÃ©e aux sept modÃ¨les actifs et Ã  Best Match.
-        // Les archives publiques historiques ne sont ni supprimÃ©es ni rÃ©Ã©crites.
+        // Écriture strictement limitée aux sept modèles actifs et à Best Match.
+        // Les archives publiques historiques ne sont ni supprimées ni réécrites.
         await insertForecasts(forecastRowsForLoc);
         dailyModelsCollected += dailyCoverage.collected.length;
         const issuedAt = Date.now();
@@ -1829,8 +1829,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
         const condition = null;
 
         const explanation = meteoAI.coreCalibrationComplete
-          ? `PrÃ©vision quotidienne calculÃ©e pour ${fav.customName ?? fav.name} : les quatre mÃ©triques principales disposent de preuves physiques rÃ©centes par modÃ¨le, variable et horizon. La tempÃ©rature actuelle est rÃ©solue en direct lors de la consultation et nâest pas interpolÃ©e depuis Tmin/Tmax.`
-          : `${meteoAI.methodNote} Pour ${fav.customName ?? fav.name}, les valeurs disponibles restent publiÃ©es avec un statut robuste ou partiellement calibrÃ©. La tempÃ©rature actuelle reste rÃ©solue sÃ©parÃ©ment en direct.`;
+          ? `Prévision quotidienne calculée pour ${fav.customName ?? fav.name} : les quatre métriques principales disposent de preuves physiques récentes par modèle, variable et horizon. La température actuelle est résolue en direct lors de la consultation et n’est pas interpolée depuis Tmin/Tmax.`
+          : `${meteoAI.methodNote} Pour ${fav.customName ?? fav.name}, les valeurs disponibles restent publiées avec un statut robuste ou partiellement calibré. La température actuelle reste résolue séparément en direct.`;
 
         // Find all favorites with this location (same lat/lon) and upsert for each
         const matchingFavorites = allFavorites.filter(
@@ -1886,8 +1886,8 @@ export async function collectFavoritesForecastsHandler(req: Request, res: Respon
           stations: stationEvidence,
         });
 
-        // Le bilan des modÃ¨les doit Ãªtre Ã©crit mÃªme lorsque les snapshots physiques
-        // sont collectÃ©s par la tÃ¢che horaire dÃ©diÃ©e. Les deux flux restent sÃ©parÃ©s.
+        // Le bilan des modèles doit être écrit même lorsque les snapshots physiques
+        // sont collectés par la tâche horaire dédiée. Les deux flux restent séparés.
         await insertStationCollectionSnapshot(buildStationCollectionSnapshot({
           locationKey: locKey,
           date: today,
@@ -1983,4 +1983,3 @@ export async function collectPhysicalObservationSnapshotsHandler(req: Request, r
     res.status(500).json({ error: error.message, stack: error.stack, context: { url: req.url }, timestamp: new Date().toISOString() });
   }
 }
-

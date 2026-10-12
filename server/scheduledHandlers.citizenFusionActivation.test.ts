@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FavoriteLocation, StationObservation, WeatherStation } from "../drizzle/schema";
 
-vi.mock("../db", async () => {
-  const actual = await vi.importActual<typeof import("../db")>("../db");
+vi.mock("./db", async () => {
+  const actual = await vi.importActual<typeof import("./db")>("./db");
   return {
     ...actual,
     getAllFavoriteLocations: vi.fn(),
@@ -24,7 +24,7 @@ import {
   getValidatedCitizenStationsNearReference,
   getValidatedOfficialStationsNearReference,
   upsertCitizenFusionActivation,
-} from "../db";
+} from "./db";
 
 // Fixtures de test only : favoris, stations et relevés synthétiques, aucune observation réelle.
 // Horodatage figé : l'évaluation est déterministe, la fenêtre de 30 jours couvre
