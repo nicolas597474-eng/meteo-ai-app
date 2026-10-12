@@ -63,6 +63,7 @@ import {
   personalModelObservationScores,
   personalModelCalibrations,
   citizenFusionActivations,
+  citizenSensorWeights,
   InsertWeatherStation,
   InsertStationObservation,
   InsertStationQualityProfile,
@@ -74,6 +75,7 @@ import {
   InsertPersonalModelObservationScore,
   InsertPersonalModelCalibration,
   InsertCitizenFusionActivation,
+  InsertCitizenSensorWeight,
 } from "../drizzle/schema";
 import type { HourlyComparisonDiagnostic } from "./hourlyComparisonDiagnostics";
 import { ENV } from "./_core/env";
@@ -1262,6 +1264,57 @@ export async function upsertCitizenFusionActivation(data: InsertCitizenFusionAct
     return existing[0].id;
   }
   const result = await db.insert(citizenFusionActivations).values(row);
+  return result[0].insertId;
+}
+
+/**
+ * Dernier poids adaptatif persisté de chaque capteur citoyen validé pour une
+ * référence de favori. L'appariement tolère l'écart de coordonnées
+ * d'archivage : la ligne la plus récente par capteur dans les bornes fait
+ * foi, jamais une clé exacte. Sans ligne persistée, le capteur rejoint la
+ * synthèse au poids neutre — aucune valeur n'est inventée.
+ */
+export async function getCitizenSensorWeightsNearReference(refLat: number, refLon: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const latBounds = referenceCoordinateBounds(refLat);
+  const lonBounds = referenceCoordinateBounds(refLon);
+  const rows = await db.select().from(citizenSensorWeights).where(and(
+    gte(citizenSensorWeights.refLat, latBounds.min),
+    lte(citizenSensorWeights.refLat, latBounds.max),
+    gte(citizenSensorWeights.refLon, lonBounds.min),
+    lte(citizenSensorWeights.refLon, lonBounds.max),
+  )).orderBy(desc(citizenSensorWeights.evaluatedAt));
+  const latestByStationId = new Map<string, typeof citizenSensorWeights.$inferSelect>();
+  for (const row of rows) {
+    if (!latestByStationId.has(row.stationId)) latestByStationId.set(row.stationId, row);
+  }
+  return Array.from(latestByStationId.values());
+}
+
+/**
+ * Archive le poids adaptatif d'un capteur citoyen pour une référence : la
+ * ligne la plus récente dans les bornes pour ce capteur est mise à jour,
+ * sinon le poids est inséré. L'écriture est idempotente par capteur et par
+ * référence, et aucune autre table n'est touchée.
+ */
+export async function upsertCitizenSensorWeight(data: InsertCitizenSensorWeight) {
+  const db = await getDb();
+  if (!db) return null;
+  const latBounds = referenceCoordinateBounds(Number(data.refLat));
+  const lonBounds = referenceCoordinateBounds(Number(data.refLon));
+  const existing = await db.select({ id: citizenSensorWeights.id }).from(citizenSensorWeights).where(and(
+    gte(citizenSensorWeights.refLat, latBounds.min),
+    lte(citizenSensorWeights.refLat, latBounds.max),
+    gte(citizenSensorWeights.refLon, lonBounds.min),
+    lte(citizenSensorWeights.refLon, lonBounds.max),
+    eq(citizenSensorWeights.stationId, data.stationId),
+  )).orderBy(desc(citizenSensorWeights.evaluatedAt)).limit(1);
+  if (existing[0]) {
+    await db.update(citizenSensorWeights).set({ ...data, updatedAt: new Date() }).where(eq(citizenSensorWeights.id, existing[0].id));
+    return existing[0].id;
+  }
+  const result = await db.insert(citizenSensorWeights).values(data);
   return result[0].insertId;
 }
 /** Idempotent physical synthesis for one location and Paris hour. */
