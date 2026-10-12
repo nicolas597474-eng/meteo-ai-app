@@ -242,8 +242,13 @@ function earliestContributorObservedAt(
     const weight = station.fieldWeights[field];
     if (typeof weight !== "number" || !Number.isFinite(weight) || weight < 0) return null;
     if (weight === 0) continue;
-    if (!isRecord(station.measurementTimes)) return null;
-    const observedAt = absoluteMeasurementEpoch(station.measurementTimes[field]);
+    // Snapshots archived before per-field measurement times keep the station-level
+    // absolute timestamp as their only measurement evidence — the same fallback the
+    // daily verifier applies. A per-field table missing this field's own time still
+    // rejects the field: an absent measurement is never replaced by another field's.
+    const observedAt = isRecord(station.measurementTimes)
+      ? absoluteMeasurementEpoch(station.measurementTimes[field])
+      : absoluteMeasurementEpoch(station.observedAt);
     if (observedAt == null) return null;
     earliest = Math.min(earliest, observedAt);
     contributorCount += 1;

@@ -2200,6 +2200,17 @@ export async function getHourlyForecastRunValues(locationKey: string, date: stri
   )).orderBy(hourlyForecastRunValues.modelName, hourlyForecastRunValues.validTime, hourlyForecastRunValues.variable, hourlyForecastRunValues.availableAt);
 }
 
+/** Read immutable run values over a bounded target-date window (single indexed scan). */
+export async function getHourlyForecastRunValuesByDateRange(locationKey: string, startDate: string, endDate: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(hourlyForecastRunValues).where(and(
+    eq(hourlyForecastRunValues.locationKey, locationKey),
+    gte(hourlyForecastRunValues.targetDate, startDate),
+    lte(hourlyForecastRunValues.targetDate, endDate),
+  )).orderBy(hourlyForecastRunValues.targetDate, hourlyForecastRunValues.modelName, hourlyForecastRunValues.validTime, hourlyForecastRunValues.variable, hourlyForecastRunValues.availableAt);
+}
+
 let hourlyComparisonDiagnosticsStorageWarningLogged = false;
 function warnHourlyComparisonDiagnosticsStorage(error?: unknown) {
   if (hourlyComparisonDiagnosticsStorageWarningLogged) return;

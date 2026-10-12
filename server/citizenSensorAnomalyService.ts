@@ -167,7 +167,7 @@ export function deriveCitizenSensorAnomalies(input: {
       || recentDistinctDays < CITIZEN_ANOMALY_MIN_RECENT_DISTINCT_DAYS) {
       status = "unproven";
       reason = `Preuve récente insuffisante : ${recent.length}/${CITIZEN_ANOMALY_MIN_RECENT_COMPARISONS} comparaison(s) alignée(s) sur ${recentDistinctDays}/${CITIZEN_ANOMALY_MIN_RECENT_DISTINCT_DAYS} jour(s) distinct(s) dans la fenêtre récente de ${input.recentWindowDays} jour(s) ; aucune anomalie n'est décrétée sans mesure, et la décision précédente demeure.`;
-    } else if (!measurableEnvelope || roundedRecentMaeC == null) {
+    } else if (!measurableEnvelope || roundedRecentMaeC == null || anomalyThresholdC == null) {
       status = "unproven";
       reason = "Enveloppe de référence non mesurable : la borne d'anomalie exige un MAE et une borne d'acceptation mesurés sur la fenêtre d'historique ; aucune anomalie n'est décrétée sans mesure.";
     } else if (roundedRecentMaeC > anomalyThresholdC) {

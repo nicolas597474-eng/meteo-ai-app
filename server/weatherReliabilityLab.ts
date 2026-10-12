@@ -1,11 +1,21 @@
-import { getHourlyForecastEvaluationHistory, makeLocationKey } from "./db";
+import {
+  getHourlyForecastEvaluationHistory,
+  getHourlyForecastRunValuesByDateRange,
+  getQualifiedObservationSnapshotsByDateRange,
+  makeLocationKey,
+} from "./db";
 import {
   getLaboratoryHorizon,
   LABORATORY_HORIZONS,
   PUBLIC_RANKING_EVIDENCE_THRESHOLDS,
   type LaboratoryHorizonId,
 } from "./weatherReliabilityConfig";
-import { HOURLY_FORECAST_VARIABLES } from "./hourlyForecastRunScoring";
+import {
+  evaluateHourlyForecastRuns,
+  HOURLY_FORECAST_VARIABLES,
+  normalizeHourlyForecastVariable,
+} from "./hourlyForecastRunScoring";
+import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValidation";
 import { OFFICIAL_HOURLY_MODELS } from "./weatherServices";
 import { getParisDateDaysAgo } from "./weatherTime";
 import { summarizeHourlyHistoricalEvidence, type HourlyHistoricalScoreRow } from "./hourlyHistoricalEvidence";
@@ -43,6 +53,65 @@ const VARIABLE_UNITS: Record<(typeof HOURLY_FORECAST_VARIABLES)[number], string>
   pressure: "hPa",
 };
 
+/**
+ * Read-only recomputation of the bucket scores missing from the archived
+ * aggregate table. The nightly job scores one observation date per run; any
+ * date it missed (redeploy, interrupted night, deployment younger than the
+ * archive) would otherwise leave the laboratory blind even though the
+ * immutable evidence — qualified physical snapshots and verified run values —
+ * is already archived. This never writes, never substitutes another horizon,
+ * variable or period, and skips dates already present in the stored archive so
+ * a sample can never be counted twice.
+ */
+async function recomputeMissingScoreRows(input: {
+  locationKey: string;
+  startDate: string;
+  throughDate: string;
+  storedDates: ReadonlySet<string>;
+  storedLegacyDates: ReadonlySet<string>;
+}): Promise<{
+  rows: HourlyHistoricalScoreRow[];
+  legacyRows: HourlyHistoricalScoreRow[];
+  recomputedRowCount: number;
+}> {
+  const [snapshots, runValues] = await Promise.all([
+    getQualifiedObservationSnapshotsByDateRange(input.locationKey, input.startDate, input.throughDate),
+    getHourlyForecastRunValuesByDateRange(input.locationKey, input.startDate, input.throughDate),
+  ]);
+  if (snapshots.length === 0 || runValues.length === 0) {
+    return { rows: [], legacyRows: [], recomputedRowCount: 0 };
+  }
+  const datedRunValues = runValues.flatMap((row) => {
+    const variable = normalizeHourlyForecastVariable(row.variable);
+    return variable ? [{ ...row, variable }] : [];
+  });
+  const evaluation = evaluateHourlyForecastRuns(snapshots, datedRunValues);
+  const rows: HourlyHistoricalScoreRow[] = [];
+  const legacyRows: HourlyHistoricalScoreRow[] = [];
+  for (const score of evaluation.scores) {
+    if (!(score.sampleSize > 0) || score.mae == null || score.rmse == null || score.bias == null) continue;
+    const row: HourlyHistoricalScoreRow = {
+      date: score.date,
+      sourceName: score.sourceName,
+      modelName: score.modelName,
+      modelId: score.modelId,
+      variable: score.variable,
+      horizonBucket: score.horizonBucket,
+      sampleSize: score.sampleSize,
+      mae: score.mae,
+      rmse: score.rmse,
+      bias: score.bias,
+      scoringValidationVersion: score.scoringValidationVersion,
+    };
+    if (score.scoringValidationVersion === HOURLY_SCORING_VALIDATION_VERSION) {
+      if (!input.storedDates.has(score.date)) rows.push(row);
+    } else if (!input.storedLegacyDates.has(score.date)) {
+      legacyRows.push(row);
+    }
+  }
+  return { rows, legacyRows, recomputedRowCount: rows.length + legacyRows.length };
+}
+
 export async function buildReliabilityLaboratory(input: {
   lat: number;
   lon: number;
@@ -57,6 +126,26 @@ export async function buildReliabilityLaboratory(input: {
   const selectedHorizon = getLaboratoryHorizon(input.horizon);
   const trendStartDate = getParisDateDaysAgo(Math.max(period.days, 60));
   const history = await getHourlyForecastEvaluationHistory(locationKey, trendStartDate, throughDate, [], { includeLegacy: true });
+  const storedRows = history.rows as HourlyHistoricalScoreRow[];
+  const storedLegacyRows = history.legacyRows as HourlyHistoricalScoreRow[];
+  // Bounded to 60 days so a 90/365-day period never replays a whole year of
+  // immutable runs in one read; stored aggregates still cover the full window.
+  const recomputeWindowDays = Math.min(period.days, 60);
+  const recomputeStartDate = getParisDateDaysAgo(recomputeWindowDays);
+  const storedDates = new Set(storedRows.map((row) => row.date));
+  const missingDates = Array.from({ length: recomputeWindowDays }, (_, index) => getParisDateDaysAgo(index + 1))
+    .filter((date) => !storedDates.has(date));
+  const recomputed = history.available && missingDates.length > 0
+    ? await recomputeMissingScoreRows({
+      locationKey,
+      startDate: recomputeStartDate,
+      throughDate,
+      storedDates,
+      storedLegacyDates: new Set(storedLegacyRows.map((row) => row.date)),
+    })
+    : { rows: [] as HourlyHistoricalScoreRow[], legacyRows: [] as HourlyHistoricalScoreRow[], recomputedRowCount: 0 };
+  const evidenceRows = [...storedRows, ...recomputed.rows];
+  const evidenceLegacyRows = [...storedLegacyRows, ...recomputed.legacyRows];
   const summarizeCell = (
     rows: readonly unknown[],
     model: { name: string; modelId: string },
@@ -111,9 +200,9 @@ export async function buildReliabilityLaboratory(input: {
     let noEvidenceCellCount = 0;
     for (const model of OFFICIAL_HOURLY_MODELS) {
       for (const variable of HOURLY_FORECAST_VARIABLES) {
-        const summary = summarizeCell(history.rows, model, variable, horizon.storageBucket);
+        const summary = summarizeCell(evidenceRows, model, variable, horizon.storageBucket);
         const rawCellMetrics = summary.metrics
-          ?? summarizeCell(history.legacyRows, model, variable, horizon.storageBucket).metrics;
+          ?? summarizeCell(evidenceLegacyRows, model, variable, horizon.storageBucket).metrics;
         if (rawCellMetrics) rawEvidenceCellCount += 1;
         if (summary.status === "qualified") qualifiedCellCount += 1;
         else if (summary.status === "insufficient_evidence") insufficientEvidenceCellCount += 1;
@@ -162,11 +251,11 @@ export async function buildReliabilityLaboratory(input: {
         trend: null,
       };
     }
-    const summary = summarizeCell(history.rows, model, variable, selectedHorizon.storageBucket);
+    const summary = summarizeCell(evidenceRows, model, variable, selectedHorizon.storageBucket);
     const unvalidatedSummary = summary.metrics == null
-      ? summarizeCell(history.legacyRows, model, variable, selectedHorizon.storageBucket)
+      ? summarizeCell(evidenceLegacyRows, model, variable, selectedHorizon.storageBucket)
       : null;
-    const legacyUnversionedRows = (history.legacyRows as HourlyHistoricalScoreRow[]).filter((row) =>
+    const legacyUnversionedRows = evidenceLegacyRows.filter((row) =>
       row.sourceName === "open-meteo"
       && row.modelName === model.name
       && row.modelId === model.modelId
@@ -218,6 +307,7 @@ export async function buildReliabilityLaboratory(input: {
       variables: HOURLY_FORECAST_VARIABLES.map((variable) => ({ key: variable, label: VARIABLE_LABELS[variable], unit: VARIABLE_UNITS[variable] })),
       minimumComparisons,
       minimumComparableDays,
+      recomputedScoreRows: recomputed.recomputedRowCount,
       note: "Seuls les scores horaires portant la version de validation stricte courante alimentent les preuves et les poids officiels. Les données brutes « non validées » restent consultables séparément dans le diagnostic, mais ne sont jamais traitées comme preuve actuelle. MAE/RMSE/biais ne sont pas fusionnés en note; Best Match et agrégateurs sont exclus.",
     },
     metrics: evidence,
@@ -226,6 +316,9 @@ export async function buildReliabilityLaboratory(input: {
       dailyHorizon: "Les prévisions journalières sans horodatage d’émission exact ne sont pas converties en preuves horaires par horizon.",
       selectedHorizon: selectedHorizon?.storageBucket ? "Horizon archivé séparément" : "Horizon non archivé séparément",
       trend: "Les fenêtres récentes et précédentes sont lues séparément sur 60 jours minimum; leur différence n’est calculée que si chacune atteint les seuils d’évidence.",
+      recompute: recomputed.recomputedRowCount > 0
+        ? `${recomputed.recomputedRowCount} ligne(s) recalculée(s) en lecture seule depuis les snapshots physiques qualifiés et les runs immuables des dates sans agrégat archivé; aucune écriture, aucun doublon.`
+        : "Aucune date de la fenêtre n’a nécessité de recalcul en lecture seule; chaque maille provient de l’archive agrégée.",
     },
   };
 }
