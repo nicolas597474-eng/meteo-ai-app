@@ -283,8 +283,26 @@ async function fetchOpenMeteoPoint(lat: number, lon: number, model?: string): Pr
   }
 }
 
-/** Références des modèles au point demandé : elles ne sont jamais des stations. */
+/**
+ * Références des modèles au point demandé : elles ne sont jamais des stations.
+ * Un point de grille évolue peu d'une minute à l'autre : les huit lectures
+ * Open-Meteo ne sont donc payées qu'une fois par point et par fenêtre de cinq
+ * minutes, et une réponse vide (échec amont) n'est jamais mise en cache.
+ */
+const MODEL_REFERENCES_CACHE_TTL_MS = 5 * 60 * 1000;
+const MODEL_REFERENCES_CACHE_MAX_ENTRIES = 64;
+const modelReferencesCache = new Map<string, { collectedAt: number; references: CurrentModelReference[] }>();
+
+function modelReferencesCacheKey(lat: number, lon: number): string {
+  return `${lat.toFixed(3)}_${lon.toFixed(3)}`;
+}
+
 export async function fetchCurrentModelReferences(lat: number, lon: number): Promise<CurrentModelReference[]> {
+  const cacheKey = modelReferencesCacheKey(lat, lon);
+  const cached = modelReferencesCache.get(cacheKey);
+  if (cached && Date.now() - cached.collectedAt < MODEL_REFERENCES_CACHE_TTL_MS) {
+    return cached.references;
+  }
   const responses = await Promise.allSettled(
     WEATHER_SERVICES.expert.map(async (service) => {
       const point = await fetchOpenMeteoPoint(lat, lon, service.modelId === "best_match" ? undefined : service.modelId);
@@ -304,10 +322,19 @@ export async function fetchCurrentModelReferences(lat: number, lon: number): Pro
     }),
   );
 
-  return responses
+  const references = responses
     .filter((response): response is PromiseFulfilledResult<CurrentModelReference | null> => response.status === "fulfilled")
     .map((response) => response.value)
     .filter((reference): reference is CurrentModelReference => reference !== null);
+  if (references.length > 0) {
+    modelReferencesCache.set(cacheKey, { collectedAt: Date.now(), references });
+    while (modelReferencesCache.size > MODEL_REFERENCES_CACHE_MAX_ENTRIES) {
+      const oldestKey = modelReferencesCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      modelReferencesCache.delete(oldestKey);
+    }
+  }
+  return references;
 }
 
 // ─── 1. Open-Meteo reference grid point ──────────────────────────────────────

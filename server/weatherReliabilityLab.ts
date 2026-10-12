@@ -19,6 +19,7 @@ import { HOURLY_SCORING_VALIDATION_VERSION } from "../shared/hourlyScoringValida
 import { OFFICIAL_HOURLY_MODELS } from "./weatherServices";
 import { getParisDateDaysAgo } from "./weatherTime";
 import { summarizeHourlyHistoricalEvidence, type HourlyHistoricalScoreRow } from "./hourlyHistoricalEvidence";
+import { LRUCache } from "./_core/cache";
 
 export const LABORATORY_PERIODS = {
   "24h": { label: "24 h", days: 1 },
@@ -112,6 +113,40 @@ async function recomputeMissingScoreRows(input: {
   return { rows, legacyRows, recomputedRowCount: rows.length + legacyRows.length };
 }
 
+/**
+ * Regroupe les lignes de scores par maille source × modèle × variable × bucket.
+ * Chaque synthèse ne relit plus tout l'historique : elle démarre des seules
+ * lignes de sa maille. Les lignes sans modelId ou avec un horizon exact en
+ * millisecondes ne peuvent pas matcher une synthèse par bucket ; elles sont
+ * écartées dès le regroupement pour garder un comportement strictement identique.
+ */
+type HourlyScoreCellKey = string;
+
+function hourlyScoreCellKey(
+  sourceName: string,
+  modelName: string,
+  modelId: string,
+  variable: string,
+  horizonBucket: string,
+): HourlyScoreCellKey {
+  return `${sourceName} ${modelName} ${modelId} ${variable} ${horizonBucket}`;
+}
+
+function groupHourlyScoreRowsByCell(
+  rows: readonly HourlyHistoricalScoreRow[],
+): Map<HourlyScoreCellKey, HourlyHistoricalScoreRow[]> {
+  const grouped = new Map<HourlyScoreCellKey, HourlyHistoricalScoreRow[]>();
+  for (const row of rows) {
+    if (row.horizonMilliseconds != null) continue;
+    if (typeof row.modelId !== "string") continue;
+    const key = hourlyScoreCellKey(row.sourceName, row.modelName, row.modelId, row.variable, row.horizonBucket);
+    const cell = grouped.get(key);
+    if (cell) cell.push(row);
+    else grouped.set(key, [row]);
+  }
+  return grouped;
+}
+
 export async function buildReliabilityLaboratory(input: {
   lat: number;
   lon: number;
@@ -147,20 +182,25 @@ export async function buildReliabilityLaboratory(input: {
     : { rows: [] as HourlyHistoricalScoreRow[], legacyRows: [] as HourlyHistoricalScoreRow[], recomputedRowCount: 0 };
   const evidenceRows = [...storedRows, ...recomputed.rows];
   const evidenceLegacyRows = [...storedLegacyRows, ...recomputed.legacyRows];
+  const evidenceRowsByCell = groupHourlyScoreRowsByCell(evidenceRows);
+  const evidenceLegacyRowsByCell = groupHourlyScoreRowsByCell(evidenceLegacyRows);
   const summarizeCell = (
-    rows: readonly unknown[],
+    rowsByCell: Map<HourlyScoreCellKey, HourlyHistoricalScoreRow[]>,
     model: { name: string; modelId: string },
     variable: (typeof HOURLY_FORECAST_VARIABLES)[number],
     storageBucket: string,
-  ) => summarizeHourlyHistoricalEvidence([...rows] as HourlyHistoricalScoreRow[], {
-    modelName: model.name,
-    modelId: model.modelId,
-    variable,
-    horizonBucket: storageBucket,
-    beforeDate,
-    periodStartDate: startDate,
-    historyAvailable: history.available,
-  });
+  ) => summarizeHourlyHistoricalEvidence(
+    rowsByCell.get(hourlyScoreCellKey("open-meteo", model.name, model.modelId, variable, storageBucket)) ?? [],
+    {
+      modelName: model.name,
+      modelId: model.modelId,
+      variable,
+      horizonBucket: storageBucket,
+      beforeDate,
+      periodStartDate: startDate,
+      historyAvailable: history.available,
+    },
+  );
   const minimumComparisons = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparisons;
   const minimumComparableDays = PUBLIC_RANKING_EVIDENCE_THRESHOLDS.minimumComparableDays;
   const expectedEvidenceCellCount = OFFICIAL_HOURLY_MODELS.length * HOURLY_FORECAST_VARIABLES.length;
@@ -201,9 +241,9 @@ export async function buildReliabilityLaboratory(input: {
     let noEvidenceCellCount = 0;
     for (const model of OFFICIAL_HOURLY_MODELS) {
       for (const variable of HOURLY_FORECAST_VARIABLES) {
-        const summary = summarizeCell(evidenceRows, model, variable, horizon.storageBucket);
+        const summary = summarizeCell(evidenceRowsByCell, model, variable, horizon.storageBucket);
         const rawCellMetrics = summary.metrics
-          ?? summarizeCell(evidenceLegacyRows, model, variable, horizon.storageBucket).metrics;
+          ?? summarizeCell(evidenceLegacyRowsByCell, model, variable, horizon.storageBucket).metrics;
         if (rawCellMetrics) rawEvidenceCellCount += 1;
         if (summary.status === "qualified") qualifiedCellCount += 1;
         else if (summary.status === "insufficient_evidence") insufficientEvidenceCellCount += 1;
@@ -252,19 +292,13 @@ export async function buildReliabilityLaboratory(input: {
         trend: null,
       };
     }
-    const summary = summarizeCell(evidenceRows, model, variable, selectedHorizon.storageBucket);
+    const summary = summarizeCell(evidenceRowsByCell, model, variable, selectedHorizon.storageBucket);
     const unvalidatedSummary = summary.metrics == null
-      ? summarizeCell(evidenceLegacyRows, model, variable, selectedHorizon.storageBucket)
+      ? summarizeCell(evidenceLegacyRowsByCell, model, variable, selectedHorizon.storageBucket)
       : null;
-    const legacyUnversionedRows = evidenceLegacyRows.filter((row) =>
-      row.sourceName === "open-meteo"
-      && row.modelName === model.name
-      && row.modelId === model.modelId
-      && row.variable === variable
-      && row.horizonBucket === selectedHorizon.storageBucket
-      && row.date >= startDate
-      && row.date <= throughDate,
-    );
+    const legacyUnversionedRows = (evidenceLegacyRowsByCell.get(
+      hourlyScoreCellKey("open-meteo", model.name, model.modelId, variable, selectedHorizon.storageBucket),
+    ) ?? []).filter((row) => row.date >= startDate && row.date <= throughDate);
     const legacyUnversionedRowCount = legacyUnversionedRows.length;
     const rawMetrics = summary.metrics ?? unvalidatedSummary?.metrics ?? null;
     const rawNote = summary.metrics == null && rawMetrics != null
@@ -322,4 +356,40 @@ export async function buildReliabilityLaboratory(input: {
         : "Aucune date de la fenêtre n’a nécessité de recalcul en lecture seule; chaque maille provient de l’archive agrégée.",
     },
   };
+}
+
+type ReliabilityLaboratoryReadModel = Awaited<ReturnType<typeof buildReliabilityLaboratory>>;
+
+const RELIABILITY_LABORATORY_CACHE_TTL_MS = 5 * 60 * 1000;
+const RELIABILITY_LABORATORY_CACHE_MAX_ENTRIES = 64;
+
+const reliabilityLaboratoryCache = new LRUCache<string, ReliabilityLaboratoryReadModel>(
+  RELIABILITY_LABORATORY_CACHE_MAX_ENTRIES,
+  RELIABILITY_LABORATORY_CACHE_TTL_MS,
+);
+
+export function clearReliabilityLaboratoryCache(): void {
+  reliabilityLaboratoryCache.clear();
+}
+
+/**
+ * Point d'entrée mis en cache du modèle de lecture du laboratoire : une même
+ * maille lieu × période × horizon n'est recalculée qu'une fois par fenêtre de
+ * cinq minutes. Un historique illisible n'est jamais mis en cache, pour
+ * qu'une panne transitoire de la base ne masque pas sa reprise.
+ */
+export async function buildReliabilityLaboratoryCached(input: {
+  lat: number;
+  lon: number;
+  period: LaboratoryPeriodId;
+  horizon: LaboratoryHorizonId;
+}): Promise<ReliabilityLaboratoryReadModel> {
+  const cacheKey = `${makeLocationKey(input.lat, input.lon)}:${input.period}:${input.horizon}`;
+  const cached = reliabilityLaboratoryCache.get(cacheKey);
+  if (cached) return cached;
+  const result = await buildReliabilityLaboratory(input);
+  if (result.evidence.status === "available") {
+    reliabilityLaboratoryCache.set(cacheKey, result);
+  }
+  return result;
 }
