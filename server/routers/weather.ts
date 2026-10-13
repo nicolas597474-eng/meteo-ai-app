@@ -39,26 +39,7 @@ import {
   getQualifiedEvidenceStatus,
   getStationQualityProfiles,
   getFavoriteLocations,
-  getWeatherStationQualificationVerdicts,
-  getValidatedCitizenStationsNearReference,
-  getActivePhysicalStationsNearReference,
-  getValidatedOfficialStationsNearReference,
-  getStationObservationsForQualification,
-  getCitizenFusionActivationNearReference,
-  getCitizenSensorWeightsNearReference,
-  getCitizenSensorAnomaliesNearReference,
-  getCitizenVariableQualificationsNearReference,
 } from "../db";
-import { loadCitizenQualificationEvidence } from "../citizenQualificationEvidenceLoader";
-import { indexCitizenQualificationEvidence } from "../citizenQualificationEvidenceService";
-import {
-  CITIZEN_FUSION_IMPACT_HISTORY_WINDOW_DAYS,
-  deriveCitizenFusionImpactReport,
-  type ImpactObservationRow,
-  type ImpactStationRow,
-} from "../citizenFusionImpactService";
-import { composeLocalSynthesisSources, applyCitizenVariableQualificationAdmission, type CitizenVariableAdmissionExclusion } from "../citizenFusionActivationService";
-import type { CitizenFusionActivation } from "../../drizzle/schema";
 import { collectCurrentWeatherSnapshot, collectExpertForecasts, collectObservations, collect15DayForecast, collectHourlyForecast, OFFICIAL_HOURLY_MODELS, WEATHER_SERVICES, VALIDATION_WEATHER_MODELS } from "../weatherServices";
 import { summarizeDailyModelAgreement } from "../../shared/modelAgreement";
 import { summarizePrecipitationModels } from "../../shared/precipitationConsensus";
@@ -83,8 +64,6 @@ import { findActiveHourlyForecastIndex } from "../../shared/hourlyForecastTime";
 import { buildOperationalRegime, findNextHourlyRegimeChange } from "../officialRegime";
 import { buildLocalOfficialDeltaHistory, selectOfficialHourlyTemperaturesBeforeLocalMeasurements, selectedOfficialHourlyTemperaturePoints } from "../localOfficialHistory";
 import { reconstructHistoricalOfficialTemperatures, reconstructHistoricalOfficialHours } from "../historicalOfficialForecast";
-import { getCitizenQualificationEffectiveTimesNearReference } from "../db";
-import { restrictCitizenImpactToProspectiveEvidence } from "../citizenProspectiveEvidence";
 import { buildModelIndicator } from "../modelIndicator";
 import { buildAppliedModelWeights, filterForecastTraceToModelNames } from "../aiLabTrace";
 import { buildModelReferenceCoherence } from "../modelReferenceCoherence";
@@ -119,92 +98,6 @@ import { loadDetailedForecastSources } from "../detailedForecastLoading";
 
 function getTodayParis(): string {
   return getParisDate();
-}
-
-type PersistedCitizenVerdictRow = {
-  stationId: string;
-  qualificationStatus: string | null;
-  exclusionReason: string | null;
-};
-
-type LocalSynthesisSources = {
-  physicalStations: StationData[];
-  localSynthesisStations: StationData[];
-  persistedCitizenVerdicts: ReadonlyMap<string, PersistedCitizenVerdictRow>;
-  activation: CitizenFusionActivation | null;
-  /** Multiplicateurs de performance des capteurs citoyens validés (bloc 5) ; station absente = neutre 1. */
-  citizenPerformanceMultiplierById: ReadonlyMap<string, number>;
-  /** Capteurs citoyens porteurs d'une anomalie aiguë persistée (bloc 6) ; déjà suspendus de la composition live. */
-  citizenAnomalyStationIds: ReadonlySet<string>;
-  citizenVariableExclusions: CitizenVariableAdmissionExclusion[];
-};
-
-/**
- * Charge les sources de la synthèse locale live d'une référence : stations
- * physiques actives, verdicts de qualification persistés des capteurs
- * citoyens et décision d'activation archivée. Sans décision « activated », la
- * composition reste strictement physique ; avec elle, seuls les capteurs
- * citoyens porteurs du verdict persisté « validated » rejoignent la synthèse,
- * à priorité technique strictement inchangée. Les poids adaptatifs des
- * capteurs validés, dérivés de leur preuve historique par le cycle planifié,
- * modulent ensuite leur poids spatial sans jamais toucher les stations
- * physiques. Un capteur validé porteur d'une anomalie aiguë persistée est de
- * même suspendu temporairement de la composition : son verdict demeure
- * intact, seule sa participation live attend une nouvelle preuve mesurée.
- * La vérité terrain horaire archivée reste physique uniquement et n'est
- * jamais composée ici.
- */
-async function loadLocalSynthesisSources(
-  ranked: StationData[],
-  lat: number,
-  lon: number,
-): Promise<LocalSynthesisSources> {
-  const citizenStations = ranked.filter(
-    (station) => station.source === "opensensemap" || station.source === "cwop",
-  );
-  const citizenStationIds = citizenStations.map((station) => station.stationId);
-  const [persistedCitizenVerdictRows, activation, sensorWeightRows, anomalyRows, variableVerdictRows] = await Promise.all([
-    citizenStationIds.length > 0
-      ? getWeatherStationQualificationVerdicts(citizenStationIds)
-      : Promise.resolve([] as Awaited<ReturnType<typeof getWeatherStationQualificationVerdicts>>),
-    getCitizenFusionActivationNearReference(lat, lon),
-    getCitizenSensorWeightsNearReference(lat, lon),
-    getCitizenSensorAnomaliesNearReference(lat, lon),
-    citizenStationIds.length > 0 ? getCitizenVariableQualificationsNearReference(lat, lon) : Promise.resolve([]),
-  ]);
-  const persistedCitizenVerdicts = new Map(
-    persistedCitizenVerdictRows
-      .filter((verdict) => verdict.qualificationStatus != null)
-      .map((verdict) => [verdict.stationId, verdict] as const),
-  );
-  // Seule la ligne la plus récente par capteur fait foi : un signal
-  // « nominal » plus récent restaure la participation, sans jamais toucher au
-  // verdict persisté.
-  const citizenAnomalyStationIds = new Set(
-    anomalyRows
-      .filter((row) => row.status === "anomaly")
-      .map((row) => row.stationId),
-  );
-  const physicalStations = getPhysicalActiveStations(ranked);
-  const composedStations = composeLocalSynthesisSources({
-    physicalStations,
-    citizenStations,
-    activation,
-    verdictByStationId: persistedCitizenVerdicts,
-    anomalousStationIds: citizenAnomalyStationIds,
-  });
-  const admission = applyCitizenVariableQualificationAdmission({ stations: composedStations, variableVerdicts: variableVerdictRows });
-  const localSynthesisStations = admission.stations;
-  // Seuls les poids des capteurs réellement composés dans la synthèse sont
-  // transmis : une ligne obsolète ne peut jamais moduler une station physique
-  // ni un capteur que le verdict persisté n'autorise plus.
-  const composedStationIds = new Set(localSynthesisStations.map((station) => station.stationId));
-  const citizenPerformanceMultiplierById = new Map(
-    sensorWeightRows
-      .filter((row) => composedStationIds.has(row.stationId) && Number.isFinite(row.performanceMultiplier))
-      .map((row) => [row.stationId, row.performanceMultiplier] as const),
-  );
-  return { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation, citizenPerformanceMultiplierById, citizenAnomalyStationIds, citizenVariableExclusions: admission.exclusions };
 }
 
 export function getCurrentHourlyRegimeInput(hours: Array<any>, currentHour = getParisHour(), selectionUpdatedAt?: Date | string, sourceLabel?: string, sourceComputedAt?: Date | string | null) {
@@ -1643,20 +1536,12 @@ export const weatherRouter = router({
       ]);
       const stations = stationCollection.stations;
       const ranked = rankStations(stations);
-      // Un verdict de qualification appliqué demeure : la collecte live marque
-      // toujours les capteurs citoyens « candidate », on surcharge donc ici le
-      // statut et le motif persistés (validated / excluded) — uniquement pour
-      // les capteurs citoyens openSenseMap et CWOP, sans jamais toucher
-      // isActive ni les stations physiques.
-      const { physicalStations, localSynthesisStations, persistedCitizenVerdicts, activation: citizenFusionActivation, citizenPerformanceMultiplierById } = await loadLocalSynthesisSources(ranked, lat, lon);
+      const physicalStations = getPhysicalActiveStations(ranked);
       const discoveredPhysicalStations = ranked.filter((station) => getStationSourceKind(station.source, station.stationId) === "physical");
       const excludedPhysicalStations = discoveredPhysicalStations.filter((station) => !station.isActive);
-      // Sans décision d'activation persistée, la synthèse locale reste
-      // strictement physique ; avec une décision « activated », seuls les
-      // capteurs citoyens validés y participent, à priorité technique
-      // strictement inchangée, modulée seulement par la preuve historique
-      // persistée de chaque capteur.
-      const ultraResult = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null, { performanceMultiplierById: citizenPerformanceMultiplierById });
+      // La synthèse locale reste strictement physique : seules les stations
+      // officielles et Netatmo collectées participent à la fusion.
+      const ultraResult = calculateUltraLocal(physicalStations, "local", lat, lon, null, null);
       const modelReferences = buildModelReferenceCoherence(
         currentModelReferences,
         physicalStations
@@ -1706,8 +1591,7 @@ export const weatherRouter = router({
         lon,
         radiusKm,
         stations: ranked.map(s => {
-          const persistedCitizenVerdict = persistedCitizenVerdicts.get(s.stationId);
-          const qualificationStatus = persistedCitizenVerdict?.qualificationStatus ?? s.qualificationStatus;
+          const qualificationStatus = s.qualificationStatus;
           const normalizedQualificationStatus: "candidate" | "validated" | "excluded" | undefined =
             qualificationStatus === "candidate"
               ? "candidate"
@@ -1739,22 +1623,13 @@ export const weatherRouter = router({
             updateFrequencyMin: s.updateFrequencyMin,
             dataAvailability: s.dataAvailability,
             isActive: s.isActive,
-            // Verdict persisté des capteurs citoyens uniquement ; sans ligne
-            // persistée, le statut live (« candidate ») reste la vérité.
-            exclusionReason: persistedCitizenVerdict
-              ? persistedCitizenVerdict.exclusionReason ?? null
-              : s.exclusionReason,
+            exclusionReason: s.exclusionReason,
             qualificationStatus: normalizedQualificationStatus,
             sourceTier: s.sourceTier,
           };
         }),
         modelReferences,
         groundTruth,
-        citizenFusionActivation: citizenFusionActivation ? {
-          status: citizenFusionActivation.status,
-          reason: citizenFusionActivation.reason,
-          evaluatedAt: citizenFusionActivation.evaluatedAt,
-        } : null,
         totalFound: stations.length,
         activeCount: physicalStations.length,
         ignoredCount: stations.filter(s => !s.isActive).length,
@@ -1769,126 +1644,6 @@ export const weatherRouter = router({
         sourceDiagnosticsFromCache: stationCollection.cacheHit,
         referenceSourceCount: modelReferences.length,
         fetchedAt: new Date().toISOString(),
-      };
-    }),
-
-  /**
-   * Preuve de qualification des capteurs citoyens, en lecture seule : pour
-   * chaque capteur openSenseMap/CWOP de la référence, la progression réelle
-   * (comparaisons alignées, jours distincts) et les seuils qui restent à
-   * franchir. La preuve est recalculée depuis l'historique archivé par le même
-   * évaluateur que le chemin planifié, et rien n'est écrit : consulter la
-   * progression ne promeut jamais un capteur. Endpoint séparé de
-   * `searchStations` parce que la lecture parcourt 30 jours d'historique — trop
-   * lourd pour le chemin de recherche courant.
-   *
-   * Depuis le bloc 7, les profils multi-variables (humidité, pression, vent)
-   * persistés par le cycle planifié sont retournés à côté, tels quels : la
-   * température reste l'autorité de la fusion, ces preuves par grandeur ne
-   * provoquent aucune activation implicite.
-   */
-  getCitizenQualificationEvidence: publicProcedure
-    .input(optionalCoordinatesSchema.optional())
-    .query(async ({ input }) => {
-      const lat = input?.lat ?? HONDEGHEM.lat;
-      const lon = input?.lon ?? HONDEGHEM.lon;
-      const [readModel, variableQualifications] = await Promise.all([
-        loadCitizenQualificationEvidence(lat, lon),
-        getCitizenVariableQualificationsNearReference(lat, lon),
-      ]);
-      return {
-        lat,
-        lon,
-        ...readModel,
-        variableQualifications,
-        byStationId: indexCitizenQualificationEvidence(readModel.entries),
-      };
-    }),
-
-  /**
-   * Évaluation à blanc de l'impact des capteurs citoyens validés sur l'erreur
-   * locale (plan openSenseMap/CWOP : l'activation dans la fusion est
-   * conditionnée par des métriques). La référence mesure l'écart de la
-   * synthèse physique à la médiane des stations officielles, avec et sans les
-   * capteurs validés ; le rapport reste une mesure à blanc, et la décision
-   * d'activation persistée par le cycle planifié est retournée à côté, telle
-   * quelle, jamais recalculée ici.
-   */
-  getCitizenFusionImpact: publicProcedure
-    .input(requiredCoordinatesSchema)
-    .query(async ({ input }) => {
-      const [validatedCitizens, activationRow] = await Promise.all([
-        getValidatedCitizenStationsNearReference(input.lat, input.lon),
-        getCitizenFusionActivationNearReference(input.lat, input.lon),
-      ]);
-      const activation = activationRow ? {
-        status: activationRow.status,
-        reason: activationRow.reason,
-        evaluatedAt: activationRow.evaluatedAt,
-      } : null;
-      const toImpactStationRow = (station: {
-        stationId: string;
-        source: string;
-        lat: number;
-        lon: number;
-        distanceKm: number;
-        reliabilityScore: number | null;
-      }): ImpactStationRow => ({
-        stationId: station.stationId,
-        source: station.source,
-        lat: Number(station.lat),
-        lon: Number(station.lon),
-        distanceKm: Number(station.distanceKm),
-        reliabilityScore: Number(station.reliabilityScore ?? 50),
-      });
-
-      // Sans capteur validé pour cette référence, rien ne peut être mesuré :
-      // la base n'est pas interrogée davantage et aucune valeur n'est inventée.
-      if (validatedCitizens.length === 0) {
-        return {
-          ...deriveCitizenFusionImpactReport({
-            referenceLat: input.lat,
-            referenceLon: input.lon,
-            physicalStations: [],
-            validatedCitizens: [],
-            officialStations: [],
-            observations: [],
-          }),
-          activation,
-        };
-      }
-
-      const [physicalStations, officialStations] = await Promise.all([
-        getActivePhysicalStationsNearReference(input.lat, input.lon),
-        getValidatedOfficialStationsNearReference(input.lat, input.lon),
-      ]);
-      const asOf = Date.now();
-      const sinceMs = asOf - CITIZEN_FUSION_IMPACT_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-      const observations = await getStationObservationsForQualification(
-        [
-          ...validatedCitizens.map((station) => station.stationId),
-          ...physicalStations.map((station) => station.stationId),
-          ...officialStations.map((station) => station.stationId),
-        ],
-        sinceMs,
-      );
-      const observationRows: ImpactObservationRow[] = observations.map((observation) => ({
-        stationId: observation.stationId,
-        observedAt: Number(observation.observedAt),
-        measurementTimes: observation.measurementTimes ?? null,
-        temperature: observation.temperature ?? null,
-      }));
-      return {
-        ...deriveCitizenFusionImpactReport({
-          referenceLat: input.lat,
-          referenceLon: input.lon,
-          physicalStations: physicalStations.map(toImpactStationRow),
-          validatedCitizens: validatedCitizens.map(toImpactStationRow),
-          officialStations: officialStations.map(toImpactStationRow),
-          observations: restrictCitizenImpactToProspectiveEvidence(observationRows, validatedCitizens.map(station => station.stationId), await getCitizenQualificationEffectiveTimesNearReference(input.lat, input.lon)),
-          asOf,
-        }),
-        activation,
       };
     }),
 
@@ -1908,8 +1663,7 @@ export const weatherRouter = router({
       const stations = await collectNearbyStations(lat, lon, input.radiusKm);
       const ranked = rankStations(stations);
       // Unified engine — same as Mode Local in Dashboard
-      const { localSynthesisStations, citizenPerformanceMultiplierById } = await loadLocalSynthesisSources(ranked, lat, lon);
-      const result = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null, { performanceMultiplierById: citizenPerformanceMultiplierById });
+      const result = calculateUltraLocal(getPhysicalActiveStations(ranked), "local", lat, lon, null, null);
       return {
         temperature: result.temperature,
         humidity: result.humidity,
@@ -1971,9 +1725,8 @@ export const weatherRouter = router({
       const station = stations.find(s => s.stationId === input.stationId);
       if (!station) return null;
       const ranked = rankStations(stations);
-      const { localSynthesisStations, citizenPerformanceMultiplierById } = await loadLocalSynthesisSources(ranked, lat, lon);
       // Unified engine — same as Mode Local in Dashboard
-      const gt = calculateUltraLocal(localSynthesisStations, "local", lat, lon, null, null, { performanceMultiplierById: citizenPerformanceMultiplierById });
+      const gt = calculateUltraLocal(getPhysicalActiveStations(ranked), "local", lat, lon, null, null);
       const used = gt.stationsUsed.find(s => s.stationId === input.stationId);
       return {
         ...station,

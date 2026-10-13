@@ -1769,6 +1769,9 @@ export async function getStationEvidenceSummary(locationKey: string, refLat: num
     lte(weatherStations.refLat, latBounds.max),
     gte(weatherStations.refLon, lonBounds.min),
     lte(weatherStations.refLon, lonBounds.max),
+    // Les lignes de capteurs citoyens historisées restent en base mais ne
+    // comptent plus : seules les stations collectées alimentent la preuve.
+    inArray(weatherStations.source, ["meteofrance", "netatmo"]),
   ));
   return {
     validatedStationCount: stations.filter((station) => station.isActive === 1 && station.qualificationStatus === "validated").length,
@@ -2078,6 +2081,9 @@ export async function getPhysicalStationHistory(
       gte(weatherStations.refLon, lonBounds.min),
       lte(weatherStations.refLon, lonBounds.max),
       eq(weatherStations.isActive, 1),
+      // Les lignes de capteurs citoyens historisées restent en base mais ne
+      // comptent plus : seules les stations collectées alimentent l'historique.
+      inArray(weatherStations.source, ["meteofrance", "netatmo"]),
     ))
     .orderBy(desc(weatherStations.reliabilityScore));
 
