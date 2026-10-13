@@ -1,22 +1,47 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const loaderSource = readFileSync(new URL("./WeatherAILoader.tsx", import.meta.url), "utf8");
-const stylesSource = readFileSync(new URL("../../index.css", import.meta.url), "utf8");
-const dashboardSource = readFileSync(new URL("../../pages/Dashboard.tsx", import.meta.url), "utf8");
-const detailsSource = readFileSync(new URL("../../pages/WeatherDetails.tsx", import.meta.url), "utf8");
-const appSource = readFileSync(new URL("../../App.tsx", import.meta.url), "utf8");
+const loaderSource = readFileSync(
+  new URL("./WeatherAILoader.tsx", import.meta.url),
+  "utf8"
+);
+const globeSource = readFileSync(
+  new URL("./EarthGlobe.tsx", import.meta.url),
+  "utf8"
+);
+const sceneSource = readFileSync(
+  new URL("./earthScene.ts", import.meta.url),
+  "utf8"
+);
+const stylesSource = readFileSync(
+  new URL("../../index.css", import.meta.url),
+  "utf8"
+);
+const dashboardSource = readFileSync(
+  new URL("../../pages/Dashboard.tsx", import.meta.url),
+  "utf8"
+);
+const detailsSource = readFileSync(
+  new URL("../../pages/WeatherDetails.tsx", import.meta.url),
+  "utf8"
+);
+const appSource = readFileSync(
+  new URL("../../App.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("WeatherAILoader — Moteur d'animation de chargement météo 3D + holographique", () => {
   it("1. s'affiche lorsque les données requises sont en cours de chargement avec les éléments accessibles", () => {
     // role="status", aria-live="polite", aria-busy
     expect(loaderSource).toContain('role="status"');
     expect(loaderSource).toContain('aria-live="polite"');
-    expect(loaderSource).toContain('aria-busy={!isReady}');
+    expect(loaderSource).toContain("aria-busy={!isReady}");
     expect(loaderSource).toContain("WeatherAILoaderGraphic");
 
     // Intégration dans le Dashboard et WeatherDetails
-    expect(dashboardSource).toContain("<WeatherAILoader loading={true} variant=\"full\"");
+    expect(dashboardSource).toContain(
+      '<WeatherAILoader loading={true} variant="full"'
+    );
     expect(detailsSource).toContain("<WeatherAILoader loading={true}");
     expect(appSource).toContain("<WeatherAILoader loading={true}");
   });
@@ -42,11 +67,15 @@ describe("WeatherAILoader — Moteur d'animation de chargement météo 3D + holo
 
   it("3. ne bloque pas l'affichage lorsque les données en cache sont immédiatement exploitables", () => {
     // Si loading est false initialement, le composant n'affiche rien (null)
-    expect(loaderSource).toContain("const [isVisible, setIsVisible] = useState(loading)");
+    expect(loaderSource).toContain(
+      "const [isVisible, setIsVisible] = useState(loading)"
+    );
     expect(loaderSource).toContain("if (!isVisible) return null");
 
     // Dans Dashboard, isLoading n'est vrai que si toutes les sources indispensables manquent
-    expect(dashboardSource).toContain("const isLoading = officialLoading && hourlyLoading && !fastCurrentSnapshot;");
+    expect(dashboardSource).toContain(
+      "const isLoading = officialLoading && hourlyLoading && !fastCurrentSnapshot;"
+    );
   });
 
   it("4. permet la sortie propre en cas d'erreur réseau sans boucle infinie", () => {
@@ -66,13 +95,19 @@ describe("WeatherAILoader — Moteur d'animation de chargement météo 3D + holo
     expect(loaderSource).toContain("window.clearTimeout(timerB)");
     expect(loaderSource).toContain("window.clearTimeout(timerC)");
     expect(loaderSource).toContain("window.clearTimeout(exitTimer)");
-    expect(loaderSource).toContain("document.removeEventListener?.(\"visibilitychange\", onVisibilityChange)");
-    expect(loaderSource).toContain("mediaQuery.removeEventListener?.(\"change\", onChange)");
+    expect(loaderSource).toContain(
+      'document.removeEventListener?.("visibilitychange", onVisibilityChange)'
+    );
+    expect(loaderSource).toContain(
+      'mediaQuery.removeEventListener?.("change", onChange)'
+    );
   });
 
   it("7. respecte scrupuleusement les préférences 'prefers-reduced-motion'", () => {
     // Détection programmatique
-    expect(loaderSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');
+    expect(loaderSource).toContain(
+      'window.matchMedia("(prefers-reduced-motion: reduce)")'
+    );
     expect(loaderSource).toContain("weather-ai-loader--reduced-motion");
 
     // Règle CSS pour désactiver toutes les animations continues
@@ -90,47 +125,49 @@ describe("WeatherAILoader — Moteur d'animation de chargement météo 3D + holo
     expect(loaderSource).not.toContain("apiKey");
   });
 
-  it("9. présente les éléments graphiques 3D, holographiques, radar et le noyau IA", () => {
-    // Globe terrestre 3D miniature avec dégradé sphérique et atmosphère
-    expect(loaderSource).toContain("id=\"wai-globe-sphere\"");
-    expect(loaderSource).toContain("id=\"wai-atmosphere-glow\"");
-    expect(loaderSource).toContain("id=\"wai-solar-warmth\"");
-
-    // Radar holographique et balayage rotatif
-    expect(loaderSource).toContain("weather-ai-loader__radar-grid");
-    expect(loaderSource).toContain("weather-ai-loader__radar-sweep");
-    expect(loaderSource).toContain("id=\"wai-radar-beam\"");
-
-    // Arcs orbitaux et balises
-    expect(loaderSource).toContain("weather-ai-loader__orbital-arcs");
-    expect(loaderSource).toContain("weather-ai-loader__orbit-dash-1");
-    expect(loaderSource).toContain("weather-ai-loader__orbit-dash-2");
-
-    // Nuages, pluie, vent
-    expect(loaderSource).toContain("weather-ai-loader__clouds");
-    expect(loaderSource).toContain("weather-ai-loader__rain");
-    expect(loaderSource).toContain("weather-ai-loader__wind");
-
-    // Noyau IA central avec sigle « IA »
-    expect(loaderSource).toContain("weather-ai-loader__core");
-    expect(loaderSource).toContain('{isReady ? "✓" : "IA"}');
-
-    // Particules convergeant vers le noyau
-    expect(loaderSource).toContain("weather-ai-loader__data-particles");
-    expect(loaderSource).toContain("weather-ai-particle");
+  it("9. remplace le radar vectoriel par une Terre texturée et des orbites 3D", () => {
+    expect(loaderSource).toContain("<EarthGlobe reducedMotion={reducedMotion}");
+    expect(loaderSource).not.toContain("<svg");
+    expect(sceneSource).toContain("new THREE.WebGLRenderer");
+    expect(sceneSource).toContain("new THREE.SphereGeometry");
+    expect(sceneSource).toContain("earth_atmos_2048.jpg");
+    expect(sceneSource).toContain("earth_normal_2048.jpg");
+    expect(sceneSource).toContain("earth_lights_2048.png");
+    expect(sceneSource).toContain("earth_clouds_1024.png");
+    expect(sceneSource).toContain("earth.rotation.y = 4.0 + elapsed * 0.16");
+    expect(sceneSource).toContain("elapsed * orbit.speed");
+    expect(sceneSource).toContain("new THREE.Points");
+    expect(sceneSource).toContain("THREE.AdditiveBlending");
   });
 
-  it("10. préserve les performances mobiles sur Android (Brave, Edge, Chrome) et PWA", () => {
-    // Animations prioritaires sur transform et opacity
-    expect(stylesSource).toContain("will-change: opacity, transform");
+  it("10. limite le rendu mobile et libère toutes les ressources GPU", () => {
     expect(stylesSource).toContain("contain: layout style paint");
-    expect(stylesSource).toContain("@keyframes wai-radar-spin");
-    expect(stylesSource).toContain("@keyframes wai-continents-drift");
-    expect(stylesSource).toContain("@keyframes wai-core-pulse");
-    expect(stylesSource).toContain("@keyframes wai-particle-in-1");
+    expect(sceneSource).toContain("1000 / 30");
+    expect(sceneSource).toContain("window.devicePixelRatio || 1, 1.5");
+    expect(sceneSource).toContain("document.hidden");
+    expect(sceneSource).toContain("IntersectionObserver");
+    expect(sceneSource).toContain("cancelAnimationFrame(frame)");
+    expect(sceneSource).toContain("resizeObserver.disconnect()");
+    expect(sceneSource).toContain("intersectionObserver.disconnect()");
+    expect(sceneSource).toContain(
+      'document.removeEventListener("visibilitychange", resume)'
+    );
+    expect(sceneSource).toContain("renderer.dispose()");
+    expect(sceneSource).toContain("renderer.forceContextLoss()");
+    expect(sceneSource).toContain("g.dispose()");
+    expect(sceneSource).toContain("m.dispose()");
+    expect(sceneSource).toContain("t.dispose()");
+  });
 
-    // Pause de l'animation lors de la mise en arrière-plan (visibilitychange)
-    expect(loaderSource).toContain("document.hidden");
-    expect(loaderSource).toContain("visibilitychange");
+  it("11. conserve un globe fixe sans WebGL ou en mode réduit et charge le moteur à la demande", () => {
+    expect(globeSource).toContain("if (reducedMotion) return");
+    expect(globeSource).toContain('import("./earthScene")');
+    expect(globeSource).toContain("if (cancelled || !hostRef.current) return");
+    expect(globeSource).toContain("dispose?.()");
+    expect(globeSource).toContain("earth-globe__fallback");
+    expect(stylesSource).toContain("/textures/earth/earth_atmos_2048.jpg");
+    expect(sceneSource).toContain("webglcontextlost");
+    expect(sceneSource).toContain("if (disposed)");
+    expect(sceneSource).not.toContain("https://");
   });
 });
