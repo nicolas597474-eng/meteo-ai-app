@@ -148,12 +148,13 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("hourlyComputedAt: data.officialSnapshot?.hourlyComputedAt");
     expect(pageSource).toContain("computedAt: data.officialSnapshot?.computedAt");
   });
-  it("préserve la navigation historique, la carte et les preuves horaires", () => {
+  it("préserve la navigation historique et la carte, sans bloc de fiabilité historique", () => {
     expect(pageSource).toContain('import { Link } from "wouter"');
     expect(pageSource).toContain("Historique des prévisions");
     expect(pageSource).toContain('href="/history"');
     expect(pageSource).toContain("<WindyMap");
-    expect(pageSource).toContain("<HourlyHistoricalEvidencePanel");
+    expect(pageSource).not.toContain("Fiabilité historique face aux observations");
+    expect(pageSource).not.toContain("HourlyHistoricalEvidencePanel");
     expect(pageSource).toContain("getActiveOfficialForecastHour(data.hours, Date.now())");
     expect(pageSource).toContain("Prévisions temporairement indisponibles");
     expect(pageSource).toContain("forecast-details-page");
