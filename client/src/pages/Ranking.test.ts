@@ -9,18 +9,6 @@ describe("page Fiabilité", () => {
     expect(source).not.toContain(">Connecter<");
   });
 
-  it("explique le statut des capteurs citoyens en validation", () => {
-    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
-    expect(source).toContain("Comprendre le statut capteur en validation");
-    expect(source).toContain("Performance météo individuelle non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique");
-    expect(source).not.toContain("références physiques indépendantes suffisantes");
-    expect(source).toContain("PopoverContent");
-    expect(source).toContain("collisionPadding={12}");
-    expect(source).toContain("À propos de ce statut");
-    expect(source).toContain("PopoverClose");
-    expect(source).toContain("Fermer l’aide");
-  });
-
   it("distingue explicitement les références de modèles des stations locales", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("Références de modèles — non stations");
@@ -28,7 +16,7 @@ describe("page Fiabilité", () => {
     expect(source).toContain("il ne modifie pas la température locale avant une validation historique mesurée");
   });
 
-  it("distingue une station Netatmo authentifiée d’une référence ou d’un capteur citoyen", () => {
+  it("distingue une station Netatmo authentifiée d’une référence de modèle", () => {
     const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
     expect(source).toContain("STATION NETATMO");
     expect(source).toContain("NIVEAU 1 · AUTHENTIFIÉE");
@@ -224,25 +212,5 @@ describe("page Fiabilité", () => {
     expect(comparisonPanel).toContain("<TemperatureComparison points={comparison} periodDays={periodDays} />");
     expect(chart).toContain('toPoint("officialTemperature")');
     expect(chart).toContain('toPoint("stationTemperature")');
-  });
-
-  it("étiquette les vraies stations CWOP comme capteurs citoyens, jamais comme grille", () => {
-    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
-    expect(source).toContain('cwop: "CWOP/MADIS · capteur citoyen"');
-    expect(source).not.toContain("cwop: \"Grille régionale · ECMWF\"");
-  });
-
-  it("affiche un capteur citoyen validé sans le marquer source écartée", () => {
-    const source = readFileSync(new URL("./Ranking.tsx", import.meta.url), "utf8");
-    expect(source).toContain('displayStatus === "citizen-validated" ? "CAPTEUR VALIDÉ"');
-    expect(source).toContain("Capteur citoyen validé par comparaison aux stations officielles SYNOP sur la fenêtre de qualification");
-    // Les populations affichées passent par le helper partagé : le statut n'est
-    // plus recalculé localement, il est lu une seule fois pour la carte, les
-    // badges et les compteurs. Le comportement « un validé n'est jamais écarté »
-    // reste vérifié, par le helper et par son test dédié.
-    expect(source).toContain('getStationDisplayStatus(station) === "excluded"');
-    expect(source).not.toContain("station.qualificationStatus !== \"validated\"");
-    const dialog = readFileSync(new URL("./SourceDetailsDialog.tsx", import.meta.url), "utf8");
-    expect(dialog).toContain("Capteur citoyen validé : qualifié par comparaison aux stations officielles SYNOP");
   });
 });

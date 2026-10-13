@@ -17,13 +17,6 @@ const source = [
     ),
     "utf8"
   ),
-  readFileSync(
-    new URL(
-      "../components/weather/CitizenFusionImpactSection.tsx",
-      import.meta.url
-    ),
-    "utf8"
-  ),
 ]
   .join("\n")
   .replace(/\s+/g, " ");
@@ -108,34 +101,6 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
     expect(source).not.toContain("StationQualificationSection");
     expect(source).not.toContain("searchStations");
     expect(source).not.toContain("getCitizenQualificationEvidence");
-  });
-
-  it("évalue à blanc l’impact des capteurs validés sans jamais modifier la fusion", () => {
-    expect(source).toContain("getCitizenFusionImpact");
-    expect(source).toContain("Impact à blanc des capteurs citoyens validés");
-    // Les deux bras de la comparaison sont explicites, jamais confondus.
-    expect(source).toContain("MAE synthèse physique seule");
-    expect(source).toContain("MAE avec capteurs validés");
-    expect(source).toContain("Amélioration moyenne mesurée");
-    expect(source).toContain("distance 50 %");
-    expect(source).toContain("priorité de source 30 %");
-    // Les verdicts mesurés sont affichés tels quels, sans embellissement.
-    expect(source).toContain("AMÉLIORATION MESURÉE");
-    expect(source).toContain("AUCUNE AMÉLIORATION MESURÉE");
-    expect(source).toContain("HISTORIQUE INSUFFISANT");
-    expect(source).toContain("Aucun capteur citoyen validé archivé");
-    // Aucune donnée fabriquée et aucun changement implicite de la fusion.
-    expect(source).toContain("aucune valeur n’est inventée");
-    expect(source).toContain("l’heure d’archive n’est jamais un substitut");
-    // La décision d’activation persistée est affichée à côté du rapport
-    // mesuré, sans jamais être recalculée côté client.
-    expect(source).toContain("Décision d’activation archivée");
-    expect(source).toContain("ACTIFS DANS LA TEMPÉRATURE LOCALE");
-    expect(source).toContain("HORS DE LA TEMPÉRATURE LOCALE");
-    expect(source).toContain("aucune décision d’activation archivée");
-    expect(source).toContain("data.activation.reason");
-    expect(source).toContain("réévaluée à chaque cycle planifié");
-    expect(source).toContain("la vérité terrain horaire archivée reste physique uniquement");
   });
 });
 
