@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EarthGlobe } from "./EarthGlobe";
 
 export interface WeatherAILoaderProps {
   /** État réel du chargement */
@@ -156,7 +155,7 @@ export function WeatherAILoader({
         )}
       />
 
-      {/* Terre 3D texturée et particules orbitales */}
+      {/* Planète et orbites dessinées en CSS pur : aucune image, aucun WebGL */}
       <div className="relative mx-auto flex items-center justify-center">
         <WeatherAILoaderGraphic
           phase={phase}
@@ -237,6 +236,16 @@ interface GraphicProps {
   isReady: boolean;
 }
 
+/**
+ * Visuel de chargement entièrement CSS.
+ *
+ * Il remplace la scène WebGL Three.js qui chargeait, sur l'écran d'attente de
+ * toutes les routes, 118 ko gzip de moteur et 1,6 Mo de textures — exactement
+ * pendant que les requêtes de données se disputaient la même bande passante.
+ * Ce visuel ne télécharge aucun octet : disque, halo, orbites et soleil sont
+ * des dégradés et des bordures animés en CSS. Les classes sont préfixées
+ * `weather-loader-globe` pour qu'aucune règle d'image ne s'y applique.
+ */
 function WeatherAILoaderGraphic({
   phase,
   variant,
@@ -254,7 +263,13 @@ function WeatherAILoaderGraphic({
       data-ready={isReady}
       aria-hidden="true"
     >
-      <EarthGlobe reducedMotion={reducedMotion} />
+      <span className="weather-loader-globe">
+        <span className="weather-loader-globe__halo" />
+        <span className="weather-loader-globe__orbit weather-loader-globe__orbit--back" />
+        <span className="weather-loader-globe__disc" />
+        <span className="weather-loader-globe__orbit" />
+        <span className="weather-loader-globe__sun" />
+      </span>
     </div>
   );
 }

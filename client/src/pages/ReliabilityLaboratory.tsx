@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { ChevronDown, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { BackToTopButton } from "@/components/BackToTopButton";
-import { ReliabilityTrendChart } from "@/components/weather/ReliabilityTrendChart";
 import { YesterdayVerificationPanel } from "@/components/weather/YesterdayVerificationPanel";
 import {
   ReliabilityNotesSummary,
@@ -20,6 +19,26 @@ import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { trpc } from "@/lib/trpc";
+
+/**
+ * Le graphique de tendance est le seul consommateur de la bibliothèque recharts
+ * (372 ko brut / 108 ko gzip). Son import différé évite de télécharger et
+ * d'analyser cette bibliothèque avant le premier rendu de la page : les titres,
+ * filtres et tableaux de preuves s'affichent immédiatement, le graphique se
+ * complète ensuite avec son propre squelette.
+ */
+const ReliabilityTrendChart = lazy(() =>
+  import("@/components/weather/ReliabilityTrendChart").then(({ ReliabilityTrendChart: Component }) => ({ default: Component })),
+);
+
+function ReliabilityTrendChartFallback() {
+  return (
+    <MeteoSurface tone="lab" as="section" className="overflow-hidden rounded-[1.6rem] p-4 sm:p-5" aria-hidden="true">
+      <div className="h-5 w-44 animate-pulse rounded bg-slate-800/45" />
+      <div className="mt-4 min-h-[16rem] animate-pulse rounded-2xl bg-slate-800/35" />
+    </MeteoSurface>
+  );
+}
 
 type PeriodId = "24h" | "7d" | "30d" | "90d" | "365d";
 type HorizonId =
@@ -277,12 +296,14 @@ export default function ReliabilityLaboratory() {
           <DataUnavailableCard isError={isError} />
         )}
 
-        <ReliabilityTrendChart
-          hourlyPoints={overviewData?.comparison24h ?? []}
-          dailyPoints={overviewData?.comparison7d ?? []}
-          isLoading={overviewLoading}
-          isError={overviewError}
-        />
+        <Suspense fallback={<ReliabilityTrendChartFallback />}>
+          <ReliabilityTrendChart
+            hourlyPoints={overviewData?.comparison24h ?? []}
+            dailyPoints={overviewData?.comparison7d ?? []}
+            isLoading={overviewLoading}
+            isError={overviewError}
+          />
+        </Suspense>
 
         {data ? (
           <>

@@ -1,16 +1,8 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const loaderSource = readFileSync(
   new URL("./WeatherAILoader.tsx", import.meta.url),
-  "utf8"
-);
-const globeSource = readFileSync(
-  new URL("./EarthGlobe.tsx", import.meta.url),
-  "utf8"
-);
-const sceneSource = readFileSync(
-  new URL("./earthScene.ts", import.meta.url),
   "utf8"
 );
 const stylesSource = readFileSync(
@@ -125,49 +117,43 @@ describe("WeatherAILoader — Moteur d'animation de chargement météo 3D + holo
     expect(loaderSource).not.toContain("apiKey");
   });
 
-  it("9. remplace le radar vectoriel par une Terre texturée et des orbites 3D", () => {
-    expect(loaderSource).toContain("<EarthGlobe reducedMotion={reducedMotion}");
+  it("9. dessine le visuel de chargement en CSS, sans moteur 3D ni texture", () => {
+    // Le visuel existe toujours et garde sa structure/aria
+    expect(loaderSource).toContain("WeatherAILoaderGraphic");
+    expect(loaderSource).toContain("weather-loader-globe__disc");
+    expect(loaderSource).toContain("weather-loader-globe__orbit");
+    expect(loaderSource).toContain('aria-hidden="true"');
+    // Plus aucune dépendance 3D, ni image, ni SVG
+    expect(loaderSource).not.toContain("EarthGlobe");
+    expect(loaderSource).not.toContain("earthScene");
+    expect(loaderSource).not.toContain('from "three"');
+    expect(loaderSource).not.toContain("<img");
     expect(loaderSource).not.toContain("<svg");
-    expect(sceneSource).toContain("new THREE.WebGLRenderer");
-    expect(sceneSource).toContain("new THREE.SphereGeometry");
-    expect(sceneSource).toContain("earth_atmos_2048.jpg");
-    expect(sceneSource).toContain("earth_normal_2048.jpg");
-    expect(sceneSource).toContain("earth_lights_2048.png");
-    expect(sceneSource).toContain("earth_clouds_1024.png");
-    expect(sceneSource).toContain("earth.rotation.y = 4.0 + elapsed * 0.16");
-    expect(sceneSource).toContain("elapsed * orbit.speed");
-    expect(sceneSource).toContain("new THREE.Points");
-    expect(sceneSource).toContain("THREE.AdditiveBlending");
+    // Les fichiers du moteur 3D et les textures ont bien été retirés
+    expect(existsSync(new URL("./EarthGlobe.tsx", import.meta.url))).toBe(false);
+    expect(existsSync(new URL("./earthScene.ts", import.meta.url))).toBe(false);
+    expect(
+      existsSync(new URL("../../../public/textures/earth/earth_atmos_2048.jpg", import.meta.url))
+    ).toBe(false);
   });
 
-  it("10. limite le rendu mobile et libère toutes les ressources GPU", () => {
+  it("10. garde l'isolation de rendu et supprime toute occurrence WebGL du projet", () => {
     expect(stylesSource).toContain("contain: layout style paint");
-    expect(sceneSource).toContain("1000 / 30");
-    expect(sceneSource).toContain("window.devicePixelRatio || 1, 1.5");
-    expect(sceneSource).toContain("document.hidden");
-    expect(sceneSource).toContain("IntersectionObserver");
-    expect(sceneSource).toContain("cancelAnimationFrame(frame)");
-    expect(sceneSource).toContain("resizeObserver.disconnect()");
-    expect(sceneSource).toContain("intersectionObserver.disconnect()");
-    expect(sceneSource).toContain(
-      'document.removeEventListener("visibilitychange", resume)'
-    );
-    expect(sceneSource).toContain("renderer.dispose()");
-    expect(sceneSource).toContain("renderer.forceContextLoss()");
-    expect(sceneSource).toContain("g.dispose()");
-    expect(sceneSource).toContain("m.dispose()");
-    expect(sceneSource).toContain("t.dispose()");
+    expect(stylesSource).toContain(".weather-loader-globe__disc");
+    // Aucune règle CSS ne référence une texture du globe
+    expect(stylesSource).not.toContain("textures/earth");
   });
 
-  it("11. conserve un globe fixe sans WebGL ou en mode réduit et charge le moteur à la demande", () => {
-    expect(globeSource).toContain("if (reducedMotion) return");
-    expect(globeSource).toContain('import("./earthScene")');
-    expect(globeSource).toContain("if (cancelled || !hostRef.current) return");
-    expect(globeSource).toContain("dispose?.()");
-    expect(globeSource).toContain("earth-globe__fallback");
-    expect(stylesSource).toContain("/textures/earth/earth_atmos_2048.jpg");
-    expect(sceneSource).toContain("webglcontextlost");
-    expect(sceneSource).toContain("if (disposed)");
-    expect(sceneSource).not.toContain("https://");
+  it("11. n'anime qu'en CSS et n'ajoute aucun octet au chargement", () => {
+    // Animations purement déclaratives, désactivées hors préférence de mouvement
+    expect(stylesSource).toContain("@keyframes wai-orbit-tilt");
+    expect(stylesSource).toContain("@keyframes wai-sun-pulse");
+    expect(stylesSource).toContain(".weather-loader-globe__orbit { animation: wai-orbit-tilt");
+    expect(stylesSource).toContain(".weather-ai-loader--reduced-motion * { animation: none !important; transition: none !important; }");
+    expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
+    // Aucune ressource externe ni image distante dans le loader
+    expect(loaderSource).not.toContain("manus-storage");
+    expect(loaderSource).not.toContain("http://");
+    expect(loaderSource).not.toContain("https://");
   });
 });

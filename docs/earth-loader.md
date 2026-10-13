@@ -1,46 +1,67 @@
-# Globe terrestre 3D de chargement
+# Visuel de chargement de `WeatherAILoader`
 
-Le visuel de `WeatherAILoader` est désormais une scène WebGL Three.js : surface
-terrestre texturée, relief léger, reflets océaniques, nuages indépendants,
-atmosphère bleue, éclairage solaire et lumières nocturnes. Trois orbites inclinées
-portent des particules animées, avec occultation réelle par la Terre.
+## État actuel : visuel 100 % CSS
+
+Le visuel de l'écran de chargement est constitué uniquement de dégradés, de
+bordures et d'animations CSS (préfixe `weather-loader-globe`) :
+
+- `__disc` : disque terrestre en `radial-gradient`, mêmes position, taille et
+  ombres internes que l'ancien globe ;
+- `__orbit` / `__orbit--back` : deux orbites elliptiques avec un point lumineux ;
+- `__sun` : halo solaire ; `__halo` : lueur d'ambiance.
+
+**Il ne télécharge aucun octet** : ni image, ni moteur de rendu, ni requête.
+
+## Pourquoi la scène WebGL Three.js a été supprimée
+
+La version précédente affichait une Terre 3D texturée. Coût mesuré par le build
+de production (`gzip -9`) :
+
+| Ressource | Poids |
+|---|---|
+| `earthScene-*.js` (Three.js) | 474,2 ko brut / **118,3 ko gzip** |
+| `earth_atmos_2048.jpg` (fond CSS du repli) | 512,6 ko |
+| `earth_normal_2048.jpg` | 336,8 ko |
+| `earth_lights_2048.png` | 410,2 ko |
+| `earth_clouds_1024.png` | 226,1 ko |
+| `earth_specular_2048.jpg` | 223,4 ko |
+| **Total ajouté à chaque chargement à froid** | **118,3 ko gzip + 1,71 Mo** |
+
+Ces ressources étaient demandées par l'écran d'attente de **toutes les routes**,
+donc précisément pendant que les requêtes de données se disputaient la même
+bande passante. Elles étaient par ailleurs servies en `no-store` : elles étaient
+donc retéléchargées à chaque chargement à froid, y compris pour un visiteur
+revenant sur le site.
+
+L'élément était décoratif (`aria-hidden="true"`) et le cycle de chargement météo
+n'a jamais attendu sa scène. Son coût n'était donc justifié ni par
+l'accessibilité, ni par les données : il a été supprimé, ainsi que ses textures,
+`EarthGlobe.tsx`, `earthScene.ts` et la page d'aperçu `earth-preview.html`.
+
+Les textures restent récupérables dans l'historique Git si la scène devait
+revenir un jour.
 
 ## Comportement conservé
 
-- Les variantes `full`, `light`, `compact`, messages et trois phases restent disponibles.
+- Les variantes `full`, `light`, `compact`, les messages et les trois phases
+  restent disponibles et inchangés.
 - Aucun appel météo/IA supplémentaire et aucun délai de chargement imposé.
-- La scène est libérée à la disparition du loader ; la sortie conserve ses 340 ms.
-- Les textures sont locales, avec attribution dans `client/public/textures/earth/`.
+- La sortie conserve ses 340 ms (`.weather-ai-loader--exiting`).
+- Le conteneur `.weather-ai-loader` garde `contain: layout style paint`.
 
-## Performance et accessibilité
+## Accessibilité et mouvement
 
-Le moteur est importé à la demande dans un chunk séparé, seulement lorsque le
-loader animé est monté. Le rendu est plafonné à 30 images/s et au DPR 1,5 ; il
-s’arrête quand le document est caché ou le globe hors écran. Géométries, matériaux,
-textures, contexte WebGL, observateurs et écouteurs sont libérés au démontage.
-
-`prefers-reduced-motion` et la prop `reducedMotion` affichent un globe fixe sans
-initialiser WebGL. Ce même visuel sert de repli pendant le chargement du moteur,
-en cas d’import/texture principale indisponible ou si WebGL est indisponible/perdu.
-La scène est décorative (`aria-hidden`), les informations du loader restent accessibles.
-
-## Aperçu indépendant
-
-Lancer `pnpm exec vite --host 0.0.0.0` et ouvrir `/earth-preview.html`.
-Cette entrée de développement n’est pas incluse dans le build de production.
-Elle permet de voir l’animation sans attendre un appel météo, de choisir les
-formats, de passer au mode fixe et de simuler la fin du chargement.
+Les animations CSS sont déclarées sous
+`@media (prefers-reduced-motion: no-preference)`, et la prop `reducedMotion`
+(ou la préférence système) les désactive via les règles existantes
+`.weather-ai-loader--reduced-motion *` et `@media (prefers-reduced-motion: reduce)`.
+Le visuel reste décoratif : les informations du loader restent accessibles
+(`role="status"`, `aria-live="polite"`, `aria-busy`).
 
 ## Validation
 
-- `pnpm check` : réussi.
-- `pnpm build` : réussi (avertissements préexistants sur les variables analytics
-  non définies et un ancien asset `manus-storage`).
-- Tests ciblés `WeatherAILoader.test.ts` + `Dashboard.test.ts` : 19 réussis.
-- Vérification Chromium/Playwright à 390 × 844 et 1280 × 900 : rendu WebGL et
-  rotation effectifs, aucun débordement horizontal mobile, mode fixe sans canvas,
-  repli après perte simulée du contexte, sortie et remontage, variantes compactes,
-  aucune erreur JavaScript/console. Préférence système de mouvement réduit et
-  pause/reprise lors du masquage du document également vérifiées.
-
-Il s’agit d’une animation 3D en direct, pas d’une vidéo MP4.
+- `WeatherAILoader.test.ts` : vérifie l'absence totale de dépendance 3D, d'image,
+  de `three` et de texture, et la présence des animations CSS sous condition de
+  mouvement.
+- `pnpm check`, `pnpm test`, `pnpm build` : voir les résultats consignés dans le
+  rapport de performance `analyse-performance-pages.md`.
