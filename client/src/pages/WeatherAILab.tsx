@@ -1028,7 +1028,6 @@ export default function WeatherAILab() {
   const stationSourceLabels: Record<string, string> = {
     meteofrance: "Météo-France · SYNOP",
     netatmo: "Netatmo",
-    opensensemap: "openSenseMap · candidat",
   };
   const stationSourceStatusLabels: Record<string, string> = {
     success_with_data: "succès avec stations",

@@ -16,7 +16,6 @@ import {
   MethodologySection,
   ModelComparisonSection,
 } from "@/components/weather/ReliabilityComparisonSections";
-import { CitizenFusionImpactSection } from "@/components/weather/CitizenFusionImpactSection";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
@@ -111,16 +110,6 @@ export default function ReliabilityLaboratory() {
     }),
     [activeLocation?.lat, activeLocation?.lon]
   );
-  // Impact à blanc des capteurs citoyens validés : la référence d’évaluation
-  // est le lieu actif, sur la même fenêtre d’historique archivé que la
-  // qualification ; la fusion locale n’est jamais modifiée.
-  const citizenImpactInput = useMemo(
-    () => ({
-      lat: activeLocation?.lat ?? 50.7567,
-      lon: activeLocation?.lon ?? 2.5204,
-    }),
-    [activeLocation?.lat, activeLocation?.lon]
-  );
 
   const { data, isLoading, isError, isFetching } =
     trpc.weather.getReliabilityLaboratory.useQuery(input, {
@@ -140,14 +129,6 @@ export default function ReliabilityLaboratory() {
     isLoading: yesterdayLoading,
     isError: yesterdayError,
   } = trpc.weather.getYesterdayForecastObservation.useQuery(yesterdayInput, {
-    staleTime: 5 * 60 * 1000,
-    placeholderData: keepPreviousData,
-  });
-  const {
-    data: citizenImpactData,
-    isLoading: citizenImpactLoading,
-    isError: citizenImpactError,
-  } = trpc.weather.getCitizenFusionImpact.useQuery(citizenImpactInput, {
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
@@ -346,12 +327,6 @@ export default function ReliabilityLaboratory() {
           </div>
         </details>
 
-        <CitizenFusionImpactSection
-          data={citizenImpactData}
-          isLoading={citizenImpactLoading}
-          isError={citizenImpactError}
-          locationName={locationName}
-        />
       </div>
       <BackToTopButton />
     </main>
