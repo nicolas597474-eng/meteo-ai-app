@@ -34,13 +34,11 @@ export type StationSource =
   | "meteofrance"
   | "netatmo"
   | "wunderground"
-  | "cwop"
   | "noaa"
   | "openmeteo"
   | "synop"
   | "davis"
-  | "infoclimat"
-  | "opensensemap";
+  | "infoclimat";
 
 export type StationData = {
   stationId: string;
@@ -65,8 +63,6 @@ export type StationData = {
   dataAvailability: number; // 0-1
   isActive: boolean;
   exclusionReason?: string;
-  qualificationStatus?: "candidate" | "validated" | "excluded";
-  sourceTier?: 1 | 2 | 3;
 };
 
 export type StationCollectionSource = "meteofrance" | "netatmo";
@@ -196,9 +192,7 @@ const SOURCE_DEFAULTS: Record<StationSource, { reliability: number; updateFreqMi
   openmeteo:    { reliability: 80, updateFreqMin: 60, availability: 0.90 },
   davis:        { reliability: 78, updateFreqMin: 10, availability: 0.85 },
   netatmo:      { reliability: 65, updateFreqMin: 10, availability: 0.75 },
-  cwop:         { reliability: 60, updateFreqMin: 15, availability: 0.70 },
   wunderground: { reliability: 58, updateFreqMin: 5,  availability: 0.65 },
-  opensensemap: { reliability: 0, updateFreqMin: 15, availability: 0 },
 };
 
 /** Read-only copy of a mapper's existing source-level prioritization defaults. */

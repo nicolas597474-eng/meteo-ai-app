@@ -1591,15 +1591,6 @@ export const weatherRouter = router({
         lon,
         radiusKm,
         stations: ranked.map(s => {
-          const qualificationStatus = s.qualificationStatus;
-          const normalizedQualificationStatus: "candidate" | "validated" | "excluded" | undefined =
-            qualificationStatus === "candidate"
-              ? "candidate"
-              : qualificationStatus === "validated"
-                ? "validated"
-                : qualificationStatus === "excluded"
-                  ? "excluded"
-                  : undefined;
           return {
             stationId: s.stationId,
             source: s.source,
@@ -1624,8 +1615,6 @@ export const weatherRouter = router({
             dataAvailability: s.dataAvailability,
             isActive: s.isActive,
             exclusionReason: s.exclusionReason,
-            qualificationStatus: normalizedQualificationStatus,
-            sourceTier: s.sourceTier,
           };
         }),
         modelReferences,

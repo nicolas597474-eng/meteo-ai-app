@@ -3,7 +3,6 @@ import {
   haversineKm,
   rankStations,
   calculateGroundTruth,
-  getCandidateStations,
   getPhysicalActiveStations,
   getStationSourceKind,
   mapSynopRecord,
@@ -82,9 +81,7 @@ describe("getStationSourceKind", () => {
     expect(getStationSourceKind("openmeteo")).toBe("reference");
     expect(getStationSourceKind("netatmo")).toBe("physical");
     expect(getStationSourceKind("synop")).toBe("reference");
-    expect(getStationSourceKind("cwop")).toBe("reference");
     expect(getStationSourceKind("wunderground")).toBe("reference");
-    expect(getStationSourceKind("opensensemap")).toBe("reference");
   });
 });
 
@@ -148,22 +145,6 @@ describe("getPhysicalActiveStations", () => {
   it("ne classe pas une ancienne référence de grille comme une station Netatmo physique", () => {
     expect(getStationSourceKind("netatmo", "grid-local-est")).toBe("reference");
     expect(getStationSourceKind("netatmo", "netatmo-public-42")).toBe("physical");
-  });
-});
-
-describe("getCandidateStations", () => {
-  it("conserve les capteurs citoyens candidats openSenseMap et CWOP sans les transformer en station physique", () => {
-    const candidates = getCandidateStations([
-      makeStation({ stationId: "opensensemap-box-1", source: "opensensemap", isActive: false, qualificationStatus: "candidate", sourceTier: 3 }),
-      makeStation({ stationId: "cwop-EW1234", source: "cwop", isActive: false, qualificationStatus: "candidate", sourceTier: 3 }),
-      makeStation({ stationId: "mf-59000", source: "meteofrance", qualificationStatus: "validated", sourceTier: 1 }),
-    ]);
-
-    expect(candidates).toHaveLength(2);
-    expect(candidates.map((station) => station.stationId)).toEqual(["opensensemap-box-1", "cwop-EW1234"]);
-    for (const candidate of candidates) {
-      expect(getStationSourceKind(candidate.source, candidate.stationId)).toBe("reference");
-    }
   });
 });
 

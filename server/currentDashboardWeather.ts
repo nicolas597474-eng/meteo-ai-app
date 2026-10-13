@@ -63,13 +63,11 @@ const SOURCE_LABELS: Record<StationSource, string> = {
   meteofrance: "Météo-France",
   netatmo: "Netatmo",
   wunderground: "Weather Underground",
-  cwop: "CWOP",
   noaa: "NOAA",
   openmeteo: "Open-Meteo",
   synop: "Référence SYNOP",
   davis: "Davis",
   infoclimat: "Infoclimat",
-  opensensemap: "openSenseMap",
 };
 
 type PhysicalField = "temperature" | "humidity" | "windSpeed" | "windGust" | "windDirection";
