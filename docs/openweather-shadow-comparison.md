@@ -1,6 +1,8 @@
 # Comparaison OpenWeather en mode shadow
 
-**Statut :** diagnostic manuel réservé à l’administration; non utilisé par les prévisions officielles.
+**Statut :** panneau d’interface retiré; seul le chemin serveur réservé à l’administration subsiste et il n’est appelé par aucun écran. Non utilisé par les prévisions officielles.
+
+**Interface :** le bloc « Diagnostic manuel · mode shadow — OpenWeather ↔ prévision officielle » a été supprimé de la page Prévisions (`client/src/pages/WeatherDetails.tsx`), avec le bouton « Comparer OpenWeather », les paires horaires, la couverture exacte et la liste des champs non comparés. Plus aucune requête OpenWeather de comparaison n’est déclenchable depuis l’interface. Le routeur `weather.compareOpenWeatherShadow` reste défini côté serveur (`server/routers/weather.ts`) pour les appels administrateurs hors écran; le module de comparaison est inchangé. Le repli horaire OpenWeather, indépendant et documenté dans `docs/openweather-hourly-fallback.md`, n’est pas concerné.
 
 **Endpoint :** `https://api.openweathermap.org/data/2.5/forecast` (`Forecast 5 jours / 3 heures`), déjà présent dans `server/realWeatherAPIs.ts`.
 
@@ -8,7 +10,7 @@
 
 ## Contrat d’isolation
 
-Le panneau n’est visible qu’à l’administrateur et n’envoie une requête OpenWeather qu’après son clic. Il transmet la série horaire officielle déjà reçue et affichée par la page; le routeur ne relance pas le collecteur officiel et ne relit ni n’écrit la base. La réponse du comparateur est uniquement renvoyée à l’écran; elle n’est pas archivée.
+Le chemin de comparaison est réservé à l’administration et n’envoie une requête OpenWeather qu’à la demande explicite. Il reçoit la série horaire officielle déjà calculée et transmise par l’appelant; le routeur ne relance pas le collecteur officiel et ne relit ni n’écrit la base. La réponse du comparateur est uniquement renvoyée à l’appelant; elle n’est pas archivée.
 
 OpenWeather est explicitement une **source de comparaison**, pas un modèle indépendant et pas un contributeur au vote. Aucun poids, classement, score, fallback, résultat officiel, archivage ou pipeline de prévision n’est modifié. Le diagnostic ne rend donc pas encore un champ OpenWeather manquant disponible en secours.
 
