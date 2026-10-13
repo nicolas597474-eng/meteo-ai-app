@@ -314,7 +314,7 @@ export function calculateUltraLocal(
   };
   const stationById = new Map(stations.map((station) => [station.stationId, station]));
   const activeSources: SpatialSource[] = stations
-    .filter((station) => station.isActive && station.qualificationStatus !== "excluded")
+    .filter((station) => station.isActive)
     .map((station) => ({ ...station, id: station.stationId }));
   const qcOptions = {
     now,

@@ -1,5 +1,4 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getStationDisplayStatus } from "@/lib/stationCandidateStatus";
 
 type SourceSelection = { kind: "station" | "model"; source: any } | null;
 
@@ -15,16 +14,11 @@ export function SourceDetailsDialog({ selection, groundTruth, onOpenChange }: { 
   const source = selection?.source;
   const isModel = selection?.kind === "model";
   const contribution = !isModel ? groundTruth?.stationsUsed?.find((item: any) => item.stationId === source?.stationId) : null;
-  const displayStatus = !isModel && source ? getStationDisplayStatus(source) : null;
   const participation = isModel
     ? "Référence de modèle : poids de fusion locale 0 %. Son coefficient de cohérence est informatif et ne modifie pas la température locale."
-    : displayStatus === "candidate"
-      ? "Capteur citoyen en validation : poids de fusion locale 0 %. La mesure est conservée pour contrôle avant toute évaluation historique."
-      : displayStatus === "citizen-validated"
-        ? "Capteur citoyen validé : qualifié par comparaison aux stations officielles SYNOP sur la fenêtre de qualification. Il ne participe pas à la fusion locale des stations physiques, et aucune preuve chiffrée n’est inventée ici."
-        : contribution
-        ? `Station physique utilisée dans la synthèse locale : poids final ${Math.round(Number(contribution.weight) * 1000) / 10} %.`
-        : "Cette source ne participe pas au calcul local sur ce cycle : elle est absente, écartée ou ne passe pas les contrôles de qualité.";
+    : contribution
+      ? `Station physique utilisée dans la synthèse locale : poids final ${Math.round(Number(contribution.weight) * 1000) / 10} %.`
+      : "Cette source ne participe pas au calcul local sur ce cycle : elle est absente, écartée ou ne passe pas les contrôles de qualité.";
   const coherence = isModel && source?.coherenceWeight !== null && source?.coherenceWeight !== undefined
     ? `${Math.round(Number(source.coherenceWeight) * 100)} % (indicateur, pas un poids de fusion)`
     : "Non mesurable sans station physique locale validée";

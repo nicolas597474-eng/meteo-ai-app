@@ -7,13 +7,12 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { filterAndSortStationSources, type SourceDistanceOrder, type SourceKindFilter, type SourceStatusFilter } from "@/lib/stationSourceFilters";
 import { getStationDisplayStatus } from "@/lib/stationCandidateStatus";
-import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SourceDetailsDialog } from "@/pages/SourceDetailsDialog";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { CollectionObservabilitySections } from "@/components/weather/CollectionObservabilitySections";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
-import { ChevronDown, Clock3, RefreshCw, X } from "lucide-react";
+import { ChevronDown, Clock3, RefreshCw } from "lucide-react";
 
 type ComparisonPoint = {
   hour?: number;
@@ -115,7 +114,6 @@ type PhysicalStationDiagnostics = {
 
 function explainPhysicalStationAvailability(
   diagnostics: PhysicalStationDiagnostics | null | undefined,
-  candidateCount: number,
   radiusKm: number,
 ) {
   const exclusionReasons = diagnostics?.exclusionReasons ?? [];
@@ -136,9 +134,7 @@ function explainPhysicalStationAvailability(
     detail = `Aucune station physique n’a été trouvée dans le rayon de ${radiusKm} km lors de la vérification actuelle.`;
   }
 
-  if (candidateCount === 0) return detail;
-  const candidateLabel = `${candidateCount} capteur${candidateCount > 1 ? "s" : ""} citoyen${candidateCount > 1 ? "s" : ""}`;
-  return `${detail} ${candidateLabel} ${candidateCount > 1 ? "sont" : "est"} en validation ; ${candidateCount > 1 ? "ils ne comptent" : "il ne compte"} pas encore comme station physique validée.`;
+  return detail;
 }
 
 function TemperatureComparison({ points, periodDays }: { points: ComparisonPoint[]; periodDays: 1 | 7 }) {
@@ -287,24 +283,12 @@ export default function Ranking() {
   const instantDeltaC = data?.instantDeltaC ?? null;
   const modelReferences = liveStationData?.modelReferences ?? [];
   const realLocalStations = currentSources.filter((station) => station.isActive && station.sourceKind === "physical");
-  // Les deux populations passent par le helper partagé, celui que la carte et
+  // Les sources écartées passent par le helper partagé, celui que la carte et
   // les badges utilisent : une seule définition du statut affiché, donc aucune
   // divergence possible entre le compteur et la pastille.
-  const candidateSources = currentSources.filter((station) => getStationDisplayStatus(station) === "candidate");
-  // Un capteur citoyen validé n’est pas « écarté » : son verdict persisté le
-  // distingue d’une source exclue, même s’il reste hors de la fusion locale.
-  //
-  // Conséquence visible, assumée : une station non citoyenne inactive (Météo-
-  // France, Netatmo) est désormais comptée dans « Écartées ». L’ancien filtre
-  // portait un garde `!== "validated"` trop large — et `validated` est le défaut
-  // du schéma — si bien que ces stations n’apparaissaient dans AUCUN compteur :
-  // elles disparaissaient en silence, ce que ce dépôt s’interdit. Le helper
-  // implémente l’intention réellement visée (seul un citoyen validé échappe au
-  // statut « écarté ») et rend ces stations à nouveau visibles.
   const ignoredSources = currentSources.filter((station) => getStationDisplayStatus(station) === "excluded");
   const physicalStationExplanation = explainPhysicalStationAvailability(
     liveStationData?.physicalStationDiagnostics,
-    candidateSources.length,
     radiusKm,
   );
 
@@ -342,7 +326,7 @@ export default function Ranking() {
           <div className="mt-3 space-y-3" aria-label="Détails de la synthèse locale">
             <h3 className="px-1 text-xs font-semibold text-sky-100">Détails de la synthèse locale</h3>
               <div className="rounded-xl border border-sky-500/20 bg-[#10131a] p-3"><div><h3 className="text-sm font-semibold text-white">Synthèse multi-source</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-400">Les observations disponibles sont séparées des références de modèles; aucun indice global de confiance n’est affiché.</p></div><div className="mt-3 grid grid-cols-3 gap-2"><Reading label="Température" value={liveStationData?.groundTruth?.temperature == null ? "—" : `${Number(liveStationData.groundTruth.temperature).toFixed(1)}°C`} /><Reading label="Humidité" value={liveStationData?.groundTruth?.humidity == null ? "—" : `${Number(liveStationData.groundTruth.humidity).toFixed(0)}%`} /><Reading label="Pression" value={liveStationData?.groundTruth?.pressure == null ? "—" : `${Number(liveStationData.groundTruth.pressure).toFixed(0)} hPa`} /><Reading label="Vent" value={liveStationData?.groundTruth?.windSpeed == null ? "—" : `${Number(liveStationData.groundTruth.windSpeed).toFixed(1)} km/h`} /><Reading label="Rafales" value={liveStationData?.groundTruth?.windGust == null ? "—" : `${Number(liveStationData.groundTruth.windGust).toFixed(1)} km/h`} /><Reading label="Précip." value={liveStationData?.groundTruth?.precipitation == null ? "—" : `${Number(liveStationData.groundTruth.precipitation).toFixed(1)} mm`} /></div></div>
-              <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-[#10131a] p-3"><Metric label="Locales réelles" value={String(realLocalStations.length)} icon="stations" color="text-emerald-400" /><Metric label="Modèles" value={String(modelReferences.length)} icon="confidence" color="text-violet-300" /><Metric label="Candidates" value={String(candidateSources.length)} icon="location" color="text-amber-300" /><Metric label="Écartées" value={String(ignoredSources.length)} icon="refresh" color="text-slate-300" /></div>
+              <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-800 bg-[#10131a] p-3"><Metric label="Locales réelles" value={String(realLocalStations.length)} icon="stations" color="text-emerald-400" /><Metric label="Modèles" value={String(modelReferences.length)} icon="confidence" color="text-violet-300" /><Metric label="Écartées" value={String(ignoredSources.length)} icon="refresh" color="text-slate-300" /></div>
           </div>
           <p className="mt-3 rounded-xl border border-sky-400/15 bg-slate-950/20 px-3 py-2 text-[11px] leading-relaxed text-slate-400">La synthèse locale complète la prévision officielle. Elle ne la remplace pas et aucun relevé absent n’est inventé.</p>
         </section>
@@ -388,7 +372,6 @@ export default function Ranking() {
           groundTruth={liveStationData?.groundTruth}
           realLocalStations={realLocalStations}
           modelReferences={modelReferences}
-          candidateSources={candidateSources}
           ignoredCount={ignoredSources.length}
           criteria={rankingCriteria}
           isLoading={liveStationsLoading}
@@ -457,12 +440,8 @@ const SOURCE_LABELS: Record<string, string> = {
   synop: "SYNOP/WMO",
   noaa: "NOAA",
   openmeteo: "Open-Meteo",
-  opensensemap: "openSenseMap · capteur citoyen",
   netatmo: "STATION NETATMO",
   wunderground: "Grille régionale · GFS",
-  // Vestige des fausses grilles retiré : CWOP est un réseau de stations
-  // citoyennes réelles (MADIS), jamais une grille de modèle.
-  cwop: "CWOP/MADIS · capteur citoyen",
   davis: "Référence de grille",
   infoclimat: "Grille locale · AROME",
 };
@@ -471,12 +450,12 @@ function StationSourceCard({ station, rank, physical, onOpenDetails }: { station
   const temperature = station.temperature === null || station.temperature === undefined ? "—" : `${Number(station.temperature).toFixed(1)}°`;
   const displayStatus = getStationDisplayStatus(station);
   const isAuthenticatedNetatmo = displayStatus === "physical" && station.source === "netatmo" && String(station.stationId ?? "").startsWith("netatmo-");
-  const sourceTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : displayStatus === "candidate" ? "warning" : displayStatus === "citizen-validated" ? "success" : "info";
-  const statusTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : displayStatus === "candidate" ? "warning" : displayStatus === "citizen-validated" ? "success" : displayStatus === "reference" ? "info" : "danger";
-  const statusLabel = isAuthenticatedNetatmo ? "NIVEAU 1 · AUTHENTIFIÉE" : displayStatus === "physical" ? "STATION RÉELLE" : displayStatus === "candidate" ? "CAPTEUR EN VALIDATION" : displayStatus === "citizen-validated" ? "CAPTEUR VALIDÉ" : displayStatus === "reference" ? "RÉFÉRENCE / GRILLE" : "SOURCE ÉCARTÉE";
-  const markerClass = displayStatus === "physical" ? "bg-emerald-400" : displayStatus === "candidate" ? "bg-amber-300" : displayStatus === "citizen-validated" ? "bg-emerald-300" : displayStatus === "reference" ? "bg-sky-400" : "bg-rose-400";
-  const inactiveClass = displayStatus === "excluded" ? "border-rose-500/25 bg-rose-500/5 opacity-80" : displayStatus === "citizen-validated" ? "border-emerald-500/25 bg-emerald-500/5" : "border-slate-800 bg-[#090b10]";
-  const description = displayStatus === "candidate" ? "Capteur citoyen en validation : profil opérationnel seulement. Performance météo individuelle non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique; il reste hors de la température locale." : displayStatus === "citizen-validated" ? "Capteur citoyen validé par comparaison aux stations officielles SYNOP sur la fenêtre de qualification ; il reste hors de la fusion locale des stations physiques." : isAuthenticatedNetatmo ? "Observation issue de l’API Netatmo autorisée ; identifiant de station vérifiable et provenance physique." : station.exclusionReason ? `Écartée : ${station.exclusionReason}` : null;
+  const sourceTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : "info";
+  const statusTone: WeatherStatusBadgeTone = displayStatus === "physical" ? "success" : displayStatus === "reference" ? "info" : "danger";
+  const statusLabel = isAuthenticatedNetatmo ? "NIVEAU 1 · AUTHENTIFIÉE" : displayStatus === "physical" ? "STATION RÉELLE" : displayStatus === "reference" ? "RÉFÉRENCE / GRILLE" : "SOURCE ÉCARTÉE";
+  const markerClass = displayStatus === "physical" ? "bg-emerald-400" : displayStatus === "reference" ? "bg-sky-400" : "bg-rose-400";
+  const inactiveClass = displayStatus === "excluded" ? "border-rose-500/25 bg-rose-500/5 opacity-80" : "border-slate-800 bg-[#090b10]";
+  const description = isAuthenticatedNetatmo ? "Observation issue de l’API Netatmo autorisée ; identifiant de station vérifiable et provenance physique." : station.exclusionReason ? `Écartée : ${station.exclusionReason}` : null;
   const quality = station.qualityProfile;
   const qualityLabel = quality?.status === "fiable" ? "PROFIL OPÉRATIONNEL STABLE" : quality?.status === "qualifiee" ? "PROFIL DE RELEVÉS QUALIFIÉ" : quality?.status === "degradee" ? "PROFIL DE RELEVÉS DÉGRADÉ" : quality?.status === "en_observation" ? "PROFIL DE RELEVÉS EN OBSERVATION" : null;
   const qualityTone: WeatherStatusBadgeTone = quality?.status === "fiable" ? "success" : quality?.status === "qualifiee" ? "info" : quality?.status === "degradee" ? "warning" : "neutral";
@@ -507,7 +486,7 @@ function FilteredStationDirectory({ sources, isLoading, onOpenDetails }: { sourc
   return <section className="mb-4 rounded-2xl border border-slate-700 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Explorer les sources</h2><p className="text-xs text-slate-500">Filtrez chaque source selon son type, son statut et sa distance.</p></div><WeatherStatusBadge compact tone="neutral" label="Sources" value={String(filteredSources.length)} /></div><div className="space-y-3 border-b border-slate-800 pb-3"><div><p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Type</p><div className="flex flex-wrap gap-1.5"><Choice active={kind === "all"} onClick={() => setKind("all")}>Toutes</Choice><Choice active={kind === "physical"} onClick={() => setKind("physical")}>Locales réelles</Choice><Choice active={kind === "reference"} onClick={() => setKind("reference")}>Références</Choice></div></div><div><p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Statut</p><div className="flex flex-wrap gap-1.5"><Choice active={status === "active"} onClick={() => setStatus("active")}>Actives</Choice><Choice active={status === "ignored"} onClick={() => setStatus("ignored")}>Écartées</Choice><Choice active={status === "all"} onClick={() => setStatus("all")}>Toutes</Choice></div></div><div className="flex items-center justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Distance</p><div className="flex gap-1.5"><Choice active={distanceOrder === "nearest"} onClick={() => setDistanceOrder("nearest")}>Plus proches</Choice><Choice active={distanceOrder === "furthest"} onClick={() => setDistanceOrder("furthest")}>Plus éloignées</Choice></div></div></div>{isLoading ? <div className="mt-3 h-24 animate-pulse rounded-xl bg-slate-800" /> : filteredSources.length > 0 ? <div className="mt-3 space-y-2">{filteredSources.map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical={station.sourceKind === "physical"} onOpenDetails={onOpenDetails} />)}</div> : <div className="mt-3 rounded-xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-500">Aucune source ne correspond à ces filtres.</div>}</section>;
 }
 
-function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, candidateSources, ignoredCount, criteria, isLoading, physicalStationExplanation, onOpenDetails }: { groundTruth: any; realLocalStations: any[]; modelReferences: any[]; candidateSources: any[]; ignoredCount: number; criteria: any; isLoading: boolean; physicalStationExplanation: string; onOpenDetails: (source: any, kind: "station" | "model") => void }) {
+function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, ignoredCount, criteria, isLoading, physicalStationExplanation, onOpenDetails }: { groundTruth: any; realLocalStations: any[]; modelReferences: any[]; ignoredCount: number; criteria: any; isLoading: boolean; physicalStationExplanation: string; onOpenDetails: (source: any, kind: "station" | "model") => void }) {
   const netatmoCount = realLocalStations.filter((station) => station.source === "netatmo" && String(station.stationId ?? "").startsWith("netatmo-")).length;
   const [showAdditionalLocalStations, setShowAdditionalLocalStations] = useState(false);
   const [showAdditionalModelReferences, setShowAdditionalModelReferences] = useState(false);
@@ -534,7 +513,7 @@ function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, ca
       </div> : <div className="rounded-xl border border-dashed border-emerald-500/20 px-4 py-5 text-center"><p className="text-sm font-semibold text-emerald-100">Modèles disponibles, relevés physiques insuffisants</p><p className="mt-2 text-xs leading-relaxed text-slate-400">{physicalStationExplanation}</p></div>}
     </div>
     <details className="rounded-2xl border border-slate-800 bg-[#10131a] p-3">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden"><span>Comprendre les modèles, candidats et critères</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /></summary>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden"><span>Comprendre les modèles et les critères</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /></summary>
       <div className="mt-3 rounded-2xl border border-violet-500/20 bg-[#10131a] p-4">
       <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Références de modèles — non stations</h2><p className="text-xs text-slate-500">Prévisions au point du lieu, comparées aux observations physiques quand elles existent.</p></div><WeatherStatusBadge compact tone="lab" label="Références" value={String(modelReferences.length)} /></div>
       <p className="mb-3 rounded-xl border border-violet-500/15 bg-violet-500/5 px-3 py-2 text-[11px] leading-relaxed text-slate-400">Le coefficient de cohérence compare le modèle à la station locale validée et au consensus des modèles. Il sert à lire l’accord instantané ; il ne modifie pas la température locale avant une validation historique mesurée.</p>
@@ -549,7 +528,6 @@ function LiveSourceSummary({ groundTruth, realLocalStations, modelReferences, ca
         </> : null}
       </div> : <div className="rounded-xl border border-dashed border-violet-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucune référence de modèle n’est disponible pour ce cycle.</div>}
     </div>
-    <div className="rounded-2xl border border-amber-500/20 bg-[#10131a] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Capteurs citoyens en validation</h2><p className="text-xs text-slate-500">Observations réelles archivées pour contrôle qualité ; elles n’influencent pas encore la température locale.</p></div><div className="flex shrink-0 items-center gap-2"><Popover><PopoverTrigger asChild><button type="button" aria-label="Comprendre le statut capteur en validation" className="min-h-8 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 text-[10px] font-semibold text-amber-100 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">Comprendre</button></PopoverTrigger><PopoverContent side="bottom" align="end" sideOffset={8} collisionPadding={12} className="z-[80] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-amber-500/30 bg-[#17130b] px-3 py-3 text-left text-[11px] leading-relaxed text-amber-50 shadow-xl"><div className="flex items-start justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-200/75">À propos de ce statut</p><PopoverClose type="button" aria-label="Fermer l’aide" className="-mt-0.5 -mr-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-amber-100/70 hover:bg-amber-500/15 hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"><X className="h-3.5 w-3.5" /></PopoverClose></div><p className="mt-1.5">Ce capteur est archivé pour documenter son profil opérationnel (fraîcheur, complétude, continuité, stabilité). Sa performance météo individuelle reste non mesurée sans comparaisons physiques suffisantes entre réseaux distincts et prior empirique; il reste hors de la température locale.</p></PopoverContent></Popover><WeatherStatusBadge compact tone="warning" label="Capteurs" value={String(candidateSources.length)} /></div></div>{isLoading ? <div className="h-20 animate-pulse rounded-xl bg-slate-800" /> : candidateSources.length > 0 ? <div className="space-y-2">{candidateSources.map((station, index) => <StationSourceCard key={station.stationId} station={station} rank={index + 1} physical={false} onOpenDetails={(source) => onOpenDetails(source, "station")} />)}</div> : <div className="rounded-xl border border-dashed border-amber-500/20 px-4 py-5 text-center text-sm text-slate-500">Aucun capteur citoyen extérieur récent trouvé dans le rayon actuel.</div>}</div>
     {criteria && <div className="rounded-2xl border border-slate-800 bg-[#10131a] p-4"><h2 className="mb-3 font-semibold text-white">Critères de classement</h2><div className="grid grid-cols-2 gap-2">{criteria.criteria.map((criterion: any) => <div key={criterion.name} className="flex items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-bold text-blue-300">{criterion.weight}%</span><span><span className="block text-xs font-medium text-slate-200">{criterion.name}</span><span className="block text-[10px] leading-tight text-slate-500">{criterion.description}</span></span></div>)}</div><div className="mt-4 border-t border-slate-800 pt-3"><h3 className="text-xs font-semibold text-slate-100">Priorités techniques fixes par réseau/source — pas des scores météo</h3><div className="mt-2 flex flex-wrap gap-2">{criteria.sources.map((source: any) => <span key={source.id} className="rounded-lg border border-slate-700 bg-slate-950/40 px-2.5 py-1.5 text-[10px] text-slate-200">{source.name} · {source.sourcePriorityScore}/100</span>)}</div><p className="mt-2 text-[10px] leading-relaxed text-slate-400">Ces valeurs codées par origine servent aux heuristiques de classement et de pondération existantes; elles ne mesurent ni la précision météorologique ni la performance de cette station. Une performance individuelle n’est publiée que si des comparaisons physiques entre réseaux distincts et un prior empirique propre au réseau sont suffisants. Le profil opérationnel (complétude, continuité, stabilité) reste une information distincte.</p></div></div>}
     </details>
   </section>;

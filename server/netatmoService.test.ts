@@ -25,8 +25,6 @@ describe("stations Netatmo publiques", () => {
       windSpeed: 11,
       precipitation: 0.4,
       isActive: true,
-      qualificationStatus: "validated",
-      sourceTier: 1,
     });
     expect(getStationSourceKind("netatmo")).toBe("physical");
   });
@@ -48,8 +46,6 @@ describe("stations Netatmo publiques", () => {
       stationId: "netatmo-outdoor-1",
       temperature: 19.1,
       humidity: 58,
-      qualificationStatus: "validated",
-      sourceTier: 1,
     });
   });
 
@@ -105,7 +101,7 @@ describe("stations Netatmo publiques", () => {
 
     expect(station).toMatchObject({
       stationId: "netatmo-cache-1", source: "netatmo", temperature: 19.2,
-      isActive: true, qualificationStatus: "validated", sourceTier: 1,
+      isActive: true,
     });
     expect(station?.measurementTimes).toBeUndefined();
   });

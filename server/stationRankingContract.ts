@@ -14,9 +14,7 @@ const PHYSICAL_SOURCE_NAMES: Record<StationSource, string> = {
   infoclimat: "Infoclimat",
   openmeteo: "Open-Meteo / référence de grille",
   davis: "Davis Instruments",
-  cwop: "CWOP / APRS",
   wunderground: "Weather Underground PWS",
-  opensensemap: "openSenseMap",
 };
 
 /** Describes existing production heuristics and the separate empirical station measurement contract. */

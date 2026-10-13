@@ -69,7 +69,6 @@ describe("weather.searchStations · diagnostics des sources", () => {
       sourceDiagnostics: [
         { source: "meteofrance", status: "error", stationCount: 0, reason: "network_error" },
         { source: "netatmo", status: "success_with_data", stationCount: 1 },
-        { source: "opensensemap", status: "success_empty", stationCount: 0 },
       ],
       cacheHit: false,
     };

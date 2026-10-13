@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import L from "leaflet";
 import { LocateFixed, Maximize2, Undo2, X } from "lucide-react";
 import { MapControlButton, MapZoomControl, mapActionButtonClass } from "@/components/MapControls";
 import { MapView } from "@/components/Map";
-import { getStationQualificationBadge, isUnqualifiedCitizenStation } from "@/lib/stationCandidateStatus";
+import { getStationQualificationBadge } from "@/lib/stationCandidateStatus";
 
 type StationMarker = {
   stationId: string;
@@ -18,7 +18,6 @@ type StationMarker = {
   readings?: unknown[];
   isActive?: boolean;
   sourceKind?: "physical" | "reference";
-  qualificationStatus?: "candidate" | "validated" | "excluded";
   latest?: {
     temperature?: number | null;
     humidity?: number | null;
@@ -48,13 +47,12 @@ function stationInfoHtml(station: StationMarker) {
   const latest = station.latest;
   const freshness = stationFreshness(station.ageMinutes);
   const sourcePriority = station.reliabilityScore === null || station.reliabilityScore === undefined ? "—" : `${Math.round(station.reliabilityScore)}/100`;
-  // Badge de qualification réel, repris du helper partagé : un capteur citoyen
-  // en validation n'est jamais présenté comme qualifié, et inversement.
+  // Badge de statut repris du helper partagé : la carte, le classement et les
+  // badges affichent la même définition du statut d'une station.
   const qualification = getStationQualificationBadge({
     isActive: station.isActive ?? true,
     source: station.source,
     sourceKind: station.sourceKind,
-    qualificationStatus: station.qualificationStatus,
     exclusionReason: null,
   });
   const rows = [
@@ -79,34 +77,8 @@ export function StationMap({
   const [mapReady, setMapReady] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFocusedOnLocation, setIsFocusedOnLocation] = useState(false);
-  // Filtre « capteurs citoyens qualifiés » : désactivé par défaut, la carte ne
-  // masque jamais une station sans que l’utilisateur l’ait demandé.
-  const [qualifiedCitizensOnly, setQualifiedCitizensOnly] = useState(false);
   const normalZoom = stations.length > 0 ? 11 : 10;
   const [zoomLevel, setZoomLevel] = useState(normalZoom);
-
-  /**
-   * Capteurs citoyens non qualifiés présents dans le rayon : capteurs en
-   * validation et capteurs exclus. C’est la population que le filtre retire —
-   * le verdict vient du statut persisté relayé par la recherche, aucun capteur
-   * n’est promu ni rétrogradé ici.
-   */
-  const unqualifiedCitizenCount = useMemo(
-    () => stations.filter((station) => isUnqualifiedCitizenStation(station)).length,
-    [stations],
-  );
-  /**
-   * Le filtre ne retire que les capteurs citoyens non qualifiés : les stations
-   * officielles SYNOP restent affichées. Ce n’est pas un détail — la
-   * qualification se *définit* par l’accord avec ces stations officielles. Les
-   * masquer retirerait l’étalon qui donne son sens au mot « qualifié » et
-   * laisserait une carte vide, indiscernable d’une carte en panne.
-   */
-  const visibleStations = useMemo(
-    () => (qualifiedCitizensOnly ? stations.filter((station) => !isUnqualifiedCitizenStation(station)) : stations),
-    [qualifiedCitizensOnly, stations],
-  );
-  const hiddenStationCount = stations.length - visibleStations.length;
 
   const focusCurrentLocation = useCallback(() => {
     const map = mapRef.current;
@@ -156,7 +128,7 @@ export function StationMap({
       .bindTooltip("Lieu de référence")
       .addTo(markerLayer);
 
-    visibleStations.forEach((station) => {
+    stations.forEach((station) => {
       const freshness = station.ageMinutes !== null && station.ageMinutes <= 90 ? "#34d399" : "#fbbf24";
       L.circleMarker([station.lat, station.lon], {
         color: "#071018",
@@ -169,7 +141,7 @@ export function StationMap({
         .bindTooltip(`${station.name} · ${station.distanceKm.toFixed(1)} km`)
         .addTo(markerLayer);
     });
-  }, [center.lat, center.lon, visibleStations]);
+  }, [center.lat, center.lon, stations]);
 
   useEffect(() => {
     if (mapRef.current) renderMarkers(mapRef.current);
@@ -268,21 +240,6 @@ export function StationMap({
               Agrandir la carte
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setQualifiedCitizensOnly((current) => !current)}
-            aria-pressed={qualifiedCitizensOnly}
-            aria-label="Masquer les capteurs citoyens non qualifiés"
-            className={`${mapActionButtonClass} w-full ${qualifiedCitizensOnly ? "border-sky-300/80 bg-sky-400/20 text-sky-100" : "text-slate-100"}`}
-          >
-            {/* Le libellé dit exactement ce que le filtre retire, et l'effectif
-                concerné : la carte ne fait jamais disparaître une station sans
-                le dire, et ne promet jamais « uniquement » ce qu'elle n'affiche
-                pas — les stations officielles restent, elles sont l'étalon. */}
-            {qualifiedCitizensOnly
-              ? `Afficher toutes les sources (${hiddenStationCount} masquée(s))`
-              : `Masquer les capteurs citoyens non qualifiés (${unqualifiedCitizenCount})`}
-          </button>
           <details className="group rounded-xl border border-slate-700 bg-[#0b1524]">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-xs font-semibold text-slate-200 [&::-webkit-details-marker]:hidden">
               <span>Légende des marqueurs</span>
@@ -292,7 +249,6 @@ export function StationMap({
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-blue-100 bg-blue-600" /><span><strong className="text-slate-100">Bleu</strong> — lieu de référence.</span></div>
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-emerald-400" /><span><strong className="text-slate-100">Vert</strong> — station avec relevé de moins de 90 min.</span></div>
               <div className="flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[#071018] bg-amber-400" /><span><strong className="text-slate-100">Ambre</strong> — station avec relevé de plus de 90 min.</span></div>
-              <div className="flex items-start gap-2 border-t border-slate-700/70 pt-2"><span aria-hidden="true" className="mt-0.5 h-3 w-3 flex-none rounded-full border-2 border-sky-200 bg-sky-500" /><span>La couleur ne dit <strong className="text-slate-100">jamais</strong> la qualification. Le filtre retire les capteurs citoyens <strong className="text-slate-100">en validation et exclus</strong> ; les stations officielles restent affichées, car la qualification se définit par l’accord avec elles. L’effectif masqué est annoncé sur le bouton.</span></div>
             </div>
           </details>
         </div>

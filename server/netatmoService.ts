@@ -191,8 +191,6 @@ export function mapNetatmoPublicStation(station: NetatmoPublicStation, refLat: n
     updateFrequencyMin: 10,
     dataAvailability: 0.75,
     isActive: true,
-    qualificationStatus: "validated",
-    sourceTier: 1,
   };
 }
 
@@ -265,8 +263,6 @@ export function mapPersistedNetatmoObservation(
     updateFrequencyMin: station.updateFrequencyMin ?? 10,
     dataAvailability: station.dataAvailability ?? 0.75,
     isActive: true,
-    qualificationStatus: "validated",
-    sourceTier: station.sourceTier === 1 ? 1 : 1,
   };
 }
 
