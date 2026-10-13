@@ -9,7 +9,17 @@ import { getLoginUrl } from "./const";
 import { LocationProvider } from "./contexts/LocationContext";
 import "./index.css";
 
-const queryClient = new QueryClient();
+// Default staleTime for queries that do not set their own: a freshly mounted
+// query stays fresh for 30s instead of refetching on every mount and window
+// focus. Pages needing fresher data (Dashboard, Fiabilité) keep their
+// explicit per-query staleTime values, which override this default.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
