@@ -312,6 +312,7 @@ describe("computeOfficialDailyForecast", () => {
     expect(result.confidenceScore).toBeNull();
     expect(result.trace.calibrationStatus.tempMax).toBe("UNCALIBRATED_ROBUST");
     expect(result.methodNote).toContain("non calibr\u00e9e");
+    expect(result.methodNote).toContain("preuves calibrées exactes pour 0/5 variables calibrables");
   });
 
   it("refuse une pr\u00e9vision dont l\u2019horodatage d\u00e9passe la fra\u00eecheur maximale", () => {

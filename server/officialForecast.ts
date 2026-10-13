@@ -462,7 +462,10 @@ function computeOfficialDailyForecastInternal(
   const coreMultiModel = requiredCoreKeys.every((key) => diagnosticsByVariable[key].availabilityStatus === "FUSED");
   const fusionByMetric = Object.fromEntries(METRICS.map(({ key }) => [key, getFusion(key).temperature])) as Record<DailyVariable, number | null>;
   const parameterDiagnostics = Object.fromEntries(METRICS.map(({ key }) => [key, diagnosticsByVariable[key]])) as Record<DailyVariable, DailyFusionMetricDiagnostic>;
-  const calibratedCount = Object.values(diagnosticsByVariable).filter((item) => item.calibrationStatus === "CALIBRATED").length;
+  // Humidity and cloud cover have no daily physical observation series: they can never
+  // carry a calibrated proof, so the calibration denominator counts only calibrable variables.
+  const calibrableMetrics = METRICS.filter(({ key }) => key !== "humidity" && key !== "cloud_cover");
+  const calibratedCount = calibrableMetrics.filter(({ key }) => diagnosticsByVariable[key].calibrationStatus === "CALIBRATED").length;
   const forecast = {
     tempMax: getSelection("temperature_max").eligible.length > 0 ? fusionByMetric.temperature_max : null,
     tempMin: getSelection("temperature_min").eligible.length > 0 ? fusionByMetric.temperature_min : null,
@@ -478,7 +481,7 @@ function computeOfficialDailyForecastInternal(
     coreCalibrationComplete,
     weights,
     trace,
-    methodNote: `Fusion quotidienne par disponibilité réelle: valeurs disponibles pour ${Object.values(availabilityStatus).filter((status) => status !== "UNAVAILABLE").length}/7 variables; preuves calibrées exactes pour ${calibratedCount}/7. Les autres valeurs disponibles restent robustes et explicitement non calibrées; les absences de couverture normale ne sont pas des échecs.`,
+    methodNote: `Fusion quotidienne par disponibilité réelle: valeurs disponibles pour ${Object.values(availabilityStatus).filter((status) => status !== "UNAVAILABLE").length}/7 variables; preuves calibrées exactes pour ${calibratedCount}/${calibrableMetrics.length} variables calibrables (humidité et nébulosité non calibrables: aucune série d'observations physiques quotidienne). Les autres valeurs disponibles restent robustes et explicitement non calibrées; les absences de couverture normale ne sont pas des échecs.`,
   };
   return { forecast, parameterDiagnostics };
 }
