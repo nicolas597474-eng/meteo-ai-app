@@ -177,14 +177,18 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("score de fiabilité restent inchangés (mode shadow)");
     expect(pageSource).toContain('{user?.role === "admin" && <MeteoSurface');
   });
-  it("garde OpenWeather comme comparateur manuel shadow et affiche les échéances et champs non couverts", () => {
-    expect(pageSource).toContain("trpc.weather.compareOpenWeatherShadow.useMutation()");
-    expect(pageSource).toContain("validAt,");
-    expect(pageSource).toContain("openWeatherShadow.data.provenance.endpoint");
-    expect(pageSource).toContain("openWeatherShadow.data.coverage.map");
-    expect(pageSource).toContain("openWeatherShadow.data.unsupportedFields.map");
-    expect(pageSource).toContain("aucun changement des prévisions officielles");
-    expect(pageSource).toContain("jamais un modèle ni un vote");
+  it("n’expose plus le bloc Diagnostic manuel OpenWeather ↔ prévision officielle", () => {
+    expect(pageSource).not.toContain("compareOpenWeatherShadow");
+    expect(pageSource).not.toContain("openWeatherShadow");
+    expect(pageSource).not.toContain("OpenWeather ↔ prévision officielle");
+    expect(pageSource).not.toContain("openweather-shadow-title");
+    expect(pageSource).not.toContain("Comparer OpenWeather");
+    expect(pageSource).not.toContain("Écart OWM−officiel");
+    // Seul le diagnostic AROME reste accessible aux administrateurs sur cette page.
+    expect(pageSource).toContain('aria-labelledby="arome-shadow-title"');
+    expect(pageSource).toContain("trpc.weather.compareHondeghemAromeShadow.useMutation()");
+    // Le repli horaire OpenWeather, indépendant de ce panneau, reste hors de la page.
+    expect(pageSource).not.toContain("OpenWeatherMap");
   });
   it("rend visibles la fraîcheur, l’origine, la sélection et les états accessibles", () => {
     expect(timelineSource).toContain('aria-label="Prévision, source et fraîcheur"');
