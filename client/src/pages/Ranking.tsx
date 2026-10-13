@@ -208,7 +208,9 @@ export default function Ranking() {
     isFetching: isOverviewFetching,
     isLoading,
     refetch: refetchOverview,
-  } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput);
+  } = trpc.weather.getStationReliabilityOverview.useQuery(overviewInput, {
+    staleTime: 5 * 60 * 1000,
+  });
   const {
     data: liveStationData,
     error: liveStationsError,

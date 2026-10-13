@@ -96,6 +96,7 @@ import { getCollectedModelNames, getMissingModelNames } from "../stationCollecti
 import { isOperationalObservation } from "../observationProvenance";
 import { latitudeSchema, longitudeSchema, optionalCoordinatesSchema, requiredCoordinatesSchema } from "../weatherInput";
 import { buildReliabilityLaboratoryCached } from "../weatherReliabilityLab";
+import { buildStationReliabilityOverviewCached, clearStationReliabilityOverviewCache } from "../stationReliabilityOverview";
 import { getApparentAstronomyPosition, getEnvironmentalSnapshot, getTerrainHorizonProfile } from "../environmentalData";
 import { refreshManualFusionForFavorite } from "../manualFusion";
 import { getLocalEclipseCircumstances } from "../eclipseVisibility";
@@ -1377,7 +1378,11 @@ export const weatherRouter = router({
     .mutation(async ({ ctx, input }) => {
       const favorite = (await getFavoriteLocations(ctx.user.id)).find((entry) => entry.id === input.favoriteId);
       if (!favorite) throw new Error("Ce lieu favori est introuvable ou ne vous appartient pas.");
-      return collectPhysicalObservationSnapshotsForFavorites([favorite], "manual");
+      const result = await collectPhysicalObservationSnapshotsForFavorites([favorite], "manual");
+      // La relance vient d'écrire de nouveaux relevés qualifiés : le cache de
+      // l'aperçu ne doit pas masquer ces preuves après l'invalidation client.
+      clearStationReliabilityOverviewCache();
+      return result;
     }),
 
   /** Read-only view of the last scheduled hourly-comparison diagnostic cycle. */
@@ -2009,142 +2014,12 @@ export const weatherRouter = router({
       periodDays: z.union([z.literal(1), z.literal(7)]).optional(),
       radiusKm: z.number().min(5).max(50).optional(),
     }).optional())
-    .query(async ({ input }) => {
-      const lat = input?.lat ?? HONDEGHEM.lat;
-      const lon = input?.lon ?? HONDEGHEM.lon;
-      const periodDays = input?.periodDays ?? 1;
-      const now = Date.now();
-      const sinceMs = now - periodDays * 24 * 60 * 60 * 1000;
-      const performanceWindowDays = 30;
-      const performanceSinceMs = now - performanceWindowDays * 24 * 60 * 60 * 1000;
-      const locationKey = makeLocationKey(lat, lon);
-      const date = getTodayParis();
-      const [stationData, hourlyRunValues, collectionSnapshots] = await Promise.all([
-        getPhysicalStationHistory(lat, lon, performanceSinceMs),
-        getHourlyForecastRunValues(locationKey, date),
-        getStationCollectionSnapshots(locationKey, 14),
-      ]);
-      const radiusKm = input?.radiusKm ?? stationData.latestGroundTruth?.radiusKm ?? 20;
-      const stationPerformanceById = deriveStationPerformanceProfiles({
-        stations: stationData.stations.map((station) => ({
-          stationId: station.stationId,
-          source: station.source,
-          qualificationStatus: station.qualificationStatus,
-          isActive: station.isActive,
-          lat: station.lat,
-          lon: station.lon,
-          distanceKm: station.distanceKm,
-          readings: station.readings.map((reading) => ({
-            ...reading,
-            measurementTimes: reading.measurementTimes ?? null,
-          })),
-        })),
-        maxDistanceKm: radiusKm,
-        asOf: now,
-      });
-      const qualityProfiles = await getStationQualityProfiles(stationData.stations.map((station) => station.stationId));
-      const qualityByStationId = new Map(qualityProfiles.map((profile) => [profile.stationId, profile]));
-      const archivedOfficialModels = reconstructOfficialHourlyModelsFromArchive(hourlyRunValues, date);
-      const hourlyScoreHistory = await getHourlyForecastEvaluationHistory(
-        locationKey,
-        getParisDateDaysAgo(OFFICIAL_HOURLY_HISTORY_DAYS),
-        getParisDateDaysAgo(1),
-      );
-      const officialHourlyForecast = computeOfficialHourlyForecast(
-        archivedOfficialModels,
-        hourlyScoreHistory.rows,
-        { historyAvailable: hourlyScoreHistory.available },
-      );
-      const stationHourlyReadings = qualifyStationForecastReadings(stationData.stations.flatMap((station) => station.readings.filter((reading) => reading.observedAt >= sinceMs)), now);
-      const historicalHours = reconstructHistoricalOfficialHours(
-        stationHourlyReadings.map(reading => Math.floor(Number(reading.observedAt) / 3_600_000) * 3_600_000),
-        hourlyRunValues,
-        hourlyScoreHistory.rows,
-      ).map(point => point.hour);
-      const comparison24h = buildStationForecastComparison24h(date, historicalHours, stationHourlyReadings);
-
-      const parisDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
-      const dateFormatter = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "short" });
-      const stationByDate = new Map<string, Array<{ temperature: number | null; windSpeed: number | null; precipitation: number | null }>>();
-      for (const station of stationData.stations) {
-        for (const reading of station.readings) {
-          if (reading.observedAt < sinceMs) continue;
-          const key = parisDate.format(new Date(reading.observedAt));
-          const list = stationByDate.get(key) ?? [];
-          list.push(reading);
-          stationByDate.set(key, list);
-        }
-      }
-      const officialHistory = await getLatestMeteoAIForecasts(7, locationKey);
-      const officialByDate = new Map(officialHistory.map((forecast) => [forecast.date, forecast]));
-      const comparison7d = Array.from({ length: 7 }, (_, index) => {
-        const targetDate = getParisDateDaysAgo(6 - index);
-        const readings = stationByDate.get(targetDate) ?? [];
-        const stationTemps = readings.map((reading) => reading.temperature).filter((value): value is number => value !== null);
-        const official = officialByDate.get(targetDate);
-        const officialTemperature = official && official.tempMax !== null && official.tempMin !== null
-          ? Math.round(((official.tempMax + official.tempMin) / 2) * 10) / 10
-          : null;
-        return {
-          label: dateFormatter.format(new Date(`${targetDate}T12:00:00+02:00`)),
-          stationTemperature: stationTemps.length ? Math.round((stationTemps.reduce((sum, value) => sum + value, 0) / stationTemps.length) * 10) / 10 : null,
-          officialTemperature,
-          stationSampleCount: readings.length,
-        };
-      });
-
-      const currentUtcHour = Math.floor(now / (60 * 60_000)) * 60 * 60_000;
-      const instant = comparison24h.find((point) => point.validAt === currentUtcHour);
-      const instantDeltaC = instant && instant.stationTemperature !== null && instant.officialTemperature !== null
-        ? Math.round((instant.stationTemperature - instant.officialTemperature) * 10) / 10
-        : null;
-
-      return {
-        locationKey,
-        center: { lat, lon },
-        periodDays,
-        radiusKm,
-        performanceWindowDays,
-        collectedAt: stationData.latestGroundTruth?.computedAt ?? null,
-        latestGroundTruth: stationData.latestGroundTruth,
-        latestCollection: collectionSnapshots[0] ?? null,
-        availabilityHistory: [...collectionSnapshots].reverse().map((snapshot) => ({
-          date: snapshot.date,
-          collectedAt: snapshot.collectedAt,
-          radiusKm: snapshot.radiusKm,
-          physicalStationCount: snapshot.physicalStationCount,
-          dailyModelCount: snapshot.dailyModelCount,
-          hourlyModelCount: snapshot.hourlyModelCount,
-          dailyMissingModels: snapshot.dailyMissingModels,
-          hourlyMissingModels: snapshot.hourlyMissingModels,
-          status: snapshot.status,
-        })),
-        stations: stationData.stations.map((station) => {
-          const currentPeriodReadings = station.readings.filter((reading) => reading.observedAt >= sinceMs);
-          const latest = currentPeriodReadings.at(-1) ?? null;
-          const qualityProfile = qualityByStationId.get(station.stationId) ?? null;
-          return {
-            stationId: station.stationId,
-            name: station.name,
-            source: station.source,
-            lat: station.lat,
-            lon: station.lon,
-            distanceKm: station.distanceKm,
-            reliabilityScore: station.reliabilityScore,
-            updateFrequencyMin: station.updateFrequencyMin,
-            latest,
-            ageMinutes: latest ? Math.max(0, Math.round((now - latest.observedAt) / 60000)) : null,
-            readings: currentPeriodReadings,
-            qualityProfile,
-            stationPerformance: stationPerformanceById.get(station.stationId) ?? null,
-          };
-        }),
-        comparison24h,
-        officialHourlyWeighting: officialHourlyForecast.weighting,
-        comparison7d,
-        instantDeltaC,
-      };
-    }),
+    .query(async ({ input }) => buildStationReliabilityOverviewCached({
+      lat: input?.lat ?? HONDEGHEM.lat,
+      lon: input?.lon ?? HONDEGHEM.lon,
+      periodDays: input?.periodDays ?? 1,
+      radiusKm: input?.radiusKm,
+    })),
 
   /**
    * Laboratory: a strict read-model over qualified physical evidence only.
