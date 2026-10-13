@@ -1,3 +1,9 @@
+/**
+ * Chemin hérité WCS/GeoTIFF : conservé mais désactivé par défaut.
+ * Tous les appels de ce fichier optent explicitement pour `wcsEnabled: true`
+ * (équivalent AROME_WCS_ENABLED=true) pour prouver que le repli reste réversible.
+ * Le chemin Open-Meteo par défaut est couvert par aromeHondeghemOpenMeteo.test.ts.
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPointFromGeoTiffBytes, runHondeghemAromeShadowComparison, SINGLE_RUN_FORECAST_DAYS, verifyHondeghemAromeWindDirectionAvailability } from "./aromeHondeghemShadow";
 
@@ -86,7 +92,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("n’envoie aucune requête si l’identifiant OAuth manque pour la vérification de métadonnées", async () => {
     const fetchImpl = vi.fn();
-    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "", fetchImpl: fetchImpl as typeof fetch });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(result.status).toBe("missing-key");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -94,7 +100,7 @@ describe("AROME Hondeghem shadow comparison", () => {
   it("interroge Single Runs avec forecast_days et sans start_hour/end_hour, non exposés par cet endpoint", async () => {
     const { fetchImpl, requests, decodePoint } = createFetchMock();
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T01:00:00Z"),
       sleep: async () => undefined,
@@ -110,7 +116,7 @@ describe("AROME Hondeghem shadow comparison", () => {
   it("remonte le motif d’erreur Open-Meteo quand Single Runs refuse le run", async () => {
     const { fetchImpl } = createFetchMock({ openMeteoReason: "Run 2026-09-29T00:00 is not available for model meteofrance_arome_france_hd" });
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T01:00:00Z"),
       sleep: async () => undefined,
@@ -127,7 +133,7 @@ describe("AROME Hondeghem shadow comparison", () => {
       metaLastRun: RUN,
     });
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T04:00:00Z"),
       sleep: async () => undefined,
@@ -154,7 +160,7 @@ describe("AROME Hondeghem shadow comparison", () => {
       unavailableRuns: ["2026-09-29T03:00"],
     });
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T04:00:00Z"),
       sleep: async () => undefined,
@@ -172,7 +178,7 @@ describe("AROME Hondeghem shadow comparison", () => {
   it("conserve le run le plus récent du catalogue quand Open-Meteo publie au moins ce cycle", async () => {
     const { fetchImpl, requests, decodePoint } = createFetchMock({ metaLastRun: "2026-09-29T06:00:00Z" });
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T07:00:00Z"),
       sleep: async () => undefined,
@@ -193,7 +199,7 @@ describe("AROME Hondeghem shadow comparison", () => {
       openMeteoStatus: 404,
     });
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       sleep: async () => undefined,
     });
@@ -207,11 +213,11 @@ describe("AROME Hondeghem shadow comparison", () => {
   it("refuse un jeton d’accès collé dans METEOFRANCE_API_KEY sans interroger le portail", async () => {
     const fetchImpl = vi.fn();
     const jwt = `${Buffer.from('{"alg":"HS256"}', "utf8").toString("base64url")}.${Buffer.from('{"sub":"x"}', "utf8").toString("base64url")}.sig`;
-    const verification = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: jwt, fetchImpl: fetchImpl as typeof fetch });
+    const verification = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: jwt, wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(verification.status).toBe("invalid-key");
     expect(fetchImpl).not.toHaveBeenCalled();
 
-    const comparison = await runHondeghemAromeShadowComparison({ oauthApplicationId: jwt, fetchImpl: fetchImpl as typeof fetch });
+    const comparison = await runHondeghemAromeShadowComparison({ oauthApplicationId: jwt, wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(comparison.status).toBe("invalid-key");
     expect(comparison.message).toContain("jeton d’accès");
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -220,7 +226,7 @@ describe("AROME Hondeghem shadow comparison", () => {
   it("encode une paire client_id:client_secret avant l’en-tête Basic", async () => {
     const { fetchImpl, requests, decodePoint } = createFetchMock();
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "my-client-id:my-client-secret",
+      oauthApplicationId: "my-client-id:my-client-secret", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T01:00:00Z"),
       sleep: async () => undefined,
@@ -244,7 +250,7 @@ describe("AROME Hondeghem shadow comparison", () => {
       throw new Error(`Unexpected verification URL: ${url.origin}${url.pathname}`);
     });
     const result = await verifyHondeghemAromeWindDirectionAvailability({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T01:00:00Z"),
     });
@@ -275,7 +281,7 @@ describe("AROME Hondeghem shadow comparison", () => {
       if (url.pathname.endsWith("/DescribeCoverage")) return response(invalidDescription);
       throw new Error(`Unexpected verification URL: ${url.origin}${url.pathname}`);
     });
-    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(result.status).toBe("not-confirmed");
     expect(result.candidates[0]).toMatchObject({ metadataConfirmed: false, unit: "m/s", heights: [2] });
     expect(result.candidates[0].issues.join(" ")).toMatch(/degrés|10 m/);
@@ -288,7 +294,7 @@ describe("AROME Hondeghem shadow comparison", () => {
       if (url.pathname.endsWith("/GetCapabilities")) return response(capabilities());
       throw new Error(`Unexpected verification URL: ${url.origin}${url.pathname}`);
     });
-    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(result.status).toBe("not-advertised");
     expect(result.message).toContain("ne prouve pas l’absence");
     expect(result.candidates).toEqual([]);
@@ -296,7 +302,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("does not send any request when the OAuth2 application identifier is missing", async () => {
     const fetchImpl = vi.fn();
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "", fetchImpl: fetchImpl as typeof fetch });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(result.status).toBe("missing-key");
     expect(result.message).toContain("METEOFRANCE_API_KEY");
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -305,7 +311,7 @@ describe("AROME Hondeghem shadow comparison", () => {
   it("uses the advertised GeoTIFF format, samples Hondeghem and compares the exact common run with units converted", async () => {
     const { fetchImpl, requests, decodePoint } = createFetchMock();
     const result = await runHondeghemAromeShadowComparison({
-      oauthApplicationId: "synthetic-application-id",
+      oauthApplicationId: "synthetic-application-id", wcsEnabled: true,
       fetchImpl: fetchImpl as typeof fetch,
       now: () => new Date("2026-09-29T01:00:00Z"),
       sleep: async () => undefined,
@@ -359,7 +365,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("returns an explicit authentication error instead of falling back to another run", async () => {
     const { fetchImpl } = createFetchMock({ authStatus: 401 });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined });
     expect(result.status).toBe("authentication-error");
     expect(result.run).toBeNull();
     expect(result.message).toContain("401");
@@ -368,7 +374,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("stops before requesting AROME when the OAuth2 application credential is rejected", async () => {
     const { fetchImpl, requests } = createFetchMock({ tokenStatus: 401 });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(result.status).toBe("authentication-error");
     expect(result.message).toContain("HTTP 401");
     expect(requests).toHaveLength(1);
@@ -377,7 +383,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("does not substitute another model/run when Single Runs has no copy of the WCS run", async () => {
     const { fetchImpl, requests } = createFetchMock({ openMeteoStatus: 404 });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined });
     expect(result.status).toBe("request-impossible");
     expect(result.hourly).toHaveLength(0);
     expect(result.message).toContain("aucun autre run n’a été substitué");
@@ -386,7 +392,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("does not invent a GeoTIFF media type when WCS does not advertise one", async () => {
     const { fetchImpl, requests } = createFetchMock({ noGeoTiff: true });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined });
     expect(result.status).toBe("request-impossible");
     expect(result.message).toContain("n’annonce aucun format GeoTIFF");
     expect(requests.some(({ url }) => url.hostname === "single-runs-api.open-meteo.com")).toBe(false);
@@ -394,7 +400,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("reports unavailable hourly precipitation metadata rather than comparing an unknown accumulation period", async () => {
     const { fetchImpl, decodePoint } = createFetchMock({ missingPrecip: true });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined, decodePoint });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined, decodePoint });
     expect(result.status).toBe("partial");
     expect(result.missing.some((item) => item.includes("PT1H"))).toBe(true);
     expect(result.hourly[0].metrics.precipitation.arome).toBeNull();
@@ -403,7 +409,7 @@ describe("AROME Hondeghem shadow comparison", () => {
 
   it("marks WCS 403 unavailable coverage per valid time rather than treating it as a key error", async () => {
     const { fetchImpl, decodePoint } = createFetchMock({ coverageFailure: 403 });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined, decodePoint });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch, sleep: async () => undefined, decodePoint });
     expect(result.status).toBe("partial");
     expect(result.hourly).toHaveLength(3);
     expect(result.hourly[0].metrics.temperature.arome).toBeNull();
@@ -442,7 +448,7 @@ describe("AROME Hondeghem shadow comparison", () => {
     const fetchImpl = vi.fn(async (): Promise<Response> => {
       throw new Error("connection reset by peer");
     });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as unknown as typeof fetch });
     expect(result.status).toBe("request-impossible");
     expect(result.message).toContain("pendant l’échange OAuth2 Météo-France");
     expect(result.message).toContain("connection reset by peer");
@@ -456,7 +462,7 @@ describe("AROME Hondeghem shadow comparison", () => {
     const fetchImpl = vi.fn(async (): Promise<Response> => {
       throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
     });
-    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const result = await runHondeghemAromeShadowComparison({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as unknown as typeof fetch });
     expect(result.status).toBe("request-impossible");
     expect(result.message).toContain("délai de 20 s dépassé");
     errorSpy.mockRestore();
@@ -469,7 +475,7 @@ describe("AROME Hondeghem shadow comparison", () => {
       if (url.pathname === "/token") return response(JSON.stringify({ access_token: "synthetic-access-token" }));
       throw new Error("catalogue WCS illisible");
     });
-    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", fetchImpl: fetchImpl as typeof fetch });
+    const result = await verifyHondeghemAromeWindDirectionAvailability({ oauthApplicationId: "synthetic-application-id", wcsEnabled: true, fetchImpl: fetchImpl as typeof fetch });
     expect(result.status).toBe("request-impossible");
     expect(result.message).toContain("pendant la lecture du catalogue WCS AROME");
     expect(result.message).toContain("catalogue WCS illisible");

@@ -159,11 +159,21 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("forecast-details-page");
     expect(pageSource).toContain("pb-24");
   });
-  it("sépare la vérification admin du catalogue de la comparaison de valeurs AROME/Single Runs", () => {
-    expect(pageSource).toContain("trpc.weather.verifyHondeghemAromeWindDirection.useMutation()");
-    expect(pageSource).toContain('onClick={() => windDirectionVerification.mutate()}');
-    expect(pageSource).toContain("ne télécharge ni raster AROME ni valeurs Single Runs");
-    expect(pageSource).toContain("elle ne télécharge ni raster AROME ni valeurs Single Runs et n’intègre pas automatiquement le champ");
+  it("compare AROME uniquement via Open-Meteo, direction DD(10 m) comprise, sans bouton de vérification WCS", () => {
+    expect(pageSource).toContain("trpc.weather.compareHondeghemAromeShadow.useMutation()");
+    expect(pageSource).not.toContain("verifyHondeghemAromeWindDirection");
+    expect(pageSource).not.toContain("windDirectionVerification");
+    expect(pageSource).not.toContain("Vérification du catalogue");
+    expect(pageSource).not.toContain("AROME WCS");
+    expect(pageSource).not.toContain("Authentification AROME refusée");
+    expect(pageSource).toContain("wind_direction_10m");
+    expect(pageSource).toContain("Direction DD(10 m)");
+    expect(pageSource).toContain("écart circulaire");
+    expect(pageSource).toContain("350° contre 10° donne 20°");
+    expect(pageSource).toContain("Run non prouvé");
+    expect(pageSource).toContain("runProven");
+    expect(pageSource).toContain("AROME_WCS_ENABLED");
+    expect(pageSource).toContain("score de fiabilité restent inchangés (mode shadow)");
     expect(pageSource).toContain('{user?.role === "admin" && <MeteoSurface');
   });
   it("garde OpenWeather comme comparateur manuel shadow et affiche les échéances et champs non couverts", () => {

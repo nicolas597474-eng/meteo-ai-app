@@ -1,3 +1,20 @@
+/**
+ * Comparaison shadow AROME à Hondeghem — mode shadow uniquement : aucun résultat
+ * n’écrit en base, ne modifie les prévisions affichées, Best Match, les fusions
+ * journalières, la Vigilance, l’agrégation Netatmo ni le score de fiabilité.
+ *
+ * Chemin par défaut (depuis le retrait du WCS) : AROME est récupéré uniquement
+ * via Open-Meteo, sans clé Météo-France — série Forecast
+ * `models=meteofrance_arome_france_hd` comparée, pour le run prouvé par les
+ * métadonnées du modèle Open-Meteo, à la série Single Runs du même run.
+ * Aucune lecture de `METEOFRANCE_API_KEY`, aucun appel OAuth2/WCS/GeoTIFF et
+ * donc aucune erreur 401/404 issue de l’API authentifiée dans ce chemin.
+ *
+ * Chemin hérité WCS/GeoTIFF : conservé mais désactivé par défaut derrière
+ * `AROME_WCS_ENABLED=true` (voir `isAromeWcsEnabled`), pour rester réversible.
+ * Lui seul lit l’identifiant Météo-France et peut produire les statuts
+ * `missing-key` / `invalid-key` / `authentication-error`.
+ */
 import { fromArrayBuffer } from "geotiff";
 import { ENV } from "./_core/env";
 import { inspectMeteoFranceCredential } from "./meteoFranceCredentials";
@@ -7,6 +24,7 @@ import { HONDEGHEM } from "./weatherServices";
 export const AROME_WCS_PROFILE = "MF-NWP-HIGHRES-AROME-001-FRANCE-WCS";
 const AROME_WCS_BASE = `https://public-api.meteofrance.fr/public/arome/1.0/wcs/${AROME_WCS_PROFILE}`;
 const METEOFRANCE_TOKEN_URL = "https://portail-api.meteofrance.fr/token";
+const OPEN_METEO_FORECAST = "https://api.open-meteo.com/v1/forecast";
 const OPEN_METEO_SINGLE_RUNS = "https://single-runs-api.open-meteo.com/v1/forecast";
 const OPEN_METEO_MODEL = "meteofrance_arome_france_hd";
 const MAX_HOURS = 24;
@@ -16,11 +34,51 @@ export const SINGLE_RUN_FORECAST_DAYS = Math.max(1, Math.ceil(MAX_HOURS / 24) + 
 export const MAX_ALIGNED_RUN_ATTEMPTS = 3;
 /** Lecture des métadonnées de run Open-Meteo : une panne ne doit jamais bloquer la comparaison. */
 const OPEN_METEO_RUN_METADATA_TIMEOUT_MS = 10_000;
-const METRICS = ["temperature", "precipitation", "windSpeed"] as const;
+const METRICS = ["temperature", "precipitation", "windSpeed", "windDirection"] as const;
 export type AromeShadowMetric = typeof METRICS[number];
+/** Variables que le chemin hérité WCS savait récupérer; la direction DD(10 m) n’y a jamais été confirmée. */
+const WCS_METRICS = ["temperature", "precipitation", "windSpeed"] as const;
+type AromeWcsMetric = typeof WCS_METRICS[number];
 export type AromeShadowStatus = "ok" | "partial" | "missing-key" | "invalid-key" | "authentication-error" | "request-impossible";
 
-const COVERAGE_PATTERNS: Record<AromeShadowMetric, RegExp> = {
+/**
+ * Le WCS Météo-France authentifié est-il explicitement réactivé ?
+ * Désactivé par défaut : seule la valeur `true` (insensible à la casse) de la
+ * variable d’environnement `AROME_WCS_ENABLED` — ou l’option explicite des
+ * appels/tests — réactive le chemin hérité, de façon réversible.
+ */
+export function isAromeWcsEnabled(explicit?: boolean): boolean {
+  if (typeof explicit === "boolean") return explicit;
+  return (process.env.AROME_WCS_ENABLED ?? "").trim().toLowerCase() === "true";
+}
+
+/**
+ * Écart angulaire minimal entre deux directions, en degrés dans [0, 180].
+ * Une direction est circulaire : 350° et 10° sont à 20° l’un de l’autre
+ * (passage par le nord), pas à 340°. Renvoie `null` si une valeur manque :
+ * aucun écart n’est inventé.
+ */
+export function angularDifferenceDegrees(left: number | null | undefined, right: number | null | undefined): number | null {
+  if (left == null || right == null || !Number.isFinite(left) || !Number.isFinite(right)) return null;
+  const raw = Math.abs(((left - right) % 360 + 360) % 360);
+  return Math.round(Math.min(raw, 360 - raw) * 100) / 100;
+}
+
+function normalizeDirectionDegrees(value: number): number {
+  return Math.round((((value % 360) + 360) % 360) * 100) / 100;
+}
+
+/** Moyenne circulaire de directions (350° et 10° donnent 0°, pas 180°); `null` sans valeur exploitable. */
+function circularMeanDegrees(values: number[]): number | null {
+  if (!values.length) return null;
+  const radians = values.map((value) => (value * Math.PI) / 180);
+  const sin = radians.reduce((sum, value) => sum + Math.sin(value), 0) / radians.length;
+  const cos = radians.reduce((sum, value) => sum + Math.cos(value), 0) / radians.length;
+  if (Math.hypot(sin, cos) < 1e-12) return null;
+  return normalizeDirectionDegrees((Math.atan2(sin, cos) * 180) / Math.PI);
+}
+
+const COVERAGE_PATTERNS: Record<AromeWcsMetric, RegExp> = {
   temperature: /^TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___/i,
   precipitation: /^TOTAL_WATER_PRECIPITATION__GROUND_OR_WATER_SURFACE___/i,
   windSpeed: /^WIND_SPEED__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND___/i,
@@ -29,6 +87,7 @@ const METRIC_UNITS: Record<AromeShadowMetric, string> = {
   temperature: "°C",
   precipitation: "mm / heure",
   windSpeed: "km/h",
+  windDirection: "°",
 };
 
 export interface AromeShadowMetricValue {
@@ -59,8 +118,11 @@ export interface AromeHondeghemShadowResult {
   location: { name: "Hondeghem"; lat: number; lon: number };
   profile: string;
   openMeteoModel: string;
+  /** Run AROME prouvé par les métadonnées du modèle Open-Meteo; `null` = « run non prouvé », jamais inventé. */
   run: string | null;
   openMeteoRun: string | null;
+  /** `true` uniquement si le run vient des métadonnées du modèle Open-Meteo (et, en mode WCS hérité, du catalogue commun). */
+  runProven: boolean;
   comparedAt: string;
   hourly: AromeShadowHour[];
   daily: AromeShadowDaily[];
@@ -68,7 +130,7 @@ export interface AromeHondeghemShadowResult {
 }
 
 interface CoverageChoice {
-  metric: AromeShadowMetric;
+  metric: AromeWcsMetric;
   id: string;
   run: string;
   period: string | null;
@@ -85,21 +147,23 @@ interface ForecastSeries {
   temperature: Array<number | null>;
   precipitation: Array<number | null>;
   windSpeed: Array<number | null>;
+  windDirection: Array<number | null>;
 }
 type FetchLike = typeof fetch;
 
 function emptyMetric(metric: AromeShadowMetric, issue?: string): AromeShadowMetricValue {
   return { arome: null, openMeteoArome: null, difference: null, unit: METRIC_UNITS[metric], ...(issue ? { issue } : {}) };
 }
-function baseResult(status: AromeShadowStatus, message: string, comparedAt: string): AromeHondeghemShadowResult {
+function baseResult(status: AromeShadowStatus, message: string, comparedAt: string, profile: string = AROME_WCS_PROFILE): AromeHondeghemShadowResult {
   return {
     status,
     message,
     location: { name: "Hondeghem", lat: HONDEGHEM.lat, lon: HONDEGHEM.lon },
-    profile: AROME_WCS_PROFILE,
+    profile,
     openMeteoModel: OPEN_METEO_MODEL,
     run: null,
     openMeteoRun: null,
+    runProven: false,
     comparedAt,
     hourly: [],
     daily: [],
@@ -133,7 +197,7 @@ function parseRunFromCoverageId(id: string): { run: string; period: string | nul
 }
 interface CatalogueRun {
   run: string;
-  choices: Partial<Record<AromeShadowMetric, CoverageChoice>>;
+  choices: Partial<Record<AromeWcsMetric, CoverageChoice>>;
 }
 
 function chooseLatestRun(coverageIds: string[]): CatalogueRun | null {
@@ -141,11 +205,11 @@ function chooseLatestRun(coverageIds: string[]): CatalogueRun | null {
 }
 /** Tous les runs du catalogue, du plus récent au plus ancien, avec leurs couvertures reconnues. */
 function rankCatalogueRuns(coverageIds: string[]): CatalogueRun[] {
-  const byRun = new Map<string, Partial<Record<AromeShadowMetric, CoverageChoice>>>();
+  const byRun = new Map<string, Partial<Record<AromeWcsMetric, CoverageChoice>>>();
   for (const id of coverageIds) {
     const parsedRun = parseRunFromCoverageId(id);
     if (!parsedRun) continue;
-    const metric = METRICS.find((candidate) => COVERAGE_PATTERNS[candidate].test(id));
+    const metric = WCS_METRICS.find((candidate) => COVERAGE_PATTERNS[candidate].test(id));
     if (!metric) continue;
     if (metric === "precipitation" && parsedRun.period !== "PT1H") continue;
     const choices = byRun.get(parsedRun.run) ?? {};
@@ -224,9 +288,9 @@ function convertOfficialValue(metric: AromeShadowMetric, value: number, unit: st
 function toSingleRunTime(run: string): string {
   return run.slice(0, 16);
 }
-function resultStatus(result: AromeHondeghemShadowResult): AromeShadowStatus {
+function resultStatus(result: AromeHondeghemShadowResult, comparedMetrics: readonly AromeShadowMetric[] = METRICS): AromeShadowStatus {
   if (!result.hourly.length) return "request-impossible";
-  return result.missing.length > 0 || result.hourly.some((hour) => METRICS.some((metric) => hour.metrics[metric].arome == null || hour.metrics[metric].openMeteoArome == null))
+  return result.missing.length > 0 || result.hourly.some((hour) => comparedMetrics.some((metric) => hour.metrics[metric].arome == null || hour.metrics[metric].openMeteoArome == null))
     ? "partial"
     : "ok";
 }
@@ -238,6 +302,8 @@ function dailyAggregate(hours: AromeShadowHour[]): AromeShadowDaily[] {
   }
   const aggregate = (values: number[], metric: AromeShadowMetric): number | null => {
     if (!values.length) return null;
+    // La direction est circulaire : sa moyenne journalière est une moyenne circulaire, jamais arithmétique.
+    if (metric === "windDirection") return circularMeanDegrees(values);
     if (metric === "precipitation") return Math.round(values.reduce((sum, value) => sum + value, 0) * 100) / 100;
     return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 100) / 100;
   };
@@ -251,8 +317,11 @@ function dailyAggregate(hours: AromeShadowHour[]): AromeShadowDaily[] {
       metrics[metric] = {
         arome,
         openMeteoArome,
-        difference: arome != null && openMeteoArome != null ? Math.round((arome - openMeteoArome) * 100) / 100 : null,
-        unit: metric === "precipitation" ? "mm cumulés sur les heures comparées" : metric === "temperature" ? "°C · moyenne horaire" : "km/h · moyenne horaire",
+        // Écart journalier de direction : écart circulaire, pas une soustraction des moyennes.
+        difference: metric === "windDirection"
+          ? angularDifferenceDegrees(arome, openMeteoArome)
+          : arome != null && openMeteoArome != null ? Math.round((arome - openMeteoArome) * 100) / 100 : null,
+        unit: metric === "precipitation" ? "mm cumulés sur les heures comparées" : metric === "temperature" ? "°C · moyenne horaire" : metric === "windDirection" ? "° · moyenne circulaire horaire" : "km/h · moyenne horaire",
         hours: Math.min(aromeValues.length, openValues.length),
       };
     }
@@ -296,9 +365,27 @@ function buildSingleRunsUrl(run: string): string {
   url.searchParams.set("longitude", String(HONDEGHEM.lon));
   url.searchParams.set("run", toSingleRunTime(run));
   url.searchParams.set("models", OPEN_METEO_MODEL);
-  url.searchParams.set("hourly", "temperature_2m,precipitation,wind_speed_10m");
+  url.searchParams.set("hourly", "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m");
   // L’endpoint Single Runs n’expose pas start_hour/end_hour : la fenêtre est demandée en jours
   // (comme dans providerRunHorizon.ts) puis les échéances sont filtrées sur [run, run + MAX_HOURS[.
+  url.searchParams.set("forecast_days", String(SINGLE_RUN_FORECAST_DAYS));
+  url.searchParams.set("timezone", "UTC");
+  url.searchParams.set("temperature_unit", "celsius");
+  url.searchParams.set("wind_speed_unit", "kmh");
+  url.searchParams.set("precipitation_unit", "mm");
+  return url.toString();
+}
+/**
+ * Série AROME principale du chemin par défaut : API Forecast Open-Meteo, sans clé,
+ * modèle imposé `meteofrance_arome_france_hd` et les quatre variables comparées —
+ * dont `wind_direction_10m` (DD à 10 m), que le WCS n’avait jamais confirmée.
+ */
+function buildOpenMeteoForecastUrl(): string {
+  const url = new URL(OPEN_METEO_FORECAST);
+  url.searchParams.set("latitude", String(HONDEGHEM.lat));
+  url.searchParams.set("longitude", String(HONDEGHEM.lon));
+  url.searchParams.set("models", OPEN_METEO_MODEL);
+  url.searchParams.set("hourly", "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m");
   url.searchParams.set("forecast_days", String(SINGLE_RUN_FORECAST_DAYS));
   url.searchParams.set("timezone", "UTC");
   url.searchParams.set("temperature_unit", "celsius");
@@ -318,8 +405,9 @@ async function readOpenMeteoReason(response: Response): Promise<string | null> {
 }
 /**
  * Dernier run publié par Open-Meteo pour AROME France HD, lu dans `static/meta.json` du modèle.
- * `null` quand les métadonnées sont indisponibles ou illisibles : la comparaison conserve alors
- * le run le plus récent du catalogue WCS, comme avant, et laisse Single Runs répondre.
+ * C’est la seule preuve de run du chemin par défaut : `null` quand les métadonnées sont
+ * indisponibles ou illisibles, et la comparaison affiche alors « run non prouvé » sans
+ * inventer de run (en mode WCS hérité, le catalogue borne alors les candidats comme avant).
  */
 async function readOpenMeteoLastRunAt(fetchImpl: FetchLike): Promise<number | null> {
   try {
@@ -380,6 +468,8 @@ function parseOpenMeteoSeries(payload: any): ForecastSeries | null {
     temperature: toNumbers(hourly.temperature_2m),
     precipitation: toNumbers(hourly.precipitation),
     windSpeed: toNumbers(hourly.wind_speed_10m),
+    // Direction normalisée dans [0, 360) ; un `null` Open-Meteo reste `null`, jamais remplacé.
+    windDirection: toNumbers(hourly.wind_direction_10m).map((value) => value == null ? null : normalizeDirectionDegrees(value)),
   };
 }
 function forecastValue(series: ForecastSeries | null, metric: AromeShadowMetric, validAt: string): number | null {
@@ -391,11 +481,14 @@ function forecastValue(series: ForecastSeries | null, metric: AromeShadowMetric,
 }
 
 export interface AromeShadowOptions {
+  /** Chemin hérité uniquement : identifiant OAuth2 Météo-France. Jamais lu dans le chemin Open-Meteo par défaut. */
   oauthApplicationId?: string;
   fetchImpl?: FetchLike;
   now?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
   decodePoint?: typeof getPointFromGeoTiffBytes;
+  /** `true` = chemin hérité WCS/GeoTIFF authentifié. Défaut : `AROME_WCS_ENABLED`, désactivé. */
+  wcsEnabled?: boolean;
 }
 
 export type AromeWindDirectionVerificationStatus =
@@ -405,7 +498,9 @@ export type AromeWindDirectionVerificationStatus =
   | "missing-key"
   | "invalid-key"
   | "authentication-error"
-  | "request-impossible";
+  | "request-impossible"
+  /** WCS désactivé (défaut) : la direction DD(10 m) est comparée via `wind_direction_10m` Open-Meteo. */
+  | "wcs-disabled";
 
 export interface AromeWindDirectionCoverageCandidate {
   coverageId: string;
@@ -455,12 +550,17 @@ function describeAromeShadowError(error: unknown): string {
 /**
  * Explicit admin-only metadata check. It discovers candidate identifiers from the live catalogue
  * when the admin clicks; it never assumes a WCS identifier and never downloads forecast values.
+ * Chemin hérité uniquement : sans `AROME_WCS_ENABLED=true`, aucune clé n’est lue et aucune
+ * requête n’est envoyée — la direction DD(10 m) est désormais comparée via Open-Meteo.
  */
 export async function verifyHondeghemAromeWindDirectionAvailability(
-  options: Pick<AromeShadowOptions, "oauthApplicationId" | "fetchImpl" | "now"> = {},
+  options: Pick<AromeShadowOptions, "oauthApplicationId" | "fetchImpl" | "now" | "wcsEnabled"> = {},
 ): Promise<AromeWindDirectionVerificationResult> {
   const checkedAt = (options.now?.() ?? new Date()).toISOString();
   const base = (status: AromeWindDirectionVerificationStatus, message: string, run: string | null = null, candidates: AromeWindDirectionCoverageCandidate[] = []) => ({ status, message, checkedAt, run, candidates });
+  if (!isAromeWcsEnabled(options.wcsEnabled)) {
+    return base("wcs-disabled", "Vérification WCS DD(10 m) désactivée (AROME_WCS_ENABLED absent ou différent de true) : AROME passe uniquement par Open-Meteo et la direction DD(10 m) est comparée via wind_direction_10m dans la comparaison shadow. Aucune clé Météo-France n’a été lue et aucune requête WCS n’a été envoyée.");
+  }
   const credential = inspectMeteoFranceCredential(options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId);
   if (credential.kind === "missing") return base("missing-key", credential.message);
   if (!credential.basic) return base("invalid-key", credential.message);
@@ -561,12 +661,139 @@ export async function verifyHondeghemAromeWindDirectionAvailability(
 }
 
 /**
+ * Comparaison shadow par défaut : AROME uniquement via Open-Meteo, sans clé.
+ *
+ * 1. Le run de référence est celui des métadonnées du modèle Open-Meteo
+ *    (`static/meta.json`, `last_run_initialisation_time`). S’il ne peut pas être
+ *    prouvé, `run` reste `null`, `runProven` vaut `false` et le résultat affiche
+ *    « run non prouvé » : aucun run n’est inventé et Single Runs n’est pas
+ *    demandé pour un run supposé.
+ * 2. La série AROME comparée vient de l’API Forecast Open-Meteo
+ *    (`models=meteofrance_arome_france_hd`, `temperature_2m`, `precipitation`,
+ *    `wind_speed_10m`, `wind_direction_10m`). Quand le run est prouvé, la série
+ *    Single Runs du même run sert de référence horaire; si Single Runs la
+ *    refuse, aucun autre run n’est substitué et seules les valeurs Forecast
+ *    sont présentées, en partiel.
+ * 3. L’écart de direction DD(10 m) est un écart circulaire (modulo 360°) :
+ *    350° contre 10° donne 20°. Une valeur `null` renvoyée par Open-Meteo pour
+ *    une heure reste `null` : écart `null`, échéance signalée, statut partiel.
+ *
+ * Mode shadow strict : aucune écriture, aucune modification des prévisions
+ * affichées, de Best Match, des fusions journalières, de la Vigilance, de
+ * l’agrégation Netatmo ou du score de fiabilité.
+ */
+async function runHondeghemAromeOpenMeteoShadowComparison(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
+  const comparedAt = (options.now?.() ?? new Date()).toISOString();
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const result = baseResult("request-impossible", "La comparaison n’a pas pu être exécutée.", comparedAt, `Open-Meteo Forecast · ${OPEN_METEO_MODEL}`);
+  const round2 = (value: number | null): number | null => value == null ? null : Math.round(value * 100) / 100;
+  let step = "les métadonnées de run Open-Meteo (dernier run publié)";
+  try {
+    const openMeteoLastRunAt = await readOpenMeteoLastRunAt(fetchImpl);
+    const provenRun = openMeteoLastRunAt == null ? null : new Date(openMeteoLastRunAt).toISOString().replace(/\.000Z$/, "Z");
+    if (provenRun) {
+      result.run = provenRun;
+      result.openMeteoRun = toSingleRunTime(provenRun);
+      result.runProven = true;
+    } else {
+      result.missing.push("Run non prouvé : les métadonnées du modèle Open-Meteo sont indisponibles ou illisibles; aucun run n’a été inventé et Single Runs n’a pas été demandé pour un run supposé.");
+    }
+
+    step = "la série AROME Open-Meteo (Forecast, sans clé)";
+    const forecastResponse = await fetchImpl(buildOpenMeteoForecastUrl(), { signal: AbortSignal.timeout(20_000), headers: { accept: "application/json" } });
+    if (!forecastResponse.ok) {
+      return { ...result, message: `Open-Meteo AROME indisponible (HTTP ${forecastResponse.status}); aucune valeur n’a été inventée et le WCS Météo-France authentifié n’a pas été sollicité.` };
+    }
+    const forecastSeries = parseOpenMeteoSeries(await forecastResponse.json());
+    if (!forecastSeries || !forecastSeries.time.length) {
+      return { ...result, message: "La réponse Open-Meteo AROME ne contient pas de série horaire exploitable; aucune valeur n’a été inventée." };
+    }
+
+    let singleRunsSeries: ForecastSeries | null = null;
+    if (provenRun) {
+      step = "la série Open-Meteo Single Runs du run prouvé";
+      const singleRunsResponse = await fetchImpl(buildSingleRunsUrl(provenRun), { signal: AbortSignal.timeout(20_000), headers: { accept: "application/json" } });
+      if (singleRunsResponse.ok) {
+        singleRunsSeries = parseOpenMeteoSeries(await singleRunsResponse.json());
+        if (!singleRunsSeries) result.missing.push("Single Runs a répondu sans série horaire exploitable pour le run prouvé; aucun autre run n’a été substitué.");
+      } else {
+        const reason = await readOpenMeteoReason(singleRunsResponse);
+        result.missing.push(`Single Runs n’a pas fourni le run prouvé ${toSingleRunTime(provenRun)} UTC (HTTP ${singleRunsResponse.status}${reason ? ` : ${reason}` : ""}); aucun autre run n’a été substitué. Seules les valeurs AROME Open-Meteo Forecast sont présentées.`);
+      }
+    }
+
+    step = "l’appariement horaire des séries Open-Meteo";
+    // Fenêtre comparée : [run, run + MAX_HOURS) si le run est prouvé, sinon les
+    // prochaines heures à partir de l’heure de comparaison — jamais un run supposé.
+    const windowStart = provenRun ? Date.parse(provenRun) : Math.floor(Date.parse(comparedAt) / 3_600_000) * 3_600_000;
+    const validTimes = forecastSeries.time
+      .filter((time) => Date.parse(time) >= windowStart && Date.parse(time) < windowStart + MAX_HOURS * 60 * 60 * 1000)
+      .sort((a, b) => Date.parse(a) - Date.parse(b))
+      .slice(0, MAX_HOURS);
+    if (!validTimes.length) return { ...result, message: "Aucune échéance AROME Open-Meteo n’est exploitable dans la fenêtre comparée; aucune valeur n’a été inventée et aucun autre run n’a été mélangé." };
+
+    for (const validAt of validTimes) {
+      const metrics = {} as Record<AromeShadowMetric, AromeShadowMetricValue>;
+      for (const metric of METRICS) {
+        const arome = round2(forecastValue(forecastSeries, metric, validAt));
+        const openMeteoArome = round2(forecastValue(singleRunsSeries, metric, validAt));
+        let issue: string | undefined;
+        if (arome == null) {
+          issue = "Valeur AROME Open-Meteo absente ou nulle pour cette échéance; elle n’est pas remplacée.";
+          result.missing.push(`${metric} ${validAt}: valeur Open-Meteo Forecast absente ou nulle; aucun écart n’est calculé pour cette heure.`);
+        } else if (provenRun && singleRunsSeries && openMeteoArome == null) {
+          issue = "Valeur Single Runs absente ou nulle pour cette échéance du run prouvé; aucun écart n’est calculé pour cette heure.";
+          result.missing.push(`${metric} ${validAt}: valeur Single Runs absente ou nulle pour le run prouvé; aucun écart n’est calculé pour cette heure.`);
+        } else if (!provenRun) {
+          issue = "Run non prouvé : pas de référence Single Runs attribuée à cette échéance.";
+        } else if (!singleRunsSeries) {
+          issue = "Référence Single Runs indisponible pour le run prouvé; aucun autre run n’a été substitué.";
+        }
+        metrics[metric] = {
+          arome,
+          openMeteoArome,
+          // Direction : écart circulaire modulo 360° (350° vs 10° = 20°), jamais une soustraction simple.
+          difference: metric === "windDirection"
+            ? angularDifferenceDegrees(arome, openMeteoArome)
+            : arome != null && openMeteoArome != null ? round2(arome - openMeteoArome) : null,
+          unit: METRIC_UNITS[metric],
+          ...(issue ? { issue } : {}),
+        };
+      }
+      result.hourly.push({ validAt, metrics });
+    }
+    result.daily = dailyAggregate(result.hourly);
+    result.status = resultStatus(result);
+    result.message = (result.status === "ok"
+      ? "Comparaison shadow terminée : AROME est récupéré uniquement via Open-Meteo (Forecast comparé à Single Runs pour le run prouvé par les métadonnées du modèle), direction DD(10 m) incluse en écart circulaire. Les prévisions affichées et le score de fiabilité restent inchangés."
+      : "Comparaison shadow partielle : AROME est récupéré uniquement via Open-Meteo; seules les valeurs présentes sont comparées et les valeurs nulles ou manquantes ne sont pas remplacées. Les prévisions affichées et le score de fiabilité restent inchangés.")
+      + (result.runProven ? "" : " Run non prouvé : aucun run n’est attribué à la série AROME tant que les métadonnées du modèle Open-Meteo ne le prouvent pas.");
+    return result;
+  } catch (error) {
+    console.error(`[arome-shadow] comparaison shadow Open-Meteo échouée pendant ${step}`, error);
+    return { ...result, message: `Requête Open-Meteo impossible ou métadonnées inattendues pendant ${step} (${describeAromeShadowError(error)}); aucune prévision de production n’a été modifiée et le WCS Météo-France authentifié n’a pas été sollicité.` };
+  }
+}
+
+/**
+ * Manual, read-only comparison at Hondeghem; it never writes to forecasts or lets
+ * the AROME result replace the displayed Best Match values.
+ * Chemin par défaut : Open-Meteo uniquement (voir ci-dessus), sans clé Météo-France.
+ * Le chemin WCS/GeoTIFF hérité ne part que si `AROME_WCS_ENABLED=true`, de façon réversible.
+ */
+export async function runHondeghemAromeShadowComparison(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
+  if (!isAromeWcsEnabled(options.wcsEnabled)) return runHondeghemAromeOpenMeteoShadowComparison(options);
+  return runHondeghemAromeShadowComparisonViaWcs(options);
+}
+
+/**
+ * Chemin hérité désactivé par défaut (`AROME_WCS_ENABLED=true` pour le réactiver).
  * Manual, read-only comparison. It uses only the default AROME France HD product at Hondeghem;
  * it never writes to forecasts or lets the AROME result replace the displayed Best Match values.
  * Le cycle comparé est le plus récent publié à la fois par le catalogue WCS et par Open-Meteo
  * Single Runs : l’alignement du run évite de demander un cycle que Single Runs n’a pas encore.
  */
-export async function runHondeghemAromeShadowComparison(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
+async function runHondeghemAromeShadowComparisonViaWcs(options: AromeShadowOptions = {}): Promise<AromeHondeghemShadowResult> {
   const comparedAt = (options.now?.() ?? new Date()).toISOString();
   const credential = inspectMeteoFranceCredential(options.oauthApplicationId ?? ENV.meteoFranceOAuthApplicationId);
   if (credential.kind === "missing") return baseResult("missing-key", credential.message, comparedAt);
@@ -667,11 +894,12 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     const run = selection.run;
     result.run = run;
     result.openMeteoRun = toSingleRunTime(run);
+    result.runProven = true;
     const alignmentNote = describeRunAlignment({ advertisedRun, comparedRun: run, openMeteoLastRunAt, skipped });
 
     step = "les métadonnées WCS DescribeCoverage";
     const metadata: Partial<Record<AromeShadowMetric, CoverageMetadata>> = {};
-    for (const metric of METRICS) {
+    for (const metric of WCS_METRICS) {
       const choice = selection.choices[metric];
       if (!choice) {
         result.missing.push(metric === "precipitation" ? "Précipitations : aucune couverture PT1H dans le run AROME sélectionné." : `${metric}: couverture absente du run AROME sélectionné.`);
@@ -735,7 +963,8 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
     for (const validAt of validTimes) {
       const metrics = {} as Record<AromeShadowMetric, AromeShadowMetricValue>;
       for (const metric of METRICS) {
-        const choice = selection.choices[metric];
+        // En mode WCS hérité, la direction n’a pas de couverture confirmée : valeur laissée vide, référence Single Runs conservée.
+        const choice = (selection.choices as Partial<Record<AromeShadowMetric, CoverageChoice>>)[metric];
         const info = metadata[metric];
         const openMeteoArome = forecastValue(openMeteoSeries, metric, validAt);
         if (!choice || !info || !info.validAt.some((time) => Date.parse(time) === Date.parse(validAt))) {
@@ -795,7 +1024,7 @@ export async function runHondeghemAromeShadowComparison(options: AromeShadowOpti
       result.hourly.push({ validAt, metrics });
     }
     result.daily = dailyAggregate(result.hourly);
-    result.status = resultStatus(result);
+    result.status = resultStatus(result, WCS_METRICS);
     result.message = (result.status === "ok"
       ? "Comparaison shadow terminée : AROME WCS et Open-Meteo portent le même run. Les prévisions affichées restent inchangées."
       : "Comparaison partielle : seules les valeurs présentes dans les deux sources et conformes aux métadonnées sont comparées; les prévisions affichées restent inchangées.") + alignmentNote;
