@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   AstronomyEventSelector,
+  syncAstronomyEventCapsule,
   type AstronomyEventOption,
 } from "./AstronomyEventSelector";
 
@@ -45,6 +46,7 @@ describe("AstronomyEventSelector — rendu mobile", () => {
       'aria-label="Sélection des événements astronomiques"'
     );
     expect(markup).toContain("overflow-x-auto");
+    expect(markup).toContain("scrollbar-hide");
     expect(markup).toContain("data-horizontal-scroll");
     expect(markup).toContain("data-swipe-exclude");
     expect(markup).toContain("min-h-[4.25rem]");
@@ -78,7 +80,7 @@ describe("AstronomyEventSelector — rendu mobile", () => {
     expect(markup).not.toContain("border-sky-");
   });
 
-  it("prolonge la rangée d’une fine piste sombre dont la capsule bleu clair glisse jusqu’à l’événement choisi", () => {
+  it("prolonge la rangée d’une fine piste sombre dont la capsule bleu clair suit le balayage", () => {
     const markup = renderToStaticMarkup(
       createElement(AstronomyEventSelector, {
         events,
@@ -89,12 +91,15 @@ describe("AstronomyEventSelector — rendu mobile", () => {
 
     expect(markup).toContain("h-1 rounded-full bg-slate-800");
     expect(markup).toContain("rounded-full bg-sky-400");
+    expect(markup).toContain("data-astronomy-scroll-capsule");
+    // Avant tout balayage, la capsule démarre sur l’événement choisi.
     const segmentWidth = 100 / events.length;
     expect(markup).toContain(`width:${segmentWidth}%;left:${segmentWidth}%`);
   });
 
-  it("transmet l’identifiant de la carte activée au gestionnaire de sélection", () => {
+  it("transmet l’identifiant de la carte activée et recentre la zone choisie dans le rail", () => {
     const onSelect = vi.fn();
+    const scrollIntoView = vi.fn();
     const tree = AstronomyEventSelector({
       events,
       selectedEventId: "lunar-2026",
@@ -103,14 +108,29 @@ describe("AstronomyEventSelector — rendu mobile", () => {
     const rootChildren = (
       tree.props as unknown as {
         children: Array<{
-          props: { children: Array<{ props: { onClick: () => void } }> };
+          props: {
+            children: Array<{
+              props: {
+                onClick: (clickEvent: {
+                  currentTarget: {
+                    scrollIntoView: (options: ScrollIntoViewOptions) => void;
+                  };
+                }) => void;
+              };
+            }>;
+          };
         }>;
       }
     ).children;
     const buttons = rootChildren[0].props.children;
 
-    buttons[2].props.onClick();
+    buttons[2].props.onClick({ currentTarget: { scrollIntoView } });
     expect(onSelect).toHaveBeenCalledWith("solar-2027");
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
   });
 
   it("expose clairement la sélection actuelle aux technologies d’assistance et visuellement", () => {
@@ -128,5 +148,53 @@ describe("AstronomyEventSelector — rendu mobile", () => {
     expect(markup).toContain("Essaim des Perséides");
     expect(markup).toContain("Éclipse lunaire partielle");
     expect(markup).toContain("Éclipse solaire partielle");
+  });
+});
+
+describe("AstronomyEventSelector — capsule de défilement", () => {
+  it("dimensionne la capsule selon la part visible du rail et la positionne sur la progression du balayage", () => {
+    const capsule = { style: { width: "", left: "" } };
+    syncAstronomyEventCapsule(
+      { scrollWidth: 400, clientWidth: 100, scrollLeft: 150 },
+      capsule,
+    );
+
+    expect(capsule.style.width).toBe("25%");
+    expect(capsule.style.left).toBe("37.5%");
+  });
+
+  it("conserve une largeur minimale lisible quand le rail est très long", () => {
+    const capsule = { style: { width: "", left: "" } };
+    syncAstronomyEventCapsule(
+      { scrollWidth: 1000, clientWidth: 50, scrollLeft: 0 },
+      capsule,
+    );
+
+    expect(capsule.style.width).toBe("15%");
+    expect(capsule.style.left).toBe("0%");
+  });
+
+  it("borne la progression au rail même si le décalage dépasse la fin", () => {
+    const capsule = { style: { width: "", left: "" } };
+    syncAstronomyEventCapsule(
+      { scrollWidth: 400, clientWidth: 100, scrollLeft: 999 },
+      capsule,
+    );
+
+    expect(capsule.style.width).toBe("25%");
+    expect(capsule.style.left).toBe("75%");
+  });
+
+  it("ne touche pas à la capsule quand le rail tient entièrement dans la fenêtre", () => {
+    const capsule = {
+      style: { width: "33.333333333333336%", left: "33.333333333333336%" },
+    };
+    syncAstronomyEventCapsule(
+      { scrollWidth: 300, clientWidth: 300, scrollLeft: 0 },
+      capsule,
+    );
+
+    expect(capsule.style.width).toBe("33.333333333333336%");
+    expect(capsule.style.left).toBe("33.333333333333336%");
   });
 });
