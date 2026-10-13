@@ -106,8 +106,7 @@ function getEligibleFieldStations(
   nowMs: number,
   requireAltitude: boolean,
 ): { eligible: FieldStation[]; reason: string } {
-  const physical = getPhysicalActiveStations(stations)
-    .filter((station) => station.qualificationStatus !== "excluded");
+  const physical = getPhysicalActiveStations(stations);
   const withValue = physical.filter((station) => validStationValue(field, station[field]));
   if (withValue.length === 0) {
     return { eligible: [], reason: "Aucune valeur physique exploitable pour ce champ." };
@@ -304,7 +303,7 @@ function aggregatePhysicalField(
 
 function rawFieldObservations(field: PhysicalField, stations: StationData[], nowMs: number) {
   return stations
-    .filter((station) => getStationSourceKind(station.source, station.stationId) === "physical" && station.qualificationStatus !== "excluded")
+    .filter((station) => getStationSourceKind(station.source, station.stationId) === "physical")
     .flatMap((station) => {
       const value = station[field];
       if (typeof value !== "number" || !Number.isFinite(value)) return [];
