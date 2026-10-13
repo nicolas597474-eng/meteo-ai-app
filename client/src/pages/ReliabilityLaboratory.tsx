@@ -16,7 +16,6 @@ import {
   MethodologySection,
   ModelComparisonSection,
 } from "@/components/weather/ReliabilityComparisonSections";
-import { StationQualificationSection } from "@/components/weather/StationQualificationSection";
 import { CitizenFusionImpactSection } from "@/components/weather/CitizenFusionImpactSection";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { useLocation } from "@/contexts/LocationContext";
@@ -112,17 +111,6 @@ export default function ReliabilityLaboratory() {
     }),
     [activeLocation?.lat, activeLocation?.lon]
   );
-  // Stations et capteurs autour du lieu : la section de transparence des
-  // badges de qualification (officielle, citoyen en validation, validé, exclu)
-  // lit la même recherche que la page Stations, au rayon du lieu actif.
-  const nearbyStationsInput = useMemo(
-    () => ({
-      lat: activeLocation?.lat ?? 50.7567,
-      lon: activeLocation?.lon ?? 2.5204,
-      radiusKm,
-    }),
-    [activeLocation?.lat, activeLocation?.lon, radiusKm]
-  );
   // Impact à blanc des capteurs citoyens validés : la référence d’évaluation
   // est le lieu actif, sur la même fenêtre d’historique archivé que la
   // qualification ; la fusion locale n’est jamais modifiée.
@@ -155,22 +143,6 @@ export default function ReliabilityLaboratory() {
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
-  const {
-    data: nearbyStationsData,
-    isLoading: nearbyStationsLoading,
-    isError: nearbyStationsError,
-  } = trpc.weather.searchStations.useQuery(nearbyStationsInput, {
-    staleTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
-  });
-  // Progression de qualification des capteurs citoyens : preuve recalculée par
-  // le serveur depuis l’historique archivé, avec le même évaluateur que les
-  // verdicts. Aucune écriture, aucun seuil recopié côté client.
-  const { data: qualificationEvidenceData } =
-    trpc.weather.getCitizenQualificationEvidence.useQuery(citizenImpactInput, {
-      staleTime: 5 * 60 * 1000,
-      placeholderData: keepPreviousData,
-    });
   const {
     data: citizenImpactData,
     isLoading: citizenImpactLoading,
@@ -373,15 +345,6 @@ export default function ReliabilityLaboratory() {
             />
           </div>
         </details>
-
-        <StationQualificationSection
-          data={nearbyStationsData}
-          isLoading={nearbyStationsLoading}
-          isError={nearbyStationsError}
-          locationName={locationName}
-          radiusKm={radiusKm}
-          qualificationEvidence={qualificationEvidenceData?.byStationId}
-        />
 
         <CitizenFusionImpactSection
           data={citizenImpactData}

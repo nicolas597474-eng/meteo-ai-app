@@ -19,21 +19,9 @@ const source = [
   ),
   readFileSync(
     new URL(
-      "../components/weather/StationQualificationSection.tsx",
-      import.meta.url
-    ),
-    "utf8"
-  ),
-  readFileSync(
-    new URL(
       "../components/weather/CitizenFusionImpactSection.tsx",
       import.meta.url
     ),
-    "utf8"
-  ),
-  // Les libellés des badges de qualification vivent dans la lib partagée.
-  readFileSync(
-    new URL("../lib/stationCandidateStatus.ts", import.meta.url),
     "utf8"
   ),
 ]
@@ -115,22 +103,11 @@ describe("ReliabilityLaboratory — preuves brutes", () => {
     expect(source).toContain("L’accord inter-modèles");
   });
 
-  it("affiche le badge de qualification réel de chaque station autour du lieu", () => {
-    expect(source).toContain("Stations et capteurs autour du lieu");
-    expect(source).toContain("Station officielle");
-    expect(source).toContain("Capteur citoyen en validation");
-    expect(source).toContain("Capteur citoyen validé");
-    expect(source).toContain("Exclu");
-    expect(source).toContain(
-      "Aucun capteur citoyen n’est étiqueté Netatmo, Weather Underground ou station officielle."
-    );
-    expect(source).toContain("CWOP/MADIS · capteur citoyen");
-    expect(source).toContain("Variables présentes");
-    expect(source).toContain("Motif d’exclusion");
-    // Aucune donnée fabriquée : l’âge et les variables absentes restent explicites.
-    expect(source).toContain("Aucune donnée n’est fabriquée");
-    expect(source).toContain("Aucun relevé");
-    expect(source).toContain("Aucune variable mesurée");
+  it("ne contient plus le bloc stations et capteurs autour du lieu", () => {
+    expect(source).not.toContain("Stations et capteurs autour du lieu");
+    expect(source).not.toContain("StationQualificationSection");
+    expect(source).not.toContain("searchStations");
+    expect(source).not.toContain("getCitizenQualificationEvidence");
   });
 
   it("évalue à blanc l’impact des capteurs validés sans jamais modifier la fusion", () => {
