@@ -11,7 +11,6 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
 import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { ForecastByDaySection } from "@/components/weather/ForecastByDaySection";
-import { HourlyHistoricalEvidencePanel } from "@/components/weather/HourlyHistoricalEvidencePanel";
 import { BackToTopButton } from "@/components/BackToTopButton";
 import { WEATHER_QUERY_SLOW_MS } from "@/lib/weatherQueryRecovery";
 import { WindyMap } from "@/components/WindyMap";
@@ -125,7 +124,6 @@ export default function WeatherDetails() {
 
   const hours = data.hours ?? [];
   const currentHourIdx = activeOfficialHour?.index ?? -1;
-  const currentHour = activeOfficialHour?.hour ?? null;
   const displayHours = withCurrentStationTemperature(hours, currentHourIdx, stationTemperature);
 
   return (
@@ -293,19 +291,6 @@ export default function WeatherDetails() {
             </div>
             <Link href="/history" className="shrink-0 rounded-xl border border-emerald-300/70 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-400/20 active:scale-[0.97]">Ouvrir <span aria-hidden="true">→</span></Link>
           </div>
-        </MeteoSurface>
-
-        {/* ═══ SECTION 6: FIABILITÉ HISTORIQUE QUALIFIÉE ═══ */}
-        <MeteoSurface as="section" tone="subtle" className="min-w-0 w-full max-w-full rounded-2xl border border-white/8 bg-black/20 p-2 sm:rounded-[24px] sm:p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
-              <MeteoIcon name="confidence" size={18} />
-              Fiabilité historique face aux observations
-            </h2>
-            <HourlyHistoricalEvidencePanel
-                variableWeightings={currentHour?.forecastWeighting?.variableWeightings ?? []}
-                horizonBucket={currentHour?.forecastWeighting?.horizonBucket}
-                horizonUnavailableReason={currentHour?.forecastWeighting?.unavailableReason}
-              />
         </MeteoSurface>
 
       </div>
