@@ -6,8 +6,6 @@
  * 2. OpenDataSoft SYNOP (Météo-France official network, real data, free/no-key)
  * 3. Netatmo public stations (OAuth, when a user connection is active)
  * 4. Open-Meteo multi-point grid references (clearly not physical stations)
- * 5. openSenseMap outdoor citizen sensors (candidates, excluded from ground truth)
- * 6. CWOP/MADIS citizen stations (real public observations, candidates)
  *
  * Ground truth weighting:
  *   50% distance normalisée (IDW quadratique, closer = more weight)
@@ -18,8 +16,6 @@
  * distance brute de contourner les proportions annoncées.
  */
 
-import { fetchOpenSenseMapCandidates } from "./openSenseMapService";
-import { fetchCwopCandidates } from "./cwopMadisService";
 import { WEATHER_SERVICES } from "./weatherServices";
 import type { CurrentModelReference } from "./modelReferenceCoherence";
 import {
@@ -73,7 +69,7 @@ export type StationData = {
   sourceTier?: 1 | 2 | 3;
 };
 
-export type StationCollectionSource = "meteofrance" | "netatmo" | "opensensemap" | "cwop";
+export type StationCollectionSource = "meteofrance" | "netatmo";
 export type StationSourceDiagnosticStatus = "success_with_data" | "success_empty" | "error" | "not_configured";
 export type StationSourceDiagnostic = {
   source: StationCollectionSource;
@@ -110,10 +106,6 @@ export function getStationSourceKind(source: StationSource, stationId?: string):
 
 export function getPhysicalActiveStations(stations: StationData[]): StationData[] {
   return stations.filter((station) => station.isActive && getStationSourceKind(station.source, station.stationId) === "physical");
-}
-
-export function getCandidateStations(stations: StationData[]): StationData[] {
-  return stations.filter((station) => station.qualificationStatus === "candidate");
 }
 
 function getStationFreshnessExclusionReason(station: StationData, nowMs: number): string | null {
@@ -220,7 +212,7 @@ export function getStationSourcePriorityDefaults(source: StationSource) {
 }
 
 // La même collecte de stations alimente les modes Local et Ultra-local. Un cache
-// très court évite de solliciter quatre fournisseurs à chaque changement de filtre,
+// très court évite de solliciter les deux fournisseurs à chaque changement de filtre,
 // sans masquer un relevé durablement obsolète.
 export const NEARBY_STATIONS_CACHE_TTL_MS = 90_000;
 type NearbyStationsCacheEntry = {
@@ -569,10 +561,10 @@ async function collectNearbyStationsUncached(
   options: { netatmoUserId?: number; onNetatmoStatus?: (status: import("./netatmoService").NetatmoAvailability) => void } = {},
 ): Promise<CachedNearbyStationsCollection> {
   const { fetchNetatmoPublicStations } = await import("./netatmoService");
-  // Seules les observations de station et les candidats sont assemblés ici.
+  // Seules les observations de station sont assemblées ici.
   // Les modèles sont exposés séparément par fetchCurrentModelReferences().
   let netatmoStatus: import("./netatmoService").NetatmoAvailability | undefined;
-  const [meteoFrance, netatmo, openSenseMap, cwop] = await Promise.allSettled([
+  const [meteoFrance, netatmo] = await Promise.allSettled([
     fetchMeteoFranceStations(lat, lon, radiusKm),
     fetchNetatmoPublicStations(options.netatmoUserId, lat, lon, radiusKm, {
       onStatus: (status) => {
@@ -580,73 +572,16 @@ async function collectNearbyStationsUncached(
         options.onNetatmoStatus?.(status);
       },
     }),
-    fetchOpenSenseMapCandidates(lat, lon, radiusKm),
-    fetchCwopCandidates(lat, lon, radiusKm),
   ]);
 
   const sourceDiagnostics = [
     makeSourceDiagnostic("meteofrance", meteoFrance),
     makeSourceDiagnostic("netatmo", netatmo, netatmoStatus),
-    makeSourceDiagnostic("opensensemap", openSenseMap),
-    makeSourceDiagnostic("cwop", cwop),
   ];
 
   const all: StationData[] = [
     ...(meteoFrance.status === "fulfilled" ? meteoFrance.value : []),
     ...(netatmo.status === "fulfilled" ? netatmo.value : []),
-    ...(openSenseMap.status === "fulfilled" ? openSenseMap.value.map((candidate): StationData => ({
-      stationId: `opensensemap-${candidate.providerStationId}`,
-      source: "opensensemap",
-      name: candidate.name,
-      lat: candidate.lat,
-      lon: candidate.lon,
-      altitude: candidate.altitude,
-      distanceKm: candidate.distanceKm,
-      temperature: candidate.temperature,
-      humidity: candidate.humidity,
-      pressure: candidate.pressure,
-      windSpeed: candidate.windSpeed,
-      windGust: candidate.windGust,
-      windDirection: candidate.windDirection,
-      precipitation: candidate.precipitation,
-      updatedAt: candidate.updatedAt,
-      measurementTimes: candidate.measurementTimes,
-      reliabilityScore: SOURCE_DEFAULTS.opensensemap.reliability,
-      updateFrequencyMin: SOURCE_DEFAULTS.opensensemap.updateFreqMin,
-      dataAvailability: SOURCE_DEFAULTS.opensensemap.availability,
-      isActive: false,
-      qualificationStatus: "candidate",
-      sourceTier: 3,
-      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
-    })) : []),
-    // Les stations CWOP/MADIS deviennent des candidats citoyens dès leur
-    // première observation réelle : jamais actives, jamais physiques, la
-    // qualification MAE vs SYNOP décidera seule de leur promotion future.
-    ...(cwop.status === "fulfilled" ? cwop.value.map((candidate): StationData => ({
-      stationId: `cwop-${candidate.providerStationId}`,
-      source: "cwop",
-      name: candidate.name,
-      lat: candidate.lat,
-      lon: candidate.lon,
-      altitude: candidate.altitude,
-      distanceKm: candidate.distanceKm,
-      temperature: candidate.temperature,
-      humidity: candidate.humidity,
-      pressure: candidate.pressure,
-      windSpeed: candidate.windSpeed,
-      windGust: candidate.windGust,
-      windDirection: candidate.windDirection,
-      precipitation: candidate.precipitation,
-      updatedAt: candidate.updatedAt,
-      measurementTimes: candidate.measurementTimes,
-      reliabilityScore: SOURCE_DEFAULTS.cwop.reliability,
-      updateFrequencyMin: SOURCE_DEFAULTS.cwop.updateFreqMin,
-      dataAvailability: SOURCE_DEFAULTS.cwop.availability,
-      isActive: false,
-      qualificationStatus: "candidate",
-      sourceTier: 3,
-      exclusionReason: "Capteur citoyen en validation — non utilisé dans la température locale",
-    })) : []),
   ];
 
   // Deduplicate by stationId
