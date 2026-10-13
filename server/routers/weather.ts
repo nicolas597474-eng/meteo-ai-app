@@ -773,10 +773,10 @@ export const weatherRouter = router({
       return { today: snapshot.weatherDate, currentSnapshot: snapshot.currentSnapshot, hours: snapshot.hourly, officialSnapshot: { validAt: snapshot.validAt, computedAt: snapshot.computedAt, sourceKind: snapshot.sourceKind, source: snapshot.source, hourlyWeighting: snapshot.hourlyWeighting } };
     }),
 
-  /** Comparaison manuelle AROME en lecture seule, limitée à Hondeghem et sans effet sur la production. */
+  /** Comparaison manuelle AROME en lecture seule, limitée à Hondeghem et sans effet sur la production. AROME vient uniquement d’Open-Meteo (sans clé); le WCS authentifié ne part que si AROME_WCS_ENABLED=true côté serveur. */
   compareHondeghemAromeShadow: adminProcedure
     .mutation(async () => runHondeghemAromeShadowComparison()),
-  /** Vérification au clic des candidats DD(10 m) du catalogue WCS; aucun raster ni run Single Runs n’est téléchargé. */
+  /** Chemin hérité uniquement (AROME_WCS_ENABLED=true) : vérification des candidats DD(10 m) du catalogue WCS. Désactivé par défaut — la direction est comparée via wind_direction_10m Open-Meteo; sans le flag, aucune clé n’est lue et aucune requête n’est envoyée. */
   verifyHondeghemAromeWindDirection: adminProcedure
     .mutation(async () => verifyHondeghemAromeWindDirectionAvailability()),
   /** OpenWeather est un comparateur shadow manuel; il ne participe pas au moteur et ne persiste rien. */

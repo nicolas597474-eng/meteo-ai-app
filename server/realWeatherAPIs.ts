@@ -14,8 +14,10 @@
  * d’authentification : l’appel était refusé (401) puis absorbé en silence par un repli
  * Open-Meteo, ce qui laissait croire à une clé invalide.
  *
- * La seule intégration Météo-France réellement active est la comparaison shadow AROME :
- * `server/aromeHondeghemShadow.ts`, avec l’identifiant normalisé par
+ * AROME ne dépend plus de l’API Météo-France authentifiée : la comparaison shadow
+ * `server/aromeHondeghemShadow.ts` récupère AROME uniquement via Open-Meteo, sans clé.
+ * Le WCS/GeoTIFF historique y reste conservé mais désactivé par défaut derrière
+ * `AROME_WCS_ENABLED=true`; lui seul utilise l’identifiant normalisé par
  * `server/meteoFranceCredentials.ts`.
  */
 

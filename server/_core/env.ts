@@ -72,6 +72,8 @@ export const ENV = {
   openWeatherMapApiKey: process.env.OPENWEATHERMAP_API_KEY ?? "",
   // Legacy variable name; the value is the Météo-France OAuth2 application identifier
   // used as the Basic credential for the portal's client_credentials token exchange.
+  // Chemin hérité uniquement : il n’est lu que si AROME_WCS_ENABLED=true réactive le
+  // WCS AROME. Le chemin AROME par défaut passe uniquement par Open-Meteo, sans clé.
   meteoFranceOAuthApplicationId: process.env.METEOFRANCE_API_KEY ?? "",
   
   // ============================================================================
