@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./History.tsx", import.meta.url), "utf8");
+// La page s'appuie depuis l'optimisation sur un module de graphiques chargé en
+// différé : les assertions portent donc sur l'ensemble des fichiers qui la
+// composent, pas seulement sur le composant de page.
+const source = [
+  readFileSync(new URL("./History.tsx", import.meta.url), "utf8"),
+  readFileSync(new URL("../components/HistoryCharts.tsx", import.meta.url), "utf8"),
+  readFileSync(new URL("../lib/historyChartFormat.ts", import.meta.url), "utf8"),
+].join("\n");
 
 describe("History", () => {
   it("isole la comparaison sur un modèle sélectionné afin d’éviter les graphiques surchargés", () => {

@@ -1,7 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { MeteoIcon } from "@/components/MeteoIcon";
-import { StationMap } from "@/components/StationMap";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePageWeatherSky } from "@/hooks/usePageWeatherSky";
@@ -13,6 +12,25 @@ import { MeteoSurface } from "@/components/weather/MeteoSurface";
 import { CollectionObservabilitySections } from "@/components/weather/CollectionObservabilitySections";
 import { WeatherStatusBadge, type WeatherStatusBadgeTone } from "@/components/weather/WeatherStatusBadge";
 import { ChevronDown, Clock3, RefreshCw } from "lucide-react";
+
+/**
+ * La carte Leaflet (50 ko gzip de moteur + 6 ko de CSS) n'est plus chargée avec
+ * la page : elle arrive après le premier rendu et affiche son propre repère de
+ * chargement. La page, ses titres et ses chiffres s'affichent donc sans
+ * attendre ni télécharger le moteur cartographique.
+ */
+const StationMap = lazy(() =>
+  import("@/components/StationMap").then(({ StationMap: Component }) => ({ default: Component })),
+);
+
+function StationMapFallback() {
+  return (
+    <div
+      aria-hidden="true"
+      className="h-72 animate-pulse rounded-xl border border-slate-800 bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_34%)] sm:h-80"
+    />
+  );
+}
 
 type ComparisonPoint = {
   hour?: number;
@@ -218,7 +236,12 @@ export default function Ranking() {
     { ...(coords ?? { lat: 50.7567, lon: 2.5204 }), radiusKm },
     { staleTime: 5 * 60 * 1000 },
   );
-  const { data: rankingCriteria } = trpc.weather.getStationRankingCriteria.useQuery();
+  // Contrat de classement figé côté serveur (getStationRankingContract) :
+  // inutile de le redemander à chaque retour d'onglet.
+  const { data: rankingCriteria } = trpc.weather.getStationRankingCriteria.useQuery(
+    undefined,
+    { staleTime: 60 * 60 * 1000, refetchOnWindowFocus: false },
+  );
   const { data: forecastProvenance } = trpc.weather.getForecastProvenance.useQuery(
     coords, { staleTime: 60 * 1000, refetchOnWindowFocus: false }
   );
@@ -333,7 +356,9 @@ export default function Ranking() {
 
         <section className="mb-4 rounded-2xl border border-slate-800 bg-[#10131a] p-4">
           <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-semibold text-white">Carte des stations</h2><p className="text-xs text-slate-500">Vert : utilisée · ambre : à vérifier · bleu : lieu sélectionné.</p></div><MeteoIcon name="location" size={21} className="text-blue-400" /></div>
-          <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
+          <Suspense fallback={<StationMapFallback />}>
+            <StationMap center={data?.center ?? { lat: coords?.lat ?? 50.75, lon: coords?.lon ?? 2.73 }} stations={stations} />
+          </Suspense>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />Utilisée</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-300" />À vérifier</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-400" />Lieu actif</span></div>
         </section>
 

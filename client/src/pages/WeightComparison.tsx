@@ -29,7 +29,10 @@ export default function WeightComparison() {
     [activeLocation?.lat, activeLocation?.lon]
   );
   const locationKey = coords ? `${coords.lat},${coords.lon}` : "default";
-  const { data: history = [], isLoading: historyLoading, isPlaceholderData } = trpc.weather.getWeightTraceHistory.useQuery(coords);
+  const { data: history = [], isLoading: historyLoading, isPlaceholderData } = trpc.weather.getWeightTraceHistory.useQuery(
+    coords,
+    { staleTime: 60 * 1000, refetchOnWindowFocus: false, retry: 1 },
+  );
   const [selection, setSelection] = useState<{ locationKey: string; before: number | null; after: number | null }>({
     locationKey: "",
     before: null,

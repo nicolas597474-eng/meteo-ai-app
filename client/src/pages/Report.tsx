@@ -35,7 +35,7 @@ export default function Report() {
   const { data, isLoading } = trpc.weather.getReport.useQuery({
     date,
     ...(activeLocation ? { lat: activeLocation.lat, lon: activeLocation.lon } : {}),
-  });
+  }, { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false, retry: 1 });
 
   if (isLoading) {
     return <div className="min-h-screen bg-background p-4"><div className="max-w-3xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-48 bg-muted rounded" /><div className="h-40 bg-muted rounded-xl" /><div className="h-64 bg-muted rounded-xl" /></div></div>;
