@@ -15,7 +15,6 @@ import { BackToTopButton } from "@/components/BackToTopButton";
 import { WEATHER_QUERY_SLOW_MS } from "@/lib/weatherQueryRecovery";
 import { WindyMap } from "@/components/WindyMap";
 import { Link } from "wouter";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { DEFAULT_OFFICIAL_FORECAST_LOCATION, getActiveOfficialForecastHour } from "@/lib/officialForecast";
 import { useOfficialForecast } from "@/hooks/useOfficialForecast";
 import { useCurrentStationTemperature } from "@/hooks/useCurrentStationTemperature";
@@ -25,7 +24,6 @@ import { withCurrentStationTemperature } from "@/lib/currentStationTemperature";
 
 export default function WeatherDetails() {
   const { activeLocation } = useLocation();
-  const { user } = useAuth();
   const { style: pageSkyStyle } = usePageWeatherSky();
   const { query: essentialForecastQuery, coordinates } = useOfficialForecast(activeLocation);
   const { data: essentialForecast, isLoading: essentialLoading, isError: essentialError, error: essentialForecastError, refetch: refetchEssentialForecast } = essentialForecastQuery;
@@ -46,33 +44,6 @@ export default function WeatherDetails() {
   };
   const isEnrichingDiagnostics = !!essentialForecast && detailedFetching && !detailedForecast;
   const [slowLoad, setSlowLoad] = useState(false);
-  const aromeShadow = trpc.weather.compareHondeghemAromeShadow.useMutation();
-
-  const isHondeghem = !activeLocation || (
-    Math.abs(activeLocation.lat - 50.7567) < 0.001 && Math.abs(activeLocation.lon - 2.5204) < 0.001
-  );
-  const bestMatchValueAt = (validAt: string, key: "temp" | "precipitation" | "windSpeed" | "windDirection") => {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-    }).formatToParts(new Date(validAt));
-    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-    const date = `${part("year")}-${part("month")}-${part("day")}`;
-    const hour = `${part("hour")}:${part("minute")}`;
-    return hours.find((item: any) => item.date === date && item.hour === hour)?.[key] ?? null;
-  };
-  const parisDateAt = (validAt: string) => new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date(validAt));
-  // Direction circulaire : la moyenne de 350° et 10° est 0° (nord), jamais 180°.
-  const circularMeanDegrees = (values: number[]): number | null => {
-    if (!values.length) return null;
-    const radians = values.map((value) => (value * Math.PI) / 180);
-    const sin = radians.reduce((sum, value) => sum + Math.sin(value), 0) / radians.length;
-    const cos = radians.reduce((sum, value) => sum + Math.cos(value), 0) / radians.length;
-    if (Math.hypot(sin, cos) < 1e-12) return null;
-    return Math.round((((Math.atan2(sin, cos) * 180) / Math.PI + 360) % 360) * 10) / 10;
-  };
   useEffect(() => {
     if (!isLoading && !isFetching) {
       setSlowLoad(false);
@@ -131,77 +102,6 @@ export default function WeatherDetails() {
         />
         {isEnrichingDiagnostics && <p role="status" className="rounded-xl border border-sky-300/20 bg-sky-300/[0.05] px-3 py-2 text-[11px] text-sky-100">Les valeurs essentielles sont affichées. Les diagnostics horaires détaillés se complètent en arrière-plan.</p>}
         {detailedForecastError && !detailedForecast && <p role="status" className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[11px] text-amber-100">Les diagnostics détaillés ne sont pas encore disponibles ; les prévisions essentielles affichées restent utilisables.</p>}
-
-        {user?.role === "admin" && <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-violet-300/25 bg-violet-300/[0.045] p-3 sm:rounded-[24px] sm:p-4" aria-labelledby="arome-shadow-title">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-200/75">Diagnostic manuel · mode shadow</p>
-              <h2 id="arome-shadow-title" className="mt-1 text-base font-semibold text-white">AROME via Open-Meteo ↔ Single Runs</h2>
-              <p className="mt-1 text-[10px] leading-relaxed text-slate-300">Modèle meteofrance_arome_france_hd via Open-Meteo, sans clé Météo-France · Hondeghem uniquement. La requête n’est envoyée qu’au clic; aucun résultat ne modifie les prévisions affichées ni le score de fiabilité.</p>
-            </div>
-            <button type="button" onClick={() => aromeShadow.mutate()} disabled={!isHondeghem || aromeShadow.isPending} className="min-h-10 shrink-0 rounded-xl border border-violet-200/35 bg-violet-300/10 px-3 py-2 text-xs font-semibold text-violet-100 disabled:cursor-not-allowed disabled:opacity-50">
-              {aromeShadow.isPending ? "Comparaison en cours…" : aromeShadow.data ? "Relancer la comparaison" : "Comparer les runs"}
-            </button>
-          </div>
-          {!isHondeghem && <p className="mt-3 rounded-xl border border-amber-200/20 bg-amber-200/[0.05] p-2 text-[10px] text-amber-100">Cette comparaison est limitée à Hondeghem (50,7567° N, 2,5204° E); choisissez ce lieu pour l’activer.</p>}
-          <p className="mt-2 text-[9px] leading-relaxed text-slate-300">La comparaison couvre température, précipitations, vitesse du vent et direction DD(10 m) via wind_direction_10m. L’écart de direction est circulaire (modulo 360°) : 350° contre 10° donne 20°. L’ancien bouton de vérification du catalogue WCS n’est plus nécessaire et a été retiré.</p>
-          {aromeShadow.error && <p role="alert" className="mt-3 rounded-xl border border-rose-300/25 bg-rose-300/[0.06] p-2 text-[10px] text-rose-100">Requête impossible : {aromeShadow.error.message}</p>}
-          {aromeShadow.data && <div className="mt-3 space-y-3" role="status">
-            <div className={`rounded-xl border p-2 text-[10px] leading-relaxed ${aromeShadow.data.status === "ok" ? "border-emerald-300/25 bg-emerald-300/[0.05] text-emerald-100" : "border-sky-300/20 bg-sky-300/[0.04] text-sky-100"}`}>
-              <p className="font-semibold">{aromeShadow.data.status === "request-impossible" ? "Requête impossible" : aromeShadow.data.status === "partial" ? "Comparaison partielle" : "Comparaison terminée"}</p>
-              <p className="mt-0.5">{aromeShadow.data.message}</p>
-              {aromeShadow.data.runProven && aromeShadow.data.run ? <p className="mt-1">Run AROME prouvé par les métadonnées du modèle Open-Meteo : <strong>{aromeShadow.data.run}</strong> (UTC) · profil {aromeShadow.data.profile} · Open-Meteo {aromeShadow.data.openMeteoModel}, run Single Runs {aromeShadow.data.openMeteoRun} UTC.</p> : <p className="mt-1">Run non prouvé : les métadonnées du modèle Open-Meteo n’ont pas permis de prouver le run; aucun run n’est inventé ni attribué à la série.</p>}
-              <p>Référence courante Best Match : run non identifié par Open-Meteo; elle n’est pas présentée comme run équivalent.</p>
-              <p>Dernière tentative : {new Date(aromeShadow.data.comparedAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (Europe/Paris).</p>
-            </div>
-            {aromeShadow.data.daily.length > 0 && <div>
-              <h3 className="text-[11px] font-semibold text-white">Synthèse journalière sur les heures comparées</h3>
-              <div className="mt-2 space-y-2">
-                {aromeShadow.data.daily.map((day: any) => <div key={day.date} className="rounded-xl border border-white/10 bg-black/15 p-2">
-                  <p className="text-[10px] font-semibold text-slate-100">{day.date} · {day.metrics.temperature.hours} échéance(s) horaires avec valeurs appariées</p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {(["temperature", "precipitation", "windSpeed", "windDirection"] as const).map((metric) => {
-                      const value = day.metrics[metric];
-                      const bestMatchKey = metric === "temperature" ? "temp" : metric;
-                      const bestValues = aromeShadow.data.hourly.filter((hour: any) => parisDateAt(hour.validAt) === day.date)
-                        .map((hour: any) => bestMatchValueAt(hour.validAt, bestMatchKey))
-                        .filter((item: unknown): item is number => typeof item === "number" && Number.isFinite(item));
-                      const bestDirection = metric === "windDirection" ? circularMeanDegrees(bestValues) : null;
-                      const bestSummary = metric === "windDirection" ? (bestDirection == null ? "—" : `${bestDirection.toFixed(1)} °`) : bestValues.length ? metric === "precipitation" ? `${bestValues.reduce((sum, item) => sum + item, 0).toFixed(1)} mm` : `${(bestValues.reduce((sum, item) => sum + item, 0) / bestValues.length).toFixed(1)} ${metric === "temperature" ? "°C" : "km/h"}` : "—";
-                      const label = metric === "temperature" ? "Température moyenne" : metric === "precipitation" ? "Précipitations cumulées" : metric === "windDirection" ? "Direction DD(10 m) moyenne (circulaire)" : "Vent moyen";
-                      const fmt = (item: number | null) => item == null ? "—" : `${item.toFixed(1)} ${metric === "temperature" ? "°C" : metric === "precipitation" ? "mm" : metric === "windDirection" ? "°" : "km/h"}`;
-                      return <div key={metric} className="rounded-lg border border-white/8 bg-white/[0.025] p-2 text-[9px] text-slate-300">
-                        <p className="font-semibold text-slate-100">{label} · {value.hours} h avec valeurs</p>
-                        <p>AROME Open-Meteo : {fmt(value.arome)} · Open-Meteo même run : {fmt(value.openMeteoArome)}</p>
-                        <p>Best Match affiché (run inconnu): {bestSummary}</p>
-                        <p>{metric === "windDirection" ? "Écart circulaire AROME − Single Runs" : "Écart AROME Open-Meteo − Single Runs"} : {fmt(value.difference)}</p>
-                      </div>;
-                    })}
-                  </div>
-                </div>)}
-              </div>
-              <details className="mt-2 rounded-xl border border-white/10 bg-black/10 p-2">
-                <summary className="cursor-pointer text-[10px] font-semibold text-violet-100">Détail horaire, valeurs et écarts ({aromeShadow.data.hourly.length} échéances UTC)</summary>
-                <div className="mt-2 max-h-96 overflow-auto">
-                  <table className="w-full border-collapse text-left text-[9px]">
-                    <thead className="sticky top-0 bg-slate-950 text-slate-300"><tr><th className="p-1">Validité</th><th className="p-1">Variable</th><th className="p-1">AROME Open-Meteo</th><th className="p-1">OM même run</th><th className="p-1">Best Match*</th><th className="p-1">Écart AROME−OM</th></tr></thead>
-                    <tbody>{aromeShadow.data.hourly.flatMap((hour: any) => (["temperature", "precipitation", "windSpeed", "windDirection"] as const).map((metric) => {
-                      const item = hour.metrics[metric];
-                      const bestKey = metric === "temperature" ? "temp" : metric;
-                      const unit = metric === "temperature" ? "°C" : metric === "precipitation" ? "mm" : metric === "windDirection" ? "°" : "km/h";
-                      const fmt = (value: number | null) => value == null ? "—" : `${value.toFixed(1)} ${unit}`;
-                      const label = metric === "temperature" ? "Température" : metric === "precipitation" ? "Précipitations" : metric === "windDirection" ? "Direction DD(10 m)" : "Vent";
-                      return <tr key={`${hour.validAt}-${metric}`} className="border-t border-white/8 text-slate-200"><td className="whitespace-nowrap p-1">{hour.validAt.replace("T", " ").replace(":00.000Z", "Z")}</td><td className="p-1">{label}</td><td className="p-1">{fmt(item.arome)}</td><td className="p-1">{fmt(item.openMeteoArome)}</td><td className="p-1">{fmt(bestMatchValueAt(hour.validAt, bestKey))}</td><td className="p-1">{fmt(item.difference)}{item.issue ? <span className="block text-amber-200">{item.issue}</span> : null}</td></tr>;
-                    }))}</tbody>
-                  </table>
-                </div>
-                <p className="mt-2 text-[9px] text-slate-400">* Best Match reprend les valeurs déjà affichées par l’application. Son run n’est pas identifié; seuls AROME Open-Meteo et Single Runs sont comparés comme runs équivalents quand le run est prouvé. Pour la direction, l’écart affiché est l’écart circulaire (0–180°).</p>
-              </details>
-            </div>}
-            {aromeShadow.data.missing.length > 0 && <div className="rounded-xl border border-amber-200/20 bg-amber-200/[0.04] p-2 text-[9px] text-amber-100"><p className="font-semibold">Manquants et limites détectés</p><ul className="mt-1 list-inside list-disc">{aromeShadow.data.missing.map((message: string, index: number) => <li key={`${index}-${message}`}>{message}</li>)}</ul></div>}
-          </div>}
-          <p className="mt-2 text-[9px] text-slate-500">Appels Open-Meteo sans clé, côté serveur uniquement. Le WCS Météo-France authentifié est désactivé par défaut (AROME_WCS_ENABLED) et aucune clé Météo-France n’est lue dans ce chemin. Open-Meteo Best Match, les fusions journalières, la Vigilance, l’agrégation Netatmo et le score de fiabilité restent inchangés (mode shadow).</p>
-        </MeteoSurface>}
 
         {/* ═══ SECTION : CARTE MÉTÉO ANIMÉE ═══ */}
         <MeteoSurface as="section" tone="default" className="min-w-0 w-full max-w-full rounded-2xl border border-white/10 bg-[rgba(26,48,70,0.56)] p-2 sm:rounded-[26px] sm:p-4">

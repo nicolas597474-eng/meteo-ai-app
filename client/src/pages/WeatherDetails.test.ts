@@ -160,22 +160,19 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).toContain("forecast-details-page");
     expect(pageSource).toContain("pb-24");
   });
-  it("compare AROME uniquement via Open-Meteo, direction DD(10 m) comprise, sans bouton de vérification WCS", () => {
-    expect(pageSource).toContain("trpc.weather.compareHondeghemAromeShadow.useMutation()");
+  it("n’expose plus le diagnostic manuel AROME ↔ Single Runs sur la page Prévisions", () => {
+    expect(pageSource).not.toContain("Diagnostic manuel · mode shadow");
+    expect(pageSource).not.toContain("AROME via Open-Meteo ↔ Single Runs");
+    expect(pageSource).not.toContain("arome-shadow-title");
+    expect(pageSource).not.toContain("compareHondeghemAromeShadow");
+    expect(pageSource).not.toContain("aromeShadow");
+    expect(pageSource).not.toContain("Comparer les runs");
+    expect(pageSource).not.toContain('user?.role === "admin"');
     expect(pageSource).not.toContain("verifyHondeghemAromeWindDirection");
     expect(pageSource).not.toContain("windDirectionVerification");
     expect(pageSource).not.toContain("Vérification du catalogue");
     expect(pageSource).not.toContain("AROME WCS");
     expect(pageSource).not.toContain("Authentification AROME refusée");
-    expect(pageSource).toContain("wind_direction_10m");
-    expect(pageSource).toContain("Direction DD(10 m)");
-    expect(pageSource).toContain("écart circulaire");
-    expect(pageSource).toContain("350° contre 10° donne 20°");
-    expect(pageSource).toContain("Run non prouvé");
-    expect(pageSource).toContain("runProven");
-    expect(pageSource).toContain("AROME_WCS_ENABLED");
-    expect(pageSource).toContain("score de fiabilité restent inchangés (mode shadow)");
-    expect(pageSource).toContain('{user?.role === "admin" && <MeteoSurface');
   });
   it("n’expose plus le bloc Diagnostic manuel OpenWeather ↔ prévision officielle", () => {
     expect(pageSource).not.toContain("compareOpenWeatherShadow");
@@ -184,9 +181,6 @@ describe("page Prévisions détaillées", () => {
     expect(pageSource).not.toContain("openweather-shadow-title");
     expect(pageSource).not.toContain("Comparer OpenWeather");
     expect(pageSource).not.toContain("Écart OWM−officiel");
-    // Seul le diagnostic AROME reste accessible aux administrateurs sur cette page.
-    expect(pageSource).toContain('aria-labelledby="arome-shadow-title"');
-    expect(pageSource).toContain("trpc.weather.compareHondeghemAromeShadow.useMutation()");
     // Le repli horaire OpenWeather, indépendant de ce panneau, reste hors de la page.
     expect(pageSource).not.toContain("OpenWeatherMap");
   });
