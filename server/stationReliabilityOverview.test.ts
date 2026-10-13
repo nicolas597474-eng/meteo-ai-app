@@ -93,7 +93,7 @@ describe("Aperçu de fiabilité des stations — cache de lecture", () => {
 
     expect(mocks.getPhysicalStationHistory).toHaveBeenCalledTimes(1);
     expect(second).toBe(first);
-    expect(first.locationKey).toBe("50.757_2.520");
+    expect(first.locationKey).toBe("50.757_2.52");
     expect(first.periodDays).toBe(7);
     expect(first.radiusKm).toBe(20);
     expect(first.performanceWindowDays).toBe(30);
@@ -112,9 +112,9 @@ describe("Aperçu de fiabilité des stations — cache de lecture", () => {
     await buildStationReliabilityOverviewCached(INPUT);
 
     expect(mocks.getPhysicalStationHistory).toHaveBeenCalledTimes(3);
-    expect(stationReliabilityOverviewCacheKey(INPUT)).toBe("50.757_2.520:7:auto");
-    expect(stationReliabilityOverviewCacheKey({ ...INPUT, radiusKm: 25 })).toBe("50.757_2.520:7:25");
-    expect(stationReliabilityOverviewCacheKey({ ...INPUT, periodDays: 1 })).toBe("50.757_2.520:1:auto");
+    expect(stationReliabilityOverviewCacheKey(INPUT)).toBe("50.757_2.52:7:auto");
+    expect(stationReliabilityOverviewCacheKey({ ...INPUT, radiusKm: 25 })).toBe("50.757_2.52:7:25");
+    expect(stationReliabilityOverviewCacheKey({ ...INPUT, periodDays: 1 })).toBe("50.757_2.52:1:auto");
   });
 
   it("ne met jamais en cache un aperçu construit pendant une lecture illisible", async () => {
@@ -129,7 +129,7 @@ describe("Aperçu de fiabilité des stations — cache de lecture", () => {
     const first = await buildStationReliabilityOverviewCached(INPUT);
     const second = await buildStationReliabilityOverviewCached(INPUT);
 
-    expect(first.locationKey).toBe("50.757_2.520");
+    expect(first.locationKey).toBe("50.757_2.52");
     expect(second).not.toBe(first);
     expect(mocks.getPhysicalStationHistory).toHaveBeenCalledTimes(2);
   });
