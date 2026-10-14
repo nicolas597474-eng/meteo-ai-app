@@ -1,16 +1,8 @@
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const loaderSource = readFileSync(
   new URL("./WeatherAILoader.tsx", import.meta.url),
-  "utf8"
-);
-const graphicSource = readFileSync(
-  new URL("./EarthLoaderVisual.tsx", import.meta.url),
-  "utf8"
-);
-const sceneSource = readFileSync(
-  new URL("./earthLoaderScene.ts", import.meta.url),
   "utf8"
 );
 const stylesSource = readFileSync(
@@ -57,7 +49,7 @@ describe("WeatherAILoader — Moteur d'animation de chargement météo 3D + holo
 
     // Phase C : Analyse et fusion IA & radar
     expect(loaderSource).toContain("Phase 3/3 · Fusion IA & radar");
-    expect(loaderSource).toContain("Analyse et fusion des données météo…");
+    expect(loaderSource).toContain("Préparation de votre météo…");
 
     // Phase D : Transition vers les prévisions dès que loading devient false
     expect(loaderSource).toContain("Données prêtes");
@@ -125,54 +117,43 @@ describe("WeatherAILoader — Moteur d'animation de chargement météo 3D + holo
     expect(loaderSource).not.toContain("apiKey");
   });
 
-  it("9. améliore progressivement une image locale avec une vraie scène 3D différée", () => {
-    expect(graphicSource).toContain('import("./earthLoaderScene")');
-    expect(graphicSource).toContain("SCENE_START_DELAY_MS");
-    expect(graphicSource).toContain("earth-poster.webp");
-    expect(graphicSource).toContain('aria-hidden="true"');
-    expect(graphicSource).toContain('alt=""');
+  it("9. dessine le visuel de chargement en CSS, sans moteur 3D ni texture", () => {
+    // Le visuel existe toujours et garde sa structure/aria
+    expect(loaderSource).toContain("WeatherAILoaderGraphic");
+    expect(loaderSource).toContain("weather-loader-globe__disc");
+    expect(loaderSource).toContain("weather-loader-globe__orbit");
+    expect(loaderSource).toContain('aria-hidden="true"');
+    // Plus aucune dépendance 3D, ni image, ni SVG
+    expect(loaderSource).not.toContain("EarthGlobe");
+    expect(loaderSource).not.toContain("earthScene");
     expect(loaderSource).not.toContain('from "three"');
-    expect(sceneSource).toContain("THREE.SphereGeometry");
-    expect(sceneSource).toContain("getEarthLoaderRotation(seconds)");
-    expect(sceneSource).toContain("depthTest: true");
-    expect(sceneSource).toContain("group.rotation.y = rotation.orbits[i]");
+    expect(loaderSource).not.toContain("<img");
+    expect(loaderSource).not.toContain("<svg");
+    // Les fichiers du moteur 3D et les textures ont bien été retirés
+    expect(existsSync(new URL("./EarthGlobe.tsx", import.meta.url))).toBe(false);
+    expect(existsSync(new URL("./earthScene.ts", import.meta.url))).toBe(false);
+    expect(
+      existsSync(new URL("../../../public/textures/earth/earth_atmos_2048.jpg", import.meta.url))
+    ).toBe(false);
   });
 
-  it("10. conserve les variantes, le confinement et un indicateur sans faux pourcentage", () => {
+  it("10. garde l'isolation de rendu et supprime toute occurrence WebGL du projet", () => {
     expect(stylesSource).toContain("contain: layout style paint");
-    expect(stylesSource).toContain('.earth-loader[data-variant="compact"]');
-    expect(stylesSource).toContain('.earth-loader[data-variant="light"]');
-    expect(loaderSource).toContain("weather-ai-loader__progress");
-    expect(loaderSource).not.toContain("aria-valuenow");
-    expect(stylesSource).toContain("@keyframes wai-progress-travel");
+    expect(stylesSource).toContain(".weather-loader-globe__disc");
+    // Aucune règle CSS ne référence une texture du globe
+    expect(stylesSource).not.toContain("textures/earth");
   });
 
-  it("11. borne le coût des médias locaux et ne contacte aucun CDN à l'exécution", () => {
-    const assets = [
-      "earth-day",
-      "earth-normal",
-      "earth-water",
-      "earth-night",
-      "earth-clouds",
-      "storm-cloud",
-      "earth-poster",
-    ];
-    const totalBytes = assets.reduce((total, name) => {
-      const path = new URL(
-        `../../assets/earth-loader/${name}.webp`,
-        import.meta.url
-      );
-      expect(readFileSync(path).subarray(8, 12).toString()).toBe("WEBP");
-      return total + statSync(path).size;
-    }, 0);
-    expect(totalBytes).toBeLessThan(600 * 1024);
-    for (const source of [loaderSource, graphicSource, sceneSource]) {
-      expect(source).not.toContain("https://");
-      expect(source).not.toContain("http://");
-    }
-    expect(graphicSource).toContain("connection?.saveData");
-    expect(sceneSource).toContain(
-      'fetch(url, { signal, cache: "force-cache" })'
-    );
+  it("11. n'anime qu'en CSS et n'ajoute aucun octet au chargement", () => {
+    // Animations purement déclaratives, désactivées hors préférence de mouvement
+    expect(stylesSource).toContain("@keyframes wai-orbit-tilt");
+    expect(stylesSource).toContain("@keyframes wai-sun-pulse");
+    expect(stylesSource).toContain(".weather-loader-globe__orbit { animation: wai-orbit-tilt");
+    expect(stylesSource).toContain(".weather-ai-loader--reduced-motion * { animation: none !important; transition: none !important; }");
+    expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
+    // Aucune ressource externe ni image distante dans le loader
+    expect(loaderSource).not.toContain("manus-storage");
+    expect(loaderSource).not.toContain("http://");
+    expect(loaderSource).not.toContain("https://");
   });
 });

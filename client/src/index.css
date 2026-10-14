@@ -2354,147 +2354,72 @@
   50% { transform: translateX(2.5%); opacity: 0.3; }
 }
 
-/* ─── MeteoAI — reference-inspired Earth loading scene ─────────────────── */
+/* ─── MeteoAI — realistic Earth loading scene ───────────────────────────── */
 .weather-ai-loader {
   contain: layout style paint;
-  background: radial-gradient(ellipse at 50% 38%, #06162f 0%, #020918 44%, #020610 78%);
+  will-change: opacity, transform;
 }
-.weather-ai-loader[data-variant="light"],
-.weather-ai-loader[data-variant="compact"] { background: transparent; }
 .weather-ai-loader--exiting {
   pointer-events: none;
   transition: opacity 340ms cubic-bezier(0.23, 1, 0.32, 1), transform 340ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-
-.earth-loader {
-  position: relative;
-  flex-shrink: 0;
-  width: min(560px, 100%, 63svh);
+.weather-ai-loader__globe {
+  width: min(340px, 80vw);
   aspect-ratio: 1;
-  container-type: inline-size;
-  isolation: isolate;
-  pointer-events: none;
+  position: relative;
 }
-.earth-loader[data-variant="light"] { width: min(380px, 100%, 53svh); }
-.earth-loader[data-variant="compact"] { width: min(210px, 100%); }
-.earth-loader__nebula {
+.weather-ai-loader__globe[data-variant="light"] { width: min(280px, 78vw); }
+.weather-ai-loader__globe[data-variant="compact"] { width: min(180px, 70vw); }
+.weather-ai-loader__globe[data-ready="true"] { filter: drop-shadow(0 0 12px rgb(52 211 153 / 0.15)); }
+/* Visuel de chargement 100 % CSS : disque, halo, orbites et soleil.
+   Aucune image, aucun moteur WebGL — l'écran d'attente n'ajoute donc aucun
+   octet en concurrence avec les requêtes de données. Les dimensions reprennent
+   celles de l'ancien globe pour que la mise en page reste identique. */
+.weather-loader-globe { position: absolute; inset: 0; display: block; pointer-events: none; }
+.weather-loader-globe__halo {
+  position: absolute; inset: 5%; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, #38bdf838 0%, #0284c71a 46%, transparent 72%);
+}
+.weather-loader-globe__disc {
   position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse at 18% 78%, #14489121 0%, transparent 24%),
-    radial-gradient(ellipse at 85% 23%, #1c4ea41c 0%, transparent 24%),
-    radial-gradient(ellipse at 50% 48%, #064ba033 0%, transparent 65%);
-}
-.earth-loader__poster,
-.earth-loader__canvas,
-.earth-loader__canvas canvas {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.earth-loader__poster { object-fit: contain; opacity: 1; }
-.earth-loader__canvas { opacity: 0; transition: opacity 280ms ease-out; }
-.earth-loader[data-render-mode="webgl"] .earth-loader__canvas { opacity: 1; }
-.earth-loader[data-render-mode="webgl"] .earth-loader__poster,
-.earth-loader[data-render-mode="webgl"] .earth-loader__emergency-globe {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 280ms ease-out, visibility 0s 280ms;
-}
-.earth-loader__emergency-globe {
-  position: absolute;
-  inset: 19.34%;
+  width: 53%; height: 53%; left: 23.5%; top: 23.5%;
   border-radius: 50%;
-  background: radial-gradient(circle at 65% 30%, #3d93ae, #0e4170 46%, #020715 85%);
-  box-shadow: inset -2px 1px 4px #b4f4ff80, 0 0 20px #0baaff45;
+  background: radial-gradient(circle at 36% 30%, #2a7fb8 0%, #14507f 38%, #0a2540 74%, #061426 100%);
+  box-shadow: inset 22px -12px 34px 8px #000b, inset -3px 2px 8px #bfecff88, 0 0 9px #38bdf880, 0 0 28px #0284c744;
 }
-
-/* Screen-space labels remain readable while the scene rotates beneath them. */
-.earth-loader__label {
-  position: absolute;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 1.5cqi;
-  padding: 1.9cqi 2.3cqi;
-  border: 1px solid #6ba7ff4a;
-  border-radius: 2.3cqi;
-  background: linear-gradient(140deg, #0b205374, #020e235c);
-  box-shadow: inset 0 0 10px #397bf514, 0 0 14px #1446a317;
-  color: #d5e4f4;
-  font-size: clamp(8px, 2.55cqi, 14px);
-  font-weight: 400;
-  line-height: 1.3;
-  text-align: left;
+.weather-loader-globe__orbit {
+  position: absolute; width: 88%; height: 27%; left: 6%; top: 37%;
+  border: 1px solid #38bdf855; border-radius: 50%; transform: rotate(-12deg);
+  box-shadow: 0 0 8px #0ea5e922;
 }
-.earth-loader__label svg {
-  flex-shrink: 0;
-  width: 6.3cqi;
-  height: 6.3cqi;
-  color: #84d8ff;
-  stroke-width: 1.25;
-  filter: drop-shadow(0 0 3px #2c92eb99);
+.weather-loader-globe__orbit::after {
+  content: ''; position: absolute; width: 4px; height: 4px; left: 13%; top: 11%;
+  background: #c4f4ff; border-radius: 50%; box-shadow: 0 0 7px 2px #38bdf8;
 }
-.earth-loader__label--stations { top: 9%; left: 25%; transform: rotate(-3deg); }
-.earth-loader__label--models { top: 10%; right: 9%; transform: rotate(12deg); }
-.earth-loader__label--radar { bottom: 18%; left: 3%; transform: rotate(9deg); }
-.earth-loader__label--sources { bottom: 12%; right: 3%; transform: rotate(-11deg); }
-.earth-loader__symbol {
-  position: absolute;
-  width: 6cqi;
-  height: 6cqi;
-  color: #84dfff;
-  stroke-width: 1;
-  filter: drop-shadow(0 0 4px #248edbbf);
-  opacity: 0.8;
+.weather-loader-globe__orbit--back { transform: rotate(28deg); }
+.weather-loader-globe__sun {
+  position: absolute; width: 18%; height: 18%; left: 65%; top: 21%;
+  background: radial-gradient(circle, #fff5dbaa 0%, #fcd88955 10%, #fbbf2415 35%, transparent 70%);
+  mix-blend-mode: screen;
 }
-.earth-loader__symbol--snow { top: 35%; right: 8%; transform: rotate(-12deg); }
-.earth-loader__symbol--snow-small { top: 24%; right: 14%; width: 4cqi; height: 4cqi; }
-.earth-loader__symbol--wind { right: 3%; bottom: 32%; width: 7cqi; height: 7cqi; transform: rotate(-15deg); }
-.earth-loader__symbol--drop { left: 9%; top: 29%; width: 4cqi; height: 4cqi; }
-.earth-loader[data-variant="compact"] .earth-loader__label,
-.earth-loader[data-variant="compact"] .earth-loader__symbol { display: none; }
-
-.weather-ai-loader__information { margin-top: -1rem; }
-.weather-ai-loader__progress {
-  width: min(265px, 85%);
-  height: 7px;
-  margin-top: 10px;
-  overflow: hidden;
-  border: 1px solid #5079c624;
-  border-radius: 999px;
-  background: #14234b;
-}
-.weather-ai-loader__progress > span {
-  display: block;
-  width: 46%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #4caeff, #2961f5);
-  box-shadow: 0 0 12px #1b80ff70;
-}
-.weather-ai-loader__progress[data-ready="true"] > span {
-  width: 100%;
-  background: #34d399;
-  animation: none;
-  transform: none;
-}
-.weather-ai-loader[data-variant="compact"] .weather-ai-loader__information { margin-top: 0; }
-.weather-ai-loader[data-variant="compact"] .weather-ai-loader__subtitle { display: none; }
 @media (prefers-reduced-motion: no-preference) {
-  .weather-ai-loader__progress:not([data-ready="true"]) > span {
-    animation: wai-progress-travel 2.5s ease-in-out infinite alternate;
-  }
+  .weather-loader-globe__orbit { animation: wai-orbit-tilt 7s ease-in-out infinite alternate; }
+  .weather-loader-globe__orbit--back { animation: wai-orbit-tilt-back 9s ease-in-out infinite alternate; }
+  .weather-loader-globe__disc { animation: wai-disc-breathe 6s ease-in-out infinite alternate; }
+  .weather-loader-globe__sun { animation: wai-sun-pulse 4.2s ease-in-out infinite alternate; }
 }
-@keyframes wai-progress-travel {
-  from { transform: translateX(0); }
-  to { transform: translateX(118%); }
+@keyframes wai-orbit-tilt { from { transform: rotate(-16deg); } to { transform: rotate(-6deg); } }
+@keyframes wai-orbit-tilt-back { from { transform: rotate(22deg); } to { transform: rotate(34deg); } }
+@keyframes wai-disc-breathe { from { filter: brightness(0.93); } to { filter: brightness(1.06); } }
+@keyframes wai-sun-pulse { from { opacity: 0.72; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .weather-ai-loader__ambient-glow { animation: wai-ambient-pulse 5.4s ease-in-out infinite alternate; }
 }
-.weather-ai-loader--reduced-motion,
+@keyframes wai-ambient-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.95; }
+}
 .weather-ai-loader--reduced-motion * { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .weather-ai-loader, .weather-ai-loader * { animation: none !important; transition: none !important; }
+  .weather-ai-loader * { animation: none !important; transition: none !important; }
 }

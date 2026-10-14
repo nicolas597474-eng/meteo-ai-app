@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { WeatherAILoaderGraphic } from "./EarthLoaderVisual";
 
 export interface WeatherAILoaderProps {
   /** État réel du chargement */
@@ -36,7 +35,7 @@ const PHASE_CONFIG: Record<
   },
   fuse: {
     badge: "Phase 3/3 · Fusion IA & radar",
-    defaultMessage: "Analyse et fusion des données météo…",
+    defaultMessage: "Préparation de votre météo…",
     subtitle: "Analyse radar · Fusion des observations · Synthèse IA",
   },
   ready: {
@@ -57,12 +56,7 @@ export function WeatherAILoader({
   const [phase, setPhase] = useState<LoaderPhase>("init");
   const [isVisible, setIsVisible] = useState(loading);
   const [isExiting, setIsExiting] = useState(false);
-  const wasLoadingRef = useRef(loading);
-  const [systemReducedMotion, setSystemReducedMotion] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-  );
+  const [systemReducedMotion, setSystemReducedMotion] = useState(false);
   const onTransitionEndRef = useRef(onTransitionEnd);
   onTransitionEndRef.current = onTransitionEnd;
 
@@ -82,8 +76,6 @@ export function WeatherAILoader({
   // Gestion des phases continues (sans bloquer ni retarder la fin réelle du chargement)
   useEffect(() => {
     if (!loading) {
-      if (!wasLoadingRef.current) return;
-      wasLoadingRef.current = false;
       // Dès que loading passe à false, transition immédiate vers la fin
       setPhase("ready");
       setIsExiting(true);
@@ -94,7 +86,6 @@ export function WeatherAILoader({
       return () => window.clearTimeout(exitTimer);
     }
 
-    wasLoadingRef.current = true;
     // Chargement en cours : progression visuelle douce des phases
     setIsVisible(true);
     setIsExiting(false);
@@ -132,40 +123,57 @@ export function WeatherAILoader({
     <div
       role="status"
       aria-live="polite"
-      aria-atomic="true"
-      data-variant={variant}
       aria-busy={!isReady}
       aria-label={message || "Chargement de la météo en cours"}
       className={cn(
         "weather-ai-loader relative flex flex-col items-center justify-center select-none overflow-hidden text-center",
         variant === "full" &&
-          "min-h-[calc(100svh-4rem)] w-full px-2 py-5 sm:min-h-[calc(100svh-3.5rem)] sm:py-7",
+          "min-h-[64vh] w-full px-4 py-8 sm:min-h-[72vh] sm:py-12",
         variant === "light" && "min-h-[44vh] w-full px-3 py-6",
         variant === "compact" && "min-h-[220px] w-full p-4",
-        prefersReduced && "weather-ai-loader--reduced-motion",
         isExiting &&
           "weather-ai-loader--exiting opacity-0 scale-[0.985] pointer-events-none",
         "transition-all duration-300 ease-out",
         className
       )}
+      style={{
+        background:
+          variant === "full"
+            ? "radial-gradient(ellipse at 50% 40%, #06152d 0%, #030a17 55%, #02050e 100%)"
+            : undefined,
+      }}
     >
-      {/* Scène décorative fidèle à la référence, sans bloquer les données. */}
-      <WeatherAILoaderGraphic
-        phase={phase}
-        variant={variant}
-        reducedMotion={prefersReduced}
-        isReady={isReady}
+      {/* Halo holographique d’ambiance en arrière-plan */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full",
+          "w-72 h-72 sm:w-96 sm:h-96",
+          "bg-gradient-to-tr from-cyan-500/10 via-sky-500/15 to-transparent blur-3xl",
+          !prefersReduced && "weather-ai-loader__ambient-glow",
+          isReady && "from-emerald-500/15 via-teal-500/10"
+        )}
       />
 
+      {/* Planète et orbites dessinées en CSS pur : aucune image, aucun WebGL */}
+      <div className="relative mx-auto flex items-center justify-center">
+        <WeatherAILoaderGraphic
+          phase={phase}
+          variant={variant}
+          reducedMotion={prefersReduced}
+          isReady={isReady}
+        />
+      </div>
+
       {/* Section informative accessible et typographie */}
-      <div className="weather-ai-loader__information relative z-10 flex w-full max-w-sm flex-col items-center gap-2 px-3">
+      <div className="relative z-10 mt-6 flex max-w-sm flex-col items-center gap-2 px-2">
         {/* Badge d'étape */}
         <div
           className={cn(
-            "inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-medium tracking-[0.12em] uppercase transition-colors duration-300",
+            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide uppercase transition-colors duration-300",
             isReady
               ? "border border-emerald-400/40 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-              : "text-sky-300/85"
+              : "border border-cyan-400/30 bg-cyan-950/60 text-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.2)]"
           )}
         >
           {isReady ? (
@@ -174,7 +182,7 @@ export function WeatherAILoader({
             <span
               className={cn(
                 "h-1.5 w-1.5 rounded-full bg-cyan-400",
-                !prefersReduced && "animate-pulse"
+                !prefersReduced && "animate-ping"
               )}
             />
           )}
@@ -182,23 +190,14 @@ export function WeatherAILoader({
         </div>
 
         {/* Titre principal */}
-        <h2 className="text-base font-medium tracking-tight text-slate-100 sm:text-lg">
+        <h2 className="text-base font-bold tracking-tight text-white sm:text-lg">
           {displayMessage}
         </h2>
 
         {/* Sous-titre rassurant */}
-        <p className="weather-ai-loader__subtitle max-w-xs text-xs leading-relaxed text-slate-400">
+        <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
           {currentConfig.subtitle}
         </p>
-
-        {/* Indicateur indéterminé : ce n'est pas un pourcentage de données. */}
-        <div
-          aria-hidden="true"
-          className="weather-ai-loader__progress"
-          data-ready={isReady}
-        >
-          <span />
-        </div>
 
         {/* Indicateur de progression des trois phases (si non réduit) */}
         {!prefersReduced && (
@@ -226,6 +225,51 @@ export function WeatherAILoader({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+interface GraphicProps {
+  phase: LoaderPhase;
+  variant: "full" | "light" | "compact";
+  reducedMotion: boolean;
+  isReady: boolean;
+}
+
+/**
+ * Visuel de chargement entièrement CSS.
+ *
+ * Il remplace la scène WebGL Three.js qui chargeait, sur l'écran d'attente de
+ * toutes les routes, 118 ko gzip de moteur et 1,6 Mo de textures — exactement
+ * pendant que les requêtes de données se disputaient la même bande passante.
+ * Ce visuel ne télécharge aucun octet : disque, halo, orbites et soleil sont
+ * des dégradés et des bordures animés en CSS. Les classes sont préfixées
+ * `weather-loader-globe` pour qu'aucune règle d'image ne s'y applique.
+ */
+function WeatherAILoaderGraphic({
+  phase,
+  variant,
+  reducedMotion,
+  isReady,
+}: GraphicProps) {
+  return (
+    <div
+      className={cn(
+        "weather-ai-loader__globe",
+        reducedMotion && "weather-ai-loader--reduced-motion"
+      )}
+      data-variant={variant}
+      data-phase={phase}
+      data-ready={isReady}
+      aria-hidden="true"
+    >
+      <span className="weather-loader-globe">
+        <span className="weather-loader-globe__halo" />
+        <span className="weather-loader-globe__orbit weather-loader-globe__orbit--back" />
+        <span className="weather-loader-globe__disc" />
+        <span className="weather-loader-globe__orbit" />
+        <span className="weather-loader-globe__sun" />
+      </span>
     </div>
   );
 }
