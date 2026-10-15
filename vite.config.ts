@@ -1,4 +1,4 @@
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
+successfully downloaded text file (SHA: 51f5b9d05630a87f7534a63c1d14a9a297439fe6)import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { execFileSync } from "node:child_process";
@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
+import { generatePwaIconPng, PWA_ICON_ENTRIES } from "./client/src/lib/pwaIcon";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -177,7 +178,29 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+// =============================================================================
+// PWA Icons - Vite Plugin
+// Génère les icônes PNG du manifeste au moment du build : aucun binaire
+// versionné dans le dépôt, aucune dépendance. Génération déterministe :
+// mêmes octets à chaque build pour un bundle reproductible.
+// =============================================================================
+function vitePluginPwaIcons(): Plugin {
+  return {
+    name: "meteoai-pwa-icons",
+    apply: "build",
+    generateBundle() {
+      for (const entry of PWA_ICON_ENTRIES) {
+        this.emitFile({
+          type: "asset",
+          fileName: entry.fileName,
+          source: generatePwaIconPng(entry.size),
+        });
+      }
+    },
+  };
+}
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginPwaIcons()];
 
 export default defineConfig({
   define: {
