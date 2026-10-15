@@ -104,3 +104,13 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+// PWA : enregistrement du service worker de coquille, uniquement en
+// production. Échec silencieux : sans SW, l'application reste fonctionnelle.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Non bloquant : pas de mode hors ligne, rien de cassé.
+    });
+  });
+}
