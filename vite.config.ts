@@ -1,4 +1,4 @@
-successfully downloaded text file (SHA: 51f5b9d05630a87f7534a63c1d14a9a297439fe6)import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
+import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { execFileSync } from "node:child_process";
